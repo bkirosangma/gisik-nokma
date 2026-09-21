@@ -1464,3 +1464,357 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
     expect(declarationsOf(UI_CSS, '.gn-visibility__no-such-class-exists')).toBe(0);
   });
 });
+
+/**
+ * Case `13.1140` — E4-14 — the filter chip's remove control is a 24-px target,
+ * not an 8×13 glyph wearing the control's own `cursor: pointer`.
+ *
+ * On Calendar and Timeline, `button.gn-project__filter-chip-remove`
+ * (`aria-label="Remove filter — Closed: hidden"`) measured **8.1×13** with
+ * `padding: 0`, `line-height: 13px`, `font-size: 13px` and both min sizes
+ * `auto`. The chip around it is a **`<span>` with no handler**, so the whole
+ * 147×26 pill reads as the target and only the × in its corner responds.
+ *
+ * **The one larger equivalent was checked, and it is why this is Minor rather
+ * than a hard failure:** the Filters panel's own toggle behind the *Filters*
+ * button is `90×35`, which arguably meets WCAG 2.5.8's *Equivalent* exception.
+ * The finding is scored on the control a person reaches for, so the floor is
+ * applied to it. `1.5rem` is this file's in-list floor — the same number
+ * `.gn-attention__title` carries for the same reason.
+ *
+ * **A source scan, not a paint.** `apps/web/e2e-*` is Playwright and is not in
+ * `pnpm test`; the property at issue is what the rule declares, and the
+ * stylesheet is the authority on that. What the scan therefore does NOT prove
+ * is the chip's own new height — see the rule's own note; that arithmetic
+ * (24 + the chip's two 0.25rem paddings = 32) is stated in the rule and was
+ * not measured on a running server.
+ */
+describe('13.1140 the filter chip remove control meets the 24-px in-list floor', () => {
+  const REMOVE = '.gn-project__filter-chip-remove';
+
+  it('13.1140 the rule declares the floor, in this file\'s own unit', () => {
+    const body = rule(REMOVE);
+    expect(body).toMatch(/min-width:\s*1\.5rem/);
+    expect(body).toMatch(/min-height:\s*1\.5rem/);
+  });
+
+  it('13.1140 and it declares a box that HONOURS a min size', () => {
+    // The load-bearing half, and the one a `min-height`-only edit would miss:
+    // with `padding: 0` the element's height IS its line box, so the floor
+    // needs a box that honours it. `.gn-attention__title`'s own note holds
+    // this; the assertion is that min size and such a box arrive TOGETHER.
+    expect(rule(REMOVE)).toMatch(/display:\s*inline-grid/);
+    expect(rule(REMOVE)).toMatch(/place-items:\s*center/);
+  });
+
+  it('13.1140 the two declarations that made the GLYPH the control are still in force', () => {
+    // Not a control — the pair is the negative half of the fix, asserted so a
+    // later edit cannot silently undo it. `padding: 0` and `line-height: 1`
+    // are what made the glyph the control in the first place; either coming
+    // back is how the defect returns.
+    const body = rule(REMOVE);
+    expect(body).toMatch(/padding:\s*0;/);
+    expect(body).toMatch(/line-height:\s*1;/);
+  });
+});
+
+/**
+ * Case `13.1142` — E4-7 — at phone width the ticket sheet's label column
+ * collapses, so the description stops running off the sheet.
+ *
+ * The row is a two-column grid with a fixed `8rem` label column. At 390 px the
+ * sheet body is 366.6 wide, so the value column got 224 — and the description
+ * editor measured **224×3195** inside a `dd` spanning `x 178.6 → 402.7` while
+ * the sheet ends at `x 390`. Words were cut mid-glyph at the right edge.
+ *
+ * **`1fr` is asserted TOGETHER WITH `min-width: 0`, and that pair is the whole
+ * point.** A grid item's `min-width` is `auto`, so the column is floored at its
+ * content's min-content width; `grid-template-columns: 1fr` alone would leave
+ * the editor pushing the column back out and the fix would look applied while
+ * changing nothing. **Not painted**: the rules were not measured on a running
+ * server, and `apps/web/e2e-*` is Playwright, which is not in `pnpm test` —
+ * what this scan proves is that the breakpoint declares them.
+ */
+describe('13.1142 the ticket sheet collapses its label column at phone width', () => {
+  /**
+   * The `@media` blocks whose header contains `query`, braces matched. Local to
+   * this case because `components.test.tsx`'s `rule()` reads top-level
+   * declarations only — and `ui.css` carries the phone rules in more than one
+   * 40rem block, so "the 40rem block" is not a thing that exists.
+   */
+  const mediaBlocksContaining = (query: string, needle: string): string[] => {
+    const noComments = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const blocks: string[] = [];
+    let i = 0;
+    for (;;) {
+      const start = noComments.indexOf(`@media ${query} {`, i);
+      if (start === -1) return blocks.filter((b) => b.includes(needle));
+      let depth = 0;
+      let end = noComments.length - 1;
+      for (let j = noComments.indexOf('{', start); j < noComments.length; j += 1) {
+        if (noComments[j] === '{') depth += 1;
+        else if (noComments[j] === '}') {
+          depth -= 1;
+          if (depth === 0) {
+            end = j;
+            break;
+          }
+        }
+      }
+      blocks.push(noComments.slice(start, end + 1));
+      i = end + 1;
+    }
+  };
+
+  it('13.1142 the 40rem block that carries the collapse exists', () => {
+    // POSITIVE CONTROL for both assertions below: without it they would fail
+    // against `undefined` rather than redden on the declaration.
+    expect(
+      mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field').length,
+      'no 40rem block names .gn-ticket-sheet__field',
+    ).toBeGreaterThan(0);
+  });
+
+  it('13.1142 the label column becomes one column AND the value can shrink', () => {
+    const phone = mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field')[0] as string;
+    expect(phone).toMatch(/\.gn-ticket-sheet__field\s*\{\s*grid-template-columns:\s*1fr;/);
+    expect(phone).toMatch(/\.gn-ticket-sheet__field dd\s*\{\s*min-width:\s*0;/);
+  });
+
+  it('13.1142 Full screen is withdrawn below the same width', () => {
+    const phone = mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field')[0] as string;
+    // Same block as the collapse, deliberately: two breakpoints for one
+    // screen's phone treatment is how they drift apart.
+    expect(phone).toMatch(/\.gn-sheet__full\s*\{\s*display:\s*none;/);
+  });
+});
+
+/**
+ * Case `13.1144` — P2 — the board's whole-board empty state is styled, and the
+ * three classes it renders stop matching nothing.
+ *
+ * `board.tsx` renders `gn-board gn-board--empty` (`:528`), `gn-board__empty-copy`
+ * (`:490`) and `gn-board__empty-create` (`:494`). **All three had ZERO selector
+ * blocks** — the only two hits for the family in this file were COMMENTS — so the
+ * product's first-run call to action on an empty board was a grey outset
+ * `<button>` on a neumorphic page. It is the one board empty state with no
+ * styling while its per-column sibling has three rules.
+ *
+ * **The container borrows the COLUMN empty state's shape, and that is the design
+ * decision rather than a shortcut:** the prototype draws no whole-board empty
+ * state at all, so there is no drawing to fit — and two empty states on one
+ * board should read as one family. That absence is recorded in `Features.md` as
+ * a deliberate addition, which is what stops a later reader "correcting" it back
+ * toward a prototype that has no such screen. The ACTION takes the shared
+ * control constant `981aa92b` established for `.ticket-type-list__move`:
+ * fill-tertiary, text-accent, control radius, no border.
+ *
+ * **Not painted** — what is asserted is what the rules declare.
+ */
+describe('13.1144 the board\'s whole-board empty state is styled', () => {
+  it('13.1144 the container carries the column sibling\'s shape', () => {
+    const body = rule('.gn-board--empty');
+    expect(body).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-card\)/);
+    // The sibling's own three, asserted as a family rather than one property:
+    // a container that centred differently would read as a different state.
+    expect(body).toMatch(/display:\s*flex/);
+    expect(body).toMatch(/align-items:\s*center/);
+    expect(body).toMatch(/text-align:\s*center/);
+  });
+
+  it('13.1144 the copy takes the sibling copy\'s type', () => {
+    // Same numbers as `.gn-board__column-empty-copy` deliberately: the two
+    // sentences are the same kind of sentence and one scale apart would show.
+    expect(rule('.gn-board__empty-copy')).toMatch(/font-size:\s*0\.9375rem/);
+    expect(rule('.gn-board__empty-copy')).toMatch(/color:\s*var\(--gn-text-muted\)/);
+  });
+
+  it('13.1144 the action takes the shared control constant', () => {
+    const body = rule('.gn-board__empty-create');
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    expect(body).toMatch(/border:\s*none/);
+    // The 44px standalone floor, the same one `.ticket-type-list__move` carries.
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    // And the NEGATIVE half: a control still carrying the UA's edge is exactly
+    // what this rule exists to remove, so its return is asserted against.
+    expect(body).not.toMatch(/outset|inset/);
+  });
+
+  it('13.1144 the P1 bare-control reset and this rule both match, and this one is later', () => {
+    // The overlap is deliberate and is pinned rather than left to be
+    // rediscovered: P1 removes the UA chrome, this gives the product's own.
+    // If the two rules ever swap order the action silently loses its fill.
+    const resetAt = UI_CSS.indexOf('.gn-board__empty-create,\n.add-rule-menu__trigger {');
+    const styledAt = UI_CSS.indexOf('.gn-board__empty-create {');
+    expect(resetAt, 'the P1 grouped reset vanished').toBeGreaterThan(-1);
+    expect(styledAt, 'this rule vanished').toBeGreaterThan(-1);
+    expect(styledAt).toBeGreaterThan(resetAt);
+  });
+});
+
+/**
+ * Case `13.1147` — E4-15 (and P35, filed from the other side) — the timeline's
+ * Earlier / Today / Later buttons stop wearing the browser's default bevel.
+ *
+ * `.gn-timeline__nav` declared a radius, a background, a colour, a font, padding
+ * and a cursor — **and no `border`** — so the UA's `2px outset rgb(0,0,0)`
+ * survived the rule: measured with the product's own `background:
+ * rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`. This is
+ * outside round 1's P1 population by construction — P1 selected classes with
+ * ZERO matching selector blocks and this one matched — which is the finding's
+ * real lesson: *"matched a selector block"* and *"is fully styled"* are
+ * different questions.
+ *
+ * **The assertion is the PRESENCE OF `border`, not the absence of `outset`**,
+ * and the difference matters: `outset` is what the UA applies *because* the
+ * declaration is missing, so a test looking for the string `outset` in a
+ * stylesheet would pass on every tree, broken or fixed. What can fail is the
+ * declaration.
+ */
+describe('13.1147 the timeline nav declares a border, so no UA bevel survives', () => {
+  it('13.1147 the rule declares border: none', () => {
+    expect(rule('.gn-timeline__nav')).toMatch(/border:\s*none/);
+  });
+
+  it('13.1147 and it takes the calendar nav\'s own values', () => {
+    // Asserted as a PAIR with the sibling rule rather than as literals: the
+    // finding's remedy is that the two views' navs agree, so a later edit that
+    // re-diverges one of them is the regression to catch.
+    const timeline = rule('.gn-timeline__nav');
+    const calendar = rule('.gn-calendar__nav');
+    for (const property of [
+      /min-height:\s*2\.25rem/,
+      /border:\s*none/,
+      /border-radius:\s*var\(--gn-radius-control\)/,
+      /background:\s*var\(--gn-fill-tertiary\)/,
+      /color:\s*var\(--gn-text-accent\)/,
+    ]) {
+      expect(timeline, `timeline nav: ${String(property)}`).toMatch(property);
+      expect(calendar, `calendar nav: ${String(property)}`).toMatch(property);
+    }
+  });
+
+  it('13.1147 the family\'s other two members were already carrying it', () => {
+    // P35's own observation, kept as the calibration control for the pair
+    // above: `.gn-timeline__bar` and `.gn-timeline__open` declare `border:
+    // none` while the nav did not, which is what made the omission an omission
+    // rather than a convention.
+    expect(rule('.gn-timeline__bar')).toMatch(/border:\s*none/);
+    expect(rule('.gn-timeline__open')).toMatch(/border:\s*none/);
+  });
+});
+
+/**
+ * Case `13.1148` — E4-2 — the sheet's and the dialog's Close glyph is a
+ * 44-px target, not a 21-px glyph in a transparent box.
+ *
+ * `button.gn-sheet__close` measured **23.59×21.20** with `padding: 1px 6px`
+ * (the UA's), `min-width`/`min-height: auto`, `font-size: 19.2px` and
+ * `background: rgba(0,0,0,0)` — the visible pointer control for leaving the
+ * product's most-used overlay. The prototype draws a 32-px filled circle; this
+ * rule takes **44**, the same divergence `.gn-sheet__full` immediately above
+ * already records and for the same reason (WCAG 2.5.5 and `tap-targets.ts`
+ * measure every `button`), because two controls in one header cannot answer
+ * that question differently.
+ *
+ * **This is NOT a WCAG 2.5.8 failure in the strict sense, and the case says so
+ * rather than letting the assertion imply otherwise:** the scrim
+ * (`sheet.tsx:97-99`, `onClick={onClose}`) is a pointer *equivalent*, so the
+ * finding's first draft — *"no other pointer control closes the sheet"* — was
+ * withdrawn before the freeze. What remains is a 21-px control whose equivalent
+ * is an unmarked area a person has to know about.
+ *
+ * **The size is asserted as a PAIR with `.gn-sheet__full`** rather than as a
+ * literal, because the two sit in one header and the shared number is the
+ * decision; a later edit that gave the close the prototype's 32 would redden
+ * here instead of shipping two answers.
+ */
+describe('13.1148 the overlay dismiss control meets the 44px standalone floor', () => {
+  const CLOSE = '.gn-sheet__close';
+
+  it('13.1148 the rule declares the floor in both dimensions', () => {
+    const body = rule(CLOSE);
+    expect(body).toMatch(/min-width:\s*2\.75rem/);
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    // And a box that honours them — the same half `.gn-attention__title`'s own
+    // note makes: a UA inline-block would take a min size, but this control is
+    // centred glyph in a circle, which is what `inline-flex` is for here.
+    expect(body).toMatch(/display:\s*inline-flex/);
+    expect(body).toMatch(/align-items:\s*center/);
+    expect(body).toMatch(/justify-content:\s*center/);
+  });
+
+  it('13.1148 it takes the prototype\'s circle and fill', () => {
+    const body = rule(CLOSE);
+    expect(body).toMatch(/border-radius:\s*999px/);
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+  });
+
+  it('13.1148 the header\'s two controls answer the size question the same way', () => {
+    // The decision, asserted as a pair: both are standalone controls in the
+    // sheet header, so both take 44 and neither takes the prototype's 32.
+    for (const selector of [CLOSE, '.gn-sheet__full']) {
+      expect(rule(selector), `${selector} min-height`).toMatch(/min-height:\s*2\.75rem/);
+      expect(rule(selector), `${selector} must not take the prototype's 32px`).not.toMatch(
+        /min-height:\s*2rem\b/,
+      );
+    }
+  });
+
+  it('13.1148 the dialog\'s close shares the rule, so both overlays get it', () => {
+    // `.gn-dialog__close, .gn-sheet__close { … }` is ONE rule with two heads.
+    // Asserted rather than assumed, because the fix would silently cover only
+    // half the overlays if a later edit split them.
+    // `rule()` cannot be used on `.gn-dialog__close` — it looks for that
+    // selector immediately followed by `{`, and this head does not end a
+    // selector list. The combined head's own BODY is read instead, which is
+    // the same evidence: there is one body and it serves both heads.
+    const noComments = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const combined = noComments.match(/\.gn-dialog__close,\s*\.gn-sheet__close\s*\{([^}]*)\}/);
+    expect(combined, 'the two overlay dismiss controls no longer share a rule').not.toBeNull();
+    expect(combined?.[1]).toMatch(/min-height:\s*2\.75rem/);
+    // And the sheet head resolves through `rule()`, which is what every other
+    // case in this file uses — so the shared body is the one they all see.
+    expect(rule(CLOSE)).toBe(combined?.[1]);
+  });
+});
+
+/**
+ * Case `13.1153` — E4-35 — the segmented control's items carry horizontal
+ * padding, so a content-sized track does not shrink a tab to its word.
+ *
+ * `[role=tablist][aria-label="Filter notifications"]` on `/inbox`, 1512, owner:
+ * **`All` 31×44**, `Unread` 64×44, `Mentions` 78×44, each item
+ * `padding: 1px 6px` (the UA's) with `min-width: auto`. On the board the same
+ * class paints 92×44 because that track FILLS its row and `flex: 1` shares the
+ * free space; `div.gn-inbox__header` is `display:flex; justify-content:
+ * space-between`, so the track is content-sized and `flex: 1` has nothing to
+ * share. The width of a tab was the width of its word.
+ *
+ * **`padding: 0 1rem` and not a `min-width`, and the choice is the finding's
+ * own:** the prototype's segment carries `padding:0 16px`, so the padding is
+ * what the drawing asks for; a `min-width` would be a second number invented
+ * beside it, and it would not scale with the label the way padding does.
+ */
+describe('13.1153 the segmented item carries the prototype\'s horizontal padding', () => {
+  it('13.1153 the rule declares it', () => {
+    const body = rule('.gn-segmented__item');
+    expect(body).toMatch(/padding:\s*0 1rem/);
+  });
+
+  it('13.1153 it does not instead invent a min-width', () => {
+    // The negative half, and the reason it is worth asserting: a `min-width`
+    // would fix the 31px *All* tab and be wrong for every longer label — it is
+    // a fixed floor where the prototype has a padding.
+    expect(rule('.gn-segmented__item')).not.toMatch(/min-width/);
+  });
+
+  it('13.1153 the board\'s own reading is untouched — `flex: 1` still shares free space', () => {
+    // The other half of the finding: on the board this class paints 92×44 and
+    // must keep doing so. That comes from `flex: 1`, which must survive.
+    expect(rule('.gn-segmented__item')).toMatch(/flex:\s*1/);
+  });
+});

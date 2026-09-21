@@ -2612,3 +2612,42 @@ true only for live routes, and the one route it is about is the project you are 
   live one; the DROPDOWN stays live-only, because it offers somewhere to go. A live project's own route is
   the control in the same case: named, unbadged. —
   (`apps/web/test/last-project-nav.test.tsx`)
+## A SEVENTH ground for `textAccent`: the ghost button on a sunken row (lane ds1, 2026-09-21, batch B10) — case `13.1145`
+
+**The finding, round 2 `E4-31`, scored PARTIAL → IMPORTANT.** `button.gn-button--ghost` inside the
+`/account` *Connected assistants* and `/mcp/tokens` rows, and `button.gn-button--ghost.fields-editor__required`
+on the type editor, sit on `surfaceSunken` — so the ground their label has to clear is `fillTertiary`
+composited **over `surfaceSunken`**, not over `surface`. Case `13.360` measured two composites (ghost over
+`surface`, and `surfaceSunken` bare) and **not this triple**, which is the whole of the finding:
+`textAccent` was derived against six grounds and a seventh was being painted. Measured **3.997 light**
+(`#2d5488` absent, `rgb(50,93,151)` on `rgb(207,199,192)`) and **3.973 dark** (`rgb(139,177,230)` on
+`rgb(65,73,109)`) — **below 4.5 in `hig` and `minimal`, both themes**. The judge's one correction: the
+sessions-rows placement named in the finding is false (`variant="danger"` there); the other three hold.
+`neo` contributes no separate reading, and that is a fact about the style axis rather than an omission —
+`STYLE_COLOR_OVERRIDES` maps `neo`'s `surfaceSunken` to `neoPaper`/`neoNavy`, its own `surface`, so its
+third composite IS its second.
+
+### The remedy taken, and the two not taken
+
+The finding offered three fixes. **`textAccent` was stepped in both themes** — the third option, and the
+only one that makes the prescribed check pass: lifting the rows off `surfaceSunken`, or using the
+`--primary` variant there, removes the composite from the product but leaves the *arithmetic* failing, so
+the measurement the finding asked for would still be red. The step follows this file's own recorded
+procedure exactly (darker/lighter in the same hue until the WORST ground clears 4.5), the same one that
+produced the previous values: **`textAccentLight` `#325d97` → `#2d5488`** (worst ground now 4.601) and
+**`textAccentDark` `#8bb1e6` → `#97bdf2`** (worst ground now 4.535). The old figures are kept in the
+token docblocks so the move is legible.
+
+### The case
+
+- ✅ **13.1145 — `textAccent` clears 4.5 against `fillTertiary` over `surfaceSunken`, all six
+  style×theme, and `neo`'s third composite is asserted to BE its second.** `packages/ui/test/tokens.test.ts`,
+  inside `13.360`. **The mutation is the finding itself:** reverting only the two primitives to their
+  pre-change values reddens this case on the THIRD assertion alone with
+  `hig/light: textAccent on fillTertiary over surfaceSunken: expected 3.997033866940763 to be greater than
+  or equal to 4.5` — the finding's own number, to four decimal places. The `neo` arm is an assertion and not
+  a comment because the day that override is removed, `neo`'s third composite becomes a real separate
+  constraint that will need its own step, and this is what says so. **The `#2d5488`/`#97bdf2` values are
+  computed, not painted** — no browser was run for this change; the derivation is arithmetic from the
+  token table, and the suite that asserts it is arithmetic too. Package suites: ui 410, web 639, app-core
+  1722, all green.

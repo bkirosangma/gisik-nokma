@@ -473,12 +473,36 @@ export const primitives = {
    * The BINDING constraint is untouched by the move, which is the point: it is
    * the `hig`/`minimal` composite, and T5 does not reach `hig`/`minimal`.**
    *
-   * Measured at `#325D97` (L≈0.3928, stepped from L≈0.4991): `warmPaper`
-   * 5.453, `warmRaised` 6.258, `warmSunken` 4.762, `neoPaper` 5.596, the
-   * `hig`/`minimal` ghost-button composite 4.539 (the binding constraint),
-   * the `neo` ghost-button composite 4.984. All six ≥4.5.
+   * **STEPPED AGAIN 2026-09-21, `#325D97` → `#2D5488` (round-2 finding E4-31),
+   * and this is the SEVENTH ground the derivation above did not have.** A ghost
+   * button does not only sit on `surface`: on `/account` and `/mcp/tokens` it
+   * sits on `surfaceSunken`, so the value that has to clear 4.5 is `fillTertiary`
+   * composited over `warmSunken` (`#CFC7C0`), not over `warmPaper`. Measured:
+   * **3.997**, below 4.5 — and `13.360` did not measure that triple, so nothing
+   * in this file's own test surfaced it. The step is the same procedure as the
+   * first derivation (darker in the same hue until the WORST ground clears); the
+   * margin is deliberately a little larger than the old binding 4.539 because
+   * this is now the tightest constraint in the table.
+   *
+   * **Re-measured at `#2D5488`:** `warmPaper` 6.276, `warmRaised` 7.202,
+   * `warmSunken` 5.481, `neoPaper` 6.441, the `hig`/`minimal`
+   * ghost-over-`surface` composite 5.224, the `neo` ghost-over-`surface`
+   * composite 5.737, and the two NEW ones — `hig`/`minimal` ghost over
+   * `warmSunken` **4.601** (the binding constraint) and `neo` ghost over
+   * `neoPaper` 5.173. All eight ≥4.5. **`neo` needs no separate number for the
+   * third composite and the reason is worth stating:** `neo`'s light override
+   * maps `surfaceSunken` to `neoPaper` itself (`STYLE_COLOR_OVERRIDES` below),
+   * so its sunken composite IS its `surface` composite. A first pass here
+   * measured it against `#E7DDD4` as if it were a different ground and reported
+   * a second, spurious failure at 4.494; the override is what makes that reading
+   * wrong.
+   *
+   * The old numbers, kept so the move is legible: at `#325D97` the six were
+   * `warmPaper` 5.453, `warmRaised` 6.258, `warmSunken` 4.762, `neoPaper`
+   * 5.596, the `hig`/`minimal` composite 4.539 (then the binding constraint),
+   * the `neo` composite 4.984.
    */
-  textAccentLight: '#325d97',
+  textAccentLight: '#2d5488',
 
   /**
    * **DERIVED, dark half of `textAccentLight` above — and the direction is
@@ -493,16 +517,27 @@ export const primitives = {
    * `#7FA9E4` (L≈0.6961) to `#8BB1E6` (L≈0.7241), until `neoNavySunken`
    * clears too.
    *
-   * Measured at `#8BB1E6`: `navyBase` 7.830, `navyRaised` 6.450, `navySunken`
-   * 5.364, `neoNavy` 7.001, `neoNavyRaised` 5.818, `neoNavySunken` 4.503 (the
-   * binding constraint). All six ≥4.5. The two `.gn-button--ghost`
-   * fillTertiary-over-surface composites (see `textAccentLight`'s docblock
-   * for why they matter) clear with room to spare here — 5.856 (`hig`/
-   * `minimal`) and 5.870 (`neo`) — because the dark composites land LIGHTER
-   * than their own bare surfaces, the opposite of the light-theme case; no
-   * further step was needed once `neoNavySunken` was satisfied.
+   * **STEPPED LIGHTER AGAIN 2026-09-21, `#8BB1E6` → `#97BDF2`, for the same
+   * seventh ground `textAccentLight` gained (E4-31).** The note above reads
+   * *"the dark composites land LIGHTER than their own bare surfaces, the
+   * opposite of the light-theme case; no further step was needed"* — **that
+   * sentence is true of the ghost-over-`surface` composite and false of
+   * ghost-over-`surfaceSunken`**, which is the one a sunken row paints.
+   * `fillNavyHig3` over `navySunken` composites to `#41496D`, and `#8BB1E6`
+   * measures **3.973** on it — below 4.5, in both `hig` and `minimal` dark,
+   * and measured by nothing. Stepped lighter in the same hue until that ground
+   * clears, exactly as the first derivation stepped for `neoNavySunken`.
+   *
+   * Measured at `#97BDF2`: `navyBase` 9.0+, `navyRaised`, `navySunken`,
+   * `neoNavy`, `neoNavyRaised`, `neoNavySunken` all higher, and the binding
+   * constraint is now `hig`/`minimal` ghost over `navySunken` at **4.535**.
+   * All grounds ≥4.5. The two ghost-over-`surface` composites
+   * (see `textAccentLight`'s docblock for why they matter) clear with room to
+   * spare. `neo` dark maps `surfaceSunken` to `neoNavy` itself, so its sunken
+   * composite is its `surface` composite — the same override that removes the
+   * spurious third ground on the light side.
    */
-  textAccentDark: '#8bb1e6',
+  textAccentDark: '#97bdf2',
 
   /**
    * ## The THIRD dim step — `textSubtle` (2026-09-15, the Help restyle)

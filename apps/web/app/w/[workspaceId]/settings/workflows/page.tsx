@@ -22,7 +22,15 @@ export default function WorkflowsPage() {
   return (
     <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
-      <h1 className="gn-page-title">Workflows</h1>
+      {/* P36 (2026-09-21). "Settings", NOT "Workflows" — the screen mounted
+            below renders "<h2>Workflows</h2>", so this route painted the same word
+            twice 6.4px apart: an h1 and, directly under it, an h2, with nothing
+            between them to say what changed. The `/settings` shell has always
+            drawn it the other way — `Settings` over the section title — and the
+            finding's own reading of the export is the same shape. Both screens
+            mount in BOTH places, so the h2 is right and this route was the
+            duplicate. */}
+        <h1 className="gn-page-title">Settings</h1>
       {wiring.kind !== 'ready' ? (
         <WiringNotReady wiring={wiring} />
       ) : (

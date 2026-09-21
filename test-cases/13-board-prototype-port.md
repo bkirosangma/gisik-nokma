@@ -1703,3 +1703,517 @@ and the code has five** (`13-board-prototype-port.md:1172`, above). Corrected to
 duplicates (pre-existing, unrelated to this fix wave, carried since before Task 3 — see the "Case-id fix"
 entry in `.superpowers/sdd/2026-09-16-board-prototype-port/progress.md`). Verified by ID, not by count.
 
+
+## The New-ticket dialog's Title field wears the product's field treatment (lane ds1, 2026-09-21, batch B10) — case `13.1139`
+
+**The finding, round 2 `E4-13`, IMPORTANT.** The first control a person types into in *New ticket* was
+`<label class="gn-new-ticket__field">Title<input value=""></label>` — an `<input>` with **no class at
+all**, inside a neumorphic sheet, on a dialog whose `Type` and `Parent` siblings paint at the product's
+17 px on a 44 px control. Measured in `neo`/light: `border: 2px inset rgb(118,118,118)`,
+`background-color: rgb(255,255,255)`, `border-radius: 0px`, `padding: 1px 2px`,
+`font-size: 13.33px`, `getBoundingClientRect` **425×22**. `ui.css` carries exactly two `.gn-new-ticket`
+rules (the actions row at `:2154`, the field wrapper at `:2155`), neither of which reaches the input, so
+the user-agent box is what painted.
+
+**Id `13.1139`, and how it was arrived at is the part worth recording.** The first pass asked
+`13-second-wave-roles-and-navigation.md` for its next free number and collided with
+`13-second-wave-board-actions.md`; the guard named both lines. **A per-file "next free" is not a smaller
+version of the repo-wide question — it is a different question.** The second answer was a self-declared
+reservation of `13.1054`–`13.1073`, verified free across all 25 catalogue files, and it was superseded
+within the hour by the third: the controller allocated §13 ids per RELEASE BATCH, and **B10 owns
+`13.1137`–`13.1156`**. This id was renumbered into that block in the same pass as every other §13 id the
+batch had minted.
+
+### The case
+
+- ✅ **13.1139 — the Title control carries `gn-field__input`, and that class is a RULE, not a dead name.**
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`. **The two halves are asserted together
+  because either alone is passable while the defect survives:** round 1's `P1` was exactly *"a control
+  styled by no rule of its own"*, so a class that matches no selector block satisfies a class-name
+  assertion and changes nothing about the paint. The rule it names is read out of
+  `packages/ui/src/ui.css` by the cross-package read `sync-ux-css-binding.test.tsx` and
+  `inbox-css-binding.test.tsx` already establish for this question, guarded by its own control —
+  without it, a needle that matched nothing would make the assertion a pass on a stylesheet that had
+  lost the block entirely. `packages/ui/test/components.test.tsx` pins what that rule *says* (`13.339`);
+  this case pins that this control is one of its wearers. `13.1139` was minted with the fix and the
+  stylesheet was reverted to `HEAD` for the RED run, restored from a sha256-compared backup.
+
+**No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance and no
+new state, so there is no feature bullet to edit — recorded here rather than left as a silent omission.
+
+## The active-filter chip's remove control meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1140`
+
+**The finding, round 2 `E4-14`, IMPORTANT.** On Calendar and Timeline (any view with a chip in the tray),
+`button.gn-project__filter-chip-remove` — `aria-label="Remove filter — Closed: hidden"` — measured
+**8.1×13** with `padding: 0`, `line-height: 13px`, `font-size: 13px` and both `min-width`/`min-height`
+`auto`. The chip around it (`span.gn-project__filter-chip`, 147×26) **is a `<span>` with no handler**, so
+the whole pill reads as the target and only the × in its corner responds. **The one larger equivalent was
+checked before the floor was applied:** the Filters panel's own toggle behind the *Filters* button is
+`90×35`, so WCAG 2.5.8's *Equivalent* exception is arguably met and this is scored on the control a
+person reaches for rather than as a hard failure.
+
+### The case
+
+- ✅ **13.1140 — the remove rule declares the 24-px floor, in a box that honours it, and the two
+  declarations that made the glyph the control are still in force.** `packages/ui/test/components.test.tsx`.
+  **A source scan, not a paint.** `apps/web/e2e-*` is Playwright and is not in `pnpm test`; the property
+  at issue is what the rule declares, and the stylesheet is the authority on that. `1.5rem` is this
+  file's own WCAG 2.5.8 in-list floor — the same number and reasoning `.gn-attention__title` carries at
+  `ui.css:1667` — and the `display: inline-grid` half is asserted alongside the min sizes on purpose,
+  because that rule's own note is that `padding: 0` makes the element's height its line box, so a
+  `min-height`-only edit would not hold. The third assertion is the negative half, not a control: the
+  pair `padding: 0` / `line-height: 1` passes before the fix and after it, and is asserted so neither can
+  return. **The chip's own new height is NOT claimed as measured** — the rule states the arithmetic
+  (24 + the chip's two `0.25rem` paddings = 32, up from 26) and labels it arithmetic; the rule was
+  reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
+
+**No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance, so
+there is no feature bullet to edit — recorded here rather than left as a silent omission.
+
+## Every board card's `who · when` disclosure meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1141`
+
+**The finding, round 2 `E4-3`, IMPORTANT, scored PARTIAL.** `button.gn-board-card__provenance`
+toggles the state-provenance line on each card. Measured on the board at 1512×900 against the product's
+own selector list (`tap-targets.ts:268-280`) and visibility filter: **24 instances** — one per card,
+`document.querySelectorAll('button.gn-board-card__provenance').length` → 24 and `.gn-board-card` → 24 —
+each **66×21**, `display: inline-block`. It is not the card's open control (`.gn-board__card-slot` is),
+so nothing larger performs its function and WCAG 2.5.8's *Equivalent* exception does not apply. The
+judge corrected the finding's "only sweep" absolute — `e2e-viewport/responsive.spec.ts:678` is a second
+`measureTapTargets` call — and the core held.
+
+### The case
+
+- ✅ **13.1141 — the rule declares the 24-px in-list floor, and `DENSE_IN_LIST` classifies it as
+  in-list.** `apps/web/test/tap-target-density.test.ts`. **Both halves are asserted together and for
+  the reason the table exists at all:** a floor in the CSS with no classification is judged at 44 the
+  day a sweep reaches the board, and a classification with no floor absolves a control that does not
+  meet 24. The extractor is `ruleHeads` — the same comment-stripped one the liveness check uses, not a
+  second copy — because `ui.css` is mostly prose and a selector merely discussed in a comment would
+  answer for a rule that had been deleted. `min-height` alone is the fix: the element is UA
+  `inline-block` (its rule sets no `display`), so a min size applies to it, unlike the `padding: 0` bare
+  buttons elsewhere in the file whose height is their line box. `ui.css` and `e2e-viewport/tap-targets.ts`
+  were each reverted to `HEAD` for the RED run and restored from sha256-compared backups.
+
+### ⚠ Clause (b) of the membership rule is UNMET, recorded rather than implied
+
+`tap-targets.ts`'s own membership rule requires **(a)** a CSS rule that makes the 24-px call in its own
+words **AND (b) a sweep that actually visits the route it renders on.** The board route **is** in the
+stack suite's accessible-name and type-scale loop, but **not** in its tap-target pass, which measures
+`/my-work` alone — round-2 finding **E4-12**. So this `DENSE_IN_LIST` entry is **declared but not yet
+exercised**, the same position `.gn-my-work__title` is already recorded in, and it is written in both
+the entry's own `why` and the CSS rule rather than left to read as covered. Closing it needs a second
+`measureTapTargets` call on the board route plus its baseline key, and the suite refuses to invent a
+baseline — it needs a live stack on `:3001`, which another lane owns. **Owner: whoever widens that pass
+(E4-12).** The conservative direction is guarded either way: an undeclared dense control is judged at
+44, which reddens loudly.
+
+**No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
+
+## At phone width the ticket sheet's label column collapses (lane ds1, 2026-09-21, batch B10) — case `13.1142`
+
+**The finding, round 2 `E4-7`, IMPORTANT.** With the sheet open on `CCSO-6` at `emulate 390x844`, the
+description editor (`div.tiptap.ProseMirror`) measured **224×3195**; its container `dd` spanned
+`x 178.6 → 402.7` while the sheet ends at `x 390` and the sheet body is `366.6` wide. Words were cut at
+the right edge mid-glyph (*"as o"*, *"the"*, *"screens"*, *"look"*), and the toolbar
+(`div.ticket-editor__toolbar`) reported the same `right=403`. The cause is the only rule for that class:
+`ui.css` `.gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr }` — a fixed 8-rem
+label column with **no narrow-width override** (the file's four other `@media (max-width…)` blocks name
+it nowhere).
+
+### The case
+
+- ✅ **13.1142 — below 40rem the row is one column, the value can shrink, and Full screen is withdrawn.**
+  `packages/ui/test/components.test.tsx`. **`grid-template-columns: 1fr` is asserted together with
+  `min-width: 0` on the `dd`, and that pair is the point:** a grid item's `min-width` is `auto`, so the
+  column is floored at its content's min-content width and `1fr` alone would leave the editor pushing the
+  column back out — the fix would look applied while changing nothing. `.gn-sheet__full` is withdrawn in
+  the same block rather than a second breakpoint, because two breakpoints for one screen's phone
+  treatment is how they drift apart, and the pill expands a sheet that at 390 px already fills the
+  viewport. **Not painted**: the rules were not measured on a running server — `apps/web/e2e-*` is
+  Playwright and is not in `pnpm test` — so what this scan proves is that the breakpoint declares them;
+  the pre-fix numbers above are the finding's own, and the rule carries the same caveat. `ui.css` was
+  reverted to `HEAD` for the RED run and restored from a sha256-compared backup. The block is selected by
+  *containing* `.gn-ticket-sheet__field`, because `ui.css` carries more than one 40rem block.
+
+**No `Features.md` bullet.** This corrects an existing screen's layout at a width it already served; it
+adds no affordance.
+
+## The controls that painted as raw UA chrome join the bare-control convention (lane ds1, 2026-09-21, batch B10) — case `13.1143`
+
+**The finding, round 2 `P1`, IMPORTANT** (filed as nine sites / seven controls, corrected to eight sites / six
+controls — the seventh, `gn-nav__signin`, was withdrawn because `.gn-nav a` reaches it from an ancestor).
+P1 swept every static `className` literal on a `<button|input|select|textarea|summary|a>` in the product and
+required that at least one of its class tokens match a selector block; six controls matched none. **The
+mechanism is one line:** `apps/web/app/globals.css:84` sets `button { font: inherit }` — font ONLY, no
+`border`, no `background`, no `padding` — so an unstyled button keeps the UA's `outset` edge and grey fill.
+Painted by the finding on the members a browser could reach: `button.editor-slot__submit` "Save description"
+**136.4×29.2** and "Comment" **86.9×29.2**, each `border: 2px outset rgb(0,0,0)`,
+`background-color: rgb(239,239,239)`, `border-radius: 0px`, `padding: 1px 6px`; `button.add-rule-menu__trigger`
+"Add rule" **76.6×29.2** the same — beside a *Publish* button reading `1px solid rgb(51,98,159)`, the control
+in the same paint.
+
+### ⚠ FOUR OF THE SIX ARE FIXED, AND THE OTHER TWO ARE A MEASUREMENT
+
+`gn-attachment__link` and `attachment-item__name` are **`<a>` elements**. The UA gives an anchor **no**
+border, **no** background and **no** padding, so a bare-control reset is a **no-op** on them — the reset's
+shape is a *button*'s problem. Their ink comes from `globals.css:39` and the underline that remains is the
+link affordance. `attachment-item__name` is additionally under an explicit both-directions contract at
+`packages/editor/src/styles/editor.css:218` ("emitted deliberately and styled by nobody yet … a plain link")
+asserted by `test/attachment-list-item.test.tsx`, so a box rule there would falsify a deliberate record to
+fix nothing the UA had wrong. **This is recorded in `ui.css` above the reset, in `editor.css` above its own,
+and in the test — not dropped.** The two stylesheets carry one grouped rule each, in the file that owns the
+package: `ui.css` for `.gn-board__empty-create` and `.add-rule-menu__trigger`, `editor.css` for
+`.editor-slot__submit` and `.evidence-picker__cancel` — the split `ui.css`'s own `.gn-comments` docblock
+requires ("`packages/ui` styling another package's internals is the duplication this repo refuses").
+`background: none`, not the reviewer's `transparent`, because `editor.css`'s header forbids a bare colour
+keyword — and the shorthand resets every background property anyway.
+
+### The case
+
+- ✅ **13.1143 — the extractor can tell both ways, all four buttons match a selector block, each declares
+  the reset in the file that owns it, and the editor's stays inside that file's no-colour rule.**
+  `packages/ui/test/bare-control-coverage.test.ts`. The control runs FIRST and in both directions: 600+
+  selector heads extracted, a class that genuinely has a rule reads as styled, an invented class reads as
+  unstyled — and the **boundary guard is asserted on its own**, `(?<![\w-])`/`(?![\w-])`, because without it
+  `gn-board__empty` would be satisfied by `gn-board__empty-create`, which is the exact "a name that looks
+  covered" defect this case exists for. "Some rule exists" is not enough either: the reset's own
+  declarations are asserted, since a class matching an unrelated selector would pass the coverage
+  assertion and leave the UA edge in place. **Not painted by this change** — the numbers above are the
+  finding's, and the case says so. `ui.css` and `editor.css` were each reverted to `HEAD` for the RED run
+  and restored from sha256-compared backups.
+
+**No `Features.md` bullet.** This corrects existing controls' paint; it adds no affordance.
+
+## The board's whole-board empty state gets a treatment, and a recorded rationale (lane ds1, 2026-09-21, batch B10) — case `13.1144`
+
+**The finding, round 2 `P2`, IMPORTANT.** `board.tsx:528` renders
+`<div className="gn-board gn-board--empty">`, `:490` renders `gn-board__empty-copy` and `:494` renders
+`gn-board__empty-create`. **All three had ZERO selector blocks** — the only two hits for the family in
+`ui.css` were *comments* (`:835`, `:4980`), and `/usr/bin/git log -S'gn-board__empty-create'` shows
+`b1dda062` added a mention, not a rule. So the product's first-run call to action on an empty board was a
+grey outset `<button>` on a neumorphic page. It is the one board empty state with no styling: its
+per-column sibling has three rules (`.gn-board__column-empty`, `-icon`, `-copy`).
+
+### The design decision, recorded rather than left implicit
+
+**The prototype draws no whole-board empty state at all.** So the container borrows the per-column empty
+state's own shape — `fill-quaternary`, `--gn-radius-card`, the centred column, the muted `0.9375rem` copy —
+rather than inventing a third treatment: two empty states on one board should read as one family. The
+action takes the shared control constant **`981aa92b`** established for `.ticket-type-list__move`:
+fill-tertiary, text-accent, control radius, no border, the 44 px standalone floor. **The absence is
+recorded in `Features.md` as a deliberate addition**, which is what stops a later reader "correcting" the
+screen back toward a prototype that never had it — the second half of the finding's own remedy.
+
+### The case
+
+- ✅ **13.1144 — the container carries the sibling's shape, the copy takes the sibling's type, the action
+  takes the shared constant, and the P1 reset still precedes this rule.** `packages/ui/test/components.test.tsx`.
+  The last case is the one worth naming: **P1's bare-control reset and this rule BOTH match
+  `.gn-board__empty-create`**, deliberately — P1 removed the UA chrome, this gives the product's own — and
+  they overlap on `border`, `background`, `padding` and `color`, so source order decides. If the two ever
+  swap, the action silently loses its fill while every other assertion here stays green, so the order is
+  pinned by index rather than assumed. **Not painted**: what is asserted is what the rules declare, and
+  `apps/web/e2e-*` is Playwright, which is not in `pnpm test`. `ui.css` was reverted to `HEAD` for the RED
+  run and restored from a sha256-compared backup.
+
+## The timeline's nav buttons stop wearing the browser's bevel (lane ds1, 2026-09-21, batch B10) — case `13.1147`
+
+**The finding, filed twice from two sides: round 2 `E4-15`** (MINOR — "the class HAS a rule, and the rule
+forgot the border") **and `P35`** (MINOR, `r2 NEW` phase 2 — the same rule, reached by asking whether a
+matched selector block means a fully-styled control). `.gn-timeline__nav` — the three Earlier / Today /
+Later buttons — declared a radius, a background, a colour, a font, padding and a cursor, **and no
+`border`**, so the user agent's `2px outset rgb(0,0,0)` survived the rule: measured with the product's own
+`background: rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`. **This is outside round 1's
+`P1` population by construction** — P1 selected classes with ZERO matching selector blocks, and this one
+matched — which is the lesson both findings share: *"matched a selector block"* and *"is fully styled"* are
+different questions. `P35`'s own corroboration: the family's other two members, `.gn-timeline__bar` and
+`.gn-timeline__open`, already carry `border: none`; the nav did not.
+
+### The case
+
+- ✅ **13.1147 — the rule declares `border`, and it takes the calendar nav's own values.** `packages/ui/test/components.test.tsx`.
+  **The assertion is the PRESENCE of the declaration, not the absence of `outset`**, and the difference
+  matters: `outset` is what the UA applies *because* the declaration is missing, so a test searching a
+  stylesheet for the string `outset` would pass on every tree, broken or fixed. The five values are
+  asserted as a PAIR with `.gn-calendar__nav` rather than as literals, because the remedy is that the two
+  views' navs agree — a later edit re-diverging one of them is the regression. A third assertion keeps
+  `P35`'s observation as calibration: the family's other two members already carried it. **Not painted** —
+  the ratios and measurements above are the findings' own. `ui.css` was reverted to `HEAD` for the RED run
+  and restored from a sha256-compared backup. Package suites: ui 416, web 639.
+
+**No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance.
+
+## The overlay dismiss control is a 44-px circle, not a 21-px glyph (lane ds1, 2026-09-21, batch B10) — case `13.1148`
+
+**The finding, round 2 `E4-2`, MINOR.** `button.gn-sheet__close` — "×", `aria-label="Close sheet"` — the
+visible pointer control for leaving the product's most-used overlay, measured **23.59×21.20**
+(`getBoundingClientRect`) with `padding: 1px 6px` (the UA's), `min-width`/`min-height: auto`,
+`font-size: 19.2px` and `background: rgba(0,0,0,0)`: the glyph WAS the box. The only rule for it
+(`.gn-dialog__close, .gn-sheet__close`) sets `font`, `font-size`, `line-height`, `border`, `background`,
+`color` and `cursor` — and no size. The prototype draws a 32-px filled circle.
+
+### ⚠ The finding's opening claim was withdrawn before the freeze, and the fix records that
+
+The first draft said *"no other pointer control closes the sheet"*, on a `[class*="backdrop"]` query that
+returned null. **That query was the wrong needle** — the scrim is `div.gn-sheet__scrim` with
+`onClick={onClose}` (`sheet.tsx:97-99`; the dialog's is `dialog.tsx:17`), and clicking outside closes both.
+So this is **not a WCAG 2.5.8 failure in the strict sense**; it is a 21-px control whose pointer
+equivalent is an unmarked area a person has to know about. The severity is set accordingly and the rule
+says so rather than letting the assertion imply a stricter claim.
+
+### The case
+
+- ✅ **13.1148 — the dismiss control declares the 44-px floor in both dimensions, takes the prototype's
+  circle and fill, and answers the size question the same way the header's other control does.**
+  `packages/ui/test/components.test.tsx`. **44, not the prototype's 32:** this is the same divergence
+  `.gn-sheet__full` immediately above already records — *"this repo enforces the 44px tap-target floor on
+  every `button` (WCAG 2.5.5, and `tap-targets.ts` measures them), while the prototype draws 32px"* — and
+  two controls in one header cannot answer it differently, so the size is asserted as a **pair** with
+  `.gn-sheet__full` rather than as a literal. The circle and fill are the prototype's. A fourth assertion
+  pins that the two overlay dismiss controls still SHARE one rule: `rule()` cannot be used on
+  `.gn-dialog__close` because that head does not end a selector list, so the combined head's body is read
+  and compared to the sheet head's — the same evidence by a different route. **Not painted**: the
+  measurement above is the finding's own. `ui.css` was reverted to `HEAD` for the RED run and restored
+  from a sha256-compared backup. Package suites: ui 420, web 639.
+
+**No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
+
+**One half of the finding's remedy is NOT done, named rather than implied:** it also asked for *"one sweep
+that opens a sheet before measuring"*, because no current sweep enters a state where the sheet is open
+(`UNAUTHED_ROUTES` covers `/help`, `/privacy`, `/terms` and a 404 probe; the stack suite's tap pass
+measures `/my-work` alone). That is a Playwright change needing a live stack on `:3001`, out of this
+lane's reach; the owner is whoever widens that pass, and the same gap is recorded under `13.1141`.
+
+## The List row's two controls meet the 24-px floor, and the spacer follows (lane ds1, 2026-09-21, batch B10) — case `13.1151`
+
+**The finding, round 2 `E4-26`, MINOR.** On the List at 1512: `button.gn-list__collapse "Collapse Open
+questions"` **22×22** and `button.gn-list__open "Open questions"` **125×22** (×26 rows, `17px/22px`) — both
+under WCAG 2.5.8's 24px in-list floor, the same floor `.gn-my-work__title` and `.gn-attention__title` were
+moved to on 2026-09-08. `grep -n onClick packages/app-core/src/views/ticket-list.tsx` finds **three
+handlers** — the Columns toggle, the caret and the title — and **no `<tr>`/row handler**, so unlike the
+board card (`13.523`) there is no larger equivalent target and 2.5.8's *Equivalent* exception does not
+apply. The prototype draws 22px; the floor wins, as it did for `.gn-attention__title`.
+
+### The case
+
+- ✅ **13.1151 — the caret is 24×24, the title's LINE BOX is 24px, the floor is asserted as a floor, and a
+  planted 22px caret reddens the same reader.** `packages/app-core/test/views/ticket-list-css-binding.test.tsx`.
+  **The title is raised through its line box and that is asserted rather than assumed:** `.gn-list__open`
+  declares `font-size`/`line-height` only, so its height IS its line box and a `min-height` there would be
+  a second, competing mechanism. `>= 24` on the two min sizes rather than `=== 24`, because a larger in-list
+  target is an improvement and an equality would redden on it; the exact values are pinned in the
+  assertion above. The mutation plant REPLACES the real rule rather than appending — a rule appended at the
+  end leaves `declarationsFor` reading the real one, so the plant would be inert, the same lesson
+  `settings-shell-tokens.test.ts`'s `withRule` records.
+
+### ⚠ Two consequences, both recorded rather than discovered later
+
+**(1) `.gn-list__caret-spacer` moved with the caret, and had to.** The prototype's spacer is 22px to match
+its 22px caret; a 24px caret beside a 22px spacer **shears every leaf off its parent's left edge by 2px**,
+which is the exact failure the `13.671` binding test exists to catch. Both absolutes in that test moved
+`1.375rem` → `1.5rem` together, which is why that test carries two absolutes beside its relative one.
+
+**(2) `declarationsFor` RETURNED THE WRONG RULE FOR `.gn-list__open`, and nothing had read it before now.**
+Its docblock claimed the line-start anchor handled selector LISTS; it happens to work for
+`.gn-list__collapse` (whose shared-rule line ends in a comma) and silently fails for `.gn-list__open`
+(whose shared-rule line IS `^.gn-list__open {`) — returning the two-head rule's body. The helper now skips
+a candidate whose preceding text ends in a comma. **The limitation was written down as if it were handled,
+and it was handled for one of the two names** — which is why the fix is in the helper rather than in this
+case's own reader.
+
+**One half of the remedy is NOT done, named rather than implied:** the finding also asks for the List view
+in the stack suite's route list with a `DENSE_IN_LIST` entry for each. That is a Playwright change needing
+a live stack on `:3001` — the same deferral recorded under `13.1141` (E4-3) and `13.1148` (E4-2), whose
+`DENSE_IN_LIST` entries are likewise declared but not yet exercised. **Owner: whoever widens that pass
+(E4-12).** `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
+Package suites: ui 420, app-core 1725, web 643.
+
+## The segmented control's items carry the prototype's horizontal padding (lane ds1, 2026-09-21, batch B10) — case `13.1153`
+
+**The finding, round 2 `E4-35`, MINOR.** `[role=tablist][aria-label="Filter notifications"]` on `/inbox` at
+1512, owner: **`All` 31×44**, `Unread` 64×44, `Mentions` 78×44 — each item `padding: 1px 6px` (the UA's),
+`min-width: auto`. `.gn-segmented__item` declares no horizontal padding, so wherever `flex: 1` has no free
+space to share, **the width of a tab is the width of its word**. On the board the same class paints 92×44
+and is unaffected: that track fills its row and `flex: 1` distributes the extra. The difference is the
+container — `div.gn-inbox__header` is `display:flex; justify-content: space-between`, so the track is
+content-sized. The prototype's segment carries `padding:0 16px`.
+
+### The case
+
+- ✅ **13.1153 — the rule declares `padding: 0 1rem`, does not instead invent a `min-width`, and keeps
+  `flex: 1`.** `packages/ui/test/components.test.tsx`. The second assertion is the one that stops the
+  cheap wrong fix: a `min-width` would repair the 31-px *All* tab and be wrong for every longer label — a
+  fixed floor where the prototype has a padding, and one that does not scale with the text. The third
+  pins the board's own reading, which the finding requires be untouched. **Not painted** — the 31×44
+  above is the finding's own measurement. `ui.css` was reverted to `HEAD` for the RED run and restored
+  from a sha256-compared backup. Package suites: ui 423, web 647.
+
+**No `Features.md` bullet.** This corrects an existing control's metrics; it adds no affordance.
+
+## The editor's formatting strip takes the product's fill, not an outline (lane ds1, 2026-09-21, batch B10) — case `13.1154`
+
+**The finding, round 2 `E4-8`, IMPORTANT → scored MINOR.** In the sheet (style `neo`, light),
+`button.ticket-editor__tool` painted `border: 1px solid rgb(32,43,73)` (the label ink),
+`background: transparent`, `box-shadow: none`, and the strip `div.ticket-editor__toolbar` carried the same
+outline on three sides — while every neighbouring control in the same sheet (`.gn-button--ghost`,
+`.gn-segmented__item`, `.gn-select__trigger`, `.gn-field__input`) is border-less fill. Six outlined boxes
+and an outlined rule over a soft-fill sheet. The judge scored it below the claimed severity because **the
+defect itself is style consistency** — what was IMPORTANT was that the two recorded reasons for it rest on
+a false premise.
+
+### ⚠ The premise, corrected and asserted
+
+`editor.css`'s own docblock said the fill *"is NOT transcribed, and it cannot be"* for two reasons.
+**(1)** *"`packages/editor` does not depend on `packages/ui`, so no token from `tokens.ts` is
+reachable"* — a PACKAGE-DEPENDENCY fact where the question is a DOCUMENT one: `apps/web/app/layout.tsx:3-4`
+imports `ui.css` AND `editor.css` into one document, and custom properties cascade from the document.
+**(2)** *"this file forbids colour of every kind"* — **a `var(--gn-…)` reference is not a colour
+literal**, and the header's third prohibition is a bare colour *keyword*, which is why neither rule writes
+`transparent`. **Checked against the scanner rather than assumed:** `packages/ui/test/helpers/colour-scan.ts`
+matches a hex (`#[0-9a-fA-F]{3,8}`) in a CSS value or a string, and the functions
+`rgb|rgba|hsl|hsla|oklch|oklab|color-mix(`; a token reference matches neither.
+
+### The case
+
+- ✅ **13.1154 — both rules declare a fill and no outline, neither writes a literal or a keyword, and the
+  token-less context degrades to today's paint.** `packages/editor/test/editor-toolbar.test.tsx`. The
+  third assertion is not decoration: `src/webview/entry.tsx` loads this file **without** `ui.css`, so
+  `var(--gn-…)` resolves to `initial` there — `transparent` for `background`, `none` for `box-shadow` —
+  which is exactly what these controls paint today, so the mobile webview regresses by nothing. It also
+  pins the shape: **no fallback value**, since `var(--gn-x, <fallback>)` would change the webview's paint
+  and would need a colour token the header cannot express. **Not painted** — the computed values above are
+  the finding's own. `editor.css` was reverted to `HEAD` for the RED run and restored from a
+  sha256-compared backup. Package suites: editor 191, ui 423, web 647.
+
+## The viewport suite measures WCAG 1.4.10's own width (lane ds1, 2026-09-21, batch B10) — case `13.1155`
+
+**The finding, round 2 `P27`, MINOR, `r2 NEW`, scored PARTIAL.** WCAG 2.2 §1.4.10 *Reflow* is Level AA and
+names a number: content must reflow to **320 CSS px** without two-dimensional scrolling. **The narrowest
+width this product was ever measured at was 390px** — 70px above the criterion — and `grep -rc "320"` over
+`apps/web/e2e-viewport/*.ts` and `apps/web/e2e-stack/*.spec.ts` returned **no non-zero count**. The
+verifier's correction, carried rather than smoothed over: the finding's *"`min-width` above 320px →
+exactly one"* is **false** (`ui.css:1477 .gn-list__table` is a second), so the census is not restated here —
+the remedy is the viewport, not the count.
+
+### The case
+
+- ✅ **13.1155 — 320 is a declared viewport with the criterion's own numbers, 390 is STILL measured, and
+  the config maps the record so the entry becomes a real project.** `apps/web/test/viewport-reflow-320.test.ts`.
+  The last assertion is what stops the first two being satisfied by a record nothing reads:
+  `playwright.viewport.config.ts:184` builds its `projects[]` by **mapping** `VIEWPORTS`, so a fourth entry
+  IS a fourth Playwright project and every per-viewport sweep runs at it. The second assertion is the safe
+  direction — an edit that REPLACED 390 with 320 would satisfy the first and shrink coverage.
+  `device: 'iPhone SE'` and not `'iPhone 5'`: Playwright ships no `iPhone 5` descriptor (checked against
+  `@playwright/test`'s own `devices`), and the descriptor only contributes the non-viewport mobile
+  characteristics anyway — the config pins `viewport` after the spread.
+
+### ⚠ The baselines for this width do not exist, named here and in the source
+
+`tap-target-baseline.json`, `accessible-names-baseline.json` and the type-scale baseline are keyed
+`<viewport>|<route>` and all three **REFUSE a missing key rather than seeding it**
+(`responsive.spec.ts`'s own *"the suite refuses to invent one"*). So the first run of the viewport suite
+reports a missing baseline for each of the five routes at `phone-320` and stops — **loudly, in the safe
+direction, with no invented number committed.** **Owner: whoever next runs `test:e2e:viewport` against a
+live stack; record with `UPDATE_*_BASELINE=1` and commit the file.** This lane could not: Playwright needs
+its own `next dev`, and this lane runs in push-only mode with no stack. `viewports.ts` was reverted to
+`HEAD` for the RED run and restored from a sha256-compared backup. Web suite 650; `pnpm turbo run typecheck`
+17/17, which is what covers `tsconfig.e2e.json`.
+
+## The accessible-name ratchet's message says what it measures (lane ds1, 2026-09-21, batch B10) — P10, no case id
+
+**The finding, round 2 `P10`, MINOR, judged VALID.** The ratchet's unit is an ATTRIBUTE and its failure
+message claimed a PROPERTY OF ASSISTIVE TECH. `accessible-names.ts:49` counts
+`all.filter((el) => el.hasAttribute(attr)).length`, and the assertion at `e2e-stack/viewport.spec.ts:720`
+ended *"Something that identified an element to assistive tech is gone."* — a stronger claim than the
+number supports. **A live site where the two differ is named in the finding:** an `aria-label` that left an
+element and was replaced by visible text elsewhere reddens this exactly as a genuine loss does.
+
+**Sentence corrected, no product test, per the finding's own DONE WHEN.** The message now reads *"An
+`${attr}` ATTRIBUTE left the document — that is all this measured, and whether it still named anything is
+not what it measured."*, and the counter's own docblock records the limits (`aria-labelledby`, visible
+text) in the same place the count is taken. **The finding's own instruction is kept — keep the count, it is
+cheap and it does catch a dropped attribute** — so this is a wording fix, not a relaxation.
+`pnpm turbo run typecheck` 17/17 (the web package's `tsconfig.e2e.json` covers the edited spec); web suite
+652.
+
+## The board, the List and My Work stop skipping heading level 2 (lane ds1, 2026-09-21, batch B10) — T-E4-24 and T-P17
+
+> **Case id PENDING ALLOCATION.** These two tasks are one property measured on the same three screens, so
+> they are carried as ONE instrument with two arms — and B10's section-13 block (`13.1137`–`13.1156`) is
+> **fully used**. The ask for three more ids is recorded in
+> `docs/lanes/release-2026-09-22-progress.md`. **No id was minted outside the block**; this entry's case
+> marker is therefore the task id, and the allocated id gets filled in here when it arrives.
+
+**The findings, round 2 `E4-24` and `P17`, both MINOR.** Measured on every route: Board `H1 Shop operations`
+→ `H3 Simple kanban`, `H3 Errand with waits`; List `H1` → `H3 Recently assigned`, `H3 Open questions …`;
+My Work `H1 My Work` → `H3 Assigned to me` … (four). **The outline went h1 → h3 with no h2 anywhere in the
+path, on three of the product's main screens.** The page title is an `h1`; the first level under it is an
+`h2`. `P17` adds that no instrument measures heading level or order at all — the assertion below is a
+partial answer to that, and its remaining half is named.
+
+### The case
+
+- ✅ **T-E4-24 / T-P17 — every section heading under a page title is an `h2`, and none is an `h3`.**
+  `packages/app-core/test/views/heading-outline.test.ts`. **A SOURCE scan, and the reason is specific
+  rather than convenient:** the property IS the tag — `<h3 className="…">` and `<h2 className="…">` differ
+  by one character and nothing else about them changes — so the file is the authority. The extractor runs
+  through a positive control over the same reader (all three families found, ≥5 headings), the fix is
+  witnessed by planting the pre-fix tag back into the board's own source and reading it back as `h3` at the
+  same time as the real source reads `h2`, and the levels are asserted for **all three views at once**
+  because the finding measured them together.
+
+### ⚠ Two residuals, named rather than implied
+
+**(1) The builder is NOT covered.** `E4-24` also records that its aside panels' `h3`s hang under no `h1`
+at all — the route renders `main.gn-shell` and the screen's visible title is an editable
+`<input class="workflow-builder-screen__name">`, not a heading. That is a different defect (a MISSING
+`h1`, not a skipped `h2`) and needs a design decision about where a heading goes on a screen whose title
+is a field; the finding's own words call it *"which its own record already owes"*.
+**(2) `P17`'s second half — a per-route outline WALK that fails on a skip anywhere** — is not built. A
+source scan cannot see an `h2` nested under something that is not an `h1`; that needs the browser-side
+sweep `P17` describes, with a recorded baseline per route.
+
+### One existing assertion pinned the defect
+
+`apps/web/test/board-narrowing.test.tsx` queried the group headings at `level: 3` — so the assertion was
+holding the level the finding says is wrong. All four sites moved to `level: 2` **in the same change**, and
+the fact that this had to happen is the finding's point stated in reverse: no instrument measures heading
+level or order, so the only thing watching that number was an unrelated case's query. The RED pair:
+heading-outline `2 failed | 1 passed (3)` (`/tmp/ds1-E4-24-red.log`), board-narrowing
+`1 failed | 19 passed (20)` (`/tmp/ds1-E4-24-red-web.log`), with the three views reverted to `HEAD` and
+rebuilt, then restored from sha256-compared backups and rebuilt again. Package suites: app-core 1728,
+web 652.
+
+## The help search announces how many answers it found (lane ds1, 2026-09-21, batch B10) — T-E4-36
+
+> **Case id PENDING ALLOCATION** — B10's section-13 block (`13.1137`–`13.1156`) is fully used and the ask is
+> recorded in `docs/lanes/release-2026-09-22-progress.md`. **No id was minted outside the block**; this
+> entry's marker is the task id, and the allocated id gets filled in when it arrives.
+
+**The finding, round 2 `E4-36`, MINOR.** `packages/app-core/src/help/help-browser.tsx:207` renders
+`<p className="gn-help__results-count">` — **no role** — while the no-match arm `thirty lines below**
+(`:684`, `gn-help__none`) carries `role="status"`. So the help search **announced "nothing matches" and
+stayed silent when it found nine things.** Measured on `/help` at 1512, owner: after typing `invite` into
+the search (`aria-label="Search the manual and FAQ"`, via the input's value setter + an `input` event),
+`document.querySelectorAll('[role=status],[aria-live]')` → **none**, while the count paragraph rendered
+`9 answers for “invite”` and nine `li.gn-help__result`. The mechanic the judge corrected is recorded rather
+than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* mechanism is FALSE
+(`git log -S` puts it at `8079e999`); the core — a status role on one arm and not the other — holds.
+
+### The case
+
+- ✅ **T-E4-36 — a search that finds something puts the count in a live region, the count is NOT a live
+  region before there is anything to announce, and the result link meets the 24-px in-list floor.**
+  `packages/app-core/test/help/help-browser.test.tsx`. **The count is the answer to the question the reader
+  just asked by typing** — it is the one thing on the screen that changed — so a polite live region is what
+  the sentence was missing, not a different string. `role="status"` and not a bare `aria-live`: that role
+  IS `aria-live="polite"` with a name, and it is the idiom the sibling arm already uses. The negative half
+  stops the first assertion being satisfied by a page that renders a status element unconditionally: an
+  empty search box draws no count and therefore no status. The second half of the remedy —
+  `min-height: 1.5rem` on `.gn-help__result-title` — is read out of `ui.css` the way this repo's other
+  cross-package cases do, with `display: inline-flex` asserted alongside it because an inline element's
+  height is its line box. `ui.css` and `help-browser.tsx` were reverted to `HEAD` for the RED run (with a
+  rebuild, so the revert reached the compiled artifact) and restored from sha256-compared backups. Package
+  suites: ui 426, app-core 1731, web 654.
+
+**No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.

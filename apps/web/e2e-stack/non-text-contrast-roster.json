@@ -1,4 +1,9 @@
 {
+  "headSha": "8e742d18645cb27be17c4a970b0e67d564014832",
+  "producedAt": null,
+  "treeWasClean": null,
+  "provenance": "Every number below describes the tree at `headSha`, at `producedAt` — no other. A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and nothing here re-checks that: the file is regenerated only by a run of this sweep. So read an entry as a measurement, never as a claim about the tree you are standing in.",
+  "backfilled": "T-I2, 2026-09-21, round-2 finding I2. `headSha` is the commit that last wrote THIS file, measured with `/usr/bin/git log -1 --format=%H -- apps/web/e2e-stack/non-text-contrast-roster.json`, not remembered. `producedAt` and `treeWasClean` are null because the run that produced the file did not record them and the commit cannot recover them — the commit's own date, 2026-09-20 03:28:49 +0530, is an UPPER bound on producedAt and nothing more. The generator now writes all four fields itself. `belowCount: 1` with `button.ticket-type-list__move` at 1.41 is the entry this provenance exists to explain: that class was given a rule in `981aa92b`, eight hours after this file was written, and nothing in the file said which run it came from.",
   "belowCount": 1,
   "totalClasses": 2,
   "examined": 13,

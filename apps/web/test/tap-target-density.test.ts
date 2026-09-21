@@ -199,3 +199,48 @@ describe('tap-target density — case 13.991', () => {
     }
   });
 });
+
+/**
+ * Case `13.1141` — E4-3 — the board card's `who · when` disclosure is declared
+ * at the 24-px in-list floor, and the table that classifies it says so.
+ *
+ * Every board card carried `button.gn-board-card__provenance` at **66×21** with
+ * no `min-width`/`min-height` anywhere in its rule, so the glyph row was the
+ * target on all 24 cards. It is not the card's open control
+ * (`.gn-board__card-slot` is), so nothing larger performs its function.
+ *
+ * **The two halves are asserted together, and for the reason `tap-targets.ts`
+ * gives for the table existing at all:** a floor in the CSS with no
+ * classification is judged at 44 the day a sweep reaches the board, and a
+ * classification with no floor in the CSS absolves a control that does not meet
+ * 24. `ruleHeads` is the same comment-stripped extractor the liveness check
+ * uses — not a second one — because `ui.css` is mostly prose and a selector
+ * discussed in a comment would answer for a rule that had been deleted.
+ */
+describe('tap-target density — case 13.1141', () => {
+  const PROVENANCE = '.gn-board-card__provenance';
+
+  it('13.1141 the rule declares the in-list floor', () => {
+    const heads = ruleHeads(readFileSync(UI_CSS_PATH, 'utf8'));
+    expect(heads, 'the CSS extractor found no rules — it is broken, not the CSS').toContain(
+      PROVENANCE,
+    );
+    const withoutComments = readFileSync(UI_CSS_PATH, 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const m = withoutComments.match(
+      new RegExp(`${PROVENANCE.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`),
+    );
+    expect(m, `no declaration block for ${PROVENANCE}`).not.toBeNull();
+    expect(m?.[1]).toMatch(/min-height:\s*1\.5rem/);
+  });
+
+  it('13.1141 and the table classifies it as in-list, naming this protocol', () => {
+    const entry = DENSE_IN_LIST.find((e) => e.control === PROVENANCE);
+    expect(entry, `${PROVENANCE} is not in DENSE_IN_LIST`).toBeDefined();
+    expect(entry?.declaredAt).toBe(PROVENANCE);
+    expect(entry?.container).toBe('.gn-board__cards');
+    expect(entry?.witness).toBe('.gn-board__card-slot');
+    // The witness must be a rule head too, or the stale-entry guard's
+    // "container rendered but the witness is absent" arm can never fire.
+    expect(ruleHeads(readFileSync(UI_CSS_PATH, 'utf8'))).toContain('.gn-board__card-slot');
+  });
+});

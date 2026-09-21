@@ -46,6 +46,13 @@ export const ACCESSIBLE_BASELINE_PATH = fileURLToPath(
 export async function sweepAccessibleNames(page: Page): Promise<AccessibleNameCounts> {
   return page.evaluate(() => {
     const all = Array.from(document.querySelectorAll('*'));
+    // THE UNIT IS AN ATTRIBUTE, NOT A PROPERTY OF ASSISTIVE TECH, and one
+    // consuming assertion used to say otherwise (P10, 2026-09-21). This counts
+    // elements CARRYING the attribute; it cannot tell a label that names the
+    // right thing from one that names nothing, and it cannot see a name
+    // supplied by visible text or by `aria-labelledby`. Kept because it is
+    // cheap and it does catch a dropped attribute — with the message in
+    // `e2e-stack/viewport.spec.ts` now saying so.
     const count = (attr: string): number => all.filter((el) => el.hasAttribute(attr)).length;
     return {
       ariaLabel: count('aria-label'),

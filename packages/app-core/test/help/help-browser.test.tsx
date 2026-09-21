@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { act, render, screen, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
@@ -347,5 +350,71 @@ describe('15.24 HelpBrowser — the Next pager', () => {
     const first = manual?.sections[1];
     expect(fragments[0]).toHaveAttribute('href', `#manual-${first?.id ?? ''}`);
     expect(fragments[0]).toHaveAccessibleName(first?.title ?? '');
+  });
+});
+
+/**
+ * T-E4-36 — the help search announces how many answers it found, not only when
+ * it found none.
+ *
+ * **The no-match arm has carried `role="status"` all along** (`gn-help__none`,
+ * thirty lines below the count), so a screen-reader user was told *"Nothing in
+ * the manual or FAQ matches …"* and told **nothing at all** when the search
+ * returned nine things. Measured on `/help` at 1512, owner: after typing
+ * `invite` into the search (`aria-label="Search the manual and FAQ"`, driven
+ * through the input's value setter + an `input` event), `document
+ * .querySelectorAll('[role=status],[aria-live]')` → **none**, while the count
+ * paragraph rendered `9 answers for “invite”`.
+ *
+ * **The count is the answer to the question the reader just asked by typing** —
+ * it is the one thing on the screen that changed — so a polite live region is
+ * what this sentence was missing, not a different string. `role="status"` and
+ * not a bare `aria-live`: that role IS `aria-live="polite"` with a name, and it
+ * is the idiom the sibling arm already uses.
+ */
+describe('T-E4-36 the help search count is announced', () => {
+  async function searchFor(text: string): Promise<void> {
+    render(<HelpBrowser />);
+    const box = screen.getByRole('searchbox', { name: 'Search the manual and FAQ' });
+    await userEvent.clear(box);
+    await userEvent.type(box, text);
+  }
+
+  it('T-E4-36 a search that finds something puts the count in a live region', async () => {
+    await searchFor('the');
+    // A query that matches: the count must exist AND be announced.
+    const count = screen.getByRole('status');
+    expect(count.className).toContain('gn-help__results-count');
+    expect(count.textContent, `count read: ${String(count.textContent)}`).toMatch(
+      /^\d+ answers? for /,
+    );
+  });
+
+  it('T-E4-36 and the count is NOT a live region before there is anything to announce', async () => {
+    // The negative half, so the first assertion cannot be satisfied by a page
+    // that renders a status element unconditionally: an empty search box draws
+    // no result count at all, and therefore no status.
+    render(<HelpBrowser />);
+    const statuses = screen.queryAllByRole('status');
+    expect(
+      statuses.filter((el) => el.className.includes('gn-help__results-count')),
+      'the results count rendered before a query was typed',
+    ).toHaveLength(0);
+  });
+
+  it('T-E4-36 the result link meets the 24px in-list floor', () => {
+    // The finding's second half, read out of the stylesheet the way the other
+    // cross-package cases in this repo do: the property is a declaration, and
+    // ui.css is the authority on it.
+    const css = readFileSync(
+      resolve(dirname(fileURLToPath(import.meta.url)), '../../../ui/src/ui.css'),
+      'utf8',
+    );
+    const body = /\.gn-help__result-title\s*\{([^}]*)\}/.exec(css.replace(/\/\*[\s\S]*?\*\//g, ''));
+    expect(body, 'no rule for .gn-help__result-title').not.toBeNull();
+    expect(body?.[1]).toMatch(/min-height:\s*1\.5rem/);
+    // The load-bearing half: an inline element's height is its line box, so a
+    // `min-height` needs a box that honours it.
+    expect(body?.[1]).toMatch(/display:\s*inline-flex/);
   });
 });

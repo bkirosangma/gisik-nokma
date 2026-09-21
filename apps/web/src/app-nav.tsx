@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { useCurrentUser } from "./providers.js";
@@ -228,6 +229,23 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const current = (target: string): "page" | undefined =>
     pathname === target ? "page" : undefined;
 
+  /**
+   * **The phone-width disclosure (E4-11).** At 390 px this bar measured 390×310
+   * — five wrapped 44-px rows, 37 % of an 844-px viewport, with the board's
+   * first card 1105 px below the fold. `flex-wrap: wrap` is what stops a long
+   * signed-in name overflowing the row by 10 px (Item 7 of
+   * `docs/pre-launch-checklist.md`); it was never a ruling that the bar may
+   * take five rows.
+   *
+   * So below 40rem the workspace-scoped links move behind one disclosure while
+   * `Workspaces`, the toggle and the corner stay on a single line. This is
+   * STATE, but not CONDITIONAL RENDERING: the links are always in the document
+   * and `data-open` only decides whether the stylesheet paints them. A closed
+   * bar is a visual state, not a missing link — and it keeps every route to
+   * My Work / Members / Settings in the accessibility tree at every width.
+   */
+  const [moreOpen, setMoreOpen] = useState(false);
+
   return (
     <nav
       className="gn-nav"
@@ -262,6 +280,23 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             Workspaces
           </Link>
         ) : null}
+        {/* PHONE-ONLY (E4-11). `display: none` above 40rem, where the links it
+            opens are painted directly by `.gn-nav__more`'s `display: contents`.
+            It renders only when the disclosure it controls has content in it:
+            every child of `.gn-nav__more` is gated on `!noWorkspace`, so that
+            flag is the exact condition, not a proxy for it. */}
+        {!noWorkspace ? (
+          <button
+            type="button"
+            className="gn-nav__more-toggle"
+            aria-expanded={moreOpen}
+            aria-controls="gn-nav-more"
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            Menu
+          </button>
+        ) : null}
+        <div className="gn-nav__more" id="gn-nav-more" data-open={moreOpen ? "true" : "false"}>
         {/* The workspace's own served name — ONE source, `getMyWorkspaces`, never
             a second derivation. Omitted (not id, not a placeholder) until the
             name arrives or if the read fails; see `useWorkspaceName` above. */}
@@ -321,6 +356,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             Settings
           </Link>
         ) : null}
+        </div>
         {/* Inbox LEFT this group in Round 24 — it now renders in
             `.gn-nav__corner` below, immediately left of the avatar. It is still
             unconditional on `workspaceId` for the reason it always was: the

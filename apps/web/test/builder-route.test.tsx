@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -54,6 +57,9 @@ vi.mock('../src/auth-client.js', () => ({
 }));
 
 import EditWorkflowPage from '../app/w/[workspaceId]/settings/workflows/[workflowId]/page.js';
+
+/** This file's own directory — no helper here exports one. */
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * THE REACT FLOW GLOBALS, SHIMMED HERE AND NOT IN `apps/web/test/setup.ts`.
@@ -257,5 +263,88 @@ describe('13.773 the crumb is a single link to the workflow list', () => {
     // anchor" just as well.
     expect(screen.getByRole('button', { name: 'Add state' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Case `13.1152` — E4-27, the Publish half. The Save half is in
+ * `authoring-routes.test.tsx`, because the two controls render on two routes and
+ * a single case cannot reach both.
+ *
+ * `.publish-controls__publish` was a hand-rolled `<button>` whose own rule
+ * re-declared the accent fill, a 1px accent border, a 6px radius and
+ * `0.35rem 0.9rem` padding — measured **146×36** beside a shared `Button` that is
+ * 44px, border-less and control-radiused, on a screen whose prototype draws 44.
+ * Swift to `@gisik-nokma/ui`'s `Button variant="primary"`; the page-local class
+ * survives for `align-self: flex-start`, the one declaration the shared
+ * component does not supply.
+ *
+ * **The page-local rule is asserted to carry NO paint**, in the same case: a
+ * tree that swapped the component but left the old rule behind would still look
+ * right in jsdom — `classList` would hold `gn-button--primary` either way — and
+ * the duplicate declarations would go on competing in a browser.
+ */
+describe('13.1152 the builder\'s Publish is the shared Button, and the page rule keeps only layout', () => {
+  it('13.1152 Publish carries the shared primary variant', async () => {
+    renderWithAuthoring({});
+    const publish = await screen.findByRole('button', { name: 'Publish' });
+    expect(publish).toHaveClass('gn-button');
+    expect(publish).toHaveClass('gn-button--primary');
+    // The class that survives, for `align-self`, must survive — a later tidy
+    // that deleted it would let a column flex parent stretch the control.
+    expect(publish).toHaveClass('publish-controls__publish');
+  });
+
+  it('13.1152 the page-local rule declares no fill, border or padding', async () => {
+    const css = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
+    const body = /\.publish-controls__publish\s*\{([^}]*)\}/.exec(css);
+    expect(body, 'no rule for .publish-controls__publish').not.toBeNull();
+    expect(body?.[1]).toContain('align-self: flex-start');
+    for (const paint of [/background:/, /border/, /padding/, /border-radius/]) {
+      expect(body?.[1], `.publish-controls__publish re-declared ${String(paint)}`).not.toMatch(paint);
+    }
+  });
+});
+
+/**
+ * Case `13.1156` — E4-9 — the builder page has ONE `<main>`, and its name field
+ * can shrink on a phone.
+ *
+ * Measured at `emulate 390x844`: `document.querySelectorAll('main')` → **2**,
+ * `main.gn-shell` (parent `body`) and `main.workflow-builder-screen__canvas`
+ * (parent `div.workflow-builder-screen__layout`, nested inside it), and
+ * `document.documentElement.scrollWidth` → **415** on a 390-px viewport — a
+ * 25-px sideways scroll, with the name field itself **403 px wide**. A page has
+ * one main; the canvas is a named region inside it.
+ *
+ * **Both halves are asserted because the finding named both and they have
+ * different causes:** the double landmark is a ROUTE-structure defect and the
+ * overflow is a CSS one, and a fix for either alone leaves the other. **The
+ * overflow half is asserted as the three declarations rather than as a
+ * measurement** — jsdom has no layout engine, so a width cannot be measured
+ * here; what the case can prove is that the pair that makes the field
+ * shrinkable is present, and it says so rather than implying a painted number.
+ */
+describe('13.1156 the builder page has one main and a shrinkable name field', () => {
+  it('13.1156 the route renders exactly one <main>, and the canvas is a named region', async () => {
+    renderWithAuthoring({});
+    // The screen is mounted (not the loading arm) before the landmark census
+    // means anything — otherwise "one main" could be a page that drew nothing.
+    expect(await screen.findByRole('button', { name: 'Publish' })).toBeInTheDocument();
+    expect(document.querySelectorAll('main'), 'the page has more than one <main>').toHaveLength(1);
+    expect(document.querySelector('.workflow-builder-screen__canvas')?.tagName).toBe('SECTION');
+    expect(screen.getByRole('region', { name: 'Canvas' })).toBeInTheDocument();
+  });
+
+  it('13.1156 the name field declares all three shrink properties', () => {
+    const css = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
+    const body = /\.workflow-builder-screen__name\s*\{([^}]*)\}/.exec(css);
+    expect(body, 'no rule for .workflow-builder-screen__name').not.toBeNull();
+    // All three, because none alone is the fix: `width: 100%` without
+    // `min-width: 0` is floored by the input's intrinsic size, and
+    // `min-width: 0` without `width: 100%` does not fill the column.
+    expect(body?.[1]).toMatch(/width:\s*100%/);
+    expect(body?.[1]).toMatch(/min-width:\s*0/);
+    expect(body?.[1]).toMatch(/box-sizing:\s*border-box/);
   });
 });

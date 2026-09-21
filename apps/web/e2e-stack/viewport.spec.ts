@@ -1,3 +1,4 @@
+import { execFileSync } from 'node:child_process';
 import { writeFileSync } from 'node:fs';
 import { fileURLToPath } from 'node:url';
 import { expect, test } from '@playwright/test';
@@ -716,8 +717,18 @@ test('label text on the signed-in surface holds the 12px floor at 390px', async 
       for (const attr of RATCHETED) {
         expect(
           names[attr],
+          // P10 (2026-09-21). The old message ended "Something that identified an
+          // element to assistive tech is gone.", which claims a PROPERTY OF
+          // ASSISTIVE TECH from a count of an ATTRIBUTE. `sweepAccessibleNames`
+          // counts `el.hasAttribute(attr)` — nothing more — so an `aria-label`
+          // that left an element and was replaced by visible text elsewhere
+          // reddens this exactly as a genuine loss does, and the sentence named
+          // the first as the second. What the number measures is stated instead,
+          // because a count read as a property is how a real loss gets argued
+          // away by someone who knows the label is still announced.
           `13.287: ${route.path} LOST ${attr}: baseline ${accessibleBaseline[attr]}, now ` +
-            `${names[attr]}. Something that identified an element to assistive tech is gone. ` +
+            `${names[attr]}. An \`${attr}\` ATTRIBUTE left the document — that is all this ` +
+            `measured, and whether it still named anything is not what it measured. ` +
             `If this is intended, delete the key from e2e-stack/accessible-names-baseline.json ` +
             `in a commit that says which element and why.`,
         ).toBeGreaterThanOrEqual(accessibleBaseline[attr]);
@@ -1003,10 +1014,45 @@ test('records non-text contrast across the signed-in surface, with a positive co
    * other is that a before/after comparison needs the BEFORE to still exist
    * after the tree has changed — prose is not a baseline.
    */
+  /*
+   * PROVENANCE (round-2 finding I2). **The file is a MEASUREMENT, and that is
+   * exactly why it needs to say WHICH measurement.** It recorded
+   * `"belowCount": 1` with `button.ticket-type-list__move` at 1.41:1 for four
+   * days after that class was fixed in `981aa92b`, and nothing in the twenty
+   * keys it carried said which run had produced it — an unattributed number in
+   * a committed file reads as a fact about the tree, and was a fact about a
+   * tree four commits old. The stamp costs three lines and it is what turns
+   * the file from a claim into a record.
+   *
+   * `git` is called through a TRY, and a failure records `null` rather than
+   * throwing: a sweep that dies because the runner has no git binary would
+   * lose the measurement it had already taken, which is a worse trade than an
+   * honest "I do not know which tree this was".
+   */
+  const repoRoot = fileURLToPath(new URL('../../..', import.meta.url));
+  const gitOrNull = (args: string): string | null => {
+    try {
+      return execFileSync('git', args.split(' '), { cwd: repoRoot, encoding: 'utf8' }).trim();
+    } catch {
+      return null;
+    }
+  };
+  const headSha = gitOrNull('rev-parse HEAD');
+  const treeWasClean = (gitOrNull('status --porcelain') ?? '') === '';
   writeFileSync(
     new URL('./non-text-contrast-roster.json', import.meta.url),
     `${JSON.stringify(
       {
+        headSha,
+        producedAt: new Date().toISOString(),
+        treeWasClean,
+        provenance:
+          'Every number below describes the tree at `headSha`, at `producedAt` — no other. ' +
+          'A later commit SUPERSEDES any entry whose class it styles, fixes or deletes, and ' +
+          'nothing here re-checks that: the file is regenerated only by a run of this sweep. ' +
+          'So read an entry as a measurement, never as a claim about the tree you are standing in. ' +
+          '`treeWasClean: false` means an uncommitted edit was in the tree the run measured, and ' +
+          '`headSha` then names its BASE rather than what was actually swept.',
         belowCount: below.length,
         totalClasses: roster.length,
         examined: examinedTotal,

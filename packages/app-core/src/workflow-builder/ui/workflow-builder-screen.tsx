@@ -201,9 +201,17 @@ export function WorkflowBuilderScreen(props: {
             <SystemRulesPanel />
             <IssuesPanel />
           </aside>
-          <main className="workflow-builder-screen__canvas">
+          {/* E4-9 — a `<section>`, NOT a `<main>`. The route page already
+              renders `<main className="gn-shell">`
+              (`settings/workflows/[workflowId]/page.tsx:57`), so this was the
+              product's only page with TWO nested `<main>` landmarks — measured
+              `document.querySelectorAll('main')` → 2, the inner one's parent
+              being `div.workflow-builder-screen__layout`. A page has one main;
+              the canvas is a named region inside it, and `aria-label` is what
+              keeps it addressable now that it is not a landmark of its own. */}
+          <section className="workflow-builder-screen__canvas" aria-label="Canvas">
             <WorkflowCanvas />
-          </main>
+          </section>
           <aside className="workflow-builder-screen__right">
             <InspectorPanel />
           </aside>

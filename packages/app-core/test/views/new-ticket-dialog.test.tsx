@@ -3,8 +3,19 @@ import { act, fireEvent, render, screen, within } from '@testing-library/react';
 // survives `verbatimModuleSyntax`, settled at packages/ui/test/components.test.tsx and repeated
 // by board.test.tsx, ticket-list.test.tsx and reopen-flow.test.tsx.
 import { userEvent } from '@testing-library/user-event';
+import { readFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { NewTicketDialog, defaultRootTypeFor } from '../../src/views/new-ticket-dialog.js';
+
+// The cross-package stylesheet read `sync-ux-css-binding.test.tsx:47` and
+// `inbox-css-binding.test.tsx` already establish for "is this class a rule?".
+// FOUR levels up, not three: that file sits directly in `test/`, this one in
+// `test/views/`. Measured the hard way — `../../..` resolved to `packages/` and
+// the read threw ENOENT, which a `Tests no tests` summary reports as a red
+// suite that ran nothing.
+const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '../../../..');
 
 /**
  * Both pickers in this dialog are the shared searchable `Select`, whose trigger is a real
@@ -825,5 +836,61 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
     expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
     expect(onCreate).not.toHaveBeenCalled();
+ * Case `13.1139` — E4-13 — the Title field wears the product's own field
+ * treatment instead of painting as raw user-agent chrome.
+ *
+ * Opened *New ticket* on the board and measured the first control a person
+ * types into: `getComputedStyle(input)` gave `border: 2px inset rgb(118,118,118)`,
+ * `background-color: rgb(255,255,255)`, `border-radius: 0px`,
+ * `padding: 1px 2px`, `font-size: 13.33px`, and `getBoundingClientRect` gave
+ * **425×22** — inside a neumorphic sheet, on a dialog whose `Type` and `Parent`
+ * siblings paint at the product's 17 px on a 44 px control. `ui.css` holds
+ * exactly two `.gn-new-ticket` rules (the actions row, the field wrapper), so
+ * the bare `<input>` had nothing to inherit.
+ *
+ * **The two halves are asserted together because either alone is passable while
+ * the defect survives.** Round 1's `P1` was precisely *"a control styled by no
+ * rule of its own"*: a class that matches no selector block satisfies a
+ * class-name assertion and changes nothing about the paint. So the class is
+ * checked on the CONTROL and the rule it names is checked in the STYLESHEET,
+ * by the cross-package read `sync-ux-css-binding.test.tsx:105` and
+ * `inbox-css-binding.test.tsx` already establish for this exact question.
+ * `packages/ui/test/components.test.tsx` pins what that rule *says* (`13.339`);
+ * this case pins that this control is one of its wearers.
+ */
+describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () => {
+  const UI_CSS = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+
+  const renderDialog = () =>
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={[{ id: 'task', name: 'Task' }]}
+        parentCandidates={[]}
+        onCreate={vi.fn()}
+        onClose={() => undefined}
+      />,
+    );
+
+  it('13.1139 the Title control carries the class', () => {
+    renderDialog();
+    const title = screen.getByLabelText('Title');
+    // The control, not a wrapper — the fix is on the `<input>` itself.
+    expect(title.tagName).toBe('INPUT');
+    expect(title).toHaveClass('gn-field__input');
+  });
+
+  it('13.1139 and the class it carries is a RULE, not a dead name', () => {
+    // CONTROL, first, for the same reason `sync-ux-css-binding.test.tsx` runs
+    // one: without it a needle that matches nothing would make the assertion
+    // below read as a pass on a stylesheet that had lost the block entirely.
+    expect(UI_CSS.includes('.gn-field__input')).toBe(true);
+    renderDialog();
+    const carried = screen.getByLabelText('Title');
+    const names = [...carried.classList];
+    expect(
+      names.some((name) => new RegExp(`\\.${name}(?![\\w-])`).test(UI_CSS)),
+      `none of ${JSON.stringify(names)} matches a selector block in ui.css`,
+    ).toBe(true);
   });
 });

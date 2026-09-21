@@ -1066,8 +1066,8 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
    * up as a diff here rather than passing unnoticed.
    */
   it('13.360 textAccent is pinned to its derived hexes', () => {
-    expect(primitives.textAccentLight).toBe('#325d97');
-    expect(primitives.textAccentDark).toBe('#8bb1e6');
+    expect(primitives.textAccentLight).toBe('#2d5488');
+    expect(primitives.textAccentDark).toBe('#97bdf2');
     expect(themes.light.textAccent).toBe('textAccentLight');
     expect(themes.dark.textAccent).toBe('textAccentDark');
   });
@@ -1082,9 +1082,27 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
    * the composite/sunken safety margin the derivation bought beyond what the
    * declared rows require.
    *
+   * **AND THE THIRD COMPOSITE, case `13.1145`, added 2026-09-21 by round-2 finding E4-31: a
+   * ghost button over `fillTertiary` does not only sit on `surface`.** On
+   * `/account` and `/mcp/tokens` it sits on `surfaceSunken`, so the ground that
+   * has to be cleared is `fillTertiary` composited over `surfaceSunken` —
+   * `#CFC7C0` light, `#41496D` dark. **It measured 3.997 light and 3.973 dark
+   * in `hig`/`minimal`, below 4.5 in BOTH, and no case measured it** — which is
+   * the whole of the finding: `textAccent` was derived against six grounds and
+   * a seventh was being painted. Both primitives were stepped for it (see their
+   * docblocks), so this case is red before that step and green after.
+   *
+   * `neo` contributes no separate reading and that is a fact about the style
+   * axis, not an omission: `STYLE_COLOR_OVERRIDES` maps `neo`'s
+   * `surfaceSunken` to `neoPaper`/`neoNavy` — its own `surface` — so the third
+   * composite IS the second one there. Asserted rather than assumed below.
+   *
    * Mutation: reverting either primitive to a value that only clears the two
    * declared rows (e.g. the intermediate `#33619c`/pre-composite pass this
-   * derivation actually went through) reddens this case alone.
+   * derivation actually went through) reddens this case alone. Reverting the
+   * 2026-09-21 step — `#2d5488`/`#97bdf2` back to `#325d97`/`#8bb1e6` — reddens
+   * the THIRD assertion alone, in `hig`/`minimal`, which is the pair that had
+   * no coverage.
    */
   it('13.360 textAccent clears 4.5 against the fillTertiary-composited control background and surfaceSunken', () => {
     const over = (src: string, dst: string): string => {
@@ -1106,6 +1124,27 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
           contrastRatio(colorOf(theme, 'textAccent', style), colorOf(theme, 'surfaceSunken', style)),
           `${style}/${theme}: textAccent on surfaceSunken`,
         ).toBeGreaterThanOrEqual(4.5);
+        // E4-31 — the THIRD ground. A ghost button on a sunken row paints
+        // `fillTertiary` over `surfaceSunken`, not over `surface`.
+        const sunkenComposite = over(
+          colorOf(theme, 'fillTertiary', style),
+          colorOf(theme, 'surfaceSunken', style),
+        );
+        expect(
+          contrastRatio(colorOf(theme, 'textAccent', style), sunkenComposite),
+          `${style}/${theme}: textAccent on fillTertiary over surfaceSunken`,
+        ).toBeGreaterThanOrEqual(4.5);
+        if (style === 'neo') {
+          // The style axis, asserted rather than assumed: `neo` maps
+          // `surfaceSunken` to its own `surface`, so its third composite is
+          // its second one. If that override is ever removed this comparison
+          // fails and the third assertion above becomes a real, separate
+          // constraint for `neo` too — which is the day it needs its own step.
+          expect(
+            sunkenComposite,
+            'neo no longer maps surfaceSunken to surface — the third composite is a new constraint here',
+          ).toBe(composite);
+        }
       }
     }
   });
@@ -2091,5 +2130,150 @@ describe('13.693 — the green700 calibration is computed on the shipped ground'
     // Neither ground flips the DECISION — which is the whole reason this is a
     // documentation defect rather than a contrast one.
     expect(shipped).toBeGreaterThan(withApple);
+  });
+});
+
+/**
+ * Case `13.1146` — P24 — every rule that paints a token colour on
+ * `surfaceSunken` names an fg role the roster actually declares for it.
+ *
+ * The finding's own second half: *"a sweep in the shape the extraction used
+ * here — every rule painting a token colour on a token surface, each pair
+ * required to appear in `CONTRAST_PAIRS` — is a gate-able check (it reads two
+ * files and needs no browser), and it is the instrument this regime has never
+ * had."* This is that instrument, deliberately scoped to `surfaceSunken`
+ * because that is the surface the finding measured; widening it to every
+ * surface is the right next move and is NOT claimed here.
+ *
+ * **The defect it catches, and why nothing else did:**
+ * `.ticket-type-editor__issues` set `color: var(--gn-danger)` on
+ * `background: var(--gn-surface-sunken)` at 12.8px — 3.844 in `hig`/`minimal`
+ * light, 4.191 dark, both below 4.5 — and the pair was in no `CONTRAST_PAIRS`
+ * row, so the enforcement loop above never evaluated it. A pair can only be
+ * enforced if it is declared, and nothing was checking that a pair which
+ * actually CO-OCCURS has been.
+ *
+ * A source scan, and it says so: it proves the roster COVERS the pair, not
+ * that the pair passes — the loop above is what measures the ratios.
+ */
+describe('13.1146 token colours on surfaceSunken are declared pairs', () => {
+  const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+  /** `surface-sunken` → `surfaceSunken`, the same transform `cssVariableName` inverts. */
+  const toRole = (kebab: string): string => kebab.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  const declaredSunkenFgs = new Set(
+    CONTRAST_PAIRS.filter((pair) => pair.bg === 'surfaceSunken').map((pair) => pair.fg),
+  );
+
+  /** Every `color: var(--gn-…)` sitting in a rule whose background is `surfaceSunken`. */
+  function undeclaredOnSunken(css: string): string[] {
+    const noComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const found: string[] = [];
+    for (const m of noComments.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const head = (m[1] ?? '').trim();
+      const body = m[2] ?? '';
+      if (head === '' || head.startsWith('@')) continue;
+      if (!/background:\s*var\(--gn-surface-sunken\)/.test(body)) continue;
+      const colour = body.match(/(?:^|;)\s*color:\s*var\(--gn-([a-z-]+)\)/);
+      if (colour?.[1] === undefined) continue;
+      const role = toRole(colour[1]);
+      if (!declaredSunkenFgs.has(role as (typeof CONTRAST_PAIRS)[number]['fg'])) {
+        found.push(`${head} -> color: var(--gn-${colour[1]})`);
+      }
+    }
+    return found;
+  }
+
+  it('13.1146 the sweep can see a violation — planted, in the same path', () => {
+    // CONTROL, FIRST and in both directions. Without it, a regex that matched
+    // nothing would report "no violations" over a stylesheet that had lost the
+    // family entirely — the same green-for-the-wrong-reason shape the sweep
+    // exists to catch.
+    const planted = `${UI_CSS_TEXT}\n.gn-zz-planted { background: var(--gn-surface-sunken); color: var(--gn-danger); }\n`;
+    const found = undeclaredOnSunken(planted);
+    expect(found, 'the sweep did not see a planted undeclared pair').toContain(
+      '.gn-zz-planted -> color: var(--gn-danger)',
+    );
+    // And the declared-and-passing direction, so "finds something" is not the
+    // only reading it can produce:
+    const plantedOk = `${UI_CSS_TEXT}\n.gn-zz-planted { background: var(--gn-surface-sunken); color: var(--gn-text); }\n`;
+    expect(undeclaredOnSunken(plantedOk)).toHaveLength(0);
+  });
+
+  it('13.1146 no rule in ui.css paints an undeclared token colour on surfaceSunken', () => {
+    const violations = undeclaredOnSunken(UI_CSS_TEXT);
+    expect(
+      violations,
+      `painted on surfaceSunken but absent from CONTRAST_PAIRS (declared fg roles there: ` +
+        `${[...declaredSunkenFgs].join(', ')}): ${violations.join(' | ')}`,
+    ).toEqual([]);
+  });
+
+  it('13.1146 the rule the finding named carries the tone on its BORDER, not its text', () => {
+    // The fix is only correct if the danger signal survives it. `danger` as a
+    // 3px non-text boundary owes 3:1, not 4.5, and clears it on this surface.
+    const rule = UI_CSS_TEXT.match(/\.ticket-type-editor__issues\s*\{([^}]*)\}/);
+    expect(rule, '`.ticket-type-editor__issues` has no rule').not.toBeNull();
+    const body = rule?.[1] ?? '';
+    expect(body).toMatch(/border-left:\s*3px solid var\(--gn-danger\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text\)/);
+    expect(body, 'the danger-toned TEXT came back').not.toMatch(/color:\s*var\(--gn-danger\)/);
+  });
+});
+
+/**
+ * Case `13.1146`, second arm — E4-32 — the advisories title does not override
+ * its panel's ink with `warning`.
+ *
+ * `.advisories-panel` sets `background: var(--gn-surface-sunken)` **and**
+ * `color: var(--gn-text-muted)`; `.advisories-panel__title` used to override the
+ * second with `color: var(--gn-warning)`, which put **13.6px warning ink on that
+ * sunken ground at 3.71:1** in `hig`/`minimal` light (rgb(178,80,0) on
+ * rgb(228,216,204)) — below the 4.5 that text of that size owes. `neo` light
+ * passed and all three darks passed, which is how a one-style failure stayed
+ * invisible; and `warning` is a foreground **no `CONTRAST_PAIRS` row names on
+ * any background**, so nothing measured the pair.
+ *
+ * **This arm exists because the sweep above CANNOT see it, and that limit is
+ * the point of writing it here:** that sweep looks for a `color` and a
+ * `background` in the SAME rule, and this pair is painted by a rule and its
+ * CHILD. The instrument is narrower than the finding, so the finding gets its
+ * own assertion rather than being folded into a sweep that would pass over it.
+ * The tone is not lost by the fix — the panel's own `border-left: 3px dashed
+ * var(--gn-warning)` carries it, at 3:1 as a non-text boundary.
+ */
+describe('13.1146 (second arm) the advisories title inherits a declared ink', () => {
+  // Read HERE, not reused from the describe above: `UI_CSS_TEXT` is scoped to
+  // that block, and a module-scope read would be a second copy of the same
+  // path — the failure mode `check-case-citations` and this file's own
+  // "one origin" rule both exist to prevent.
+  const UI = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8').replace(
+    /\/\*[\s\S]*?\*\//g,
+    '',
+  );
+  const bodyOf = (selector: string): string => {
+    const m = new RegExp(`^${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`, 'm').exec(UI);
+    if (m?.[1] === undefined) throw new Error(`no rule for ${selector}`);
+    return m[1];
+  };
+
+  it('13.1146 the title declares no ink of its own, so it inherits the panel\'s', () => {
+    expect(bodyOf('.advisories-panel__title')).not.toMatch(/color:/);
+  });
+
+  it('13.1146 the panel it inherits from is a DECLARED pair on sunken', () => {
+    const panel = bodyOf('.advisories-panel');
+    expect(panel).toMatch(/background:\s*var\(--gn-surface-sunken\)/);
+    // The ink the title now inherits, and it must be one the roster holds on
+    // this surface — otherwise the fix moves the failure rather than removing
+    // it.
+    expect(panel).toMatch(/color:\s*var\(--gn-text-muted\)/);
+    expect(
+      CONTRAST_PAIRS.some((pair) => pair.fg === 'textMuted' && pair.bg === 'surfaceSunken'),
+      'textMuted/surfaceSunken is not a declared pair — the inherited ink is unchecked',
+    ).toBe(true);
+  });
+
+  it('13.1146 the warning tone survives on the panel\'s edge, not its text', () => {
+    expect(bodyOf('.advisories-panel')).toMatch(/border-left:\s*3px dashed var\(--gn-warning\)/);
   });
 });

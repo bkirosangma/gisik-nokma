@@ -1466,3 +1466,193 @@ tell them apart would not be a case.
 **The error arm comes before the loading gate** on both screens, the order
 `apps/web/app/settings/page.tsx:277-284` records — a failure and a read still in flight are different
 states, and the loading sentence is the one that cannot tell them apart.
+## The type editor's issues list stops painting danger-toned text on a sunken surface (lane ds1, 2026-09-21, batch B10) — case `13.1146`
+
+**The finding, round 2 `P24`, IMPORTANT, flagged `r2 NEW`.** `ui.css` `.ticket-type-editor__issues` set
+`background: var(--gn-surface-sunken)` **and** `color: var(--gn-danger)` at `font-size: 0.8rem` — 12.8px,
+far below the large-text exemption, so WCAG 2.2 §1.4.3 requires 4.5. Measured **3.844** (`hig`/`minimal`
+light) and **4.191** (dark) — below 4.5 in both — and **the pair is in no `CONTRAST_PAIRS` row**, so
+`tokens.test.ts`'s enforcement loop never evaluated it. The finding's own extraction found **46 rules
+setting both a token `color` and a token `background`, against 34 declared pairs — 14 of those rules naming
+a pair with no row, i.e. 7 distinct pairs.**
+
+### The remedy taken, and the one refuted
+
+**The text moves to `--gn-text` and the danger tone stays on the 3px left border.** `{ fg: 'text', bg:
+'surfaceSunken' }` is a pair that is **already declared and already enforced** (`tokens.ts`
+`CONTRAST_PAIRS`), measuring 9.97 light / 11.09 dark; the border owes 3:1 as a non-text boundary and
+clears it at the same ratios the text failed. **The reviewer's second option is REFUTED with its number:**
+it proposed `dangerText` on this surface, but `dangerText` is `onColorWarmLight` (`#fbf7f3`) in light and
+`redInk` (`#300a06`) in dark — the ink that goes ON a danger fill, not a danger-tinted ink — so on
+`surfaceSunken` it measures **≈1.06:1 light**, the least legible value on the page. Recorded in the rule so
+the next reader of the finding does not reach for it.
+
+### The case
+
+- ✅ **13.1146 — a gate-able sweep: every rule painting a token colour on `surfaceSunken` must name an fg
+  role the roster declares for it.** `packages/ui/test/tokens.test.ts`. This is the finding's own second
+  half, which it called *"the instrument this regime has never had"* — it reads two files, needs no
+  browser, and is scoped to `surfaceSunken` **because that is the surface the finding measured; widening it
+  to every surface is the right next move and is not claimed here.** **The control runs FIRST and in both
+  directions** — a planted `.gn-zz-planted { … color: var(--gn-danger) }` must be FOUND, and the same
+  plant with `--gn-text` must not be — because without it a regex that matched nothing would report "no
+  violations" over a stylesheet that had lost the family. The RED names the finding's own rule:
+  `.ticket-type-editor__issues -> color: var(--gn-danger)`. A third assertion pins that the danger signal
+  SURVIVED the fix (the border keeps `--gn-danger`, the text may not go back). **A source scan, and it says
+  so:** it proves the roster COVERS the pair, not that the pair passes — the enforcement loop above is what
+  measures ratios. `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared
+  backup. **The two ratios are computed, not painted.** Package suites: ui 413, web 639, all green.
+
+**No `Features.md` bullet.** This corrects an existing notice's paint; it adds no affordance.
+
+## The settings sidebar's section links port the prototype's four metrics (lane ds1, 2026-09-21, batch B10) — case `13.1149`
+
+**The finding, round 2 `E4-25`, MINOR.** `nav.gn-settings__sidebar a` ×3 (`Ticket types` with
+`aria-current="page"`, `Workflows`, `Workspace`) measured **232×39**, `display: block`,
+`padding: 8px 11.2px`, `min-height: auto`. The prototype's item (`desktop.dc.html:3145`) carries
+`min-height:44px; padding:0 14px; font-size:15px; font-weight:500`, **and `globals.css`'s own docblock
+named all four as deliberately NOT ported** — *"tap-target and type-scale questions rather than token
+ones … outside this task's named scope"*. That position did not survive being measured: 44 here is a
+POINTER floor (WCAG 2.5.5), these three links are the sidebar's only controls for changing section, and
+a scope argument can defer a metric but cannot make 39 equal 44. The deferral is what made the number
+invisible. The judge's own note adds the instrument context: `DENSE_IN_LIST` holds four entries and none
+is the settings sidebar, and the stack suite's tap route list is seven routes with no bare `/settings`.
+
+### The case
+
+- ✅ **13.1149 — all four declarations are present, the two halves that hold the row at 44 arrive
+  TOGETHER, and four single-declaration mutation plants are each caught in the same path.**
+  `apps/web/test/settings-shell-tokens.test.ts`. `padding: 0 14px` is asserted with `min-height` on
+  purpose: the prototype's item carries **no vertical padding at all** and takes its height from
+  `min-height`, so porting either alone leaves the row able to drift off 44 again the moment the font
+  does — and `min-height` without the padding leaves 8px of vertical padding under the floor. The
+  witness uses this file's own `withRule`, which replaces the **first** match through the same `ruleFor`
+  the case reads, so each plant traverses the measurement's path rather than being appended past it; each
+  plant drops **exactly one** declaration, so a plant that reddened nothing would mean that declaration
+  is not what the case is reading. **Not painted** — the 232×39 above is the finding's own measurement.
+  `globals.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
+  Package suites: web 642.
+
+**No `Features.md` bullet.** This corrects an existing control's metrics; it adds no affordance.
+
+## The type editor's Save and the builder's Publish are the shared `Button` (lane ds1, 2026-09-21, batch B10) — case `13.1152`
+
+**The finding, round 2 `E4-27`, MINOR.** `button.ticket-type-editor__save "Save ticket type"` measured
+**146×36** with `border: 1px solid var(--gn-accent)`, `border-radius: 6px` and `padding: 0.35rem 0.9rem`
+— a page-local copy of a control the product already has — beside a shared `Button` that is 44px,
+border-less and control-radiused, on a screen whose prototype draws 44. `.publish-controls__publish` is
+the same rule in a second file, and the judge's note enumerated the roster that made it a family
+(`.gn-button:61-68` = `min-height: 2.75rem` + control radius; the Publish rule the same idiom).
+
+### The case
+
+- ✅ **13.1152 — the rendered Save and Publish carry the shared primary variant, and the two page-local
+  rules kept only the layout they own.** Asserted in **two files, because the two controls render on two
+  routes and one case cannot reach both**: the Save in `apps/web/test/authoring-routes.test.tsx` on the
+  type-editor route, the Publish in `apps/web/test/builder-route.test.tsx` on the builder route. Both
+  assertions are made because either alone is passable while the defect survives: a tree that swapped the
+  component but left the old paint behind would still look right in jsdom — `classList` would hold
+  `gn-button--primary` either way — while the duplicate declarations went on competing in a browser. The
+  classes survive as **layout only** (`align-self: flex-start`, the one declaration the shared component
+  does not supply), asserted so a later tidy that deleted them does not let a column flex parent stretch
+  the control.
+
+### ⚠ Two things the first cut got wrong, both caught by an assertion rather than by review
+
+**The Publish loop was passing vacuously.** The first version looped over
+`[/^Publish$/, /^Use this template/]` **on the type-editor route**, and the population assertion added to
+stop an empty loop reading as a pass immediately failed: **that route renders no Publish at all.** The loop
+had been green for the wrong reason, and the fix is the split above. **And the first Save run reported
+"2 passed, 1 error"**: the editor's mount effect calls `listWorkflows`/`listTicketTypes` as well as the
+roster, and an un-stubbed read rejects **by name** — surfacing as an unhandled error, not a red assertion.
+A summary that counted only tests would have read it as green. `ui.css` and the two components were
+reverted to `HEAD` for the RED run (with a rebuild, so the revert reached the compiled artifact) and
+restored from sha256-compared backups. Package suites: ui 420, app-core 1725, web 647.
+
+## The builder page has one `<main>`, and its name field can shrink (lane ds1, 2026-09-21, batch B10) — case `13.1156`
+
+**The finding, round 2 `E4-9`, PARTIAL → scored IMPORTANT.** At `emulate 390x844` on
+`/w/<id>/settings/workflows/<workflowId>`: `document.querySelectorAll('main')` → **2** — `main.gn-shell`
+(parent `body`) and `main.workflow-builder-screen__canvas` (parent
+`div.workflow-builder-screen__layout`, nested inside it) — and
+`document.documentElement.scrollWidth` → **415** on a 390-px viewport, a 25-px sideways scroll, with
+`.workflow-builder-screen__name` itself **403 px wide**. The judge's correction: the outer main is the
+ROUTE PAGE, not `layout.tsx` as the finding said — which is why the fix is in the screen and not in the
+shell.
+
+### The case
+
+- ✅ **13.1156 — the route renders exactly one `<main>` and the canvas is a named region; the name field
+  declares all three shrink properties.** `apps/web/test/builder-route.test.tsx`. The canvas is a
+  `<section aria-label="Canvas">`: a page has one main, and `aria-label` is what keeps the canvas
+  addressable now that it is not a landmark of its own (asserted through `getByRole('region', …)`, so a
+  `<section>` that lost its label would redden). **Both halves are asserted because they have different
+  causes** — the double landmark is route structure, the overflow is CSS — and a fix for either alone
+  leaves the other. **The overflow half is asserted as the three DECLARATIONS rather than as a
+  measurement**, and it says so: jsdom has no layout engine, so a width cannot be measured here, and
+  `width: 100%` without `min-width: 0` is floored by the input's intrinsic size while `min-width: 0`
+  without `width: 100%` does not fill the column — all three or none. `ui.css` and the screen were
+  reverted to `HEAD` for the RED run (with a rebuild, so the revert reached the compiled artifact) and
+  restored from sha256-compared backups. Package suites: ui 423, app-core 1725, web 652.
+
+**One third of the remedy is NOT done, named rather than implied:** the finding also asks for the builder
+route in the stack suite's overflow loop — a Playwright change needing a live stack on `:3001`, the same
+deferral recorded under `13.1141`, `13.1148` and `13.1151`. **Owner: whoever widens that loop.**
+
+## The builder's advisories title stops overriding its panel's ink with `warning` (lane ds1, 2026-09-21, batch B10) — case `13.1146` (second arm)
+
+**The finding, round 2 `E4-32`, MINOR** (the verifier would have raised it to IMPORTANT; no upward
+re-grading by policy). `h3.advisories-panel__title` (*"Worth a look — none of these block publishing"*)
+painted `color: var(--gn-warning)` on the panel's `--gn-surface-sunken` ground at `font-size: 0.85rem` —
+**13.6px**, far below the large-text exemption — measuring **3.71:1** in `hig` and `minimal` light
+(rgb(178,80,0) on rgb(228,216,204). `neo` light passed and all three darks passed, which is how a
+one-style failure stayed invisible. **And `warning` is a foreground no `CONTRAST_PAIRS` row names on any
+background**, so nothing measured the pair at all.
+
+### The case
+
+- **SECOND ARM (the same case) — the title declares no ink of its own, the panel it inherits from is a
+  DECLARED pair on sunken, and the warning tone survives on the panel's edge.** Recorded as a **second arm
+  of `13.1146` rather than a new case id, and the reason is in the arm itself**: the sweep that case
+  carries looks for a `color` and a `background` **in the same rule**, and this pair is painted by a rule
+  and its child — **the instrument is narrower than the finding**, so the finding gets its own assertion
+  instead of being folded into a sweep that would pass over it. The fix drops the title's override, so it
+  inherits `.advisories-panel`'s own `color: var(--gn-text-muted)` — a pair that **is** declared and
+  enforced (`{ fg: 'textMuted', bg: 'surfaceSunken' }`, asserted so a future palette edit cannot move the
+  failure rather than remove it) — while the warning reads from the panel's existing
+  `border-left: 3px dashed var(--gn-warning)`, at 3:1 as a non-text boundary rather than at 4.5 as text it
+  could not meet. `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared
+  backup. Package suites: ui 426, web 652. **The three ratios are computed, not painted** — the 3.71 is
+  the finding's own.
+
+**No `Features.md` bullet.** This corrects an existing heading's ink; it adds no affordance.
+
+## The dedicated settings routes stop painting the section word twice (lane ds1, 2026-09-21, batch B10) — T-P36
+
+> **Case id PENDING ALLOCATION** — B10's section-13 block (`13.1137`–`13.1156`) is fully used and the ask is
+> recorded in `docs/lanes/release-2026-09-22-progress.md`. **No id was minted outside the block**, so this
+> entry's marker is the task id. (A first pass DID mint `13.1157`; it was caught by reading the test back
+> before committing and replaced with this marker in the same working tree.)
+
+**The finding, round 2 `P36`, MINOR, `r2 NEW` phase 2 (half weight).** `/w/<id>/settings/workflows` renders
+`<h1 class="gn-page-title">Workflows</h1>` and then mounts `WorkflowListScreen`, whose header is
+`<h2 class="workflow-list__title">Workflows</h2>`; `/settings/ticket-types` does the same with
+`Ticket types`. Measured: `H1 "Workflows"` (34 px), `H2 "Workflows"` (16 px), the h2's top **6.4 px** below
+the h1's bottom, and the a11y tree lists `heading "Workflows"` twice in a row with nothing between them to
+say what changed.
+
+### The case
+
+- ✅ **T-P36 — neither route paints the section word as its `h1`, and the screens keep their own `h2`.**
+  `apps/web/test/authoring-routes.test.tsx`. **The screens are right and the routes were the duplicate, and
+  that is the half worth pinning:** both screens mount in **two** places —
+  `apps/web/app/settings/page.tsx:351,373` and the two dedicated routes — and in the `/settings` shell the
+  `h1` is already `Settings` with the screen's `h2` naming the section. So the export's own shape is
+  `Settings` over the section title, the shell has always drawn it, and the fix is the two route headings.
+  **The second assertion is the tempting wrong fix, refused:** deleting the screen's `h2` would satisfy the
+  first and leave the `/settings` shell with a section that has no heading at all. RED: `1 failed |
+  12 passed (13)` (`/tmp/ds1-P36-red.log`) — the loop stops at the first route, so one failure is both
+  routes' evidence — with both routes reverted to `HEAD`, then restored from sha256-compared backups. Web
+  suite 654; `pnpm turbo run typecheck` 17/17.
+
+**No `Features.md` bullet.** This corrects an existing page's heading; it adds no affordance.

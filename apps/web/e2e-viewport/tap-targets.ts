@@ -181,6 +181,21 @@ export const DENSE_IN_LIST: readonly DenseInList[] = [
       'sits inline after a `Next` label in running text, and its rule says so — "the 24px in-list ' +
       'floor is the applicable one."',
   },
+  {
+    control: '.gn-board-card__provenance',
+    container: '.gn-board__cards',
+    witness: '.gn-board__card-slot',
+    declaredAt: '.gn-board-card__provenance',
+    why:
+      'The `who · when` disclosure on every board card, 66x21 with no min size before E4-3 gave it ' +
+      'the floor. A bare text control on the card’s meta line beside the progress count, so its rule ' +
+      'reaches the same call `.gn-attention__title` does — 44 would turn each meta row into a slab. ' +
+      'It is NOT the card’s open control (`.gn-board__card-slot` is), so it has no larger equivalent. ' +
+      '⚠ Clause (b) of the membership rule is UNMET for this entry today: the board is not in the ' +
+      'stack suite’s tap-target pass, which measures /my-work alone (round-2 finding E4-12). The ' +
+      'classification is declared here so it cannot be forgotten when that pass widens; the entry ' +
+      'is not yet exercised, and that is recorded rather than left to read as covered.',
+  },
 ];
 
 /** WCAG 2.5.8, "Target Size (Minimum)" — the floor for a dense in-list control. */
