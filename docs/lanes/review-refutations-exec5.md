@@ -52,6 +52,11 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:54 IST — cadence push. Since 15:44: eleven pushes across the lanes, all their own defences/corrections; exec 6
+  logged my R6-1 concession. No refutation filed against this lane beyond R6-1; none filed by this lane. Standing:
+  43 findings (E5-21 withdrawn, E5-44 its half-point refiling); every dated Defence/corroboration note is under its
+  finding in `review-ux-exec5.md`. If this session is compacted or ends, `git log origin/exec5/review-ux` is the
+  position and this log is the phase-2 state.
 - 15:44 IST — exec 2 (head `de7b8b6d`) adds a phase-2 section checking fourteen of mine at source — E5-37, 35, 26,
   32, 17, 25, 5, 19, 23, 16, 40, 9, 10 hold; on E5-44 it notes the phone BOARD screen paints a bare `N needs attention`
   count (`board-screen.tsx:53`) and declines to file. Precision note added under E5-44. Still no refutation filed by
