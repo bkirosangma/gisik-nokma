@@ -48,7 +48,8 @@ import type { SqlParams } from './sql-params.js';
  * implemented Plan 4 code, which says the opposite in three places:
  * `can-see.ts:101` (`case 'owner': return true`), `can-see.ts`'s own table
  * (owner is its own yes/yes/yes row, disclosed by owner decision 2026-08-27),
- * and `test/visibility/visible-tickets.test.ts:88` ("from the bypass alone").
+ * and the `[owner, allTickets]` row in
+ * `test/visibility/visible-tickets.test.ts` commented `from the bypass alone`.
  * So owner compiles to `TRUE` here.
  *
  * **Admins get no bypass.** `admin` shares the member `case` deliberately.
