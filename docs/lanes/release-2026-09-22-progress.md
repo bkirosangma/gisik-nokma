@@ -82,3 +82,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F3-fn | done | d3dda5f7 | §17 names the prototype copy and its sha, with the ruling's +1 offset |
 | T-F6-fn | done | 7d358fed | soft-delete enumeration: 14 constant uses, 18 SQL statements (10 green) |
 | T-F7-fn | done | e4d6236a | §17: a lane with no row must STOP AND ASK (the count half was superseded) |
+| T-I3 | done | 0bc9919c | tap-targets: the my-work exclusion names its real reason (stack window) |
