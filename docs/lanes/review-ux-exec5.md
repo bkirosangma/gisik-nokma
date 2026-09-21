@@ -188,6 +188,7 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-35 | Min | inbox rows | copy (no time, no ticket) — prototype cat. 3 | source | — |
 | E5-36 | Min | `/workspaces` card, zero projects | FIRST-RUN | source (owner's `workspaces-gap.md` item 12) | — |
 | E5-37 | Imp | the shell's own-identity sites (heading, menu, monogram, two accessible names) | EMPTY (the person's own name) | source (two docblocks, one "confirmed in the database") | sibling of E5-4 |
+| E5-38 | Min | `/privacy` at sign-in | copy (category 2, argued) | browser (2nd) + source | — |
 
 **Edge classes reached, by finding:** EMPTY (E5-4, 37) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
@@ -1326,6 +1327,40 @@ defect was found, recorded and left in the shared hook.
 
 ---
 
+### E5-38 — MINOR · The sign-in page binds agreement to a Privacy notice that reads "Operated by [ENTITY NAME] · Governed by the laws of [JURISDICTION] … write to [CONTACT EMAIL]" — ten placeholders at paint — while the recorded choice says the page must not announce its own unreliability `[BROWSER, devtools isolated context]` `[SOURCE]` — category 2, argued
+
+**WHAT.** `/sign-in`: *"By continuing you agree to the Terms and Privacy notice."* (`sign-in/page.tsx:491`,
+`[BROWSER]`). `/privacy` at paint (second browser, signed out): the meta line *"Last updated [DATE] · Operated by
+[ENTITY NAME] · Governed by the laws of [JURISDICTION]"* and, in the body, *"operated by [ENTITY NAME], [REGISTERED
+ADDRESS]. For anything in this policy, write to [CONTACT EMAIL]"* — **10 bracketed placeholders**, 7 distinct
+(`[DATE]`, `[ENTITY NAME]`, `[JURISDICTION]`, `[REGISTERED ADDRESS]`, `[CONTACT EMAIL]`, `[RESPONSE PERIOD]`,
+`[SUPERVISORY AUTHORITY]`), measured by regex over `main.innerText`. No sentence on the page says it is a draft.
+
+**The recorded choice, quoted.** `privacy/page.tsx:1-24`: *"⚠️ BOILERPLATE. NOT REVIEWED BY A LAWYER … Before Gisik
+Nokma handles one real user's data: … 2. Every [BRACKETED PLACEHOLDER] must be replaced with a real value … **This
+warning is deliberately in a code comment and NOT on the rendered page. A live page that announced its own
+unreliability would be worse than useless to a reader** — but shipping it without this marker, to whoever next
+opens this file, would be worse still."* Case `13.251` pins *"bracketed placeholders rather than invented party
+details"*.
+
+**WHY the choice's premise does not hold.** The page announces its unreliability anyway — the brackets are the
+announcement, in the three places a reader looks (who operates this, under what law, whom to write to) — so the
+choice bought nothing it was meant to buy, and cost the one thing a draft can offer: a sentence saying so. The
+placeholders-not-invented-details half (`13.251`) is right and is not disputed; what is disputed is hiding the draft
+status. The precondition the warning names (*"before … one real user's data"*) is behind us for the owner's own
+work on this stack (`13-deployment-dogfooding.md`), and E5-33's flow asks every new person to agree to it.
+
+**WHAT WOULD HAVE BEEN BETTER.** One visible line at the top of both legal pages — *"Draft notice: the bracketed
+details are not yet filled in"* — until the placeholders are, and the sign-in line phrased as *"… the draft Terms and
+Privacy notice"* until then.
+
+**MEASUREMENT.** `[BROWSER]` `/privacy` text and regex count as above; `[SOURCE]` `privacy/page.tsx:1-24`;
+`sign-in/page.tsx:491`; `test-cases/13-pre-launch-checklist.md:149`.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1355,8 +1390,8 @@ brief's three categories.
 | 20 | Epic band count | `:2904-2927` | counts membership on screen | 2 — ruled (controller §4 #5); the ordered "record the ruling beside `ticket-list.tsx:656-664`" not yet done — **not filed** | — |
 | 21 | Inbox row time + per-row read toggle | `:606-640` (`n.time`, `n.toggleRead`) | no time, mark-read on open | **3 — recorded as "render-only", no ruling** | E5-35 |
 
-**Category-3 members, counted: 9** (rows 1, 4, 6, 8, 12, 16, 17, 21 filed; 13 folded). **Category-2 argued: 1** (row 9,
-E5-9). **Category 1 with a shared defect, noted not filed: 1** (row 5).
+**Category-3 members, counted: 9** (rows 1, 4, 6, 8, 12, 16, 17, 21 filed; 13 folded). **Category-2 argued: 2** (row 9, E5-9; and E5-38 against a
+recorded product choice outside the prototype). **Category 1 with a shared defect, noted not filed: 1** (row 5).
 
 ---
 
@@ -1390,15 +1425,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**37 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 37). By claimed severity, read from the
-heading text: **Critical 1 · Important 23 · Minor 13** (1 + 23 + 13 = 37).
+**38 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 38). By claimed severity, read from the
+heading text: **Critical 1 · Important 23 · Minor 14** (1 + 23 + 14 = 38).
 
 - **Critical (1):** E5-13
 - **Important (23):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37
-- **Minor (13):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36
+- **Minor (14):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 37. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 38. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
@@ -1582,5 +1617,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 37 findings — Critical 1 · Important 23 · Minor 13 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 38 findings — Critical 1 · Important 23 · Minor 14 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
