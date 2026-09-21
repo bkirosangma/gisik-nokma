@@ -1272,7 +1272,7 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
   });
 
   /**
-   * 10.90 — a rejected migration REQUEST is not a refusal. The server said
+   * 10.112 — a rejected migration REQUEST is not a refusal. The server said
    * nothing about the move, so the mapping the admin just authored is the only
    * copy of that work that exists anywhere, and the control that reopens the
    * dialog is the only route back to it. The dialog therefore stays mounted

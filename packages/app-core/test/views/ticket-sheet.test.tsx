@@ -608,7 +608,7 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
   });
 
   /**
-   * 3.179 (E5-7). The candidate carries `{ to }` and nothing else, so the
+   * 3.186 (E5-7). The candidate carries `{ to }` and nothing else, so the
    * preview is
    * asked a question the submission does not ask: the dialog shows
    * `Comment (required by this transition)`, its own `blocked` clears the
@@ -647,7 +647,7 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
   });
 
   /**
-   * 3.178 (E2-40). `require-field` reads the value out of the TICKET STATE
+   * 3.185 (E2-40). `require-field` reads the value out of the TICKET STATE
    * (`rule-engine/src/rules/require-field.ts:9`), not out of the candidate's
    * payload — which is why the real path sends the field claims FIRST, in one
    * ordered batch, before the transition. The preview evaluates ONE candidate
@@ -3366,7 +3366,55 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
 });
 
 /**
- * 3.182 (E5-20) — ONE ESCAPE, TWO `role="dialog"` ELEMENTS, AND ONLY ONE OF
+ * 3.190 (E5-9) — A REFUSAL ANSWERS WHERE THE CONTROL IS.
+ *
+ * `Delete` sits in the sheet's footer, at the very END of a body that scrolls:
+ * the lane that filed this measured `.gn-ticket-sheet__body` at `clientHeight
+ * 756` against `scrollHeight 4036`, with the footer's top **3,942.8 px** below
+ * the tab bar — roughly five viewports. Delete's refusal rode the shared
+ * `gn-refusal--server` slot at the HEAD of that body, so a person who scrolled
+ * to the bottom, pressed Delete, and was refused got the answer where they
+ * could not see it. The recorded ruling (`deleteTicket`'s own docblock) chose
+ * "the engine's own refusal … rather than a button that silently is not there";
+ * that ruling is about WHETHER Delete is offered, not about where its answer
+ * lands, so this case does not disturb it.
+ */
+describe('E5-9 a refused Delete answers beside the button that was pressed', () => {
+  it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'permission.role',
+          reason: 'Only an admin may delete this ticket.',
+        })),
+    );
+    renderSheet(read, source);
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    const refusal = await screen.findByText(/Refused by the server/);
+    // One sentence, never two: the footer answer REPLACES the shared slot's,
+    // rather than being a second copy of the same fact on one screen.
+    expect(screen.getAllByText(/Refused by the server/)).toHaveLength(1);
+    // …and it is in the surface the person is looking at. `.closest('footer')`
+    // is the structural claim; the pixel claim is the lane's measurement above,
+    // which a jsdom sheet cannot make (it lays nothing out).
+    expect(refusal.closest('footer')).not.toBeNull();
+  });
+});
+
+/**
+ * 3.189 (E5-20) — ONE ESCAPE, TWO `role="dialog"` ELEMENTS, AND ONLY ONE OF
  * THEM SHOULD CLOSE.
  *
  * `Move…` mounts `TransitionDialog` → `Dialog` INSIDE the sheet's own subtree,

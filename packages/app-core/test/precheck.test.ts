@@ -291,7 +291,7 @@ describe('precheckEvent — instant named-reason previews from the same engine t
   });
 
   /**
-   * 3.178 (E2-40) — the OTHER half of "the candidate must carry what the
+   * 3.185 (E2-40) — the OTHER half of "the candidate must carry what the
    * submission will carry", and it travels by a different road. `require-field` reads the
    * value out of the TICKET STATE (`rule-engine/src/rules/require-field.ts:9`),
    * so no payload key can reach it; the dialog's collected values ride

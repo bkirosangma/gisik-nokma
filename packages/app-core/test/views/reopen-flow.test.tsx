@@ -583,7 +583,7 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
 });
 
 /**
- * 3.180 (V10) — THE LEDGER END OF THE SAME GUARD, which is the thing the
+ * 3.187 (V10) — THE LEDGER END OF THE SAME GUARD, which is the thing the
  * finding is actually about. The dialog's own case pins "onCreate is called once"; this
  * pins what that is FOR. `create-ticket-flow` mints
  * `entity: { kind: 'ticket', id: newUlid() }` PER CALL, so two presses are two

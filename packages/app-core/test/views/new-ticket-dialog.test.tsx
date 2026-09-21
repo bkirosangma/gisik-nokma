@@ -496,7 +496,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
 });
 
 /**
- * 3.180 (V10) — THE CREATE CONTROL HAD NO RE-ENTRANCY GUARD OF ANY KIND.
+ * 3.187 (V10) — THE CREATE CONTROL HAD NO RE-ENTRANCY GUARD OF ANY KIND.
  *
  * `disabled` carried the title/type gates and nothing else, and the dialog held
  * no in-flight latch, so a second press was not even a race. The call reaches
@@ -606,7 +606,7 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
  * served-types map both drop it), so any "deepest" rule would have to invent a
  * rank — or a new prop — to decide a product question this task does not own.
  */
-describe('3.181 (E5-16) the Type picker does not start at the top of the hierarchy', () => {
+describe('3.188 (E5-16) the Type picker does not start at the top of the hierarchy', () => {
   // The BUILT-IN ladder, in its own order and with its own ranks — Epic is
   // FIRST and rank 1, which is the whole defect. Nothing here is sorted or
   // reversed to manufacture it, and `sub-task` is present at rank 4 because it
