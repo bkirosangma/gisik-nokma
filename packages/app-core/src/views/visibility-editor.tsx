@@ -34,6 +34,30 @@ export const LOCKOUT_WARNING_COPY =
   'You are about to lose access to this ticket. A project admin — or the workspace owner, who always sees — can restore it.';
 
 /**
+ * What the read-only arm says when this viewer may not edit — i.e. the answer to
+ * *"then who can?"*, which is the question a person who has just been told "no"
+ * is asking.
+ *
+ * **⚠ IT WAS WRONG AND IT CONTRADICTED ITS OWN SIBLING (F4, 2026-09-21).** It read
+ * *"Only a project admin, or whoever created this ticket, can change who sees
+ * it."* The server's rule
+ * (`apps/server/src/permissions/check-permission.ts:1058-1060`) is
+ * `hasProjectAdminRights(ctx.eff, projectId) || ctx.sessionUserId === creatorId`,
+ * and `hasProjectAdminRights` (`apps/server/src/permissions/effective-role.ts`) is
+ * `workspaceRole === 'owner' || workspaceRole === 'admin' || projectAdmin`. **A
+ * workspace OWNER or ADMIN may change any ticket's visibility**, and the sentence
+ * named neither — while `LOCKOUT_WARNING_COPY` two declarations up says *"or the
+ * workspace owner, who always sees"*. Two sentences in ONE component disagreeing
+ * about who may act, and the omission is invisible to the people best placed to
+ * notice it: an owner never reads a sentence about what an owner may do.
+ *
+ * Hoisted to a constant for the reason the other two are: the spec asserts the
+ * string that RENDERS, not a re-typed copy of it.
+ */
+export const READ_ONLY_COPY =
+  'Only a project admin, a workspace owner or admin, or whoever created this ticket, can change who sees it.';
+
+/**
  * How the ticket's audience stands now, as somebody's claim rather than a
  * property.
  *
@@ -115,15 +139,23 @@ export type VisibilityEditorProps = {
    */
   current: VisibilityClaim | null;
   /**
-   * Whether this viewer may CHANGE the audience — spec §6: project admins and
-   * the ticket's creator.
+   * Whether this viewer may CHANGE the audience — the server's rule, which is
+   * **a project admin, a workspace OWNER or ADMIN, or the ticket's creator**
+   * (`apps/server/src/permissions/check-permission.ts:1058-1060` ORs
+   * `hasProjectAdminRights` with `sessionUserId === creatorId`, and
+   * `effective-role.ts` defines the first as owner ‖ admin ‖ projectAdmin).
    *
-   * Decided by the caller and passed in, not resolved here, because the two
-   * facts it needs (project-admin rights, and who created this ticket) are the
-   * caller's reads and not this component's. It gates only the CONTROLS: the
-   * standing claim and the owner-disclosure line render either way, because
-   * somebody who cannot change the audience still needs to know what it is and
-   * who else can see.
+   * ⚠ **THIS SENTENCE SAID "project admins and the ticket's creator" UNTIL
+   * 2026-09-21 (F4), and it was the same omission as the read-only sentence's:**
+   * it left out the workspace owner and admin, who may change any ticket's
+   * visibility. A caller reading this docblock to decide what to pass would have
+   * written the same under-permissive gate the sentence described.
+   *
+   * Decided by the caller and passed in, not resolved here, because the facts it
+   * needs (effective role, and who created this ticket) are the caller's reads
+   * and not this component's. It gates only the CONTROLS: the standing claim and
+   * the owner-disclosure line render either way, because somebody who cannot
+   * change the audience still needs to know what it is and who else can see.
    */
   canEdit: boolean;
   /** Told after a committed change, so the sheet can refetch what it holds. */
@@ -438,9 +470,26 @@ export function VisibilityEditor({
           ) : null}
         </div>
       ) : (
-        <p className="gn-visibility__read-only">
-          Only a project admin, or whoever created this ticket, can change who sees it.
-        </p>
+        /*
+          ⚠ **THE ARM IS DEAD IN THE SHIPPED PRODUCT, AND THAT IS RECORDED RATHER
+          THAN FIXED HERE (F4, 2026-09-21).** It renders only when `canEdit` is
+          false, `canEdit` is `TicketSheet`'s `canSetVisibility` prop, whose
+          declared default is `true` (`ticket-sheet.tsx:422`), and a sweep of
+          `apps/web/**`, `apps/desktop/**` and `apps/mobile/**` for
+          `canSetVisibility` finds ONE hit and it is a COMMENT
+          (`page.tsx:2825`) — no caller anywhere passes it, so no shipped surface
+          can render this. **The sentence is corrected above regardless**, because
+          a wrong permission statement is not made less wrong by being
+          unreachable, and because the prop is a declared part of this component's
+          public surface that a caller may pass at any time. **Deleting the arm —
+          or giving it the read that makes it reachable — is a decision about
+          `canSetVisibility` rather than about this sentence**, and the sheet's
+          own docblock (`ticket-sheet.tsx:225-241`) argues at length that the
+          client cannot know role or creator, which is a sound argument for
+          showing the control and letting the door refuse. **Owner: whoever next
+          revisits `canSetVisibility`.**
+        */
+        <p className="gn-visibility__read-only">{READ_ONLY_COPY}</p>
       )}
     </section>
   );

@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.062`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.063`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -166,3 +166,41 @@ the link opens nothing.
 **The state is four-valued now** — `'loading' | 'unreachable' | null | InviteSummary` — where it was
 three. `3.121` keeps the ANSWERED-`null` arm and its own docblock; the half of it that asserted the
 transport failure was the defect, and it moved here rather than being renumbered.
+
+## The visibility editor's read-only sentence — case `17.063` (F4, 2026-09-21)
+
+**The arm answered "then who can?"** — the exact question a person who has just been told "no" is asking —
+with a sentence that omitted the two roles most likely to be able to help, and that contradicted its own
+sibling two declarations up.
+
+**The measurement, re-taken rather than inherited.** The server's rule is
+`apps/server/src/permissions/check-permission.ts:1058-1060`,
+`hasProjectAdminRights(ctx.eff, projectId) || ctx.sessionUserId === creatorId`, and
+`hasProjectAdminRights` (`apps/server/src/permissions/effective-role.ts`) is
+`workspaceRole === 'owner' || workspaceRole === 'admin' || projectAdmin`. **A workspace owner or admin
+may change any ticket's visibility.** The shipped sentence — *"Only a project admin, or whoever created
+this ticket, can change who sees it."* — named neither, while `LOCKOUT_WARNING_COPY` in the same file
+says *"or the workspace owner, who always sees"*.
+
+- **17.063** ✅ The read-only sentence NAMES the workspace owner and admin. Asserted on the pair — the
+  corrected sentence present AND the understated one absent — because a case asserting only the presence
+  passes over a component rendering both; and the two role words are asserted separately, because a
+  sentence that merely reworded the old one would satisfy a presence-only check. —
+  (`packages/app-core/test/views/visibility-editor.test.tsx`)
+
+**The second copy of the same omission was found while fixing the first, and it is the more load-bearing
+one.** `canEdit`'s own prop docblock read *"spec §6: project admins and the ticket's creator"* — the same
+under-permissive rule, stated at the place a CALLER reads to decide what to pass. It is corrected in the
+same change set; had it been left, the next caller would have written the gate the old sentence
+described.
+
+**⚠ THE ARM IS STILL DEAD IN THE SHIPPED PRODUCT, AND THAT IS RECORDED AT THE SITE RATHER THAN FIXED
+HERE.** It renders only when `canEdit` is false; `canEdit` is `TicketSheet`'s `canSetVisibility` prop,
+whose declared default is `true` (`ticket-sheet.tsx:422`); and a sweep of `apps/web/**`,
+`apps/desktop/**` and `apps/mobile/**` for `canSetVisibility` finds ONE hit and it is a COMMENT
+(`page.tsx:2825`). **Deleting the arm — or giving it the read that makes it reachable — is a decision
+about `canSetVisibility`, not about this sentence**, and the sheet's own docblock
+(`ticket-sheet.tsx:225-241`) argues that the client cannot know role or creator, which is a sound
+argument for showing the control and letting the door refuse. **Owner: whoever next revisits
+`canSetVisibility`.** The sentence was corrected regardless: a wrong permission statement is not made
+less wrong by being unreachable, and the prop is a declared part of this component's public surface.

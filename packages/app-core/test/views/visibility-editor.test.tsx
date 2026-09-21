@@ -7,6 +7,7 @@ import type { DataSource } from '../../src/data-source.js';
 import {
   LOCKOUT_WARNING_COPY,
   OWNER_ALWAYS_SEES_COPY,
+  READ_ONLY_COPY,
   VisibilityEditor,
   type VisibilityClaim,
 } from '../../src/views/visibility-editor.js';
@@ -134,6 +135,37 @@ describe('3.104 the owner’s read bypass is disclosed, on every mode', () => {
     mount({ canEdit: false });
     expect(screen.getByText(OWNER_ALWAYS_SEES_COPY)).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Only the people I name' })).toBeNull();
+  });
+
+  /**
+   * 17.063 — F4. The read-only arm answered *"then who can?"* — the exact question
+   * a person who has just been told "no" is asking — with a sentence that omitted
+   * the two roles most likely to be able to help and that contradicts its own
+   * sibling two declarations up.
+   *
+   * The server's rule (`apps/server/src/permissions/check-permission.ts:1058-1060`)
+   * is `hasProjectAdminRights(eff) || sessionUserId === creatorId`, and
+   * `hasProjectAdminRights` (`effective-role.ts`) is
+   * `workspaceRole === 'owner' || workspaceRole === 'admin' || projectAdmin`. So a
+   * WORKSPACE owner or admin may change any ticket's visibility, and the shipped
+   * sentence named neither — while `LOCKOUT_WARNING_COPY` right beside it says
+   * *"or the workspace owner, who always sees"*. Two sentences in one component
+   * disagreeing about who may act.
+   *
+   * Asserted on the pair: the corrected sentence is present AND the understated
+   * one is absent. A case asserting only the first passes over a component
+   * rendering both.
+   */
+  it('17.063 the read-only sentence names the WORKSPACE owner and admin, not only a project admin', () => {
+    mount({ canEdit: false });
+
+    expect(screen.getByText(READ_ONLY_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/^Only a project admin, or whoever created this ticket,/)).toBeNull();
+    // And the two roles the server's own predicate admits are both NAMED — the
+    // omission is the defect, so a sentence that merely rewords it would pass a
+    // presence-only assertion.
+    expect(READ_ONLY_COPY).toMatch(/workspace owner/i);
+    expect(READ_ONLY_COPY).toMatch(/workspace .*admin|admin/i);
   });
 });
 
