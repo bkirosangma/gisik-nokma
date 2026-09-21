@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, within } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { CheckIcon, RemoveIcon, SearchIcon } from '../src/select/select-icons.js';
@@ -83,6 +83,62 @@ describe('Select — non-searchable single-select', () => {
   it('is disabled when disabled is true', () => {
     render(<Select options={FRUIT} value={null} onChange={vi.fn()} disabled aria-label="Fruit" />);
     expect(screen.getByRole('button', { name: /Fruit/ })).toBeDisabled();
+  });
+});
+
+describe('Select — non-searchable focus restoration', () => {
+  /**
+   * E4-17 — both keyboard close paths of the non-searchable `Select` used to end
+   * with `document.activeElement === body`: Enter opens the listbox and DOM-focuses
+   * an option row inside a `document.body` portal, so when the panel unmounts the
+   * focused node is removed with it and the browser drops focus to the document
+   * root. `SelectPanel` now wraps its content in `<FocusScope restoreFocus>` — the
+   * React Aria primitive the finding names — which restores the element that had
+   * focus when the scope mounted, i.e. the trigger.
+   *
+   * The control comes FIRST in each test, on purpose: it asserts the open path
+   * really did move focus into the option row, so the closing assertion that
+   * follows is a reading of a component that demonstrably *can* move focus here —
+   * not a passing assertion about a control that never focuses anything.
+   */
+  it('E4-17: Escape returns focus to the trigger, not <body>', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} aria-label="Fruit" />);
+    const trigger = screen.getByRole('button', { name: /Fruit/ });
+
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    const listbox = await screen.findByRole('listbox');
+    // Control: the open path moved DOM focus off the trigger and into the row.
+    expect(listbox.contains(document.activeElement)).toBe(true);
+    expect(trigger).not.toHaveFocus();
+
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    // `FocusScope` restores inside a `requestAnimationFrame`, so the settle is async.
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('E4-17: picking with Enter returns focus to the trigger, not <body>', async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    render(<Select options={FRUIT} value={null} onChange={onChange} aria-label="Fruit" />);
+    const trigger = screen.getByRole('button', { name: /Fruit/ });
+
+    trigger.focus();
+    expect(trigger).toHaveFocus();
+
+    await user.keyboard('{Enter}');
+    const listbox = await screen.findByRole('listbox');
+    // Control: same open path as above, this time followed by a commit.
+    expect(listbox.contains(document.activeElement)).toBe(true);
+
+    await user.keyboard('{Enter}');
+    expect(onChange).toHaveBeenCalledWith('apple');
+    expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    await waitFor(() => expect(trigger).toHaveFocus());
   });
 });
 
