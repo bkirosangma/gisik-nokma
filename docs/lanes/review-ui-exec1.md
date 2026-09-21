@@ -12,7 +12,7 @@
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
 | **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
-| **P16–P22** | — | **7 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important). |
+| **P16–P23** | — | **8 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
@@ -579,6 +579,28 @@ The two that stand:
 
 **WHAT WOULD HAVE BEEN BETTER.** `aria-label` on both — `"Account"` and `"Add rule"` name them exactly, and the workflow-builder menu's trigger already reads *"Add rule"* three lines above it (`add-rule-menu.tsx:44`). Better still, the same structural remedy P19 asks for: a shared menu component that requires the label by type, which is how `SegmentedControl` prevents P19's version of this.
 
+### P23 — **IMPORTANT** ⚠ **r2 NEW** — The searchable Select's input has its focus outline REMOVED and nothing replaces it, so the control has no visible focus indicator
+
+**WHAT.** `ui.css:2474` sets `.gn-select__trigger--searchable input:focus { outline: none; }`. Nothing in the product supplies a ring for that control in its place. **WCAG 2.2 §2.4.7 *Focus Visible* is Level AA** — *"any keyboard operable user interface has a mode of operation where the keyboard focus indicator is visible"* — and here the indicator is not merely absent by default, it is **removed by the product's own CSS**, so no user-agent default can survive it.
+
+**MEASUREMENT — every step opened, because this is the finding I would most expect to be wrong.**
+1. **The removal.** `ui.css:2474`, exactly as quoted. It is the **only** `outline: none` in `ui.css` (`grep -cE 'outline:\s*(none|0)'` → **1**) and one of only two in the product; the other is `globals.css:1160`, which *does* replace it (below).
+2. **The element that wears it.** `select.tsx:427-433`: the searchable branch renders `<div className={props.multiple ? '… --searchable … --multiple gn-field__input' : '… --searchable gn-field__input'}>` — **a `<div>`**, containing a `<SearchIcon />`, the chips in multi mode, and the `<input {...inputProps} ref={inputRef} …/>`. **A `<div>` cannot match `:focus-visible`, because it is not focusable** — which is what makes the wrapper's `gn-field__input` class no help at all.
+3. **No replacement anywhere in the family.** `grep -nE '\.gn-select[a-z_-]*[^ ]*:(focus|focus-within)'` over `ui.css` → **no matches**. The complete family is `:2453` `.gn-select__trigger`, `:2462` `:disabled`, `:2464` `--searchable`, `:2467` `--searchable input`, `:2474` `--searchable input:focus`, `:2485` `--multiple`, `:2494` `--trigger-open` — **not one `:focus` or `:focus-visible` rule among them.**
+4. **And the ring that DOES exist in this area is not reachable by this element.** `ui.css:4771-4774` is `.gn-field__input:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }` — a real ring, which is why the **non-searchable** trigger is fine: `select.tsx:254` renders it as `<button … className="gn-select__trigger gn-field__input">`, a **focusable** element that matches. **The difference between the two branches is the whole finding: the same class on a `<button>` works and on a `<div>` cannot.**
+
+**⚠ AND THE CONTRAST THAT MAKES THIS A DEFECT RATHER THAN A STYLE — the product does this correctly one line away.** `globals.css:1160` is the other `outline: none`, and it is `globals.css:1160-1164`:
+```
+.gn-project-card__door:focus-visible { outline: none; }
+.gn-project-card__door:focus-visible::after {
+  outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
+```
+with a docblock explaining that *"The focus ring goes on the STRETCHED layer, not the anchor's own box"*. **So the codebase removes an outline only when it has somewhere to put the ring — and the Select searchable branch removed one and put it nowhere.**
+
+**Blast radius, measured:** `searchable` is passed at **three** call sites — `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:360`, `views/new-ticket-dialog.tsx:145` and `:204`, and `packages/ui/src/select/select.tsx:123,126` picks the branch. So the affected controls are the ticket-type editor's and the New-ticket dialog's searchable pickers.
+
+**WHAT WOULD HAVE BEEN BETTER.** A ring for the control, in the place the product already uses for this exact shape: `.gn-select__trigger--searchable:focus-within { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }` — `:focus-within` on the **div** is what matches when the inner input has focus, and `outline-offset: 1px` is `.gn-field__input`'s own value so the two branches look identical. One rule; and it is the same move `globals.css:1160-1164` already makes.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -634,7 +656,7 @@ The two that stand:
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 12**
+**IMPORTANT — 13**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -644,6 +666,7 @@ The two that stand:
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 - `P21` ⚠ r2 — the description editor's content area has no role and no accessible name
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
+- `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
@@ -663,7 +686,7 @@ The two that stand:
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 
-**Total 26.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 27.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
