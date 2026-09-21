@@ -1669,7 +1669,15 @@ export function TicketSheet({
             // `ticket.assigned` with `null` is a legal state the control must be
             // able to express, and a picker with no way back to it cannot.
             { value: UNASSIGNED, label: 'Unassigned' },
-            ...people.map((member) => ({ value: member.id, label: member.name })),
+            // RULING E4-18: `member.name` verbatim rendered a BLANK option
+            // for a member with no display name, breaking the honesty
+            // contract `provenance.ts` states ("a missing display name
+            // falls back to the raw actor id — attributed, never blank")
+            // and `visibility-editor.tsx:410`'s own picker already keeps.
+            ...people.map((member) => ({
+              value: member.id,
+              label: actorLabel(member.id, member.name),
+            })),
           ]}
           value={state.assigneeId ?? UNASSIGNED}
           onChange={(next) => {

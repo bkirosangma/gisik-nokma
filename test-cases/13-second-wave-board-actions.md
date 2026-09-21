@@ -1915,6 +1915,15 @@ with them.
   current value** (`select.tsx:255` renders the placeholder otherwise).
   **Mutation-witnessed twice:** `submitAssignee` never ingesting reddens it, and collapsing a refused roster
   back into `[]` — the sheet's own old behaviour — reddens it too.
+  **A FIFTH arm added, RULING E4-18 (closed), same file, no new id (§13's own numbering is exhausted —
+  see `test-cases/17-open-work.md`'s block-allocation rule; this ruling has none there either):** a member
+  with no display name used to render as a BLANK 13px option — `...people.map((member) => ({ value:
+  member.id, label: member.name }))`, `member.name` verbatim — breaking the same honesty contract
+  `provenance.ts` states for every other actor label on this sheet (`visibility-editor.tsx:410`'s own
+  picker already keeps it via `actorLabel`). The picker now routes through `actorLabel(member.id,
+  member.name)` too, so a nameless member reads by its raw id rather than as nothing — asserted with a
+  seeded three-member roster (one carrying `name: ''`) against the full rendered option-text array, plus
+  a direct check that no option's text is the empty string.
 
 ### What is NOT covered, named rather than implied
 

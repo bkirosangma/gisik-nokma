@@ -1414,6 +1414,46 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     expect(within(row).getByText(/roster could not be loaded/i)).toBeInTheDocument();
   });
 
+  /**
+   * RULING E4-18 — `...people.map((member) => ({ value: member.id, label:
+   * member.name }))` rendered a BLANK 13px option for a member with no
+   * display name (a real, seeded member: `accountant@e2e.gisik-nokma.local`,
+   * `name: ''`). `provenance.ts`'s own honesty contract ("a missing display
+   * name falls back to the raw actor id — attributed, never blank") already
+   * governs the sibling `visibility-editor.tsx` picker via `actorLabel`; this
+   * is the same contract applied here.
+   */
+  it('a member with no display name renders by id, never a blank option', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
+        { id: 'user_nameless', name: '', role: 'guest' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source);
+    await settled();
+    const listbox = await openAssigneeList();
+    const options = within(listbox).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Unassigned',
+      'Kiro',
+      'Anselma Marak',
+      'user_nameless',
+    ]);
+    // The blank-string failure mode this ruling closes: no option's visible
+    // text is empty, which a `.toEqual` on the full array above could in
+    // principle still satisfy by accident if the array itself were wrong —
+    // this is the assertion that addresses the failure mode directly.
+    for (const option of options) {
+      expect(option.textContent).not.toBe('');
+    }
+  });
+
   it('names who assigned the ticket, in the sibling rows’ own shape', async () => {
     renderSheet(
       ticketRead({
