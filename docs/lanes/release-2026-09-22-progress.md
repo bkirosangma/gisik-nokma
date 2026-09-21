@@ -28,3 +28,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-12 | done | 04ac1714 | account row counts live + names archived; 18 tests green |
 | T-E5-33 | done | cf064cfe | sign-in requires the email in a real form; 25 tests green |
 | T-E5-14 | done | ebb82030 | on-screen reorder note + tie-break; 54 tests green |
+| T-E5-35 | done | f75680b4 | inbox rows show WHEN + ticket; 67 tests green |
