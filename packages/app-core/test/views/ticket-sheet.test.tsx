@@ -3172,6 +3172,8 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     await settled();
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    // E2-35 (B13): Delete asks first — press through the confirm.
+    await user.click(await screen.findByRole('button', { name: 'Delete ticket' }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
 
     expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return');
