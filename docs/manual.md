@@ -726,8 +726,8 @@ not an error.
 
 A table. You choose two things:
 
-- **How to group it** — by epic, status, assignee, type, or flat (no grouping).
-- **Which columns to show** — from status, assignee, due date, type, progress.
+- **How to group it** — by epic, status, assignee, type, **priority**, or flat (no grouping).
+- **Which columns to show** — from status, assignee, due date, type, progress, **priority**.
 
 Grouping only rearranges. It never hides a row and never changes the counts — the summary at the top
 ("4 tickets · 1 done") stays the same however you regroup or collapse. Things with nothing to group

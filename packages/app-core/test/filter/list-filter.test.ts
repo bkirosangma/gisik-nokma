@@ -191,3 +191,23 @@ describe('13.543 the axis a ListRow cannot answer is unrepresentable in both hal
     expect(spec).toBeDefined();
   });
 });
+
+/**
+ * 13.1229 — the `priorities` axis, both halves (spec 2026-09-22). `row` carries
+ * `P2`, so the include half is asserted on the level it holds AND on the two it
+ * does not: an axis that narrowed nothing, or one that narrowed everything,
+ * would each pass a single-sided assertion here.
+ */
+describe('13.1229 the priorities axis, both halves', () => {
+  it('narrows to the listed levels and excludes the listed levels; empty lists touch nothing', () => {
+    expect(matchesListRow(row, 'p1', { priorities: ['P2'] })).toBe(true);
+    expect(matchesListRow(row, 'p1', { priorities: ['P1', 'P3'] })).toBe(false);
+    // An absent list and an empty list both mean "the caller named nothing" —
+    // the same rule every other id axis here follows.
+    expect(matchesListRow(row, 'p1', {})).toBe(true);
+    expect(matchesListRow(row, 'p1', { priorities: [] })).toBe(true);
+    expect(matchesListRow(row, 'p1', { exclude: { priorities: ['P2'] } })).toBe(false);
+    expect(matchesListRow(row, 'p1', { exclude: { priorities: ['P1'] } })).toBe(true);
+    expect(matchesListRow(row, 'p1', { exclude: { priorities: [] } })).toBe(true);
+  });
+});

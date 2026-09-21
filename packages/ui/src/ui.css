@@ -1659,6 +1659,13 @@ button.gn-ticket-sheet__crumb--link {
    A danger tone with no clock behind it would paint every past date the same
    colour as every future one. */
 .gn-list__due { color: var(--gn-text-muted); }
+/* The priority cell (spec 2026-09-22), muted for the due cell's own reason: the
+   cell's content is a CLAIM plus its claimant, and the value itself is not a
+   warning. P1 is NOT given `--gn-danger` here, unlike the board card's badge —
+   on the board the badge is the only signal on a dense grid, while the list
+   already carries the level in a column beside a state chip, and the spec names
+   the danger tone for the BADGE only. */
+.gn-list__priority { color: var(--gn-text-muted); }
 /* Board prototype port Task 9 (2026-09-16), spec List `:405-479`,
    "Container": `cardBg + cardShadow; radius cardR; overflow:auto`. Wraps
    `<Table>` (`@gisik-nokma/ui`) FROM THE OUTSIDE — `ticket-list.tsx`'s

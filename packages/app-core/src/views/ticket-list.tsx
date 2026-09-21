@@ -35,8 +35,15 @@ import { formatRollup } from './rollup-text.js';
 import { useLiveQuery } from './use-live-query.js';
 import { usePreferences } from './use-preferences.js';
 
-const GROUPING_OPTIONS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'flat'];
-const AVAILABLE_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'type', 'progress'];
+const GROUPING_OPTIONS: Grouping[] = ['epic', 'status', 'assignee', 'type', 'priority', 'flat'];
+const AVAILABLE_COLUMNS: ListColumnId[] = [
+  'status',
+  'assignee',
+  'dueDate',
+  'type',
+  'progress',
+  'priority',
+];
 
 /**
  * What a group's title NAMES, transcribed from the prototype's own grouping
@@ -1131,6 +1138,17 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
         </span>
       );
     }
+    case 'priority':
+      // A CLAIM, attributed exactly like the due cell above (spec 2026-09-22):
+      // the level with whose claim it is, so nobody reads a priority as a fact
+      // the system established. There is no absence arm — `ListRow.priority` is
+      // required and its mapper THROWS rather than defaulting to P2, so a row
+      // reaching this switch always has a level and a claimant.
+      return (
+        <span className="gn-list__priority">
+          {row.priority.value} — {actorLabel(row.priority.claim.actorId, row.priority.claim.actorName)}&apos;s claim
+        </span>
+      );
     case 'type':
       return <span>{row.typeId}</span>;
     case 'progress':

@@ -1,3 +1,4 @@
+import { PRIORITIES } from '@gisik-nokma/domain';
 import { actorLabel } from '../provenance.js';
 import type { Grouping, ListColumnId, ListRow } from '../view-types.js';
 
@@ -117,6 +118,19 @@ export function groupRows(rows: ListRow[], grouping: Grouping, labels: GroupLabe
     const section = sections.get(key) ?? { key, label, rows: [] };
     section.rows.push(row);
     sections.set(key, section);
+  }
+  if (axis === 'priority') {
+    // THE LADDER'S order, not encounter order (spec 2026-09-22). `sections` is
+    // built by WALKING the rows, so its insertion order is the order the levels
+    // happen to be met in the input — a page whose P2 rows come first would
+    // answer P2, P1, P3. `PRIORITIES` is imported rather than re-typed here for
+    // the one-origin rule the ladder is under.
+    //
+    // `flatMap` over the ladder and not `PRIORITIES.map(...)`: a level nobody
+    // holds yields `?? []`, which flattens away. An empty section would assert
+    // there is something to look for in a bucket that has nothing in it — the
+    // rule the list route states for an empty page, applied one level down.
+    return PRIORITIES.flatMap((level) => sections.get(`priority:${level}`) ?? []);
   }
   return [...sections.values()];
 }

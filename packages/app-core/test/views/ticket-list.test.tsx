@@ -1221,8 +1221,8 @@ const DUE_CLOSED: ListRow = listRowSeed({
   closed: { actorId: 'me', at: '2026-09-17T09:00:00.000Z' },
 });
 
-describe('13.659 Group by keeps its accessible name and exactly its five keys', () => {
-  it('the control is a button named `Group by`, and its panel offers epic/status/assignee/type/flat — and no sixth key', async () => {
+describe('13.659 Group by keeps its accessible name and exactly its six keys', () => {
+  it('the control is a button named `Group by`, and its panel offers epic/status/assignee/type/priority/flat — and no seventh key', async () => {
     const user = userEvent.setup();
     render(<ControlledList />);
     // MEASURED, and worth recording because it looks like a defect and is not
@@ -1238,8 +1238,8 @@ describe('13.659 Group by keeps its accessible name and exactly its five keys', 
     expect(trigger).toHaveAttribute('aria-label', 'Group by');
     await user.click(trigger);
     const listbox = await screen.findByRole('listbox');
-    expect(within(listbox).getAllByRole('option')).toHaveLength(5);
-    for (const key of ['epic', 'status', 'assignee', 'type', 'flat']) {
+    expect(within(listbox).getAllByRole('option')).toHaveLength(6);
+    for (const key of ['epic', 'status', 'assignee', 'type', 'priority', 'flat']) {
       expect(within(listbox).getByRole('option', { name: key })).toBeInTheDocument();
     }
     // The prototype's own list carries `workflow` in this slot
@@ -1250,23 +1250,24 @@ describe('13.659 Group by keeps its accessible name and exactly its five keys', 
   });
 });
 
-describe('13.660 the tray renders five chips, each with its own accessible name and checked state', () => {
-  it('five checkboxes, named for their columns, checked exactly where the preferences say', async () => {
+describe('13.660 the tray renders six chips, each with its own accessible name and checked state', () => {
+  it('six checkboxes, named for their columns, checked exactly where the preferences say', async () => {
     const user = userEvent.setup();
     render(<ControlledList initial={chose(['status', 'assignee'], 'flat')} />);
     // Opened first, and not as a convenience: a `hidden` subtree is excluded
     // from the accessible tree, so `getAllByRole` over a closed tray answers
-    // ZERO while five chips sit in the DOM — a zero that would read as "the
+    // ZERO while six chips sit in the DOM — a zero that would read as "the
     // chips are gone". `getAllByLabelText` below is the closed-tray arm.
     await user.click(screen.getByRole('button', { name: 'Columns' }));
     const tray = screen.getByTestId('list-columns-tray');
-    expect(within(tray).getAllByRole('checkbox')).toHaveLength(5);
+    expect(within(tray).getAllByRole('checkbox')).toHaveLength(6);
     for (const [name, checked] of [
       ['Status', true],
       ['Assignee', true],
       ['Due date', false],
       ['Type', false],
       ['Progress', false],
+      ['Priority', false],
     ] as const) {
       const chip = within(tray).getByRole('checkbox', { name });
       if (checked) expect(chip, name).toBeChecked();
@@ -1279,11 +1280,13 @@ describe('13.660 the tray renders five chips, each with its own accessible name 
     // an `unchecked` assertion is only worth something if the same read can
     // come back `checked`. Both arms are measured in one run.
     const all = render(
-      <ControlledList initial={chose(['status', 'assignee', 'dueDate', 'type', 'progress'], 'flat')} />,
+      <ControlledList
+        initial={chose(['status', 'assignee', 'dueDate', 'type', 'progress', 'priority'], 'flat')}
+      />,
     );
     const allTray = all.getByTestId('list-columns-tray');
     const allChips = [...allTray.querySelectorAll<HTMLInputElement>('input[type="checkbox"]')];
-    expect(allChips).toHaveLength(5);
+    expect(allChips).toHaveLength(6);
     expect(allChips.every((chip) => chip.checked)).toBe(true);
     // The closed-tray arm, read straight off the DOM because the accessible
     // tree excludes a `hidden` subtree: this is the property the tray's
@@ -1298,9 +1301,35 @@ describe('13.660 the tray renders five chips, each with its own accessible name 
     const noneChips = [
       ...screen.getByTestId('list-columns-tray').querySelectorAll<HTMLInputElement>('input[type="checkbox"]'),
     ];
-    expect(noneChips).toHaveLength(5);
+    expect(noneChips).toHaveLength(6);
     expect(noneChips.some((chip) => chip.checked)).toBe(false);
     expect(screen.getByLabelText('Type')).not.toBeChecked();
+  });
+});
+
+/**
+ * 13.1232 — the priority column (spec 2026-09-22). Asserted as the SAME
+ * sentence shape the due cell uses (`${value} — ${actor}'s claim`) because that
+ * is the whole claim being made here: a priority is a claim and its claimant
+ * travels with it, so the column must not degrade into a bare token. A case
+ * asserting only that `P1` is on screen would pass for a cell that dropped the
+ * attribution entirely.
+ */
+describe('13.1232 the priority column draws the level with its claimant', () => {
+  it('renders the level and the claimant — the attribution shape the due cell uses', () => {
+    render(
+      <ControlledList
+        initial={chose(['priority'], 'flat')}
+        rows={[
+          listRowSeed({
+            title: 'Loud one',
+            priority: { value: 'P1', claim: claim({ actorName: 'Kiro' }) },
+          }),
+        ]}
+      />,
+    );
+    const cell = screen.getByText(/^P1 — /);
+    expect(cell.textContent).toBe("P1 — Kiro's claim");
   });
 });
 
@@ -1582,7 +1611,7 @@ describe('13.669 the controls row, tray and table render under all three styles'
       expect(
         screen.getByTestId('list-columns-tray').querySelectorAll('input[type="checkbox"]'),
         style,
-      ).toHaveLength(5);
+      ).toHaveLength(6);
       expect(screen.getByTestId('list-summary'), style).toHaveTextContent('4 tickets · 1 done');
       expect(view.container.querySelector('.gn-list__section-title'), style).not.toBeNull();
       expect(view.container.querySelector('.gn-list__table-wrap'), style).not.toBeNull();

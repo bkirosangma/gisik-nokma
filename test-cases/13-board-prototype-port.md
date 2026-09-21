@@ -2223,6 +2223,11 @@ than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* m
   manufactured by stripping the key from an otherwise real, ledger-created ticket, and `rebuildProjection`
   replays the whole ledger into the live table inside one transaction, putting the claim back attributed to
   the creator. — `apps/server/test/tools/rebuild-projection.test.ts`
+
+**No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.
+
+## Priority is a built-in — the dev seed (spec 2026-09-22, Task 4)
+
 - **13.1228** ✅ The dev seed spreads the three levels: every seeded `ticket.created` carries an explicit
   `priority` cycling P1 → P2 → P3 off the ticket's position in the series, so a fresh database shows the
   whole ladder instead of only the reducer's birth default. Read back from `proj_tickets` rather than from
@@ -2230,4 +2235,23 @@ than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* m
   a payload. Deterministic off position, never random — the seed is a fixture and a re-run must rebuild
   byte-identical payloads. — `apps/server/test/seed/seed-dev.test.ts`
 
-**No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.
+## Priority is a built-in — the list: grouping, column and filter (spec 2026-09-22, Task 6)
+
+- **13.1229** ✅ The `priorities` axis narrows a list row to the levels it names and refuses the ones it
+  does not, and its exclude half drops the levels it names; an absent list and an empty list both narrow
+  nothing — the same rule every other id axis follows. — `packages/app-core/test/filter/list-filter.test.ts`
+- **13.1230** ✅ Grouping by priority yields sections P1, P2, P3 in THAT order — the LADDER's order, not the
+  order the levels are first met while walking the rows — holding every row exactly once, with the level
+  itself as both the key and the label. CONTROL: a level nobody holds yields NO empty section, because
+  `flatMap` over the ladder emits only the levels with rows (rows drive sections, the ladder only orders
+  them). — `packages/app-core/test/views/list-model.test.ts`
+- **13.1231** ✅ `columnLabel('priority')` is `Priority`. — `packages/app-core/test/views/list-model.test.ts`
+- **13.1232** ✅ The priority column draws the level WITH its claimant — `P1 — Kiro's claim`, the same
+  attribution sentence the due cell uses — so the column cannot degrade into a bare token. —
+  `packages/app-core/test/views/ticket-list.test.tsx`
+
+**A gap in this block is deliberate: `13.1233` is minted by nothing in this plan.** Task 6's own file-map
+line names the range `13.1229`–`13.1233` while its Step 5 (the enumeration of what to flip to ✅) names
+`13.1229`–`13.1232`, and the four cases its Step 1 writes carry those four ids. The number is left UNUSED
+rather than filled with a case invented to close it, per the catalogue's own rule that a deleted or skipped
+number is never renumbered.
