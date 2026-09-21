@@ -2083,3 +2083,63 @@ same kind of declarative claim about `tickets-read.test.ts` walking only the mem
 returns **0**, and the case itself says it is *"a deliberate non-duplication rather than an oversight"*.
 **So the sweep distinguishes a stale line from a live one in the same file**, and I am filing one of the two
 I checked at that depth.
+
+---
+
+## 26. `E3-21` (r2) — **IMPORTANT (claimed)** — Case 6.84 declares a cross-workspace parent link "reachable and unrefused" and "*no check compares them*"; two checks compare them, at both doors, with a named rule
+
+**WHAT.** `test-cases/06-auth-visibility.md:117` — case **6.84**, still **❌**:
+
+> **A child in another workspace than its parent is reachable and unrefused, so the role is resolved per
+> CHILD workspace.** **Nothing on this branch refuses a `ticket.created` in workspace B naming a
+> `parentId` in workspace A**: `proj_visibility` writes `workspace_id` from the envelope and `parent_id`
+> from the payload, and **no check compares them** … **Whether a cross-workspace parent link is legal at
+> all is recorded as observed, not asserted legal.** *Owner: Plan 3.*
+
+**WHY it is wrong — measured at the line, in the rule engine:**
+
+```ts
+// packages/rule-engine/src/checks/hierarchy.ts
+:124   if (!parent || parent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+:250   if (!newParent || newParent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+```
+
+**The comparison the case says does not exist is made twice**: once on `ticket.created` (the `parentId`
+the case names) and once on `ticket.reparented` (the `newParentId` the sibling case 6.57 names). Both
+refuse with the named rule `hierarchy.unknown-parent`. **`hierarchy.ts:120-122` explains exactly why the
+check is there** — *"The ingest door's tenancy check does not cover this: it guards the event's own entity,
+never the parent the payload names"* — so the gap the case declares was closed by a check written for it,
+with a docblock about it, and the case line was left standing.
+
+**AND THE CASE'S OWN OPEN QUESTION IS ANSWERED.** It ends: *"Whether a cross-workspace parent link is
+legal at all is recorded as observed, not asserted legal."* **It is answered, and the answer is `no`** —
+refused at both doors, with a rule id, by a check whose docblock states the reason. An ❌ titled "reachable
+and unrefused" over a door that refuses is the exact inversion the round-1 ruling priced: *"a case that
+asserts a property the product has quietly stopped having"*, inverted — a case that asserts the ABSENCE of
+a property the product has.
+
+**⚠ WHAT REMAINS TRUE, stated rather than flattened.** The case's second half is about the ROLLUP: *"The
+foreign child is COUNTED in the total — dropping it would understate the one number this task exists to
+keep honest"*. **That property is still real and still tested** — `rollup.test.ts` asserts `2/1` over a
+hand-built parent row whose child sits in another workspace, which is now a CORRUPT row the engine would
+refuse to create, and the rollup's resilience to corrupt data is a legitimate defensive property. **So this
+is a partial staleness like `E3-20`'s and I am not claiming the case should be ✅** — the first half is
+dead, the second half is live, and the ❌ currently presents them as one open item with one owner.
+
+**WHAT WOULD HAVE BEEN BETTER.** Split it in place: the first half becomes a ✅ (or is struck) naming
+`hierarchy.ts:124`/`:250` and the rule id; the second half stays ❌ or moves to the rollup's own file as a
+defensive property with its fixture. And the `*Owner: Plan 3.*` line should name whoever owns the rollup's
+corrupt-data resilience, because Plan 3 no longer owns a gap here.
+
+**SEVERITY: Important (claimed).** It is **security-relevant in the direction that matters for a review**:
+a lane picking up an ❌ that says *"nothing refuses a cross-workspace parent"*, owner Plan 3, will build a
+refusal that already exists at two doors — the pre-authorised work the round-1 ruling named. **The class is
+the one already priced at Important twice** (`E3-1`, `E6-12`), and this instance sits in the same file and
+in the same family as the two cases `E6-12` found, one and twenty lines away respectively.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:117` (full text read); `checks/hierarchy.ts:120-124`
+and `:250` — both refusals read with their surrounding docblock; `rollup.test.ts` for the `2/1` property the
+case names. **Control on the same file and the same sweep:** case **6.71** (`:87`) makes a declarative claim
+about a test file and **holds** (0 viewer-class mentions); case **6.82** (`:115`) is stale in four stated
+particulars (`E3-20`). **Three lines checked at this depth in one file give one live, one partial and one
+stale — so the sweep is discriminating rather than matching a pattern.**
