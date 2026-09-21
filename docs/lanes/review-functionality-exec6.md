@@ -1140,6 +1140,18 @@ can re-assign. Filed because the door answers "committed" to a question it never
 Each of these was a hypothesis I opened a file or ran a command to break. They are recorded so the judge can see
 what was looked at and found sound, not only what was found wrong.
 
+- **Every workspace-scoped read door refuses a non-member, and none is an existence oracle — measured, 23 doors
+  (Appendix P; 1 file / 1 test passed).** A signed-in stranger asked every `GET` door in the server plus
+  `POST /v1/sync/reconcile` about a workspace holding a ticket titled `MARKER-TITLE-7` with a comment
+  `MARKER-COMMENT-7`: **no response body carried either marker or the workspace name.** Answers by shape: 404
+  `not_found` (detail, attachments, comments, events, history, board, list, search, attention, my-work, members,
+  ticket-types, population, counts-by-type, workflows ×3), 403 (`invites` → `permission.role`; `sync/bootstrap`,
+  `sync/bootstrap/ticket`, `sync/reconcile` → `not_a_member`), 200-empty (`/v1/workspaces/:ws/tickets` →
+  `{"tickets":[]}`; `/v1/contests` → `{"contests":[]}`). The same six doors asked about a **nonexistent** workspace
+  id answered byte-for-byte the same shape (403/403/403/200/200/404), so the shape difference between doors is
+  not an oracle. The owner's control read the marker (200). *Observation, not filed:* three refusal vocabularies
+  for one fact (`not_found`, `forbidden`, empty 200) is the same divergence class 16.96 records for
+  `not_found`/`not-found`; nothing leaks through it.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -3213,6 +3225,157 @@ describe('exec6 probe: assignee and collaborator who are not in the workspace', 
     out.push(`roster -> ${roster.statusCode}; contains 'nobody-here': ${roster.body.includes('nobody-here')}; contains stranger: ${roster.body.includes(stranger.userId)}`);
     const filt = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/tickets?filter=${encodeURIComponent(JSON.stringify({ assigneeId: 'nobody-here' }))}`, headers: auth(ownerToken) });
     out.push(`list filtered by assigneeId=nobody-here -> ${filt.statusCode}; contains T: ${filt.body.includes(T)}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix P — the non-member read sweep (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-stranger.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-stranger.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: what does every workspace-scoped READ door answer to a signed-in user who is NOT a member of the workspace?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  (globalThis as unknown as { __otp: unknown }).__otp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 sweep: every read door, as a non-member', () => {
+  it('records status and whether any workspace content leaks', async () => {
+    const out: string[] = [];
+    const stranger = await signInWithPhone(app, (globalThis as unknown as { __otp: never }).__otp, '+919000000604');
+    const S = { authorization: `Bearer ${stranger.token}` };
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'MARKER-TITLE-7' }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'MARKER-COMMENT-7' }] }] } }, ownerId, ownerToken)).status).toBe('committed');
+    const wf = await db.pool.query<{ workflow_id: string }>("SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = 'task'", [WS]);
+    const WF1 = wf.rows[0]!.workflow_id;
+    const doors: Array<[string, string]> = [
+      ['GET', `/v1/workspaces/${WS}/tickets/${T}`], ['GET', `/v1/workspaces/${WS}/tickets/${T}/attachments`], ['GET', `/v1/workspaces/${WS}/tickets/${T}/comments`],
+      ['GET', `/v1/workspaces/${WS}/tickets/${T}/events`], ['GET', `/v1/tickets/${T}/history`], ['GET', `/v1/workspaces/${WS}/tickets`],
+      ['GET', `/v1/projects/${PRJ}/board`], ['GET', `/v1/projects/${PRJ}/tickets`], ['GET', `/v1/search?workspaceId=${WS}&q=MARKER`],
+      ['GET', `/v1/workspaces/${WS}/attention`], ['GET', `/v1/me/work?workspaceId=${WS}`], ['GET', `/v1/workspaces/${WS}/members`],
+      ['GET', `/v1/workspaces/${WS}/invites`], ['GET', `/v1/workspaces/${WS}/ticket-types`], ['GET', `/v1/workspaces/${WS}/ticket-types/task/population`],
+      ['GET', `/v1/workspaces/${WS}/ticket-counts-by-type`], ['GET', `/v1/workspaces/${WS}/workflows`], ['GET', `/v1/workspaces/${WS}/workflows/${WF1}`],
+      ['GET', `/v1/workspaces/${WS}/workflows/${WF1}/state-occupancy`], ['GET', `/v1/sync/bootstrap?workspaceId=${WS}`], ['GET', `/v1/sync/bootstrap/ticket?workspaceId=${WS}&ticketId=${T}`],
+      ['GET', `/v1/contests?workspaceId=${WS}`], ['POST', `/v1/sync/reconcile`],
+    ];
+    for (const [method, url] of doors) {
+      const res = await app.inject({ method, url, headers: S, ...(method === 'POST' ? { payload: { workspaceId: WS, heldIds: [T] } } : {}) });
+      const leak = res.body.includes('MARKER-TITLE-7') || res.body.includes('MARKER-COMMENT-7') || res.body.includes('Exec6 probe');
+      out.push(`${res.statusCode} ${leak ? 'LEAK ' : 'ok   '} ${method} ${url.replace(WS, ':WS').replace(PRJ, ':PRJ').replace(T, ':T').replace(WF1, ':WF')}  ${res.body.slice(0, 60).replace(/\n/g, ' ')}`);
+    }
+    // Existence oracle: the same doors with a workspace id that does not exist.
+    const GHOST = newUlid();
+    for (const [method, url] of [
+      ['GET', `/v1/workspaces/${GHOST}/invites`], ['GET', `/v1/sync/bootstrap?workspaceId=${GHOST}`], ['POST', `/v1/sync/reconcile`],
+      ['GET', `/v1/contests?workspaceId=${GHOST}`], ['GET', `/v1/workspaces/${GHOST}/tickets`], ['GET', `/v1/workspaces/${GHOST}/members`],
+    ] as Array<[string, string]>) {
+      const res = await app.inject({ method, url, headers: S, ...(method === 'POST' ? { payload: { workspaceId: GHOST, heldIds: [T] } } : {}) });
+      out.push(`GHOST ${res.statusCode} ${method} ${url.replace(GHOST, ':GHOST').replace(T, ':T')}  ${res.body.slice(0, 60)}`);
+    }
+    // control: the owner sees the marker on the detail door
+    const own = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
+    out.push(`control owner GET detail -> ${own.statusCode} marker present: ${own.body.includes('MARKER-TITLE-7')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
