@@ -1453,8 +1453,8 @@ sends them to create tickets that "land here".
 **WHAT.** `workflow-builder-screen.tsx:61` `const [store] = useState(() => createDraftStore(props.initialDraft))` —
 the draft lives in the mounted screen's React state and nowhere else: `grep -n 'localStorage\|sessionStorage\|persist\|beforeunload'`
 over `workflow-builder/*.ts`, `workflow-builder/ui/*.tsx` and `apps/web/src/authoring/*.tsx` → **0**. The screen is
-the route `/w/[workspaceId]/settings/workflows/[workflowId]` (`page.tsx:92-98`), so every nav-bar link, the settings
-sidebar's other tabs, the browser's back button and a tab close unmount it and the draft is gone. Nothing on screen
+the route `/w/[workspaceId]/settings/workflows/[workflowId]` (`page.tsx:92-98`), so every nav-bar link (`AppNav`, `page.tsx:58`), the page's own
+*"Settings › Workflows"* crumb (`:80-81`), the browser's back button and a tab close unmount it and the draft is gone. Nothing on screen
 says the draft is unsaved: the export's *"Draft · last saved 11:58"* line is *"NOT here … Named as an absence, not
 built"* (`workflow-builder-screen.tsx:114-117`). The only way work survives is Publish — which E5-28 shows can also
 strand.
@@ -1462,8 +1462,8 @@ strand.
 **WHY.** `docs/manual.md:1085-1087`: *"**Your layout is not saved.** The positions you drag the boxes into are for
 this session only. Come back tomorrow and it will have laid itself out again. Known, deliberate for now — do not
 spend twenty minutes tidying."* — scoped to positions, and *"for this session"* reads as *until you close the tab*.
-The states, transitions and rules a person spends those twenty minutes on are lost by one click on *Ticket types*
-in the sidebar beside the canvas, and the manual's own warning implies they are not. Every other draft in the product
+The states, transitions and rules a person spends those twenty minutes on are lost by one click on *Settings* in the bar or the
+*Settings › Workflows* crumb above the canvas, and the manual's own warning implies they are not. Every other draft in the product
 is protected somewhere: the sheet's title keeps its draft beside a refusal (`ticket-sheet.tsx:1159-1162` *"the draft STAYS on screen beside
 the answer"*), the New-ticket draft survives its close (`exec2-E2-37`), and the read-only editor fallback composes
 *"by having no control to type into rather than by offering one that silently discards what is typed"*
