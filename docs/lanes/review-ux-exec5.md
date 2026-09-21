@@ -208,7 +208,8 @@ done?"*: *"Open the job, press **Move…**, pick the stage, press Move. There is
 false. `docs/manual.md:666-668` then lists what a card shows (*"the title, who it is on, whether it is blocked, its
 progress, and a small 'who · when' button"*) and names no move arrows.
 
-**WHY.** The help is the product's onboarding surface. Its answer to the most basic question a person asks of a board
+**WHY.** The help is the product's onboarding surface, and its own preface promises *"It will not send you hunting
+for a button that was never built"* (`docs/manual.md:7-8`) — here it denies two that are. Its answer to the most basic question a person asks of a board
 ("how do I mark something done?") names one path as the ONLY path and denies the two faster ones that are painted on
 every card. A sibling class of exec 2's `F1` (help describes a product that no longer exists) — but `F1`'s eight rows
 (a–h) are the nav, sign-out, theme toggle, workspace card, comments, attachments and settings links; **none touches
@@ -922,8 +923,10 @@ the owner's database.
 | d | *"**You can set who sees a job. You cannot see what it is currently set to.** On the one screen whose entire subject is who can see what, the current audience is shown as unavailable rather than guessed."* | `docs/manual.md:989-993` | `routes/tickets.ts:78-90` serves `own_mode`/`resolved_mode` on the detail read; `mappers.ts:1992` maps it; `ticket-sheet.tsx:649-653` builds `standingVisibility` from it and passes `current=` (`:2512`); `visibility-editor.tsx:315-330` renders the *unserved* arm only when `current === null` and otherwise `standingSentence(current, nameOf)`. `[BROWSER]` the wire for `CCSO-3`'s parent object carried `own_mode: "inherit", resolved_mode: "project"`. |
 | e | *"**Inbox** — with a small number badge on it when you have unread messages."* and *"**The unread badge** … keeps the last number"* | `docs/manual.md:124`, `:913` | The visible signal is a **dot**, not a number — `inbox-nav-link.tsx` renders `<span className="gn-nav__inbox-dot" aria-hidden="true" />` when `unread > 0` and puts the count only in the accessible name (`\`Inbox, ${unread} unread notification…\``), by owner ruling quoted in the file: *"dot visually, count in the accessible name"*. A sighted reader never sees a number. Category 2 for the product; the help was not moved with the ruling. |
 
-**WHY.** The same defect and the same direction as `exec2-F1` (accepted, Important): the product's own help makes it
-look less capable than it is — here on the four most basic acts a person takes on a ticket and a person (rename,
+**WHY.** The manual's own promise, `docs/manual.md:7-8`: *"Where the product cannot do something yet, this manual
+says so plainly and tells you what to do instead. It will not send you hunting for a button that was never built."*
+Each row above is that promise inverted — the help denies a button that IS built. The same defect and the same
+direction as `exec2-F1` (accepted, Important): the product's own help makes it look less capable than it is — here on the four most basic acts a person takes on a ticket and a person (rename,
 delete, set a role, read who can see) plus the one chrome element the manual describes by its shape. `check:help` cannot see any of these (`exec2-F2`). `F1`'s rows a–h are the
 nav, sign-out, the theme toggle, the workspace card, comments, attachments and the settings links; none is these
 four passages, so this is a wider true scope with its own measurements.
