@@ -182,6 +182,7 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-32 | Imp | signed-out deep link + help | FIRST-RUN (copy) | browser (2nd) + source | — |
 | E5-33 | Min | `/sign-in` | ERROR (copy) | browser (2nd, 390 px) + source | — |
 | E5-34 | Min | nav project item on an archived project | SOFT-DELETED (project) | source | extends `exec2-E2-38` |
+| E5-35 | Min | inbox rows | copy (no time, no ticket) — prototype cat. 3 | source | — |
 
 **Edge classes reached, by finding:** EMPTY (E5-4) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
@@ -1229,6 +1230,35 @@ honest by not substituting.
 
 ---
 
+### E5-35 — MINOR · No inbox row says WHEN — `createdAt` is on every notification and rendered nowhere — and the two rows that could name their ticket do not: the mention drops a `ticketTitle` it carries, the contested claim has none and prints a rule slug `[SOURCE]` — category 3 (recorded as "render-only", unruled)
+
+**WHAT.** `inbox-view.tsx:66-109`: a row is icon + headline + body + unread dot. `grep -n createdAt inbox-view.tsx
+format.ts` → **0** — the wire's `Notification.createdAt` (`domain/notifications.ts:134`, `:146`) reaches no row. The
+export's row draws `{{ n.time }}` (`EXPORT:606-637`). Headlines (`format.ts:73-103`): a mention is *"<name> mentioned
+you"* with the excerpt as body — `mentionNotificationPayloadSchema` carries `ticketTitle` (`notifications.ts:66`)
+and neither headline nor body uses it; a contested claim is *"Your claim was contested — require-comment"* with the
+engine's reason as body — the payload (`:77-81`) has `ticketId`, `rule`, `reason` and no title, so the row cannot
+name the ticket, and the headline prints the rule's slug (`payload.rule`) where a person reads a sentence — the
+same shape as E5-8's `ticket.field_set`.
+
+**WHY.** An inbox is a list of things that happened; without a time a person cannot tell this morning's from last
+month's, and the unread dot is the only ordering cue. `docs/design/prototype-delta-2026-09-18.md` (`isInbox`) records
+the time and the per-row toggle as *"render-only and S-sized"* and notes *"`n.time` is carried"* — a record, and the
+two WIRE gaps in the same entry (filter tabs, bulk mark-read) have since been built (`[BROWSER]` `/inbox` shows
+All/Unread/Mentions; `inbox/page.tsx:300` `markAllRead`) while the render-only one was not. The manual
+(`docs/manual.md:884-893`) lists the five sentences and none names a time or, for a mention, the ticket.
+
+**WHAT WOULD HAVE BEEN BETTER.** `formatDateTime(notification.createdAt)` on the row (the sheet's one renderer);
+the mention body as *"<excerpt>" — on <ticketTitle>*; the rule's human name from the workflow (or the reason alone)
+instead of the slug; `ticketTitle` added to the contested payload at the producer.
+
+**MEASUREMENT.** `[SOURCE]` lines above opened; `EXPORT:606-640` opened (`{{ n.time }}`, `{{ n.toggleRead }}`). Not
+painted: the owner's inbox is empty (`[BROWSER]` `EMPTY_INBOX_COPY`) and I mint no notifications in their database.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1255,6 +1285,7 @@ brief's three categories.
 | 17 | Invite landing (inviter, expiry, tray, Decline/Accept) | `:1761-1789` | one sentence + Join | **3 — recorded, unruled; wire-limited** | E5-18 |
 | 18 | `/mcp/authorize` shows code vs product types code | `:1828-1836` | person types the assistant's code; Deny present | 3 by the delta doc; product's direction is the standard device flow — **not filed** | — |
 | 19 | Founding lands on the list + toast | `:2741-2752` | `/my-work` | 2 — ruled (`exec2-F5`, controller §4 #4); remedy not yet in tree at `a7b6292b` (`grep -in 'first-run\|new project' my-work.tsx` → 0) — **not filed**, it is F5's remedy | — |
+| 21 | Inbox row time + per-row read toggle | `:606-640` (`n.time`, `n.toggleRead`) | no time, mark-read on open | **3 — recorded as "render-only", no ruling** | E5-35 |
 | 20 | Epic band count | `:2904-2927` | counts membership on screen | 2 — ruled (controller §4 #5); the ordered "record the ruling beside `ticket-list.tsx:656-664`" not yet done — **not filed** | — |
 
 **Category-3 members, counted: 8** (rows 1, 4, 6, 8, 12, 16, 17 filed; 13 folded). **Category-2 argued: 1** (row 9,
@@ -1292,16 +1323,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**34 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 34). By claimed severity, read from the
-heading text: **Critical 1 · Important 22 · Minor 11** (1 + 22 + 11 = 34).
+**35 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 35). By claimed severity, read from the
+heading text: **Critical 1 · Important 22 · Minor 12** (1 + 22 + 12 = 35).
 
 - **Critical (1):** E5-13
 - **Important (22):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32
-- **Minor (11):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34
+- **Minor (12):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 34. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 35. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1474,5 +1505,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 34 findings — Critical 1 · Important 22 · Minor 11 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 35 findings — Critical 1 · Important 22 · Minor 12 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
