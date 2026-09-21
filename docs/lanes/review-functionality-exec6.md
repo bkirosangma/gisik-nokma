@@ -653,6 +653,56 @@ at `:312`, the 422 at `:352`); `members-page.test.tsx:66`, `:244`, `:263`; expor
 **SEVERITY: Important.** A shipped admin action is unreachable for phone-only invitees from the page built to do
 it, with a refusal message that cannot be acted on, for nineteen days.
 
+### E6-10 — IMPORTANT — The bulk rebind route can be refused part-way by the permission gate, leaving the type's tickets split across two workflows while the client is told "refused"; its docblock says that window is unreachable, and case 7.45 asserts "appends nothing"
+
+**WHAT.** `POST /v1/workspaces/:ws/ticket-types/:typeId/migrate` (`routes/builder-reads.ts:851-1049`) is
+`admins-only` (`:856`). Its pre-flight (`:870-955`) asks every *migration* question — unknown target state,
+unmapped occupied state, same workflow, closed → non-terminal, `backlog` as a key — and then submits one
+`ticket.workflow_rebound` per ticket through `ingestClientBatch` (`:1038`), which commits **one transaction per
+event**. The pre-flight never asks the question the permission gate asks per ticket: `checkVisibilityPermission`
+→ `canSee` (`check-permission.ts:1048`), and `canSeeResolved` (`can-see.ts:105-112`) answers **false for an
+`admin` on a project-mode ticket whose project they are not on** — a designed state (`check-permission.ts:938`,
+*"There is deliberately NO admin shortcut: an admin who wants to create work in a project joins it first"*).
+Measured through the real doors (Appendix I; 1 file / 1 test passed):
+
+```
+admin peer GET T0 (in Q, admin on Q) -> 200;  GET T1 (in P, admin NOT on P) -> 404
+before: T1=WF1 T0=WF1 T2=WF1
+POST migrate as admin -> HTTP 422 {"status":"refused","rule":"permission.visibility","reason":"This ticket is not visible to you."}
+after:  T1=WF1 T0=WF2 T2=WF1                     ← one ticket moved; the client was told "refused"
+ticket.workflow_rebound events appended: 1
+control: POST migrate as owner -> HTTP 200 {"status":"migrated","count":2}
+```
+
+**WHY it is wrong.** Three sentences in the record say this cannot happen, and one measurement says it does:
+
+- `builder-reads.ts:843-847`: *"if ingest refuses or fails PART WAY through a batch it accepted the pre-flight of,
+  earlier tickets stay moved. **Nothing this route can construct reaches that window — the pre-flight covers every
+  refusal `checkTicketWorkflowRebound` can produce**"*. True of the engine's refusals; false of the gate's, which
+  runs first (`ingest-service.ts:235-252`) and which the pre-flight never consults.
+- Case 7.45 (`07-api-realtime-search.md:68`): *"The bulk rebind refuses up front and appends nothing"* — with a
+  ledger-row-count control. The case's three refusals are the pre-flight's; the gate's refusal appends `n − k`
+  rows and then says `refused`.
+- The route's own answer is the *"client believes what the server declined"* shape run backwards: the client is
+  told nothing moved (`MigrationOutcome` `refused` carries no count) while the server has moved every ticket the
+  admin could see. The type-editor then displays a refusal and the type's tickets stay **split across two
+  workflows** — the state the migration exists to end (`ticket-type-editor-screen.tsx:462-474` talks of "the
+  divergence is OVER for these tickets") — and the admin cannot finish: re-running refuses on the same invisible
+  tickets. Only an owner, or an admin who first joins every project the type has tickets in, can complete it.
+
+**WHAT WOULD HAVE BEEN BETTER.** Ask the gate's question in the pre-flight: `canSee` over the selected ticket
+set (or the cheaper `visibleTicketsWhere` join), and refuse **up front** with a count — *"3 tickets of this type
+are not visible to you; ask an owner, or join their projects"* — so 7.45's sentence becomes true of this door
+too. Alternatively, an owner-only door for migration; or the batch-scoped ingest transaction the docblock already
+names as the real fix. And 7.45 should carry a fourth arm: an admin not on one project, asserting zero appends.
+
+**MEASUREMENT.** Appendix I, run from `apps/server`. Lines opened: `builder-reads.ts:843-847`, `:856`,
+`:938` (`ORDER BY ticket_id`), `:1038`, `:1041`; `check-permission.ts:938`, `:1048`; `can-see.ts:105-112`;
+`ingest-service.ts:235-252`; `07-api-realtime-search.md:68`.
+
+**SEVERITY: Important.** A documented "cannot happen" that happens for an ordinary admin, producing a
+half-migrated type, a false refusal, and no way forward from the page.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1611,6 +1661,157 @@ describe('exec6 probe: the three channels the mint form offers, at the mint door
       });
       console.log(`PROBE mint channel=${channel.padEnd(8)} -> HTTP ${res.statusCode} ${res.body.slice(0, 220)}`);
     }
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix I — probe for E6-10 — the bulk rebind refused part-way by the permission gate
+
+File path in the tree: `apps/server/test/zz-exec6-probe-migrate.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-migrate.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A. (`ORDER BY ticket_id` put T1 before T0 in this run — ULIDs minted in the same
+millisecond do not sort by call order — which is why T0 is the one that moved; the property does not depend on
+the order, only on there being at least one visible and one invisible ticket.)
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: can the bulk rebind route be refused PART WAY through by the permission gate, leaving earlier tickets moved?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'admin' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: ownerId, projectAdmin: true }, ownerId, ownerToken)).status).toBe('committed');
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: bulk rebind, partial refusal by the permission gate', () => {
+  it('records what moved and what the route answered', async () => {
+    const out: string[] = [];
+    // A second project the ADMIN peer IS on.
+    const Q = newUlid();
+    expect((await post(WS, { kind: 'project', id: Q }, 'project.created', { name: 'Q' }, ownerId, ownerToken)).status).toBe('committed');
+    for (const uid of [ownerId, peerId]) expect((await post(WS, { kind: 'project', id: Q }, 'project.member_added', { userId: uid, projectAdmin: false }, ownerId, ownerToken)).status).toBe('committed');
+    // The founding workflow and the task type's binding.
+    const wf = await db.pool.query<{ workflow_id: string }>("SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = 'task'", [WS]);
+    const WF1 = wf.rows[0]!.workflow_id;
+    // A second workflow with the same state ids, published through the door.
+    const WF2 = newUlid();
+    const def = { id: WF2, version: 1, name: 'Second', initialStateId: 'todo',
+      states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'doing', name: 'Doing', category: 'active' }, { id: 'done', name: 'Done', category: 'terminal' }],
+      transitions: [{ from: '*', to: 'todo', rules: [] }, { from: '*', to: 'doing', rules: [] }, { from: '*', to: 'done', rules: [] }] };
+    expect((await post(WS, { kind: 'workflow', id: WF2 }, 'workflow.defined', def, ownerId, ownerToken)).status).toBe('committed');
+    // Tickets: T0 in Q (visible to the admin), then T1 and T2 in PRJ (project-mode, admin NOT on PRJ). ULIDs order by creation.
+    const T0 = newUlid(); const T1 = newUlid(); const T2 = newUlid();
+    for (const [id, prj, title] of [[T0, Q, 'in Q'], [T1, PRJ, 'in P #1'], [T2, PRJ, 'in P #2']] as const) {
+      expect((await post(WS, { kind: 'ticket', id }, 'ticket.created', { typeId: 'task', projectId: prj, parentId: null, title }, ownerId, ownerToken)).status).toBe('committed');
+    }
+    const seeT1 = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T1}`, headers: auth(peerToken) });
+    const seeT0 = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T0}`, headers: auth(peerToken) });
+    out.push(`admin peer GET T0 (in Q) -> ${seeT0.statusCode}; GET T1 (in P) -> ${seeT1.statusCode}`);
+    const before = await db.pool.query<{ ticket_id: string; workflow_id: string }>('SELECT ticket_id, workflow_id FROM proj_tickets WHERE ticket_id = ANY($1) ORDER BY ticket_id', [[T0, T1, T2]]);
+    out.push(`before: ${before.rows.map((r) => `${r.ticket_id === T0 ? 'T0' : r.ticket_id === T1 ? 'T1' : 'T2'}=${r.workflow_id === WF1 ? 'WF1' : r.workflow_id === WF2 ? 'WF2' : '?'}`).join(' ')}`);
+    // The admin runs the migration.
+    const res = await app.inject({ method: 'POST', url: `/v1/workspaces/${WS}/ticket-types/task/migrate`, headers: auth(peerToken),
+      payload: { fromWorkflowId: WF1, toWorkflowId: WF2, stateMap: { todo: 'todo', doing: 'doing', done: 'done' } } });
+    out.push(`POST migrate as admin -> HTTP ${res.statusCode} ${res.body}`);
+    const after = await db.pool.query<{ ticket_id: string; workflow_id: string }>('SELECT ticket_id, workflow_id FROM proj_tickets WHERE ticket_id = ANY($1) ORDER BY ticket_id', [[T0, T1, T2]]);
+    out.push(`after:  ${after.rows.map((r) => `${r.ticket_id === T0 ? 'T0' : r.ticket_id === T1 ? 'T1' : 'T2'}=${r.workflow_id === WF1 ? 'WF1' : r.workflow_id === WF2 ? 'WF2' : '?'}`).join(' ')}`);
+    const appended = await db.pool.query<{ n: string }>("SELECT count(*)::text AS n FROM events WHERE type = 'ticket.workflow_rebound' AND workspace_id = $1", [WS]);
+    out.push(`ticket.workflow_rebound events appended: ${appended.rows[0]!.n}`);
+    // Control: the OWNER (sees everything) runs the same migration on what is left.
+    const res2 = await app.inject({ method: 'POST', url: `/v1/workspaces/${WS}/ticket-types/task/migrate`, headers: auth(ownerToken),
+      payload: { fromWorkflowId: WF1, toWorkflowId: WF2, stateMap: { todo: 'todo', doing: 'doing', done: 'done' } } });
+    out.push(`control: POST migrate as owner -> HTTP ${res2.statusCode} ${res2.body}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
 });
