@@ -3741,3 +3741,63 @@ here by id. **The number is not wrong; the phrase carrying it does not name its 
 count in this report I have had to pin at the boundary (95 → 93 paths, 43 → 23 rows, 54 → 35 sections), and
 the pattern is not that the numbers drifted — it is that **none of the three had its unit written beside it
 when it was written.**
+
+---
+
+# R2.24 — TWO MORE CANDIDATES KILLED IN PHASE 1, AND ONE OF THEM KILLED BY MY OWN INSTRUMENT
+
+**Both were checked in the last stretch of phase 1, and both are recorded because the near-miss is the
+method.** Neither is filed. The count of candidates examined and not filed is now **eight**.
+
+### ❌ A mechanical stale-copy sweep over `13-settings-and-workflows.md` — **my instrument was the defect, not the catalogue**
+
+**The method, and it is a good one:** extract every quoted string of ≥18 characters from a 13.x cases file
+and test whether it still appears anywhere in the shipping source. A case quoting a sentence the product no
+longer contains is a stale case, found without reading 82 ids by hand. I built a 25.5 M-character corpus
+from `apps/`, `packages/` and `docs/` (excluding `node_modules`, `dist`, `.next`, `reference/` and
+`test-cases/`) and ran it over **33 quoted strings**. **11 did not appear.**
+
+**Every one of the 11 that I opened was a false positive, and the false-positive modes are worth writing
+down, because this sweep *will* be re-run by someone:**
+1. **Nine are case prose, not product copy** — *"replaced, not appended"*, *"there is one switch rule set"*,
+   *"vocabulary AND casing differ"*. The quote marks in a case description are not a marker for
+   user-facing text, so the extractor's universe was wrong at the root.
+2. **⚠ One is a template literal split by interpolation.** `13.941` quotes *"1 version in this workflow's
+   range did not answer…"*, which is **exactly what the product renders** — at
+   `packages/app-core/src/workflow-builder/ui/workflow-history-screen.tsx:138`, as
+   `` `${missing} version${missing === 1 ? '' : 's'} in this workflow's range did not answer and ${…}` ``.
+   The sentence a person reads is assembled from three fragments, so **no substring of the source equals
+   the string the case quotes.** A case cannot be checked against source by substring matching when the
+   copy it quotes has a plural in the middle of it — and this is not an edge case: **every count-bearing
+   sentence in the product has this shape.**
+3. **And the catalogue's own quoting convention guarantees a miss.** A case truncates with `…` when it
+   quotes the beginning of a longer sentence — the natural convention, and one that makes exact matching
+   fail by construction for exactly the sentences most worth checking.
+
+**Why I am recording a failed sweep in a report that is scored on findings:** the sweep's *idea* is sound
+and its *implementation* had a 100 % false-positive rate on the one real target I opened to test it. **A
+sweep whose instrument turns out to be the defect is the shape this repository has catalogued against me
+five times today**, and the honest form is to report the rate rather than the idea. **`13.941` holds**; the
+other nine are not cases; the sweep produced no finding and I am not claiming its coverage.
+
+### ❌ The invite form's guest role — the hidden-control class, checked and **NOT** violated
+
+`apps/web/app/w/[workspaceId]/members/page.tsx` hides the whole *"Projects (comma-separated ids,
+optional)"* field when the role is `guest` — `:874` `{role === 'guest' ? null : (…)}`, which **removes it
+from the DOM**. My brief names this class in its own words (*"a hidden control does not clear the state
+behind it"*), and the draft `projectIds` is **not** cleared by `setRole`. So I had the two halves of a
+finding: hidden on screen, still in state.
+
+**It is not one, and the line that decides it is `:761`:** the payload is built as
+`...(role === 'guest' || named.length === 0 ? {} : { projectIds: named })` — **the value is omitted from
+the request while it is hidden, not sent while invisible.** My brief's rule is about exactly this
+distinction: *"withholds the parent from the DRAFT and not merely from the screen"* — the invariant that
+matters is that the withheld thing does not reach the server, and here it does not. The leftover draft is
+only ever re-shown (switch back to `member` and the field returns with its value visible), so there is no
+state a person can believe in that the server never received and the screen never showed. **Checked, killed
+on its last link, and the general lesson is worth one line: for this class the line to read is the PAYLOAD,
+not the render — the render tells you what is hidden, and the payload tells you whether hiding matters.**
+Two further things in the same file are worth naming as **better than my findings assume**, on the same
+evidence: `:867-870`'s options carry the comment *"No `owner`. The door refuses it and a picker offering
+it would lie"* — the "asks before it offers" rule, applied to a `Select`; and `:868`'s comment records *why*
+the option is absent rather than leaving the omission to be inferred.
