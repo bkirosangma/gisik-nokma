@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty of the twenty-three findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-one of the twenty-four findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -391,6 +391,19 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-24 — **MINOR** — The board, the List, My Work and the builder skip a heading level: `h1` → `h3` with no `h2`, and the builder's `h3`s hang under no `h1` at all
+
+**MEASUREMENT (painted, heading sweep on every route).** Board: `H1 Shop operations` → `H3 Simple kanban`, `H3 Errand with waits`; List: `H1` → `H3 Recently assigned`, `H3 Open questions …`; My Work: `H1 My Work` → `H3 Assigned to me` … (four); builder: `H3 System rules …`, `H3 Worth a look …` with `h1` count 0. Source: `board.tsx:642` (`<h3 className="gn-board__workflow">`), `my-work.tsx:75-97` (`<h3 className="gn-my-work__heading">` ×4). Controls in the same sweep: `/account` (`H1` → seven `H2`), `/help` (`H1` → `H2` → `H3`), `/workspaces` (`H1` → `H2`) are in order.
+
+**PROTOTYPE.** `Desktop.dc.html` contains 15 `<h1` and 17 `<h2` and **0** `<h3` — its section titles under a page title are `h2`. Category 3, small: no ruling names the level.
+
+**WHY IT IS WRONG.** Screen-reader users navigate by heading level; a jump from 1 to 3 is announced as a missing section. It is not a WCAG failure by itself (1.3.1 is arguable), which is why this is Minor — but it is four routes and one line each.
+
+**WHAT WOULD HAVE BEEN BETTER.** `h2` for the first level under a page title (or a page `h1` on the builder, which its own record already owes).
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -416,6 +429,10 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 | Headings: an `<h1>` on every route except the builder and its history page | **MATCHES / RECORDED** — the builder's h1 gap is written at `ui.css:2959-2967` with an owner | sweep `counts.h1`. |
 | The builder's `Settings › Workflows` crumb and the type editor's `Ticket types` back link | **MATCHES the prototype's shape** (`Desktop.dc.html:1016`, a 13-px link in a `<p>`) — 126×15 / 77×16 is what the authority draws | painted. |
 | Member roster's `HiddenSelect`s (`74×20`, `83×20`, `95×20`) | **not a defect** — React Aria's visually-hidden native select inside a `1×1 clip:rect(0,0,0,0)` wrapper, `tabindex=-1`; **but a note for the instrument:** the product's tap sweep's visibility test (`display`, `visibility`, `width===0`, `height===0`) would count them as offenders on any route with a `Select`, which is one more reason the population is one route | painted chain of five ancestors. |
+| Calendar event pills `1238×20` (5) | **MATCHES** the prototype's `padding:2px 7px; line-height:16px` pill (`Desktop.dc.html:2543`, 20 px) | painted. |
+| `Toast` | **MATCHES** — `role="status"` (`toast.tsx:139`), dismiss `min-height/min-width: 2.75rem` (`ui.css:463-464`) | source; no toast was triggered (that needs a write). |
+| `aria-current="page"` on the active nav link | **MATCHES** — `Shop operations:page`, the rest `null` | painted. |
+| The style axis (`data-style` = `hig` / `minimal` / `neo`, set on `<html>` client-side, nothing persisted) | **MATCHES** — 230 text elements with the sheet open, **0** contrast failures in each of the three; the same UA-chrome set in each | painted at 500 px. |
 | Visibility roster cut (`own_user_ids`/`resolved_user_ids` refused) | **RULED** — already classified category 2 by the compiled ruling; not re-examined | — |
 | Whole-board empty state, parent crumb title-only, 4-mode visibility radio, visibility `<section>` outside the `<dl>` | **RULED** in `review-compiled-controller.md` §4 rows 1, 2, 6, 7 — not re-raised | — |
 
@@ -439,8 +456,9 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 | width · theme | routes / states measured (each: my tap/name/UA-chrome/tiny-text/heading/landmark sweep with the product's own selector list, plus the composited text-contrast sweep) |
 |---|---|
 | **1512×900 · light · neo** | `/sign-in`, `/workspaces`, `/w/:id`, the board and its **List, Backlog, Calendar, Timeline** views, the **ticket sheet open** (Details and History tabs), the **New-ticket dialog**, the **Filters panel**, the **Move dialog**, the **Assignee listbox open** (real Enter/Escape keys), the **account menu open**, `/inbox` (empty), `/account`, `/settings`, `/members`, `/my-work`, `/settings/ticket-types` (list, `new`, `errand`), `/settings/workflows` (list, `new`, builder, history), `/help`, `/mcp/tokens` |
-| **390×844 · light · neo** (`emulate …,mobile,touch`) | the board, the sheet open (with screenshot), `/inbox`, `/account`, `/my-work`, `/members`, `/settings`, ticket-types list/`new`/`errand`, workflows list/`new`/builder/history, `/help`, `/mcp/tokens` |
+| **390×844 · light · neo** (`emulate …,mobile,touch`) | `/workspaces`, `/w/:id`, the board, the sheet open (with screenshot), `/inbox`, `/account`, `/my-work`, `/members`, `/settings`, ticket-types list/`new`/`errand`, workflows list/`new`/builder/history, `/help`, `/mcp/tokens` |
 | **768×1024 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, the builder, `errand`, `/account` |
+| **500 · light · `hig` / `minimal` / `neo`** (attribute set client-side) | the sheet open on the board — contrast + UA-chrome only |
 | **1512 · dark** (`emulate colorScheme: dark`) | the sheet open, `/workspaces`, `/w/:id`, `/my-work`, `/members`, `/settings`, `errand`, the builder, `/account`, `/inbox`, `/help`, `/mcp/tokens`, and the four board views |
 
 Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512.jpeg`, `board-390.jpeg`, `sheet-390-description.jpeg` (JPEG q55–60, 260 KB total). The numbers in the findings are from `getBoundingClientRect`/`getComputedStyle`; the screenshots are the human check.
@@ -487,10 +505,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **17** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 |
-| **Minor** | **6** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 |
-| **total** | **23** | `17 + 6 = 23`; ids `E4-1` … `E4-23` with no gaps |
+| **Minor** | **7** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 |
+| **total** | **24** | `17 + 7 = 24`; ids `E4-1` … `E4-24` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20. Category 2 argued against the record: E4-6, E4-8, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24. Category 2 argued against the record: E4-6, E4-8, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
