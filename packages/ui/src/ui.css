@@ -5003,6 +5003,30 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1;
   color: var(--gn-text-muted);
   cursor: pointer;
+  /* E4-14. Without these the GLYPH was the control: measured 8.1x13 at
+     `padding: 0`, `line-height: 13px`, `font-size: 13px`, `min-width` and
+     `min-height` both `auto`, on a 147x26 chip whose own `<span>` has no
+     handler — so the whole chip reads as the target and the only thing that
+     responds is the × in its corner.
+
+     1.5rem is this file's WCAG 2.5.8 in-list floor, the same number and the
+     same reasoning as `.gn-attention__title` above (`:1667`): bare-text
+     controls on a dense row get 24, standalone controls get 44. The
+     `inline-grid` half is load-bearing rather than cosmetic — the same note
+     that rule carries applies here, that `padding: 0` means the element's
+     height IS its line box, so `min-height` needs a box that honours it.
+
+     ⚠ THE CHIP GROWS, and it is stated here rather than discovered later:
+     `.gn-project__filter-chip` is `inline-flex` and its height follows its
+     tallest child, so a 24-px control inside 0.25rem of vertical padding
+     takes the chip from 26 to 32 and the tray with it. That is arithmetic
+     from the two declarations, NOT a paint — the chip's new height was not
+     measured on a running server. It is the cost of the control meeting the
+     floor, and it is accepted: 32 is still a tray, not a slab. */
+  min-width: 1.5rem;
+  min-height: 1.5rem;
+  display: inline-grid;
+  place-items: center;
 }
 
 /* ── The workflow picker (board-prototype-port, Task 8, Ruling R3,

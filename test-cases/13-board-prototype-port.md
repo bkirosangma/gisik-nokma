@@ -1694,3 +1694,32 @@ per-file "next free" is not a smaller version of the repo-wide question — it i
 
 **No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance and no
 new state, so there is no feature bullet to edit — recorded here rather than left as a silent omission.
+
+## The active-filter chip's remove control meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1055`
+
+**The finding, round 2 `E4-14`, IMPORTANT.** On Calendar and Timeline (any view with a chip in the tray),
+`button.gn-project__filter-chip-remove` — `aria-label="Remove filter — Closed: hidden"` — measured
+**8.1×13** with `padding: 0`, `line-height: 13px`, `font-size: 13px` and both `min-width`/`min-height`
+`auto`. The chip around it (`span.gn-project__filter-chip`, 147×26) **is a `<span>` with no handler**, so
+the whole pill reads as the target and only the × in its corner responds. **The one larger equivalent was
+checked before the floor was applied:** the Filters panel's own toggle behind the *Filters* button is
+`90×35`, so WCAG 2.5.8's *Equivalent* exception is arguably met and this is scored on the control a
+person reaches for rather than as a hard failure.
+
+### The case
+
+- ✅ **13.1055 — the remove rule declares the 24-px floor, in a box that honours it, and the two
+  declarations that made the glyph the control are still in force.** `packages/ui/test/components.test.tsx`.
+  **A source scan, not a paint.** `apps/web/e2e-*` is Playwright and is not in `pnpm test`; the property
+  at issue is what the rule declares, and the stylesheet is the authority on that. `1.5rem` is this
+  file's own WCAG 2.5.8 in-list floor — the same number and reasoning `.gn-attention__title` carries at
+  `ui.css:1667` — and the `display: inline-grid` half is asserted alongside the min sizes on purpose,
+  because that rule's own note is that `padding: 0` makes the element's height its line box, so a
+  `min-height`-only edit would not hold. The third assertion is the negative half, not a control: the
+  pair `padding: 0` / `line-height: 1` passes before the fix and after it, and is asserted so neither can
+  return. **The chip's own new height is NOT claimed as measured** — the rule states the arithmetic
+  (24 + the chip's two `0.25rem` paddings = 32, up from 26) and labels it arithmetic; the rule was
+  reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
+
+**No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance, so
+there is no feature bullet to edit — recorded here rather than left as a silent omission.

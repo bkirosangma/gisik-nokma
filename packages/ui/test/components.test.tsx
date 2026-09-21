@@ -1464,3 +1464,56 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
     expect(declarationsOf(UI_CSS, '.gn-visibility__no-such-class-exists')).toBe(0);
   });
 });
+
+/**
+ * Case `13.1055` — E4-14 — the filter chip's remove control is a 24-px target,
+ * not an 8×13 glyph wearing the control's own `cursor: pointer`.
+ *
+ * On Calendar and Timeline, `button.gn-project__filter-chip-remove`
+ * (`aria-label="Remove filter — Closed: hidden"`) measured **8.1×13** with
+ * `padding: 0`, `line-height: 13px`, `font-size: 13px` and both min sizes
+ * `auto`. The chip around it is a **`<span>` with no handler**, so the whole
+ * 147×26 pill reads as the target and only the × in its corner responds.
+ *
+ * **The one larger equivalent was checked, and it is why this is Minor rather
+ * than a hard failure:** the Filters panel's own toggle behind the *Filters*
+ * button is `90×35`, which arguably meets WCAG 2.5.8's *Equivalent* exception.
+ * The finding is scored on the control a person reaches for, so the floor is
+ * applied to it. `1.5rem` is this file's in-list floor — the same number
+ * `.gn-attention__title` carries for the same reason.
+ *
+ * **A source scan, not a paint.** `apps/web/e2e-*` is Playwright and is not in
+ * `pnpm test`; the property at issue is what the rule declares, and the
+ * stylesheet is the authority on that. What the scan therefore does NOT prove
+ * is the chip's own new height — see the rule's own note; that arithmetic
+ * (24 + the chip's two 0.25rem paddings = 32) is stated in the rule and was
+ * not measured on a running server.
+ */
+describe('13.1055 the filter chip remove control meets the 24-px in-list floor', () => {
+  const REMOVE = '.gn-project__filter-chip-remove';
+
+  it('13.1055 the rule declares the floor, in this file\'s own unit', () => {
+    const body = rule(REMOVE);
+    expect(body).toMatch(/min-width:\s*1\.5rem/);
+    expect(body).toMatch(/min-height:\s*1\.5rem/);
+  });
+
+  it('13.1055 and it declares a box that HONOURS a min size', () => {
+    // The load-bearing half, and the one a `min-height`-only edit would miss:
+    // with `padding: 0` the element's height IS its line box, so the floor
+    // needs a box that honours it. `.gn-attention__title`'s own note holds
+    // this; the assertion is that min size and such a box arrive TOGETHER.
+    expect(rule(REMOVE)).toMatch(/display:\s*inline-grid/);
+    expect(rule(REMOVE)).toMatch(/place-items:\s*center/);
+  });
+
+  it('13.1055 the two declarations that made the GLYPH the control are still in force', () => {
+    // Not a control — the pair is the negative half of the fix, asserted so a
+    // later edit cannot silently undo it. `padding: 0` and `line-height: 1`
+    // are what made the glyph the control in the first place; either coming
+    // back is how the defect returns.
+    const body = rule(REMOVE);
+    expect(body).toMatch(/padding:\s*0;/);
+    expect(body).toMatch(/line-height:\s*1;/);
+  });
+});
