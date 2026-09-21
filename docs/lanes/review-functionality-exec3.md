@@ -2018,3 +2018,68 @@ one mechanism that could have made it moot is measured away.
 in the same shell invocation** (`git status --porcelain` empty). `Tests 1 passed`. The invalid first rerun
 is `zz-e3-probe-cookie.test.ts`, run and deleted the same way, and is recorded above rather than
 discarded.
+
+---
+
+## 25. `E3-20` (r2) — **IMPORTANT (claimed)** — Case 6.82 declares a rollup capability "cannot ship" and "ABSENT from the type"; it shipped, the field is in both types, and the code records *"case 6.82 closed"* while the catalogue line stands
+
+**WHAT.** `test-cases/06-auth-visibility.md:115` — case **6.82**, still **❌** — says:
+
+> **The category half of a rollup — `open`/`active`/`terminal` — cannot ship, and is ABSENT from the type
+> rather than zeroed.** … that lives in `proj_tickets`, reached through `proj_rollups`, and **neither table
+> exists on this branch** (Plan 3 Task 11 owns `proj_rollups`, Task 12 owns `proj_tickets`, 6.61). …
+> **The three keys are left off `RollupView` entirely** … What is asserted instead is `toEqual` on the
+> whole view, which reddens if a key is grown. *Owner: Plan 3 Task 11.*
+
+**WHY it is wrong — four stated particulars, each measured:**
+
+| the case says | measured at this sha |
+|---|---|
+| "the category half … **cannot ship**" | **`terminal` shipped.** `apps/server/src/visibility/rollup.ts:126` — `terminal: number` on `RollupView`; `packages/domain/src/read-models.ts:95` — `terminalChildren: number` on the shipped client type |
+| "is **ABSENT from the type** rather than zeroed" and "**The three keys are left off `RollupView` entirely**" | **One of the three is on the type**, in both the server view and the client read-model. Only `open` and `active` remain absent — `rollup.ts:61`: *"`open` and `active` remain absent, for 6.82's original reason and no other"* |
+| "**neither table exists on this branch**" | **Both exist**: `apps/server/migrations/1787961800000_proj-tickets.sql` and `1787961900000_proj-rollups.sql` |
+| "*Nothing in the suite asserts the keys are missing* … `toEqual` on the whole view … reddens if a key is grown" | The `toEqual` it describes was written while the keys were absent; `terminal` could not have landed without that assertion moving with it. The sentence describes a guard that is no longer the guard |
+
+**AND THE CODE RECORDS THE CLOSURE WHILE THE CATALOGUE DOES NOT — the exact mechanism of round 1's `E3-1`.**
+`rollup.ts:48` reads, in a docblock heading:
+
+> ## `terminal` LANDED here (**case 6.82 closed**); `open` / `active` are still ABSENT
+
+**So the closure is recorded in the file the case cites, in those words, and the case is still ❌.** This is
+the same shape as `E3-1`: a correction that exists next door and was not carried to the artifact that
+declares the gap — and the artifact here is the one the workspace calls *"the scope contract between
+features and tests"*.
+
+**AND THE CATALOGUE'S OWN CHECKER CANNOT SEE IT, which the competing lane measured first.** `E6-12`
+(executor 6, this round) establishes that `check-case-citations.mjs` walks **✅ ids only** — its docblock
+requires *"a checked ('checkmark') case id must appear literally"* — so a ❌ line is never asked whether it
+is still open. **That is why the file could drift: the five ids around it are checked and this one is not.**
+I cite `E6-12` for the mechanism rather than restating it as my own.
+
+**WHAT WOULD HAVE BEEN BETTER.** The partial-closure form the catalogue already uses elsewhere
+(`16-remaining-doors.md:923`): amend 6.82 in place to say which half landed, that `terminal` is on both
+types and counted over all children including unreachable ones, that `open`/`active` remain absent for the
+original reason, and drop the dead "neither table exists" premise — **in the same change set as the code
+that landed it**, per the workspace rule that `Features.md` and `test-cases/` move together, *"never a
+follow-up"*. Its owner line (*"Plan 3 Task 11"*) should move with it: the owner is now whoever removes
+`open`/`active` from the wait, or nobody.
+
+**⚠ AND IT IS A PARTIAL STALENESS, WHICH I STATE RATHER THAN FLATTENING.** `open` and `active` genuinely
+remain absent — the case is not wholly false, and I am **not** claiming it should be ✅. **The defect is
+that the reader who picks up an ❌ labelled "Plan 3 Task 11 owns this" is sent to build a capability that
+half exists, against a reason (no tables) that has been false since Plan 3 landed.**
+
+**SEVERITY: Important (claimed).** By the class the judge has already priced — `E3-1` for a stale
+open-gap declaration in a source docblock, and `E6-12` this round for the same in this very file. The
+consequence is bounded: nothing misbehaves at runtime. **But it is the catalogue entry that tells a future
+lane there is work here**, and I found it only because `E6-12` made me look at the other ❌ lines in the
+file its author had already opened.
+
+**MEASUREMENT.** Every line above opened: `06-auth-visibility.md:115`; `rollup.ts:48`, `:61`, `:126`;
+`read-models.ts:95`; `ls apps/server/migrations/ | grep proj-rollups\|proj-tickets` (both present).
+**Control on the same sweep, so the finding is not a pattern artefact:** case **6.71** (`:87`) makes the
+same kind of declarative claim about `tickets-read.test.ts` walking only the member viewer class, and it
+**holds** — `grep -cE "guest|admin|owner|non-member|revoked" apps/server/test/routes/tickets-read.test.ts`
+returns **0**, and the case itself says it is *"a deliberate non-duplication rather than an oversight"*.
+**So the sweep distinguishes a stale line from a live one in the same file**, and I am filing one of the two
+I checked at that depth.
