@@ -2231,7 +2231,7 @@ than filing a weak refutation to look active.**
 | `E5-6` (no due date can be set anywhere) | my own sweep for `type="date"` → **2 hits, both prose** (`ticket-sheet.tsx:1239`, a test comment); and `apps/web/src/ticket-dates-input.ts` is a *data adapter*, not an input — a lead I chased and dropped | **holds** |
 | `E5-7` (a typed comment leaves "none was provided" on screen) | `ticket-sheet.tsx:672-692` — `payload = { to }` plus evidence, **no comment** — and `transition-dialog.tsx:281-294` deps `[toStateId, evidenceAttachmentId]` | **holds** — and it produced `E2-40` by extension |
 | `E5-9` (a refused Delete answers 3,943 px above the button) | its own concession that the *no-confirmation* shape matches the export | **holds**, and I folded its geometry into `E2-35` |
-| `E6-1` (the help says a job cannot be deleted) | `docs/manual.md:373-375` says exactly that, against the shipped `Delete` | **holds** — same corpus and same section as my `E2-1`, different row |
+| `E6-1` (the help says a job cannot be deleted) | `docs/manual.md:372` says exactly that (*"**You cannot delete a job.**"*), against the shipped `Delete` at `ticket-sheet.tsx:2612-2621` | **holds** — same corpus and same section as my `E2-1`, different row |
 | `E5-8` (the History tab prints raw event names) | `history-list.tsx:45` `{event.type}` — I read that file in full in round 1 and did not file it | **holds, and I will not file it** — see `E2-35`'s note; filing it now could not be separated from copying |
 
 **What this costs me, stated plainly:** the pairing's refutation phase will find me filing nothing, and a
