@@ -1543,7 +1543,8 @@ what was looked at and found sound, not only what was found wrong.
 - **OTP and device-code doors are bounded.** better-auth's phone plugin caps verification at 3 attempts per code
   (`routes.mjs:505-514` in the installed 1.7.2), the sign-in path is IP-limited (`app.ts:519-520`), the MCP
   user code is 8 symbols over a 28-symbol alphabet (`token-store.ts:18`, `:33-40`, ≈3.8×10¹¹), approve and deny
-  are session-gated and single-shot (`UPDATE … WHERE approved_user_id IS NULL`).
+  are `requireSession`-gated and single-shot (`UPDATE … WHERE approved_user_id IS NULL`) — where "session"
+  includes a bearer MCP token, which is E6-16.
 - **The orphan sweep cannot delete a soft-deleted ticket's files.** `sweep-orphans.ts:100-109` keeps anything
   with an `attachments` row or an `attachment.added` event, independent of the ticket's flag.
 - **Reconcile is only the audience question** (`reconcile-route.ts`); a deleted ticket is not "restricted", and
