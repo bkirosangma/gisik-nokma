@@ -1659,3 +1659,38 @@ and the code has five** (`13-board-prototype-port.md:1172`, above). Corrected to
 duplicates (pre-existing, unrelated to this fix wave, carried since before Task 3 — see the "Case-id fix"
 entry in `.superpowers/sdd/2026-09-16-board-prototype-port/progress.md`). Verified by ID, not by count.
 
+
+## The New-ticket dialog's Title field wears the product's field treatment (lane ds1, 2026-09-21, batch B10) — case `13.1054`
+
+**The finding, round 2 `E4-13`, IMPORTANT.** The first control a person types into in *New ticket* was
+`<label class="gn-new-ticket__field">Title<input value=""></label>` — an `<input>` with **no class at
+all**, inside a neumorphic sheet, on a dialog whose `Type` and `Parent` siblings paint at the product's
+17 px on a 44 px control. Measured in `neo`/light: `border: 2px inset rgb(118,118,118)`,
+`background-color: rgb(255,255,255)`, `border-radius: 0px`, `padding: 1px 2px`,
+`font-size: 13.33px`, `getBoundingClientRect` **425×22**. `ui.css` carries exactly two `.gn-new-ticket`
+rules (the actions row at `:2154`, the field wrapper at `:2155`), neither of which reaches the input, so
+the user-agent box is what painted.
+
+**Id `13.1054`, and the recount is the part worth recording.** The first pass asked
+`13-second-wave-roles-and-navigation.md` for its next free number and collided with
+`13-second-wave-board-actions.md`; the guard named both lines. **B10 therefore reserves the contiguous
+block `13.1054`–`13.1073`**, verified free across all 25 catalogue files in one sweep, and records the
+reservation in `docs/lanes/release-2026-09-22-progress.md` so a peer lane does not take from it. A
+per-file "next free" is not a smaller version of the repo-wide question — it is a different question.
+
+### The case
+
+- ✅ **13.1054 — the Title control carries `gn-field__input`, and that class is a RULE, not a dead name.**
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`. **The two halves are asserted together
+  because either alone is passable while the defect survives:** round 1's `P1` was exactly *"a control
+  styled by no rule of its own"*, so a class that matches no selector block satisfies a class-name
+  assertion and changes nothing about the paint. The rule it names is read out of
+  `packages/ui/src/ui.css` by the cross-package read `sync-ux-css-binding.test.tsx` and
+  `inbox-css-binding.test.tsx` already establish for this question, guarded by its own control —
+  without it, a needle that matched nothing would make the assertion a pass on a stylesheet that had
+  lost the block entirely. `packages/ui/test/components.test.tsx` pins what that rule *says* (`13.339`);
+  this case pins that this control is one of its wearers. `13.1054` was minted with the fix and the
+  stylesheet was reverted to `HEAD` for the RED run, restored from a sha256-compared backup.
+
+**No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance and no
+new state, so there is no feature bullet to edit — recorded here rather than left as a silent omission.

@@ -126,7 +126,22 @@ export function NewTicketDialog({
     <Dialog open={open} title="New ticket" onClose={onClose}>
       <label className="gn-new-ticket__field">
         Title
-        <input value={title} onChange={(event) => setTitle(event.target.value)} />
+        {/* `gn-field__input` — the product's own field treatment, and the one
+            every neighbouring field on this screen already wears
+            (`ticket-sheet.tsx:2298`, `passkeys-section.tsx:120`,
+            `ticket-type-editor-screen.tsx:322`). Without it a bare `<input>`
+            paints as raw user-agent chrome in a neumorphic sheet: measured at
+            `border: 2px inset rgb(118,118,118)`, `background: #fff`,
+            `border-radius: 0`, `padding: 1px 2px`, `font-size: 13.33px`, and
+            **425×22** where its two siblings (Type, Parent) paint at the
+            product's 17px on a 44px control. One class, not a new rule: the
+            fill, radius, 2.75rem floor and the `neo` sunken override all
+            already live on it (`ui.css:4774`, `:4811`). */}
+        <input
+          className="gn-field__input"
+          value={title}
+          onChange={(event) => setTitle(event.target.value)}
+        />
       </label>
       {/*
         Spec §5.4: this note is unconditional — every ticket this dialog can
