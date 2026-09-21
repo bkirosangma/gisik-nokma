@@ -2507,7 +2507,7 @@ against a real workspace. I claim the code path and the attribution semantics, n
 > I am not withdrawing (phase 2 has no free withdrawal) — the judge has the finding as frozen, this concession, and
 > exec 6's probe, and the severity of what survives is theirs to set.
 >
-> **Addendum — 15:44 IST, one more seam opened.** The paragraphs above say the phone renders the failure *"as
+> **Addendum — 15:42 IST, one more seam opened.** The paragraphs above say the phone renders the failure *"as
 > `{failed} needs attention` on the BOARD screen"*. That count is read by `refreshQueue`, which runs only from
 > `dataSource.subscribe(workspaceId, 0, refreshQueue)` (`apps/mobile/src/app.tsx:47-49`), and the replica's
 > `subscribe` fires only on an incoming engine item or a status flip to `live`
