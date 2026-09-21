@@ -732,9 +732,12 @@ that calls `onClose()` on `Escape` **with no `preventDefault()`**. `packages/ui/
 document-level `keydown` that closes the sheet on `Escape` unless `event.defaultPrevented` — and its docblock is
 explicit: *"A child that handles Escape must call `preventDefault()` for this guard to see it."* The Sheet's listener
 was registered first (the sheet mounted first), so on one Escape it runs first, sees `defaultPrevented === false`,
-and closes the sheet; then the dialog's listener closes the dialog. (The order does not matter: neither handler
-sets `defaultPrevented`, so both fire in either order.) The person who meant to cancel a move is dumped
-back on the board.
+and calls the sheet's `onClose`; then the dialog's listener closes the dialog. (The order does not matter: neither handler
+sets `defaultPrevented`, so both fire in either order.) The rendered outcome — the person who meant to cancel a move
+landing back on the board — is **unverified**: the browser stopped hydrating before I pressed Escape with both open
+(§6.1), and the `×` button path I did drive closed only the dialog (`dialogsAfter: 1`), which is the close-button
+path and says nothing about Escape. What is verified is the mechanism: two `document` listeners, one guard, and the
+guard's precondition unmet by the sibling component.
 
 **WHY.** The fix round that added the guard fixed the ONE child it was looking at — the title field
 (`ticket-sheet.tsx:1831-1845`, `preventDefault` "IS LOAD-BEARING", case `16.86` *"does not close the sheet"*) — and
@@ -875,7 +878,11 @@ that as transport: `ticket-sheet.tsx:1074` *"We could not reach the server for t
 `page.tsx:848` (the delete's Undo) — nine sites, `grep -rn 'could not reach the server'`. Meanwhile
 `apps/web/src/expired-session.tsx` is *"The ONE author of 'a 401 is not a refusal, it is a session that ended'"* and
 its hook is fed **reads only**: `page.tsx:1094-1098` `useSignInOnExpiredSession([board.error, list.error,
-ticketTypes.error])`; `inbox/page.tsx:234`; `w/[workspaceId]/page.tsx:219`. No write error is on any of those lists.
+ticketTypes.error])`; `inbox/page.tsx:234`; `w/[workspaceId]/page.tsx:219`. No write error is on any of those lists — and it could not be: the sheet's `transportError` is component-local state
+(`ticket-sheet.tsx:1074` `setTransportError`), never lifted to the page that owns the hook. The irony is that the
+sentence already CONTAINS the hook's predicate — `EXPIRED_SESSION_PREFIX = 'HTTP 401 '` (`expired-session.tsx`) is a
+string match, and `"… — HTTP 401 for /v1/events"` carries it — so the classifier exists and the writes simply never
+reach it.
 
 **WHY.** A person whose session lapsed while a sheet was open presses Move, Close, Delete, Save, Start, or Undo, and
 is told the server is unreachable — the server was reached and said the one thing the product elsewhere treats as
@@ -971,6 +978,9 @@ as `void onPublishClick()`, `:113`), and `:126` `onConfirm={(mapping) => void su
 button is `disabled={issues.length > 0 || state.phase === 'submitting'}` (`:111`), and nothing but a server answer
 ever leaves `submitting`. So a transport failure — the request never reaching the server — leaves the person with a
 greyed Publish, no banner (`:129-146` render only `published`/`refused`/`invalid`), and no way back but a reload.
+(`submit` is `dataSource.ingest` — `apps/web/src/authoring/data-source-gateway.ts:327` — which throws `HttpError` or
+the fetch `TypeError`; and if it ever resolved with a shape the `switch` at `:71-83` does not name, that path also
+returns without leaving `submitting`. Either way the phase is stuck.)
 Separately, the confirm path sets `submitting` and so unmounts `StateMappingDialog` (`:117`, rendered only while
 `phase === 'mapping'`) before the server answers; on `refused` the banner says *"The server refused this publish."*
 under an idle Publish button and the mapping the person built is gone — pressing Publish again reopens an EMPTY
