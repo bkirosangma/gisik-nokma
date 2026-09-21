@@ -2208,3 +2208,62 @@ refusals), and its docblock at `:157-159`; `refusal-rules.ts` for the rule id; `
 `seed.ts:84-87` still hand-lists four projections, and the file argues for keeping it that way) — **so four
 lines checked in one file give two live and three stale, which is a discriminating sweep and not a pattern
 match.**
+
+---
+
+## 28. `E3-23` (r2) — **IMPORTANT (claimed)** — Case 6.124 is ❌ with owner "Plan 11"; the code that closed it names the case by number and says so
+
+**WHAT.** `test-cases/06-auth-visibility.md:202` — case **6.124**, still **❌**:
+
+> **`WEB_ORIGIN` and `BETTER_AUTH_URL` are `z.string().url()`, which only requires a SCHEME.** Measured:
+> `'localhost:3001'` passes, parsed as scheme `localhost:` with path `3001` — and an invitation link built
+> on it goes nowhere. **Neither variable is constrained to an http(s) scheme with a host and no path.**
+> Pinned as a bound in `config.test.ts` rather than left to be discovered. *Owner: Plan 11.*
+
+**WHY it is wrong — measured at the line, in the file the case itself points at:**
+
+```ts
+// apps/server/src/config.ts
+:53    return (parsed.protocol === 'http:' || parsed.protocol === 'https:') && parsed.hostname !== '';
+:55    { message: 'must be an http(s) URL with a host, e.g. https://pm.artsourced.in' },
+:110   BETTER_AUTH_URL: httpUrl(),
+:139   WEB_ORIGIN: httpUrl(),
+```
+
+Both variables are now `httpUrl()`, whose refine is exactly the constraint the case says is absent — an
+http(s) scheme **with a host**. The message even names the shape. **And the helper's docblock cites the case
+by number as the thing it exists to close:**
+
+> `config.ts:25-33` — *"`.url()` delegates to the WHATWG parser, which asks only for a scheme. So
+> `localhost:3001` PASSED it … **closes it (test case 6.124), for `WEB_ORIGIN` and for `BETTER_AUTH_URL`**"*
+
+**THIS IS THE MOST UNAMBIGUOUS INSTANCE OF THE CLASS I FOUND, and that is why it is filed separately.**
+`E3-20`'s code said *"case 6.82 closed"* in a heading; **this one names the case number inside the
+sentence that explains the fix**, in the file the case's own text points a reader at (`config.ts`), while
+the catalogue line keeps its ❌ and its `*Owner: Plan 11.*`. A lane that picks up 6.124 is told a variable
+is unconstrained, by a document that tells them to trust it, about a constraint that has a helper, a
+message, a docblock and a case number.
+
+**⚠ AND I AM NOT CLAIMING THE CASE SHOULD BE ✅ WHOLESALE, because the case also says something that may
+still hold.** It closes: *"Pinned as a bound in `config.test.ts` rather than left to be discovered."* The
+**bound** half is what `httpUrl()` closes and it is closed. Whether `config.test.ts` still pins it is a
+separate question I did **not** measure, and I am not asserting it either way — **the finding rests on the
+constraint, not on the test.** What is unambiguously stale is the sentence *"Neither variable is
+constrained to an http(s) scheme with a host"* and the `*Owner: Plan 11.*` that follows it.
+
+**THE FILE, STATED PLAINLY, because four findings from one file is itself a datum.** This is the **fourth**
+stale ❌ line I have measured in `06-auth-visibility.md` — with `E3-20` (6.82), `E3-21` (6.84) and
+`E3-22` (6.58). **Of the nine ❌ lines in that file I read at depth, four are stale and five hold**
+(6.71, 6.125, 6.130, 6.53, 6.65 — the last two of which I read and did *not* file because their claims are
+live). **The mechanism is one and it is `E6-12`'s: `check-case-citations.mjs` walks ✅ ids only.** I have
+filed four rather than one because each names a different closed door and each would send a reader to
+different work; **a judge who would rather rule the mechanism once should read the four as one and say so.**
+
+**SEVERITY: Important (claimed).** Same class, same file, and this instance carries the strongest available
+evidence — the closing code names the case number.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:202` (full text); `config.ts:25-33` (the docblock,
+read in full), `:53` and `:55` (the refine and its message), `:110` and `:139` (both call sites). **Control
+inside the same file and the same sweep:** five ❌ lines read at the same depth and **not filed** —
+`6.71` (:87), `6.125` (:203), `6.130` (:193), `6.53` (:95), `6.65` (:77) — each checked against the code and
+each still describing the product as it is. **Nine read, four stale, five live.**
