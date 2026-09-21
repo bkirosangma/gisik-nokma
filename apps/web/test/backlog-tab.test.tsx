@@ -33,7 +33,12 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
+import ProjectPage, {
+  // Value import, deliberately: the case asserts the string that RENDERS rather
+  // than a re-typed copy of it — two spellings of one sentence is how a copy
+  // change passes a test it broke (`epics-not-rows.test.tsx`'s own note).
+  BACKLOG_EMPTY_ACTIVE_ONLY_COPY,
+} from '../app/w/[workspaceId]/p/[projectId]/page.js';
 
 afterEach(() => {
   push.mockClear();
@@ -155,6 +160,87 @@ describe('13.596 the Backlog tab, empty', () => {
     expect(
       await screen.findByText('Nothing in the backlog — new tickets land here.'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('13.1115 the Backlog tab with “Only tickets in progress” ON (E5-40)', () => {
+  /**
+   * 13.1115 — E5-40. The toggle writes `stateCategories: ['active']` into the
+   * SERVER read (`listFilter`, above `useTicketList`), and a backlog ticket's
+   * category is `open` — so with the toggle on, every backlog row is stripped
+   * before any screen-level fold sees it. The Backlog tab then rendered
+   * *"Nothing in the backlog — new tickets land here."* over a project that may
+   * hold plenty, and nothing on the tab said the toggle was why. The file itself
+   * recorded this as `RECORDED, NOT FIXED`.
+   *
+   * **The stub APPLIES the filter rather than ignoring it**, which is the whole
+   * case: a `getTickets` that returned every row would render the backlog
+   * correctly and the defect could not appear. It mirrors the server — filter
+   * first, then answer — for the reason the fake-notifications gateway's own
+   * extension records, one file over.
+   *
+   * Asserted on the pair, because the two sentences are alternatives in ONE
+   * branch: the toggle's sentence renders AND the original is absent. A case
+   * asserting only the new sentence passes on a screen that draws both.
+   */
+  it('13.1115 says the backlog is HIDDEN, not that it is empty, when the toggle emptied it', async () => {
+    const backlogRow = row({
+      ticketId: 'bt_1',
+      title: 'Backlog ticket',
+      stateId: BACKLOG_STATE_ID,
+      stateName: 'Backlog',
+      stateCategory: 'open',
+    });
+    const activeRow = row({ ticketId: 'at_1', title: 'Active ticket' });
+    const world = servedWorld([], {
+      getTickets: async (_projectId: string, filter): Promise<TicketListView> => {
+        const narrowing = filter?.stateCategories;
+        const all = [backlogRow, activeRow];
+        return {
+          projectId: PROJECT,
+          rows: narrowing === undefined ? all : all.filter((r) => narrowing.includes(r.stateCategory)),
+        };
+      },
+    });
+    render(
+      <Providers services={world}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    await userEvent.click(
+      await screen.findByRole('checkbox', { name: 'Only tickets in progress' }),
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+
+    expect(await screen.findByText(BACKLOG_EMPTY_ACTIVE_ONLY_COPY)).toBeInTheDocument();
+    expect(
+      screen.queryByText('Nothing in the backlog — new tickets land here.'),
+    ).toBeNull();
+    // And the backlog's own row is really gone from the read — without this the
+    // case would pass against a page that never narrowed anything.
+    expect(screen.queryByText('Backlog ticket')).toBeNull();
+  });
+
+  /**
+   * 13.1115's control — the sentence is about the TOGGLE, so it must not appear
+   * without it. With the toggle OFF and a genuinely empty backlog, the original
+   * sentence is the true one and still renders. Without this the fix could be
+   * "always print the toggle sentence", which would be false whenever the toggle
+   * is off.
+   */
+  it('13.1115 control: with the toggle OFF, an empty backlog keeps the original sentence', async () => {
+    render(
+      <Providers services={servedWorld([])}>
+        <ProjectPage />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('tab', { name: 'Backlog' }));
+
+    expect(
+      await screen.findByText('Nothing in the backlog — new tickets land here.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(BACKLOG_EMPTY_ACTIVE_ONLY_COPY)).toBeNull();
   });
 });
 

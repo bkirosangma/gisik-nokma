@@ -7,6 +7,7 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import { newUlid, type TicketTypeDef } from '@gisik-nokma/domain';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
+import { AuthoringReadRefused } from '../../src/workflow-builder/gateway.js';
 import { cloneTemplate, draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import type { BuilderSession } from '../../src/workflow-builder/ui/builder-context.js';
 import { WorkflowBuilderScreen } from '../../src/workflow-builder/ui/workflow-builder-screen.js';
@@ -145,7 +146,12 @@ describe('read-only workflow views for non-admins', () => {
   it('a guest gets the read-only screen even when the member roster is refused, as a guest roster is', async () => {
     const gateway = createFakeGateway();
     gateway.listMembers = async () => {
-      throw new Error('403 guest cannot list members');
+      // E2-39 (2026-09-21) — this used to throw a bare `Error`, which is NOT how
+      // a guest's refusal arrives. The adapter converts the door's 404 into
+      // `AuthoringReadRefused` (`apps/web/src/authoring/data-source-gateway.ts`),
+      // and the screen now narrows on that class, so a bare `Error` here would
+      // assert the guest degradation against a value no guest can produce.
+      throw new AuthoringReadRefused('/v1/workspaces/ws/members');
     };
     renderBuilder(guestSession, gateway);
     expect(await screen.findByText(BANNER)).toBeInTheDocument();

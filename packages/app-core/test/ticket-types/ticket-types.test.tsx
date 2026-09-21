@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax` — the same fix already
 // settled at test/views/board.test.tsx and test/workflow-builder/canvas.test.tsx.
@@ -1713,5 +1713,121 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
     const saved = onSaved.mock.calls[0]?.[0] as TicketTypeDef;
     expect(saved.fields[0]?.type).toBe('number');
     expect(CUSTOM_FIELD_KINDS).toContain(saved.fields[0]?.type);
+  });
+});
+
+describe('A rejected ticket-type read is an error, not an eternal load (E2-20)', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+
+  /**
+   * 13.1110 — E2-20. The `Promise.all` at the top of the list screen's effect had
+   * no rejection arm, and the screen gated its whole render on the loaded state, so
+   * a rejected read was drawn as `Loading ticket types…` on a screen that would
+   * never load. The file's own docblock at the SIBLING promise names that exact
+   * failure — *"leave the screen on "Loading ticket types…" for ever"* — while
+   * leaving it present in the `Promise.all` the sentence talks about.
+   *
+   * Asserted on the pair that makes the fix real: the error sentence is present
+   * AND the loading sentence is gone. Either alone passes on a screen that renders
+   * both — and a reader cannot tell the two apart, which is the whole defect.
+   */
+  it('13.1110 a rejected ticket-type read renders the load-error sentence, never “Loading ticket types…” for ever', async () => {
+    const gateway = {
+      ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+      listTicketTypes: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/ticket-types')),
+    };
+    render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+  });
+
+  /**
+   * 13.1111 — E2-20, the editor half. Same missing arm, same gate. The header is
+   * asserted here for the reason case 13.924 records for the loading arm: the pane
+   * draws the name and Cancel from its own fetch, and an error arm that dropped the
+   * header would blank the row it belongs to at the moment a person needs to see
+   * which type they were editing.
+   */
+  it('13.1111 the editor screen says the same thing on a rejected read, and keeps its header', async () => {
+    const gateway = {
+      ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+      listWorkflows: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/workflows')),
+    };
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        initialDef={task}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.getByTestId('type-editor-header')).toBeTruthy();
+  });
+});
+
+describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+
+  /**
+   * 13.1114 — E5-15, filed independently against the same two screens as E2-20
+   * (*"A refused or failed ticket-types read leaves Settings on 'Loading ticket
+   * types…' for ever"*), and it exercises the rejecter the E2-20 cases do NOT.
+   *
+   * Each screen loads its environment through `Promise.all([A, B])`, and a tuple
+   * rejects if EITHER element does. `13.1110` rejects `listTicketTypes` on the list
+   * screen and `13.1111` rejects `listWorkflows` on the editor; this case rejects
+   * the OTHER promise at each site. **That is not a duplicate of the same
+   * assertion** — it is the half that a fix threaded onto one specific promise
+   * would miss, and a handler attached to the wrong element of the tuple is exactly
+   * the shape a `Promise.all` defect takes. Both halves are asserted in ONE case
+   * because they are one property measured at two sites, the way this file's
+   * sibling already batches arms of one property.
+   *
+   * Each arm asserts the pair — the sentence present AND `Loading ticket types…`
+   * absent — because the two live in one branch and a case asserting only the
+   * sentence passes on a screen that draws both.
+   */
+  it('13.1114 a rejected listWorkflows on the LIST screen, and a rejected listTicketTypes on the EDITOR, are both the load-error arm', async () => {
+    // ARM ONE — the list screen, `listWorkflows` rejecting.
+    render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={{
+          ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+          listWorkflows: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/workflows')),
+        }}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    cleanup();
+
+    // ARM TWO — the editor, `listTicketTypes` rejecting.
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={{
+          ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+          listTicketTypes: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/ticket-types')),
+        }}
+        initialDef={task}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
   });
 });

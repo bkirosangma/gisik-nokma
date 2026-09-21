@@ -3690,5 +3690,126 @@ describe('E5-20 Escape in the Move dialog does not close the sheet under it', ()
     // …and the sheet underneath did NOT also take it. `onClose`, not the
     // absence of the sheet, is the measurement: see this block's docblock.
     expect(onClose).not.toHaveBeenCalled();
+
+describe('13.1112 the ticket read ANSWERS null (E4-23)', () => {
+  /**
+   * 13.1112 — E4-23. `useLiveQuery` reported `data` and `error` and nothing else, so
+   * "the read answered `null`" and "the read has not answered yet" were the SAME
+   * render: `data === null`. The sheet gated its whole body on `read.data === null`
+   * and drew `Loading…`.
+   *
+   * `null` is not a gap here — it is the transport's deliberate 404 affordance.
+   * Every `/v1` read door answers ONE frozen 404 body for "no such thing" and for
+   * "not yours" (`apps/server/src/routes/tickets.ts`, `READ_NOT_FOUND_BODY`), so a
+   * mistyped id, a soft-deleted ticket and a ticket this viewer may not see all
+   * arrive as `null`. The sheet therefore said "Loading…" for ever, on a screen the
+   * server had already answered.
+   *
+   * Asserted on the pair, because the two live in one branch: the absent sentence
+   * renders AND `Loading…` does not. A case asserting only the sentence passes on a
+   * sheet that draws both.
+   */
+  it('13.1112 a ticket the server answers 404 for says it is not here, not “Loading…”', async () => {
+    const source = createFakeDataSource({
+      getTicket: async () => null,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: async (projectId: string) => ({ projectId, rows: [] }),
+      getTicketTypes: async () => [],
+    });
+    render(
+      <TicketSheet
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        currentUserId="user_kiro"
+        onClose={vi.fn()}
+      />,
+    );
+
+    const absent = await screen.findByTestId('sheet-ticket-absent');
+    // The sentence names BOTH readings, because the one-body refusal is the whole
+    // reason the server will not say which.
+    expect(absent.textContent ?? '').toMatch(/deleted/i);
+    expect(absent.textContent ?? '').toMatch(/may not be able to see it/i);
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  /**
+   * 13.1113 — the control for the case above, which must not be satisfiable by a
+   * sheet that never draws `Loading…` at all. A read that has genuinely not answered
+   * yet still says so; if this reddens, the "not here" arm has swallowed the wait.
+   */
+  it('13.1113 a read still in flight still says “Loading…”, and the absent sentence is not drawn', async () => {
+    const source = createFakeDataSource({
+      getTicket: () => new Promise(() => {}),
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: async (projectId: string) => ({ projectId, rows: [] }),
+      getTicketTypes: async () => [],
+    });
+    render(
+      <TicketSheet
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        currentUserId="user_kiro"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-ticket-absent')).toBeNull();
+  });
+});
+
+describe('17.072 a committed move does not carry its comment to the next one (E2-32)', () => {
+  /**
+   * 17.072 — E2-32. `comment` and `fieldValues` are cleared by neither reset
+   * effect: the destination-change effect clears `evidenceAttachmentId`/
+   * `uploadError`, and the `!open` effect does the same on close. The docblock
+   * beside the latter defends keeping the comment — *"typing into a dialog and
+   * losing it to a stray Cancel is a real cost"* — and that argument is about
+   * CANCEL, while the effect serves Cancel and Commit alike. The dialog is mounted
+   * for the sheet's whole life (`open={moveOpen}`), so after a committed move —
+   * which only calls `setMoveOpen(false)` — the comment is still in state, and
+   * `submit` puts it on the wire for the NEXT move: **a comment written about move
+   * A is recorded as the comment for move B.**
+   *
+   * Asserted on the state the person can SEE: after one committed move, reopening
+   * the dialog and choosing the same destination must find an EMPTY box. The
+   * first move's arm is the control — its comment reaches the wire — without
+   * which "empty on reopen" would be satisfiable by a box that never held
+   * anything.
+   */
+  it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    // ARM ONE — pick Done, write the comment, commit.
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(
+      screen.getByLabelText('Comment (required by this transition)'),
+      'shipped on the morning van',
+    );
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // THE CONTROL: the comment really reached the wire for the move it belonged to.
+    expect(source.ingested[0]![0]!.payload).toEqual({
+      to: 'done',
+      comment: { text: 'shipped on the morning van' },
+    });
+
+    // ARM TWO — reopen and pick the SAME destination again.
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
   });
 });

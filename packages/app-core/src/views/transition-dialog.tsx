@@ -373,10 +373,21 @@ export function TransitionDialog({
    * see, silently satisfying a rule.
    *
    * Cleared on CLOSE rather than on open, so the abandoned attempt is discarded
-   * at the moment it is abandoned. **The comment and the field values still
-   * persist across a reopen — pre-existing behaviour, left alone deliberately:**
-   * typing into a dialog and losing it to a stray Cancel is a real cost, and
-   * unlike an attachment id it is visible in the reopened dialog.
+   * at the moment it is abandoned. **The comment and the field values persist
+   * across a reopen, and that is deliberate:** typing into a dialog and losing it
+   * to a stray Cancel is a real cost, and unlike an attachment id it is visible in
+   * the reopened dialog.
+   *
+   * ⚠ **AND THAT SENTENCE NAMED ONLY CANCEL, WHILE THIS EFFECT SERVES COMMIT
+   * TOO — WHICH WAS THE DEFECT (E2-32, 2026-09-21).** A committed move closes the
+   * dialog the same way, so the finished move's comment survived into the NEXT
+   * one and `submit` put it on the wire: a comment written about move A recorded
+   * as move B's. **The fix is NOT here**, and deliberately so — this effect
+   * cannot tell the two closes apart, and giving it a flag would be this
+   * component guessing at a fact only the caller has. `TicketSheet` remounts the
+   * dialog per committed move instead (its `key`), which discards the whole
+   * finished attempt and nothing else. **What this effect still owns is the
+   * Cancel half, unchanged.**
    */
   useEffect(() => {
     if (!open) {

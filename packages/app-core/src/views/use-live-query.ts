@@ -1,7 +1,26 @@
 import { useCallback, useEffect, useRef, useState } from 'react';
 import type { DataSource } from '../data-source.js';
 
-export type LiveQueryResult<T> = { data: T | null; error: string | null; reload: () => void };
+/**
+ * `settled` says whether the CURRENT question has been answered yet — true once the
+ * load for the current key resolves, whether it answered or rejected.
+ *
+ * **It exists because `data === null` alone is two different facts** (E4-23,
+ * 2026-09-21): *"the read has not answered"* and *"the read answered `null`"*. On a
+ * read whose honest answer includes `null` — `getTicket` returns the transport's
+ * 404 affordance, and every `/v1` read door answers ONE frozen body for "no such
+ * thing" and "not yours" — a view gating on `data === null` draws a server refusal
+ * as a wait that never ends. The alternative readings are both worse: add an
+ * `answered` sentinel to every `T` and every adapter grows a case; or overload
+ * `error` with a `null`-meaning-404 convention, which would put a transport detail
+ * in the domain of a hook that deliberately knows no status codes.
+ */
+export type LiveQueryResult<T> = {
+  data: T | null;
+  error: string | null;
+  settled: boolean;
+  reload: () => void;
+};
 
 /**
  * Load once, then refetch (debounced) whenever the workspace stream moves.
@@ -40,6 +59,10 @@ export function useLiveQuery<T>(
 ): LiveQueryResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
+  // Whether the CURRENT question has been answered. Cleared when a load is issued
+  // and set when one resolves, `isCurrent`-guarded the same way `data` is — a
+  // superseded load's settlement says nothing about the question on screen now.
+  const [settled, setSettled] = useState(false);
   const loadRef = useRef(load);
   loadRef.current = load;
   const keyRef = useRef(queryKey);
@@ -75,15 +98,18 @@ export function useLiveQuery<T>(
     const askedFor = keyRef.current;
     const issued = (issuedRef.current += 1);
     const isCurrent = (): boolean => keyRef.current === askedFor && issued === issuedRef.current;
+    setSettled(false);
     loadRef.current().then(
       (value) => {
         if (!isCurrent()) return;
         setData(value);
         setError(null);
+        setSettled(true);
       },
       (cause: unknown) => {
         if (!isCurrent()) return;
         setError(cause instanceof Error ? cause.message : String(cause));
+        setSettled(true);
       },
     );
   }, []);
@@ -94,6 +120,7 @@ export function useLiveQuery<T>(
     // as the load takes, with nothing on screen saying which it is.
     setData(null);
     setError(null);
+    setSettled(false);
     reload();
   }, [source, workspaceId, queryKey, reload]);
 
@@ -110,5 +137,5 @@ export function useLiveQuery<T>(
     };
   }, [source, workspaceId, debounceMs, reload]);
 
-  return { data, error, reload };
+  return { data, error, settled, reload };
 }

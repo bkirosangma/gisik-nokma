@@ -1864,6 +1864,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__refusal { color: var(--gn-danger); margin: 0; }
+/* The FOURTH arm (E4-23): the read answered `null` — the door's one-body 404 for
+   "no such thing OR not yours". Deliberately NEITHER of its two siblings: not
+   `--loading`'s muted tone, because it is not a wait and must not read as one,
+   and not `--refusal`'s danger tone, because nothing failed — the server answered.
+   Body text, with the family's paragraph reset. */
+.gn-ticket-sheet__absent { margin: 0; }
 .gn-ticket-sheet__fields { margin: 0.8rem 0 0; }
 .gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr; gap: 0.6rem; padding: 0.35rem 0; }
 .gn-ticket-sheet__field dt { color: var(--gn-text-muted); }
@@ -2106,6 +2112,21 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-visibility__lockout { box-shadow: inset 4px 0 0 var(--gn-warning); }
 .gn-visibility__refusal { box-shadow: inset 4px 0 0 var(--gn-danger); }
 .gn-visibility__refusal-rule { font-weight: 600; margin-right: 0.4rem; }
+/* The TRANSPORT failure (V3, 2026-09-21) — the same card treatment as the refusal
+   beside it, and deliberately NO coloured inset marker: the two markers this
+   section already carries mean something (danger = the server refused; warning =
+   you are about to lose access), and a write that never reached a server is
+   neither. A marker chosen to fill the slot would be the styling making a claim
+   the sentence does not. */
+.gn-visibility__unreached {
+  align-self: flex-start;
+  margin: 0;
+  padding: 0.5rem 0.7rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-secondary);
+  color: var(--gn-text);
+  text-align: left;
+}
 
 .gn-editor-slot--plain { white-space: pre-wrap; }
 .gn-editor-slot__placeholder { color: var(--gn-text-muted); }

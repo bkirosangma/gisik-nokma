@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
-import type { WorkflowAuthoringGateway, WorkspaceMember } from '../gateway.js';
+import { AuthoringReadRefused, type WorkflowAuthoringGateway, type WorkspaceMember } from '../gateway.js';
 import {
   BuilderProvider,
   canAuthorRole,
@@ -115,9 +115,21 @@ export function WorkflowBuilderScreen(props: {
     // A guest may not call GET /v1/workspaces/:id/members (executor ruling
     // 2026-09-02, coordination doc ~5442-5465; see gateway.ts's listMembers
     // docstring) — that refusal is not a load failure, it is an empty roster.
-    // Only listTicketTypes rejecting is treated as fatal to this screen.
+    //
+    // **Narrowed to the refusal (E2-39, 2026-09-21).** The catch used to be
+    // blanket — `catch(() => [])` — so a 500, a dropped connection or an
+    // unparseable roster body became the same empty array a refusal produces,
+    // and flowed into `BuilderEnvironment.members`, which the rule editors and
+    // rule summaries read. An admin then authored rules against a workspace that
+    // appeared to hold nobody, with nothing on screen saying the read had failed.
+    // The refusal class is declared in `gateway.ts` now, so the narrowing is
+    // possible here at all — the adapter's docblocks record that it previously
+    // was not, `app-core` depending on nothing under `apps/`.
     Promise.all([
-      props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[]),
+      props.gateway.listMembers(props.workspaceId).catch((cause: unknown) => {
+        if (cause instanceof AuthoringReadRefused) return [] as WorkspaceMember[];
+        throw cause;
+      }),
       props.gateway.listTicketTypes(props.workspaceId),
     ])
       .then(([members, ticketTypes]) => {

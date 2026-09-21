@@ -2370,3 +2370,31 @@ described") reddens **13.983 alone** (`expected function to throw an error, but 
 - **The 500-character bound is asserted at the schema, not at the input.** The form carries no
   `maxLength` (deliberately, matching the name field), so an over-long description is refused by the
   domain on submission rather than prevented while typing. No case drives that path from the browser.
+
+## The inbox's single-row read and its Undo, which failed in silence — cases `13.1108`–`13.1109` (E5-10, 2026-09-21)
+
+**The defect, in the file's own words, twice.** `markRead(id)` flipped the row optimistically and then
+`void gateway.markRead(id).catch(() => loadFirstPage())` — a reload and NO sentence. `undoMarkAllRead()`
+had the same. The BULK path sixty lines up classifies its failure and renders it, and its docblock
+records why it does: *"The first version of this catch reloaded and said NOTHING: a reader over the bound
+saw a click do nothing and the list snap back, with no sentence anywhere."* **The single-row and undo
+paths were still that first version** — the defect the bulk arm's own note says it fixed, standing in the
+two arms beside it.
+
+The Undo's is the worse of the two: the reader has just been TOLD by the toast that those notifications
+are unread again, and a failed undo leaves the screen contradicting a sentence the page has already
+withdrawn.
+
+- **13.1108** ✅ A refused single-row mark-read SAYS SO, and a failure that never reached a server says
+  THAT instead — never a refusal. **The row splits by KIND where the bulk arm splits by STATUS**: the
+  bulk route's 400 is its bound, a number only a bulk request can exceed, while the single-row route's
+  only status is the 404 that both "not yours" and "does not exist" share — so an `HttpError` of any
+  status is the server adjudicating and anything else never reached one. —
+  (`apps/web/test/inbox-bulk.test.tsx`)
+- **13.1109** ✅ A refused Undo says so, beside the toast, rather than silently leaving the rows read.
+  Its own slot, not the bulk one: the two are said in different places, and this sentence has to outlive
+  the toast the Undo just closed. — (`apps/web/test/inbox-bulk.test.tsx`)
+
+**Three constants, not the bulk pair reused.** `ROW_REFUSED_COPY` / `ROW_UNREACHED_COPY` /
+`UNDO_FAILED_COPY` — the bulk sentences say *"Those notifications"*, and a plural said about one row is a
+second false statement laid on top of the missing one.

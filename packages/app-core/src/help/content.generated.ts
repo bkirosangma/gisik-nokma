@@ -3978,7 +3978,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"the list, calendar and timeline are asking only for tickets in progress — not started and done are both excluded. The board is not narrowed.\""
+                    "text": "\"the list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
                   }
                 ]
               },
@@ -4000,6 +4000,35 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " — and a project opens on the Board the first time you look at it. So you can turn it on, read \"done are excluded\", and be looking at a Done column full of done cards. The note exists precisely because of this."
+                  }
+                ]
+              },
+              {
+                "kind": "quote",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "And the Backlog is the odd one of the four."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The switch narrows the list, calendar and timeline; on the Backlog there is nothing left to narrow, because a backlog ticket is "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "not started"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the switch asks only for tickets already in progress. So the Backlog tab goes empty while the switch is on — and it says so, in its own words: "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"The backlog is hidden while 'Only tickets in progress' is on.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It does not say the backlog is empty, because it is not: the tickets are there, and turning the switch off brings them back."
                   }
                 ]
               },

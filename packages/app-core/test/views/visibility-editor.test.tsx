@@ -1,12 +1,14 @@
-import { fireEvent, render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
 import { visibilitySetPayload } from '@gisik-nokma/domain';
 import type { DataSource } from '../../src/data-source.js';
 import {
   LOCKOUT_WARNING_COPY,
   OWNER_ALWAYS_SEES_COPY,
+  READ_ONLY_COPY,
+  writeUnreachedCopy,
   VisibilityEditor,
   type VisibilityClaim,
 } from '../../src/views/visibility-editor.js';
@@ -152,6 +154,37 @@ describe('3.104 the owner’s read bypass is disclosed, on every mode', () => {
     mount({ canEdit: false });
     expect(screen.getByText(OWNER_ALWAYS_SEES_COPY)).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Only the people I name' })).toBeNull();
+  });
+
+  /**
+   * 17.063 — F4. The read-only arm answered *"then who can?"* — the exact question
+   * a person who has just been told "no" is asking — with a sentence that omitted
+   * the two roles most likely to be able to help and that contradicts its own
+   * sibling two declarations up.
+   *
+   * The server's rule (`apps/server/src/permissions/check-permission.ts:1058-1060`)
+   * is `hasProjectAdminRights(eff) || sessionUserId === creatorId`, and
+   * `hasProjectAdminRights` (`effective-role.ts`) is
+   * `workspaceRole === 'owner' || workspaceRole === 'admin' || projectAdmin`. So a
+   * WORKSPACE owner or admin may change any ticket's visibility, and the shipped
+   * sentence named neither — while `LOCKOUT_WARNING_COPY` right beside it says
+   * *"or the workspace owner, who always sees"*. Two sentences in one component
+   * disagreeing about who may act.
+   *
+   * Asserted on the pair: the corrected sentence is present AND the understated
+   * one is absent. A case asserting only the first passes over a component
+   * rendering both.
+   */
+  it('17.063 the read-only sentence names the WORKSPACE owner and admin, not only a project admin', () => {
+    mount({ canEdit: false });
+
+    expect(screen.getByText(READ_ONLY_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/^Only a project admin, or whoever created this ticket,/)).toBeNull();
+    // And the two roles the server's own predicate admits are both NAMED — the
+    // omission is the defect, so a sentence that merely rewords it would pass a
+    // presence-only assertion.
+    expect(READ_ONLY_COPY).toMatch(/workspace owner/i);
+    expect(READ_ONLY_COPY).toMatch(/workspace .*admin|admin/i);
   });
 });
 
@@ -751,5 +784,58 @@ describe('E2-33c a reload that changes the standing claim re-seeds the fieldset'
       />,
     );
     expect(screen.getByRole('checkbox', { name: 'Dipu' })).toBeChecked();
+
+describe('17.064 a rejected visibility write (V3)', () => {
+  /**
+   * 17.064 — V3. `apply` set `{kind:'sending'}` and then awaited
+   * `dataSource.ingest([…])` with NO try/catch, and its call site is
+   * `onClick={() => void apply()}` — a `void`, so the rejection was discarded
+   * entirely. `submission` therefore stayed `'sending'` for ever: the Apply button
+   * is `disabled={… || submission.kind === 'sending'}`, and the only sentence the
+   * component can render sits under `submission.kind === 'refused'`, which had
+   * become unreachable. A transport failure left a permanently disabled control
+   * and nothing said — the same shape `BulkCloseDialog` two files away already
+   * handles with a `transportError` slot.
+   *
+   * Asserted on the PAIR, because the two halves are one state: the sentence is
+   * present AND Apply is live again. Either alone passes over the defect — a
+   * component that re-enabled the control and said nothing, or one that spoke and
+   * left the control dead, would each satisfy one half.
+   */
+  it('17.064 a rejected write says so, and Apply comes back', async () => {
+    const user = userEvent.setup();
+    const source = recordingSource();
+    const cause = new Error('HTTP 500 for /v1/events');
+    source.dataSource.ingest = async () => {
+      throw cause;
+    };
+    mount({}, source);
+
+    await user.click(await screen.findByRole('radio', { name: 'Everyone in the workspace' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    expect(await screen.findByText(writeUnreachedCopy(cause))).toBeInTheDocument();
+    // THE HALF THE DEFECT IS NAMED FOR: before the fix the control stayed
+    // disabled for ever, so a reader could neither retry nor understand.
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  });
+
+  /**
+   * 17.065 — the control for the case above: a COMMITTED write still ends clean: no transport sentence,
+   * and the success path still calls `onChanged`. Without it the fix could be
+   * "always render the transport sentence", which would be false of every write
+   * that landed.
+   */
+  it('17.065 a committed write says nothing about the server being unreachable', async () => {
+    const user = userEvent.setup();
+    const onChanged = vi.fn();
+    mount({ onChanged });
+
+    await user.click(await screen.findByRole('radio', { name: 'Everyone in the workspace' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(screen.queryByText(/could not reach the server/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 });

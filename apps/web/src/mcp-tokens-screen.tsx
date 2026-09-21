@@ -109,6 +109,22 @@ export function McpTokensScreen({
   // somebody who is already signed in is a false statement about their session.
   const session = useSessionStatus();
   const [tokens, setTokens] = useState<TokenRow[] | null>(null);
+  /**
+   * A read that REJECTED (E2-44, 2026-09-21) — distinct from one still in flight,
+   * which is what `tokens === null` alone says.
+   *
+   * The rejection arm used to be `() => setTokens([])`, and `[]` is precisely the
+   * value the empty arm asserts over: *"No assistants are connected. One appears
+   * here after you approve it on the connect page."* So a 500 was drawn as a
+   * confident claim about the person's account — on the one screen whose whole
+   * subject is which assistants still hold access — and the sentence it printed
+   * sent them to approve a second one. `tokens` now stays `null` on a rejection
+   * and this flag carries the failure, so the empty sentence means only what it
+   * says.
+   */
+  const [loadFailed, setLoadFailed] = useState(false);
+  /** The server's own words for the failed read, when it sent any. */
+  const [loadRefusal, setLoadRefusal] = useState<string | null>(null);
   const [busy, setBusy] = useState<string | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
   /** The row whose name is being edited, or null. ONE at a time: two open editors would be two unsaved drafts against one list. */
@@ -119,8 +135,21 @@ export function McpTokensScreen({
 
   const load = useCallback((): void => {
     void http.get('/v1/me/mcp-tokens').then(
-      (body) => setTokens((body as { tokens: TokenRow[] }).tokens),
-      () => setTokens([]),
+      (body) => {
+        setLoadFailed(false);
+        setLoadRefusal(null);
+        setTokens((body as { tokens: TokenRow[] }).tokens);
+      },
+      (cause: unknown) => {
+        // NOT `setTokens([])`: that is the value the empty arm renders, and an
+        // unanswered read is not a finding about the person's account. The
+        // server's own words are carried when it sent any, the way `revoke` and
+        // the rename path already do; otherwise the sentence says what is true
+        // — the read did not come back — and names the one recovery there is.
+        setLoadFailed(true);
+        setLoadRefusal(cause instanceof HttpError ? refusalText(cause.body) : null);
+        setTokens(null);
+      },
     );
     // `http` is rebuilt each render and is stateless; depending on it would
     // reload on every render instead of on sign-in.
@@ -231,7 +260,16 @@ export function McpTokensScreen({
               is interrupted mid-task, and it will simply be asked to sign in again.
             </p>
 
-            {tokens === null ? (
+            {loadFailed ? (
+              <p
+                role="status"
+                className="gn-mcp-tokens__load-error"
+                data-testid="mcp-tokens-failed"
+              >
+                {loadRefusal ??
+                  'Your connected assistants could not be loaded — reload to try again. The list is unknown, not empty.'}
+              </p>
+            ) : tokens === null ? (
               <p data-testid="mcp-tokens-loading">Loading…</p>
             ) : tokens.length === 0 ? (
               <p className="gn-mcp-tokens__empty" data-testid="mcp-tokens-empty">

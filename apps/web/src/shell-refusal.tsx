@@ -50,11 +50,36 @@
  * `what` names the read that refused, because the message alone does not say
  * which part of the page went missing.
  */
+/**
+ * What the panel SAYS, for a read that would not answer.
+ *
+ * **⚠ IT READ `"{what} cannot be shown yet."` UNTIL 2026-09-21 (E5-30)**, with
+ * the transport's raw string spliced straight after it. That sentence reported
+ * the failure and stopped: it never said a RELOAD is the way out, which is the
+ * one thing a person looking at this panel can actually do, and the string it
+ * carried is a status code addressed to somebody who cannot act on one.
+ *
+ * It names the action now — *"reload to try again"* — which is the same advice the
+ * sibling load-error sentences in `packages/app-core` already give
+ * (`Could not load workflows — reload to try again.`). Hoisted to a function so a
+ * caller's spec asserts the string that RENDERS rather than re-typing it.
+ */
+export function shellRefusalCopy(what: string): string {
+  return `${what} could not be loaded — reload to try again.`;
+}
+
 export function ShellRefusal({ what, message }: { what: string; message: string }) {
   return (
     <p role="status" className="gn-shell__refusal">
-      <span className="gn-shell__refusal-what">{what} cannot be shown yet.</span>
-      {message}
+      <span className="gn-shell__refusal-what">{shellRefusalCopy(what)}</span>
+      {/* The wire string on its OWN LINE, in its own element — `LiveQueryResult.
+          error`, the stringified cause. It is the authority's own words and is
+          carried without paraphrase; what changed (E5-30, 2026-09-21) is that it
+          is no longer spliced into a sentence designed to be read, because
+          "… cannot be shown yet. HTTP 500 for /v1/me/notifications" is a status
+          code addressed to a person who cannot act on one. `expired-session.tsx`
+          routes the 401 arm elsewhere, deliberately untouched. */}
+      <span className="gn-shell__refusal-wire">{message}</span>
     </p>
   );
 }

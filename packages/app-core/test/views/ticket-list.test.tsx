@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default
 // export that survives `verbatimModuleSyntax` — settled at
 // packages/ui/test/components.test.tsx and again in board.test.tsx.
@@ -92,6 +92,10 @@ function chose(columns: ListColumnId[], grouping: Grouping): ProjectViewPrefs {
 function ControlledList({
   rows = ROWS,
   initial = DEFAULT_VIEW_PREFS,
+  // Undefaulted, like its neighbours below: every existing case exercises
+  // `TicketList`'s absent-prop arm, and 13.1107 is the one that measures the
+  // sentence this prop draws.
+  prefsError,
   // Deliberately NOT defaulted here. Defaulting it in the harness means every
   // test passes the prop explicitly and `TicketList`'s own default is never
   // exercised — measured: flipping that default to `false` killed nothing.
@@ -123,6 +127,7 @@ function ControlledList({
   prefsEditable?: boolean;
   onOpenTicket?: (ticketId: string) => void;
   onChange?: (prefs: ProjectViewPrefs) => void;
+  prefsError?: string | null;
   narrowing?: string;
   rowAction?: (row: ListRow) => ReactNode;
   rowDrag?: { onReorder: (movedTicketId: string, beforeTicketId: string | null) => void };
@@ -142,6 +147,7 @@ function ControlledList({
       }}
       labels={LABELS}
       onOpenTicket={onOpenTicket}
+      {...(prefsError === undefined ? {} : { prefsError })}
       {...(narrowing === undefined ? {} : { narrowing })}
       {...(rowAction === undefined ? {} : { rowAction })}
       {...(rowDrag === undefined ? {} : { rowDrag })}
@@ -689,6 +695,7 @@ function Harness({ source }: { source: FakeDataSource }) {
       <span data-testid="origin">{list.prefsOrigin}</span>
       <span data-testid="can-set">{String(list.canSetPrefs)}</span>
       <span data-testid="error">{list.error ?? '-'}</span>
+      <span data-testid="prefs-error">{list.prefsError ?? '-'}</span>
       <button type="button" onClick={() => list.setPrefs(chose(['status'], 'flat'))}>
         rearrange
       </button>
@@ -1880,5 +1887,81 @@ describe('13.705 the rowDrag slot: rows drag, the row reports itself as the befo
     expect(rowTr('rd_a')).not.toHaveAttribute('draggable');
     expect(rowTr('rd_b')).not.toHaveAttribute('draggable');
     expect(document.querySelector('.gn-list__tail-drop')).toBeNull();
+  });
+});
+
+describe('13.1116/13.1107 a preferences failure is not a LIST failure (E5-42)', () => {
+  /**
+   * 13.1116 — E5-42. `useTicketList` returned
+   * `error: list.error ?? preferences.error`, folding the preferences hook's
+   * error — set on a failed `getPreferences` AND on a failed `putPreferences` —
+   * into the SAME field the ticket read uses. The project page refuses on that
+   * field FIRST on every tab but the Board, so a column-preference read that
+   * failed painted *"The ticket list cannot be shown yet. HTTP … for
+   * /v1/me/preferences"* over rows that had loaded perfectly. `setPrefs` is what
+   * the List's own column chooser calls, so a click by the person themselves
+   * could produce it.
+   *
+   * The two failures are asserted in ONE case because they are one field being
+   * measured: the list failure still reaches `error`, the preferences failure no
+   * longer does, and it reaches `prefsError` instead. Asserting only the second
+   * half would pass on a hook that had simply dropped every error.
+   */
+  it('13.1116 the preferences error is its own field, and the ticket read’s error is untouched', async () => {
+    const source = createFakeDataSource({
+      getTickets: async () => ({ projectId: PROJECT, rows: ROWS }),
+      getPreferences: async () => {
+        throw new Error('HTTP 500 for /v1/me/preferences');
+      },
+    });
+    render(<Harness source={source} />);
+
+    await waitFor(() => expect(screen.getByTestId('rows')).toHaveTextContent('rows:'));
+    // The rows are intact and the LIST reports no failure...
+    expect(screen.getByTestId('error')).toHaveTextContent('-');
+    // ...while the preferences failure is reported as its own.
+    await waitFor(() =>
+      expect(screen.getByTestId('prefs-error')).toHaveTextContent('/v1/me/preferences'),
+    );
+    cleanup();
+
+    // The control: a failure of the TICKET READ still reaches `error`. Without
+    // this the case above would pass on a hook that had stopped reporting errors
+    // at all — which is the check-that-cannot-fail shape.
+    const broken = createFakeDataSource({
+      getTickets: async () => {
+        throw new Error('HTTP 500 for /v1/workspaces/ws/tickets');
+      },
+      getPreferences: async () => storedPreferences(chose(['assignee'], 'type')),
+    });
+    render(<Harness source={broken} />);
+    await waitFor(() =>
+      expect(screen.getByTestId('error')).toHaveTextContent('/v1/workspaces/ws/tickets'),
+    );
+  });
+
+  /**
+   * 13.1107 — the sentence, where a person meets it: beside the column chooser.
+   *
+   * A `prefsError` the page could not render would be the same silent failure one
+   * layer out, and this is the arm the finding's own remedy names. Asserted on the
+   * PAIR: the sentence is present AND the rows are still drawn — a screen that
+   * replaced the list with the preference failure would pass an assertion on the
+   * sentence alone, which is precisely the defect E5-42 reports.
+   */
+  it('13.1107 the preference failure is said BESIDE the column chooser, over rows that are still drawn', async () => {
+    render(<ControlledList prefsError="HTTP 500 for /v1/me/preferences" />);
+    const notice = await screen.findByTestId('list-prefs-error');
+    expect(notice).toHaveTextContent('Your column choice was not saved');
+    expect(notice).toHaveTextContent('/v1/me/preferences');
+    // The rows survive: this is a preference failure, not a data failure.
+    // `getAllByText`, not `getByText` — an epic is drawn BOTH as a section
+    // heading and as its own row, so the title legitimately appears twice and a
+    // singular query would redden for a reason that is not this case's.
+    expect(screen.getAllByText(ROWS[0]!.title).length).toBeGreaterThan(0);
+    expect(screen.getAllByRole('row').length).toBeGreaterThan(0);
+    // And the list's own summary is still a claim about the project, not a
+    // sentence about the person's columns.
+    expect(screen.getByTestId('list-summary')).toBeInTheDocument();
   });
 });

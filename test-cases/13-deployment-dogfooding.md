@@ -157,6 +157,18 @@ fall inside B06's block `13.1097`–`13.1106`; ids already on `main` never move.
 block: `13.1081` — a lane mints only from its own row of the batch table, and recounts against every
 remote branch before trusting any "next free" number, not `origin/main` alone; the release plan runs
 several lanes on this same section at once, and `origin/main` is the SLOWEST of the readings, not the true one.
+**`13.1107`–`13.1116` is ALLOCATED to release batch B09 (lane ds5, 2026-09-21) — `13.1110` and `13.1111`
+minted, `13.1107`–`13.1109` and `13.1112`–`13.1116` reserved.** ⚠ **THIS BLOCK EXISTS BECAUSE THE RELEASE'S OWN RULE COLLIDED, AND
+THE COLLISION IS RECORDED HERE RATHER THAN ONLY IN THE BATCH'S PROGRESS FILE.** The release plan (`§0` rule
+5) instructs every batch to mint "the next free id in that file's section", and six batches were minting
+that way at once: **`13.1050`–`13.1051` were minted by B09 and `13.1050`–`13.1056` were minted
+INDEPENDENTLY by B03 in `13-hig-per-screen.md` on the same day**, from the same tip. Neither had merged, so
+**B09 renumbered its two to `13.1110`/`13.1111`** — the repo's rule that *an id which has not merged can
+still be renumbered* — and took a block clear of every live tip instead of the tip itself. Measured before
+choosing, across ALL remote branches rather than `origin/main`: §13's occupied ordinals ran to **`13.1103`**
+(B01's server-door cases), and `13.1100`–`13.1103` were already taken, so the block starts at `13.1110`.
+**A lane minting §13 ids should read this line first; the tip is no longer a safe starting point while the
+release runs.**
 
 Nothing in the Task 14/15 section below is proven by an automated test in the usual `vitest` sense —
 there is no test runner for GitHub Actions YAML. `🧪` there means: reproduced by hand against the actual

@@ -404,6 +404,26 @@ export type TicketSheetProps = {
  * clear it. **Why the branch exists did NOT change:** `data` is null on a
  * failure AND on a real absence, and an error must never render as an absence.
  *
+ * ## And what it does when the read ANSWERS `null` (E4-23, 2026-09-21)
+ *
+ * A fourth arm, between the failure and the wait, and it exists because `data`
+ * being null was doing THREE jobs rather than two. `getTicket` returns the
+ * transport's 404 affordance — `createHttpClient` answers `null` for a 404 on a
+ * GET, deliberately, because every `/v1` read door sends ONE frozen body for "no
+ * such thing" and for "not yours" (`READ_NOT_FOUND_BODY`,
+ * `apps/server/src/routes/tickets.ts`) and a client that told them apart would be
+ * inventing the existence oracle the server refused to provide. So a mistyped id,
+ * a soft-deleted ticket and a ticket this viewer may not see are ONE answer, and
+ * that answer was drawn as `Loading…` — a server refusal rendered as a wait that
+ * never ends, measured on a live page at 2.5 s, 8.5 s, 18.5 s and 61 s.
+ *
+ * `useLiveQuery` now reports `settled`, so the three states are told apart:
+ * `data === null && !settled` is the wait, `data === null && settled` is that one
+ * refusal, and each renders its own words. **The sentence names both readings** —
+ * *"This ticket is not here — it may have been deleted, or you may not be able to
+ * see it."* — because naming only one of them would be this screen making the
+ * distinction the server declined to make.
+ *
  * `HistoryTab` (below) applies the SAME three-way distinction to the ledger tab.
  */
 export function TicketSheet({
@@ -434,6 +454,15 @@ export function TicketSheet({
    */
   const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  /**
+   * How many moves have COMMITTED. Bumped beside `setMoveOpen(false)` on the
+   * success path and used as `TransitionDialog`'s `key`, so a committed move is a
+   * fresh dialog the next time it opens (E2-32, 2026-09-21) while a Cancel —
+   * which does not bump it — still preserves what was typed. The reason is at the
+   * bump site; the short version is that the dialog's own `!open` effect serves
+   * Cancel and Commit alike and can only honour one of them.
+   */
+  const [movesCommitted, setMovesCommitted] = useState(0);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   /**
    * Ruling 33 (fix round 2, 2026-09-17) — Close/Reopen's OWN transport-error
@@ -644,6 +673,25 @@ export function TicketSheet({
     );
   }
 
+  // **The read ANSWERED `null` — a distinct state from "not answered yet" (E4-23,
+  // 2026-09-21).** `null` is the transport's deliberate 404 affordance: every `/v1`
+  // read door answers ONE frozen body for "no such thing" and for "not yours"
+  // (`apps/server/src/routes/tickets.ts`, `READ_NOT_FOUND_BODY`), so a mistyped id,
+  // a soft-deleted ticket and a ticket this viewer may not see all arrive here as
+  // `null` and are deliberately indistinguishable. Gating on `data === null` alone
+  // drew all three as `Loading…` — a server refusal rendered as a wait that never
+  // ends, measured at 61 s on a live page. The sentence names BOTH readings because
+  // the one-body refusal is exactly the reason the server will not say which.
+  if (read.data === null && read.settled) {
+    return (
+      <Sheet open title="Ticket" onClose={onClose}>
+        <p className="gn-ticket-sheet__absent" data-testid="sheet-ticket-absent">
+          This ticket is not here — it may have been deleted, or you may not be able to see it.
+        </p>
+      </Sheet>
+    );
+  }
+
   if (read.data === null) {
     return (
       <Sheet open title="Ticket" onClose={onClose}>
@@ -793,6 +841,17 @@ export function TicketSheet({
     if (failed === undefined) {
       setServerRefusal(null);
       setMoveOpen(false);
+      // **A COMMITTED move is a fresh dialog next time (E2-32, 2026-09-21).**
+      // The dialog's own `!open` effect deliberately keeps `comment` and
+      // `fieldValues` across a close — *"typing into a dialog and losing it to a
+      // stray Cancel is a real cost"* — and that argument is about CANCEL, while
+      // the effect serves Commit alike. The dialog is mounted for the sheet's
+      // whole life, so without this the next Move carried the previous move's
+      // words onto the wire: a comment written about move A recorded as move B's.
+      // Bumping this KEY remounts the dialog, which discards the whole abandoned
+      // attempt and nothing else — Cancel does not bump it, so the cost the
+      // docblock defends is untouched.
+      setMovesCommitted((count) => count + 1);
       return;
     }
     // The authority's own words, carried without paraphrase. A refusal is a
@@ -2666,12 +2725,15 @@ export function TicketSheet({
             <AttachmentList entries={attachments ?? []} />
           ) : (
             /*
-              The three-way distinction this sheet already draws for the ticket
-              read and for the ledger tab, applied to the files: an ANSWER (drawn
-              above, empty or not), a WAIT (nothing yet — `AttachmentList`'s own
-              silence), and a FAILURE, which is this sentence. It is deliberately
-              not a `Loading…` line: a read that failed under the word "Loading…"
-              is a wait that will never end, wearing the clothes of one that will.
+              The three-way distinction this sheet draws for the ledger tab,
+              applied to the files: an ANSWER (drawn above, empty or not), a WAIT
+              (nothing yet — `AttachmentList`'s own silence), and a FAILURE, which
+              is this sentence. It is deliberately not a `Loading…` line: a read
+              that failed under the word "Loading…" is a wait that will never end,
+              wearing the clothes of one that will. **(The ticket read draws a
+              FOURTH arm the files do not need — an answered `null` — since E4-23;
+              `attachments` has no 404 affordance to answer with, so there is no
+              third null here.)**
             */
             <p
               // `alert`, matching this sheet's five other failure sentences
@@ -2848,6 +2910,14 @@ export function TicketSheet({
 
       {workflow.data != null ? (
         <TransitionDialog
+          /*
+            ⚠ THE KEY IS LOAD-BEARING (E2-32, 2026-09-21). A committed move
+            remounts this dialog, which is what discards the finished move's
+            `comment` and `fieldValues`; the dialog cannot do it itself, because
+            its only close-time effect must also preserve them for a Cancel.
+            Cancel does not change the key, so nothing typed is lost to one.
+          */
+          key={movesCommitted}
           open={moveOpen}
           workflow={workflow.data}
           fromStateId={state.stateId}

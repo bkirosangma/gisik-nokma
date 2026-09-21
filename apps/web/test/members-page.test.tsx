@@ -179,7 +179,7 @@ describe('3.129 a member sees the roster and none of the invite machinery', () =
   it('3.131 renders a refusal for a read that failed for any other reason', async () => {
     mount({ listPending: async () => Promise.reject(new InviteAdminError(500, null)) });
     await waitFor(() =>
-      expect(screen.getByText(/cannot be shown yet/)).toBeInTheDocument(),
+      expect(screen.getByText(/could not be loaded/)).toBeInTheDocument(),
     );
     expect(screen.queryByText(ADMIN_ONLY)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Invite somebody' })).toBeNull();

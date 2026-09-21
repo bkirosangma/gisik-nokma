@@ -28,7 +28,7 @@ never saw.
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
 | **release batch B08** (ds3, `rel/b08-ticket-sheet-crumbs-history-comm`) | **`17.021`–`17.040`** — allocated by the controller 2026-09-21 21:0x (cycle 46) when ds3 reported F3's §16 case OWED with §16 fully allocated; `17.021` is that case |
 | **release batch B06** (ds1, `rel/b06-new-ticket-and-move-dialogs`) | **`17.041`–`17.060`** — allocated 2026-09-21 21:0x (cycle 46) |
-| **release batch B09** (ds5, `rel/b09-failure-states-on-the-web-reads-`) | **`17.061`–`17.080`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.067` and `17.069`–`17.072`** (`17.068` deliberately unused: a control arm folded into `17.067`'s case rather than given its own id) |
 | **release batch B01** (exec6, `rel/b01-server-doors-security-and-refusa`) | **`17.081`–`17.100`** — allocated 2026-09-21 21:0x (cycle 46) |
 | **release batch B02** (exec2, `rel/b02-account-page-workflow-builder-dr`) | **`17.101`–`17.120`** — allocated 2026-09-21 21:0x (cycle 46) |
 | **release batch B07** (exec4, `rel/b07-soft-delete-integrity-engine-rep`) | **`17.121`–`17.140`** — allocated 2026-09-21 21:0x (cycle 46) |
@@ -154,3 +154,207 @@ a peer rather than by the author of the check.
 `origin/main` has not moved is *true when written* and *false within two minutes*; the `git log
 origin/main..HEAD` check the handoff itself prescribes is **structurally blind to being BEHIND**, so
 nothing in this lane's own machinery could have caught it.
+
+## The invite page's fourth arm: a link that could not be CHECKED — cases `17.061`–`17.062` (V9, 2026-09-21)
+
+**Why this case is in §17.** The invite page's older cases are §3 (`3.118`–`3.123`), and its newer
+token-page case is §16 (`16.44`) — but §16's blocks are spent and §3's tip is shared across live lanes
+with no block held here. §17's own table above carries this batch's allocation, so the case is minted
+from it. It is a door case, which is what that block was allocated for.
+
+**The defect.** `getInvite`'s rejection arm set `invite = null` for ANY failure, and the render gave
+`null` exactly one sentence: *"This invitation link does not open anything. It may have been used,
+withdrawn, or lapsed — ask whoever invited you for a new one."* So a dropped connection, a 500 or an
+unparseable body were all drawn as a dead link — and that sentence **sends the person to ask for a
+replacement, retiring a link that was never tried and may be perfectly good.** `null` is not nothing
+here: it is the transport's read affordance for the server's ONE frozen 404 body, which really does mean
+the link opens nothing.
+
+- **17.061** ✅ A transport failure says the link could not be CHECKED, says nothing has been used up,
+  and does not say the link opens nothing. Asserted on the pair, because the two sentences are
+  alternatives in one branch — a case asserting only the new one passes on a page drawing both. Plus the
+  retry, which re-asks and believes a second answer. — (`apps/web/test/invite-page.test.tsx`)
+- **17.062** ✅ An ANSWERED `null` still renders the dead-link sentence, and not the
+  unable-to-check one. Without it the fix could be "always say it could not be checked", which would be
+  false of every link the server actually refused. — (`apps/web/test/invite-page.test.tsx`)
+
+**The state is four-valued now** — `'loading' | 'unreachable' | null | InviteSummary` — where it was
+three. `3.121` keeps the ANSWERED-`null` arm and its own docblock; the half of it that asserted the
+transport failure was the defect, and it moved here rather than being renumbered.
+
+## The visibility editor's read-only sentence — case `17.063` (F4, 2026-09-21)
+
+**The arm answered "then who can?"** — the exact question a person who has just been told "no" is asking —
+with a sentence that omitted the two roles most likely to be able to help, and that contradicted its own
+sibling two declarations up.
+
+**The measurement, re-taken rather than inherited.** The server's rule is
+`apps/server/src/permissions/check-permission.ts:1058-1060`,
+`hasProjectAdminRights(ctx.eff, projectId) || ctx.sessionUserId === creatorId`, and
+`hasProjectAdminRights` (`apps/server/src/permissions/effective-role.ts`) is
+`workspaceRole === 'owner' || workspaceRole === 'admin' || projectAdmin`. **A workspace owner or admin
+may change any ticket's visibility.** The shipped sentence — *"Only a project admin, or whoever created
+this ticket, can change who sees it."* — named neither, while `LOCKOUT_WARNING_COPY` in the same file
+says *"or the workspace owner, who always sees"*.
+
+- **17.063** ✅ The read-only sentence NAMES the workspace owner and admin. Asserted on the pair — the
+  corrected sentence present AND the understated one absent — because a case asserting only the presence
+  passes over a component rendering both; and the two role words are asserted separately, because a
+  sentence that merely reworded the old one would satisfy a presence-only check. —
+  (`packages/app-core/test/views/visibility-editor.test.tsx`)
+
+**The second copy of the same omission was found while fixing the first, and it is the more load-bearing
+one.** `canEdit`'s own prop docblock read *"spec §6: project admins and the ticket's creator"* — the same
+under-permissive rule, stated at the place a CALLER reads to decide what to pass. It is corrected in the
+same change set; had it been left, the next caller would have written the gate the old sentence
+described.
+
+**⚠ THE ARM IS STILL DEAD IN THE SHIPPED PRODUCT, AND THAT IS RECORDED AT THE SITE RATHER THAN FIXED
+HERE.** It renders only when `canEdit` is false; `canEdit` is `TicketSheet`'s `canSetVisibility` prop,
+whose declared default is `true` (`ticket-sheet.tsx:422`); and a sweep of `apps/web/**`,
+`apps/desktop/**` and `apps/mobile/**` for `canSetVisibility` finds ONE hit and it is a COMMENT
+(`page.tsx:2825`). **Deleting the arm — or giving it the read that makes it reachable — is a decision
+about `canSetVisibility`, not about this sentence**, and the sheet's own docblock
+(`ticket-sheet.tsx:225-241`) argues that the client cannot know role or creator, which is a sound
+argument for showing the control and letting the door refuse. **Owner: whoever next revisits
+`canSetVisibility`.** The sentence was corrected regardless: a wrong permission statement is not made
+less wrong by being unreachable, and the prop is a declared part of this component's public surface.
+
+## The visibility editor's write: a transport failure left Apply dead and silent — cases `17.064`–`17.065` (V3, 2026-09-21)
+
+**The defect.** `apply` set `{kind:'sending'}` and then awaited `dataSource.ingest([…])` with **no
+`try`/`catch`**, and its call site is `onClick={() => void apply()}` — a `void`, so the rejection was
+discarded entirely. Nothing caught it, so `submission` stayed `'sending'`, and that is exactly the state
+the Apply button is `disabled` on (`disabled={explicitNamesNobody || submission.kind === 'sending'}`).
+The component's only sentence lives under `submission.kind === 'refused'`, which the throw had made
+unreachable. A dropped connection therefore left a control that never came back and nothing said — the
+shape `BulkCloseDialog` two files away already handles with a dedicated `transportError` slot.
+
+- **17.064** ✅ A rejected write says so, and Apply comes back. Asserted on the PAIR, because the two
+  halves are one state: a component that re-enabled the control and said nothing, or one that spoke and
+  left the control dead, would each satisfy one half alone. The sentence carries the cause's own words
+  and says WHO CAN SEE THIS IS UNCHANGED — the reader's next question, whose honest answer is that
+  nothing was recorded. — (`packages/app-core/test/views/visibility-editor.test.tsx`)
+- **17.065** ✅ A COMMITTED write says nothing about the server being unreachable, and `onChanged`
+  still fires. Without it the fix could be "always render the transport sentence", which would be false
+  of every write that landed. — (`packages/app-core/test/views/visibility-editor.test.tsx`)
+
+**`submission` returns to `idle`, NOT to `refused`.** Nothing was refused — no server judged this — and
+dressing a transport failure in the engine's words is the thing the refusal slot exists to prevent. The
+transport sentence is its own slot (`transportError`), with its own CSS rule and deliberately no coloured
+inset marker: the two markers this section carries mean something (danger = refused, warning = you are
+about to lose access) and this is neither.
+
+**RED was observed against a MUTATION rather than against `HEAD`**, because the true pre-fix file has no
+`writeUnreachedCopy` at all and the spec imports it — the run would have died on the import, which is the
+"a mutation that cannot parse runs zero tests" shape. The first attempt at that mutation did not parse
+either (a `perl` template ate the quoting around `.ticket.`), and it was discarded rather than counted.
+
+## The invite page names the deadline and offers a next step — cases `17.066`–`17.069` (E5-18, 2026-09-21)
+
+**Two of this finding's three parts are closed; the third is recorded with its reason rather than built.**
+
+**(a) The expiry was on the wire and dropped.** The door has served `expiresAt` — the presented
+TOKEN's own window, the value `openableInvite` matched on — as a fourth field on `GET /v1/invites/:token`
+since 2026-09-19 (`apps/server/src/routes/invites.ts:417`, the `isInvite` expiry ruling), and
+`createHttpInviteGateway` read three fields and threw it away. So the page could not say when the link
+lapses while `/workspaces` renders the same fact for a waiting invitation (*"Invited … · lapses …"*).
+
+- **17.066** ✅ The mapper carries the token's expiry, and answers `null` — never an invented day — for a
+  body that sent none. — (`packages/app-core/test/online/invites.test.ts`)
+- **17.067** ✅ The page NAMES the day it lapses, in the workspace's zone, through the same `onDay` shape
+  `/workspaces` uses rather than a second date vocabulary; a summary with NO expiry draws no line at all
+  (the control arm, in the same case).
+  — (`apps/web/test/invite-page.test.tsx`)
+
+**(b) The dead arm offered nothing.** It was ONE `<p>` in a Card with no link: a person who followed a
+dead link, possibly while signed out, got a sentence and no next step.
+
+- **17.069** ✅ The dead-link arm links to `/workspaces` — where their own waiting invitations live,
+  including the one this link was for if they signed in under the address it was sent to — rather than a
+  generic home link. — (`apps/web/test/invite-page.test.tsx`)
+
+**(c) ⚠ DECLINE IS NOT BUILT, AND THE DOOR THE FINDING NAMES DOES NOT FIT THIS PAGE.** The decline that
+exists is `MyInvitationsGateway.decline(inviteId)` (`packages/app-core/src/online/my-invitations.ts:50`),
+served by `apps/server/src/routes/my-invitations.ts` — and **it is keyed by `inviteId`, matched to the
+SIGNED-IN person's own address**, which is why `/workspaces` can offer it and this page cannot: a token
+page holds a bearer TOKEN and, on a signed-out arrival, no session at all. Declining from here would need
+a new door (decline-by-token), which is a route and a ruling rather than a control, and it would have to
+answer what a decline means for a person who never signed in. **Owner: whoever next takes the invite
+surface.** The finding's own words — *"A Decline beside Join (the door exists)"* — are true of the
+PRODUCT and not of this page, and that distinction is the reason this part is recorded rather than built.
+
+## The shared refusal panel says what to DO — case `17.070` (E5-30, 2026-09-21)
+
+**The defect.** `ShellRefusal` — the one panel every refusing read in the shell renders — drew
+`"{what} cannot be shown yet."` with the transport's raw string spliced straight after it. `message` is
+the page's `error` string, the stringified cause, so a 500 read *"Your inbox cannot be shown yet. HTTP 500
+for /v1/me/notifications"*: a sentence that reports the failure and stops — it never says a RELOAD is the
+way out, which is the one thing a person looking at this panel can do — and then appends a status code to
+someone who cannot act on one.
+
+- **17.070** ✅ The panel names the action — *"{what} could not be loaded — reload to try again."* — the
+  same advice the sibling load-error sentences in `packages/app-core` already give, AND still carries the
+  transport's own words, now on their OWN LINE in their own element rather than spliced into a sentence
+  designed to be read. Asserted on the pair, and with the old wording asserted ABSENT, because a panel
+  rendering both would satisfy a presence-only check. — (`apps/web/test/page-refusals.test.tsx`)
+
+**⚠ THE JUDGE SCORED THIS "PARTIAL" ON SCOPE, AND THE CORRECTION IS RECORDED RATHER THAN REPEATED.** The
+finding said the panel is mounted on six sites across five routes; the verifier's own grep found
+**fourteen mounts on seven routes**. Nothing in this case asserts a count — the copy change reaches every
+mount either way, since it is one component.
+
+**⚠ AND THE COPY CHANGE'S BLAST RADIUS IS THE HONEST COST OF A SHARED COMPONENT, MEASURED RATHER THAN
+GLOSSED:** **29 assertions across 8 spec files** asserted the old wording and moved with it. Three of
+those are historical records and were deliberately EXCLUDED from the sweep (this file's own record above,
+`page-refusals`'s E5-30 docblock, and `ticket-list.test.tsx`'s E5-42 note). **The sweep also had to be
+narrowed twice after it ran:** a generic `/could not be loaded/` matcher reddens on `/workspaces`'s
+*"Your invitations could not be loaded:"*, which is a DIFFERENT component's sentence, so the two
+absence-assertions that used it now name their own page's copy.
+
+The `401` arm is untouched: `expired-session.tsx` routes it to the sign-in notice, deliberately, and the
+panel never renders it.
+
+## The single row's failure speaks in the ROW's vocabulary — case `17.071` (E2-26, 2026-09-21)
+
+**Why this case is in §17 and not beside E5-10's in §13.** E2-26 and E5-10 name the same lines
+(`apps/web/app/inbox/page.tsx:278`, `:269-279`) and were judged to score independently. The FIX landed
+with E5-10; §13's B09 block (`13.1107`–`13.1116`) is spent, so this case is minted from this batch's §17
+allocation. It records the property the fix turns on that E5-10's case does not assert.
+
+**⚠ THE FINDING'S OWN REMEDY WAS "REUSE THE SAME TWO SENTENCES THE BULK PATH ALREADY HAS — one fact, one
+vocabulary, no new copy", AND THIS CASE ASSERTS THE OPPOSITE ON PURPOSE.** The bulk pair says *"Those
+notifications were not marked read"* — a plural, about a set. Said about ONE row it is a second false
+statement laid on top of the missing one: the reader clicked one row and is told about several. So the row
+has its own pair (`ROW_REFUSED_COPY`/`ROW_UNREACHED_COPY`), and the deviation is stated at the constant,
+in the case, and in the commit rather than made silently. **The disagreement is with a reviewer's
+suggestion, not with the finding's substance** — the substance, that the failure was silent, is closed.
+
+- **17.071** ✅ The row renders its OWN sentence and the bulk path's is absent — both halves asserted,
+  because a page rendering the bulk sentence would satisfy a check that only looked for "a sentence".
+  — (`apps/web/test/inbox-bulk.test.tsx`)
+
+## A committed move does not carry its comment into the next one — case `17.072` (E2-32, 2026-09-21)
+
+**The defect.** `TransitionDialog` holds `comment` and `fieldValues`, and neither reset clears them: the
+destination-change effect clears `evidenceAttachmentId`/`uploadError`, and the `!open` effect does the same
+on close. The docblock beside the latter defends keeping the comment — *"typing into a dialog and losing it
+to a stray Cancel is a real cost"* — **and that argument names CANCEL while the effect serves Cancel and
+Commit alike.** The dialog is mounted for the sheet's whole life (`open={moveOpen}`), so after a committed
+move — which only calls `setMoveOpen(false)` — the comment is still in state, and `submit` puts it on the
+wire for the NEXT move: **a comment written about move A is recorded as the comment for move B.**
+
+- **17.072** ✅ After one committed move, reopening the dialog and choosing the same destination finds an
+  EMPTY comment box. The first move's arm is the control — its comment REACHES THE WIRE, asserted on the
+  ingested payload — without which "empty on reopen" would be satisfiable by a box that never held
+  anything. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+
+**The fix is NOT inside the dialog, and the reason is the property rather than the file.** The `!open`
+effect cannot tell a Cancel from a Commit, and giving it a flag would be the component guessing at a fact
+only the caller has. `TicketSheet` bumps a `movesCommitted` counter on the success path and uses it as the
+dialog's `key`, so a committed move REMOUNTS the dialog — discarding the whole finished attempt and
+nothing else. **Cancel does not change the key, so the cost the docblock defends is untouched**, which is
+the half of the finding's own remedy that says *"while keeping preserve-on-Cancel"*.
+
+The dialog's docblock is corrected in the same change set: it named only Cancel while its effect served
+both closes, and that sentence is where the defect was legible.

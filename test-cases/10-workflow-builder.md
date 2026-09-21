@@ -2,6 +2,8 @@
 
 Mirrors `Features.md` §10. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` covered by E2E only · `🚫` consciously out of scope. Test names cross-reference the covering test.
 
+**⚠ THE TIP IS NOT A SAFE PLACE TO MINT FROM WHILE THE RELEASE RUNS — `10.110`–`10.119` is ALLOCATED to release batch B09 (lane ds5, 2026-09-21)**, of which `10.110` and `10.111` are minted. **Why the block exists rather than the next free id:** the release plan tells every batch to mint "the next free id in that file's section" and six batches were doing it at once, so **`10.90` was minted independently by B06 and by B09 on the same day** — both real case bullets in THIS file, neither merged. **B09 renumbered its two to `10.110`/`10.111`** (the repo's rule: an id which has not merged can still be renumbered) and took a block clear of every live tip. Measured before choosing, across ALL remote branches rather than `origin/main`: §10's occupied ordinals ran to **`10.92`**. A lane minting here should read this line first.
+
 ## Canvas authoring
 - 10.1 ✅ States render as nodes with name, category, blocked flag, start marker — `canvas.test.tsx` renders every state / initial-state marker / blocked checkbox
 - 10.2 ✅ Category picker on the node edits the def — `canvas.test.tsx` changes a state category
@@ -122,6 +124,48 @@ Six real, gate-covered tests over the route layer, in `apps/web/test/authoring-r
 - 10.87 ✅ Both rule-editor pickers — `RequireFieldEditor`'s Field picker and `RequireDifferentUserEditor`'s Earlier-move picker (Task 2) — render as the shared non-searchable Select (button trigger, portal listbox) instead of native `<select>`s, each carrying the same `string` → `string | null` unset treatment (`value={known ? … : null}`) so a rule naming a value the Select doesn't recognize shows the component's own placeholder rather than falsely displaying its first option — `rule-editors.test.tsx` ("offers built-ins plus the bound types fields, and picks into the rule"; "warns when the rule names a field no bound type carries", the placeholder-fallback case; "offers only states some transition points at, naming the move", the Earlier-move picker).
 - 10.88 ✅ The state-mapping dialog's target-state select (`state-mapping-dialog.tsx`, Task 3) — repeated once per dropped state — renders as the shared Select (button trigger, portal listbox): the confirm button stays disabled until every row is picked, and the submitted payload reflects exactly what was picked — `publish.test.tsx` ("lists every stranded state with its in-flight count and requires a target for each"; "demands a destination for EVERY dropped state — either one alone is not enough"). The same `string | null` unset treatment as 10.87 (`mapping[state.id] ?? null`) is read from source, not witnessed here the way 10.87's placeholder assertion is: no standing case in this file exercises the picker with a value the Select doesn't recognize.
 - 10.89 ✅ The workflow-rebind dialog's target-state select (`workflow-rebind-dialog.tsx`, Task 4) migrated the same way — structurally similar to 10.88's picker but, per its own docblock, a genuinely SEPARATE component: it authors a one-shot map between two UNRELATED workflows that rides its own migration request, never a `stateMapping` keyed inside one workflow's own version chain (design decision 10) — `ticket-types.test.tsx` ("authors one cross-workflow map and hands the server one migration — never a stateMapping"). Same `?? null` treatment (`stateMap[state.id] ?? null`), same caveat as 10.88: read from source, not witnessed by a standing placeholder assertion.
+
+## The builder's roster read: a failed read is a load failure, a refusal is an empty roster — cases `10.110`–`10.111` (E2-39, 2026-09-21)
+
+**The id block is `10.110`–`10.111`.** Both were free when this lane recounted (`git grep -hoE '10\.[0-9]{1,4}([^0-9]|$)'` over
+`test-cases/`, `docs/superpowers/plans/` and `docs/lanes/`; the maximum in use was `10.89`, control `10.89` = 2 hits in the
+same invocation). **`test-cases/README.md` still says §10 continues from `10.71` and that is stale** — `10.71`–`10.89` were
+minted after that sentence was written, which is the "a next-free pointer is a cache" trap the §13 header records, one part-file
+over. A lane taking the README at its word would have re-minted eleven landed ids.
+
+**The defect.** `WorkflowBuilderScreen` loaded its environment with
+`props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[])` — a BLANKET catch, written for the one
+refusal it names in its own comment (a guest may not call `GET /v1/workspaces/:id/members`, executor ruling 2026-09-02) but
+unable to tell that 404 from a 500, a dropped connection or a roster body it could not parse. All of them became the EMPTY
+roster, which flows into `BuilderEnvironment.members` and out to the rule editors and rule summaries — so an admin authored
+`restrict-to` and `require-different-user` rules against a workspace that appeared to hold nobody, with no sentence anywhere
+saying the read had failed. The screen already HAD the arm for it: *"Could not load workspace people and types — reload to try
+again."*, unreachable for the members half.
+
+- **10.110** ✅ A roster read that fails for a reason other than the refusal is a LOAD FAILURE, not an empty roster: the
+  failure sentence renders and the builder's own name field does not. Asserted on the pair, because either half alone passes
+  over the defect — a screen that mounted normally *and* printed the sentence would still fail. The stub throws a bare `Error`,
+  so the case does not depend on the refusal class existing to be RED. — (`packages/app-core/test/workflow-builder/screens.test.tsx`)
+  *Planted defect, run (control 1 of 2): restoring the blanket `catch(() => [] as WorkspaceMember[])` reddens **this case only**
+  — 10.111 stays green, which is correct, because a refusal SHOULD degrade. Log `/tmp/ds5-E2-39-control.log`.*
+- **10.111** ✅ A guest refused the member list still degrades to the read-only builder, not a fatal error — the justified half
+  of the same catch, kept under the narrowed one so that 10.110 cannot be satisfied by a `throw everything`. The stub throws
+  `AuthoringReadRefused`, which is what a guest's refusal actually arrives as. — (`packages/app-core/test/workflow-builder/screens.test.tsx`)
+  *Planted defect, run (control 2 of 2): replacing the narrowing with `throw cause` reddens **this case only** — 10.110 stays
+  green. Log `/tmp/ds5-E2-39-control2.log`. **The two controls together are the discrimination proof**: each case fails when
+  the other's half of the fix is removed, so neither is a check that cannot fail.*
+
+**What closing it needed, and why it was not a catch clause.** `AuthoringReadRefused` was declared in
+`apps/web/src/authoring/data-source-gateway.ts`, and `packages/app-core` depends on `domain`, `rule-engine`, `sync-client`,
+`ui` and `@xyflow/react` — nothing under `apps/` — so the screen could not name the type to narrow on. The class now lives in
+the contract (`packages/app-core/src/workflow-builder/gateway.ts`) and the adapter re-exports it, so there is ONE class and
+`instanceof` holds across the boundary. The adapter's message and `route` field are unchanged, so nothing a reader sees moved.
+
+**Two existing tests carried the blanket behaviour as their premise and were corrected in the same commit, not weakened:**
+`access.test.tsx`'s *"a guest gets the read-only screen even when the member roster is refused, as a guest roster is"* threw a
+bare `Error` while its own docblock claimed the roster was refused *"the way a guest's actually will be"* — the throw is now
+the class a guest's refusal really is, and every assertion of that test is unchanged. `screens.test.tsx`'s admin-session test
+of the same degradation is 10.111 above.
 
 ## Smoke (Playwright, env-gated)
 - 10.50 🧪 Template to published to listed — `workflow-builder.spec.ts`

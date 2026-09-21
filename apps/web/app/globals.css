@@ -2174,6 +2174,11 @@ input, textarea, select { font-family: inherit; }
    is still where the shell shows those words rather than a spinner. */
 .gn-shell__refusal { margin: 0; padding: 0.75rem 0.9rem; border-radius: var(--gn-radius-control); color: var(--gn-text-muted); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-danger); }
 .gn-shell__refusal-what { display: block; font-weight: 600; color: var(--gn-text); }
+/* The transport's own words, on their own line under the sentence (E5-30,
+   2026-09-21) — muted, like the panel, and NOT bold, because it is the cause
+   rather than the statement. Pinned rather than left to inheritance: the line
+   above is `display: block` and this span would otherwise ride it. */
+.gn-shell__refusal-wire { display: block; font-weight: 400; }
 .gn-shell__expired { margin: 0; padding: 0.75rem 0.9rem; border-radius: var(--gn-radius-control); color: var(--gn-text); background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); }
 
 /* ── The 404, and the two legal pages ────────────────────────────────────────

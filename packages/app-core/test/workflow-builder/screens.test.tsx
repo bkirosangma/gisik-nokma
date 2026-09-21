@@ -3,6 +3,7 @@ import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
+import { AuthoringReadRefused } from '../../src/workflow-builder/gateway.js';
 import { cloneTemplate, draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
 import type { BuilderSession } from '../../src/workflow-builder/ui/builder-context.js';
 import { TemplateGallery } from '../../src/workflow-builder/ui/template-gallery.js';
@@ -84,10 +85,21 @@ describe('WorkflowBuilderScreen', () => {
     ).toBeInTheDocument();
   });
 
-  it('degrades to an empty roster instead of a fatal error when a guest is refused the member list', async () => {
+  /**
+   * 10.111 — the justified half of the same catch, kept under the narrowed one.
+   *
+   * A guest may not call `GET /v1/workspaces/:id/members` (executor ruling
+   * 2026-09-02), and THAT refusal is not a load failure — it is an empty roster,
+   * and the builder mounts read-only. This test used to throw a bare `Error`
+   * reading `403 guest cannot list members`, which the blanket catch could not
+   * tell apart from a 500; it now throws the refusal class, which is the thing
+   * the catch is actually for. Without this half the narrowing of 10.110 could be
+   * a `throw everything` and still pass.
+   */
+  it('10.111 a guest REFUSED the member list still degrades to an empty roster, not a fatal error', async () => {
     const gateway = createFakeGateway();
     gateway.listMembers = async () => {
-      throw new Error('403 guest cannot list members');
+      throw new AuthoringReadRefused('/v1/workspaces/ws/members');
     };
     render(
       <WorkflowBuilderScreen
@@ -99,6 +111,42 @@ describe('WorkflowBuilderScreen', () => {
     );
     expect(await screen.findByRole('textbox', { name: 'Workflow name' })).toHaveValue('Simple kanban');
     expect(screen.queryByText('Could not load workspace people and types — reload to try again.')).not.toBeInTheDocument();
+  });
+
+  /**
+   * 10.110 — E2-39. The roster read that fails for any reason OTHER than the
+   * guest refusal is a load failure, and the screen already has the arm for it.
+   *
+   * `listMembers(...).catch(() => [])` is blanket, so a 500, a dropped connection
+   * or an unparseable roster body became the EMPTY roster — the same value the
+   * justified arm produces for a refusal — and that empty array flows into
+   * `BuilderEnvironment.members`, which the rule editors and rule summaries read.
+   * The admin then authors rules against a workspace that appears to hold nobody,
+   * and nothing on the screen says the read failed.
+   *
+   * Asserted on the pair, because either half alone is passable by the defect:
+   * the failure sentence is present AND the builder's own name field is not,
+   * so a screen that mounted normally while ALSO printing the sentence would
+   * still fail. The thrown value is a bare `Error` — not the refusal type — so
+   * this file does not depend on the refusal class existing to be RED.
+   */
+  it('10.110 a roster read that fails for a reason other than the refusal is a LOAD FAILURE, not an empty roster', async () => {
+    const gateway = createFakeGateway();
+    gateway.listMembers = async () => {
+      throw new Error('HTTP 500 for /v1/workspaces/ws/members');
+    };
+    render(
+      <WorkflowBuilderScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        initialDraft={draftFromTemplate(kanban)}
+      />,
+    );
+    expect(
+      await screen.findByText('Could not load workspace people and types — reload to try again.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('textbox', { name: 'Workflow name' })).not.toBeInTheDocument();
   });
 
   it('disables the name field and hides Add state for non-authors', async () => {
