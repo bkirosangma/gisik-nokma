@@ -1178,6 +1178,11 @@ what was looked at and found sound, not only what was found wrong.
 - **The dev database is current.** All 32 migrations applied (`1790000000000` at 02:50Z today), on a database
   holding 169 events — which is the "migration applied to a database that already holds data" property exec 3
   §7.6 called unwitnessed in tests, witnessed on the owner's stack (Appendix E).
+- **`check-env-example.mjs` reddens in the direction it claims.** Removing `DATABASE_URL=` from `.env.example` →
+  `EXIT=1`, *"config vars read by code but undocumented … DATABASE_URL"*; appending an unknown documented key →
+  `EXIT=0` (the header states the contract as *"every configuration variable app code reads must be documented"*,
+  one direction, so the pass is by design). File restored byte-identical (`cmp`). My first run of this pair reported
+  `EXIT=0` for both because the status was read after a `| tail` — the pipe's, not the checker's — and was re-run.
 - **`check:db-tz` passes on both live databases** (`Asia/Kolkata` on 54329 and 54330).
 - **Rate limits cover the credential and write doors** (`/api/auth/*`, `/v1/events`, `/v1/sync`,
   `/v1/sync/bootstrap`, `/v1/attachments`, the invite mint, the three MCP device doors — `app.ts:505-600`).
