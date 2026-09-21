@@ -1344,16 +1344,24 @@ I read the patterns against the tree rather than trusting the empty result.
 | severity | count | members |
 |---|---|---|
 | **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES` |
-| **Important (claimed)** | **2** | `E3-15` — the set-equality drift guard compares the set to its own table, so it cannot see the class it was written for · `E3-16` — the roster-cut citation, drifted twice, with a correction note that now misdirects the fix |
-| **Minor** | **3** | `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 JSON fixtures" vs 86) |
-| **Minor** | **2** | `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) |
+| **Important (claimed)** | **3** | `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-18` (the replica invents an ancestor the online read reports as absent — **reproduced, §19**) |
+| **Minor** | **6** | `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 fixtures" vs 86) · `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) · `E3-17` (outbox refactor total 8, its own bullets sum to 9) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
 | **Instrument defects in my own method** | **1** | §15 — the 439-hit sweep, not filed as findings |
 | **Corrections to this report's own citations** | **4** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) |
 
-**Round-2 total: 8 new findings** (1 Critical claimed, 2 Important claimed, 5 Minor), plus 8 round-1
-findings re-validated and 4 corrections to this report's own citations. **A count is only evidence once
-its members are named — hence the table.**
+**Round-2 total: 10 new findings** (1 Critical claimed, 3 Important claimed, 6 Minor), plus 8 round-1
+findings re-validated and 4 corrections to this report's own citations.
+
+**Six of the ten are measured by RUNNING something** — `E3-14` and `E3-15` by injection at the assembled
+app, `E3-18` by a replica reproduction, `E3-9` by a runtime schema probe, `E3-11` by three agreeing
+counts including the runner's own case count, `E3-17` by the docblock's own published command. **Four are
+measurements of text** (`E3-10`, `E3-12`, `E3-13`, `E3-16`), and each names the command and its control.
+
+**A count is only evidence once its members are named — hence the table.** And this table has now been
+corrected three times in this round (7 → 8 → 10), which is the same drift it is tabulating: **a total
+nobody re-derives is the one that goes stale**, and the only reason this one did not stay stale is that
+each new finding forced it. That is `E3-17`'s mechanism, visible from inside.
 
 ### 16.1 What changed about my coverage boundary since round 1
 
