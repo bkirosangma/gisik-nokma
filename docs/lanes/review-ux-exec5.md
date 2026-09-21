@@ -1419,11 +1419,12 @@ ruling, 2026-09-20)"* — a backlog holding only epics no longer reads *"new tic
 holds one, and case `13.1044` asserts both arms — because *"a claim about the backlog SET that denied a member of
 it"* was judged a defect. The toggle arm is the same claim denying every member, left with an owner note. The
 manual repeats the three-tab scope (`docs/manual.md:763-770`) and never says the Backlog empties. And the case that
-pins the note — `12.387` *"the narrowing note names the surfaces it narrows, and exempts the board"*
-(`apps/web/test/page-refusals.test.tsx:556-585`, asserting the literal *"the list, calendar and timeline …"*) — was
-written before the Backlog tab existed; its title is now false of the product (the toggle narrows four surfaces and
-the note names three), which is the brief §5's *"case that asserts a property the product has quietly stopped
-having"*.
+pins the note, `12.387`, is precise in the catalogue — *"THE NARROWING NOTE MAY NOT CLAIM A SURFACE IT DOES NOT
+NARROW"* (`test-cases/12-offline-sync-apps.md:2694`), the soundness half, which still holds — while its test's own
+title over-claims the completeness half: *"the narrowing note names the surfaces it narrows"*
+(`apps/web/test/page-refusals.test.tsx:556`), asserting the literal *"the list, calendar and timeline …"* (`:582-584`).
+Written before the Backlog tab joined the toggle's server-side narrowing, that title is now false of the product
+(four surfaces narrowed, three named), and the test passes because it pins the sentence, not the property.
 
 **WHAT WOULD HAVE BEEN BETTER.** A third sentence for this arm, chosen where `activeOnly` is known —
 *"The backlog is hidden while 'Only tickets in progress' is on."* — and the scope note naming the Backlog.
@@ -1485,15 +1486,16 @@ verify 2606 ids; I verified the ones my findings touch, and asked of each the br
 | `5.19` | 05 | ✅ | ✅ | ✅ | the endpoint serves unsummarised; nothing pins the ROW text (E5-8) |
 | `11.147` | 11 | ✅ | ✅ | ✅ — it pins the silent reload that the bulk path's docblock calls the defect | E5-10: the case witnesses a property the file elsewhere disowns |
 | `11.201`–`11.205` | 11 | ✅ | ✅ | ✅ | none covers the failed-read path (E5-13) |
-| `12.387` | 12 | ✅ | ✅ | ❌ **as titled** — the note no longer names every surface the toggle narrows | E5-40; the test asserts the literal sentence and passes |
+| `12.387` | 12 | ✅ | ✅ | ✅ as the catalogue words it (soundness); the TEST's title claims completeness and that half is ❌ since the Backlog tab | E5-40; the test pins the literal sentence and passes |
 | `13.428` | 13 | ✅ | ✅ | ✅ | Settings link present — exec 2's control; reused as mine for the nav |
 | `13.451` | 13 | ✅ | ✅ | ✅ — *"Picking a Collaborator … does not narrow the board … but the scope note names 'collaborator' as not applied"* | E5-5: the case pins the after-the-press disclosure as the property; nothing asks whether the control should be offered |
 | `13.468` | 13 | ✅ | ✅ | ✅ | the workflow picker's default; no case pins the New-ticket TYPE default (E5-16) |
 | `15.*` (help) | 15 | — | — | ⚠ | `12 cases, 5 planted` per exec 2's recount; the help corpus's Board section (E5-1) is not among the planted defects — `check:help` cannot see it |
 
-**Cases that assert a property the product has quietly stopped having:** `12.387` — its title, *"the narrowing
-note names the surfaces it narrows"*, was true of three tabs and is false since the Backlog tab joined the toggle's
-server-side narrowing (E5-40); the test still passes because it asserts the literal sentence, not the property. **Cases that
+**Cases that assert a property the product has quietly stopped having:** none in the catalogue's own words. The
+nearest is `12.387`, whose catalogue title (soundness: no false claim) holds, but whose TEST title (*"names the
+surfaces it narrows"*, completeness) stopped being true when the Backlog tab joined the toggle's narrowing (E5-40)
+— the test passes because it pins the sentence, not the property. **Cases that
 witness a defect as a property:** `3.72` (E5-7), `11.147` (E5-10) and `13.451` (E5-5) — all true of the code, the first
 two pinning behaviour a sibling docblock calls wrong, the third pinning a disclosure the brief's own rule calls late.
 
