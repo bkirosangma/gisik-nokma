@@ -3566,6 +3566,17 @@ route files** (`my-work.ts` calls it twice), which is the measured unit behind t
 **Source:** the case catalogue — my largest named gap, reached in two bounded bites (`17-open-work.md`'s
 `17.005` and this). **Severity: Minor** — a comment, but a verified disagreement between two documents, with
 the correct value already written down three files away.
+
+> **DEFENCE — phase 2, 2026-09-21 15:35 IST, self-filed: this finding does not hold.** Re-reading the comment in its
+> own context (`apps/server/src/read/ticket-cards.ts:20-26`, opened again) — it sits on `workflow_version`, a row
+> field *"Selected for `ListCard.stateName`"*, i.e. written from the **list** route's standpoint — the word I
+> passed over is **"other"**: *"putting it on the card would change four **other** routes' bodies."* Other than the
+> list route. The five callers I measured are `attention`, `board`, `list`, `my-work`, `search`; take `list` out and
+> **four remain**. The comment's number and `Features.md:695`'s *"FIVE route files"* are the same fact from two
+> standpoints, and they agree. The catalogue log entry I quoted ("undercounted") reads the comment without its
+> standpoint, and I repeated that reading and then called the code wrong. **E2-50 is withdrawn in substance:** there
+> is no disagreement inside the repository; the only thing left is that the comment is standpoint-relative where an
+> absolute number would have been clearer, which is not a defect. The ×3 on a Minor is the rule's.
 ### E2-51 (r2) — MINOR · My own `13.761` still asserts an absence the product reversed, with a reason that is now false and a citation that points at a different case
 
 **WHAT.** `test-cases/13-second-wave-board-actions.md:49-58`, case **`13.761`** — one of seven ids I minted on 2026-09-18 for the members roster — says:
