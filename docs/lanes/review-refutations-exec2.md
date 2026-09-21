@@ -113,7 +113,28 @@ does not rest on reading a line.
 | `P2` (exec 1, IMPORTANT) | that the board's whole-board empty state has **no styling at all** | In all of `ui.css` the only two lines naming `gn-board__empty` / `gn-board--empty` are **comments** — `:835` (*"a different granularity from `.gn-board__empty-*` above"*) and `:4980` (*"`.gn-board__empty-create`, 37 more"*). **Zero selector blocks.** I took care to separate comment hits from rule hits, because a grep that cannot tell them apart is the silent-empty failure | **holds** |
 | `I3` (exec 1, IMPORTANT) | that `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified **by its own docblock** | `tap-targets.ts:71-76` states the rule — clause **(a)** the CSS makes the 24px call, AND clause **(b)** *"a sweep actually visits the route it renders on"*. `:82` lists `.gn-my-work__title` among the deliberately excluded and says its rule is *"byte-similar to `.gn-attention__title`"*, which **is** a member (`:142`) — so (a) holds. And **(b) holds on a measurement I had already taken independently**: `e2e-stack/viewport.spec.ts:170` measures tap targets on `/my-work` | **holds** — the exclusion rests on a clause that is satisfied |
 
-**Twenty-seven checks across all five lanes. Twenty-seven held. My refutation count is zero.**
+
+### And into exec 3, the lane I had checked least — including the class my own rules call critical
+
+| target | the clause I tried to falsify | what I opened | outcome |
+|---|---|---|---|
+| `F1` (exec 3, IMPORTANT) | that an open-gap section still declares a leak whose two supporting numbers are stale | The section at `soft-delete-background-paths.test.ts:142-144` asserts *"`routes/attachments.ts` contains the word `deleted` **ZERO** times, while the same grep finds it **6** times in `routes/tickets.ts`"*. I measured **6 occurrences across 5 lines** in `attachments.ts` and **13** in `tickets.ts` | **holds** |
+| `F2` (exec 3, IMPORTANT) | that a recorded survivor measurement's stated warrant is false — the second witness read a stale `dist` | The docblock claims *"that test imports `../../src/replica/replica-data-source.js`, not the package name, so nothing resolved through a stale `dist`"*. I opened both halves: `packages/app-core/test/replica/replica-data-source.test.ts:30` **does** import the relative path — and `apps/server/test/dual-client/rig.ts:32` imports **`'@gisik-nokma/app-core'`**, the **package name**, in the half the same sentence cites as *"21 passed"* | **holds** |
+
+**Twenty-nine checks across all five lanes. Twenty-nine held. My refutation count is zero.**
+
+> **Two notes on my own measurement of `F1`, because the unit is the whole story.** The judge's round-1
+> verification of the same sentence recorded `grep -c deleted` → **5** for `attachments.ts`; I measured **6**
+> occurrences. **Both are right and they are different units**: `grep -c` counts matching LINES, and I
+> counted occurrences, so six on five lines reconciles exactly. I state my unit rather than the number
+> alone, because *"a count is evidence only once its unit is pinned"* is a rule I have already broken twice
+> today in my own report.
+>
+> **And `F2` is the class my own brief calls critical** — a cross-package mutation under a bare runner
+> testing the stale `dist`, where *"a mutation that never ran is indistinguishable from a killed one"*.
+> exec 3 found it by reading the **import style** of both halves rather than trusting the docblock that
+> asserts both are safe, which is the only way that shape is ever caught. It holds, and it is the strongest
+> single finding I have checked in any of the five lanes.
 
 > ⚠ **`I3` is the one where I had independent evidence and did not have to take their word.** My own
 > reachability work had already opened `e2e-stack/viewport.spec.ts:170` and established that the signed-in
