@@ -364,9 +364,42 @@ export type ListRow = {
 
 export type TicketListView = { projectId: string; rows: ListRow[] };
 
-/** Plan 4's read shape: a restricted parent is existence-without-title, structurally. */
+/**
+ * Plan 4's read shape: a restricted parent is existence-without-title,
+ * structurally.
+ *
+ * ## `key` — P3, and why it is OPTIONAL here and required on the ticket itself
+ *
+ * The prototype labels its PARENT crumb `p.id + " " + p.title`
+ * (`desktop.dc.html:3417`) and its EPIC crumb `e.title` — title only
+ * (`:3410-3413`). The product rendered `title` for both, because the wire
+ * carried no key for an ancestor, so a parent and an epic sharing a title drew
+ * two IDENTICAL crumbs. The parent ref now carries one.
+ *
+ * **`key?: string | null` has three states and each means something different,
+ * which is why the field is not simply required:**
+ *
+ * - a STRING — the composed key; the parent crumb reads `KEY Title`, as the
+ *   prototype's does.
+ * - `null` — a key was attempted and could not be composed. `ticketNumber`
+ *   answers `null` for a ticket whose creation position falls outside the
+ *   snapshot the number is derived from, and `read/ticket-numbers.ts` records
+ *   the ruling that a key is not worth refusing a read over. The crumb falls
+ *   back to the title alone.
+ * - ABSENT — **this ref does not carry a key at all.** The GRANDPARENT ref is
+ *   the case, and it is the prototype's own asymmetry rather than an omission:
+ *   its epic crumb is `e.title` and never a key. Serving one for the epic would
+ *   put a field on the wire for a crumb that does not read it — the same
+ *   objection `routes/tickets.ts`'s `AncestorRef` docblock records for the
+ *   audience roster.
+ *
+ * So `undefined` and `null` are told apart here deliberately, and NOT collapsed
+ * into one value: they are different facts about two different crumbs. `null`
+ * and absent render identically (title alone), and that is the only thing they
+ * share.
+ */
 export type ParentRef =
-  | { kind: 'ticket'; id: string; title: string }
+  | { kind: 'ticket'; id: string; title: string; key?: string | null }
   | { kind: 'restricted'; id: string }
   | null;
 

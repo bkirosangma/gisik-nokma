@@ -96,8 +96,10 @@ describe('CommentsThread', () => {
     expect(screen.getByText('Kiro')).toBeInTheDocument();
     expect(screen.getAllByText('K', { selector: '.gn-comment__avatar' })).toHaveLength(1);
     expect(screen.getByText('AM', { selector: '.gn-comment__avatar' })).toBeInTheDocument();
-    // `docToPlainText` renders both paragraphs, so the body is the document and
-    // not a stringified one.
+    // Both paragraphs render as ELEMENTS, so the body is the document and not a
+    // stringified one. (This comment named `docToPlainText` until F3 replaced
+    // the thread's renderer with `renderCommentBody`; the assertion it explains
+    // did not change, and the sentence describing it did.)
     expect(screen.getByText(/The shared bucket is the defect\./)).toBeInTheDocument();
     expect(screen.getByText(/Confirmed\./)).toBeInTheDocument();
     // The instant goes through the product's ONE renderer, which names the
@@ -182,5 +184,103 @@ describe('CommentsThread', () => {
     );
     expect(screen.getByRole('button', { name: 'Post' })).toBeInTheDocument();
     expect(screen.getByText('Posting records an event citing you.')).toBeInTheDocument();
+  });
+
+  /**
+   * F3 — THE THREAD RENDERS THE COMPOSER'S MARKS, through the new projection.
+   *
+   * The cases in `comment-body.test.tsx` prove the projection; this proves the
+   * thread USES it, which is the part a person meets and the part that was
+   * wrong. Before F3 this body rendered through `docToPlainText`, so the
+   * anchor did not exist and the destination was unrecoverable from anywhere on
+   * the surface — the finding's worst row.
+   *
+   * Case `17.021` — minted in §17 because exec 2's §16 block is fully spent;
+   * this is §16's comment-thread door and `17-open-work.md` names it as such.
+   * See the header of `comment-body.test.tsx` for the full record.
+   */
+  it('renders a comment’s link as an anchor — the destination survives the round trip', () => {
+    const linked: TicketComment = {
+      commentId: '01COMMENTLINKED',
+      authorId: 'user_kiro',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'See ' },
+              {
+                type: 'text',
+                text: 'the doc',
+                marks: [{ type: 'link', attrs: { href: 'https://gst.gov.in' } }],
+              },
+              { type: 'text', text: ' for the rates.' },
+            ],
+          },
+        ],
+      },
+      recordedAt: '2026-09-20T16:26:57.306Z',
+      files: [],
+    };
+    render(<CommentsThread comments={[linked]} nameOf={nameOf} />);
+
+    const body = screen.getByTestId(`comment-${linked.commentId}`);
+    const anchor = within(body).getByRole('link', { name: 'the doc' });
+    expect(anchor).toHaveAttribute('href', 'https://gst.gov.in');
+    // The sentence around it is intact, so the link was lifted out of the text
+    // rather than the text being rebuilt around it.
+    expect(body.textContent).toContain('See the doc for the rates.');
+  });
+
+  /**
+   * V4 — A STILL-LOADING READ IS NOT AN EMPTY THREAD.
+   *
+   * `useLiveQuery` initialises `data` to `null` and leaves it there while the
+   * request is in flight. The sheet collapsed it — `comments={comments.data ??
+   * []}` — so during the load window the thread rendered `Comments · 0` and
+   * *"No comments yet."*. Both are claims about the TICKET, and this component's
+   * own docblock names *"No comments yet."* as exactly such a claim: it was
+   * written to prevent it, and the collapse on the last hop reintroduced it.
+   * The History tab three arms away has always done this correctly.
+   *
+   * The two controls are here because the three arms are only distinguishable
+   * together: a wait arm that also swallowed the empty case would satisfy the
+   * first assertion and break the ticket.
+   *
+   * Case `17.022` — minted in §17, same file and same reason as the link arm
+   * above. The §16 door is the comment thread's empty/failed/loading split.
+   */
+  it('V4: a read still in flight draws a WAIT, never “Comments · 0” and never “No comments yet.”', () => {
+    render(<CommentsThread comments={null} nameOf={nameOf} />);
+
+    // A count nobody has measured is not printed…
+    expect(screen.getByText('Comments')).toBeInTheDocument();
+    expect(screen.queryByText(/Comments · \d/)).toBeNull();
+    // …the empty-ticket claim is not made…
+    expect(screen.queryByText('No comments yet.')).toBeNull();
+    // …no failure is claimed either — nobody refused anything…
+    expect(screen.queryByTestId('sheet-comments-unavailable')).toBeNull();
+    // …and the state the person is actually in is on screen.
+    expect(screen.getByTestId('sheet-comments-loading')).toHaveTextContent('Loading…');
+  });
+
+  it('V4 CONTROL: an ANSWERED empty read still says “No comments yet.” with a count of 0', () => {
+    render(<CommentsThread comments={[]} nameOf={nameOf} />);
+    // The wait arm must not have swallowed the real empty state — that would be
+    // the same defect in the opposite direction.
+    expect(screen.getByText('Comments · 0')).toBeInTheDocument();
+    expect(screen.getByText('No comments yet.')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
+  });
+
+  it('V4 CONTROL: a FAILED read outranks the wait — null data plus an error is the failure, not a load', () => {
+    // `useLiveQuery` leaves `data` at `null` after a rejection too, so a thread
+    // that tested `comments === null` FIRST would draw a wait over a document
+    // that had already failed — a spinner for a read that is never coming back.
+    render(<CommentsThread comments={null} commentsUnavailable="the route answered 404" nameOf={nameOf} />);
+    expect(screen.getByTestId('sheet-comments-unavailable')).toHaveTextContent('the route answered 404');
+    expect(screen.queryByTestId('sheet-comments-loading')).toBeNull();
+    expect(screen.queryByText('No comments yet.')).toBeNull();
   });
 });

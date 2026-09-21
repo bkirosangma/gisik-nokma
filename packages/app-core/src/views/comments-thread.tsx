@@ -1,6 +1,6 @@
 import type { ReactElement, ReactNode } from 'react';
-import { docToPlainText } from '@gisik-nokma/domain';
 import { formatDateTime } from '../provenance.js';
+import { renderCommentBody } from './comment-body.js';
 
 /**
  * The comment thread — the prototype's `Comments · {count}` block
@@ -16,21 +16,23 @@ import { formatDateTime } from '../provenance.js';
  * here means *this comment's document names this attachment*, which is the only
  * attribution the product can make.
  *
- * **WHY THAT ARM IS NOT OPTIONAL — measured, not argued.** This component
- * renders the body through `docToPlainText`, and that renderer drops an
- * `image` node entirely: `render`'s fallthrough takes `candidate.content`,
- * which an image node does not have, so it returns `''`
- * (`packages/domain/src/doc-text.ts:71-75` — `children` is `''` and the node is
- * not a `BLOCK_NODE_TYPES` member, so the ternary returns it unchanged). A
- * comment whose only trace of its file were the chip row would therefore render
- * as a comment with no file at all if the row were dropped — an absence drawn as
- * a fact. The chips are the ONLY place an embedded image is reachable from this
- * screen.
+ * **WHY THAT ARM IS NOT OPTIONAL — measured, not argued.** The body renderer
+ * drops an `image` node entirely, and it is dropped in BOTH of the two
+ * renderers this surface has had. `docToPlainText` (`packages/domain/src/
+ * doc-text.ts`) returns `''` for it: `render`'s fallthrough takes
+ * `candidate.content`, which an image node does not have, and the node is not a
+ * `BLOCK_NODE_TYPES` member, so the ternary returns it unchanged. F3 replaced
+ * the thread's renderer with `renderCommentBody` (`./comment-body.tsx`) for
+ * every OTHER reason, and that file drops an image node deliberately and says
+ * so — the declared decision that a comment's files are CHIPS. A comment whose
+ * only trace of its file were the chip row would therefore render as a comment
+ * with no file at all if the row were dropped — an absence drawn as a fact. The
+ * chips are the ONLY place an embedded image is reachable from this screen.
  *
- * ⚠ **This citation read `doc-text.ts:44-50`, and it RESOLVED — at the end of
- * `BLOCK_NODE_TYPES`, which is not the code it describes.** The range was
- * corrected by reading the lines; a citation that resolves is not a citation
- * that is right, which is the failure this repo has recorded most often.
+ * ⚠ **This paragraph used to cite `doc-text.ts:71-75` for the drop, and F3
+ * moved the renderer out from under it.** The claim is still true and the code
+ * it described is no longer what runs here, which is how a citation goes stale
+ * without going wrong. Both are named above.
  *
  * ## The two absences, kept apart
  *
@@ -66,7 +68,7 @@ export type TicketComment = {
   /** The `comment.added` event's id — a comment's only identity. */
   commentId: string;
   authorId: string;
-  /** The structured document the editor wrote; rendered by `docToPlainText`. */
+  /** The structured document the editor wrote; rendered by `renderCommentBody`. */
   body: unknown;
   /** The envelope's `serverTime`, ISO 8601. */
   recordedAt: string;
@@ -74,7 +76,20 @@ export type TicketComment = {
 };
 
 export type CommentsThreadProps = {
-  comments: TicketComment[];
+  /**
+   * V4 — `null` means THE READ HAS NOT ANSWERED, and it is NOT the same as an
+   * empty thread. `useLiveQuery` initialises `data` to `null` and leaves it
+   * there while the request is in flight, so a caller that collapsed it to `[]`
+   * at the boundary made a still-loading read render as *"Comments · 0"* and
+   * *"No comments yet."* — the exact claim this component's own docblock says
+   * it exists to prevent, because *"No comments yet."* is a statement about the
+   * TICKET and nobody had asked the ticket yet.
+   *
+   * The collapse is therefore removed AT THE BOUNDARY rather than compensated
+   * for here: `null` arrives as `null`, and the three arms below tell it apart
+   * from both `[]` and a failure.
+   */
+  comments: TicketComment[] | null;
   /** The read's failure reason. Absent means the read answered. */
   commentsUnavailable?: string;
   /** The sheet's one actor-name join, the same `nameOf` every other row uses. */
@@ -115,7 +130,10 @@ function CommentItem({
   nameOf: (actorId: string) => string;
 }): ReactElement {
   const name = nameOf(comment.authorId);
-  const text = docToPlainText(comment.body);
+  // F3 — the body is rendered as the DOCUMENT the composer wrote, not as its
+  // plain text. `docToPlainText` still serves the search projection and the
+  // notifications; it is a display of last resort and never was this one.
+  const text = renderCommentBody(comment.body);
   return (
     <li className="gn-comment" data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
@@ -126,7 +144,7 @@ function CommentItem({
           <strong className="gn-comment__name">{name}</strong>
           <span className="gn-comment__time">{formatDateTime(comment.recordedAt)}</span>
         </p>
-        <p className="gn-comment__body">{text}</p>
+        <div className="gn-comment__body">{text}</div>
         {comment.files.length > 0 ? (
           <div className="gn-comment__files">
             {comment.files.map((file) => (
@@ -156,29 +174,50 @@ export function CommentsThread({
   nameOf,
   composer,
 }: CommentsThreadProps): ReactElement {
-  const answered = commentsUnavailable === undefined;
+  // THREE FACTS, THREE ARMS — and the ORDER of these two lines is the whole
+  // fix. A failure outranks a wait: `useLiveQuery` leaves `data` at `null` after
+  // a rejection too, so a document that failed must not be read as one that has
+  // not answered yet. Once the failure is excluded, `comments === null` can
+  // only mean "still in flight".
+  // `comments === null` is tested INLINE rather than hoisted into a `pending`
+  // boolean, and that is not a style choice: the compiler narrows `comments`
+  // through the ternary chain only when the null test is one of its own
+  // conditions. A hoisted boolean narrows nothing, and the list arm then needs
+  // an `?? []` — which is the collapse this fix removed, reintroduced in the
+  // type system's name.
+  const failed = commentsUnavailable !== undefined;
   return (
     <section className="gn-comments" data-testid="sheet-comments">
       <p className="gn-comments__heading">
-        {answered ? `Comments · ${comments.length}` : 'Comments'}
+        {/* A count appears only when there is one to give. `Comments · 0` over a
+            read that failed — or over one that has not answered — is a count
+            nobody measured, which is why the heading drops it in BOTH cases
+            rather than only the one the failure arm already handled. */}
+        {failed || comments === null ? 'Comments' : `Comments · ${comments.length}`}
       </p>
 
-      {answered ? (
-        <>
-          {comments.length === 0 ? (
-            <p className="gn-comments__empty">No comments yet.</p>
-          ) : (
-            <ul className="gn-comments__list">
-              {comments.map((comment) => (
-                <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} />
-              ))}
-            </ul>
-          )}
-        </>
-      ) : (
+      {failed ? (
         <p className="gn-comments__error" role="alert" data-testid="sheet-comments-unavailable">
           {`This ticket's comments could not be read — ${commentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
         </p>
+      ) : comments === null ? (
+        /*
+          V4 — the wait arm. The same word the History tab three arms away uses
+          for the same state, so the two tabs do not describe one read's progress
+          two different ways. Nothing about the ticket is claimed here: an empty
+          thread is a fact, and this is not one yet.
+        */
+        <p className="gn-comments__loading" data-testid="sheet-comments-loading">
+          Loading…
+        </p>
+      ) : comments.length === 0 ? (
+        <p className="gn-comments__empty">No comments yet.</p>
+      ) : (
+        <ul className="gn-comments__list">
+          {comments.map((comment) => (
+            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} />
+          ))}
+        </ul>
       )}
 
       {composer === undefined ? null : (

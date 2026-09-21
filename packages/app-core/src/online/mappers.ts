@@ -1865,10 +1865,23 @@ function mapParentRef(raw: unknown, path: string): ParentRef {
   if (kind !== 'ticket') {
     throw new MappingError(`${path}.kind`, `one of ticket/restricted (got ${kind})`);
   }
+  // P3 — THE KEY, AND THE ABSENT ARM IS NOT THE NULL ARM.
+  //
+  // `key: string | null` (a composed key, or one that could not be composed)
+  // and `key` absent (a ref that carries no key at all — the grandparent, whose
+  // crumb is title-only in the prototype) are different facts about different
+  // crumbs. ⚠ Collapsing them — `record['key'] ?? null`, or emitting `null`
+  // where the producer sent nothing — is the same mistake the TICKET's own
+  // `key` mapping above refuses by name, one ref over: "this read could not
+  // compose a key" and "this producer does not carry one" would become one
+  // value. The property is simply not set when the wire does not set it, and
+  // the client's type admits that.
+  const key = record['key'];
   return {
     kind: 'ticket',
     id: asString(record['id'], `${path}.id`),
     title: asString(record['title'], `${path}.title`),
+    ...(key === undefined ? {} : { key: key === null ? null : asString(key, `${path}.key`) }),
   };
 }
 

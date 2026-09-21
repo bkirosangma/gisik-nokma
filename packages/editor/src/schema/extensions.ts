@@ -88,12 +88,24 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     //     paragraph, and pins the typed half (9.95) on the typing path, since a
     //     paste-path case stays green with the option OFF and would prove
     //     nothing about it.
-    //     ⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT DOES NOT WIDEN THE
-    //     ESCAPE MECHANIC: a typed link now fires an input rule, but typing one
-    //     offers no escape suggestion where `**due soon**` does. That asymmetry
-    //     is measured in `test/schema.test.ts` (9.95) with its cause left
-    //     unestablished rather than guessed — owner: whoever next touches the
-    //     trigger coverage in `extensions/escape-suggestion.ts`.
+    //     ⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT WIDENS THE ESCAPE
+    //     MECHANIC BY EXACTLY ONE TOO. An earlier version of this comment said
+    //     the opposite — that a typed link "offers no escape suggestion where
+    //     `**due soon**` does", an asymmetry whose cause it left unestablished
+    //     and whose owner it named. **That sentence is FALSE, and E2-46 is the
+    //     correction.** `test/escape-suggestion.test.ts` (9.96) measures both
+    //     triggers under both conditions: typing `see [the doc](https://gst.gov.in)`
+    //     offers `Keep "see [the doc](https://gst.gov.in)" as text` exactly as
+    //     typing `x **b**` offers its own. What the recorded probes were
+    //     actually comparing was TEXT AFTER THE TRIGGER — the link probe typed
+    //     `… now` and the bold probe typed nothing — and continuing to type
+    //     dismisses the suggestion by design (`escape-suggestion.ts`'s `apply`,
+    //     "dismiss by continuing to type or clicking elsewhere"; case 9.92).
+    //     So the link chip was dismissed, not absent, and the bold chip was
+    //     live. The typed link is now a row in that file's trigger table, so
+    //     the coverage is WITNESSED rather than declared, and the 2x2 in 9.96
+    //     is the control that distinguishes the trigger from the probe's
+    //     conditions.
     //
     // Still live, counted on the extension list this function builds, at
     // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
@@ -123,12 +135,13 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // product judgement. TASK 5 — the escape-suggestion mechanic — owns the
     // general question and closes it for the TYPED path by offering an escape;
     // the LINK half was put to the owner on 2026-09-20 and answered ("both"),
-    // which is the reversal above. **What the reversal did NOT settle is the
-    // asymmetry it exposed**: a typed link fires an input rule but offers no
-    // escape, where a typed bold mark does. That is recorded with a named owner
-    // in `test/schema.test.ts` (9.95) rather than absorbed here. Tests in that
-    // file record the behaviour truthfully, which is why this reversal failed
-    // them and why they were FLIPPED rather than deleted.
+    // which is the reversal above. **The reversal left NOTHING open here**, and
+    // an earlier version of this paragraph said it left an asymmetry open — a
+    // typed link firing an input rule but offering no escape where a typed bold
+    // mark does. E2-46 measured that claim and it is false; see the paragraph
+    // above, and `test/escape-suggestion.test.ts` (9.96) for the 2x2. Tests in
+    // `test/schema.test.ts` record the reversal's behaviour truthfully, which is
+    // why it failed them and why they were FLIPPED rather than deleted.
     //
     // `openOnClick: false` keeps a click editing the link, not following it.
     Link.configure({

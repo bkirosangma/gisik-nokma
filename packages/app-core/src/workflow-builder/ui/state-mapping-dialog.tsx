@@ -40,6 +40,21 @@ export function StateMappingDialog(props: {
   targetStates: { id: string; name: string }[];
   fromVersion: number;
   toVersion: number;
+  /**
+   * E5-28 — what the person had already chosen, when this dialog is being
+   * re-entered rather than opened.
+   *
+   * The dialog used to own its mapping outright, and `PublishControls` set
+   * `submitting` before awaiting the server — which unmounted it. So a REFUSAL
+   * returned the person to an idle Publish button with the mapping gone, and
+   * pressing Publish again reopened an EMPTY dialog. The owner of the mapping
+   * is now the caller, and this is how it hands it back.
+   *
+   * It is the INITIAL value and not a controlled one, deliberately: the dialog
+   * still owns what is typed into it from this point on, or every keystroke
+   * would need a round trip through the parent to appear.
+   */
+  initialMapping?: Record<string, string>;
   onCancel(): void;
   onConfirm(mapping: Record<string, string>): void;
   /**
@@ -57,7 +72,7 @@ export function StateMappingDialog(props: {
    */
   outcome?: { kind: 'refused' | 'invalid'; title: string; rule?: string; detail: string } | null;
 }) {
-  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [mapping, setMapping] = useState<Record<string, string>>(props.initialMapping ?? {});
   const complete = props.dropped.every((state) => mapping[state.id] !== undefined);
   const loading = props.occupancy === null && !props.occupancyFailed;
   return (

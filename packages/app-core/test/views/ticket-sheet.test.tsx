@@ -596,6 +596,136 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(serverBox).toHaveTextContent('ticket.transitioned is not a registered event type.');
   });
 
+  /**
+   * 3.178 / E2-29 — a dropped connection during a Move used to produce nothing
+   * at all.
+   *
+   * `submitTransition` awaited `dataSource.ingest([...])` with no `try`, and its
+   * call site is `void submitTransition(submission)` — so a REJECTED ingest was
+   * an unhandled promise rejection. The sheet does hold a transport sentence,
+   * but it renders only when `!moveOpen`; the dialog that replaces it while a
+   * Move is being made was handed the literal `transportError={null}`, so there
+   * was no surface anywhere that could speak. The sibling writes on the same
+   * sheet (`submitTicketEvent` for Close/Reopen/Delete) do catch and disclose,
+   * which is what makes this an omission rather than a design.
+   *
+   * The assertion is deliberately about WHICH surface speaks and in WHICH
+   * voice: the alert is read inside the Move dialog (the surface in view — the
+   * sheet's own copy is gated out while it is open), and it must not wear the
+   * refusal's sentence or its class. A dropped connection is not an
+   * adjudication, and a person cannot act on it as one.
+   */
+  it('3.178 / E2-29: a rejected ingest during a Move is spoken by the dialog, never as the server’s own verdict', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => {
+        throw new Error('network unreachable');
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'filed at the portal');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('We could not reach the server for this move — network unreachable');
+    expect(alert).not.toHaveTextContent('Refused by the server');
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
+    // The dialog stays: the retry lives here, and so does the sentence.
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+  });
+
+  /**
+   * 3.182 / E5-27 — THE MOVE CONTROL HAS AN IN-FLIGHT STATE.
+   *
+   * E2-29's transport arm (3.178) gave a dropped connection a sentence. This is
+   * the other half of the same finding, and it is a different defect: with the
+   * request merely SLOW the dialog said nothing because there was nothing to
+   * say yet, and Move stayed enabled — so "still sending", "already failed" and
+   * "already succeeded" were indistinguishable to the person deciding whether
+   * to press again. `blocked` is the form's validity and only that; the dialog
+   * had no way to express "a submission is already in flight".
+   *
+   * The ingest is held open behind a deferred promise rather than rejecting,
+   * and that is the whole design of the case: a REJECTING ingest also reddens
+   * under a fix that only resets the latch on the error path, so it cannot
+   * distinguish a latch from a `finally`. Holding it open tests the window
+   * itself — the state the person is actually in while the network is slow.
+   *
+   * THE SECOND PRESS IS ASSERTED, not assumed away. Disabling a button is a
+   * DOM fact; whether a second submission can still be FILED is the property
+   * that matters, and the two come apart whenever the guard is missing and
+   * `userEvent` dispatches before React re-renders. `source.ingested` is the
+   * ledger of what actually went out.
+   */
+  it('3.182 / E5-27: a Move in flight disables the control, and a second press files nothing', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    let release: (() => void) | null = null;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      async (events) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-08-20T09:00:00.000Z',
+        }));
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'filed at the portal');
+
+    const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
+    const moveButton = within(dialog).getByRole('button', { name: 'Move' });
+    // Before the press it is enabled — the field the case moves must be the
+    // ONLY thing that turns it off, or "disabled" would prove nothing.
+    expect(moveButton).toBeEnabled();
+
+    await user.click(moveButton);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // The request is out and unanswered: the control says so.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Move' })).toBeDisabled(),
+    );
+    // And a second press — the person's natural response to a slow network —
+    // files nothing at all. Measured against the LEDGER, not the attribute.
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    expect(source.ingested).toHaveLength(1);
+
+    // Release: the latch clears, the dialog closes, and the button is gone
+    // with it — the happy path still works through the same flag.
+    await act(async () => {
+      release?.();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull());
+  });
+
   it('a committed batch closes the dialog and clears any earlier refusal', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());
@@ -3219,6 +3349,165 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     // The seeded read carries a parent (`Registrations`) and a key
     // (`CCSO-1183`) and NO grandparent, which is the ordinary shape: the epic
     // crumb is conditional and this fixture is what its absence looks like.
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      'Registrations',
+      'CCSO-1183',
+    ]);
+  });
+
+  /**
+   * E4-1 / E5-3 — THE SAME ANCESTOR IS NAMED ONCE WHEN IT IS BOTH THE EPIC AND
+   * THE PARENT.
+   *
+   * The server's ancestry walk starts at `state.parentId` and returns the first
+   * ancestor whose type is an epic, so when the ticket's DIRECT PARENT is an
+   * epic, `epic.id === parent.id` (`apps/server/src/routes/tickets.ts`). The bar
+   * rendered both under two independent null checks and nothing compared their
+   * ids, so the painted crumbs read:
+   *
+   *     Convenience Corner › Shop operations › Open questions › Open questions › CCSO-6
+   *
+   * — one ancestor, named twice, a depth the hierarchy does not have. **The
+   * blast radius is the ordinary case, not an edge: 23 of the 26 tickets in the
+   * seeded project have an epic as their direct parent** (the reviewer's own
+   * count, and they painted one and said so). The prototype never shows this
+   * shape, so it gives no authority for it.
+   *
+   * ⚠ NO EXISTING FIXTURE COULD SEE THIS: `ticketRead()`'s default carries a
+   * parent and no epic, and every case that sets an `epic` sets a DISTINCT id
+   * (`EPIC`), so the equal-id shape was never rendered by any case in this file.
+   * This fixture is the first, and it is the shape the seed produces 23 times.
+   */
+  /**
+   * E5-3 — THE SAME SHAPE WITH BOTH REFS `restricted`.
+   *
+   * The case above covers the visible pair. This is the arm the id comparison
+   * has to reach WITHOUT a title to compare: the server's walk answers
+   * `{kind:'restricted', id}` both for the parent branch and for the epic hop
+   * when the ticket is one the viewer may not see (or one the ledger records as
+   * deleted), so a viewer can be sent two restricted refs to ONE ticket. **An
+   * implementation that compared TITLES, or that special-cased `kind`, would
+   * pass the visible case and draw `Restricted parent` twice here** — which is
+   * the same defect, on the screen of the person least able to notice it is the
+   * same ticket, because a restricted crumb carries no title to compare by eye.
+   *
+   * `16.65` owns the property that a restricted ancestor is NAMED rather than
+   * dropped; this case is its one-hop companion, and it asserts BOTH halves:
+   * named once, and the surviving crumb is the parent's.
+   */
+  /**
+   * P3 — THE PARENT CRUMB READS THE PARENT'S KEY; THE EPIC CRUMB NEVER DOES.
+   *
+   * The prototype labels its parent crumb `p.id + " " + p.title`
+   * (`Gisik Nokma - Desktop.dc.html:3417`) and its epic crumb `e.title` alone
+   * (`:3410-3413`). The product matched the epic and not the parent, because the
+   * wire carried no key for an ancestor. **The cost was not cosmetic: the key is
+   * what disambiguates**, so a ticket whose epic and parent share a title drew
+   * two identical crumbs.
+   *
+   * ⚠ THREE ARMS, because `ParentRef.key` has three states and the render treats
+   * exactly one of them differently — see that type's docblock. A case that only
+   * asserted the happy path would leave `null` and `undefined` indistinguishable
+   * from a bug that drops the key.
+   */
+  it('17.027 / P3: a parent crumb shows the parent’s KEY, and the epic crumb stays title-only', async () => {
+    const read = ticketRead({
+      parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: 'CCSO-9' },
+      epic: { kind: 'ticket', id: EPIC, title: 'Open Questions', key: 'CCSO-7' },
+    });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      // The epic carries a key on this fixture and does NOT render it — the
+      // prototype's `e.title`, and the reason a key on the epic ref is
+      // meaningless rather than merely unused.
+      'Open Questions',
+      'CCSO-9 Registrations',
+      'CCSO-1183',
+    ]);
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('CCSO-9 Registrations');
+    expect(screen.getByTestId('sheet-crumb-epic').textContent).toBe('Open Questions');
+  });
+
+  it('17.027 / P3: a parent key that could NOT be composed falls back to the title alone — never a half label', async () => {
+    // `null` is the ticket-number ruling's own absence: the number is derived
+    // from the ledger's order, so a snapshot-bounded read composes no key, and a
+    // key is not worth refusing the read over.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: null } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
+    // And the separator-space trap: a naive `${key} ${title}` with a null key
+    // prints " Registrations" — a leading space nobody sees in a browser and
+    // every assertion above would still pass.
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).not.toMatch(/^\s/);
+  });
+
+  it('17.027 / P3: a parent ref that carries NO key field at all renders the title alone', async () => {
+    // The third state: absent. A producer that does not carry a key for this ref
+    // (the grandparent's ref is the one the product has) must read exactly like
+    // `null` on screen, and neither may read as an empty crumb.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
+  });
+
+  it('17.026 / E5-3: two restricted refs to the SAME ticket draw one crumb, not two', async () => {
+    const read = ticketRead({
+      parent: { kind: 'restricted', id: PARENT },
+      epic: { kind: 'restricted', id: PARENT },
+    });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    // NAMED, not dropped — the vanish `invariant 5` forbids.
+    expect(crumbTexts()).toContain('Restricted parent');
+    // …and named ONCE. `filter` on the text rather than a set size, because the
+    // crumb text is a constant here and a set would collapse the duplicate the
+    // case exists to find.
+    expect(crumbTexts().filter((text) => text === 'Restricted parent')).toHaveLength(1);
+    expect(screen.queryByTestId('sheet-crumb-epic')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
+  });
+
+  it('17.024 / E4-1: when the direct parent IS the epic, the ancestor is named ONCE', async () => {
+    // The one-hop shape: the epic IS the parent, same id, and the title the
+    // server sends for both is the same row's title.
+    const read = ticketRead({ epic: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    // THE PROPERTY, asserted apart from the list: the ancestor appears once.
+    // Reverting the comparison makes this read `2` while the list assertion
+    // above it still looks plausible on a casual read.
+    expect(crumbTexts().filter((text) => text === 'Registrations')).toHaveLength(1);
+    // The surviving crumb is the PARENT's — the nearer one, and the one a
+    // reader of this sheet looks for — so the epic crumb is the one dropped.
+    expect(screen.queryByTestId('sheet-crumb-epic')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
+    // And the bar is then IDENTICAL to the no-epic bar, which is the point: a
+    // one-hop ticket has one ancestor and the path states one.
     expect(crumbTexts()).toEqual([
       'Convenience Corner',
       'Shop operations',

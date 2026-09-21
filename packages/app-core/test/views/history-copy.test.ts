@@ -1,0 +1,206 @@
+import { describe, expect, it } from 'vitest';
+import { CONTEST_EVENT_TYPES, TICKET_EVENT_TYPES } from '@gisik-nokma/domain';
+import type { TicketHistoryEvent } from '../../src/view-types.js';
+import { describeEvent } from '../../src/views/history-copy.js';
+
+/**
+ * 3.183 / E5-8 — THE CENSUS: every event type that reaches the History tab is
+ * NARRATED, and the list is the DOMAIN's rather than one retyped here.
+ *
+ * E5-8's own words for the property are *"the export narrates every row"*. The
+ * first pass at `describeEvent` was a hand-written `switch`, and a hand-written
+ * `switch` looks complete from the inside — it was in fact missing TWO of the
+ * eighteen types registered against entity kind `ticket` (`attachment.added` and
+ * `claim.contested_resolved`), both of which fell through to the wire name, which
+ * is the exact defect the ruling is about, surviving in two rows.
+ *
+ * So the universe is read off the domain's own lists and never typed out below:
+ * a type ADDED to either list reddens this case the day it lands, and a type
+ * REMOVED shrinks the union, which its own assertion catches. That is the
+ * difference between a census and a restatement.
+ *
+ * ## What this case cannot see, named rather than implied
+ *
+ * The two exported lists do not cover the whole entity-kind-`ticket` set: the
+ * eighteen registrations in `vocabulary.ts` read as
+ * `TICKET_EVENT_TYPES` (15) ∪ `CONTEST_EVENT_TYPES` (2) ∪ {`visibility.set`} —
+ * `visibility.set` is registered against a ticket but is in NEITHER list, so it
+ * is the one member spelled by hand here. **A NEW event type registered against
+ * entity kind `ticket` and added to neither exported list would not be seen by
+ * this case.** That is a real blind spot and it is stated rather than papered
+ * over; the count assertion below is what makes it loud, because the day the
+ * registrations move, this number is wrong and the reader is sent back to
+ * `vocabulary.ts`.
+ */
+const ENTITY_KIND_TICKET_UNIVERSE = [
+  ...TICKET_EVENT_TYPES,
+  ...CONTEST_EVENT_TYPES,
+  // The one member in neither exported list — see the docblock.
+  'visibility.set',
+] as const;
+
+/**
+ * The registrations that read this way on 2026-09-21. Pinned as a NUMBER so a
+ * change to the domain's lists fails loudly here rather than quietly shrinking
+ * what this census covers: the failure message says to re-read the
+ * registrations, which is the actual remedy.
+ */
+const REGISTRATIONS_ON_2026_09_21 = 18;
+
+/**
+ * ONE VALID PAYLOAD PER TYPE, and the table is what makes this a census of
+ * SENTENCES rather than a census of empty payloads.
+ *
+ * ⚠ **The first version of this case passed `{}` for every type and was
+ * therefore measuring the wrong thing.** Eleven of the eighteen "fell through",
+ * because a `describeEvent` that reads its payload defensively returns the wire
+ * name when the payload is empty — which is correct behaviour, and which the
+ * empty-payload version could not tell apart from a type that has no sentence
+ * at all. A control that cannot distinguish the two cases it is sitting between
+ * is not a weaker control, it is a different measurement. So each type gets a
+ * payload shaped as the domain declares it, and the fall-through then means
+ * exactly one thing: **this type has no sentence.**
+ *
+ * A type ADDED to the domain's lists has no entry here, gets `{}`, falls
+ * through, and reddens the case below — which is the intended behaviour and
+ * the reason the two assertions are separate: the first says which types have
+ * no fixture, the second which have no sentence, and the remedy differs.
+ */
+const VALID_PAYLOAD: Record<string, unknown> = {
+  'ticket.created': { typeId: 'task', projectId: 'prj', parentId: null, title: 'HSN codes' },
+  'ticket.transitioned': { to: 'doing' },
+  'ticket.assigned': { assigneeId: 'user_anselma' },
+  'ticket.collaborator_added': { userId: 'user_anselma' },
+  'ticket.collaborator_removed': { userId: 'user_anselma' },
+  'ticket.field_set': { fieldId: 'priority', value: 'high' },
+  'ticket.reparented': { newParentId: null },
+  'ticket.workflow_rebound': { toWorkflowId: 'wf-1', toStateId: 'doing' },
+  'ticket.closed': {},
+  'ticket.reopened': {},
+  'ticket.ranked': { rank: 'a1' },
+  'ticket.deleted': {},
+  'ticket.restored': {},
+  'comment.added': { body: {} },
+  'attachment.added': { kind: 'upload', attachmentId: 'a1', filename: 'gst-return.pdf' },
+  'claim.contested': { originalEvent: {}, rule: 'r', reason: 'why' },
+  'claim.contested_resolved': { resolution: 'redone' },
+  'visibility.set': { ticketId: 't1', mode: 'project' },
+};
+
+/** One event of `type`, carrying the fixture payload above when there is one. */
+function eventOf(type: string): TicketHistoryEvent {
+  return {
+    id: `e-${type}`,
+    type,
+    version: 1,
+    payload: VALID_PAYLOAD[type] ?? {},
+    actorId: 'user_anselma',
+    origin: 'web',
+    clientTime: '2026-08-19T09:59:00.000Z',
+    serverTime: '2026-08-19T10:00:00.000Z',
+    seq: 1,
+  };
+}
+
+describe('3.183 history copy — the census', () => {
+  /**
+   * The count first, so the blind spot above is loud: if this reddens, the
+   * domain's registrations have moved and BOTH lists need re-reading.
+   */
+  it('CONTROL — the universe is the size the registrations actually are', () => {
+    expect(
+      TICKET_EVENT_TYPES.length,
+      'TICKET_EVENT_TYPES changed shape: re-read packages/domain/src/vocabulary.ts and re-derive the universe',
+    ).toBe(15);
+    expect(CONTEST_EVENT_TYPES.length).toBe(2);
+    expect(new Set(ENTITY_KIND_TICKET_UNIVERSE).size).toBe(REGISTRATIONS_ON_2026_09_21);
+  });
+
+  /**
+   * The fixtures themselves, asserted before they are relied on — a type with
+   * no payload would fall through for a reason that has nothing to do with the
+   * sentence, and reporting it as "no sentence" is the misdiagnosis this whole
+   * file was rewritten to stop making.
+   */
+  it('CONTROL — every type in the universe has a payload fixture', () => {
+    const missing = ENTITY_KIND_TICKET_UNIVERSE.filter((type) => VALID_PAYLOAD[type] === undefined);
+    expect(missing, `no payload fixture for: ${missing.join(', ')}`).toEqual([]);
+  });
+
+  /**
+   * THE PROPERTY. `describeEvent` returns `event.type` for a type it does not
+   * narrate, so "is this type narrated?" is exactly
+   * `describeEvent(...) !== type` — and asserting it over the domain's own list
+   * is what turns a hand-written switch into something that cannot silently
+   * fall behind.
+   */
+  it('every type registered against a ticket is narrated — not one falls through to the wire name', () => {
+    const falling = ENTITY_KIND_TICKET_UNIVERSE.filter((type) => describeEvent(eventOf(type)) === type);
+    expect(falling, `these reach the History tab as raw slugs: ${falling.join(', ')}`).toEqual([]);
+  });
+
+  /**
+   * And the fall-through is still THERE, on purpose — the census above must not
+   * be satisfiable by removing it. A future event type this file has not learned
+   * renders as the wire name, which is honest; a guessed sentence about a claim
+   * nobody described would not be.
+   */
+  it('CONTROL — an unregistered type still falls back to the wire name', () => {
+    expect(describeEvent({ ...eventOf('ticket.closed'), type: 'ticket.something_this_build_has_never_seen' })).toBe(
+      'ticket.something_this_build_has_never_seen',
+    );
+  });
+});
+
+/**
+ * 3.184 / E5-8 — THE TWO THE FIRST PASS MISSED, read as sentences.
+ *
+ * The census above proves they are narrated; this proves they are narrated
+ * CORRECTLY, because `!== type` would be satisfied by any sentence at all and
+ * "Attached " with nothing after it would pass it.
+ *
+ * `attachment.added` is a discriminated union of exactly two kinds and the
+ * sentence names the FILE — `filename` for an upload this product holds, `name`
+ * for a Drive pointer it does not. Those are separate fields in the schema and
+ * they stay separate here, including the case where the payload's `kind` is
+ * right but the name field is absent (which the payload schema forbids, and
+ * which the fallback covers anyway rather than printing an empty sentence).
+ */
+describe('3.184 history copy — the attachment and resolution sentences', () => {
+  function withPayload(type: string, payload: unknown): TicketHistoryEvent {
+    return { ...eventOf(type), payload };
+  }
+
+  it('names the file for an upload, and the file for a Drive reference — from their own fields', () => {
+    expect(
+      describeEvent(
+        withPayload('attachment.added', { kind: 'upload', attachmentId: 'a1', filename: 'gst-return.pdf' }),
+      ),
+    ).toBe('Attached gst-return.pdf');
+    expect(
+      describeEvent(
+        withPayload('attachment.added', { kind: 'drive-reference', attachmentId: 'a2', name: 'Q3 sheet' }),
+      ),
+    ).toBe('Linked Drive file Q3 sheet');
+    // Neither field is a fallback for the other: an upload has no `name`, and
+    // reading one would print the wrong thing rather than nothing.
+    expect(
+      describeEvent(withPayload('attachment.added', { kind: 'upload', name: 'wrong field' })),
+    ).toBe('attachment.added');
+  });
+
+  it('reads the resolution through as the server wrote it, including a value this build does not enumerate', () => {
+    expect(
+      describeEvent(withPayload('claim.contested_resolved', { resolution: 'redone' })),
+    ).toBe('Conflicting claim resolved — redone');
+    expect(
+      describeEvent(withPayload('claim.contested_resolved', { resolution: 'discarded' })),
+    ).toBe('Conflicting claim resolved — discarded');
+    // A FOURTH resolution — added to the domain later — reads as itself rather
+    // than as a missing case. Same discipline the publish banner keeps for rule
+    // names it has never heard of.
+    expect(
+      describeEvent(withPayload('claim.contested_resolved', { resolution: 'escalated-to-owner' })),
+    ).toBe('Conflicting claim resolved — escalated-to-owner');
+  });
+});

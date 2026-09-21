@@ -665,17 +665,35 @@
    never a `role="button"` span — this repo's rule for a control — so the UA's
    border, background and font are reset here exactly as
    `button.gn-ticket-sheet__parent-chip` below resets them for the same reason.
-   `color: inherit` takes the nav's own `--gn-text-muted` on `--gn-surface-raised`
-   (`CONTRAST_PAIRS`), which is also what the prototype does: its `<a>` sits in a
-   nav declaring `color:var(--label2)` and sets no colour of its own (`:1101`,
-   `:1103`). Only the PLAIN-and-current crumb departs from it. */
+
+   ⚠ **`color` IS SET HERE, AND THIS RULE USED TO SAY IT MUST NOT BE
+   (E4-30).** The old docblock read: *"`color: inherit` takes the nav's own
+   `--gn-text-muted` … which is also what the prototype does: its `<a>` sits in
+   a nav declaring `color:var(--label2)` and sets no colour of its own
+   (`:1101`, `:1103`)"*. **The premise was true and the inference was false.**
+   The prototype's anchor does not set a colour of its own AND it is not
+   `var(--label2)`: the export carries `a{color:var(--accent);text-decoration:
+   none;…}` at **`:86`** — a TYPE selector, so it applies to every `<a>` in the
+   document and beats any inherited `color` from the nav. (Verified by opening
+   `:86`.) **A `<button>` inherits, an `<a>` does not** — which is exactly why
+   the product's ancestor crumbs were painted in the non-link ink while the
+   prototype's are not, and why a reader could not tell an ancestor crumb that
+   opens a ticket from the plain crumbs beside it: identical ink, no underline,
+   no weight change, `cursor: pointer` and the UA focus ring the only tells.
+
+   `var(--gn-text-accent)`, NOT `var(--gn-accent)`: `accent` is not text-safe
+   (see `.gn-button`'s note at `:89` and Round 2d), and `textAccent` is the role
+   the product resolves the prototype's `accent` to for TEXT — the same one
+   `.gn-button` and `.gn-board-card__move` already wear. The `--restricted` and
+   plain arms keep the nav's muted ink, so the three arms are now three inks
+   rather than two. */
 button.gn-ticket-sheet__crumb--link {
   border: none;
   background: transparent;
   padding: 0;
   cursor: pointer;
   font: inherit;
-  color: inherit;
+  color: var(--gn-text-accent);
 }
 /* An ancestor the viewer may NOT see — existence-without-title, NAMED rather
    than dropped. Dropping it would make a restricted chain read as a shorter
@@ -2134,6 +2152,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8rem; }
 .gn-history__headline { display: flex; gap: 0.6rem; align-items: baseline; }
 .gn-history__type { font-weight: 600; }
+/* E4-19 / E5-8 — the wire name, kept beside the sentence rather than as it.
+   Muted and one step down from the sentence so the reading order is sentence
+   first, slug second, and a reader who wants the event's own name still has it
+   without hovering anything (the product rules against `title=` for this, and
+   a tooltip is unreachable by touch and keyboard anyway). `font-family:
+   ui-monospace` is the small honest signal that this text is a wire identifier
+   and not prose a person wrote. */
+.gn-history__slug { color: var(--gn-text-muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .gn-history__actor { color: var(--gn-text); }
 .gn-history__origin { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-history__clocks { display: grid; grid-template-columns: auto auto; gap: 0.1rem 0.8rem; margin: 0.2rem 0 0; font-size: 0.85rem; }
@@ -2339,6 +2365,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .publish-controls__banner--success { border-left-color: var(--gn-success); }
 .publish-controls__banner--refused { border-left-color: var(--gn-danger); }
 .publish-controls__banner--invalid { border-left-color: var(--gn-warning); }
+/* E5-28 — the dropped connection's own tone, and its own class so it can never
+   be read as the server refusing: `--refused` wears `--gn-danger`, this wears
+   `--gn-warning`, the same amber `gn-refusal--transport` uses on the sheet for
+   the identical fact. `--unknown` is a third thing again — the door answered,
+   in a vocabulary this build does not hold — so it takes the muted ink rather
+   than either verdict tone. */
+.publish-controls__banner--transport { border-left-color: var(--gn-warning); }
+.publish-controls__banner--unknown { border-left-color: var(--gn-text-muted); }
 .publish-controls__banner-title { margin: 0 0 0.3rem; font-weight: 600; }
 .publish-controls__banner-reason { margin: 0; }
 .publish-controls__banner-rule { margin: 0.3rem 0 0; font-size: 0.75rem; color: var(--gn-text-muted); }
@@ -5987,6 +6021,29 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   white-space: pre-wrap;
   overflow-wrap: anywhere;
 }
+/* F3 — the body is a DOCUMENT now, so the blocks it can contain need the two
+   declarations the plain-text renderer made unnecessary. `white-space:
+   pre-wrap` above is KEPT: a newline the author typed inside a paragraph still
+   means a newline, and that was true before this change and stays true after. */
+.gn-comment__body > * { margin: 0; }
+.gn-comment__body > * + * { margin-top: 0.4rem; }
+.gn-comment__list { padding-left: 1.3rem; }
+.gn-comment__list > li + li { margin-top: 0.15rem; }
+.gn-comment__quote {
+  margin: 0;
+  padding-left: 0.6rem;
+  border-left: 2px solid var(--gn-border);
+  color: var(--gn-text-muted);
+}
+.gn-comment__code {
+  font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
+  background: var(--gn-surface-sunken);
+  border-radius: var(--gn-radius-control);
+  padding: 0.35rem 0.5rem;
+  overflow-x: auto;
+}
+.gn-comment__body a { color: var(--gn-text-accent); overflow-wrap: anywhere; }
+.gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {
   display: inline-flex;
@@ -6006,6 +6063,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* Mirrors `.gn-ticket-sheet__attachments-error` (the sibling read's sentence)
    rather than inventing a second treatment for the same kind of fact. */
 .gn-comments__error { color: var(--gn-danger); margin: 0; }
+/* V4 — the WAIT arm. Deliberately the muted ink of `.gn-comments__empty` and
+   not the danger tone of `__error`: a read in flight is a state, not a fault,
+   and painting it red would be the same misreading in the other direction. */
+.gn-comments__loading { color: var(--gn-text-muted); font-size: 0.9375rem; line-height: 1.25rem; margin: 0; }
 .gn-comments__composer {
   margin-top: 0.9rem;
   border-radius: var(--gn-radius-control);

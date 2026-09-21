@@ -4,6 +4,7 @@ import { cleanup, render, screen, within } from '@testing-library/react';
 // canvas.test.tsx). The plan's Task 9 snippet still carries the default spelling.
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
+import type { IngestResult } from '@gisik-nokma/domain';
 import {
   adviseWorkflowDef,
   newUlid,
@@ -625,5 +626,133 @@ describe('PublishControls — server results rendered honestly', () => {
     await user.click(screen.getByRole('button', { name: 'Publish' }));
     expect(await screen.findByText(reason)).toBeInTheDocument();
     expect(screen.getByText('rule: some-rule-this-client-never-heard-of')).toBeInTheDocument();
+  });
+});
+
+/**
+ * E5-28 — THE PUBLISH THAT NEVER ARRIVED, and the mapping a refusal must not
+ * take with it.
+ *
+ * Two defects, one surface. (i) `submitPayload` awaited `env.gateway.submit`
+ * with no `catch`, and the Publish button is
+ * `disabled={issues.length > 0 || phase === 'submitting'}` — so a dropped
+ * connection left `submitting` in place FOR EVER: a greyed button, no banner,
+ * and no way back but a reload. Nothing but a server answer ever left that
+ * phase. (ii) `submitting` also unmounted `StateMappingDialog`, which held the
+ * mapping in its OWN state — so a refusal returned the person to an idle
+ * Publish button with the work the dialog exists to collect gone, and pressing
+ * Publish again reopened an EMPTY dialog.
+ *
+ * The transport arm is Ruling 27/33's split, applied here for the first time:
+ * the board and the sheet have had it since 2026-09-16 and the builder's final
+ * press had neither of the two arms — no "did not answer" and no "could not
+ * reach".
+ */
+describe('PublishControls — the transport arm and the mapping a refusal keeps (E5-28)', () => {
+  /**
+   * 10.130 — a submit that never reaches the server says so, and RE-ENABLES
+   * Publish.
+   *
+   * Both halves are asserted, and the second is the one that fails under the
+   * old code: a sentence on screen beside a button that is still greyed for
+   * ever would satisfy the banner assertion and leave the person exactly as
+   * stuck. `toBeEnabled` is the check that the phase actually LEFT
+   * `submitting`.
+   */
+  it('10.130 — a dropped connection gets the transport banner, in its own words, and Publish comes back', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(kanban));
+    setup(store, { submitError: true });
+
+    const publish = screen.getByRole('button', { name: 'Publish' });
+    expect(publish).toBeEnabled();
+    await user.click(publish);
+
+    expect(await screen.findByText('This publish did not reach the server.')).toBeInTheDocument();
+    // The fetch failure's own message, carried rather than replaced.
+    expect(screen.getByText('We could not reach the server for this publish — Failed to fetch')).toBeInTheDocument();
+    // NOT the refusal's sentence, and not its tone. A dropped connection is not
+    // an adjudication — the same distinction the board and the sheet draw.
+    expect(screen.queryByText('The server refused this publish.')).toBeNull();
+    // THE PROPERTY THE DEFECT WAS: the control came back.
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
+  });
+
+  /**
+   * 10.131 — a REFUSAL KEEPS THE MAPPING, and reopens the dialog on it.
+   *
+   * The person's whole job on this surface is a deliberate multi-step act —
+   * map every dropped state, confirm — and the refusal used to throw away the
+   * half of it they had already done. The second submit is driven all the way
+   * through and its PAYLOAD asserted, because "the dialog is on screen" is not
+   * the claim: the claim is that the destination they chose is still the one
+   * that goes to the server.
+   */
+  it('10.131 — a refusal keeps the mapping, reopens the dialog pre-filled, and resubmits what was chosen', async () => {
+    const user = userEvent.setup();
+    const workflowId = newUlid();
+    const store = draftDroppingReview(workflowId);
+    const gateway = setup(store, {
+      occupancy: { [workflowId]: { review: 4 } },
+      submitResults: [
+        { status: 'refused', eventId: 'evt', rule: 'permission.role', reason: 'Only an owner or admin may publish a workflow.' },
+      ],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    const row = await screen.findByTestId('mapping-row-review');
+    await user.click(within(row).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
+    await user.click(screen.getByRole('button', { name: 'Publish with this mapping' }));
+
+    // The authority's words, verbatim, beside the dialog they belong to…
+    expect(await screen.findByText('Only an owner or admin may publish a workflow.')).toBeInTheDocument();
+    expect(screen.getByText('rule: permission.role')).toBeInTheDocument();
+    // …and the dialog is still HERE. Before this, `submitting` unmounted it.
+    expect(screen.getByText('Every dropped state needs a destination')).toBeInTheDocument();
+    // PRE-FILLED: the row still resolves to the state that was chosen, and the
+    // confirm button is therefore already enabled without touching anything.
+    expect(
+      within(screen.getByTestId('mapping-row-review')).getByRole('button', { name: /Send them to — Review/ }),
+    ).toHaveTextContent('To do');
+    const confirm = screen.getByRole('button', { name: 'Publish with this mapping' });
+    expect(confirm).toBeEnabled();
+
+    // Pressing it again sends the SAME mapping — the property, measured on the
+    // wire rather than on the screen.
+    await user.click(confirm);
+    expect(await screen.findByText('Version 3 published.')).toBeInTheDocument();
+    expect(gateway.submitted).toHaveLength(2);
+    expect((gateway.submitted[1]!.payload as PublishedWorkflowDef).stateMapping).toEqual({ review: 'todo' });
+  });
+
+  /**
+   * 10.132 — a status this client does not name is its OWN arm, not a silent
+   * fall-through.
+   *
+   * The removed `switch` had no `default` and no path after it that set a
+   * phase, so a result outside the three shipped statuses returned having set
+   * NOTHING — leaving `submitting` in place and Publish disabled for ever. That
+   * is the same stuck control as a dropped connection reached by an entirely
+   * different route, and neither the transport arm nor the refusal arm is true
+   * of it: the door answered, and nobody refused.
+   */
+  it('10.132 — a result status this build does not recognise says so, and does not leave Publish stuck', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(kanban));
+    setup(store, {
+      // A status the union does not carry — the shape a server that grew one
+      // first would send. Cast rather than widened: the TYPE is the point, and
+      // a fixture that satisfied it could not express this at all.
+      submitResults: [{ status: 'queued-for-review', eventId: 'evt' } as unknown as IngestResult],
+    });
+
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+    expect(
+      await screen.findByText('The server answered this publish with a result this build does not recognise.'),
+    ).toBeInTheDocument();
+    expect(screen.getByText('status: queued-for-review')).toBeInTheDocument();
+    expect(screen.queryByText('The server refused this publish.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Publish' })).toBeEnabled();
   });
 });

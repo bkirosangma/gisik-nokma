@@ -175,7 +175,7 @@ function toTicketView(row: VisibilityRow): TicketView {
  * cannot be talked into filling one in.
  */
 export type ParentRef =
-  | { kind: 'ticket'; id: string; title: string; ticket: TicketView }
+  | { kind: 'ticket'; id: string; title: string; key: string | null; ticket: TicketView }
   | { kind: 'restricted'; id: string };
 
 /**
@@ -395,6 +395,18 @@ export function registerTicketRoutes(
         return reply.code(404).send(NOT_FOUND_BODY);
       }
 
+      // P3 — THE TWO PREFIXES ARE READ **BEFORE** THE PARENT BRANCH, because the
+      // parent crumb now carries a key and composing one needs them. They are
+      // the same two reads the ticket's OWN key uses a few lines below, hoisted
+      // rather than duplicated: `projectPrefixesInWorkspace` answers the whole
+      // workspace in one call, so the parent's key costs ONE extra read
+      // (`ticketNumber` for the parent) and not a second prefix lookup. The
+      // ticket's own `number` is still read where it was — it is not needed
+      // here, and reading it early would be a read that might not be used.
+      const identity = await workspaceIdentityFromLedger(deps.pool, workspaceId);
+      const prefixes = await projectPrefixesInWorkspace(deps.pool, workspaceId);
+      const projectPrefix = prefixes.get(state.projectId) ?? null;
+
       let parent: ParentRef | null = null;
       if (ticket.parent_id !== null) {
         const parentRow = await loadTicketRow(deps.pool, workspaceId, ticket.parent_id);
@@ -430,10 +442,22 @@ export function registerTicketRoutes(
           if ((parentState.deleted ?? null) !== null) {
             parent = { kind: 'restricted', id: ticket.parent_id };
           } else {
+            // P3 — the parent's KEY, composed exactly as the ticket's own is
+            // (same two prefixes, same `ticketNumber`, same `ticketKey`), so the
+            // crumb can read `KEY Title` as the prototype's does
+            // (`desktop.dc.html:3417`). `null` when the number falls outside the
+            // snapshot the number is derived from — never a refusal, per
+            // `read/ticket-numbers.ts`'s ruling, and never a made-up number.
+            const parentNumber = await ticketNumber(deps.pool, workspaceId, parentRow.ticket_id);
+            const parentKey =
+              identity.prefix === null || projectPrefix === null || parentNumber === null
+                ? null
+                : ticketKey(identity.prefix, projectPrefix, parentNumber);
             parent = {
               kind: 'ticket',
               id: parentRow.ticket_id,
               title: titleOf(parentState),
+              key: parentKey,
               ticket: toTicketView(parentRow),
             };
           }
@@ -545,9 +569,8 @@ export function registerTicketRoutes(
        * keyed by id — so both are checked rather than asserted, and the crumb
        * renders an absence instead of a key assembled from a hole.
        */
-      const identity = await workspaceIdentityFromLedger(deps.pool, workspaceId);
-      const prefixes = await projectPrefixesInWorkspace(deps.pool, workspaceId);
-      const projectPrefix = prefixes.get(state.projectId) ?? null;
+      // (`identity`, `prefixes` and `projectPrefix` are read above, before the
+      // parent branch — see the note there. Only the NUMBER is this ticket's.)
       const number = await ticketNumber(deps.pool, workspaceId, ticketId);
       const key =
         identity.prefix === null || projectPrefix === null || number === null

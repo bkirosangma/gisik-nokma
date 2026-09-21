@@ -1,6 +1,7 @@
 import { IST_CLOCK_NOTE } from '@gisik-nokma/domain';
 import { actorLabel, formatDateTime } from '../provenance.js';
 import type { TicketHistoryEvent } from '../view-types.js';
+import { describeEvent, type HistoryCopyContext } from './history-copy.js';
 
 /**
  * The history view IS the ledger, filtered (spec §3). Every entry shows the
@@ -28,21 +29,48 @@ import type { TicketHistoryEvent } from '../view-types.js';
  * label goes through `actorLabel`, so a resolver that answers with nothing —
  * a roster that 404'd, a member since removed — still renders the raw actor
  * id. A history entry never becomes anonymous, and it never becomes "system".
+ *
+ * ## The headline is a sentence, and the wire name sits beside it (E4-19 / E5-8)
+ *
+ * The headline used to be `event.type` — the wire name of the EVENT rather than
+ * a statement about the ticket. Measured on `CCSO-6`: three consecutive rows
+ * reading `ticket.field_set`, with nothing on any of them saying which field
+ * changed or to what. `describeEvent` builds the sentence from the payload the
+ * route already selects, and the raw type is KEPT in `.gn-history__slug`, one
+ * slot to the right. The complaint was never that the slug was on screen; it
+ * was that the slug was the only thing on screen.
+ *
+ * The slug renders only when it is not already the headline — an event type
+ * `describeEvent` does not know falls back to the wire name, and printing it
+ * twice would say nothing extra. `ctx` is optional in full: with no resolvers
+ * the sentences fall back to the raw ids, which is the same floor `nameOf`
+ * gives the actor line — never blank, never invented.
  */
 export function HistoryList({
   events,
   nameOf,
+  stateName,
+  typeName,
 }: {
   events: TicketHistoryEvent[];
   nameOf: (userId: string) => string;
+  /** Optional resolvers for the sentences — see `HistoryCopyContext`. */
+  stateName?: (stateId: string) => string;
+  typeName?: (typeId: string) => string;
 }) {
+  const ctx: HistoryCopyContext = { nameOf, stateName, typeName };
   return (
     <>
       <ol className="gn-history">
-        {events.map((event) => (
+        {events.map((event) => {
+          const headline = describeEvent(event, ctx);
+          return (
           <li key={event.id} className="gn-history__event">
             <div className="gn-history__headline">
-              <span className="gn-history__type">{event.type}</span>
+              <span className="gn-history__type">{headline}</span>
+              {headline === event.type ? null : (
+                <span className="gn-history__slug">{event.type}</span>
+              )}
               <span className="gn-history__actor">
                 {actorLabel(event.actorId, nameOf(event.actorId))}
               </span>
@@ -55,7 +83,8 @@ export function HistoryList({
               <dd className="gn-history__clock-value">{formatDateTime(event.serverTime)}</dd>
             </dl>
           </li>
-        ))}
+          );
+        })}
       </ol>
       <p className="gn-history__clock-note">{IST_CLOCK_NOTE}</p>
     </>

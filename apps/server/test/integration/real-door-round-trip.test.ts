@@ -840,6 +840,20 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — the single read'
         kind: 'ticket',
         id: parentId,
         title: 'Restock the chiller',
+        // P3 — the parent crumb's key. This workspace is created THROUGH THE
+        // DOOR (so a founding claim exists), its project is real and the parent
+        // is a real ticket, so the composition has all three facts and answers a
+        // STRING. ⚠ Asserted as `expect.any(String)` rather than pinned to a
+        // literal, and that is a deliberate limit rather than laziness: the
+        // literal is derivable from this fixture's own prefixes and the parent's
+        // position, but this whole-body `toEqual` runs through `freezeClocks`,
+        // and a literal typed from reasoning about that pipeline is exactly the
+        // kind of number this series keeps catching. `expect.any(String)` cannot
+        // pass on an absence — which is the property that matters here — and the
+        // EXACT string is pinned deterministically in
+        // `test/routes/ticket-crumbs.test.ts`'s P3 case, which seeds the
+        // founding claim itself.
+        key: expect.any(String),
         ticket: {
           ticket_id: parentId,
           workspace_id: workspaceId,
