@@ -373,9 +373,44 @@ describe('the legal pages’ top bar', () => {
 
       expect(screen.getByRole('navigation', { name: 'On this page' })).toBeInTheDocument();
       const labelled = container.querySelectorAll('[aria-label]');
+      // ⚠ CHANGED BY exec1 P31 (2026-09-21), and the reason is recorded rather
+      // than the expectation quietly widened. This arm used to read
+      // `['On this page']` — ONE label on the page — and the finding is that the
+      // chrome bar above it was a second, UNNAMED landmark on these very routes.
+      // Naming it is the fix, so the page now carries two, and the assertion
+      // below is a two-element list rather than a `.toContain`. The property
+      // this case actually guards is UNCHANGED and still asserted: the TOC's own
+      // label is present and is exactly `On this page`. What is gone is the
+      // incidental "and nothing else on this page is labelled", which was never
+      // about the TOC.
+      //
+      // The live accessible-names ratchet RISES on these two routes (1 → 2), and
+      // a rise is the direction nothing checks — recorded in the PR body, the
+      // same way `legal-chrome.tsx`'s own note records the swap that kept the
+      // count at 1 when `BackButton` left.
       expect(Array.from(labelled).map((el) => el.getAttribute('aria-label'))).toEqual([
+        'Legal',
         'On this page',
       ]);
+    });
+
+    /**
+     * 13.1053 — exec1 P31 — **the legal chrome is a NAMED landmark.**
+     *
+     * `LegalNav` rendered `<nav className="gn-nav">` with no accessible name, and
+     * it co-renders with the TOC above — so a screen-reader user opening the
+     * landmark list met two `navigation` regions and only one of them said what
+     * it was. The declaration is swept product-wide in
+     * `nav-landmark-name.test.tsx`; THIS reads the name off the rendered element,
+     * so a label declared but never reaching the DOM reddens here. Queried by
+     * role AND name: `getByRole('navigation')` alone would be ambiguous on this
+     * page and would stay green against an unnamed bar.
+     */
+    it(`13.1053 ${label}'s chrome is a named "Legal" landmark, reached by role and name`, () => {
+      render(node);
+      // THE WITNESS — before the fix this threw with `Unable to find an
+      // accessible element with the role "navigation" and name "Legal"`.
+      expect(screen.getByRole('navigation', { name: 'Legal' })).toBeInTheDocument();
     });
   }
 });

@@ -4,6 +4,36 @@ Part of bucket 13 (`Features.md` §13) — one part-file of the catalogue split 
 Index and id-block allocation: [`13-deployment-dogfooding.md`](./13-deployment-dogfooding.md).
 Case ids are unchanged and are never renumbered by the split.
 
+## THE BLOCKS — take from yours, never from the tip
+
+Allocated by the controller 2026-09-21 22:0x (cycle 46) after B03/B05 minted `13.1050`–`13.1052` twice
+from one base. Mirrors `17-open-work.md`: **blocks are per RELEASE BATCH (the branch that lands), not
+per lane session** — a lane runs several batches in one worktree tonight, and a block that follows the
+session would be shared by two branches landing in either order.
+
+| release batch | §13 block |
+|---|---|
+| **B03** (`rel/b03-accessible-names`) | **`13.1057`–`13.1066`** — minted: `13.1057`–`13.1059` (moved from `13.1050`–`13.1052`); `13.1053`–`13.1056` predate the blocks and are uncontested |
+| **B04** (`rel/b04-help-corpus-and-copy`) | **`13.1067`–`13.1076`** |
+| **B01** (`rel/b01-server-doors-security-and-refusa`) | **`13.1077`–`13.1086`** |
+| **B02** (`rel/b02-account-page-workflow-builder-dr`) | **`13.1087`–`13.1096`** |
+| **B06** (`rel/b06-new-ticket-and-move-dialogs`) | **`13.1097`–`13.1106`** |
+| **B09** (`rel/b09-failure-states-on-the-web-reads-`) | **`13.1107`–`13.1116`** |
+| **B08** (`rel/b08-ticket-sheet-crumbs-history-comm`) | **`13.1117`–`13.1126`** |
+| **B07** (`rel/b07-soft-delete-integrity-engine-rep`) | **`13.1127`–`13.1136`** |
+| **B10** (`rel/b10-paint-ua-chrome-phone-width-cont`) | **`13.1137`–`13.1156`** |
+| **B11** (`rel/b11-session-expiry-and-dead-controls`) | **`13.1157`–`13.1166`** |
+| **B12** (`rel/b12-workflow-and-type-invariants-in-`) | **`13.1167`–`13.1176`** |
+| **B13** (`rel/b13-due-date-soft-delete-undo-member`) | **`13.1177`–`13.1186`** |
+| **B14** (`rel/b14-minimal-shells-phone-and-desktop`) | **`13.1187`–`13.1196`** |
+| **B16** (`rel/b16-outbox-ordering-projection-verif`) | **`13.1197`–`13.1206`** |
+
+**⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** Re-read it before minting, and if your own
+allocation changes, change it HERE in the same action. **When your block is empty, STOP AND ASK.** Do
+not mint from the tip and do not borrow a neighbour's — that is the rule whose breach made §13 go red
+twice, and a third time tonight (`13.1050`–`13.1052`, B03 and B05, one base). **Ids already minted on
+`main` are never renumbered — the branch's move.**
+
 ## The HIG palette adoption (2026-09-08) — block `13.281`–`13.320`
 
 *Both cases pin a place where the adoption deliberately did NOT follow Apple. Neither departure is
@@ -205,6 +235,293 @@ the gate would have stayed 33/33.*
 > accessible name for another of equal count passes here, and should — whether the new words are better
 > is the copy rule, which is a person's judgement. This gate catches the LOSS, which is the half that
 > can be mechanised and the half a delegated implementer is most likely to cause by accident.
+
+## Every route names its view (exec1 P12, 2026-09-21) — case `13.1057`
+
+**Id `13.1057`, and the number is derived rather than guessed.** `13.922` — this file's next free id above
+its own last line — was ALREADY TAKEN in `13-settings-and-workflows.md:577`, and the guard caught it.
+`13.x` is ONE space across every `13-*.md` file, so the tip is the global high-water mark (`13.1046`), and
+the block `13.1034`–`13.1049` is another executor's with `13.1047`–`13.1049` recorded as reserved and
+deliberately unused (`13-owner-requests-and-backlog.md:2185`). `13.1048` is inside that reservation and
+must not be taken, so the first genuinely free id is the one after the block. **This lane's standing
+request for an allocated block, first recorded under `13.969`, is still open** — this task was dispatched
+without one, as that one was.
+
+- **13.1057** ✅ Every routing file under `app/` is titled by a SERVER mechanism — its own
+  `metadata`/`generateMetadata`, or a SIBLING `layout.tsx` exporting `metadata`, which is a server
+  component even when the page under it is `'use client'`. A second arm reddens on any non-dynamic route
+  that titles itself from `<DocumentTitle>` with a literal topic, and a third pins the two dynamic
+  exceptions: each must render `<DocumentTitle>` for the resolved name AND carry a server layout for the
+  generic title shown meanwhile. A fourth arm keeps every declared topic non-empty and none the bare
+  product name. The sweep walks `page.tsx` **and** `not-found.tsx`, whose exclusion list
+  (`app/page.tsx`, a bare `redirect`) is itself asserted to still be a bare redirect so it cannot become
+  a hiding place. (`apps/web/test/document-title.test.tsx`)
+
+**The finding.** `app/layout.tsx` set `{ title: 'Gisik Nokma' }` and nothing else set a title, so
+`/sign-in`, `/inbox`, `/help`, a board, a ticket sheet, `/settings`, `/privacy`, `/terms` and the 404
+all read the same string. WCAG 2.2 §2.4.2 *Page Titled* is **Level A**, and its Understanding document
+speaks to exactly this shape: *"for web applications (single page applications) where the view changes
+dynamically, the title should also be changed dynamically to reflect the content or topic of the
+current view."*
+
+### ⚠ THE FIRST FIX SHIPPED IN THIS BATCH DID NOT WORK, AND THIS CASE PASSED THROUGHOUT IT
+
+The first version gave each `'use client'` route a `<DocumentTitle>` whose effect writes `document.title`,
+and asserted only that the mechanism was DECLARED. **It lands on zero of those routes.** Traced in Chrome
+against the built app, with a forwarding `document.title` setter and a 20 ms poll of the real value:
+
+```
+  /sign-in   atMs  0  value ""                            ← no <title> yet
+             atMs 21  set   "Sign in · Gisik Nokma"       ← the effect
+             atMs 21  value "Sign in · Gisik Nokma"       ← it took
+             atMs 42  value "Gisik Nokma"                 ← REACT PUT IT BACK
+             finalTitle after 15 s: "Gisik Nokma"
+  /help      setter at 127 ms; finalTitle after 4 s: "Gisik Nokma"
+```
+
+The 42 ms repair **does not go through the `title` setter** — React mutates the `<title>` NODE while
+hydrating Next's `<head>`, repairing the text it finds changed under it. **The suite was green the whole
+time**, because a jsdom arm can see the mechanism and cannot see this.
+
+**Two replacements were tried and are MEASURED FAILURES**, recorded so neither is re-attempted (both in
+`src/document-title.tsx`): a `useSyncExternalStore` hydration gate (the write still landed at 21 ms —
+React repairs *after* hydration of the subtree, so no hydration signal precedes it), and returning
+`<title>` for React 19 to hoist (**three** `<title>` elements in the hydrated document; React does not
+deduplicate them and `document.title` reads the first, which is Next's — strictly worse).
+
+### What holds, and how it is measured
+
+**A SERVER route-segment `layout.tsx` exporting `metadata`.** A segment layout is a server component even
+when the page beneath it is `'use client'`, so the title is in the head **before any JavaScript runs** —
+which is what a Level A criterion actually asks for. `<DocumentTitle>` survives ONLY where the topic
+resolves from a READ (the workspace and project names), whose writes land long after the repair; each of
+those keeps a server layout for the generic title meanwhile.
+
+**MEASURED against the built app on lane port 3055** (`/tmp/b03-tp12-served-titles.log`):
+
+- **Served, every route own its own:** `/sign-in` → `Sign in · Gisik Nokma` · `/help` → `Help · Gisik
+  Nokma` · `/inbox` → `Inbox · Gisik Nokma` · `/account` → `Account · Gisik Nokma` · `/settings` →
+  `Settings · Gisik Nokma` · `/workspaces` → `Workspaces · Gisik Nokma` · `/privacy` → `Privacy · Gisik
+  Nokma` · `/terms` → `Terms · Gisik Nokma` · `/mcp/tokens` → `MCP tokens · Gisik Nokma` ·
+  `/definitely-not-a-route` → `Page not found · Gisik Nokma`.
+- **Post-hydration in Chrome, the reading this case previously OWED and has now PAID:** `/sign-in`,
+  `/help` and the 404 each have **exactly one `<title>`** (`titleElements: 1`), correct at the FIRST
+  sample and unchanged across 4–6 s of polling.
+- **That last one also proves Next honours `metadata` in `not-found.tsx`** — a file its own docs do not
+  list — which is why the 404 no longer needs the client component at all.
+
+`apps/web/src/page-title.ts` carries no `'use client'` on purpose: a directive there would turn the
+helper into a client reference and break the server half, which is now every route's half.
+
+## The project view rail is a NAMED tablist (exec1 P19, 2026-09-21) — case `13.1058`
+
+- **13.1058** ✅ The project page's view rail — Backlog, Board, List, Calendar, Timeline — is reached by
+  ROLE AND NAME (`getByRole('tablist', { name: 'Project view' })`), and the named element is the rail the
+  five tabs live in, not a second tablist elsewhere on the page. The case queries by name on purpose: the
+  remedy was to adopt the SHARED `SegmentedControl`, whose `'aria-label'` prop is **required**, so an
+  unnamed tablist is unrepresentable at this mount rather than merely corrected once — a page that
+  hand-rolled the markup again would fail this case. (`apps/web/test/project-calendar-timeline.test.tsx`)
+
+**The finding.** The rail declared `role="tablist"` with no `aria-label` and no `aria-labelledby`, so a
+screen reader met an unnamed set of five tabs on the product's primary view switcher — while the repo had
+**already fixed the identical defect on the ticket sheet's tablist**
+(`packages/app-core/src/views/ticket-sheet.tsx:1904`). Two real `role="tablist"` elements existed in the
+product, comments excluded, and this was the one still unnamed.
+
+**What did NOT change: the rendered DOM.** `SegmentedControl` draws the same `.gn-segmented` /
+`.gn-segmented__item` / `.gn-segmented__item--on` classes, the same `tablist` / `tab` roles and the same
+`aria-selected`, with the same one-boolean-per-tab derivation — so every case scoped to `.gn-segmented`
+and every `role="tab"` query sees exactly what it saw before, plus the name. The suite moved
+`630 → 631 passed` (the new case) with no existing case touched.
+
+**A stale sentence in a docblock this task did not otherwise edit, replaced rather than deleted:**
+`project-calendar-timeline.test.tsx`'s `viewTabs()` scoping note ended *"the view-tabs tablist itself
+still carries no `aria-label` to disambiguate by name"* — true when written, expired by this change, and
+now says so with the name it does carry.
+
+**The rail's order** (Backlog first — spec §1.3, tickets are born there — while `view`'s DEFAULT stays
+`'board'`) moved out of the JSX and onto `PROJECT_VIEW_OPTIONS`, whose labels are a
+`Record<ProjectTab, string>`: a `Record` requires every member of the union, so a sixth tab added to
+`PROJECT_TABS` without words fails `typecheck` rather than rendering an unlabelled segment — a property
+the hand-written `as const` tuple array this replaced did not have.
+
+## Every menu is named (exec1 P22, 2026-09-21) — case `13.1059`
+
+- **13.1059** ✅ No product source declares `role="menu"` without an `aria-label` or `aria-labelledby` in
+  the SAME OPENING TAG — swept over six source trees with comments stripped, taking each element's whole
+  tag rather than its line so an attribute added on a continuation line counts and a multi-line tag is not
+  missed. Positive control: the sweep found at least three menus, so a green cannot be "the regex matched
+  nothing". Two runtime arms read the name off the RENDERED menu instead of the source —
+  `getByRole('menu', { name: 'Account' })` in `app-nav.test.tsx` and
+  `getByRole('menu', { name: 'Add rule' })` in `workflow-builder/inspectors.test.tsx` — because the
+  accessible-name ratchet cannot see either menu: it counts attributes on routes it paints, and the
+  builder's menu is only in the DOM while open. (`apps/web/test/menu-accessible-name.test.tsx`)
+
+**The finding.** Two menus declared `role="menu"` with **no `aria-label` and no `aria-labelledby`** —
+`apps/web/src/account-menu.tsx:148` and
+`packages/app-core/src/workflow-builder/ui/rule-editors/add-rule-menu.tsx:47` — while a THIRD menu in the
+same product, `apps/web/src/last-project-nav.tsx:249`'s `aria-label="Projects"`, showed the pattern the
+other two were missing. The reviewer's control for the sweep was that same named twin: the grep that
+found the unnamed menus also surface the named one.
+
+**The words are each trigger's own.** The account menu is `"Account"` — not `Account menu for {name}`,
+because the menu's own header names WHO and a label that changed with the session would describe the
+person rather than the menu. The builder's is `"Add rule"`, the trigger's exact text three lines above it.
+
+**What was NOT taken, named rather than passed over:** the reviewer's stronger remedy — a shared menu
+component whose label is required by type, the shape `SegmentedControl` gave P19 — **does not exist to
+adopt here**. P19's remedy worked because the component was already there with `'aria-label': string`
+required; the product's three menus share no component, and writing one is a refactor beyond this
+finding. So both menus carry the attribute and the SWEEP is what prevents the recurrence.
+
+## Every navigation landmark is named (exec1 P31, 2026-09-21) — case `13.1053`
+
+- **13.1053** ✅ No product source renders a `<nav>` without an `aria-label` or `aria-labelledby` in the
+  SAME OPENING TAG, swept over six source trees with comments stripped and whole tags rather than lines.
+  Positive control: the sweep found more than three NAMED navs, so a green cannot be "the regex matched
+  nothing". Two runtime arms read the name off the RENDERED bar rather than the source —
+  `getByRole('navigation', { name: 'Main' })` in `app-nav.test.tsx` and `{ name: 'Legal' }` in
+  `not-found-and-legal.test.tsx` — because the accessible-name ratchet counts ATTRIBUTES and cannot judge
+  one name against another. (`apps/web/test/nav-landmark-name.test.tsx`)
+
+**The finding, in its own count.** Nine `<nav>` elements in product source; **seven carried a name and two
+did not** — `apps/web/src/app-nav.tsx:232` and `apps/web/src/legal-nav.tsx:68`, both rendering
+`<nav className="gn-nav">` with neither `aria-label` nor `aria-labelledby`. **Both co-render with a SECOND,
+already-labelled `<nav>` on the same page**, so a screen-reader user who opens the landmark list meets two
+`navigation` regions and only one of them says what it is. Named neighbours, for the pattern:
+`settings/page.tsx:180` *"Settings sections"*, `w/[workspaceId]/page.tsx:570` *"Workspace sections"*,
+`workflows/[workflowId]/page.tsx:80` and `history/page.tsx:39` *"Breadcrumb"*,
+`legal-chrome.tsx:115` *"On this page"*.
+
+**One attribute each:** `aria-label="Main"` on the product's primary bar, `aria-label="Legal"` on the legal
+chrome — the reviewer's own words, and the house's: the component is `LegalNav` and its class family is
+`.gn-legal*`.
+
+### A case this change HAD to move, and why that is not a widened assertion
+
+**`13.685`** asserted the legal pages carry **exactly ONE** `aria-label` — `['On this page']` — because its
+job was to record the swap that kept `BackButton`'s departure from taking the ratchet's `ariaLabel` count
+to 0. P31's whole point is that the bar above the TOC was a second, UNNAMED landmark on those very routes,
+so naming it makes the page carry **two**, and the expectation becomes `['Legal', 'On this page']`. The
+property `13.685` actually guards — the TOC's label is present and is exactly `On this page` — is
+unchanged and still asserted; what is gone is the incidental *"and nothing else on this page is
+labelled"*, which was never about the TOC. The reason is written into the case rather than the number
+quietly edited.
+
+### The ratchet RISES, and a rise is the direction nothing checks
+
+`e2e-viewport` and `e2e-stack` both assert `toBeGreaterThanOrEqual(baseline[attr])` — **read in both spec
+files rather than assumed**, because a rise that failed would break the e2e gate. The `ariaLabel` count
+rises on every route `AppNav` renders and 1 → 2 on `/privacy` and `/terms`. It is recorded here, in
+`legal-chrome.tsx`'s own note (whose paragraph said *"the top bar and this row"* while the top bar was
+still unnamed — the correction names the half that was missing), and in the PR body, rather than absorbed.
+
+## The shell names a person who has no display name (exec4 E4-33, 2026-09-21) — case `13.1054`
+
+- **13.1054** ✅ The two labels every signed-in screen carries name the person even when the account has
+  no display name — the product's DEFAULT email sign-up, where magic-link sign-up creates `name: ''` and
+  the sign-in form asks for none. `/workspaces`' `<h1>` reads `Workspaces — accountant@e2e.gisik-nokma.local`
+  rather than the measured `Workspaces — `, the nav button reads
+  `Account menu for accountant@e2e.gisik-nokma.local` rather than `Account menu for `, and the monogram
+  draws `AC` rather than `?`. Each arm runs the SAME assertions against a named person first as its
+  positive control, because the defect is only visible in the difference between the two — and the
+  heading arm asserts the absence of a trailing em dash as well, so a regression that appends the address
+  somewhere else still fails. (`apps/web/test/display-label.test.tsx`)
+
+**The measurement.** Painted as the seeded guest `accountant@e2e.gisik-nokma.local`, `name = ''`:
+`h1.gn-page-title` → `"Workspaces — "`; `button.gn-nav__avatar-button` → `aria-label === "Account menu for "`,
+glyph `?`, `title=""`, `aria-label=""` on the avatar span. The signed-in owner paints
+`Workspaces — Kiro` / `Account menu for Kiro` / `KI` on the same elements.
+
+**One module, not a `||` at each site.** `apps/web/src/display-label.ts` holds `displayLabelOf` (name, else
+email, else `''`) and `avatarNameOf` (name, else the email's LOCAL PART — the domain is the same for
+everyone on a hosted service and would put the same letters in every monogram). **The contract that
+matters is that `''` means NO LABEL, and every caller omits its suffix for it** — which is why the h1 and
+the button are ternaries rather than interpolations, and why neither can reproduce the dangling
+punctuation for a person who has neither a name nor an address. `useCurrentUser` types `email` as
+`string | null`, so that case is reachable and not hypothetical.
+
+**Two things deliberately NOT changed, named rather than passed over.**
+
+1. **`initialsOf`'s `?` fallback stands.** A person with neither a name nor a usable address has no handle
+   to draw from, and `?` is its own documented answer (`packages/ui/src/components/avatar.tsx:19`). What
+   changed is that the caller stops FEEDING it an empty string.
+2. **The account menu's header still renders `{user.name}`.** It is a two-line block with the email on its
+   own line below, so a nameless person sees one line, not a dangling one — and routing it through
+   `displayLabelOf` would print the address TWICE, once bold and once muted, which is worse than the gap
+   it would close.
+
+**Not to be confused with two neighbours:** exec 5's E5-4 (the visibility editor's people picker) and
+E4-6 (provenance's raw-id fallback, where `provenance.ts` records a RULED decision to attribute rather
+than blank). This is the shell.
+
+## A skip link, for the person pressing Tab (exec1 P13, 2026-09-21) — case `13.1055`
+
+- **13.1055** ✅ The product's first focusable element is a `Skip to content` link whose target resolves:
+  the rendered anchor is asserted to be FIRST among the focusable elements and to point at an id that a
+  real element carries; a sweep asserts every route's RENDERING `<main>` carries that id, so the next
+  route added without one reddens rather than shipping a dead anchor; and the layout arm asserts the
+  control renders before `<Providers>` with comments stripped and that `.gn-skip`/`.gn-skip:focus` exist
+  as two rules read separately — hidden by clipping, never `display: none`, which would take it out of the
+  tab order. (`apps/web/test/skip-link.test.tsx`)
+
+**The finding, and the part of it that was WITHDRAWN.** The reviewer's sweep —
+`grep -rniE 'skip[ -]?(to|link)|gn-skip'` over `apps/web/app`, `apps/web/src`, `packages/app-core/src`
+and `packages/ui/src` — returned **zero lines**, while the same sweep with the needle `aria-label`
+returned 166, so the instrument traverses. **The lane withdrew the WCAG 2.4.1 *Bypass Blocks* citation**
+(landmarks satisfy it) and the surviving core is filed MINOR: a keyboard-only user Tabbed the whole nav on
+every navigation. **The fix is argued from the measurement, not from a criterion the product already
+meets.** Re-running the reviewer's own sweep after the change returns 12 lines.
+
+**What was built.** `apps/web/src/skip-link.tsx` (an anchor, no `'use client'` — a directive there would
+push the whole shell tree client-side for one `<a>`), rendered in `layout.tsx` before `<Providers>`, plus
+`id="gn-main"` on each route's rendering `<main>` and the `.gn-skip` rules in `globals.css`.
+
+**MEASURED in the real prerendered output** (`next build` → `.next/server/app/workspaces.html`):
+`<a class="gn-skip" href="#gn-main">Skip to content</a>` at byte **14060**, the first `<nav` at byte
+**14147** — the anchor precedes the chrome in the delivered HTML, which is what makes it the document's
+first focusable element.
+
+⚠ **What is NOT proved:** that the link is **invisible until focused**. jsdom applies no stylesheet and
+neither does this HTML, so a skip link drawn as a permanent banner would pass every assertion in the
+suite. The rules exist and are asserted as two separately-sliced blocks (an earlier cut sliced to EOF, so
+its `display: none` check was asserting a property of the rest of the file); the *visually hidden* half is
+a BROWSER reading and is **owed**, not claimed.
+
+**Two cuts of this test that could not have failed, both caught before commit:** the layout arm read
+`indexOf('<Providers>')` over RAW source and found the one in the docblock that explains the ordering —
+*the prose about the property defeated the check for the property*, `expected 2778 to be less than 2428`;
+and the id-placement pass over the routes was written with an inverted self-closing test, so the id landed
+on the five Suspense FALLBACK shells and on none of the real `<main>`s. Both are recorded because each
+looked green-ish for a moment.
+
+## The project page's loading arms announce themselves (exec2 V6, 2026-09-21) — case `13.1056`
+
+- **13.1056** ✅ Every `Loading…` arm on the project page carries `role="status"`, and there are **exactly
+  five** — the count is PINNED, because exactly one arm renders at a time and no single mount can see them
+  all, so a sweep is the only instrument that can assert them together; a sixth arm added bare reddens and
+  so does a removal. In the same sweep, none of the file's `role="status"` sites spells `aria-live` — the
+  arms MATCH the file's own three create-region waits rather than inventing a second shape for the same
+  job, and the site count is asserted as `arms.length + 3` so it says where it comes from. One runtime arm
+  in `project-calendar-timeline.test.tsx` reads the role off a RENDERED arm, with `getBoard` never
+  settling, scoped to the status whose text IS the loading words — a bare `getByRole('status')` would pass
+  against the create region's own with the arm still bare. (`apps/web/test/loading-status.test.tsx`)
+
+**The finding.** Five arms rendered a bare `<p>Loading…</p>` — calendar, timeline, list, board and backlog
+— **in a file that uses `role="status"` three times already**, in the create region (`:1759`, `:1768`,
+`:1810`). A screen reader got the words with no announcement on every view but the one whose waits the file
+had decided deserve a role. The reviewer's own instrument was a single grep for `Loading…`, which returned
+exactly those five lines with no role on any of them.
+
+**The measured count is five, re-measured rather than inherited:** a grep for `Loading…` over the file
+returns five live arms plus two DOCBLOCK mentions (`:99-100`), which is why the sweep strips comments
+before counting — a raw search would have counted prose as implementation.
+
+⚠ **One number in this case was wrong on the run that proved the fix**, and it is recorded rather than
+quietly corrected: the create-region assertion read `toBe(3)`, written against the PRE-fix file and left
+in place when the five arms joined it, so it failed `expected 8 to be 3`. It is now `arms.length + 3` — a
+count that says where it comes from, because one that has to be re-derived whenever the thing it counts
+grows is a count nobody maintains.
 
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 

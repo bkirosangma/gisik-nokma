@@ -1123,3 +1123,91 @@ describe('13.969 the NAME is the rename’s control', () => {
     );
   });
 });
+
+/**
+ * **13.995 — E4-5 (exec4) — the level-1 heading NAMES THE PAGE.**
+ *
+ * The finding, measured on the painted page: `document.querySelector('h1')
+ * .outerHTML` was `<h1 class="gn-page-title"><button … aria-label="Rename
+ * Convenience Corner">Convenience Corner</button></h1>` — the heading's only
+ * child was the rename control — so the verbose a11y snapshot read
+ * `heading "Rename Convenience Corner" level="1"` on line 40 and `button "Rename
+ * Convenience Corner"` on line 41. Headings are the primary navigation structure
+ * for a screen-reader user, and the level-1 heading is supposed to name the
+ * page; here it named an action, while every other route names its page (`/workspaces`
+ * → `Workspaces — …`, the board → `Shop operations`).
+ *
+ * ## Why this is `aria-labelledby` and NOT the two-element shape the finding's own remedy proposes
+ *
+ * The reviewer's remedy was `<h1>Convenience Corner</h1>` plus an ADJACENT
+ * rename button. **That shape is foreclosed here by a recorded OWNER ruling and
+ * the case that enforces it.** The owner, 2026-09-19: *"have the rename be there
+ * right on the header. THE CLICK TO RENAME."* — and `test-cases/13-neomorphism-and-workspace-screens.md:2125`
+ * records what "deliberately did not" change, including *"The separate `Rename`
+ * button is GONE … there is no longer a second control in this header"*.
+ * `13.969`'s three arms pin exactly that, one of them asserting the control's
+ * VISIBLE TEXT is the name and another that no bare `Rename` control survives.
+ * The reviewer's own objection to the single-element alternative was
+ * `<h1 aria-label="…">` *"hides the button's purpose"* — and that objection does
+ * not reach `aria-labelledby`, which takes the heading's name from the visible
+ * text and leaves the BUTTON's own name untouched.
+ *
+ * So: the defect the finding measured — an inverted heading name — is closed
+ * here, and the owner's shape is not reversed. **The two-element remedy is a
+ * product decision that belongs to the owner, not to this batch**; it is flagged
+ * for the controller rather than taken.
+ */
+describe('13.995 E4-5 the level-1 heading names the page, not the action', () => {
+  it('13.995 the h1 takes its name from the visible workspace name, and the rename control keeps its own', async () => {
+    mount([[workspaceAs('admin')]]);
+
+    // POSITIVE CONTROL FIRST, so a green below cannot be "there was no heading
+    // and no control". The control is present and is still the shape 13.969
+    // rules on.
+    const control = await screen.findByRole('button', { name: 'Rename Convenience Corner' });
+    const h1 = screen.getByRole('heading', { level: 1 });
+
+    // ⚠ WHAT THIS ARM DOES **NOT** WITNESS, stated because its green is
+    // misleading otherwise. `@testing-library`'s accessible-name computation
+    // answers `Convenience Corner` for the DEFECTIVE shape too — measured
+    // against an isolated `<h1><button aria-label="Rename X">X</button></h1>`,
+    // where it reports `Name "Convenience Corner"` for the h1 and
+    // `Name "Rename Convenience Corner"` for the button. jsdom diverges from a
+    // real browser here, so this assertion was GREEN BEFORE the fix ran. It is
+    // kept because it pins the SHAPE the browser measurement depends on, not
+    // because it can redden on the defect.
+    expect(screen.getByRole('heading', { level: 1, name: 'Convenience Corner' })).toBeInTheDocument();
+
+    // THE WITNESS — the only arm here that can redden. In Chrome the heading's
+    // name is inherited from the button's label, and the fix is to give the
+    // `h1` its own source: an `aria-labelledby` that resolves to the element
+    // holding the visible name. Chrome renders this as
+    // `heading "Convenience Corner" level="1"` beside
+    // `button "Rename Convenience Corner"` (the reading is recorded in
+    // `page.tsx`'s `RENAME_NAME_ID` docblock); the browser reading is the
+    // outcome witness, and this is the mechanism it rests on.
+    const ref = h1.getAttribute('aria-labelledby');
+    expect(ref, 'the h1 must name itself from the visible workspace name').not.toBeNull();
+    const named = document.getElementById(ref as string);
+    expect(named, `aria-labelledby points at nothing: ${String(ref)}`).not.toBeNull();
+    // It resolves to the text the reader SEES on the button, so a heading and a
+    // control cannot drift apart about the workspace's name.
+    expect(named).toHaveTextContent('Convenience Corner');
+    expect(control).toHaveTextContent('Convenience Corner');
+
+    // ...and the heading does not OVERRIDE with a label of its own. That
+    // mechanism (`<h1 aria-label="…">`) is the one the finding rejected for
+    // hiding the control's purpose, and it is the one a later change is most
+    // likely to reach for.
+    expect(h1).not.toHaveAttribute('aria-label');
+
+    // THE OWNER'S SHAPE IS INTACT — one control, a real button, still inside the
+    // heading, and its own accessible name unchanged. These three are `13.969`'s
+    // arms restated where an E4-5-shaped change would break them, so a future
+    // move to the two-element remedy is a deliberate act with a red case rather
+    // than a silent one.
+    expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
+    expect(h1).toContainElement(control);
+    expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+  });
+});

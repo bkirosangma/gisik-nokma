@@ -2450,7 +2450,19 @@ export function TicketSheet({
               is drawn once.
             */}
             <div className="gn-ticket-sheet__field" data-testid="field-description">
-              <dt>description</dt>
+              {/* The field id was leaking into the UI: `:2454` renders
+                  `{fieldId}` for custom fields, and this row copied that shape
+                  instead of writing a caption, so the sheet read "description"
+                  beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
+                  Title case, matching those siblings. */}
+              {/* The caption, and the `id` the composer below is NAMED BY
+                  (exec1 P21). The `id` is load-bearing, not decorative: it is
+                  what `EditorSlot`'s `labelledBy` points at, so the words a
+                  sighted reader sees here and the name a screen reader
+                  announces are the SAME NODE and cannot drift. An `id` that
+                  nothing references would be a leftover — if this mount ever
+                  stops passing `labelledBy`, delete it in the same change. */}
+              <dt id="gn-ticket-sheet-description-label">Description</dt>
               <dd>
                 {/*
                   ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
@@ -2470,6 +2482,11 @@ export function TicketSheet({
                 */}
                 <EditorSlot
                   mode="description"
+                  // The composer is NAMED BY the `<dt>` above rather than given
+                  // its own copy of the words (exec1 P21) — the same mechanism
+                  // the ticket sheet's tablist fix used, and the reason this row
+                  // does not also pass a `label` to contradict it.
+                  labelledBy="gn-ticket-sheet-description-label"
                   doc={descriptionClaim?.value}
                   readOnly={!canEditDescription}
                   workspaceId={workspaceId}
