@@ -315,6 +315,47 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
     expect(screen.queryByRole('button', { name: /show|reveal|copy again/i })).toBeNull();
   });
 
+  /**
+   * RULING V2, CRITICAL. Before this ruling, `minted` was `MintForm`'s own
+   * local state, set on a successful mint and then passed to `onMinted` —
+   * `loadPending`, a network re-read. `loadPending`'s FAILURE arm flips
+   * `adminGate` away from `'admin'`, the only state that mounts `MintForm`
+   * at all: the form unmounted and the just-minted, one-time URL — the
+   * thing `COPY_IT_NOW` had just said "cannot be shown again" — died with
+   * it, unrecoverable. `listPending` here answers successfully on the
+   * FIRST call (mount's own read) and rejects on the SECOND (the
+   * post-mint re-read `onMinted` triggers), reproducing exactly that
+   * sequence.
+   */
+  it('E5-V2 a rejected post-mint re-read does not take the just-minted URL with it', async () => {
+    const url = 'http://localhost:3001/invite/tok_raw_secret';
+    let listCalls = 0;
+    mount({
+      listPending: async () => {
+        listCalls += 1;
+        if (listCalls === 1) return [];
+        throw new InviteAdminError(500, null);
+      },
+      mintInvite: async () => ({
+        inviteId: PENDING.inviteId,
+        url,
+        expiresAt: '2026-09-08T10:00:00.000Z',
+      }),
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+
+    expect(await screen.findByText(url)).toBeInTheDocument();
+    // The re-read's own refusal renders too — proving the failure actually
+    // happened, not merely that this case forgot to trigger it — and the
+    // URL survives it standing right beside that refusal.
+    await waitFor(() => expect(listCalls).toBe(2));
+    await waitFor(() => expect(screen.getByText(/cannot be shown yet/)).toBeInTheDocument());
+    expect(screen.getByText(url)).toBeInTheDocument();
+    expect(screen.getByText(COPY_IT_NOW)).toBeInTheDocument();
+  });
+
   it('3.136 names a pending row with no credential behind it as dead, not as never-lapsing', async () => {
     mount({ listPending: async () => [{ ...PENDING, expiresAt: null }] });
     expect(
