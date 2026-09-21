@@ -50,7 +50,7 @@ table**, a closed loop, and passes green beside the gap.
 
 **Eight Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
-command is printed beside it. **§23 and §36 record six attacks on other lanes' findings — all six failed**,
+command is printed beside it. **§23, §36 and §38 record seven attacks on other lanes' findings — all seven failed**, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
 the subject. **Two of this report's own citations were wrong and are
 corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that filed it.
@@ -2773,3 +2773,41 @@ respectively. **This one's raw output was read before anything was believed**, w
 is a finding rather than a seventh instance of the pattern it reports: the counts above were each confirmed
 by opening the section they sit in. **A sweep that reports a stale count is making a claim about the sweep
 until the count is opened.**
+
+---
+
+## 38. A SEVENTH ATTACK ON A COMPETING FINDING — `E6-9`, also unfalsifiable
+
+Attacked because it spans both lanes of my own concern — a UI form and the wire schema that refuses what the
+form offers — so it is the kind of finding most likely to be half-right.
+
+**`E6-9`'s two halves, verified independently:**
+
+```
+packages/domain/src/events/invites.ts:70   export const INVITE_CHANNELS = ['email', 'phone'] as const;
+                                           :73-75  z.enum(INVITE_CHANNELS, { errorMap: () => ({ message:
+                                                   "requires channel 'email' or 'phone'" }) })
+
+apps/web/app/w/[workspaceId]/members/page.tsx:850-855
+        options={[ { value: 'email', label: 'email' },
+                   { value: 'sms',   label: 'sms' },
+                   { value: 'whatsapp', label: 'whatsapp' } ]}
+```
+
+**Both hold.** The door's enum is `email | phone`; the form offers `email | sms | whatsapp`. So `sms` and
+`whatsapp` are offered and refused, and `phone` is accepted and absent from the form — exactly as filed,
+including their measured `422 {"code":"invalid-payload"}` on the two refused channels. **Nothing to refute.**
+
+**TALLY: SEVEN ATTACKS ON COMPETING LANES' FINDINGS, SEVEN FAILURES.** `E6-5`, `E6-1` (twice — on its
+citations and on a provenance escape I thought might exist), `E6-2`, `E6-4`/`E4-1`/`E5-3`, `E6-6`, `E6-8`,
+and now `E6-9`. **The earlier line in this report saying "six attacks, six failures" is superseded by this
+one**, and the count sweep in §37 is what made me notice the sentence needed updating rather than being
+re-derived.
+
+**What seven failures mean, stated so it is not read as flattery.** I went looking for an error in the
+competing reports because a successful refutation is worth more to me than any single finding, and I found
+**none** — every one named a line that said what it claimed, including the two I was most confident about
+(`E6-6`, whose checker guard I was sure I had read, and `E6-8`, whose central claim I tested directly).
+**One of those seven, `E6-6`, showed a claim in MY OWN report to be wrong**, which is the useful half: the
+attacks were not wasted, they just did not pay the way I was hoping. **A report that only ever confirms
+itself is not a review, and the fact that this one is 7-for-7 against its peers is a fact about its peers.**
