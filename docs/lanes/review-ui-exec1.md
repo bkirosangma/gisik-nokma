@@ -653,7 +653,22 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 | `isWorkspaces` | *"the card meta line is the project count alone"* | **HOLDS** — `workspaces/page.tsx:264` is `const meta = projectCountLine(live.length)`. |
 | `isTimelineView` | *"the product renders a custom-claim list the prototype has no arm for"* | **HOLDS** — `timeline-view.tsx:128` is `<ul className="gn-timeline__claims" data-custom-claims="">`. |
 
-**So: two of five stale, one citation drifted, two accurate — and three of the five checks were of claims the document frames as ITS OWN findings about the product.**
+**⚠ THE SAMPLE IS NOW ELEVEN SECTIONS, AND ITS SIZE AND RESULT ARE BOTH STATED — eight accurate, two stale, one citation drifted.** I extended it past the first five because a sample of five is not a rate:
+| section | the document's claim | result |
+|---|---|---|
+| `isSettingsShell` | product *"carries two"* nav entries | **STALE** — three |
+| `isInbox` | product lacks a *"Mark all read"* button | **STALE** — it exists |
+| `isInbox` citation | inbox padding at `ui.css:2375-2387` | **DRIFTED** — now `.icon-picker`/`.fields-editor` rules |
+| `isWorkspaces` | *"the card meta line is the project count alone"* | **HOLDS** — `workspaces/page.tsx:264` |
+| `isTimelineView` | *"a custom-claim list the prototype has no arm for"* | **HOLDS** — `timeline-view.tsx:128` |
+| `isBoardView` | *"`{{ t.chips }}` and `{{ t.meta }}` have **no wire fields** — WIRE GAP"* | **HOLDS** — `BoardCard` (`view-types.ts:204-214`) is `{ticketId, title, typeId, assignee, stateProvenance, cause, rollup, pending}`; no `chips`, no `meta` |
+| `isSignIn` | the new inline SVG is *"byte-identical to the asset the product already ships"* | **HOLDS** — `/sign-in:462` renders `<img src="/google-mark.svg" width={18} height={18} />`, the same file the prototype's old `<img>` pointed at |
+| `isAccount` | card title, order, control shape, labels, footnote: *"matches"* | **HOLDS** |
+| `isHelp` | *"All four structural items already ship"* | **HOLDS** |
+| `isMyWork` | h1 `"My Work"` vs prototype `"My work"`; no summary subtitle | **HOLDS** — verified independently in P17 |
+| `isCalendarView` | header order differs; legend gated; week folding added | **HOLDS** — the fold is `MAX_VISIBLE_PER_WEEK = 4` |
+
+**So the document is MOSTLY ACCURATE and stale in the specific places something changed since it was written** — which is the honest shape, and it is the same shape as its queue, where the two rows that closed within hours were the two that were never revised. **Stating it as "the document is stale" would be wrong; stating it as "a reading that is right about its tree and never revised" is right.**
 
 **THE QUEUE HALF.** 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* **EVERY numbered row is closed** — all nine I checked, eight fully and `isMcpTokens` on its badge — **and so is every one of the three `held` rows I then checked.** Twelve rows, all still presented as outstanding. The sweep reached that total by stages, and each stage is worth naming: I began with the seven rows whose product files I could name; a held row's own citation moved it to eight; checking the rest of the `held` group moved it to eleven; and finishing rows 6 and 9 moved it to twelve — which is every row in the table except `isWorkspaces`, the one `held` row I did not check.
 
