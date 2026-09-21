@@ -16,6 +16,18 @@
 // Deliberately NOT imported from apps/server: apps/server/src/db.ts's
 // createPool sets the zone via a startup option, which is exactly the
 // mechanism this script exists to not rely on.
+//
+// WHO RUNS THIS, AND WHY NO CI JOB DOES. This is the one of the nine
+// `scripts/check-*.mjs` that no workflow invokes, and that is a decision
+// recorded rather than an oversight left to be inferred: it asserts a property
+// of a PROVISIONED database, it needs DATABASE_URL and exits 2 without it, and
+// no CI job carries a database it should point at -- the `server-tests` service
+// only approximates IST through a `TZ` its own comment calls best-effort, so a
+// step there would go red on a CI-only difference. The reasoning sits beside
+// the checkers in `.github/workflows/ci.yml`'s `check-env` job; the occasions
+// this script is FOR are in `docs/runbook.md` under "Time" (after provisioning,
+// after a database restore, after managed-database maintenance). F8,
+// 2026-09-21.
 import pg from 'pg';
 
 const EXPECTED = 'Asia/Kolkata';

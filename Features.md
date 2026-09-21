@@ -2458,8 +2458,14 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   `ALTER`ed to `UTC` before being trusted — the shared dev Postgres's cluster-wide `-c
   timezone=Asia/Kolkata` GUC makes every ordinary database (including the admin `postgres` db) answer
   IST regardless of any per-database `ALTER`, which is exactly the unfalsifiable-demo trap the plan's own
-  suggested proof text would have fallen into. `scripts/check-db-timezone.mjs`, root `package.json`'s
-  `check:db-tz` script
+  suggested proof text would have fallen into. **It is the one of the nine `scripts/check-*.mjs` that no
+  CI job invokes, and that absence is a recorded decision rather than an oversight (F8)**: it asserts a
+  property of a PROVISIONED database, needs `DATABASE_URL` and exits 2 without it, and no job carries a
+  database it should point at — the `server-tests` service only approximates IST through a `TZ` its own
+  comment calls best-effort, so a step there would go red on a CI-only difference. The reasoning sits
+  beside the other checkers in `.github/workflows/ci.yml`'s `check-env` job and in this script's own
+  docblock; the occasions it is *for* (provisioning, a restore, managed-database maintenance) are the
+  runbook's. `scripts/check-db-timezone.mjs`, root `package.json`'s `check:db-tz` script
 - ⚙️ **Backups — a nightly `pg_dump`, a weekly ledger export, and a daemon that phones home when
   either fails (Task 11)** — `exportLedger` writes the whole ledger as gzipped ndjson, one envelope per
   line, in `readLedger`'s canonical replay order, to `ledger/YYYY-MM-DD.ndjson.gz`. **This export, not

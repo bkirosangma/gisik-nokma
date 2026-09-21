@@ -168,6 +168,25 @@ jobs:
       - run: node scripts/check-skipif-coverage.mjs
       - run: node scripts/check-case-ids.mjs
 
+      # NINE `scripts/check-*.mjs` EXIST AND THIS WORKFLOW RUNS EIGHT OF THEM.
+      # The one it does not run is `scripts/check-db-timezone.mjs` (`pnpm
+      # check:db-tz`), and the absence is a DECISION rather than an oversight --
+      # recorded here, beside the checkers, because a reader sweeping this file
+      # finds every sibling check either wired or accounted for and this one
+      # script with no caller anywhere (F8, 2026-09-21). It asserts the PROVISIONED database's OWN default
+      # timezone through a bare client that sets no startup option, so it needs
+      # `DATABASE_URL` and exits 2 without one -- and no job here carries a
+      # database it should point at. This job has none. The `server-tests`
+      # service below does, but only approximates IST through a `TZ` its own
+      # comment calls best-effort, so a step there would assert a property that
+      # job does not guarantee and would go red on a CI-only difference. It runs
+      # where the property exists, and `docs/runbook.md` "Time" names the three
+      # occasions: after provisioning, after a database restore, and after
+      # managed-database maintenance. (`check:ctl` is the one other package
+      # script with no step here; it is not one of the nine, which are the
+      # `scripts/check-*.mjs` files. `check:help` runs `scripts/help-content.mjs`
+      # and is likewise outside that nine.)
+
   # The task-ledger gate (scripts/check-task-ledger.mjs): every task in every
   # plan has one ledger row, and every row claiming `done` names a merge
   # commit reachable from origin/main. Deliberately NOT gated on

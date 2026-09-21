@@ -80,7 +80,14 @@ Case ids are unchanged and are never renumbered by the split.
   the trap the plan's own suggested falsifiability demo (pointing at "the dev compose Postgres has not
   been altered yet") would have fallen into, independently confirmed by a cross-lane review as a real bug
   in the plan text, not this file. The corrected demo (a database explicitly forced to `UTC`, overriding
-  the cluster default) is what actually falsifies the check. `scripts/check-db-timezone.mjs`
+  the cluster default) is what actually falsifies the check. `scripts/check-db-timezone.mjs`. **Its
+  absence from CI is a decision and is recorded as one** (F8, 2026-09-21, same change set): it is the one
+  of the nine `scripts/check-*.mjs` no workflow invokes, because it needs `DATABASE_URL` and asserts a
+  property of a PROVISIONED database — no CI job carries one it should point at, and the `server-tests`
+  service only approximates IST through a `TZ` its own comment calls best-effort, so a step there would
+  go red on a CI-only difference. The record lives beside the other checkers in `.github/workflows/ci.yml`'s
+  `check-env` job and in the script's docblock; the runbook's "Time" section names the occasions it is
+  for. No new case id: this extends 13.8, which already owns this script.
 
 ## Seed plumbing (Task 7)
 - 13.41 ✅ `seedUlid` is a valid, `ULID_REGEX`-matching id — `seed-ulid.test.ts`
