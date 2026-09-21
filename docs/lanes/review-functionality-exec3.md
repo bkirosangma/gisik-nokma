@@ -3207,3 +3207,40 @@ attachments), §11 (calendar/notifications), §12 (offline sync, ~660 lines), §
 ✅ set: I enumerated every ❌ line in my concern's file (§30.1) but have not asked whether the ✅ lines still
 describe the product**, which is `E6-12`'s finding in the other direction and is the largest remaining gap in
 this report.
+
+---
+
+## 47. REACHING §11 AND §14 — six more claims checked, five clean and one already filed
+
+Continuing the controller's instruction. §46 named five unreached `Features.md` sections; **§11 (calendar,
+timeline & notifications) and §14 (MCP server) are now reached**, which leaves §9, §12 and §13.
+
+**§14, MCP server — three checked, all hold:**
+
+| bullet | claim | measured |
+|---|---|---|
+| `:2908` | *"nine tools over stdio: five reads (`list_workspaces`, `list_projects`, `search_tickets`, `list_tickets`, `get_ticket`) and four writes"* | **exact**: `read-tools.ts` declares exactly those 5 and `write-tools.ts` exactly those 4 — count AND names ✓ |
+| `:2912` | the device-authorization flow is *"four routes"* | **holds**: four registrations in `routes/mcp-device.ts` (`code`, `approve`, `deny` at `:82`/`:138`, `token`) ✓ |
+| `:2940` | *"The HTTP-Origin CSRF control covers all four mutating methods, not just POST"* | **holds and is `E3-14`'s neighbourhood**: `MUTATING_METHODS` is `POST/PUT/PATCH/DELETE` (`http-origin.ts:223`) ✓ — **this bullet is the fix widening the method gate; `E3-14` is the route *set* the gate consults, which is a different gap** |
+
+**§11, calendar & notifications — three checked, all hold:**
+
+| bullet | claim | measured |
+|---|---|---|
+| `:2372` | Saved filters are `⚙️` because *"nothing mounts `SavedFiltersMenu` and no `PreferencesGateway` implementation exists"* | **holds, and the code says it in three places**: `preferences-gateway.ts:89` is an interface whose only implementers are `FakePreferencesGateway`/`FailingPreferencesGateway` in a test file; `index.ts:318` records *"named here while nothing implements it"*; and no non-test `.tsx` references `SavedFiltersMenu` outside its own definition ✓ |
+| `:2373` | the reporting scope guard scans *"**seven** client and server source trees"* | **holds**: the bullet lists seven and the list is the count ✓ |
+| `:2367` | IST day boundaries everywhere a day is decided | **already verified independently at §20 row 11-12** — the `istDayBounds` probe under two non-IST process zones ✓ |
+
+**A NOTE ON WHAT THESE SECTIONS LOOK LIKE, because it is the useful generalisation.** Nine claims checked
+across three sections, **one false** (E3-27's, in §6) and **eight true, several of them exactly true down to a
+count and its member names**. **§6, §11 and §14 are maintained in a way §4 was not** — §4 gave me `E3-11` and
+`E3-12` (two counts drifted) inside eighteen lines, while §14's tool list is exact and §11's quietest bullet
+is corroborated by two other files. **The difference is not the author, it is the presence of a pinned list:**
+§14's tools are declared in code that the bullet mirrors, §11's `PreferencesGateway` absence is asserted by the
+interface itself, and §4's "eleven checks" and "84 fixtures" had nothing to be checked against. **That is the
+same conclusion §30.1 and §42 reached from the other end.**
+
+**WHERE MY LIST NOW ENDS, restated so the boundary moves with the work:** `Features.md` §4 (fully), §6, §11
+and §14 audited; **§9 (editor/documents/attachments), §12 (offline sync, ~660 lines) and §13 (deployment,
+~525 lines) are still unreached**, and the `test-cases/` ✅ set remains unasked. **Three sections and the ✅
+set are what a lane with more time should take ahead of re-reading anything I have already covered.**
