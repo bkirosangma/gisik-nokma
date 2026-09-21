@@ -12,7 +12,7 @@
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
 | **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
-| **P16–P24** | — | **9 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important); an undeclared painted pair at 3.84:1 (P24, Important). |
+| **P16–P26** | — | **11 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important); an undeclared painted pair at 3.84:1 (P24, Important); three citations to a deleted component (P25, Minor); **the prototype-delta queue, re-derived row by row — 7 of 11 have shipped** (P26, Important). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
@@ -79,7 +79,7 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 1. **Painted DOM: the SIGNED-OUT half only, and no screenshots at all.** I ran the signed-out suite by hand (§0) and it gives painted measurements for **5 routes × 3 viewports** — `/help`, `/privacy`, `/terms`, `/sign-in`, the 404. **NO signed-in route was measured at paint**, so every finding about the board, the ticket sheet, the settings screens, the members page, the inbox and the desktop/mobile shells rests on *source and stylesheets*, which is weaker than a painted claim and I am not going to dress it up. **The reason is I2's:** taking the signed-in suite needs a stack serving *this* tree, and `:3001` serves a baked image that predates `main` (`981aa92b` measured `docker inspect gisik-nokma-dev-web-1` → zero mounts). So a run would have produced confident numbers about a different product — the same trap, one layer up. **No product file was modified and no screenshot was taken.**
 2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full; `sheet`/`toast`/`info-tip`/`table` grepped; `select/select.tsx` read for its structure, markup and sweep-visibility (it is built on React Aria — `useSelect`/`useComboBox`/`useListBox`/`useOption`/`HiddenSelect` — so its keyboard and role model comes from the library rather than from this repo, which is why P9's hand-rolled tabs stand out beside it). **Remaining largest hole: `apps/web/app/*`'s 25 route bodies.**
 3. Prototype comparison performed for **two** surfaces only (the ticket-sheet breadcrumb, the board empty states). The other ~20 prototype files were not compared.
-4. §16's 97 case ids were **not** each opened. `check:citations` was run (§7) and its limit is stated there.
+4. §16's 97 case ids were **not** each opened. `check:citations` was run (§7) and its limit is stated there; the breadcrumb cases `16.63`–`16.71` and `16.87` **were** read and are correctly updated for the state crumb's removal.
 
 ---
 
@@ -640,6 +640,36 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** Name the *reason* rather than the file — *"these pages are reached from the sign-in card's legal line, and the fallback link points at the same route, so a reader with no history still has a destination"* — which is what all three sentences actually mean and needs no file to resolve. Or keep a one-line tombstone in `legal-nav.tsx`'s own docblock recording that `BackButton` was removed and why, since that file *is* the chrome those pages now use.
 
+### P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta queue reads eleven items outstanding; seven have shipped, including its own row 0
+
+**WHAT.** `docs/design/prototype-delta-2026-09-18.md` is this project's prototype-provenance authority: 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* **Seven of those eleven rows are closed as of this tree — every one still presented as outstanding.**
+
+**MEASUREMENT — each row re-derived, with the source of the answer named.**
+
+| queue row | the doc says | today |
+|---|---|---|
+| **1. TOKENS** — *"not optional … precedes everything else"* | product on the **old** values; names **four** probe pairs at `tokens.ts:95/:151/:281/:282` | **CLOSED — all four moved.** `blue600: '#33629f'` (`:108`) = the refreshed `#33629F`, not `#3a6db0`; `neoPaper: '#f1eae3'` (`:176`) = `#F1EAE3`, not `#ede4db`; `tintWarmWarning: '#f07c341a'` (`:364`) and `tintNavyWarning: '#f7a9611a'` (`:365`) — `0x1a` = **0.102**, the refreshed α 0.10, from 0.20 and 0.141. |
+| **2. isLegal** ("port") | "nav bar + tabs/TOC + title scale" | **CLOSED** — `privacy/page.tsx:27` and `terms/page.tsx:27` import `LegalNav`, both render `LegalToc` and `LegalTabs` (`:26`), and `gn-legal__title` and the family are in use. |
+| **3. isNotFound** ("port") | "icon tile, 3rd link to `/help`" | **CLOSED** — `not-found.tsx` renders `gn-notfound__tile` (`:82`), `gn-notfound__title` (`:98`) and **three** links: `/workspaces` (`:137`), `/help` (`:140`), `/inbox` (`:143`). |
+| **4. isWorkflows** (*"Carries unstyled family #2"*) | the family has no styling | **CLOSED** — `.workflow-list*` → **19 selector blocks** in `ui.css` (`:5248+`); control `.gn-board-card__move` → 4. |
+| **5. isTypeEditor** ("blocked") | *"field `required` toggle is a schema gap **needing a ruling**"* | **CLOSED** — `fields-editor.tsx:53` cites the owner ruling and `:104/:132-133` implement the toggle. |
+| **8. isTypes** | *"no reorder op, no per-type count"* | **CLOSED** — the screen's own docblock: *"the ↑/↓ reorder controls — **BUILT 2026-09-19**"* (`:43`), and `:30` lists *"the reorder and the count"* as built. |
+| **10. isInvite** | *"3 fields on the read"* | **CLOSED** — `InviteSummary` (`online/invites.ts:3-7`) carries exactly `workspaceId`, `workspaceName`, `role`; the page renders the last two. |
+| **7. isMcpTokens** | *"rows need `name`+badge"* | **wire half CLOSED, badge unverified** — `token-store.ts:201` returns `name`; `mcp-tokens-screen.tsx:40` carries `name: string | null`. |
+| **11. isMcpAuth** | *"no deny route"* | **CLOSED by import, not by reading the handler** — `mcp-device.ts:5` imports `denyDeviceCode` and `:33-41` reasons about the denial's CSRF surface. |
+
+**Two of these are corroborated by my own painted run, which is stronger than a grep:** the suite rendered `span.gn-legal__meta` and `a.gn-segmented__item` on both legal pages, three `a.gn-notfound__link` on the 404, and reported **`--gn-surface=#f1eae3`** — the refreshed `neoPaper`, measured live.
+
+**⚠ AND THE DOCUMENT CONTRADICTS ITSELF.** Its header, 27 lines above the queue, tabulates the rows that closed within hours of the reading and names the commits — *"`isTypeEditor` — the field `required` toggle … **`#447 caf1edec`, landed 10:43**"*. **The queue row at `:101` still reads *"blocked"***. `git merge-base --is-ancestor caf1edec origin/main` → **true**. **The correction is in the document and was never applied to the row it corrects.**
+
+**⚠ AND BOTH corroborating citations for the TOKENS row have drifted.** It supports its token claim with *"`responsive.spec.ts:1939` asserts the neo `surfaceSunken` is `#ede4db`"* and *"`ui.css:3440` says the same in prose"*. Today `:1939` is a docblock for case 13.298 about a 401, and `ui.css:3440` is a `.gn-timeline__open:focus-visible` outline rule. **Neither mentions the hex, the token, or the property.** Same family as P25 and I4.
+
+**WHY IT IS WRONG.** Not a product defect — **the artefact that DIRECTS product work**, and its own opening records the price of exactly this staleness: **two dispatches were voided by rows that had already closed, each costing "a whole dispatch".** The header's remedy is *"re-measure a row before you act on it"* — but with all 11 printed as outstanding that is a per-row tax on every future lane, and **the two rows already known-closed in that same commit were not marked.** **The failure is not that the readings expired — the header says they would. It is that the correction went into the header and not into the rows.**
+
+**⚠ STATED AS THE LOWER BOUND IT IS.** **Two of the eleven are untested.** Row 9 (`isWorkspace`) **I could not decide** — the page carries substantial archive logic and I could not separate "chips and description exist" from "they do not" without reading the render. Row 6 (`isInbox`) is **likely closed but unproven**: `inbox-bulk.test.tsx` exists so the bulk client ships, but a grep that returns nothing because I did not know the route's shape is **not evidence of absence**. Row 7's badge and row 11's handler are asserted from an import and a docblock rather than from reading the path. The four `held` rows and the six `none` rows were not touched. **So: 7 closed, 2 partial, 2 untested — and the untested two are not a clean bill.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Mark a closed row in place — `✅ closed by #447` is a two-word edit to a line the closing commit already had open, and it is the "correct the sentence rather than delete it" discipline this document uses everywhere else. And name the string to find rather than a bare `:NNN`: *"asserts `surfaceSunken` is `#ede4db`"* survives a 200-line drift; `:1939` does not.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -697,7 +727,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 14**
+**IMPORTANT — 15**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -712,6 +742,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
+- `P26` ⚠ r2 — the prototype-delta queue reads 11 rows outstanding; 7 have shipped, including its own row 0
 
 **MINOR — 14**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
@@ -729,7 +760,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 - `P25` ⚠ r2 — three live files cite the docblock of a deleted component, one of them an instrument
 
-**Total 29.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 30.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
