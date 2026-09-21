@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:49 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:53 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -174,7 +174,9 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
 every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts`, `workspaces/workspace-name.ts`, `read/{workspace-counts,live-ticket,ticket-numbers,state-provenance,membership-roster}.ts`, `alerts/error-alerter.ts`,
 `workspaces/bootstrap-workspace.ts`, `http/{security-headers,hsts}.ts`, `http/rate-limit.ts:74-135` (+ E6-25's
-calls), `deploy/do/app.yaml:95-106` (whole:
+calls), `auth/select-senders.ts`, `deploy/do/app.yaml:56-66`, `:95-120`, `deploy/do/README.md:40-44`, `:69-72`,
+`:110-117`, `.env.example:5-40`, `:232-240`, `apps/server/src/db.ts:44-50`, `:144-150`, `apps/server/src/index.ts:100-108`,
+`:160-225`, `apps/server/src/app.ts:490-500`, `.github/workflows/ci.yml:454-492`, `docs/runbook.md:214` (whole:
 resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
 the resolver's identity is not checked, which 12.204 records as *"attributed to whoever discarded"* — not filed),
 `read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
@@ -230,9 +232,9 @@ doors and 11 hostile payload shapes; the upload door; impossible due dates; blan
 external person on an explicit list; the replica's five reads after a delete.
 
 **Citations, resolved mechanically at the end (13:50 IST, re-run 14:25 IST after E6-24):** every backticked
-`file:line` or `file:a-b` in this report was extracted (336 distinct at the last re-run, 14:49; 280 at 13:50) and checked
+`file:line` or `file:a-b` in this report was extracted (343 distinct at the last re-run, 14:55; 280 at 13:50) and checked
 against the tree — the file must resolve to exactly one path under `git ls-files` and the line must be within
-`wc -l`. **328 resolve; the 8 that do not are the staged export's
+`wc -l`. **335 resolve; the 8 that do not are the staged export's
 `github.md` / `workspaces-gap.md` (outside the repo, cited by their staged path in prose) and one
 `node_modules` line (better-auth's `routes.mjs`, version stated).** Two ranges had overrun their files by one
 or two lines and 32 basenames were ambiguous across packages; all were corrected in `2afaf4e2` and earlier.
@@ -268,7 +270,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections
   `{rollups,proj-projects,ticket-comments,entity-heads,workspace-settings,rebuild,registry,
   index}.ts` (of the 16 files in `projections/`, five read whole — `contested`, `proj-visibility`, `proj-invites`, `search`, `workflows` —
-  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{workflow-defs,assigned-provenance,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/rate-limit.ts` outside `:74-135`; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{workflow-defs,assigned-provenance,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/rate-limit.ts` outside `:74-135`; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts`, `select-senders.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
   noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
@@ -329,7 +331,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 | E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
 | E6-24 | Important | Phone board / desktop list / phone search keep a soft-deleted ticket; the replica filter sits on the two reads the shells never call | App. AF |
-| E6-25 | Minor | `deploy/do/{app.yaml,README.md}` + `.env.example`: five "until it lands" sentences (forged-XFF bypass "open on main", `DATABASE_CA_CERT` "no effect"/"not in the schema", seeds "once Task 11 lands") — all landed the day they were written | five calls + git in the finding |
+| E6-25 | Minor | `deploy/do/{app.yaml,README.md}` + `.env.example`: six "until it lands" sentences (forged-XFF bypass "open on main", `DATABASE_CA_CERT` "no effect"/"not in the schema", seeds "once Task 11 lands") — all landed the day they were written | five calls + git in the finding |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1625,7 +1627,7 @@ floor; the defect and its one-line fix stand either way.
 
 ---
 
-### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"), that `DATABASE_CA_CERT` "has no effect" and is "not yet in config.ts's zod schema", that the seed scripts are still to land, and (`.env.example`) that `SMTP_URL` does nothing until the SMTP sender lands; all five landed the day the sentences were written — one in the very commit that wrote the sentence — and the files were edited since without the sentences moving
+### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"), that `DATABASE_CA_CERT` "has no effect" and is "not yet in config.ts's zod schema", that the seed scripts are still to land, and (`.env.example`) that `SMTP_URL` does nothing until the SMTP sender lands and that "the other seven" config keys have no reader; all six were satisfied the day the sentences were written — two in the very commit that wrote them — and the files were edited since without the sentences moving
 
 **WHAT.** `deploy/do/app.yaml:95-101`, the comment above `TRUST_PROXY: "true"`, verbatim: *"…lets a caller pick
 its own rate-limit bucket via a forged leftmost X-Forwarded-For entry — Plan 11 T2 (not yet on main) fixes
@@ -1660,10 +1662,11 @@ operator reading the deploy directory today is told that the CA they set does no
 can be forged around — two "until it lands" sentences whose "it" landed within seven hours of their being
 written. **Two more in the same two files, same author-commit `56cd0913`:** `app.yaml:59-62` says `DATABASE_CA_CERT`
 is *"not yet in config.ts's zod schema … inert until [Task 1 lands]"* — it is at `apps/server/src/config.ts:212`,
-added by the same `935f5d66`; and `README.md:71` says to run the seed scripts *"once Task 11 lands them"* — the
-seed CLIs landed at 08:27 that morning (`de882483`, #154, `apps/server/src/seed/cli-seed-convenience-corner.ts`)
-and `docs/runbook.md:214` already gives the command. Four forward-looking sentences in a two-file deploy directory,
-all four resolved by 14:02 on the day they were written, none corrected by the edits that followed (`app.yaml`
+added by the same `935f5d66`; and `README.md:71` says to run the seed scripts *"per the runbook once Task 11 lands them"* — whichever task
+the sentence meant, both things it defers to exist: the seed CLIs (`apps/server/src/seed/cli-seed-convenience-corner.ts`,
+added 08:27 that morning by `de882483`, #154, labelled T9+T10) and the runbook step (`docs/runbook.md:214`,
+`pnpm --filter @gisik-nokma/server run seed:cc …`). Four forward-looking sentences in a two-file deploy directory,
+all four satisfied by 14:02 on the day they were written, none corrected by the edits that followed (`app.yaml`
 at 18:50 and on 2026-09-08; `README.md` at 19:41). (The other
 forward-looking sentence in `app.yaml`, `:112-117` on `OPTIONS` not being mounted on the auth catch-all, is still
 true: `auth/routes.ts` registers `method: ['GET', 'POST']` only.) **And a fifth, in `.env.example:234-238`, was
@@ -1672,7 +1675,15 @@ what sends, whatever is set here"* — `git blame -L 236,236` → `935f5d66`, an
 `apps/server/src/auth/smtp-magic-link-sender.ts` (+99) and `select-senders.ts` (+52) in that same commit;
 `selectMagicLinkSender` (`select-senders.ts:32-38`) returns the SMTP sender whenever `SMTP_URL` is set. The file has been edited three
 times since (`ebb21aab`, `5b4f8fc9` on 2026-09-08; `a6c3d5cc` on 2026-09-18) with the sentence intact. An operator
-reading `.env.example` today is told that setting `SMTP_URL` changes nothing. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
+reading `.env.example` today is told that setting `SMTP_URL` changes nothing. **And a sixth, the same file's header
+(`.env.example:29-35`, also `935f5d66`):** *"Two of them are also CONSUMED today — DATABASE_CA_CERT … DEPLOY_SHA …
+The other seven have no downstream reader yet … setting TRUST_PROXY=true today changes no behaviour"* — the same
+commit wired all seven: `apps/server/src/index.ts:105` (`selectMagicLinkSender(config)` — `SMTP_URL`, `MAGIC_LINK_FROM`), `:164`
+(`alerterFromConfig(config.alertWebhookUrl)`), `:176-216` (the three `RATE_LIMIT_*`), `:224` (`trustProxy:
+config.trustProxy`), and `apps/server/src/app.ts:494-498` keys every limiter bucket on `rateLimitKeyFor(…, options.security?.trustProxy)`
+(`git log -S "rateLimitKeyFor(" -- apps/server/src/app.ts` and `-S alerterFromConfig -- apps/server/src/index.ts` →
+both `935f5d66`). That wiring is also what closes the gap left by the five `rateLimitKeyFor` calls above: the
+function is not merely present, it is the key the assembled server uses. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
 Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
 a roster or a sweep (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`,
 `13-second-wave-roles-and-navigation.md:609`), `scripts/check-skipif-coverage.mjs:14` (verified still TRUE: `.github/workflows/ci.yml:454-492`'s `other-tests`
@@ -1689,8 +1700,10 @@ caught all three.
 **MEASUREMENT.** The five `node -e` calls above against `apps/server/dist/http/rate-limit.js` (dist checked
 with the code-only needle first); `sed -n 95,106p deploy/do/app.yaml`; `git blame -L 95,103 deploy/do/app.yaml`;
 `git log --format='%h %ad %s' -- deploy/do/app.yaml` (four commits, timed with `--date=iso`); `git log -1 935f5d66`; lines opened:
-`rate-limit.ts:74-99`, `:112-123`; `test-cases/13-plan11-seams-and-scheduler.md:72-75` (13.121), `:90` (13.126 ❌,
-the unit-test gap, which is a different sentence and still true). Not previously filed: `grep -c "not yet on main\|forged-header\|TRUST_PROXY"` over the six lanes' review reports
+`rate-limit.ts:74-99`, `:112-123`; `apps/server/src/app.ts:490-500`; `apps/server/src/index.ts:100-108`, `:160-225`; `auth/select-senders.ts:32-38`;
+`apps/server/src/db.ts:44-50`, `:144-150`; `apps/server/src/config.ts:212`; `.env.example:5-40`, `:232-240`;
+`deploy/do/README.md:40-44`, `:69-72`, `:110-117`; `test-cases/13-plan11-seams-and-scheduler.md:72-75` (13.121), `:90`
+(13.126 ❌, the unit-test gap, which is a different sentence and still true). Not previously filed: `grep -c "not yet on main\|forged-header\|TRUST_PROXY"` over the six lanes' review reports
 at their latest pushes (exec 1–5 and the compiled controller review) → 0 each; the same needle over this report → 10 lines,
 as the control that the path can match (measured after this sentence was written).
 
