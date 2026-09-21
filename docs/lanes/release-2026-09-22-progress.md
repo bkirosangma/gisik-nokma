@@ -16,3 +16,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 - ⚠ **This is a coordination defect the controller may want to fix for the remaining batches**, not merely a B09 matter: any two batches minting the same section will collide the same way, and the collision only becomes visible when both PRs merge — `check-case-ids` would then report `union < sum`.
 | T-E4-23 | done | 238e6fde | 13.1112/13.1113 (ticket-sheet.test.tsx) — a server-answered 404 says "not here", not Loading for ever |
 | T-E5-15 | done | fa294812 | 13.1114 (ticket-types.test.tsx) — the OTHER half of each Promise.all tuple; RED observed against the reverted fix |
+| T-E5-40 | done | 7495e6fd | 13.1115 (backlog-tab.test.tsx) — the toggle-hidden backlog says so; scope note + manual name the Backlog |
