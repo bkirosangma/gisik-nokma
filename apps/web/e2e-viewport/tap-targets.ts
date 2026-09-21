@@ -258,26 +258,54 @@ export type TapTargets = {
  * `.gn-attention__title` (`inline-flex`) and `.gn-help__pager-link`
  * (`inline-flex`) are NOT reached by it and had to be classified explicitly.
  */
+/**
+ * THE ARMS OF THE POPULATION — every selector that can make an element a tap
+ * target. Exported since P11 (2026-09-21) so the ARMS THEMSELVES are testable on
+ * the gate: this list is the definition of "what counts", and a browser suite is
+ * the only other thing that could notice an arm going missing.
+ *
+ * THE LISTBOX PATTERN WAS MISSING FOR BOTH ROLES, and that made the `Select`
+ * panel — the product's most-migrated shared control — invisible to every
+ * rendered-property sweep. Its option rows are `<li role="option">` inside a
+ * `<ul role="listbox">`, `Select` portals the panel to `document.body`, and
+ * neither role appeared in any of the four sweep modules. The rows are real
+ * controls: `ui.css` styles `.gn-select__option` and `.gn-select__panel`.
+ *
+ * ⚠ ONE OF THOSE ROWS WAS ALREADY REACHED, and the arm is not what fixed it —
+ * measured by the reviewer, and repeated here because it narrows the claim
+ * rather than widening it. React Aria's `useOption` gives the FOCUSED option a
+ * roving `tabindex="0"`, so the focused row already matched through the
+ * `[tabindex]:not([tabindex="-1"])` arm above, and a sweep that opened a panel
+ * would have judged exactly ONE option per listbox — at 44px, out of context.
+ * The other rows matched no arm. `[role="listbox"]` is added for the panel
+ * itself: it is a container of controls, and it is the thing that is on screen
+ * while the rows are.
+ */
+export const TAP_TARGET_ARMS: readonly string[] = [
+  'a[href]',
+  'button',
+  'input:not([type="hidden"])',
+  'select',
+  'textarea',
+  'summary',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="tab"]',
+  '[role="checkbox"]',
+  '[role="switch"]',
+  '[role="combobox"]',
+  '[role="option"]',
+  '[role="listbox"]',
+  '[tabindex]:not([tabindex="-1"])',
+];
+
 export async function measureTapTargets(
   page: Page,
   dense: readonly DenseInList[] = DENSE_IN_LIST,
 ): Promise<TapTargets> {
   return page.evaluate(
-    ({ table, denseFloor, standaloneFloor }) => {
-      const SELECTOR = [
-        'a[href]',
-        'button',
-        'input:not([type="hidden"])',
-        'select',
-        'textarea',
-        'summary',
-        '[role="button"]',
-        '[role="link"]',
-        '[role="tab"]',
-        '[role="checkbox"]',
-        '[role="switch"]',
-        '[tabindex]:not([tabindex="-1"])',
-      ].join(', ');
+    ({ table, denseFloor, standaloneFloor, selector }) => {
+      const SELECTOR = selector;
 
       const describe = (el: Element): string => {
         const id = el.id !== '' ? `#${el.id}` : '';
@@ -411,7 +439,12 @@ export async function measureTapTargets(
         brokenEntries,
       };
     },
-    { table: dense as DenseInList[], denseFloor: DENSE_FLOOR_PX, standaloneFloor: STANDALONE_FLOOR_PX },
+    {
+      table: dense as DenseInList[],
+      denseFloor: DENSE_FLOOR_PX,
+      standaloneFloor: STANDALONE_FLOOR_PX,
+      selector: TAP_TARGET_ARMS.join(', '),
+    },
   );
 }
 

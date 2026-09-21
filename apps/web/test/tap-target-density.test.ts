@@ -6,6 +6,7 @@ import {
   DENSE_FLOOR_PX,
   DENSE_IN_LIST,
   STANDALONE_FLOOR_PX,
+  TAP_TARGET_ARMS,
 } from '../e2e-viewport/tap-targets.js';
 
 /**
@@ -197,6 +198,60 @@ describe('tap-target density — case 13.991', () => {
         `${name} carries its own floor comparison — the floor must live only in e2e-viewport/tap-targets.ts`,
       ).not.toMatch(/[wh]\s*<\s*(24|44)\b/);
     }
+  });
+
+  it('13.991 — the arms reach the LISTBOX pattern, so a Select panel is in the population', () => {
+    /**
+     * P11 (2026-09-21). `Select` portals its panel to `document.body`, and its
+     * rows are `<li role="option">` inside a `<ul role="listbox">`. Neither role
+     * was an arm of the tap-target selector, so the product's most-migrated
+     * shared control contributed nothing to any sweep's denominator — a control
+     * `ui.css` fully styles (`.gn-select__panel`, `.gn-select__option`).
+     *
+     * THIS IS THE HALF A `vitest` RUN CAN HOLD, and it is a behavioural half
+     * rather than a string check: it builds the elements the component builds
+     * and asks the exported arms whether they match. It does NOT prove the panel
+     * renders while open — that needs a browser, and no spec opened a panel
+     * either, which is the finding's second independent reason.
+     *
+     * ⚠ AND ONE ROW WAS ALREADY REACHED, which narrows the claim rather than
+     * widening it: React Aria's `useOption` gives the FOCUSED option a roving
+     * `tabindex="0"`, so it matched through the `[tabindex]` arm already, and a
+     * panel that opened would have judged exactly one option per listbox at the
+     * standalone 44px floor. Asserted below rather than described, because it is
+     * the reason this arm is not the whole story.
+     */
+    const selector = TAP_TARGET_ARMS.join(', ');
+    const listbox = document.createElement('ul');
+    listbox.setAttribute('role', 'listbox');
+    const option = document.createElement('li');
+    option.setAttribute('role', 'option');
+    listbox.append(option);
+    document.body.append(listbox);
+
+    expect(
+      option.matches(selector),
+      'an option row is not in the tap-target population — the Select panel is invisible to every sweep again.',
+    ).toBe(true);
+    expect(
+      listbox.matches(selector),
+      'the listbox panel itself is not in the population, so the surface the rows live on draws no measurement.',
+    ).toBe(true);
+
+    const focused = document.createElement('li');
+    focused.setAttribute('role', 'option');
+    focused.setAttribute('tabindex', '0');
+    expect(
+      focused.matches(selector),
+      'P11 recorded this row as ALREADY matching through the [tabindex] arm; if it no longer does, that ' +
+        'measurement is stale and the note it supports needs re-taking.',
+    ).toBe(true);
+
+    // The negative control. Without it, "every element matched" would satisfy
+    // both assertions above, which is the shape a population check fails in.
+    const plain = document.createElement('li');
+    expect(plain.matches(selector), 'a plain <li> with no role matched the arms').toBe(false);
+    listbox.remove();
   });
 
   it('13.991 — the signed-in tap-target population is the ROUTE LIST, not one route', () => {
