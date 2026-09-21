@@ -2043,9 +2043,22 @@ button.gn-ticket-sheet__crumb--link {
   cursor: pointer;
 }
 .gn-ticket-sheet__delete:disabled { opacity: 0.4; cursor: not-allowed; }
-.gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
+/* ⚠ `align-self`, `text-align` and `justify-content` are here because this block
+   MOVED into the grid's `field-state` `<dd>` on 2026-09-22 (spec decision 1). That
+   cell is right-aligned — `align-items: flex-end; text-align: right` on
+   `.gn-ticket-sheet__field dd` — which is right for the short values the other
+   rows hold and wrong for this one: the state line is a chip, a provenance
+   sentence and up to three controls, so pinned right it would sit in a
+   shrink-to-fit box against the edge, wrapping from the right. */
+.gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; align-self: stretch; text-align: left; justify-content: flex-start; }
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }
+/* The header's chips line (spec 2026-09-22 decision 2, `desktop.dc.html:1128-1133`)
+   — under the title and ABOVE the tabs, so it renders outside every tab panel.
+   Flex and wrap for the reason every other chip row in this file is: the three
+   chips (state · Restricted · Closed) are drawn independently and any subset can
+   be present, so the row must not be arranged for one of them. */
+.gn-ticket-sheet__chips { display: flex; gap: 0.625rem; align-items: center; flex-wrap: wrap; margin: 0 0 1rem; }
 .gn-ticket-sheet__restricted { color: var(--gn-restricted); }
 /* The subtasks section's header row — the prototype's own row, not an invention
    (`desktop.dc.html:1237`, `align-items:baseline;gap:10px;flex-wrap:wrap`) — the
@@ -2092,6 +2105,37 @@ button.gn-ticket-sheet__crumb--link {
    engine); the shape it actually shipped is unstyled markup. Named here, not
    widened — this change is the chip. */
 .gn-ticket-sheet__subtasks-head { display: flex; align-items: baseline; gap: 0.625rem; flex-wrap: wrap; }
+/* THE SUBTASK ROWS ARE CARDS (spec 2026-09-22 decision 10, `desktop.dc.html:3629`):
+   a tinted block, the child's title, then a meta row carrying its state chip and
+   its `type · Due day` detail. **No tick box** — the prototype's box advances the
+   child's state on click, and drawing one that does nothing would be a control
+   that lies, while wiring it would be functionality this plan does not add.
+
+   ⚠ THE CARD IS A COLUMN, AND THAT IS WHAT REPLACES THE 2026-09-20 SEPARATOR
+   between the title and the state: two adjacent INLINE spans are one run of
+   glyphs, but a block boundary is not, so the title needs no ` · ` after it. The
+   separator is still required INSIDE `.gn-ticket-sheet__subtask-meta`, where the
+   chip and the detail ARE on one line with only a `gap` between them — and a gap
+   is not text, so the markup carries the glyph (see the render site). */
+.gn-ticket-sheet__subtasks-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-ticket-sheet__subtask-card { display: flex; flex-direction: column; gap: 0.1875rem; background: var(--gn-fill-quaternary); border-radius: 0.75rem; padding: 0.75rem; }
+.gn-ticket-sheet__subtask-meta { display: flex; gap: 0.4375rem; align-items: center; flex-wrap: wrap; }
+.gn-ticket-sheet__subtask-detail { font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); }
+/* The inline add row (`:1258-1261`) — input and button on one line, the row's own
+   `Adds a <type>.` note sharing it when there is room and wrapping above it when
+   there is not. `flex-wrap` is the whole responsive story here; there is no second
+   rule for the phone. */
+.gn-ticket-sheet__subtask-add { display: flex; gap: 0.625rem; align-items: flex-end; flex-wrap: wrap; margin-top: 0.75rem; }
+/* ⚠ THE INPUT CARRIES ITS OWN CLASS RATHER THAN BEING REACHED THROUGH
+   `.gn-ticket-sheet__subtask-add .gn-field__input`, and the reason is a PINNED
+   TEST rather than taste. `packages/ui/test/components.test.tsx` reads
+   `.gn-field__input`'s own rule with a FIRST-MATCH regex over this file
+   (`rule()`, `:548`), so a DESCENDANT selector ending in that literal becomes the
+   rule it returns — the mutation `13.291`/`13.339` then assert against these two
+   declarations and redden. Measured: it did exactly that on the first run of this
+   change. A distinct class keeps both rules addressable, and `.gn-field__input`
+   still supplies the box itself. */
+.gn-ticket-sheet__subtask-add .gn-ticket-sheet__subtask-input { flex: 1; min-width: 12.5rem; }
 button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }
@@ -2103,9 +2147,43 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    Body text, with the family's paragraph reset. */
 .gn-ticket-sheet__absent { margin: 0; }
 .gn-ticket-sheet__fields { margin: 0.8rem 0 0; }
-.gn-ticket-sheet__field { display: grid; grid-template-columns: 8rem 1fr; gap: 0.6rem; padding: 0.35rem 0; }
-.gn-ticket-sheet__field dt { color: var(--gn-text-muted); }
-.gn-ticket-sheet__field dd { margin: 0; display: flex; flex-direction: column; gap: 0.15rem; }
+/* THE FIELD GRID, at the prototype's metrics (spec 2026-09-22 decision 12,
+   `desktop.dc.html:3755-3756`): a label column that may grow to 9.375rem, a value
+   column allowed to SHRINK (`minmax(0, 1fr)` — `0` rather than `auto`, for the
+   reason the phone block below records at length: an `auto` floor IS the content's
+   min-content width, which is how the description editor pushed its column back
+   out), the value right-aligned, and every SECOND row on `--gn-fill-quaternary`.
+
+   ⚠ THE TINT IS APPLIED BY CLASS, NOT BY `:nth-child`, and the class is computed in
+   `ticket-sheet.tsx` (`fieldRowClass`). A `:nth-child` rule would count the WRAPPER
+   `<div>`s rather than the rows; that happens to agree today and would stop
+   agreeing the moment a row rendered a conditional sibling, and the case that
+   witnesses the alternation (`16.116`) reads the DOM in order — so the two would
+   disagree silently, which is the shape this file's comments exist to prevent.
+
+   ⚠ AND THE PLAN'S `dt` BLOCK WAS NOT TRANSCRIBED VERBATIM. Its draft carried
+   `min-height: 2.5rem; line-height: 2.5rem` BESIDE `padding: 0.75rem 0 0.75rem
+   0.75rem`, which double-counts the row height (2.5rem of line box PLUS 1.5rem of
+   padding is ~64px against the prototype's ~48px row) and would centre a two-line
+   label oddly inside a `flex-start` box. The padding alone gives the row its
+   height, so those two declarations are the one part of the plan's CSS this change
+   does not carry. */
+.gn-ticket-sheet__field { display: grid; grid-template-columns: minmax(6rem, 9.375rem) minmax(0, 1fr); gap: 0; padding: 0; }
+.gn-ticket-sheet__field dt { color: var(--gn-text-muted); font-size: 0.9375rem; padding: 0.75rem 0 0.75rem 0.75rem; display: flex; align-items: flex-start; }
+.gn-ticket-sheet__field dd { margin: 0; padding: 0.75rem 0.75rem 0.75rem 0; display: flex; flex-direction: column; gap: 0.25rem; align-items: flex-end; text-align: right; min-width: 0; }
+.gn-ticket-sheet__field--tinted dt { background: var(--gn-fill-quaternary); border-radius: 0.5rem 0 0 0.5rem; }
+.gn-ticket-sheet__field--tinted dd { background: var(--gn-fill-quaternary); border-radius: 0 0.5rem 0.5rem 0; }
+/* The shared eyebrow the sheet's section headings wear (spec 2026-09-22 decision
+   11; the prototype's `SUBTASKS` / `COMMENTS` captions). `text-transform` is PAINT
+   and not content — the words are unchanged, so every `getByText` on them still
+   matches. `.gn-comments__heading` already declared exactly these five
+   declarations; this rule is the NAME being made shared, not a look being
+   changed. */
+.gn-ticket-sheet__caption { margin: 0; font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); text-transform: uppercase; letter-spacing: 0.6px; }
+/* The description block — FULL WIDTH and ABOVE the grid, not a row inside it
+   (spec 2026-09-22 decision 1): the prototype draws the editor across the whole
+   panel, and its own label is the caption the composer is NAMED BY. */
+.gn-ticket-sheet__description { display: flex; flex-direction: column; gap: 0.5rem; margin: 0 0 0.75rem; }
 
 /* PHONE: THE LABEL COLUMN COLLAPSES, OR THE DESCRIPTION RUNS OFF THE SHEET
    (E4-7).
@@ -2130,7 +2208,8 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    numbers above are the finding's, taken from its own report. */
 @media (max-width: 40rem) {
   .gn-ticket-sheet__field { grid-template-columns: 1fr; }
-  .gn-ticket-sheet__field dd { min-width: 0; }
+  .gn-ticket-sheet__field dd { min-width: 0; align-items: flex-start; text-align: left; }
+  .gn-ticket-sheet__field dt { padding: 0.5rem 0.75rem 0 0.75rem; }
   .gn-sheet__full { display: none; }
 }
 .gn-ticket-sheet__claim { color: var(--gn-text-muted); font-size: 0.8rem; }
@@ -2253,6 +2332,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
+/*
+ * ⚠ UNUSED BY THE COMPONENT AS OF SHEET PROTOTYPE PARITY TASK 5 (2026-09-22).
+ * The `<h3>Who can see this</h3>` this rule painted is dropped per spec
+ * decision — the row label `Visibility` (Task 4's `<dt>`, landing on a later
+ * rebase) names the section now. The rule itself is kept, not deleted: it is
+ * still pinned by `packages/ui/test/components.test.tsx`'s 17.002 (the 12px
+ * scale) and 17.005 (the "declared exactly once" family sweep), both outside
+ * this task's file scope, and neither is Task 5's to edit. Whoever next
+ * revisits those cases can retire this rule in the same change.
+ */
 /* The standing audience, and it is the product's counterpart of the prototype's
    control (`visBtnStyle`, `:3786`): a pill carrying a dot and a label. It is
    styled as ONE and is deliberately NOT a `<button>` — in this product it is a
@@ -2323,6 +2412,65 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-success);
 }
 .gn-visibility__standing-mode--restricted .gn-visibility__dot { background: var(--gn-restricted); }
+
+/* The trigger (sheet prototype parity, Task 5, 2026-09-22): a plain button
+   reset, because the pill's own look is entirely `.gn-visibility__standing-mode`
+   above, unchanged — this wraps it rather than repainting it. The 44px floor
+   is the button's, not the pill's: the prototype's `visBtnStyle` draws 36px
+   (`.gn-visibility__standing-mode`'s own `min-height`), and the extra tap area
+   comes from this rule's padding rather than growing the pill past its own
+   measured height. `[disabled]`, for the unserved-and-no-edit corner: the
+   trigger stays reachable in the null-audience case (case 16.121) but must
+   not invite a click nobody can act on. */
+.gn-visibility__trigger {
+  min-height: 2.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: right;
+}
+.gn-visibility__trigger:disabled { cursor: not-allowed; opacity: 0.7; }
+.gn-visibility__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+
+/* Read-only viewer chips (spec decision 7, `desktop.dc.html:1214-1222`): no ×
+   and no `Add someone…` select — both are per-person writes this build does
+   not have. `--gn-fill-tertiary`/`--gn-shadow-raised` is the file's own
+   established chip recipe (`.gn-select__chip` uses the same pair). */
+.gn-visibility__viewers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-top: 0.25rem;
+}
+.gn-visibility__viewers-caption {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.gn-visibility__viewer-chips {
+  display: flex;
+  gap: 0.4375rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.gn-visibility__viewer {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
+  box-shadow: var(--gn-shadow-raised);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
 /* The notes. `visNote` (`:3782`) is the prototype's, and `text-wrap:pretty` is
    the prototype's own declaration on the same line. */
 .gn-visibility__owner-note,
@@ -2922,6 +3070,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      changed it would need this line to still say so, and the test above
      pins this selector existing for that reason. */
   box-shadow: var(--gn-shadow-raised);
+}
+
+/* Popover (spec 2026-09-22) — the visibility menu's container. The same
+   raised surface and shadow `.gn-select__panel` above uses (`--gn-surface-
+   raised`/`--gn-shadow-raised`, measured from that rule, not the plan
+   draft's `--overlay` guess: `--gn-surface-overlay`/`--gn-shadow-overlay`
+   are the full-screen scrim/dialog pair, a different role), because both
+   are anchored surfaces over the sheet and two treatments for one role is
+   the drift this file's comments exist to prevent. */
+.gn-popover {
+  position: absolute;
+  z-index: 30;
+  padding: 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  max-width: min(22rem, calc(100vw - 2rem));
 }
 
 .gn-select__list { list-style: none; margin: 0; padding: 0; }
@@ -6462,24 +6627,42 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--fieldBg` and `--ctlR` do not exist here — `tokens.ts` is the origin):
    `fillPrimary`, `fillQuaternary`, `textMuted`, `surface`, `radiusControl`.
 
-   ⚠ WHAT THIS BLOCK DELIBERATELY DOES NOT STYLE: the composer's own chrome. The
-   editor is `packages/editor`'s `.ticket-editor*` and it is styled by that
-   package's `styles/editor.css`, imported once in `apps/web/app/layout.tsx` —
-   `packages/ui` styling another package's internals is the duplication this
-   repo refuses. `.editor-slot` and `.editor-slot__submit` (the wrapper and the
-   Save/Post control) are UNSTYLED, and that is PRE-EXISTING and already
+   ⚠ WHAT THIS BLOCK DELIBERATELY DOES NOT STYLE: the composer's own chrome —
+   and the word to hold onto is BY THIS FILE. The editor is `packages/editor`'s
+   `.ticket-editor*` and it is styled by that package's `styles/editor.css`,
+   imported once in `apps/web/app/layout.tsx`; `packages/ui` styling another
+   package's internals is the duplication this repo refuses.
+
+   **⚠ CORRECTED 2026-09-22 — THIS PARAGRAPH USED TO REPORT A GAP THAT IS NOW
+   CLOSED.** It read: *"`.editor-slot` and `.editor-slot__submit` (the wrapper
+   and the Save/Post control) are UNSTYLED, and that is PRE-EXISTING and already
    recorded at `apps/web/e2e-viewport/type-scale.ts:355-357`, which names the
    same grep. The comment box inherits that gap exactly as the description row
-   already does; it is not introduced here and is not fixed here. */
+   already does; it is not introduced here and is not fixed here."*
+   **That grep no longer returns nothing.** Task 2 of the sheet-prototype-parity
+   plan gave both classes their rules in `packages/editor/src/styles/editor.css`:
+   `.editor-slot` is the composer's sunken chrome (radius, `--gn-surface-sunken`,
+   `--gn-shadow-sunken`, `overflow: hidden`) and `.editor-slot__submit` is the
+   accent-filled `Save description` / `Post` control at the 44-px floor. The gap
+   is closed — and closed in the RIGHT file, by the package that owns the markup,
+   which is the arrangement this paragraph exists to defend. The same correction
+   is made at `apps/web/e2e-viewport/type-scale.ts`, which carried the identical
+   measurement.
+
+   What remains true, and is why this paragraph stays: `ui.css` styles NEITHER
+   class. This block names the comment box's own parts — the heading, the list,
+   the rows, the empty/wait/error sentences — and stops at the slot's edge. */
 .gn-comments { margin-top: 1.4rem; padding-bottom: 0.5rem; }
-.gn-comments__heading {
-  font-size: 0.8125rem; /* 13px */
-  line-height: 1.125rem;
-  margin: 0;
-  color: var(--gn-text-muted);
-  text-transform: uppercase;
-  letter-spacing: 0.6px;
-}
+/* ⚠ THE SIX DECLARATIONS THAT STOOD HERE ARE GONE, NOT MOVED. They were the
+   eyebrow transcription — `0.8125rem`, `1.125rem`, `margin: 0`,
+   `var(--gn-text-muted)`, `uppercase`, `letter-spacing: 0.6px` — and
+   `.gn-ticket-sheet__caption` above now declares the same six for the sheet's
+   shared section headings, which this heading wears BESIDE this class
+   (`comments-thread.tsx`). Two identical rules for one element is the drift this
+   file's comments exist to prevent, and the element keeps this class as its own
+   hook. The removal was handed to the tail lane by the lane that added the shared
+   NAME, on the condition that it happen only AFTER the shared RULE existed —
+   which it does, as of Task 4, in this same change set. */
 .gn-comments__list {
   list-style: none;
   margin: 0.6rem 0 0;
@@ -6563,11 +6746,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    not the danger tone of `__error`: a read in flight is a state, not a fault,
    and painting it red would be the same misreading in the other direction. */
 .gn-comments__loading { color: var(--gn-text-muted); font-size: 0.9375rem; line-height: 1.25rem; margin: 0; }
-.gn-comments__composer {
-  margin-top: 0.9rem;
-  border-radius: var(--gn-radius-control);
-  background: var(--gn-surface);
-  box-shadow: var(--gn-shadow-raised);
-  overflow: hidden;
-}
-.gn-comments__hint { font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); margin: 0; padding: 0.5rem 0.6rem; }
+/* ⚠ MARGIN ONLY, and the four declarations that used to sit here were the
+   composer's CHROME — radius, `--gn-surface` ground, `--gn-shadow-raised` and
+   `overflow: hidden`. The chrome moved to `.editor-slot` in `packages/editor`'s
+   own stylesheet (plan Task 2: sunken body, toolbar tray, footer row), so leaving
+   a second raised surface under the slot would draw a box inside a box. What is
+   left is the spacing this block owns. `.gn-comments__hint` was here too and is
+   DELETED rather than emptied: the sentence it painted is the composer's footer
+   note now, drawn inside the slot (plan Task 7). */
+.gn-comments__composer { margin-top: 0.9rem; }

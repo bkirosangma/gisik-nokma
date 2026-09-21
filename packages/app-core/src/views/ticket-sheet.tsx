@@ -436,6 +436,68 @@ export type TicketSheetProps = {
  *
  * `HistoryTab` (below) applies the SAME three-way distinction to the ledger tab.
  */
+
+/**
+ * How many field rows the sheet draws BEFORE the generic custom-field loop — the
+ * fixed rows `State · Assignee · Priority · Due · Start · Type · Visibility`, in
+ * that order (spec 2026-09-22, decision 12). It exists so the loop's tint index
+ * continues the fixed rows' alternation instead of restarting at zero, which
+ * would put two tinted rows side by side at the seam.
+ *
+ * ⚠ **THIS DOCBLOCK CLAIMED `16.116` WAS THE WITNESS, AND IT IS NOT — the claim
+ * was measured false and is corrected rather than deleted.** `16.116` renders the
+ * DEFAULT fixture, whose `state.fields` is `{title, dueDate}` and whose two
+ * entries are BOTH in `OWN_ROW_FIELD_IDS` below — so the loop draws nothing and
+ * this constant is never read. Mutating it to `6`, which ships a doubled band on
+ * any ticket with a custom field, left **160 of 160 cases passing**.
+ *
+ * **The witness is `16.129`**, which carries a custom field so the loop really
+ * runs, and it pins the seam from both sides. It earned that role on its first
+ * run by failing: the loop's index was counting EXCLUDED entries, so the seam was
+ * misaligned for every real ticket — see the filter's own comment at the loop.
+ * The lesson is in the constant's history: a count with no fixture that exercises
+ * it is a number, not a guarantee.
+ */
+const FIXED_FIELD_ROWS = 7;
+
+/**
+ * The field ids that have their OWN row on this sheet, so the generic loop must
+ * skip them — `title`, `description`, `dueDate`, `startDate` and `priority`.
+ *
+ * A `Set` rather than the chain of `||` comparisons it replaces, and the reason is
+ * the tint index rather than taste: the loop now FILTERS on these ids before
+ * mapping, so the index it passes to `fieldRowClass` counts RENDERED rows only.
+ * As an early `return null` the same list consumed a position for every skipped
+ * field, and since `title` is on every ticket the shift was the normal case, not
+ * an edge one. Keeping the ids in one declared place is also what makes the list
+ * checkable against the rows drawn above it.
+ */
+const OWN_ROW_FIELD_IDS: ReadonlySet<string> = new Set([
+  'title',
+  'description',
+  'dueDate',
+  'startDate',
+  'priority',
+]);
+
+/**
+ * The class the alternating field grid puts on row `index` — tinted on every
+ * SECOND row, from the prototype's `rowLabelB`/`rowValueB` pair
+ * (`desktop.dc.html:3755-3756`).
+ *
+ * A function over an index rather than a `:nth-child` rule, and the reason is
+ * measured rather than stylistic: the grid is a `<dl>` of `<div>` wrappers, so
+ * `:nth-child` would count the WRAPPERS — which happens to agree today and would
+ * silently stop agreeing the moment a row renders a conditional sibling. The
+ * index is passed in by the site that knows the order, and `16.116` reads the
+ * result rather than the rule.
+ */
+function fieldRowClass(index: number): string {
+  return index % 2 === 1
+    ? 'gn-ticket-sheet__field gn-ticket-sheet__field--tinted'
+    : 'gn-ticket-sheet__field';
+}
+
 export function TicketSheet({
   dataSource,
   cache,
@@ -456,7 +518,7 @@ export function TicketSheet({
   projectName,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
-  const [tab, setTab] = useState<'details' | 'history'>('details');
+  const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
   /**
    * Full screen (sheet prototype parity, 2026-09-20). Local state, like `tab`:
    * it is a way of LOOKING at this sheet rather than anything the server holds,
@@ -2615,6 +2677,140 @@ export function TicketSheet({
         </button>
       }
     >
+      {/*
+        THE CHIPS LINE (`desktop.dc.html:1128-1133`), under the title and above
+        the tabs: the state chip, then the `Restricted` chip when the standing
+        audience is explicit, then the `Closed by … on …` chip when the ticket is
+        closed.
+
+        ⚠ THE PROTOTYPE'S *Recorded in this browser · 12:04:18* IS NOT DRAWN, and
+        its absence is a decision rather than an omission: nothing in our data is
+        that clock, and a fabricated timestamp on a sheet whose whole subject is
+        per-field attribution is the one lie this file exists to refuse.
+
+        ⚠ AND THE CLOSED CHIP MOVED UP HERE, from the state line below. The badge
+        span in the row was removed in the same change rather than left beside
+        it — two copies of `Closed by … on …` on one screen leaves a reader no
+        way to tell which is the record. It is NOT a new claim: it is the same
+        sentence the badge carried, drawn where the prototype draws it. */}
+      <div className="gn-ticket-sheet__chips" data-testid="sheet-chips">
+        <Chip tone={state.stateCategory}>{currentStateName}</Chip>
+        {standingVisibility?.resolvedMode === 'explicit' ? (
+          <Chip tone="restricted">Restricted</Chip>
+        ) : null}
+        {closed !== null ? (
+          <Chip tone="terminal">{`Closed by ${nameOf(closed.actorId)} on ${formatDate(closed.at)}`}</Chip>
+        ) : null}
+      </div>
+
+      {/*
+        ONE ELEMENT, THREE FACTS — and it used to be TWO elements.
+
+        ## The duplication the owner ruled away (2026-09-20)
+
+        Until this change the same question was answered twice on one
+        screen: this line drew the parent's TITLE as plain text, and the
+        subtasks head drew a `Subtask of {title}` chip for the same parent —
+        with the restricted case worded differently in each place
+        (`Restricted parent — exists, but you can't see it` here,
+        `Subtask of a restricted parent` there), and "At project root"
+        appearing here and NOTHING appearing there. Two elements, one
+        question, two sets of words, in two places *"and only one of them is
+        where a person looks for the hierarchy"*.
+
+        The owner ruled the merge, verbatim: *"you can keep the badge. but
+        the placement is confusing. there is already a
+        `gn-ticket-sheet__parent` section above. put the badge in that
+        position instead. you can remove that `gn-ticket-sheet__parent`."*
+        So the chip came UP into this position and the subtasks head lost
+        its copy. The wrapper keeps the old class so the rule at
+        `ui.css`'s `.gn-ticket-sheet__parent` is still the thing that draws
+        this line — the alternative was renaming it and leaving an orphaned
+        rule behind, which the same ruling forbids.
+
+        ## The three arms, and WHY the root arm is not the badge
+
+        A RESTRICTED parent is existence-without-title — the ticket has a
+        parent and this viewer may not see which; rendering it as "At
+        project root" would turn a restriction into a vanish (invariant 5).
+        A NULL parent really is at the root, and **a root is not a subtask**,
+        so it does not get a "Subtask of" badge: the sentence stays, because
+        a crumb chain that ends at the project is a different reading of the
+        same silence. A visible parent shows the badge, as a control that
+        opens it when a caller passed `onOpenTicket` and as the pill
+        otherwise — `onOpenTicket`'s own recorded rule.
+
+        ⚠ **READING TAKEN, AND IT IS ONE ARM TO CHANGE:** the badge is the
+        VISIBLE arm's; the root and restricted arms keep their sentences. If
+        the owner meant the chip's own behaviour — nothing at root — that is
+        this one arm.
+
+        ## And the PROTOTYPE'S row is not what this is
+
+        The chip's CSS comment cites `desktop.dc.html:1237`, the authority's
+        subtasks header row, as its origin. **The owner is ruling the
+        placement AWAY from the authority deliberately**, so that citation
+        is not an argument against this and must not be quoted back as one.
+        The divergence is recorded here the way the ticket-key spec recorded
+        its own. What the authority DOES still own is the chip's CONTENT and
+        its one-hop behaviour, both unchanged.
+
+        ## The chip's own reasoning, carried up with it
+
+        - **One hop, never a chain.** The chip names the IMMEDIATE parent, as
+          the prototype's `openParent` does (`:3611`); the parent's own sheet
+          draws its own indicator in turn, so a nesting or a cycle is walked
+          sheet by sheet and no traversal lives here to loop.
+        - **With no `onOpenTicket` it is a PILL and not a control** — that
+          prop's own docblock: *"a control that cannot be honoured"* is not
+          drawn.
+        - **The restricted arm is a PILL, never a control, and it names the
+          restriction rather than the ticket.** The controller ruled it on
+          2026-09-20 after the alternative was priced: the read is a
+          discriminated union whose restricted arm *structurally cannot*
+          carry a title (`routes/tickets.ts:144-168`), the parent's title is
+          read INSIDE the `canSee` branch the restricted arm never reaches
+          (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
+          and cases `7.212` and `6.14` pin the existence-versus-title
+          contrast in both directions.
+          ⚠ **THE REASON FIRST RECORDED WAS WRONG, and it is corrected rather
+          than deleted:** it cited 6.66's *"no table stores a ticket
+          title"*, which was true when 6.66 was written and is stale now —
+          `proj_tickets` exists
+          (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
+          serves `title: titleOf(parentState)` out of it. **The conclusion
+          never rested on it.**
+          And the prototype's own label fallback — `p ? p.title :
+          sheet.parentId` (`:3609`) — would have put an ID where a name
+          belongs and made the chip a control pointing at a ticket this
+          viewer's own read 404s (case 6.14). The pill re-words a disclosure
+          the sheet already makes; it does not widen one.
+        - **It must not read as "no parent"** — a root is a different fact —
+          which is why the restricted arm exists rather than being omitted.
+      */}
+      <div className="gn-ticket-sheet__parent" data-testid="sheet-parent-indicator">
+        {parent === null ? (
+          <span>At project root</span>
+        ) : parent.kind === 'restricted' ? (
+          <span className="gn-ticket-sheet__restricted" data-testid="sheet-parent-restricted">
+            Restricted parent — exists, but you can&apos;t see it
+          </span>
+        ) : openParentSheet === undefined ? (
+          <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
+            {`Subtask of ${parent.title}`}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="gn-chip gn-ticket-sheet__parent-chip"
+            data-testid="sheet-parent-chip"
+            onClick={() => openParentSheet(parent.id)}
+          >
+            {`Subtask of ${parent.title}`}
+          </button>
+        )}
+      </div>
+
       {/* ONE SEGMENTED CONTROL, the way the authority draws them
           (`desktop.dc.html@6d7b67c0a52c:1134-1140`): a `var(--segBg)` track at
           `border-radius:9px`, 2px padding and 2px gap, the selected tab on
@@ -2632,14 +2828,17 @@ export function TicketSheet({
           Measured by an independent reviewer: NO suite renders the sheet — the accessible-name sweeps navigate `/p/:projectId` WITHOUT `?ticket=`, and the sheet mounts only when that parameter is present — so the number cannot move in EITHER direction today.
           The witness is the unit assertion (`toHaveAccessibleName('Ticket sections')`), and the rise would be exactly one `ariaLabel` the day something renders it.
 
-          ⚠ The authority's THIRD tab is not drawn. `Attachments` (`:3589`) is a
-          READ behind that tab, not a surface, and the dispatch's rule for this
-          task is to say which and not to assume it — the question is with the
-          controller. Two tabs, one control, no invented tab. */}
+          ⚠ The authority's THIRD tab WAS not drawn, and it is now. `Attachments`
+          (`:3589`) is a READ behind that tab; it was left out while the question
+          of drawing a third surface was open, and **the owner ruled it IN on
+          2026-09-22** (spec decision 5 — *"add the Attachments tab"*). So the
+          tab is BUILT rather than assumed, and `16.81`'s count moved 2 → 3 in
+          the same change. */}
       <SegmentedControl
         options={[
           { value: 'details', label: 'Details' },
           { value: 'history', label: 'History' },
+          { value: 'attachments', label: 'Attachments' },
         ]}
         value={tab}
         onChange={setTab}
@@ -2717,347 +2916,129 @@ export function TicketSheet({
 
       {tab === 'details' ? (
         <div className="gn-ticket-sheet__details">
-          <div className="gn-ticket-sheet__state">
-            <Chip tone={state.stateCategory}>{currentStateName}</Chip>
-            <span className="gn-ticket-sheet__provenance">
-              {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
-            </span>
-            {closed !== null ? (
-              <span className="gn-sheet__closed-badge">
-                <Chip tone="terminal">{`Closed by ${nameOf(closed.actorId)} on ${formatDate(closed.at)}`}</Chip>
-              </span>
-            ) : null}
-            {/*
-              Spec §5.3: Close only from a terminal, not-yet-closed state;
-              Reopen only once closed. The two buttons never both show, but
-              NOT because "closed implies terminal forever" — that claim is
-              false (final whole-branch review Finding 5, 2026-09-17: a
-              rebind or a republish fold can move a closed ticket's `stateId`
-              into a non-terminal state while `closed` rides along, since
-              `foldTicketToWorkflowVersion` spreads `...state` and neither
-              event touches `stateId`). What actually holds is smaller and
-              true today: Close's own condition
-              (`stateCategory === 'terminal' && closed === null`) and
-              Reopen's (`closed !== null`) are mutually exclusive on `closed`
-              alone, so exactly one — or neither, on a still-open,
-              non-terminal ticket — can ever be true at once. The closed ⇒
-              terminal invariant this comment used to (wrongly) lean on is
-              the RULE ENGINE's to hold, not this component's: fix wave B,
-              Ruling 53, adds it at the rebind check and the republish
-              validator.
-            */}
-            {state.stateCategory === 'terminal' && closed === null ? (
-              <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
-                Close
-              </Button>
-            ) : null}
-            {closed !== null ? (
-              <Button onClick={() => void closeOrReopen('ticket.reopened')} disabled={submitting}>
-                Reopen
-              </Button>
-            ) : null}
-            {/*
-              Opening Move… clears any standing Close/Reopen refusal AND
-              transport error first (Ruling 33 adds the second clear): a
-              `close-requires-terminal` reason, or a "could not reach the
-              server" notice, left over from a prior Close/Reopen click would
-              otherwise carry into — or reappear behind — the Move dialog,
-              naming a fact that has nothing to do with the move being
-              attempted.
-            */}
-            <Button
-              onClick={() => {
-                setServerRefusal(null);
-                setTransportError(null);
-                setMoveOpen(true);
-              }}
-              disabled={closed !== null}
-            >
-              Move…
-            </Button>
-            {closed !== null ? (
-              <span className="gn-sheet__closed-note">Closed — reopen it first</span>
-            ) : null}
-          </div>
+          <section
+            className="gn-ticket-sheet__description"
+            aria-labelledby="gn-ticket-sheet-description-label"
+            data-testid="field-description"
+          >
+            {/* The field id was leaking into the UI: `:2454` renders
+                `{fieldId}` for custom fields, and this row copied that shape
+                instead of writing a caption, so the sheet read "description"
+                beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
+                Title case, matching those siblings. */}
+            {/* The caption, and the `id` the composer below is NAMED BY
+                (exec1 P21). The `id` is load-bearing, not decorative: it is
+                what `EditorSlot`'s `labelledBy` points at, so the words a
+                sighted reader sees here and the name a screen reader
+                announces are the SAME NODE and cannot drift. An `id` that
+                nothing references would be a leftover — if this mount ever
+                stops passing `labelledBy`, delete it in the same change. */}
+          <h3 id="gn-ticket-sheet-description-label" className="gn-ticket-sheet__caption">Description</h3>
+              {/*
+                ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
+                collapse them. `editorSlot` is the app's real Tiptap composer;
+                `PlainTextEditorSlot` is this package's read-only default,
+                which renders the document and offers no control to type into.
+                A build that has not wired an editor is not a broken build, and
+                the fallback is the correct behaviour for it — what was wrong
+                was that the editor was never available. THIS CHANGE IS THE ONE
+                THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
 
-          {/*
-            ONE ELEMENT, THREE FACTS — and it used to be TWO elements.
-
-            ## The duplication the owner ruled away (2026-09-20)
-
-            Until this change the same question was answered twice on one
-            screen: this line drew the parent's TITLE as plain text, and the
-            subtasks head drew a `Subtask of {title}` chip for the same parent —
-            with the restricted case worded differently in each place
-            (`Restricted parent — exists, but you can't see it` here,
-            `Subtask of a restricted parent` there), and "At project root"
-            appearing here and NOTHING appearing there. Two elements, one
-            question, two sets of words, in two places *"and only one of them is
-            where a person looks for the hierarchy"*.
-
-            The owner ruled the merge, verbatim: *"you can keep the badge. but
-            the placement is confusing. there is already a
-            `gn-ticket-sheet__parent` section above. put the badge in that
-            position instead. you can remove that `gn-ticket-sheet__parent`."*
-            So the chip came UP into this position and the subtasks head lost
-            its copy. The wrapper keeps the old class so the rule at
-            `ui.css`'s `.gn-ticket-sheet__parent` is still the thing that draws
-            this line — the alternative was renaming it and leaving an orphaned
-            rule behind, which the same ruling forbids.
-
-            ## The three arms, and WHY the root arm is not the badge
-
-            A RESTRICTED parent is existence-without-title — the ticket has a
-            parent and this viewer may not see which; rendering it as "At
-            project root" would turn a restriction into a vanish (invariant 5).
-            A NULL parent really is at the root, and **a root is not a subtask**,
-            so it does not get a "Subtask of" badge: the sentence stays, because
-            a crumb chain that ends at the project is a different reading of the
-            same silence. A visible parent shows the badge, as a control that
-            opens it when a caller passed `onOpenTicket` and as the pill
-            otherwise — `onOpenTicket`'s own recorded rule.
-
-            ⚠ **READING TAKEN, AND IT IS ONE ARM TO CHANGE:** the badge is the
-            VISIBLE arm's; the root and restricted arms keep their sentences. If
-            the owner meant the chip's own behaviour — nothing at root — that is
-            this one arm.
-
-            ## And the PROTOTYPE'S row is not what this is
-
-            The chip's CSS comment cites `desktop.dc.html:1237`, the authority's
-            subtasks header row, as its origin. **The owner is ruling the
-            placement AWAY from the authority deliberately**, so that citation
-            is not an argument against this and must not be quoted back as one.
-            The divergence is recorded here the way the ticket-key spec recorded
-            its own. What the authority DOES still own is the chip's CONTENT and
-            its one-hop behaviour, both unchanged.
-
-            ## The chip's own reasoning, carried up with it
-
-            - **One hop, never a chain.** The chip names the IMMEDIATE parent, as
-              the prototype's `openParent` does (`:3611`); the parent's own sheet
-              draws its own indicator in turn, so a nesting or a cycle is walked
-              sheet by sheet and no traversal lives here to loop.
-            - **With no `onOpenTicket` it is a PILL and not a control** — that
-              prop's own docblock: *"a control that cannot be honoured"* is not
-              drawn.
-            - **The restricted arm is a PILL, never a control, and it names the
-              restriction rather than the ticket.** The controller ruled it on
-              2026-09-20 after the alternative was priced: the read is a
-              discriminated union whose restricted arm *structurally cannot*
-              carry a title (`routes/tickets.ts:144-168`), the parent's title is
-              read INSIDE the `canSee` branch the restricted arm never reaches
-              (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
-              and cases `7.212` and `6.14` pin the existence-versus-title
-              contrast in both directions.
-              ⚠ **THE REASON FIRST RECORDED WAS WRONG, and it is corrected rather
-              than deleted:** it cited 6.66's *"no table stores a ticket
-              title"*, which was true when 6.66 was written and is stale now —
-              `proj_tickets` exists
-              (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
-              serves `title: titleOf(parentState)` out of it. **The conclusion
-              never rested on it.**
-              And the prototype's own label fallback — `p ? p.title :
-              sheet.parentId` (`:3609`) — would have put an ID where a name
-              belongs and made the chip a control pointing at a ticket this
-              viewer's own read 404s (case 6.14). The pill re-words a disclosure
-              the sheet already makes; it does not widen one.
-            - **It must not read as "no parent"** — a root is a different fact —
-              which is why the restricted arm exists rather than being omitted.
-          */}
-          <div className="gn-ticket-sheet__parent" data-testid="sheet-parent-indicator">
-            {parent === null ? (
-              <span>At project root</span>
-            ) : parent.kind === 'restricted' ? (
-              <span className="gn-ticket-sheet__restricted" data-testid="sheet-parent-restricted">
-                Restricted parent — exists, but you can&apos;t see it
-              </span>
-            ) : openParentSheet === undefined ? (
-              <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
-                {`Subtask of ${parent.title}`}
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="gn-chip gn-ticket-sheet__parent-chip"
-                data-testid="sheet-parent-chip"
-                onClick={() => openParentSheet(parent.id)}
-              >
-                {`Subtask of ${parent.title}`}
-              </button>
-            )}
-          </div>
-
-          {ticketRead.rollup !== null ? (
-            <p className="gn-ticket-sheet__progress">{formatRollup(ticketRead.rollup)}</p>
-          ) : null}
-
-          {/* Door F, 2026-09-19 — THE SUBTASKS SECTION. The prototype draws it
-              as its own block between the progress line and the fields
-              (`desktop.dc.html:1238-1265`): a heading carrying the count, the
-              children, an empty state that names what a subtask IS, and the add
-              row. Ours drew only the count, which is why this section exists.
-
-              ⚠ The prototype's SECOND direction — the `Subtask of {parent}`
-              chip (`:1240`) — was deliberately NOT built with this section, so
-              that adding it later would be a DECISION rather than a drift. That
-              decision came on 2026-09-20 (owner ruling, via the controller) and
-              the chip is below; case 16.22 asserted its absence and now asserts
-              what it does instead, updated rather than deleted. */}
-          <section className="gn-ticket-sheet__subtasks" data-testid="sheet-subtasks">
-            {/* ⚠ THE CHIP WAS HERE UNTIL 2026-09-20 AND IS NOT ANY MORE. It is
-                a `<p>` alone now because the owner ruled the chip UP into the
-                parent indicator above (*"there is already a
-                `gn-ticket-sheet__parent` section above. put the badge in that
-                position instead"*) — one element, three facts, in the position
-                a person looks for the hierarchy.
-
-                **The reasoning that governed the chip did not die with its
-                position**, and it is kept rather than dropped: the three arms,
-                the restricted pill and why it must not read as "no parent", the
-                one-hop rule, and the `7.212`/`6.14` contrast all now live in the
-                indicator's own docblock above, at the site that renders them.
-                What is recorded HERE is the one fact that belongs to this
-                heading: **the row now seats ONE child.** The prototype's flex
-                row (`align-items:baseline;gap:10px;flex-wrap:wrap`,
-                `:1237-1241`) existed to seat a chip BESIDE this heading, and
-                the rule at `.gn-ticket-sheet__subtasks-head` is left in place
-                rather than deleted: the element still renders, so the rule is
-                not orphaned, it simply has nothing left to space apart. `gap`
-                on a single child is inert, not wrong, and removing it here
-                would be a layout change this change cannot witness.
-
-                ⚠ And the prototype's `:1237` citation is NOT an argument that
-                the chip belongs here: the owner ruled the placement away from
-                the authority deliberately, which the indicator's docblock
-                records. */}
-            <div className="gn-ticket-sheet__subtasks-head">
-              <p className="gn-ticket-sheet__subtasks-heading">
-                Subtasks
-                {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
-              </p>
-            </div>
-            {/*
-              Nothing at all while the child read is in flight — not the alert,
-              and not the empty sentence either. Both are claims about a list
-              nobody has read yet; the alert is the louder one and the one V8
-              measured, and the empty arm was the same false claim one notch
-              quieter. What renders is decided by the ANSWER, never by `null`.
-            */}
-            {subtasksUnread ? null : subtasksIncomplete ? (
-              // THE RECONCILIATION, rendered rather than swallowed. A short list
-              // here is the one failure this section could hide, so it is said
-              // in the server's own numbers instead of drawn.
-              <p
-                className="gn-ticket-sheet__refusal"
-                role="alert"
-                data-testid="sheet-subtasks-incomplete"
-              >
-                {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read — so this list is not shown rather than shown short.`}
-              </p>
-            ) : subtaskRows.length === 0 ? (
-              <p className="gn-ticket-sheet__subtasks-empty" data-testid="sheet-subtasks-empty">
-                No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date
-                and a history.
-              </p>
-            ) : (
-              <ul className="gn-ticket-sheet__subtasks-list">
-                {subtaskRows.map((row) => (
-                  <li key={row.ticketId} data-testid={`subtask-${row.ticketId}`}>
-                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
-                    {/* THE SEPARATOR IS TEXT, NOT A GAP, and that is a decision
-                        rather than a preference.
-
-                        Two adjacent inline spans are ONE RUN OF GLYPHS — there is
-                        no text between them — so the row rendered
-                        `Order the brochuresTo do` on screen AND in the accessible
-                        name. The controller's browser pass caught it on
-                        2026-09-20 in this section, and the unit cases could not:
-                        `16.15` queries each span's own text, which passes while
-                        the row itself reads as one word.
-
-                        A CSS `gap` would have fixed the screen and left the name
-                        joined, and it would have been UNMEASURABLE here — this
-                        section declares no stylesheet rule at all and jsdom has
-                        no layout engine, so no case could tell the fix from its
-                        absence. That is the same shape as the defect: a check
-                        passing for a reason unrelated to what a person reads.
-                        Text is the one treatment both surfaces, and the case,
-                        can see. */}
-                    <span className="gn-ticket-sheet__subtask-sep">{' · '}</span>
-                    {/* The child's OWN state, spelled from the served row — the
-                        empty state's sentence claims a subtask gets a state, so
-                        the list has to show one or the claim is decoration. */}
-                    <span className="gn-ticket-sheet__subtask-state">{row.stateName}</span>
-                  </li>
-                ))}
-              </ul>
-            )}
-            {/* THE FORM IS OFFERED ON ONE ANSWER, and the alternative is a
-                SENTENCE rather than a disabled control (`16.91`, `16.93`). A
-                disabled control still asserts that the action exists, and this
-                one could not be performed; `Features.md:88`'s rule for the
-                New-ticket control is the precedent this follows.
-
-                There is a THIRD arm — `subtaskWithheld === null` with no
-                `subtaskType` — which draws NOTHING. It is the ladder's unread
-                state, and it is the one that must not be collapsed into the
-                sentence above it: "nothing is deeper" is a claim about the
-                workspace and this client has not read the workspace yet. */}
-            {subtaskType === null ? (
-              subtaskWithheld === null ? null : (
-                <p
-                  className="gn-ticket-sheet__subtask-withheld"
-                  role="status"
-                  data-testid="sheet-subtask-withheld"
-                >
-                  {subtaskWithheld}
-                </p>
-              )
-            ) : (
-              <form
-                className="gn-ticket-sheet__subtask-add"
-                onSubmit={(event) => {
-                  event.preventDefault();
-                  void addSubtask();
-                }}
-              >
-                {/*
-                  E5-22 — WHAT the button will file. The child's type is chosen
-                  by `subtaskTypeFor` and was in hand and unsaid: rule 1 takes the
-                  built-in `task` whenever it is legal, so under an Epic (rank 1)
-                  the child is a Task and the Story rank between them is SKIPPED —
-                  and nothing on screen named it. `subtaskType.name` was read
-                  nowhere in the render before this line.
-                */}
-                <p className="gn-ticket-sheet__subtask-target" data-testid="sheet-subtask-target">
-                  {`Adds a ${subtaskType.name}.`}
-                </p>
-                <label className="gn-field" htmlFor="gn-new-subtask-title">
-                  <span className="gn-field__label">New subtask title</span>
-                  <input
-                    id="gn-new-subtask-title"
-                    className="gn-field__input"
-                    data-testid="sheet-subtask-title"
-                    value={newSubtaskTitle}
-                    onChange={(event) => setNewSubtaskTitle(event.target.value)}
-                    disabled={addingSubtask}
-                  />
-                </label>
-                <Button data-testid="sheet-subtask-add" type="submit" disabled={addingSubtask}>
-                  {addingSubtask ? 'Adding…' : 'Add subtask'}
-                </Button>
-              </form>
-            )}
-            {subtaskRefusal === null ? null : (
-              <p className="gn-ticket-sheet__refusal" role="alert" data-testid="sheet-subtask-refusal">
-                {subtaskRefusal}
-              </p>
-            )}
+                `submit` is what makes a mounted editor usable at all:
+                `TicketEditorSlot` disables its control and NAMES the gap when
+                it is absent ("there is nowhere to send the words"). It is
+                passed unconditionally because the read-only fallback ignores
+                every capability prop on purpose.
+              */}
+              <EditorSlot
+                mode="description"
+                // The composer is NAMED BY the `<dt>` above rather than given
+                // its own copy of the words (exec1 P21) — the same mechanism
+                // the ticket sheet's tablist fix used, and the reason this row
+                // does not also pass a `label` to contradict it.
+                labelledBy="gn-ticket-sheet-description-label"
+                doc={descriptionClaim?.value}
+                readOnly={!canEditDescription}
+                workspaceId={workspaceId}
+                ticketId={ticketId}
+                placeholder="No description yet"
+                submit={submitDescription}
+                queryUsers={queryUsers}
+                onError={reportEditorError}
+              />
+              <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
           </section>
-
           <dl className="gn-ticket-sheet__fields">
-            <div className="gn-ticket-sheet__field" data-testid="field-assignee">
+            <div className={fieldRowClass(0)} data-testid="field-state">
+              <dt>State</dt>
+              <dd>
+                <div className="gn-ticket-sheet__state">
+                  <Chip tone={state.stateCategory}>{currentStateName}</Chip>
+                  <span className="gn-ticket-sheet__provenance">
+                    {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
+                  </span>
+                  {/* ⚠ THE `Closed by … on …` BADGE WAS HERE AND IS NOT ANY MORE. It
+                      moved UP into the chips line (`sheet-chips`, above the tabs) on
+                      2026-09-22, which is where the prototype draws it
+                      (`desktop.dc.html:1130`). It was MOVED rather than copied: the
+                      span that drew it here was deleted in the same change, so the
+                      sentence is on the page exactly once and the case that reads it
+                      (`16.110`) asserts that count. */}
+                  {/*
+                    Spec §5.3: Close only from a terminal, not-yet-closed state;
+                    Reopen only once closed. The two buttons never both show, but
+                    NOT because "closed implies terminal forever" — that claim is
+                    false (final whole-branch review Finding 5, 2026-09-17: a
+                    rebind or a republish fold can move a closed ticket's `stateId`
+                    into a non-terminal state while `closed` rides along, since
+                    `foldTicketToWorkflowVersion` spreads `...state` and neither
+                    event touches `stateId`). What actually holds is smaller and
+                    true today: Close's own condition
+                    (`stateCategory === 'terminal' && closed === null`) and
+                    Reopen's (`closed !== null`) are mutually exclusive on `closed`
+                    alone, so exactly one — or neither, on a still-open,
+                    non-terminal ticket — can ever be true at once. The closed ⇒
+                    terminal invariant this comment used to (wrongly) lean on is
+                    the RULE ENGINE's to hold, not this component's: fix wave B,
+                    Ruling 53, adds it at the rebind check and the republish
+                    validator.
+                  */}
+                  {state.stateCategory === 'terminal' && closed === null ? (
+                    <Button onClick={() => void closeOrReopen('ticket.closed')} disabled={submitting}>
+                      Close
+                    </Button>
+                  ) : null}
+                  {closed !== null ? (
+                    <Button onClick={() => void closeOrReopen('ticket.reopened')} disabled={submitting}>
+                      Reopen
+                    </Button>
+                  ) : null}
+                  {/*
+                    Opening Move… clears any standing Close/Reopen refusal AND
+                    transport error first (Ruling 33 adds the second clear): a
+                    `close-requires-terminal` reason, or a "could not reach the
+                    server" notice, left over from a prior Close/Reopen click would
+                    otherwise carry into — or reappear behind — the Move dialog,
+                    naming a fact that has nothing to do with the move being
+                    attempted.
+                  */}
+                  <Button
+                    onClick={() => {
+                      setServerRefusal(null);
+                      setTransportError(null);
+                      setMoveOpen(true);
+                    }}
+                    disabled={closed !== null}
+                  >
+                    Move…
+                  </Button>
+                  {closed !== null ? (
+                    <span className="gn-sheet__closed-note">Closed — reopen it first</span>
+                  ) : null}
+                </div>
+              </dd>
+            </div>
+            <div className={fieldRowClass(1)} data-testid="field-assignee">
               <dt>Assignee</dt>
               <dd>
                 {assigneeRow.control}
@@ -3073,7 +3054,7 @@ export function TicketSheet({
                 two are the same kind of fact (spec 2026-09-22). Every one that
                 the prototype makes an editor is an editor here; Type is the one
                 row that is read-only on both, argued in the derivations above. */}
-            <div className="gn-ticket-sheet__field" data-testid="field-priority">
+            <div className={fieldRowClass(2)} data-testid="field-priority">
               <dt>Priority</dt>
               <dd>
                 {/* The prototype's segmented control (`desktop.dc.html:1192-1198`)
@@ -3107,7 +3088,7 @@ export function TicketSheet({
                 )}
               </dd>
             </div>
-            <div className="gn-ticket-sheet__field" data-testid="field-due">
+            <div className={fieldRowClass(3)} data-testid="field-due">
               <dt>Due</dt>
               <dd>
                 {/*
@@ -3185,7 +3166,7 @@ export function TicketSheet({
                 sentence for either date and not a second wording invented for
                 this row. `submitStartDate` says why the two are copies rather
                 than one shared hook. */}
-            <div className="gn-ticket-sheet__field" data-testid="field-start">
+            <div className={fieldRowClass(4)} data-testid="field-start">
               <dt>Start</dt>
               <dd>
                 <input
@@ -3221,7 +3202,7 @@ export function TicketSheet({
                 )}
               </dd>
             </div>
-            <div className="gn-ticket-sheet__field" data-testid="field-type">
+            <div className={fieldRowClass(5)} data-testid="field-type">
               <dt>Type</dt>
               <dd>
                 {/* The NAME from the workspace ladder, or the id when the
@@ -3253,80 +3234,87 @@ export function TicketSheet({
               actually known. The loop below now skips `description`, so the row
               is drawn once.
             */}
-            <div className="gn-ticket-sheet__field" data-testid="field-description">
-              {/* The field id was leaking into the UI: `:2454` renders
-                  `{fieldId}` for custom fields, and this row copied that shape
-                  instead of writing a caption, so the sheet read "description"
-                  beside "Assignee", "Priority", "Due" and "Type" (exec4 E4-4).
-                  Title case, matching those siblings. */}
-              {/* The caption, and the `id` the composer below is NAMED BY
-                  (exec1 P21). The `id` is load-bearing, not decorative: it is
-                  what `EditorSlot`'s `labelledBy` points at, so the words a
-                  sighted reader sees here and the name a screen reader
-                  announces are the SAME NODE and cannot drift. An `id` that
-                  nothing references would be a leftover — if this mount ever
-                  stops passing `labelledBy`, delete it in the same change. */}
-              <dt id="gn-ticket-sheet-description-label">Description</dt>
+            <div className={fieldRowClass(6)} data-testid="field-visibility">
+              <dt>Visibility</dt>
               <dd>
                 {/*
-                  ⚠ BOTH BRANCHES ARE LIVE AND NEITHER IS DEAD CODE — do not
-                  collapse them. `editorSlot` is the app's real Tiptap composer;
-                  `PlainTextEditorSlot` is this package's read-only default,
-                  which renders the document and offers no control to type into.
-                  A build that has not wired an editor is not a broken build, and
-                  the fallback is the correct behaviour for it — what was wrong
-                  was that the editor was never available. THIS CHANGE IS THE ONE
-                  THAT MAKES THE FIRST BRANCH REACHABLE FROM `apps/web`.
-
-                  `submit` is what makes a mounted editor usable at all:
-                  `TicketEditorSlot` disables its control and NAMES the gap when
-                  it is absent ("there is nowhere to send the words"). It is
-                  passed unconditionally because the read-only fallback ignores
-                  every capability prop on purpose.
+                  Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It
+                  is mounted here and it is DARK against the shipped server: this
+                  component returns its refusal branch above whenever `getTicket`
+                  rejects, and `getTicket` refuses today (`mapTicketRead`, one of the six
+                  serving gaps). So nobody reaches this line in production until that
+                  read is served — which is why the editor's own behaviour is proven in
+                  `test/views/visibility-editor.test.tsx`, driving the component
+                  directly, rather than through a fabricated successful read here."
+                  Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read, so a
+                  person DOES reach this line and the section is not dark. Whether this
+                  mount should now be proven HERE rather than only in the editor's own
+                  suite is a test-design decision this correction does not take: *owner,
+                  whoever next touches either file.*
                 */}
-                <EditorSlot
-                  mode="description"
-                  // The composer is NAMED BY the `<dt>` above rather than given
-                  // its own copy of the words (exec1 P21) — the same mechanism
-                  // the ticket sheet's tablist fix used, and the reason this row
-                  // does not also pass a `label` to contradict it.
-                  labelledBy="gn-ticket-sheet-description-label"
-                  doc={descriptionClaim?.value}
-                  readOnly={!canEditDescription}
+                <VisibilityEditor
+                  dataSource={dataSource}
                   workspaceId={workspaceId}
                   ticketId={ticketId}
-                  placeholder="No description yet"
-                  submit={submitDescription}
-                  queryUsers={queryUsers}
-                  onError={reportEditorError}
+                  currentUserId={currentUserId}
+                  members={members.data ?? []}
+                  current={standingVisibility}
+                  canEdit={canSetVisibility}
+                  onChanged={() => {
+                    read.reload();
+                    history.reload();
+                  }}
                 />
-                <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
               </dd>
             </div>
-            {Object.entries(state.fields).map(([fieldId, fieldClaim]) => {
-              // Drawn above, unconditionally. A second pass here would mount a
-              // SECOND editor over one claim and make `field-description`
-              // ambiguous to `getByTestId` — two controls for one field.
-              //
-              // `dueDate`, `startDate` and `priority` join it for door G, and the
-              // reason is the same one rung less severe: all three are drawn as
-              // their OWN rows above, so a second pass would render **two rows
-              // for one claim**. Without this the sheet shows a `field-dueDate`
-              // beside the `field-due` this task adds, which is exactly the
-              // ambiguity the description line exists to prevent — and it would
-              // be INVISIBLE on any fixture whose ticket carries no such field.
-              // `startDate` is the third (spec 2026-09-22) and the newest: the
-              // rows above are `field-due`, `field-start` and `field-priority`.
-              if (
-                fieldId === 'description' ||
-                fieldId === 'dueDate' ||
-                fieldId === 'startDate' ||
-                fieldId === 'priority'
-              ) {
-                return null;
-              }
-              return (
-                <div key={fieldId} className="gn-ticket-sheet__field" data-testid={`field-${fieldId}`}>
+            {Object.entries(state.fields)
+              /*
+                ⚠ THE EXCLUSIONS ARE A FILTER, AND THEY USED TO BE AN EARLY
+                `return null` INSIDE THE `map` — which was a real defect and not a
+                tidy-up. `Array.prototype.map` passes the index of the ORIGINAL
+                array, so an excluded entry still consumed a position: with
+                `fields` of `{title, counterparty}` the loop's first RENDERED row
+                carried `rowIndex === 1`, not 0, and `fieldRowClass(FIXED_FIELD_ROWS
+                + rowIndex)` therefore returned an EVEN index's class — an untinted
+                row where the alternation requires a tinted one.
+
+                **And `title` is the field EVERY ticket has**, so this was not an
+                edge case: any ticket carrying a custom field drew its first
+                custom row on the wrong side of the alternation, and every
+                subsequent one shifted with it. Measured on a live fixture: the
+                grid read `… type=tinted, visibility=plain, counterparty=plain`,
+                two plain rows in a row at the seam.
+
+                ⚠ **160 GREEN CASES COULD NOT SEE IT**, because the only tint case
+                rendered the default fixture whose two fields are both excluded —
+                so the loop drew nothing and this expression never ran. Case
+                `16.129` was written for the seam and caught it on its first run;
+                the mutation that had looked harmless (`FIXED_FIELD_ROWS = 6`)
+                was actually compensating for this bug one index over, which is
+                why the property needed a case with a loop row in it rather than
+                a different constant.
+
+                Drawn above, unconditionally. A second pass here would mount a
+                SECOND editor over one claim and make `field-description`
+                ambiguous to `getByTestId` — two controls for one field.
+
+                `dueDate`, `startDate` and `priority` join it for door G, and the
+                reason is the same one rung less severe: all three are drawn as
+                their OWN rows above, so a second pass would render **two rows for
+                one claim**. Without this the sheet shows a `field-dueDate` beside
+                the `field-due` this task adds, which is exactly the ambiguity the
+                description line exists to prevent — and it would be INVISIBLE on
+                any fixture whose ticket carries no such field. `startDate` is the
+                third (spec 2026-09-22) and the newest: the rows above are
+                `field-due`, `field-start` and `field-priority`.
+              */
+              .filter(([fieldId]) => !OWN_ROW_FIELD_IDS.has(fieldId))
+              .map(([fieldId, fieldClaim], rowIndex) => (
+                <div
+                  key={fieldId}
+                  className={fieldRowClass(FIXED_FIELD_ROWS + rowIndex)}
+                  data-testid={`field-${fieldId}`}
+                >
                   <dt>{fieldId}</dt>
                   <dd>
                     <span>{renderFieldValue(fieldClaim.value)}</span>
@@ -3335,66 +3323,226 @@ export function TicketSheet({
                     </span>
                   </dd>
                 </div>
-              );
-            })}
+              ))}
           </dl>
 
-          {attachmentsUnavailable === undefined ? (
-            <AttachmentList entries={attachments ?? []} />
-          ) : (
-            /*
-              The three-way distinction this sheet draws for the ledger tab,
-              applied to the files: an ANSWER (drawn above, empty or not), a WAIT
-              (nothing yet — `AttachmentList`'s own silence), and a FAILURE, which
-              is this sentence. It is deliberately not a `Loading…` line: a read
-              that failed under the word "Loading…" is a wait that will never end,
-              wearing the clothes of one that will. **(The ticket read draws a
-              FOURTH arm the files do not need — an answered `null` — since E4-23;
-              `attachments` has no 404 affordance to answer with, so there is no
-              third null here.)**
-            */
-            <p
-              // `alert`, matching this sheet's five other failure sentences
-              // (`:1542`, `:1556`, `:1569`, `:1749`, `:1815`). The CSS twin it
-              // borrows its rule from carries NO role at all, and copying that
-              // omission would have been the quieter choice — but a read that
-              // failed is exactly what a reader must be told about.
-              role="alert"
-              className="gn-ticket-sheet__attachments-error"
-              data-testid="sheet-attachments-unavailable"
-            >
-              {`This ticket's attachments could not be read — ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
-            </p>
-          )}
+          {ticketRead.rollup !== null ? (
+            <p className="gn-ticket-sheet__progress">{formatRollup(ticketRead.rollup)}</p>
+          ) : null}
 
-          {/*
-            Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It
-            is mounted here and it is DARK against the shipped server: this
-            component returns its refusal branch above whenever `getTicket`
-            rejects, and `getTicket` refuses today (`mapTicketRead`, one of the six
-            serving gaps). So nobody reaches this line in production until that
-            read is served — which is why the editor's own behaviour is proven in
-            `test/views/visibility-editor.test.tsx`, driving the component
-            directly, rather than through a fabricated successful read here."
-            Ruling P25 clause 1 (`c86c4b5c`, 2026-09-06) served that read, so a
-            person DOES reach this line and the section is not dark. Whether this
-            mount should now be proven HERE rather than only in the editor's own
-            suite is a test-design decision this correction does not take: *owner,
-            whoever next touches either file.*
-          */}
-          <VisibilityEditor
-            dataSource={dataSource}
-            workspaceId={workspaceId}
-            ticketId={ticketId}
-            currentUserId={currentUserId}
-            members={members.data ?? []}
-            current={standingVisibility}
-            canEdit={canSetVisibility}
-            onChanged={() => {
-              read.reload();
-              history.reload();
-            }}
-          />
+          {/* Door F, 2026-09-19 — THE SUBTASKS SECTION. The prototype draws it
+              as its own block between the progress line and the fields
+              (`desktop.dc.html:1238-1265`): a heading carrying the count, the
+              children, an empty state that names what a subtask IS, and the add
+              row. Ours drew only the count, which is why this section exists.
+
+              ⚠ The prototype's SECOND direction — the `Subtask of {parent}`
+              chip (`:1240`) — was deliberately NOT built with this section, so
+              that adding it later would be a DECISION rather than a drift. That
+              decision came on 2026-09-20 (owner ruling, via the controller) and
+              the chip is below; case 16.22 asserted its absence and now asserts
+              what it does instead, updated rather than deleted. */}
+          <section className="gn-ticket-sheet__subtasks" data-testid="sheet-subtasks">
+            {/* ⚠ THE CHIP WAS HERE UNTIL 2026-09-20 AND IS NOT ANY MORE. It is
+                a `<p>` alone now because the owner ruled the chip UP into the
+                parent indicator above (*"there is already a
+                `gn-ticket-sheet__parent` section above. put the badge in that
+                position instead"*) — one element, three facts, in the position
+                a person looks for the hierarchy.
+
+                **The reasoning that governed the chip did not die with its
+                position**, and it is kept rather than dropped: the three arms,
+                the restricted pill and why it must not read as "no parent", the
+                one-hop rule, and the `7.212`/`6.14` contrast all now live in the
+                indicator's own docblock above, at the site that renders them.
+                What is recorded HERE is the one fact that belongs to this
+                heading: **the row now seats ONE child.** The prototype's flex
+                row (`align-items:baseline;gap:10px;flex-wrap:wrap`,
+                `:1237-1241`) existed to seat a chip BESIDE this heading, and
+                the rule at `.gn-ticket-sheet__subtasks-head` is left in place
+                rather than deleted: the element still renders, so the rule is
+                not orphaned, it simply has nothing left to space apart. `gap`
+                on a single child is inert, not wrong, and removing it here
+                would be a layout change this change cannot witness.
+
+                ⚠ And the prototype's `:1237` citation is NOT an argument that
+                the chip belongs here: the owner ruled the placement away from
+                the authority deliberately, which the indicator's docblock
+                records. */}
+            <div className="gn-ticket-sheet__subtasks-head">
+              {/* ⚠ TWO CLASSES, AND THE SECOND IS THE SHEET'S SHARED CAPTION (spec
+                  decision 11): the prototype draws `SUBTASKS · …` and `Comments · N`
+                  in the SAME eyebrow style (`desktop.dc.html:1236`, `:1250`), so
+                  `.gn-ticket-sheet__caption` is the name for that style and
+                  `.gn-ticket-sheet__subtasks-heading` stays this block's own hook.
+                  The words are NOT retyped into caps — `text-transform` is paint,
+                  and `16.123` asserts exactly that, so a later edit that wrote
+                  `SUBTASKS` into the source reddens there instead of quietly
+                  breaking every `getByText` on this heading. */}
+              <p className="gn-ticket-sheet__subtasks-heading gn-ticket-sheet__caption">
+                Subtasks
+                {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
+              </p>
+            </div>
+            {/*
+              Nothing at all while the child read is in flight — not the alert,
+              and not the empty sentence either. Both are claims about a list
+              nobody has read yet; the alert is the louder one and the one V8
+              measured, and the empty arm was the same false claim one notch
+              quieter. What renders is decided by the ANSWER, never by `null`.
+            */}
+            {subtasksUnread ? null : subtasksIncomplete ? (
+              // THE RECONCILIATION, rendered rather than swallowed. A short list
+              // here is the one failure this section could hide, so it is said
+              // in the server's own numbers instead of drawn.
+              <p
+                className="gn-ticket-sheet__refusal"
+                role="alert"
+                data-testid="sheet-subtasks-incomplete"
+              >
+                {`The server counts ${subtaskExpected} subtask${subtaskExpected === 1 ? '' : 's'} you can see, and ${subtaskRows.length} could be read — so this list is not shown rather than shown short.`}
+              </p>
+            ) : subtaskRows.length === 0 ? (
+              <p className="gn-ticket-sheet__subtasks-empty" data-testid="sheet-subtasks-empty">
+                No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date
+                and a history.
+              </p>
+            ) : (
+              <ul className="gn-ticket-sheet__subtasks-list">
+                {subtaskRows.map((row) => (
+                  <li
+                    key={row.ticketId}
+                    data-testid={`subtask-${row.ticketId}`}
+                    className="gn-ticket-sheet__subtask-card"
+                  >
+                    {/* THE TITLE IS THE CARD'S OWN LINE, and the meta row sits
+                        beneath it as a BLOCK rather than as a run of inline spans
+                        — which is the 2026-09-20 defect's own shape changed on
+                        purpose. The row used to be three adjacent inline spans
+                        with a text ` · ` between them, because two adjacent spans
+                        are ONE RUN OF GLYPHS: the row rendered
+                        `Order the brochuresTo do` on screen AND in the accessible
+                        name. **A card separates the title from the meta row by
+                        BLOCK, so no separator text is needed there** — assistive
+                        tech pauses at the element boundary, and jsdom cannot see
+                        layout either way. */}
+                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    <span className="gn-ticket-sheet__subtask-meta">
+                      {/* The child's OWN state, spelled from the served row — the
+                          empty state's sentence claims a subtask gets a state, so
+                          the list has to show one or the claim is decoration.
+                          Drawn as a CHIP (prototype `:1241`), and the chip is the
+                          same component the sheet's header line uses. */}
+                      <Chip tone={row.stateCategory}>{row.stateName}</Chip>
+                      {/*
+                        ⚠ THE SEPARATOR IS STILL TEXT, AND IT IS STILL LOAD-BEARING
+                        — this is the SAME property the 2026-09-20 defect was
+                        about, one element to the right. The chip and this detail
+                        line are two flex items on ONE line with a CSS `gap`
+                        between them, and a gap is not a glyph: without the
+                        leading ` · ` inside this string the meta row reads
+                        `To dotask`, on screen and in the accessible name alike,
+                        and jsdom has no layout engine to tell the two treatments
+                        apart. So the separator lives INSIDE the detail string and
+                        the case reads `textContent`, which is the one surface
+                        both a person and a unit case can see.
+
+                        The type is the CHILD's, read off the served row; the due
+                        day goes through the ONE date renderer, never an ISO
+                        slice. An absent date draws the type alone — no dangling
+                        separator, which `16.124`'s control asserts.
+                      */}
+                      <span className="gn-ticket-sheet__subtask-detail">
+                        {row.dueDate === null
+                          ? ` · ${row.typeId}`
+                          : ` · ${row.typeId} · Due ${formatDate(row.dueDate.date)}`}
+                      </span>
+                    </span>
+                  </li>
+                ))}
+              </ul>
+            )}
+            {/* THE FORM IS OFFERED ON ONE ANSWER, and the alternative is a
+                SENTENCE rather than a disabled control (`16.91`, `16.93`). A
+                disabled control still asserts that the action exists, and this
+                one could not be performed; `Features.md:88`'s rule for the
+                New-ticket control is the precedent this follows.
+
+                There is a THIRD arm — `subtaskWithheld === null` with no
+                `subtaskType` — which draws NOTHING. It is the ladder's unread
+                state, and it is the one that must not be collapsed into the
+                sentence above it: "nothing is deeper" is a claim about the
+                workspace and this client has not read the workspace yet. */}
+            {subtaskType === null ? (
+              subtaskWithheld === null ? null : (
+                <p
+                  className="gn-ticket-sheet__subtask-withheld"
+                  role="status"
+                  data-testid="sheet-subtask-withheld"
+                >
+                  {subtaskWithheld}
+                </p>
+              )
+            ) : (
+              <form
+                className="gn-ticket-sheet__subtask-add"
+                onSubmit={(event) => {
+                  event.preventDefault();
+                  void addSubtask();
+                }}
+              >
+                {/*
+                  E5-22 — WHAT the button will file. The child's type is chosen
+                  by `subtaskTypeFor` and was in hand and unsaid: rule 1 takes the
+                  built-in `task` whenever it is legal, so under an Epic (rank 1)
+                  the child is a Task and the Story rank between them is SKIPPED —
+                  and nothing on screen named it. `subtaskType.name` was read
+                  nowhere in the render before this line.
+
+                  ⚠ IT STAYS THE ROW'S NOTE, and the row is now ONE line (spec
+                  decision 10, `desktop.dc.html:1258-1261`): input and button side
+                  by side, with this sentence above them both. `flex-wrap` on the
+                  rule means it shares their line when the sheet is wide and takes
+                  its own when it is not, which is the prototype's own behaviour
+                  rather than a second layout.
+                */}
+                <p className="gn-ticket-sheet__subtask-target" data-testid="sheet-subtask-target">
+                  {`Adds a ${subtaskType.name}.`}
+                </p>
+                {/*
+                  ⚠ THE VISIBLE `<label>` IS GONE, AND ITS WORDS ARE STILL HERE —
+                  twice, in the input's `placeholder` and its `aria-label`. The
+                  label was the only visible text on the row besides the button,
+                  and an inline row has no room for it; but a placeholder alone is
+                  NOT an accessible name (it vanishes the moment anything is typed
+                  and several assistive technologies ignore it), so the `aria-label`
+                  carries the words the label used to. **Every pre-existing
+                  add-subtask case queries `getByLabelText('New subtask title')`
+                  and keeps resolving through it** — which is the half of this
+                  change that could have silently broken a dozen cases, and the
+                  reason the two are asserted to agree in `16.125`.
+                */}
+                <input
+                  id="gn-new-subtask-title"
+                  className="gn-field__input gn-ticket-sheet__subtask-input"
+                  data-testid="sheet-subtask-title"
+                  placeholder="New subtask title"
+                  aria-label="New subtask title"
+                  value={newSubtaskTitle}
+                  onChange={(event) => setNewSubtaskTitle(event.target.value)}
+                  disabled={addingSubtask}
+                />
+                <Button data-testid="sheet-subtask-add" type="submit" disabled={addingSubtask}>
+                  {addingSubtask ? 'Adding…' : 'Add subtask'}
+                </Button>
+              </form>
+            )}
+            {subtaskRefusal === null ? null : (
+              <p className="gn-ticket-sheet__refusal" role="alert" data-testid="sheet-subtask-refusal">
+                {subtaskRefusal}
+              </p>
+            )}
+          </section>
 
           {/*
             THE COMMENT THREAD AND ITS BOX — the block at
@@ -3458,10 +3606,60 @@ export function TicketSheet({
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}
+                  /*
+                    THE POSTING SENTENCE, IN THE FOOTER ROW (spec decision 8; the
+                    prototype's `cmtHint` slot at `desktop.dc.html:1329`). It is
+                    handed over rather than drawn by `CommentsThread`, which used
+                    to render its own copy as a line under the composer and whose
+                    own paragraph recorded the move as OWED — the move needed a
+                    one-line change HERE, in the file that lane was barred from
+                    touching, so the two landed in one change.
+
+                    ⚠ IT IS PASSED AS DATA AND NOT AS A CHILD OR A `cloneElement`.
+                    The alternative considered and refused was having
+                    `CommentsThread` clone the composer element it is given and
+                    inject the sentence: that works, and it creates a SILENT
+                    DOUBLE SOURCE — a later caller passing its own `footerNote`
+                    here would be overwritten by the thread's copy, and nothing
+                    would fail. One field, one direction, and the composer's own
+                    contract (`EditorSlotProps.footerNote`) is the only place the
+                    words live.
+                  */
+                  footerNote="Posting records an event citing you."
                 />
               )
             }
           />
+        </div>
+      ) : tab === 'attachments' ? (
+        <div className="gn-ticket-sheet__attachments">
+          {attachmentsUnavailable === undefined ? (
+            <AttachmentList entries={attachments ?? []} />
+          ) : (
+            /*
+              The three-way distinction this sheet draws for the ledger tab,
+              applied to the files: an ANSWER (drawn above, empty or not), a WAIT
+              (nothing yet — `AttachmentList`'s own silence), and a FAILURE, which
+              is this sentence. It is deliberately not a `Loading…` line: a read
+              that failed under the word "Loading…" is a wait that will never end,
+              wearing the clothes of one that will. **(The ticket read draws a
+              FOURTH arm the files do not need — an answered `null` — since E4-23;
+              `attachments` has no 404 affordance to answer with, so there is no
+              third null here.)**
+            */
+            <p
+              // `alert`, matching this sheet's five other failure sentences
+              // (`:1542`, `:1556`, `:1569`, `:1749`, `:1815`). The CSS twin it
+              // borrows its rule from carries NO role at all, and copying that
+              // omission would have been the quieter choice — but a read that
+              // failed is exactly what a reader must be told about.
+              role="alert"
+              className="gn-ticket-sheet__attachments-error"
+              data-testid="sheet-attachments-unavailable"
+            >
+              {`This ticket's attachments could not be read — ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+            </p>
+          )}
         </div>
       ) : (
         <HistoryTab

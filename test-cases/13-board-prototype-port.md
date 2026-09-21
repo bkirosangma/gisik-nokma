@@ -1848,6 +1848,7 @@ mechanism is one line:** `apps/web/app/globals.css:84` sets `button { font: inhe
 `border`, no `background`, no `padding` — so an unstyled button keeps the UA's `outset` edge and grey fill.
 Painted by the finding on the members a browser could reach: `button.editor-slot__submit` "Save description"
 **136.4×29.2** and "Comment" **86.9×29.2**, each `border: 2px outset rgb(0,0,0)`,
+⚠ **and the token `"Comment"` is STALE: the comment composer's control reads `Post` since 2026-09-22** (sheet prototype parity Task 2, the prototype's own word at `desktop.dc.html:1330`). **The NUMBERS stay exactly as the finding painted them** — they are that finding's measurement of a UA-styled button and are labelled as such by `13.1143` — but a reader checking the label today would find a different word and conclude the record was about some other control.
 `background-color: rgb(239,239,239)`, `border-radius: 0px`, `padding: 1px 6px`; `button.add-rule-menu__trigger`
 "Add rule" **76.6×29.2** the same — beside a *Publish* button reading `1px solid rgb(51,98,159)`, the control
 in the same paint.
@@ -2255,6 +2256,103 @@ line names the range `13.1229`–`13.1233` while its Step 5 (the enumeration of 
 `13.1229`–`13.1232`, and the four cases its Step 1 writes carry those four ids. The number is left UNUSED
 rather than filled with a case invented to close it, per the catalogue's own rule that a deleted or skipped
 number is never renumbered.
+
+### Popover (sheet prototype parity, 2026-09-22)
+
+**Task 1 of `docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md`.** A new primitive,
+`packages/ui/src/components/popover.tsx`: the product's first popover, built on the same
+`@react-aria/overlays`/`@react-aria/focus` pieces `select.tsx`'s `SelectPanel` already uses
+(`useOverlay`, `useOverlayPosition`, `FocusScope`, `DismissButton`, `createPortal`). It exists
+because the visibility menu (Task 5) needs an anchored dialog and `Select`'s listbox panel is not
+reusable for a fieldset. `.gn-popover`'s surface/shadow pair is `--gn-surface-raised`/
+`--gn-shadow-raised` — measured off `.gn-select__panel` itself, not the plan draft's
+`--gn-surface-overlay`/`--gn-shadow-overlay` guess, which is the full-screen scrim/dialog pair
+(`.gn-dialog__scrim`/`.gn-dialog`), a different role.
+
+### The case
+
+- ✅ **13.1267 — the popover opens as a named dialog portalled to `document.body`, moves focus
+  inside on open, and Escape closes it and returns focus to the trigger.** `packages/ui/test/popover.test.tsx`.
+  The focus-return assertion is awaited (`waitFor`), matching `select.test.tsx`'s own E4-17
+  cases: `FocusScope restoreFocus` restores inside a `requestAnimationFrame`, so the settle is
+  async — asserting synchronously right after `Escape` is a race, not a defect, and the plan's
+  own draft test read it synchronously and failed on the first run for exactly that reason.
+- ✅ **13.1268 — an outside click (mousedown+mouseup outside the dialog) closes it; a click on a
+  control INSIDE the dialog does not (the control).** `packages/ui/test/popover.test.tsx`. The
+  positive control clicks the dialog's own `Apply` button first and confirms the dialog is still
+  open before the outside click, so the assertion cannot pass by the dialog never having opened.
+
+`Features.md` §3 shared-components bullet: extended to name `Popover` beside `SegmentedControl`.
+`13.1269` stays free in this block for a future control arm.
+
+## The two composers share one chrome — tray, sunken body, footer row (sheet prototype parity lane B, 2026-09-22) — cases `13.1270`–`13.1274`
+
+**The change.** `TicketEditorSlot` (`packages/editor`) drew a bare field with a raw submit button under it.
+The prototype (`design-system/interactive/desktop.dc.html:1168-1173` for the description box, `:1298-1331`
+for the comment box) draws ONE set of clothes for both composers: a fill tray for the tools, a sunken field
+for the words, and a **footer row** carrying a hint on the left and the submit control on the right — and it
+calls the comment composer's control **Post** (`:1330`). No behaviour moves: `handleSubmit`,
+`composeEditorSubmission` and the events they compose are untouched, and the only label that changes is the
+comment composer's button.
+
+**The footer's left slot is a CONTRACT FIELD, not a constant.** The two boxes carry DIFFERENT hints — one
+explains Markdown, the other promises what posting does — so no single string can fill both.
+`footerNote?: string` is one additive optional field on the twice-written `EditorSlotProps` contract (both
+declarations, plus the transcription in `packages/editor/test/ticket-editor-slot.test.tsx`, which compares
+the three field-name sets for equality and fails on a one-sided addition). Comment mode takes the host's
+sentence; description mode keeps `MARKDOWN_HINT`; a comment mount that supplies nothing draws an EMPTY slot
+rather than borrowing the other composer's advice.
+
+**`hintSlot` exists because the hint would otherwise be drawn twice.** `TicketEditor` renders toolbar →
+content → hint, so a slot that drew the hint in its own footer without telling the editor to stop would print
+the sentence in both places at once. `hintSlot?: 'below' | 'none'` defaults to `'below'`, which leaves every
+other mount of `TicketEditor` — including the desktop app's — exactly as it was.
+
+**⚠ The one place the plan text could not be followed, recorded because a reader will look for it.** Task 2's
+Step 3 says to remove `.editor-slot__submit` from the shared `border: none; background: none` reset in
+`editor.css`. That edit cannot be made: `packages/ui/test/bare-control-coverage.test.ts` (case `13.1143`)
+reads that exact GROUPED rule by regex — `.editor-slot__submit,\s*\.evidence-picker__cancel\s*\{` — and
+requires `border: none`, `background: none` and `padding: 0` on it, naming both classes. Narrowing the group
+to `.evidence-picker__cancel` alone would redden a pre-existing case in a third package's suite, and the
+ratchet this repository keeps forbids editing such a case to suit a stylesheet edit. So the grouped reset is
+UNCHANGED and the submit control takes its full appearance from a rule at the foot of the file, which wins on
+the cascade for every property the two share (one class each, so equal specificity, and source order
+decides). A comment at that reset records the reason. A docblock in the same file that called tokens
+"unreachable from here" was corrected at the same time: this task's new rules paint that very class from
+tokens, and the E4-8 block above it already measured why they resolve.
+
+### The case
+
+- **13.1270** ✅ The composer's footer row holds the submit control, and its label is `Post` in comment mode
+  and `Save description` in description mode, in both cases read from the FOOTER rather than from the page.
+  `packages/editor/test/ticket-editor-slot.test.tsx`.
+- **13.1271** ✅ The host's `footerNote` sits in the footer in comment mode, the Markdown hint sits in the
+  footer in description mode, and neither mode draws the editor's own hint line.
+  `packages/editor/test/ticket-editor-slot.test.tsx`.
+- **13.1272** ✅ `editor.css` declares the footer, hint and sunken-body rules the slot renders, and the submit
+  control carries the 44-px floor, a `:focus-visible` ring and a pointer cursor — all read from
+  comment-stripped CSS, because the block's own docblock names every selector it asserts and a search over
+  the raw file would find the fix in the prose.
+  `packages/editor/test/editor-css-binding.test.ts`.
+- **13.1273** ✅ CONTROL — in description mode the Markdown hint is in the FOOTER only, and the editor draws
+  none. This is the direction 13.1271 does not read: its description arm counts `.editor-slot__hint`, which is
+  the FOOTER's class, so the mutation `hintSlot={isComment ? 'none' : 'below'}` leaves the editor's own
+  `.ticket-editor__hint` in place while the footer draws `MARKDOWN_HINT` too — the footer count is still 1,
+  the comment arm still reads 0, and 13.1271 stays green over the exact defect it exists to prevent.
+  `packages/editor/test/ticket-editor-slot.test.tsx`.
+- **13.1274** ✅ CONTROL — the css-binding extraction is bounded. `.editor-slot__hint` declares no
+  `min-height` (a body that swallowed the file would report one, since the submit rule does declare it) and
+  both extracted bodies are shorter than a tenth of the file, so 13.1272's assertions cannot be satisfied by
+  the file merely containing the strings. It runs FIRST in its suite, so an assertion above it cannot mask it.
+  `packages/editor/test/editor-css-binding.test.ts`.
+
+**This entry also carries the `Features.md` change**, in the same commit: §9's `<EditorSlot>` bullet now
+names the chrome, the `Post` label, `footerNote` and `hintSlot`. Every package that reads this file or the
+contract across a boundary was run at Node v22.22.2 and is green — `packages/editor` 202 cases,
+`packages/ui` 426 (the package whose `bare-control-coverage.test.ts` regexes `editor.css`),
+`packages/app-core` 1885 (the contract's other half), `apps/web` 747 (the app that mounts the slot),
+`apps/mobile` 59 (its webview bundle carries the editor's markup) — and both typechecks
+(`packages/editor`, `packages/app-core`) pass.
 
 ## Priority is a built-in — the new-ticket dialog (spec 2026-09-22, Task 8)
 

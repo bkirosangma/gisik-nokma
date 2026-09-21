@@ -122,9 +122,24 @@ function renderSheet(sheetSource = source(), extra: Record<string, unknown> = {}
  * stub that ignored `mode` would put two description controls on a screen that
  * has one description row and one comment box.
  */
-function fakeEditorSlot(seen: { modes: string[] }): EditorSlotComponent {
+function fakeEditorSlot(seen: {
+  modes: string[];
+  /**
+   * Every `footerNote` the sheet handed the seam, recorded in mount order.
+   *
+   * OPTIONAL so the cases that only read `modes` keep their one-field literal —
+   * and so a case that reads notes is visibly the one asking for them. The
+   * comment arm DRAWS the note, which is the plan's permitted fixture edit (d)
+   * for Task 7: the thread stopped drawing *"Posting records an event citing
+   * you."* itself, so the only thing that can put it on the screen is the host's
+   * `footerNote` reaching the composer, and a stub that swallowed it would make
+   * the pre-existing assertion below pass over a build that lost the sentence.
+   */
+  notes?: (string | undefined)[];
+}): EditorSlotComponent {
   return function FakeEditorSlot(props) {
     seen.modes.push(props.mode);
+    seen.notes?.push(props.footerNote);
     if (props.mode === 'description') {
       // Inert: this file is about the comment box. The description mount's own
       // behaviour is proven in `ticket-sheet.test.tsx`.
@@ -132,6 +147,7 @@ function fakeEditorSlot(seen: { modes: string[] }): EditorSlotComponent {
     }
     return (
       <div data-testid="fake-comment-editor">
+        <p>{props.footerNote}</p>
         <button
           type="button"
           onClick={() =>
@@ -324,5 +340,95 @@ describe('TicketSheet — the comment thread and its box', () => {
     // rather than answering `[]`.
     expect(screen.queryByText('No comments yet.')).toBeNull();
     expect(screen.queryByText('Comments · 0')).toBeNull();
+  });
+
+  /**
+   * 16.126 / 16.128 — THE HEADING WEARS THE SHEET'S CAPTION CLASS.
+   * (sheet prototype parity, 2026-09-22; spec decision 11)
+   *
+   * The prototype draws `Comments · {count}` and the sheet's `SUBTASKS · …` in the
+   * SAME eyebrow style (`desktop.dc.html:1250`, `:1236`), so that style gets one
+   * name — `.gn-ticket-sheet__caption` — instead of a copy per section. These two
+   * cases pin the NAME on this element.
+   *
+   * ⚠ **AND THE NAME WAS ALL THAT MOVED WHEN THIS WAS WRITTEN, WHICH IS THE
+   * MEASUREMENT THAT MATTERED AND WAS TAKEN RATHER THAN ASSUMED.** `.gn-comments__heading`'s
+   * rule already declared the whole eyebrow — `font-size: 0.8125rem`,
+   * `line-height: 1.125rem`, `text-transform: uppercase`, `letter-spacing: 0.6px`,
+   * `var(--gn-text-muted)` — and the shared rule the plan gives Task 4 is a
+   * transcription of exactly those declarations. So the Comments heading changed
+   * its LOOK by nothing at all at the moment this landed; it gained the second
+   * name for a later task to hang the shared rule on.
+   *
+   * ⚠ **THE SHARED CLASS HAS A RULE NOW, AND THE DUPLICATE IS GONE WITH IT
+   * (2026-09-22).** This paragraph read *"the shared class has no rule yet, and
+   * that is why 16.128 exists … dropping it today would leave the element with NO
+   * effective style at all"* — true when written, and **the reason 16.128 is the
+   * arm that had to be written FIRST.** Task 4 landed `.gn-ticket-sheet__caption`'s
+   * rule; the tail lane then removed `.gn-comments__heading`'s six duplicate
+   * declarations, which is the sequence the source comment on this element
+   * records and the reason that comment was a guard rather than a description.
+   *
+   * ⚠ **THE CSS HALF IS STILL DELIBERATELY NOT ASSERTED HERE.** A case reading
+   * those declarations out of `ui.css` would have had to be rewritten by the tail
+   * lane when it removed them — a case that exists to be edited is a liability
+   * rather than a guard — and the same argument applies to asserting their
+   * ABSENCE now: the pinned `13.1142`-style CSS-binding cases live in the package
+   * that owns the stylesheet.
+   */
+  it('16.126 the Comments heading wears the sheet caption class', async () => {
+    renderSheet();
+    const section = await screen.findByTestId('sheet-comments');
+    expect(within(section).getByText(/^Comments/).className).toContain('gn-ticket-sheet__caption');
+  });
+
+  it('16.128 CONTROL — the heading ADOPTED the caption class; it was not RENAMED into it', async () => {
+    renderSheet();
+    const section = await screen.findByTestId('sheet-comments');
+    const heading = within(section).getByText(/^Comments/);
+    // The block's own class is still worn, which is the only thing keeping this
+    // element styled while the shared rule does not exist yet. A rename would
+    // satisfy 16.126 and strip the heading bare.
+    expect(heading.className).toContain('gn-comments__heading');
+    // …and the element really is the heading, so neither assertion above is a
+    // reading of some other node that happens to start with the word.
+    expect(heading.tagName).toBe('P');
+    expect(heading.textContent).toBe('Comments · 1');
+  });
+
+  /**
+   * `16.127` — THE POSTING SENTENCE RIDES THE COMPOSER'S FOOTER (Task 7's held
+   * half, 2026-09-22).
+   *
+   * The thread drew *"Posting records an event citing you."* itself, as a line
+   * under the composer, and carried a paragraph saying the move was OWED: the
+   * sentence belongs in `TicketEditorSlot`'s footer row (the prototype's `cmtHint`
+   * slot, `desktop.dc.html:1329`), but handing it over needs a one-line change at
+   * the sheet's comment `EditorSlot` mount — a file lane B was barred from
+   * touching. **Deleting the thread's paragraph FIRST would have lost the sentence
+   * from the product**, since nothing else drew it, so the deletion and the mount
+   * are one change and land together here.
+   *
+   * ⚠ **THE CASE READS BOTH DIRECTIONS, and either alone passes over the defect.**
+   * `seen.notes` proves the sentence reached the seam; the COUNT proves the thread
+   * stopped drawing its own copy. A build that added `footerNote` without deleting
+   * the paragraph would pass the first and show the sentence TWICE — which is the
+   * shape this case exists for, and the reason it is not a `getByText`.
+   */
+  it('16.127 the posting sentence is handed to the composer as its footer note, and the thread draws no second copy', async () => {
+    const seen = { modes: [] as string[], notes: [] as (string | undefined)[] };
+    renderSheet(source(), { editorSlot: fakeEditorSlot(seen) });
+    const section = await screen.findByTestId('sheet-comments');
+
+    expect(seen.notes).toContain('Posting records an event citing you.');
+    expect(within(section).getAllByText('Posting records an event citing you.')).toHaveLength(1);
+    // And the copy that IS on screen came from the composer rather than from the
+    // thread: asserted by containment, so a build whose only copy is the thread's
+    // own paragraph cannot pass the count above by drawing it in the wrong place.
+    expect(
+      screen.getByTestId('fake-comment-editor').contains(
+        within(section).getByText('Posting records an event citing you.'),
+      ),
+    ).toBe(true);
   });
 });

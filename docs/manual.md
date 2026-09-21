@@ -349,22 +349,39 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 ### What you can change afterwards
 
 Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You
-get a panel with two tabs: **Details** and **History**.
+get a panel with three tabs: **Details**, **History** and **Attachments**.
 
 On the Details tab you can do **five things**:
 
 1. **Move it to another stage** — the **Move…** button. (§7)
-2. **Change who can see it** — the "Who can see this" section. (§10)
+2. **Change who can see it** — the pill on the **Visibility** row, which opens a menu. (§10)
 3. **Set or clear its due date** — the **Due** row's date box. Clearing the box takes the claim off
    rather than claiming a blank date. (§5)
 4. **Set its priority** — the **Priority** control, P1 / P2 / P3. Every job has one; new jobs start at
    P2. A job cannot be left without one, so there is nothing to clear. (§5)
 5. **Set or clear its start date** — the **Start** row's date box, like Due. (§5)
 
-Everything else on that panel is there to read rather than to change: the current stage, the type and
-the other field rows all show who claimed the value and when. Six rows are real controls — the title box
-at the top, the "Assignee" picker, the description box, the **Priority** control, and the **Start** and
-**Due** date boxes.
+Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a
+**Restricted** chip when its audience is a named list rather than the project or the workspace, and a
+*"Closed by … on …"* chip once it is closed. Directly below that line is where the job sits: *"At project
+root"*, or a *"Subtask of …"* chip that opens the job above it, or *"Restricted parent — exists, but you
+can't see it"*.
+
+The Details tab then reads top to bottom: the **description** box first, then the field rows — **State**,
+**Assignee**, **Priority**, **Due**, **Start**, **Type**, **Visibility** — then **Subtasks**, then
+**Comments**. That order is the prototype's, and the alternating tint on every second field row is
+decoration that nothing depends on.
+
+**The State row is a row of facts rather than a dropdown, on purpose.** It shows the stage, who moved the
+job there and when, and the **Move…** button. A stage change has to go through the rules on the move (§7),
+and a dropdown would step around them. **Start** sits beside **Due** and is the same kind of control — a
+date box that commits when you click away or press Enter, and **Escape** abandons what you typed without
+closing the panel.
+
+Everything else on that panel is there to read rather than to change: the type and the other field rows
+all show who claimed the value and when. The controls are the title box at the top, the **Assignee**
+picker, the **Priority** picker, the description box, the **Due** and **Start** date boxes, and the
+**Visibility** pill.
 
 ### The things you cannot do to a job
 
@@ -389,14 +406,15 @@ This is the honest list. Each one is an absence, not a hidden button.
   quietly lost.
 - **You can leave a comment on a job now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The job sheet carries a
-  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. A move
+  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. Its button
+  says **Post**, and the line beside it says what posting does — it records an event citing you. A move
   carrying the "require a comment" rule still puts its own box on the Move dialog (§7) and records what
   you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
   signed-in identity the phone shell does not have yet, so the control is withheld there rather than
   shipped in a shape that always fails silently (E5-44).
 - **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
-  remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's
-  files, and the comment box takes one too. The **description** box is still the exception: a file
+  remembers it as an absence finds the correction where they last saw it. The job sheet's
+  **Attachments** tab lists the job's files, and the comment box takes one too. The **description** box is still the exception: a file
   dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
   puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
@@ -996,15 +1014,20 @@ The notice clears itself next time something opens successfully.
 
 ### Setting who can see a job
 
-Open the job. On the Details tab there is a section headed **"Who can see this"** with four choices:
+Open the job. On the Details tab, the **Visibility** row holds a pill showing who can see the job
+right now — click it. A menu opens with four choices:
 
 - **Everyone in the workspace**
 - **Everyone on the project**
 - **Only the people I name** — a checklist of your workspace's people appears; tick who you want.
 - **Inherited from the parent** — whatever the job above it decided.
 
-Under every one of those, all the time, there is a line: *"Visible to: these people — and the workspace
-owner, always."*
+Pick one and press **Apply**. The menu closes once the change lands; if it does not land — a rule
+refused it, or the server could not be reached — the menu stays open with the reason shown beside the
+button, so you can try again without losing what you picked.
+
+Under every one of those choices, all the time, there is a line: *"Visible to: these people — and the
+workspace owner, always."*
 
 That line is a fact, not a caution. **The workspace owner can always see every job, whatever you set
 here.** It is shown on every option — not only the private one — because showing it only there would

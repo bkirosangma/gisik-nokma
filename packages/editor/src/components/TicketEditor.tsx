@@ -46,6 +46,22 @@ export type TicketEditorProps = {
    * than copying them; see the docblock at the host attribute below.
    */
   labelledBy?: string;
+  /**
+   * Where the Markdown hint is drawn.
+   *
+   * `'below'` (the default) is the editor's own place for it: below the field,
+   * outside the strip, which is the prototype's geometry (`:1173`) — and it is
+   * the default so that every mount which does not ask for anything else keeps
+   * exactly the chrome it had.
+   *
+   * `'none'` suppresses it ENTIRELY. One caller wants that: `TicketEditorSlot`,
+   * whose footer row draws the hint itself (and draws the host's `footerNote`
+   * instead in comment mode). Without this prop that slot would print the
+   * sentence twice — once here and once in its footer — and a duplicated hint
+   * is not a cosmetic fault: it is the same words in two places with no way to
+   * tell which is authoritative.
+   */
+  hintSlot?: 'below' | 'none';
 };
 
 export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
@@ -185,8 +201,15 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
           strip, so the two keep the prototype's geometry rather than being one
           block. Gated with the strip and for the same reason: it explains what
           typing `**bold**` does HERE, which is a sentence addressed to someone
-          who can type, and a read-only composer has nobody to address. */}
-      {editable ? <p className="ticket-editor__hint">{MARKDOWN_HINT}</p> : null}
+          who can type, and a read-only composer has nobody to address.
+
+          `hintSlot` is the second gate, and the ONLY caller that closes it is
+          the footer-chrome slot — see the prop's docblock. Read as
+          `(props.hintSlot ?? 'below') === 'below'` so an absent prop is the
+          default rather than a third state. */}
+      {editable && (props.hintSlot ?? 'below') === 'below' ? (
+        <p className="ticket-editor__hint">{MARKDOWN_HINT}</p>
+      ) : null}
       <UploadChips chips={chips} />
       <ImageWrapMenu editor={editor} />
     </div>

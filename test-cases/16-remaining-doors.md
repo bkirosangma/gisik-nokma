@@ -16,7 +16,7 @@ leaving it outside, so the section was opened.
 | **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.71`** (the `3b` allocation, **NARROWED 2026-09-21 — see the reallocation note below**), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak** and **`16.91`–`16.95` are MINTED 2026-09-20 for the Add-subtask affordance**. ⚠ **THE BLOCK `16.81`–`16.99` IS NOW FULLY SPENT**; exec 1's next free ids are `16.63`–`16.71` (of which only `16.61`–`16.62` are minted) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91` — ⚠ **a reading SUPERSEDED by the reallocation note below**); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time — **then `16.72`–`16.80`** (**REALLOCATED to exec 2 on 2026-09-21 — see the reallocation note below**), of which **`16.72`–`16.75` are MINTED 2026-09-21 for the comment thread** and **`16.76`–`16.80` are MINTED 2026-09-21 for the markdown-editing item** (the seeds parsed + `markdownLinks` on) — ⚠ **so exec 2's block is now FULLY SPENT and its next free ids are NOT `16.81`–`16.99` (exec 1's, fully spent too): it must be reallocated by the controller before the next mint** |
 | **priority built-in** (`docs/superpowers/plans/2026-09-22-priority-builtin.md`, #672) | **`16.100`–`16.109`** — the sheet's Priority editor and Start row (Task 7 of that plan); allocated 2026-09-22 against the catalogue tip `16.99`. ⚠ `16.100` also appears in this file's own prose above and in `17-open-work.md` as a WIDTH example, not a case — a line-head declaration is the only claim |
-| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block |
+| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block. **Minted by lane B (`rel/sheet-parity-b`, the comments block): `16.126` and `16.128`.** ⚠ **`16.127` WAS RESERVED AND HELD, AND IS NOW MINTED (2026-09-22, by the tail lane):** it is *the posting sentence is handed to the composer as its footer note, and the thread draws no second copy*, and it could not be written until the sheet's comment `EditorSlot` mount passed `footerNote` in `ticket-sheet.tsx` — the collision surface lane B was barred from. Its entry below is `✅`; the reservation is discharged rather than left standing. **Next free: `16.129`.** ⚠ **MINTED 2026-09-22 by the tail lane (`rel/sheet-parity-tail`, Tasks 3, 4, 6, 8 and the held half of 7): `16.110`–`16.112` (Task 3 — the chips line, the parent line, the third tab), with `16.113`–`16.117` (Task 4), `16.123`–`16.125` (Task 6) and `16.127` (the held half of Task 7, un-held once the sheet's comment mount could pass `footerNote`) landing in this same lane's later commits. So this row's ids are now SPENT and `16.129` is the only free one.** ⚠ **AND `16.129` WAS TAKEN 2026-09-22 by the same tail lane**, as the witness for the grid's tint seam — minted when the constant it guards was measured unconstrained (`160/160` green under a mutation that ships a doubled band), and whose first run then caught a real off-by-one in the loop's tint index. **THE BLOCK IS NOW FULLY SPENT: `16.110`–`16.129` is exhausted and any further case needs a controller reallocation.** |
 
 **✅ ANSWERED 2026-09-21 21:0x — THE PROPERTIES WERE MINTED IN §17, NOT HERE, AND THIS NOTE IS KEPT AS THE RECORD OF WHY (lane ds3 / batch B08).** The controller allocated `17.021`–`17.040` to this lane and directed the mint into `test-cases/17-open-work.md`; F3 is `17.021` and V4 is `17.022`, and each entry names **the §16 door it belongs to** (the comment thread, case `16.74`) so a reader arriving from this file's comments-thread section can find them. **§16 was not touched to mint them.** Original request follows, because a note that is deleted rather than discharged is how the next lane concludes the rule was never applied:
 
@@ -240,7 +240,7 @@ them all and `restrictedCount` names the ones this viewer may not see — so the
 against it on every render, and a disagreement is **said** rather than drawn. `16.17` is what makes that
 falsifiable; `16.18` is its control, without which a section that refused everything would pass.
 
-- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words. **And the ROW is read as a row** — `textContent` exactly `Order the brochures · To do`. The first version of this case did not, and that is the whole of the defect below: it queried each span's own text, so it passed while the row rendered `Order the brochuresTo do`. Two adjacent inline spans with no text between them are ONE RUN OF GLYPHS on screen and in the accessible name, and nothing in the case read the row as anything but two independent strings. **Found by the controller's browser pass on 2026-09-20** (`HSN codes for the real catalogueWaiting`); removing the separator now reddens this case with the defect itself in the message (`expected 'Order the brochuresTo do' to be 'Order the brochures · To do'`). **The treatment is TEXT rather than a CSS gap, deliberately**: this section declares no stylesheet rule at all and jsdom has no layout engine, so a gap would have been UNMEASURABLE — the unverifiable fix and the defect are the same shape.
+- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words. **And the ROW is read as a row** — `textContent` exactly `Order the brochures · To do`. The first version of this case did not, and that is the whole of the defect below: it queried each span's own text, so it passed while the row rendered `Order the brochuresTo do`. Two adjacent inline spans with no text between them are ONE RUN OF GLYPHS on screen and in the accessible name, and nothing in the case read the row as anything but two independent strings. **Found by the controller's browser pass on 2026-09-20** (`HSN codes for the real catalogueWaiting`); removing the separator now reddens this case with the defect itself in the message (`expected 'Order the brochuresTo do' to be 'Order the brochures · To do'`). **The treatment is TEXT rather than a CSS gap, deliberately**: this section declares no stylesheet rule at all and jsdom has no layout engine, so a gap would have been UNMEASURABLE — the unverifiable fix and the defect are the same shape. ⚠ **AMENDED 2026-09-22 (sheet prototype parity, Task 6): the ROW IS A CARD NOW and the whole-row `textContent` string it used to assert is unreachable.** It read `toBe('Order the brochures · To do')`; a card is a title element with a meta row BENEATH it, so the same correct rendering now reads `Order the brochuresTo do · task`. **The amendment keeps the property in both halves rather than dropping it:** the title and the meta row are asserted as separate ELEMENTS (a block boundary, not a run of glyphs), and WITHIN the meta row — where the chip and the detail DO share a line — the separator is still asserted as real characters, `To do · task` and not `To dotask`. That second half is the 2026-09-20 defect's exact shape one element to the right, and mutation `M8` (the leading glyph removed from the detail string) reddens this case, `16.124` and `16.124`'s control. — **The plan's Task 6 text claimed the pre-existing subtask cases would pass unchanged; this is the one that could not, and it is recorded rather than quietly edited.**
 - **16.16** ✅ The empty state draws the prototype's sentence, verbatim, when `rollup` is null (the server's own spelling for "no children at all").
 - **16.17** ✅ **Refuses to render a short list:** when the rollup counts more children than were read, the section says so in the server's numbers and **draws no rows**.
 - **16.18** ✅ The control for 16.17 — with the count AGREEING, the list IS drawn and no refusal appears.
@@ -318,7 +318,7 @@ what the prototype draws there.
 - **16.27** ✅ Priority renders the claim as the **SELECTED segment**, with its claim line. **AMENDED 2026-09-22** — it read *"it is a CONVENTION, so the claimed case arrives by the ticket carrying the field"*, and the retitle is the amendment: priority is a built-in, so the claimed case is the ORDINARY one, and the value renders through the control rather than as loose text. All three segments' `aria-selected` states are asserted, not only `P1`'s, so a control that marked every segment selected — or none — cannot pass.
 - **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text. **AMENDED 2026-09-22:** `startDate` joins the exclusion, asserted as `queryByTestId('field-startDate')` being null, and `field-priority` is asserted to appear exactly ONCE via `getAllByTestId` — an absence assertion would pass for a sheet that drew no priority row at all.
 - **16.29** ✅ Priority, Due and Start are **EDITORS**; **Type is the one row read-only**. **AMENDED TWICE:** by E5-6 (2026-09-21) this stopped pinning a uniform read-only absence and started pinning a split, and spec 2026-09-22 took the other half of the prototype's own shape — priority's segmented control and the Start row. Each editor is asserted POSITIVELY (its own control is present) so the case cannot pass by a control silently disappearing, and Type's read-only-ness is asserted as an absence the way `16.22` does for F's chip.
-- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is.
+- **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index. **EXTENDED 2026-09-22:** Start joins the rows between Due and Type, which is where the spec places it and where its twin is. ⚠ **This case is now the RELATIVE order of four rows inside a larger grid**, and it still holds: the full order — Description above the grid, then `State · Assignee · Priority · Due · Start · Type · Visibility`, then Subtasks and Comments — is `16.113`'s, one case owning the whole sequence rather than this one growing a clause per row added elsewhere. Neither case subsumes the other: this one reddens if two of ITS four swap, `16.113` reddens if a row moves around them.
 - **16.100** ✅ Clicking a segment other than the selected one submits exactly ONE `ticket.field_set` carrying `{ fieldId: 'priority', value }`. The payload is asserted with `toEqual`, never `toMatchObject`, so a row that re-spelled the fieldId or wrapped the level in an object is a different claim about the ledger. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **16.101** ✅ CONTROL — clicking the segment ALREADY selected submits nothing. The ledger is append-only, so a commit that changed nothing would record a claim nobody made; and there is nothing to clear to, which is why priority has no clearing gesture at all while its twin Due does. — `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **16.102** ✅ A REFUSED priority prints the server's own sentence beside the row and leaves the PREVIOUS segment selected — a control that adopted the refused level would be showing a value nobody recorded. — `packages/app-core/test/views/ticket-sheet.test.tsx`
@@ -444,7 +444,10 @@ specific mutation, not about a sentence.**
 case that asserts the parent's id is absent from the body, so **the leak guard can fail**; dropping the
 state from a subtask row reddens **16.15**; and moving the separator INSIDE the title span stays **green**,
 correctly — the row's text and its accessible name are byte-identical either way, so green is the right
-answer there rather than a blind spot.
+answer there rather than a blind spot. ⚠ **The second reading EXPIRED ON 2026-09-22 with the card (Task 6):** the
+separator now sits in a DIFFERENT element from the title, so moving it into the title span changes the meta
+row's text and reddens `16.15` — the mutation's verdict is a fact about the markup it was run against, not
+about the sentence, which is what the paragraph above this one already records.
 
 **The review round's five findings, all applied BEFORE the PR opened:** the stale authority (this section's
 `16.40` cited 6.66's *"no table stores a ticket title"*, true when written and false since `proj_tickets`
@@ -919,7 +922,7 @@ differently* is a feature. The PR body must say which list each item is on, and 
 migration or a disclosure the table does not name is a **STOP AND ASK**.
 
 - **16.82** ✅ **`Full screen`** — the authority's pill (`desktop.dc.html:1119-1120`: 32px minimum height, fully round, an icon and a label that BOTH change), toggling **the scrim, the panel and the body TOGETHER** (the prototype's own three-part treatment, `:3396-3400`: the scrim goes opaque, the panel fills the viewport, the body becomes a centred 860px column). **All three parts are one property**: any one alone is a panel that grew while the page behind it stayed visible, which is what each part looks like on its own. Mutation-witnessed both ways — the scrim alone left behind reddens it, and a label that never turns around reddens it.
-- **16.81** ✅ The sheet's sections are **ONE segmented control** — the authority's shape (`:1134-1140`) — rendered by the SHARED `SegmentedControl`, carrying the same `tablist` / `tab` / `aria-selected` roles the two bordered buttons had, **plus a `aria-label` the tablist never carried** (see the correction below). **Two tabs exactly**: `Attachments` is a read, and its absence is pinned so inventing it cannot pass. Mutation-witnessed: an empty label reddens it, and adding a third tab reddens it. **⚠ The added `aria-label` is NOT seen by the accessible-name ratchet, and an earlier version of this line claimed a "ratchet RISE": no suite renders the sheet** (the sweeps navigate `/p/:projectId` without `?ticket=`, and the sheet mounts only when it is present), so the number cannot move either way today — the witness is the unit assertion, and the rise would be exactly one `ariaLabel` the day something renders it.
+- **16.81** ✅ The sheet's sections are **ONE segmented control** — the authority's shape (`:1134-1140`) — rendered by the SHARED `SegmentedControl`, carrying the same `tablist` / `tab` / `aria-selected` roles the two bordered buttons had, **plus a `aria-label` the tablist never carried** (see the correction below). **⚠ THREE tabs since 2026-09-22, and this line read "Two tabs exactly" with the `Attachments` tab's ABSENCE pinned.** That absence was correct while the question of drawing a third surface was open; **the owner ruled it in** (sheet-parity spec decision 5 — *"add the Attachments tab"*), so the case now asserts the ruled shape. **The mutation witness turns around with it:** adding a third tab reddened this case when two were right, and the way to redden it now is REMOVING one — the assertion is `toEqual(['Details', 'History', 'Attachments'])` plus a length, so neither direction of drift passes. **⚠ The added `aria-label` is NOT seen by the accessible-name ratchet, and an earlier version of this line claimed a "ratchet RISE": no suite renders the sheet** (the sweeps navigate `/p/:projectId` without `?ticket=`, and the sheet mounts only when it is present), so the number cannot move either way today — the witness is the unit assertion, and the rise would be exactly one `ariaLabel` the day something renders it.
 - **16.83** ✅ **The ticket-type list's ↑/↓ reorder had NO CSS RULE AT ALL**, and now has one — which is the whole case, because the class rendered as raw user-agent chrome for as long as it existed. **Measured in Chromium against the real screen:** `button.ticket-type-list__move` appeared in `ui.css` and `globals.css` **zero times**, against a positive control of `.ticket-type-list__row` in the same sweep; it painted `border: 2px outset`, `background: rgba(239,239,239,0.3)`, `border-radius: 0px`, `font-weight: 400`, `28.2 × 29.2`. **⚠ AND THE FIRST REPORT OF IT WAS MISDIAGNOSED** — the controller told the owner it was a *contrast* regression at 1.41:1; a class with no rule has no ratio of its own to be below, and the 1.41 was the stripped UA border colour the roster had been recording all along. **So this case does not pin a colour and must not be read as fixing one.** It pins that the rule EXISTS, that it carries the repo's ruled borderless-control roles (`--gn-fill-tertiary` + `--gn-text-accent` + `--gn-radius-control`, the same pairing `.gn-button` and `.gn-board-card__move` resolve this identical prototype constant to), that **no `[data-style]` block forks it** (13.340's positive scan, repeated for this class), and that the **44px tap target is taken over the prototype's own `32px`/`36px`** — the recorded divergence `.gn-board-card__move` already made, pinned so a re-transcription cannot land quietly. Mutation-witnessed **six ways, and each mutation dies on ITS OWN assertion**: the rule deleted (`rule()` throws), the fill swapped, `2.75rem` → `32px`, a `[data-style="neo"]` override added, `:disabled` `0.4` → `0.55`, and the `<li>` taken back off `display: flex`. **The three styles resolve from ONE unconditional rule** — measured in Chromium: `hig`/`minimal` at `rgba(39,58,99,0.11)` + 8px, `neo` at `rgba(176,152,132,0.16)` + 14px. **The glyph clears 4.5 in all six style×theme combinations on its real painted composite** — worst **`hig`/`minimal` DARK at `4.75`** (the full set: 4.75 · 4.75 · 4.98 · 5.18 · 5.18 · 5.85; an earlier draft of this line named `neo` light's `4.98` as the worst, which is **not the minimum in the author's own table**) — measured rather than assumed because the button's ground is the card, not the `surface` the existing `fillTertiary` case pins, and **no case in `tokens.test.ts` asserts this pairing** (its composited check at `:588` uses the default style only, over `surface`). **The layout half is part of it:** `<li>` is now the flex row the component's own comment claims ("the controls sit beside the door") and nothing honoured while `<li>` was `display: list-item` and the row door is `width: 100%` — measured before: pair top `205.7` against row top `234.8`, i.e. the pair sat on its own line ABOVE the row it reorders. **What it does NOT settle, named rather than assumed:** the owner's 2026-09-20 ruling that *dense in-list* controls take 24px has a checker that does not exist yet, so 44 is taken here — matching the repo's only other instance of this exact control — and **24 would LOWER a floor a live gate currently enforces.** That question and the rule to change are named in `ui.css`'s own block. `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
 
 ## The attachments read — a route over the table that has been waiting for a caller (executor 2, 2026-09-20) — cases `16.47`–`16.58`
@@ -958,8 +961,8 @@ merely 404s everything.
 - **16.54** ✅ **The seam keeps the two states apart.** `getTicketAttachments` resolves `[]` for an empty list and REJECTS with the status it was (404) on a refusal — written as a pair in one run, because either half alone passes for the wrong reason (a method that always throws passes the rejection half; one that never throws passes the resolution half). `[]` has exactly one meaning here, which is what lets the sheet draw silence for it and a sentence for the other.
 - **16.55** ✅ The five served fields map onto the upload arm IN THE ORDER the route answered (the list renders that order), and a `sha256` that is neither a string nor `null` is REFUSED rather than mapped into the view as `undefined`, where it would render as nothing and read as "no hash known" — which is what `null` means.
 - **16.56** ✅ **The offline replica refuses this read with a NAMED absence while `getTicketHistory` serves the same fact.** The local ledger really does carry `attachment.added`, so the list looks derivable on the spot; the case applies the event to a real replica, shows the history door serving it (the positive control that makes the refusal a DECISION rather than an inability), and holds the refusal to naming what cannot be filled, why the ledger cannot stand in, and who closes it. Case `12.185` was updated in the same change set: its enumeration moved EIGHT → NINE, and its `Object.keys(REPLICA_GAPS)` comparison is order-sensitive, so the entry is inserted where the registry inserts it.
-- **16.57** ✅ **The sheet keeps an empty list and a failed read apart.** All three arms in one run — entries (drawn), empty list (nothing drawn, and no sentence: the component must not turn "there are none" into a warning), and a failed read (a sentence carrying the transport's own reason, deliberately NOT dressed as `Loading…`). `attachmentsUnavailable` mirrors `NewTicketDialogProps.parentCandidatesUnavailable`, which draws its reason the same way.
-- **16.58** ✅ **The page asks the read for the OPEN ticket.** The real page renders, opens a real ticket, and the assertion is on the ARGUMENTS the production caller passes — a page that read attachments for some OTHER ticket would draw a plausible list and pass every screen-level assertion in `16.57`. Delete the read from the page and this reddens while `16.57` stays green, which is exactly why `16.57` could not catch it (the same argument `evidence-upload.test.tsx` makes for `16.31`).
+- **16.57** ✅ **The sheet keeps an empty list and a failed read apart.** All three arms in one run — entries (drawn), empty list (nothing drawn, and no sentence: the component must not turn "there are none" into a warning), and a failed read (a sentence carrying the transport's own reason, deliberately NOT dressed as `Loading…`). `attachmentsUnavailable` mirrors `NewTicketDialogProps.parentCandidatesUnavailable`, which draws its reason the same way. ⚠ **Amended mechanically on 2026-09-22** (sheet-parity Task 3): each of the three arms now opens the Attachments tab first, because the owner's ruling moved this section out of Details and behind its own third tab. The claims are unchanged — only the tab they are read under.
+- **16.58** ✅ **The page asks the read for the OPEN ticket.** The real page renders, opens a real ticket, and the assertion is on the ARGUMENTS the production caller passes — a page that read attachments for some OTHER ticket would draw a plausible list and pass every screen-level assertion in `16.57`. Delete the read from the page and this reddens while `16.57` stays green, which is exactly why `16.57` could not catch it (the same argument `evidence-upload.test.tsx` makes for `16.31`). ⚠ **Amended mechanically on 2026-09-22** for the same reason as `16.57`: both arms open the Attachments tab before reading the list or the failure sentence. **The id is unchanged and the case is still the one that proves the CALL SITE** — a tab click is not a page behaviour and the assertion on `asked` is untouched.
 
 ### What is NOT covered, named rather than implied
 
@@ -1161,7 +1164,7 @@ what."* Both were built; the two decisions taken are named in `16.69` and `16.70
 (`16.72`–`16.80`) to exec 2 while this work was in flight, so thirteen assertions were brought inside a nine-id block **by
 grouping arms of one property under one id** — never by dropping an arm. Which `it`s share an id is stated in each entry.
 
-- **16.63** ✅ **The chain is the ANCESTOR CHAIN — `workspace › project › [epic] › [parent] › key` — and the STATE is not a crumb.** Two assertions under one id, because the second is the first's negative half. The order is `desktop.dc.html:3404-3425` transcribed rather than invented. ⚠ The state crumb is gone and should never have been there: the authority has none, and the sheet was built to `Workspace › Project › State` because the state was *"the one crumb whose source is IN this component"* while the ancestor chain *"would need a third host prop or a read"* — **the cheap reading was built and the authority's actual chain was not.** ⚠ **The removal carries a property it would otherwise have ORPHANED**: the old state crumb asserted *"the workflow's NAME for the state, not the raw id"* and was the only case in that file owning it, so both arms follow the element to the state chip in the same case. — `packages/app-core/src/views/ticket-sheet.tsx`
+- **16.63** ✅ **The chain is the ANCESTOR CHAIN — `workspace › project › [epic] › [parent] › key` — and the STATE is not a crumb.** Two assertions under one id, because the second is the first's negative half. The order is `desktop.dc.html:3404-3425` transcribed rather than invented. ⚠ The state crumb is gone and should never have been there: the authority has none, and the sheet was built to `Workspace › Project › State` because the state was *"the one crumb whose source is IN this component"* while the ancestor chain *"would need a third host prop or a read"* — **the cheap reading was built and the authority's actual chain was not.** ⚠ **The removal carries a property it would otherwise have ORPHANED**: the old state crumb asserted *"the workflow's NAME for the state, not the raw id"* and was the only case in that file owning it, so both arms follow the element to the state chip in the same case. ⚠ **Amended on 2026-09-22** (sheet-parity Task 3): the positive-control arm is now scoped to `.gn-ticket-sheet__state` rather than the whole page, because the header's new chips line draws its OWN state chip and a page-wide `getByText('Doing')` would find two nodes. **The property — the workflow's NAME, never the raw id — is unchanged**; a body-wide query would have started failing for a reason that has nothing to do with what the arm names. — `packages/app-core/src/views/ticket-sheet.tsx`
 - **16.64** ✅ **An ancestor crumb is a control ONLY where it can be honoured — a link that opens THAT ancestor's sheet with `onOpenTicket`, a plain pill without it.** Two assertions under one id. The LINK arm is asserted on the **ARGUMENT** and each crumb is clicked **SEPARATELY**: a crumb wired to the ticket's own id, or to one id shared by both crumbs, would satisfy *"the handler ran"*. The PILL arm asserts the ancestor is still NAMED. The last crumb is asserted a `SPAN`, so there is no click for a traversal to loop on. — `packages/app-core/src/views/ticket-sheet.tsx`
 - **16.65** ✅ **A RESTRICTED ancestor is NAMED, NEVER DROPPED, and is never a control.** Dropping it would make a restricted chain render as a SHORTER one — the vanish `invariant 5` forbids, and the reason the parent indicator has a restricted arm at all. The chain is asserted to still be FIVE long, so the arm occupies its own place rather than collapsing the hierarchy; the id the read sent is asserted absent. — `packages/app-core/src/views/ticket-sheet.tsx`
 - **16.66** ✅ **The last crumb is the ticket KEY; a `null` key falls back to the TITLE and never to `state.id`.** Two assertions under one id, because the fallback is the key arm's own edge. The wrong fallback is the plausible one: a ULID is not a key, and `my-work.tsx`'s *"id-only rather than blank"* rule does not license printing one here — that rule is for a SERVED withheld name, and a `null` key is a derivation this read could not complete. Scoped to the nav rather than to `document.body`, because the ticket's id legitimately appears elsewhere on the sheet. — `packages/app-core/src/views/ticket-sheet.tsx`
@@ -1200,15 +1203,15 @@ decisive property.
 
 - **16.72** ✅ **The thread route answers through the PRODUCT'S OWN DOOR, and refuses a soft-deleted ticket with a LIVE CONTROL in the same run.** `POST /v1/workspaces` for the workspace — that is what runs the founding sequence and publishes the built-in types — then `POST /v1/events` for the project, the tickets and every comment **but two**, each asserted `committed`, so the projection under test is the one the ingest transaction runs. ⚠ **The two exceptions are the fixture's own labelled hand-writes, and the entry said "every comment" until an independent review measured it:** a comment whose embedded file cannot resolve, and one on another ticket, go in through `writeCommentRow` because no product door can produce them. The test file labels both where they occur; this entry did not. Served in `workspace_seq` order; an unauthenticated caller refused; **no other ticket's comments, asserted as a SET DIFFERENCE in both directions**; a file belonging to a different ticket is not resolved; and an invisible, a nonexistent and a foreign ticket are answered identically. ⚠ **`seedTicket` was the first attempt here and it was WRONG in a way worth naming**: it writes `proj_tickets` by hand and leaves `proj_entity_heads` empty, so the `ticket.deleted` the guard needs was refused `unknown-ticket` — the engine resolves a ticket through its HEAD row, not through `proj_tickets`, and a fixture built on the seed helper would have proved the guard against a ticket the engine does not believe exists. — `apps/server/test/routes/ticket-comments.test.ts`
 - **16.73** ✅ **The wire→view mapper KEEPS an unresolved file entry with a `null` mime rather than failing the read.** `files[].mime` is `string | null` ON THE WIRE because `null` is the server saying an embedded attachment id resolved to no row — and the server renders the ID in place of a name rather than dropping the entry. **A mapper that demanded a string would turn that honest fallback into a thrown `MappingError`, so ONE unresolvable id would cost the reader the whole thread** — the assertion worth the most in this file. Both directions, so "keeps everything" is not passed by a mapper that invents: a mime that is neither a string nor `null` IS refused, and a row missing a field the mapper cannot invent IS refused. ⚠ `body` is deliberately NOT checked, and that is a contract rather than an omission — a comment body is a ProseMirror document, amendment 12 keeps it opaque outside `packages/editor`, and `docToPlainText` is total, so a malformed body renders as empty text; the last case pins it because it is the shape of decision a later reader will want to "fix". — `packages/app-core/test/online/comment-mapper.test.ts`
-- **16.74** ✅ **The thread renderer draws TWO ABSENCES as themselves — a failed read is not an empty thread, and a comment's files are never dropped.** `[]` draws *"No comments yet."*, a sentence about the TICKET, so a failed read draws a different thing **and the heading drops its count**, because `Comments · 0` over a read that failed is a count nobody measured. A body renders through `docToPlainText`, which draws an `image` node as NOTHING, so the chip row is the only trace of a comment's file — **and the chip is NOT a link when the id is unresolvable**, because a link to bytes nobody holds is a control that does nothing; **a resolved file IS linked**, so that refusal is a decision and not a renderer that never links anything. The composer is drawn only when one is supplied. — `packages/app-core/src/views/comments-thread.tsx`
+- **16.74** ✅ **The thread renderer draws TWO ABSENCES as themselves — a failed read is not an empty thread, and a comment's files are never dropped.** `[]` draws *"No comments yet."*, a sentence about the TICKET, so a failed read draws a different thing **and the heading drops its count**, because `Comments · 0` over a read that failed is a count nobody measured. A body renders through `docToPlainText`, which draws an `image` node as NOTHING, so the chip row is the only trace of a comment's file — **and the chip is NOT a link when the id is unresolvable**, because a link to bytes nobody holds is a control that does nothing; **a resolved file IS linked**, so that refusal is a decision and not a renderer that never links anything. The composer is drawn only when one is supplied. ⚠ **Amended 2026-09-22** (plan Task 7, the permitted fixture edit for `comments-thread.test.tsx`): the case that carried *"and always with the prototype's sentence"* dropped that clause, and the absence arm now reads `queryByRole('button', { name: 'Post' })` rather than a text query for the sentence. **The sentence is the COMPOSER's now** — it arrives as the host's `footerNote` and is drawn inside the slot's footer row — so a thread asserting it here would be asserting a fact about a control it does not own; `16.127` is where its passing is proved. The property this case owns is unchanged: a thread with no composer draws no control. — `packages/app-core/src/views/comments-thread.tsx`
 - **16.75** ✅ **The composer is mounted AT THE SHEET, gated on the app having mounted an editor, and wired to the LEDGER.** The sheet reads the thread and **RELOADS it after a post** so the author sees their own comment; ⚠ `read` is deliberately NOT reloaded — a comment changes no head state, so that reload could not return a different answer — **which is design rationale rather than an asserted arm: the cited file's only read instrument counts `getTicketComments`, so nothing in that file can falsify the clause about `read`.** **What IS pinned rather than described is the THREAD's reload**, because an independent reviewer measured that commenting out `comments.reload()` left the three comment suites green — **107 tests at the tree that reviewer measured (`d89db1df`); re-measured at this head they are 113, so the figure travels with its tree rather than standing as a bare number.** The upload emits `attachment.added` from the **SERVER-SNIFFED** result and refuses one that did not land; a refused claim THROWS rather than leaving an unfinished picture in the document; a failed thread read draws a sentence, not *"No comments yet."* — `packages/app-core/src/views/ticket-sheet.tsx`
 
 ### What is NOT covered, named rather than implied
 
 - ⚠ **The replica serves NO comments, and that is a stated choice rather than a gap.** `getTicketComments` refuses with a `ReplicaGapError`: a comment's FILES are resolved against a server table the replica does not hold, and the renderer draws an `image` node as nothing — so a ledger-derived thread would draw a comment that embeds a file as one that embeds none. The bodies alone are derivable; the attribution is not. **Owner: whoever next extends the replica's ticket read.**
 - **A comment's files are CHIPS, not inline images.** `docToPlainText` draws an `image` node as nothing, which is exactly why the chip row is load-bearing and why dropping it would draw an absence as a fact.
-- **The composer's footer sentence renders as a LINE UNDER the composer** rather than inside a footer row with `Attach` and `Post` as the prototype draws it: the composer is `packages/editor`'s `TicketEditorSlot`, which draws its own submit control and cannot have one injected.
-- ⚠ **`.editor-slot` / `.editor-slot__submit` remain UNSTYLED** — pre-existing, recorded at `apps/web/e2e-viewport/type-scale.ts:355-357`. The comment box inherits it exactly as the description row already does. Not introduced here, not fixed here.
+- **The composer's footer sentence WAS rendered as a LINE UNDER the composer**, rather than inside a footer row with `Post` as the prototype draws it — because the composer is `packages/editor`'s `TicketEditorSlot`, which draws its own submit control. ⚠ **CORRECTED 2026-09-22 (sheet prototype parity, Task 7): this is no longer an absence.** `TicketEditorSlot` now draws a footer row whose LEFT is the `footerNote` slot, the comment mount passes *"Posting records an event citing you."* through it, and the thread's own `<p>` is deleted (case `16.127`). **This bullet was missed by the Task 8 sweep because the sweep searched for TERMS rather than for claims** — the plan listed *"Comment"* as a term and this bullet calls the control `Post`, so no pattern matched a sentence that says the opposite of the shipped tree. Recorded here rather than quietly deleted, because a NAMED ABSENCE that has stopped being absent is the exact drift this list exists to prevent.
+- ⚠ **`.editor-slot` / `.editor-slot__submit` WERE UNSTYLED** — pre-existing, recorded at `apps/web/e2e-viewport/type-scale.ts:355-357`. The comment box inherited it exactly as the description row already did. Not introduced here. ⚠ **AND THEY ARE STYLED NOW, so both halves of this bullet are superseded (2026-09-22, sheet prototype parity Task 2).** `packages/editor/src/styles/editor.css` gives `.editor-slot` its sunken chrome and `.editor-slot__submit` the accent-filled control at the 44-px floor. **⚠ THE CITATION THIS BULLET POINTS AT HAS ALREADY BEEN CORRECTED AND THIS ONE HAD NOT**, which is the worse half: a reader following `type-scale.ts:355-357` now finds the original claim quoted WITH its correction beside it, and then reads here that the claim still holds. **The two are corrected in one change so they cannot disagree.**
 - ⚠ **A PRE-EXISTING PROSE TOKEN NOW COLLIDES WITH A MINTED ID.** `test-cases/13-neomorphism-and-workspace-screens.md:769-770` reads *"19 elements across 7 routes, positive control 16.72"* — ⚠ **the quoted fragment WRAPS, so it spans two lines; the token itself is on `:770`** — added 2026-09-19, before this mint. Neither guard counts it (it is not an id line) so no ratchet moves, and it is almost certainly a CONTRAST RATIO rather than a citation — but it is now indistinguishable from a citation of this block's first case. **Not repointed here, because rewriting it would be guessing at its unit. Owner: whoever next edits that §13 entry.**
 
 ## The seeds are PARSED, and the typed link is ON (executor 2, 2026-09-21) — cases `16.76`–`16.80`
@@ -1263,3 +1266,437 @@ using, and `docker compose` is forbidden in this topology. Owner: whoever next r
   was dismissed, not absent. Case `9.260` is the 2x2 that separates the trigger from the probe's conditions, and the typed
   link is now a row in `9.88`'s trigger table. No production behaviour changed — the mechanism was always generic; the record
   was the defect. Recorded in `packages/editor/src/schema/extensions.ts` and `packages/editor/test/schema.test.ts` (`9.95`).
+
+## Sheet prototype parity, Task 5 — the visibility pill becomes a menu trigger (lane A / claude-sonnet, 2026-09-22) — cases `16.118`–`16.122`
+
+Spec `docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, decision 6–7; plan
+`docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md` Task 5. Drawn from this lane's block
+`16.110`–`16.129`, minted `16.118`–`16.122`: `16.110`–`16.117` and `16.123`–`16.129` are Tasks 3, 4,
+6 and 8's, which touch `ticket-sheet.tsx` and wait for the priority-built-in PR to land before
+rebasing onto it — out of scope for this lane. The sheet-side mount of `VisibilityEditor` into the
+`field-visibility` row is Task 4's, not this one's (the plan's own Task 5 header says so); this
+component's tests drive it directly, as they always have.
+
+`VisibilityEditor`'s standing chip (`packages/app-core/src/views/visibility-editor.tsx`) is now the
+`aria-haspopup="dialog"` trigger for a `Popover` (Task 1) holding the SAME fieldset, people picker,
+lockout warning, Apply button, refusal and unreached sentence this component always had — moved,
+not rebuilt. Every pre-existing case in `visibility-editor.test.tsx` that touches one of those
+controls now opens the menu first, via an `openMenu()` helper; the file's own `it(` count moved from
+30 to 35 (5 new, 0 dropped) — see `test/views/visibility-editor.test.tsx`. `ticket-sheet.test.tsx`'s
+four `.gn-visibility__standing`/`role=region` cases (3.116, 3.117, 3.174, 3.175) are untouched and
+still pass: the trigger's dot/mode span nests inside `.gn-visibility__standing`, unchanged from
+before, and the section keeps its `aria-label`.
+
+- ✅ **16.118 — clicking the pill opens a `role="dialog"` named "Change who can see this", holding
+  all four visibility-mode radios and Apply; Apply on a committed write closes it.** The success arm
+  is asserted on TWO facts together — the dialog closes AND the write actually reached the source
+  (`source.submitted`) — because either alone passes over the other: a component that closed on
+  every click regardless of the write, or one that submitted but left the dialog stuck, would each
+  satisfy one half.
+- ✅ **16.119 — Apply on a REFUSAL leaves the menu open, with the refusal rendered inside it.** The
+  refusal text and the dialog's continued presence are the same case: a component that closed on
+  every Apply (success or not) would pass a "refusal renders" assertion taken alone, if the dialog
+  vanished before the text could be read.
+- ✅ **16.120 — an explicit, named audience draws one read-only chip per person under the pill, and
+  none of them is a button.** The prototype's row (`desktop.dc.html:1214-1222`) carries a `×` and an
+  `Add someone…` select; this build has neither, because both are per-person writes it does not
+  have — the people checklist inside the menu is the one write path and stays there. Asserted as a
+  `queryAllByRole('button')` count of zero, not as an absent class, so a future chip that grows a
+  remove control without renaming anything still reddens here.
+- ✅ **16.121 — with no served audience (`current: null`) the trigger still exists and still opens
+  the menu.** The unserved sentence ("not being served yet") is not an excuse to make the control
+  unreachable — a person on the offline replica still needs a way to set an audience going forward.
+- ✅ **16.122 — Escape closes the menu and returns focus to the pill.** `FocusScope`'s restore is
+  `requestAnimationFrame`-based (the same mechanism `Popover`'s own tests and `select.tsx`'s E4-17
+  cases hit), so the focus assertion is `waitFor`-wrapped rather than synchronous — a synchronous
+  read here is a timing race, not a measurement of the component being wrong, and the plan's own
+  draft test read it synchronously and would have failed on its first run for exactly that reason.
+
+`Features.md`'s visibility bullet is extended in the same commit: the pill is a menu trigger, the
+controls move into the popover unchanged, and read-only viewer chips appear under an explicit named
+audience. `docs/manual.md` §10 is rewritten to describe clicking the pill rather than a
+static section. — `packages/app-core/src/views/visibility-editor.tsx`, `packages/app-core/test/views/visibility-editor.test.tsx`, `packages/ui/src/ui.css`
+
+## The Comments heading takes the sheet's caption name, and the posting sentence's move is OWED (lane B, 2026-09-22) — cases `16.126`–`16.128`
+
+**This is HALF of Task 7 of the sheet-prototype-parity plan, and the half is split by a rule rather than by
+effort.** The task has two moves: give the Comments heading the sheet's shared caption class (`16.126`), and move
+the posting sentence out of the thread and into the composer's footer (`16.127`). The first is here; the second
+is HELD, and the reason is a measurement rather than a preference.
+
+**The measured fact that decided it.** Handing the sentence over is a one-line edit passing
+`footerNote="Posting records an event citing you."` at the sheet's comment `EditorSlot` mount in
+`ticket-sheet.tsx` — the file this lane is explicitly barred from touching, because the priority built-in lane
+and this plan's own tail lane both edit it. **Deleting the thread's hint paragraph WITHOUT that mount would lose
+the sentence from the product**, since nothing else draws it: the tail lane's Task 7 text expects
+`ticket-sheet-comments.test.tsx`'s pre-existing assertion at `:219` to keep passing while the stub editor draws
+`props.footerNote`, and `footerNote` is `undefined` until the mount passes it. So the deletion and the mount are
+ONE change and must land together. `16.127` is recorded `❌` with that reason rather than written as a case that
+could only assert the opposite of its own name.
+
+**The other half deserves its own paragraph because it changes nothing on screen, and saying so is the point.**
+`.gn-comments__heading`'s rule (`packages/ui/src/ui.css:6449`) already declares the whole eyebrow —
+`font-size: 0.8125rem`, `line-height: 1.125rem`, `text-transform: uppercase`, `letter-spacing: 0.6px`,
+`var(--gn-text-muted)` — and the shared `.gn-ticket-sheet__caption` rule the plan gives Task 4 is a transcription
+of exactly those declarations. **So this is a NAME being introduced and not a look being changed.** The shared
+class carries no rule until Task 4 lands, which is why `16.128` exists: a class asserted in the absence of a rule
+is a hook, and the thing a hook can be mistaken for is the look.
+
+**Two claims this change set had to correct, both caused by the OTHER lane's Task 2** (which gave
+`.editor-slot` and `.editor-slot__submit` their rules in `packages/editor/src/styles/editor.css`, closing a gap
+both files recorded as open): the paragraph above `ui.css`'s comment-thread block and the paragraph in
+`apps/web/e2e-viewport/type-scale.ts` both stated, as a measurement, that those two classes were unstyled and
+fell back to user-agent styling. Neither is true any more. Both are corrected in place, quoting the original
+claim, because a measurement that has gone false is a defect and not a footnote.
+
+### The case
+
+- **16.126** ✅ The Comments heading wears `gn-ticket-sheet__caption`, the name the sheet's `SUBTASKS` heading
+  will share once Task 4 hangs a rule on it. Read at the SHEET, through the real `CommentsThread` mount, because
+  the name is the sheet's caption contract and not the thread's private business.
+  `packages/app-core/test/views/ticket-sheet-comments.test.tsx`.
+- **16.127** ✅ **The posting sentence is handed to the composer as its `footerNote`, and the thread draws no
+  second copy.** ⚠ **THIS WAS `❌` OWED UNTIL 2026-09-22 AND IS NOW WRITTEN, by the tail lane that holds
+  `ticket-sheet.tsx`** — exactly the handoff the paragraph above describes, performed rather than reassigned.
+  The mount passes `footerNote="Posting records an event citing you."`, `comments-thread.tsx` deleted its hint
+  paragraph and the deviation comment above it, and `ui.css` deleted `.gn-comments__hint` and reduced
+  `.gn-comments__composer` to its margin. **The case reads BOTH directions:** `seen.notes` contains the
+  sentence (it reached the seam) AND the section shows it exactly once AND the copy on screen is contained by
+  the composer element — a build that added `footerNote` without deleting the paragraph passes the first and
+  draws the sentence twice, which is the shape the count and the containment arm exist for.
+  `packages/app-core/test/views/ticket-sheet-comments.test.tsx`.
+- **16.128** ✅ CONTROL — the heading ADOPTED the caption class; it was not RENAMED into it. Both class tokens
+  are asserted on the same element, plus its tag and its exact text so neither reading can be of some other node
+  starting with the word. `16.126`'s `toContain` passes just as happily over a heading whose own class was
+  dropped, and dropping it **would have left the element with no effective style at all while the shared rule
+  did not exist** — which is why this arm had to be written BEFORE the shared rule landed, and it is the reason
+  it was not deferred: it is the guard that made the later removal safe. **The CSS half is deliberately not
+  asserted here:** a case reading those declarations out of `ui.css` would have had to be rewritten when the
+  tail lane removed them, and a case that exists to be edited is a liability rather than a guard.
+  `packages/app-core/test/views/ticket-sheet-comments.test.tsx`.
+
+**⚠ CLOSED 2026-09-22 — the two halves of Task 7 both landed, and this section's title is kept as the record of
+the split rather than corrected.** The `❌`-with-a-reason was the right form for a case that could not be
+written, and the reason it gives is what the tail lane followed. **The tail lane also did the one thing this
+section handed it that was NOT in the plan's Task 7 step text:** the six duplicate declarations under
+`.gn-comments__heading` were removed, because this section's own paragraph made that removal conditional on the
+shared rule existing and the shared rule now does. **The stale source comment that stood over them ("the shared
+class carries no rule yet … the duplicate declarations are the tail lane's to remove") and the matching
+docblock over `16.126`/`16.128` were corrected in the same change** — a guard that has been discharged must stop
+reading like a guard, or the next reader re-derives the same two-step dance for a rule that is now single.
+
+**Mutation `M6` (the mount's `footerNote` line deleted), run: 2 failed / 18 passed in the two comment suites.**
+It kills `16.127` **and** the pre-existing `mounts the composer in COMMENT mode, with the prototype's
+sentence…` case — which is the coupling the paragraph above predicted and is why that case's fixture had to gain
+`<p>{props.footerNote}</p>`: without it, the pre-existing assertion would have kept passing on a build that lost
+the sentence entirely.
+
+## Sheet prototype parity, Task 3 — the chips line, the parent line and the third tab (tail lane, 2026-09-22) — cases `16.110`–`16.112`
+
+**The tail lane** (`rel/sheet-parity-tail`) of `docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md`:
+Tasks 3, 4, 6, 8 and the HELD half of Task 7. This section is Task 3, drawn from the lane's own block
+`16.110`–`16.129`.
+
+**What moved, and why the moves are one change rather than four.** The prototype draws, under the title,
+a chips line carrying the state chip and the `Restricted` chip, then the tabs — Details · History ·
+**Attachments** (`desktop.dc.html:1128-1140`). This build drew the state chip inside the Details body,
+the parent indicator beneath it, and two tabs. Every one of those four facts was decided in ONE owner
+ruling on 2026-09-22 (spec decisions 2, 3 and 5), so they land in one change: a chips line drawn without
+removing the state line's own chip would put `Doing` on the page twice, and a third tab drawn without
+moving the list out of Details would draw the list under two tabs at once.
+
+**⚠ THE PROTOTYPE'S THIRD ELEMENT ON THAT LINE IS DELIBERATELY NOT DRAWN, and its absence is a
+decision.** `:1128-1133` also carries *Recorded in this browser · 12:04:18*. **Nothing in our data is
+that clock** — the sentence would have to be fabricated — and a made-up timestamp on a sheet whose whole
+subject is per-field attribution is the one lie this file exists to refuse. No case asks for it, and the
+omission is recorded at the render site too so a later reader does not read it as an oversight.
+
+**⚠ AND THE `Closed by … on …` CHIP IS A MOVE, NOT A SECOND COPY.** The badge span inside the state line
+was DELETED in the same change. Two identical sentences on one screen leave a reader no way to tell which
+is the record, so `16.110` asserts the sentence appears exactly ONCE — the arm that a copy-left-behind
+would redden and that a presence-only assertion cannot see.
+
+### The case
+
+- **16.110** ✅ The chips line sits under the title and above the tablist, carrying the state chip, the
+  `Restricted` chip when the standing audience is `explicit`, and the `Closed by … on …` chip when the
+  ticket is closed. **Three arms in one id**, and the third is the count: after the closed render,
+  `getAllByText('Closed by Anselma Marak on 21 Aug 2026')` must be length **1**. `packages/app-core/test/views/ticket-sheet.test.tsx`.
+- ✅ **The CONTROL arm of `16.110` — a project-visible ticket draws NO `Restricted` chip.** Written with the
+  id in prose rather than at the line head, because **an id at a bullet's head IS a declaration and this
+  would be a second one for the same number** — `scripts/check-case-ids.mjs` caught exactly that on the
+  first run of this section. The control the first arm needs in the direction it cannot see:
+  `getByText('Restricted')` passes just as happily on a build that draws the chip for EVERY ticket. The
+  default seed is the ordinary `inherit`/`project` pair — a mode the projection really produces — not a
+  convenient fixture. `packages/app-core/test/views/ticket-sheet.test.tsx`.
+- **16.111** ✅ The attachment list renders under the Attachments tab and NOT under Details. Asserted
+  **absence first**, under the tab a reader lands on, because a change that ADDED the third tab without
+  removing the old mount would pass a presence-only case; then presence under the new tab; then that
+  Details' own content is gone while Attachments is open, so the tab is a SWAP and not an addition.
+- **16.112** ✅ The parent indicator follows the chips line and precedes the tabs — the placement the owner
+  ruled on 2026-09-20 (*"put the badge in that position instead"*), re-seated under the new chips line.
+  Its content and behaviour are unchanged, including the three arms and the restricted pill.
+
+**The attachments cases this move forces — FOUR of them, across two packages, and only one was named in the
+plan.** Moving the list behind its own tab is a change to EVERY case that reads it:
+
+1. **`16.57`** (this file) — the three arms each open the Attachments tab first. The plan's permitted
+   mechanical edit (b), named.
+2. **`16.58`** (this file; the case lives in `apps/web/test/ticket-attachments.test.tsx`) — both arms open
+   the tab before reading the list or the failure sentence. Same edit, and the plan's ratchet list did not
+   name it either: it is the same case text's other half, one package over.
+3. **`3.76` in `test-cases/03-foundation-ledger.md`** — the app-core attachment-list describe. This one
+   needed MORE than a tab click: its claim was *"wired entries render inside the DETAILS tab and not the
+   history tab"*, and **its old form passed over this move VACUOUSLY** — once the list is no longer in
+   Details, a single "not under History" assertion is true of a build that draws it NOWHERE. The case gained
+   a third arm (it draws under Attachments) so the property *one tab draws it and the others do not* is
+   witnessed in both directions, and `3.76`'s catalogue prose is corrected in this same change set.
+4. **`16.63`** — the scoping change described above.
+
+**So the plan's permitted-edit list was short by three** (the `16.58` arm, the `3.76` re-statement and the
+`16.63` scoping; only `16.57` was named). Each is recorded rather than passed over because a ratchet that
+silently absorbs whatever the change broke is not a ratchet, and because a reader comparing this list to the
+plan's will otherwise find three unexplained edits.
+
+**One more pre-existing case was forced, and it is NOT in the plan's permitted list — recorded here rather
+than passed over.** `16.63` in the breadcrumb block asserted `screen.getByText('Doing')` page-wide as its
+positive control for *"the state chip still names it"*. The new chips line draws its own state chip, so the
+query became ambiguous (`Found multiple elements`). The arm is now scoped to `.gn-ticket-sheet__state`; the
+property it owns — the workflow's NAME for the state, never the raw id — is unchanged, and a body-wide query
+would have started failing for a reason unrelated to what the arm names. `16.63`'s entry above records it in
+place. **This is the plan's permitted-edit list being one entry short, not a case being "fixed" to suit new
+code**: the new node is the spec's, the old query was only ever resolvable because no second state chip
+existed, and the arm could not be left as written without deleting the property.
+
+**Mutations — TWO, both run, both killed, and the first one corrected a claim I had written the wrong way
+round.** (Suite count asserted beside each: 150 collected in every run, so a mutation that failed to parse
+would have been visible rather than scored as a kill.)
+
+- **M1 — the `explicit` condition removed, so the `Restricted` chip is drawn for every ticket. KILLS
+  `16.110` CONTROL ONLY (1 failed / 149 passed).** ⚠ **I predicted this would kill `16.110` itself, and the
+  measurement says the opposite** — and the reason is the point: `16.110`'s first arm asserts the chip IS
+  present, which stays TRUE under the mutation. **The arm that can see the defect is the CONTROL**, which is
+  exactly what a control is for, and the two are written as one positive/negative pair for this reason. A
+  battery that had recorded only the primary arm would have reported this mutation as a SURVIVOR.
+- **M2 — the deleted `gn-sheet__closed-badge` span restored in the state row, beside the new chip. KILLS
+  `16.110` (3 failed / 147 passed), and the other two kills are the point of the count:** `13.586` and
+  `13.726` fail with it, because both read the sentence page-wide and now find two nodes. That is the
+  measurement behind the *"a move, not a second copy"* paragraph above — the pre-existing cases CAN see the
+  duplication, and `16.110`'s third arm catches it at the count rather than at a `getByText`.
+
+## Sheet prototype parity, Task 4 — the description above the grid, the State row, the deleted title row, the tinted rows (tail lane, 2026-09-22) — cases `16.113`–`16.117`
+
+**Task 4 of the same plan, the next commit of the same lane.** The Details body is re-seated into the
+prototype's order and the grid is redrawn: a full-width description block ABOVE the grid, a `State` row
+carrying the state line, every second row tinted, and the sheet-side mount of `VisibilityEditor` into the
+`field-visibility` row — Task 5's leftover, which the plan's own Task 5 header assigns to this task because
+the sheet file is this lane's to touch.
+
+**⚠ THE PLAN'S OWN `ids` ARRAY WAS STALE AND THE CASE IS BUILT FROM THE FILE.** The plan's `16.113` draft
+listed `field-description · field-state · field-assignee · field-priority · field-due · field-type ·
+field-visibility · sheet-subtasks · sheet-comments`. **`field-start` is absent from it**, and the reason is
+sequencing rather than an oversight: the Start row was added by the PRIORITY BUILT-IN lane, whose Task 7
+landed on this branch after the plan text was written, and it sits between Due and Type there. A case built
+from the plan's array would have asserted an order that SKIPS a row the sheet really draws — and it would
+have passed, because every pair it named is still in that relative order.
+
+**The tint is by CLASS, not by `:nth-child`.** `ticket-sheet.tsx` computes it (`fieldRowClass`), with
+`FIXED_FIELD_ROWS = 7` so the generic custom-field loop CONTINUES the alternation instead of restarting it
+at zero — which would put two tinted rows side by side at the seam. A `:nth-child` rule would count the
+wrapper `<div>`s rather than the rows and would agree with the class only by luck. ⚠ **`FIXED_FIELD_ROWS` IS A COUNT, and the sentence that stood here claimed `16.116` was its witness. THAT CLAIM WAS MEASURED FALSE AND IS CORRECTED RATHER THAN DELETED:** `16.116` renders the DEFAULT fixture, whose `state.fields` is `{title, dueDate}` and whose two entries are BOTH excluded — so the loop draws no rows, the constant is never read, and mutating it to `6` left **160 of 160 cases passing**. The witness is `16.129` (`16.129` below), added when that was measured, and whose first run then caught a REAL defect in this very index — see the section after the Task 6 entry.
+
+**⚠ ONE PLAN-TEXT CORRECTION, in the CSS.** The plan's `.gn-ticket-sheet__field dt` draft carried
+`min-height: 2.5rem; line-height: 2.5rem` BESIDE `padding: 0.75rem 0 0.75rem 0.75rem`. Those double-count
+the row height — 2.5rem of line box plus 1.5rem of padding is roughly 64px against the prototype's ~48px
+row — and a fixed `line-height` misaligns a two-line label inside a `flex-start` box. The padding alone
+gives the row its height, so those two declarations are the one part of the plan's CSS this change does not
+carry. **The pinned `13.1142` phone block is untouched and still declares both of its own clauses** — a
+third package's gate reads that rule by regex, and it is why the label collapse was overridden in place
+rather than rewritten.
+
+### The case
+
+- **16.113** ✅ The Details sections stand in the prototype order — Description, State, Assignee, Priority,
+  Due, **Start**, Type, Visibility, Subtasks, Comments — asserted PAIRWISE by `compareDocumentPosition`
+  rather than by index into markup, which a whitespace or wrapper change would move. Includes
+  `field-start`, which the plan's draft array omitted; see the note above.
+  `packages/app-core/test/views/ticket-sheet.test.tsx`.
+- **16.114** ✅ The State row holds the state chip, its provenance sentence and the `Move…` button, and
+  carries **no `select` and no `combobox`**. The prototype's State row IS a `<select>` that sets a state
+  directly, and that is the half of it this build refuses: a transition is rule-driven (`require-comment`,
+  `require-evidence`, `require-field`), so a select would bypass the rules. **Both spellings are asserted
+  absent**, because `combobox` and `select` are not the same query and a control could satisfy one.
+- **16.115** ✅ The title is edited in the header and draws NO generic field row — the deletion of the
+  duplicate `title` row's own case, with the header control asserted present as the positive control so a
+  build that dropped the title altogether cannot pass.
+- **16.116** ✅ Every second row of the grid is tinted, by class. **The count is asserted first**
+  (`length >= 6`), because the alternation check is a `forEach` and a grid that rendered NO rows would pass
+  it by running zero times — a check that cannot fail.
+- **16.117** ✅ The description block precedes the grid and keeps its caption as the editor's name (the `id`
+  the mounted `EditorSlot`'s `labelledBy` points at, so the words a sighted reader sees and the name a
+  screen reader announces are the SAME NODE). **Its CONTROL is a separate arm**: the block is NOT inside the
+  `<dl>`, read as `grid.contains(block) === false` — the direction the order assertion cannot see, since a
+  block moved to the TOP of the `<dl>` would also precede `field-state` while no longer being full-width.
+  `packages/app-core/test/views/ticket-sheet.test.tsx`.
+
+**⚠ THREE PRE-EXISTING CASES WERE FORCED, and only one of them is inside the plan's own account of this
+task.** Two assert the deleted `title` row, and they are case `3.73` in `test-cases/03-foundation-ledger.md`
+(the file's own amendment records both arms):
+
+1. `renders the state with its provenance line and each field with its claim` asserted
+   `getByTestId('field-title')`. Rewritten to assert the title in the HEADER — keeping the property (the
+   title is on the sheet) rather than leaving a bare absence query that a build which lost the title would
+   pass.
+2. `PLANTED DEFECT: every field carries a claim line` looped `['title', 'due']`. Now `['due']`, the one row
+   left that carries a `set by …` line on this fixture, with the reason written at the site.
+3. `16.63`'s scoping change landed in Task 3's commit and is recorded there.
+
+**Mutations — THREE, all run, all killed, and ONE of my draft claims was wrong in a way worth keeping.**
+(156 collected in every run, so a mutation that failed to parse would have been visible rather than scored
+as a kill.)
+
+- **M3 — `fieldId === 'title'` removed from the loop's exclusion list. KILLS `16.115` ONLY (1 failed /
+  155 passed).** ⚠ **I predicted this would also redden `16.113`'s order, and it does not** — the reason is
+  structural and worth stating, because it is the reason `16.113` is written as a pairwise walk over a
+  NAMED list rather than as a walk over everything in the grid: the stale `field-title` row renders at the
+  END of the loop, so every pair `16.113` names is still in that relative order. **A case that collected the
+  grid's children and compared that list would have caught it; a case that names its ids does not**, and
+  that is the trade this one takes deliberately — `16.115` is the arm that owns this defect.
+- **M4 — `fieldRowClass` returning the untinted class for every index. KILLS `16.116` ONLY (1 failed /
+  155 passed).**
+- **M5 — the description block moved INSIDE the `<dl>`. KILLS BOTH arms of `16.117` (2 failed / 154
+  passed).** ⚠ **I predicted only the CONTROL would redden, and the order assertion reddens too** — because
+  the assertion is `block.compareDocumentPosition(grid)`, and a block placed inside the grid FOLLOWS the
+  `<dl>` element it is measured against. **So the two arms are not redundant, and the reason I gave for the
+  control was the weaker one:** it catches the case where the block is the grid's FIRST CHILD — a position
+  where the order assertion alone would be ambiguous — and the order assertion catches the inside-anywhere
+  case on its own.
+
+## Sheet prototype parity, Task 6 — subtask cards, a caption heading, an inline add row (tail lane, 2026-09-22) — cases `16.123`–`16.125`
+
+**Task 6 of the same plan, the next commit of the same lane.** The subtask rows become CARDS with the
+prototype's clothes (`desktop.dc.html:3629`), the section heading takes the sheet's shared caption, and the
+add row goes inline (`:1258-1261`).
+
+**⚠ NO TICK BOX, AND ITS ABSENCE IS A DECISION RATHER THAN AN OMISSION.** The prototype's cards carry a box
+that advances the child's state on click. Drawing one that does nothing would be a control that LIES, and
+wiring it would be functionality this plan explicitly does not add (spec decision 10, and the plan's
+out-of-scope list). Nothing asserts its absence, because there is no id allocated to it and a case for a
+control nobody proposed is the inventing direction.
+
+**⚠ THE SEPARATOR SURVIVES THE CARD, ONE ELEMENT TO THE RIGHT, AND THAT IS THE POINT OF THIS SECTION.** The
+2026-09-20 defect in this very section was *"two adjacent inline spans with no text between them are one run
+of glyphs"* — the row read `Order the brochuresTo do` on screen and in the accessible name. A card separates
+the TITLE from the meta row by BLOCK, so no separator is needed there. But the meta row puts the state CHIP
+and the `type · Due day` DETAIL on ONE line with only a CSS `gap` between them, and **a gap is not a glyph**
+— so the markup carries a leading ` · ` inside the detail string, and the cases read `textContent` rather
+than a normalizing text query, because the assertion's subject is a character. Mutation `M8` is the witness.
+
+**⚠ THE PLAN SAID THE PRE-EXISTING SUBTASK CASES WOULD PASS UNCHANGED, AND ONE DOES NOT.** `16.15` asserted
+the whole row's `textContent` as one exact string — precisely the assertion a card invalidates. It is
+AMENDED rather than the card being bent to satisfy it, and its own entry (above) records the amendment with
+both halves of the property it keeps. **This is the plan's own Task 6 note being one case short, not a test
+edited to suit new code:** the old string is not reachable by ANY correct card rendering, and a case that
+pinned the card back into three inline spans would be pinning the markup the owner ruled away.
+
+**⚠ AND THE ADD ROW'S VISIBLE `<label>` IS GONE, WHICH IS THE ONE EDIT HERE THAT COULD HAVE BROKEN A DOZEN
+CASES SILENTLY.** The label's words moved into the input's `placeholder` AND its `aria-label`; a placeholder
+alone is not an accessible name (it disappears the moment something is typed), so every pre-existing
+`getByLabelText('New subtask title')` keeps resolving through the `aria-label`. `16.125` asserts the two
+agree, which is what makes the substitution checkable rather than assumed. **The `Adds a <type>.` sentence
+stays** as the row's note, above input and button, and it keeps its `data-testid`.
+
+### The case
+
+- **16.123** ✅ The Subtasks heading wears `gn-ticket-sheet__caption` — and the words are NOT retyped:
+  `textContent` still starts `Subtasks` and does not contain `SUBTASKS`, so the caps come from
+  `text-transform` (paint, not content) and every existing `getByText` on this heading keeps matching.
+- **16.124** ✅ Each subtask is a card — the `gn-ticket-sheet__subtask-card` class, the title in its own
+  element, the state as a CHIP (asserted on the `gn-chip` class, because the chip is the change), and the
+  detail line carrying `type · Due <day>` through the ONE date renderer rather than an ISO slice.
+- ✅ **The CONTROL arm of `16.124`** — a child with NO due day draws the type alone and no dangling separator.
+  Written with the id in prose rather than at the line head for the reason `16.110`'s control records: **an id
+  at a bullet's head IS a declaration**, and this would be a second one for the same number
+  (`scripts/check-case-ids.mjs` caught it on the first run, exactly as it did there). The
+  direction the case above cannot see: its fixture HAS a date, so a build that rendered
+  ` · task · Due ` unconditionally would print a separator with nothing after it and pass. It also asserts
+  `Due` is absent from the card, so the control is about the string rather than about a class.
+  `No date claimed` is deliberately NOT drawn on the card — the card is a summary and the child's own sheet
+  is where an absence is stated.
+- **16.125** ✅ The add row is one line — the input carries its former label as `placeholder` AND
+  `aria-label`, it sits inside `.gn-ticket-sheet__subtask-add`, and the button shares that same parent.
+
+**Mutations — TWO, both run, both killed (160 collected in each run).**
+
+- **M7 — the caption class dropped from the Subtasks heading. KILLS `16.123` ONLY (1 failed / 159 passed).**
+  Note the shape: the heading keeps its own class and its own text, so no other case can see this — which is
+  why `16.123` reads the class off the element rather than trusting the shared rule's existence.
+- **M8 — the leading separator glyph removed from the detail string (` · task` → `task`). KILLS THREE: `16.15`,
+  `16.124` and `16.124` CONTROL (3 failed / 157 passed).** Three, because two of them read the character and
+  the third reads the exact string it is part of — the same mutation, three independent readings, which is
+  the arrangement the 2026-09-20 defect showed was missing in the other direction.
+
+**⚠ ONE CROSS-PACKAGE COLLISION, MEASURED RATHER THAN AVOIDED.** The add row's input was first styled with
+`.gn-ticket-sheet__subtask-add .gn-field__input`. That reddened `13.291` and `13.339` in
+`packages/ui/test/components.test.tsx`: its `rule()` helper (`:548`) resolves a selector with a FIRST-MATCH
+regex over `ui.css`, so a DESCENDANT selector ending in `.gn-field__input` becomes the rule it returns, and
+those two cases then asserted against this row's `flex`/`min-width`. **Fixed by giving the input its own
+class** (`.gn-ticket-sheet__subtask-input`), which keeps both rules addressable — `.gn-field__input` still
+supplies the box. A third package's pinned case reading `ui.css` by selector is the trap the plan's Task 8
+sweep exists for, and it fired here rather than at the gate.
+
+## The tint seam: a case written to witness a constant, which then caught a real defect (tail lane, 2026-09-22) — case `16.129`
+
+**`16.129` — the tint alternation continues across the seam into the custom-field loop.** The last id taken from this
+lane's `16.110`–`16.129` block, which is now fully spent.
+
+**Why it exists: a count with no fixture that exercises it is a number, not a guarantee.** `Task 4` put the grid's
+alternating tint in a computed class (`fieldRowClass`) with a constant, `FIXED_FIELD_ROWS`, whose whole purpose is to
+carry the alternation PAST the seven fixed rows and into the generic custom-field loop. `16.116` was the only case
+reading the tint, and it renders the default fixture whose `state.fields` is `{title, dueDate}` — **both excluded by
+the loop's own list** — so the loop draws nothing and the constant is never read.
+
+**The measurement that established it, taken before the case was written:** mutating `FIXED_FIELD_ROWS = 7` to `6` —
+a value that ships a doubled tint band on any ticket carrying a custom field — left **160 of 160 cases PASSING.** The
+suite was green over the defect. The catalogue's own prose claimed `16.116` would catch exactly this; **that claim was
+false and is corrected in place rather than deleted.**
+
+**⚠ AND THE FIRST RUN OF THE NEW CASE FAILED — ON THE CODE, NOT ON THE TEST.** That is the part worth recording. The
+loop's tint index came from `Object.entries(state.fields).map(([id, claim], rowIndex) => …)` with the exclusions as an
+early `return null` INSIDE the map — and `Array.prototype.map` passes the index of the ORIGINAL array, so **every
+excluded entry consumed a position.** With `fields` of `{title, counterparty}` the loop's first rendered row carried
+`rowIndex === 1`, not 0, and `fieldRowClass(7 + 1)` returned an even index's class: an untinted row where the
+alternation requires a tinted one. Measured on the fixture before the fix:
+
+```
+field-state / priority / start / visibility = plain   ·   assignee / due / type = tinted   ·   counterparty = PLAIN
+```
+
+two plain rows in a row at the seam. **`title` is the field EVERY ticket has**, so this was the normal case rather
+than an edge one: any ticket with a custom field drew its first custom row on the wrong side, and every row after it
+with it. Fixed by making the exclusions a `.filter(...)` over a declared `OWN_ROW_FIELD_IDS` set, so the index counts
+RENDERED rows only.
+
+**It also explains a mutation result that had looked reassuring.** The constant mutations `6` and `8` both left the
+suite green BEFORE the fix — not because the constant was unconstrained, but because `6 + 1 = 7` and `8 + 1 = 9` are
+both ODD and were **compensating for the off-by-one one index over**. A mutation that passes can be evidence of a
+second defect rather than of a missing case.
+
+### The case
+
+- **16.129** ✅ The tint alternation continues across the seam. The fixture carries a CUSTOM field, so `rowIndex`
+  really runs, and **the CONTROL comes first**: `field-counterparty` is asserted present and the grid is asserted to
+  hold 8 rows — without a rendered loop row there is no seam to read, and every remaining assertion would be about the
+  fixed rows only, which is exactly how the constant went unconstrained. Then both directions: the grid alternates
+  end to end, AND the seam is named on the two elements by id — the last fixed row (`field-visibility`, index 6)
+  untinted, the first loop row (`field-counterparty`, index 7) tinted — so a mis-set constant reports the seam rather
+  than an opaque index. `packages/app-core/test/views/ticket-sheet.test.tsx`.
+
+**Mutations, run AFTER the fix (161 collected in each run).** `FIXED_FIELD_ROWS = 6` → kills `16.129` alone.
+`FIXED_FIELD_ROWS = 8` → kills `16.129` alone. **The constant is now pinned from both sides**, and each mutation
+reports the failure at `row 7` — the seam — rather than at a count.
+
+**⚠ NO RED WAS AVAILABLE FOR THIS CASE AND THAT IS STATED RATHER THAN GLOSSED.** The shipped behaviour was already
+correct once the index bug was fixed, so the case was written green and its value is established by MUTATION, not by
+a failing test. The RED it did produce was against the DEFECT — which is the stronger evidence of the two, and the
+one that would have been lost had the case been written to match what the code happened to do.

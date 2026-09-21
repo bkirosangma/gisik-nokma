@@ -188,7 +188,26 @@ export function CommentsThread({
   const failed = commentsUnavailable !== undefined;
   return (
     <section className="gn-comments" data-testid="sheet-comments">
-      <p className="gn-comments__heading">
+      {/*
+        TWO CLASSES ON THE HEADING, and the second one is the sheet's caption —
+        the prototype draws `Comments · {count}` and `SUBTASKS · …` in the SAME
+        eyebrow style (`desktop.dc.html:1250`, `:1236`), so the shared class is
+        the name for that style and `.gn-comments__heading` is this block's own.
+
+        ⚠ **THIS PARAGRAPH SAID THE SHARED CLASS CARRIED NO RULE YET, AND IT DOES
+        NOW.** It read: *"`.gn-ticket-sheet__caption` is created by Task 4 … which
+        runs on the TAIL lane … so this task's job is to put the name on the
+        element so that lane has one fewer edit to make. Measured: the heading is
+        styled identically either way today … and the duplicate declarations under
+        `.gn-comments__heading` are the tail lane's to remove once the shared rule
+        exists. Removing them BEFORE that rule lands would leave the heading with
+        no style at all."* **Every clause of that was true when written and the
+        last one was a guard rather than a description** — Task 4 landed the
+        shared rule, so the tail lane removed the six duplicate declarations in
+        the same change (spec decision 11). The element keeps BOTH class names:
+        this one is its own hook, and `.gn-ticket-sheet__caption` is the style.
+      */}
+      <p className="gn-comments__heading gn-ticket-sheet__caption">
         {/* A count appears only when there is one to give. `Comments · 0` over a
             read that failed — or over one that has not answered — is a count
             nobody measured, which is why the heading drops it in BOTH cases
@@ -221,27 +240,32 @@ export function CommentsThread({
       )}
 
       {composer === undefined ? null : (
+        /*
+          ⚠ THE HINT PARAGRAPH WAS HERE AND IS NOT ANY MORE (2026-09-22), and the
+          paragraph that blamed a deviation is CLOSED rather than moved.
+
+          It read *"it renders as a LINE UNDER the composer rather than inside a
+          footer row with `Attach` and `Post`, because our composer is
+          `packages/editor`'s `TicketEditorSlot`, which draws its own submit
+          control and cannot have one injected into its markup"* — true when
+          written. `TicketEditorSlot` now draws that footer row, and its LEFT is
+          `EditorSlotProps.footerNote`, which is precisely where this sentence
+          belongs. The sentence itself is drawn THERE now, handed over by the
+          sheet's comment mount (`ticket-sheet.tsx`), and **this component no
+          longer knows it exists** — which is the point rather than a side effect:
+          the thread renders a composer it is given, and what that composer says
+          about posting is the composer's business.
+
+          ⚠ **THE DELETION AND THE MOUNT ARE ONE CHANGE, and that is why the
+          paragraph above stood here for a day rather than being tidied away.**
+          Removing this `<p>` without the mount passing `footerNote` would have
+          LOST the sentence from the product, since nothing else drew it. Case
+          `16.127` reads both halves — the note reached the seam AND the section
+          shows it exactly once — so a change that did one without the other
+          reddens there rather than shipping a sentence drawn twice or not at all.
+        */
         <div className="gn-comments__composer">
           {composer}
-          {/*
-            The prototype's footer sentence (`desktop.dc.html:1329`), in its
-            ONLINE arm: the element renders `{{ cmtHint }}`, defined at `:3717` as
-            `s.online ? "Posting records an event citing you." : "Offline — the
-            comment queues until this device reconnects."` ⚠ **An earlier version
-            of this comment said "verbatim", which was wrong — one arm of a
-            conditional is transcribed, not the sentence.** The offline arm is
-            deliberately NOT transcribed: an online-only client reaching it would
-            be promising a queue it does not have, which is the same reason
-            `PlainTextEditorSlot` says a build without an editor cannot write
-            rather than offering a control that discards what is typed.
-
-            ⚠ And it renders as a LINE UNDER the composer rather than inside a
-            footer row with `Attach` and `Post`, because our composer is
-            `packages/editor`'s `TicketEditorSlot`, which draws its own submit
-            control and cannot have one injected into its markup. A deviation
-            from the drawing, flagged rather than hidden.
-          */}
-          <p className="gn-comments__hint">Posting records an event citing you.</p>
         </div>
       )}
     </section>
