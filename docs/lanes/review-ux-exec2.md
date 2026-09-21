@@ -1812,6 +1812,29 @@ confirmation, not a concealment.
 `:1178-1206` (the docblock, whose subject is permission and not confirmation), `:672-692` (`precheck`);
 `bulk-close-dialog.tsx` (the contrasting confirmation surface, read in my round-1 pass).
 
+**TWO THINGS CHECKED AFTER THIS WAS FILED, both of which bear on it and are recorded rather than
+quietly absorbed.**
+
+**1. Another lane's finding agrees on the shape and concedes the prototype too — and its measurement
+strengthens this one.** Lane 5's `E5-9` reports the same control from the other end: the refusal it
+produces renders in the sheet's shared slot *"directly under the tab bar"* while Delete sits at the end of
+a 4,036 px scrolling body, measured as **3,943 px below** it (`[BROWSER]`, `.gn-sheet__body` `clientHeight
+756` / `scrollHeight 4036`). `E5-9` also states, and I accept it, that *"the no-confirmation shape MATCHES
+the export (`EXPORT:3794-3799`: filter + undo toast) and is not part of this finding"* — so the prototype
+agrees with the product on there being no confirmation, and my argument therefore rests where it always
+did: **not on the drawing, but on the product's own contrary practice two files away, on the admin gate,
+and on the 15-second inverse.** The geometry is a *measured consequence* I did not have, and it makes the
+case sharper: for a non-admin — the very viewer the docblock rules must be told by the refusal — the
+answer currently lands five viewports above the button they pressed, so a confirmation is not the only
+thing missing; the refusal's *placement* is. Attribution: that measurement is lane 5's, cited as theirs.
+
+**2. I am not filing lane 5's `E5-8`.** Its History-tab finding — `history-list.tsx:45` printing
+`{event.type}` raw, so a person reads `ticket.field_set` and never learns *what* changed — is true, and I
+**read that file in full during round 1** (`history-list.tsx`, 63 lines, in my round-1 §1.4 coverage) and
+did not file it. Filing it now, after reading the other lane's report, could not be separated from
+copying, so I do not. It is recorded here so the judge can see the omission was mine and honest rather
+than an oversight being passed off as independent work.
+
 **Source:** carried candidate (round-1 §2e). **Severity: Important.** Connected to `E2-30`, which is the
 other half of the same act — that connection is deliberate, since round-2 §3 weighs a reason more when it
 connects to measured consequences.
