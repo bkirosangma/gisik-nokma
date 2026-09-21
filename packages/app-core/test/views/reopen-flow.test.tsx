@@ -870,6 +870,39 @@ describe('7.249 the fixture sentences are pinned to the producer they claim', ()
 });
 
 /**
+ * 3.192 (E2-34) — TWO `aria-modal="true"` DIALOGS WERE OPEN AT ONCE.
+ *
+ * The `needs-reopen` arm opened the reopen offer WITHOUT closing the New-ticket
+ * dialog (`create-ticket-flow.tsx` returned early with `dialogOpen` untouched),
+ * and both surfaces render from the same fragment — so the DOM held two modal
+ * dialogs, and a screen reader told the person the top one was the only modal on
+ * the page. ONE MODAL AT A TIME is the invariant the primitive assumes.
+ *
+ * E5-20 (case 3.189) closed the other half of the same stack — one Escape no
+ * longer closes both — but it does not make a second `aria-modal` element
+ * honest.
+ */
+describe('E2-34 the reopen offer is the ONLY modal on screen', () => {
+  it('PLANTED DEFECT: the offer replaces the New-ticket dialog rather than stacking on it', async () => {
+    const user = userEvent.setup();
+    const source = flowSource((call, events) =>
+      call === 1
+        ? events.map((event) => parentTerminal(event.id))
+        : events.map((event) => committed(event.id)),
+    );
+    renderFlow(source);
+    // The parent must be CHOSEN: the offer is opened for a draft whose
+    // `parentId` is a real ticket (the arm checks `draft.parentId !== null`).
+    await createTicketUnderParent(user);
+
+    // The offer is up — and it is the only modal.
+    expect(await screen.findByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.queryByRole('dialog', { name: 'New ticket' })).toBeNull();
+  });
+});
+
+/**
  * 3.191 (E2-33b) — THE SAME ONCE-SEEDED CHOICE, AND HERE THE SCREEN LIES ABOUT IT.
  *
  * `ReopenDialog` seeds `toStateId` from `reopenStates[0]` once (`useState`) and

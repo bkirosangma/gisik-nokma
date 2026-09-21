@@ -358,7 +358,23 @@ export function CreateTicketFlow({
         New ticket
       </Button>
       <NewTicketDialog
-        open={dialogOpen}
+        /**
+         * ⚠ ONE MODAL AT A TIME (E2-34, 2026-09-21).
+         *
+         * The `needs-reopen` arm opens the offer and returns WITHOUT clearing
+         * `dialogOpen` — which is right, because the draft must survive the
+         * detour — but `open` here used to be `dialogOpen` alone, so BOTH
+         * surfaces rendered: two `role="dialog"` elements, both `aria-modal="true"`,
+         * telling assistive technology that the top one was the only modal on the
+         * page. That is a lie about the page, not a layout preference.
+         *
+         * The offer REPLACES this dialog while it is up and hands it back when it
+         * closes, so `dialogOpen` keeps meaning "the person is composing a ticket"
+         * (the draft survives) while exactly one modal is ever rendered. E5-20
+         * (case 3.189) fixed the other half of the same stack — one Escape no
+         * longer closes both surfaces — and neither half implies the other.
+         */
+        open={dialogOpen && reopenPrompt === null}
         typeOptions={typeOptions}
         parentCandidates={parentCandidates}
         parentCandidatesUnavailable={parentCandidatesUnavailable}
