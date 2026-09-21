@@ -1293,8 +1293,8 @@ dev workspace has a live project.
 
 ### E5-37 — IMPORTANT · For every email sign-up the shell does not know who you are: "Workspaces — ", an empty menu header, a "?" monogram, and the accessible names "Account menu for " and "Sign out " — the shared hook's `??` never fires on `''`, a defect the consent page found by driving the flow, recorded "for its owner", and patched only locally `[SOURCE]`
 
-**WHAT.** `apps/web/src/providers.tsx:176` `name: user.name ?? user.id` (and the same shape in `useSessionStatus`,
-per the consent page). `??` catches `null`/`undefined` only; the members page records the population —
+**WHAT.** `apps/web/src/providers.tsx:176` `name: user.name ?? user.id`, and the same shape in `useSessionStatus` at
+`:206` — both opened. `??` catches `null`/`undefined` only; the members page records the population —
 *"better-auth's magic-link plugin creates a user with `name: name || ""` … **an email sign-up has `name === ''`**"*
 (`members/page.tsx:635-638`) — and the consent page confirms it from the other side: `mcp/authorize/page.tsx:47-56`
 *"FOUND BY DRIVING THE REAL FLOW … rendered 'It now acts as , with exactly your permissions' — naming nobody … A
@@ -1315,7 +1315,7 @@ and counts the attribute, not its content, so `"Sign out "` passes it.
 **WHAT WOULD HAVE BEEN BETTER.** `name → email → id` at the hook — the `memberLabel` order the members page already
 uses — so every consumer moves together; or at least `user.name?.trim() || user.email || user.id`.
 
-**MEASUREMENT.** `[SOURCE]` `providers.tsx:170-179`; `mcp/authorize/page.tsx:44-66`; `members/page.tsx:635-638`;
+**MEASUREMENT.** `[SOURCE]` `providers.tsx:170-179`, `:206`; `mcp/authorize/page.tsx:44-66`; `members/page.tsx:635-638`;
 `workspaces/page.tsx:51`; `account-menu.tsx:142`, `:145`, `:150`, `:188`. Not painted: the owner's account carries a
 name (`[BROWSER]` earlier: `Workspaces — Kiro`, `Account menu for Kiro`), and I hold no email-sign-up session; the
 empty-name population is established by two independent docblocks, one of which says *"confirmed in the database"*.
