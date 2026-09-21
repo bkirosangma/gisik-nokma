@@ -2040,3 +2040,37 @@ matches a hex (`#[0-9a-fA-F]{3,8}`) in a CSS value or a string, and the function
   and would need a colour token the header cannot express. **Not painted** — the computed values above are
   the finding's own. `editor.css` was reverted to `HEAD` for the RED run and restored from a
   sha256-compared backup. Package suites: editor 191, ui 423, web 647.
+
+## The viewport suite measures WCAG 1.4.10's own width (lane ds1, 2026-09-21, batch B10) — case `13.1155`
+
+**The finding, round 2 `P27`, MINOR, `r2 NEW`, scored PARTIAL.** WCAG 2.2 §1.4.10 *Reflow* is Level AA and
+names a number: content must reflow to **320 CSS px** without two-dimensional scrolling. **The narrowest
+width this product was ever measured at was 390px** — 70px above the criterion — and `grep -rc "320"` over
+`apps/web/e2e-viewport/*.ts` and `apps/web/e2e-stack/*.spec.ts` returned **no non-zero count**. The
+verifier's correction, carried rather than smoothed over: the finding's *"`min-width` above 320px →
+exactly one"* is **false** (`ui.css:1477 .gn-list__table` is a second), so the census is not restated here —
+the remedy is the viewport, not the count.
+
+### The case
+
+- ✅ **13.1155 — 320 is a declared viewport with the criterion's own numbers, 390 is STILL measured, and
+  the config maps the record so the entry becomes a real project.** `apps/web/test/viewport-reflow-320.test.ts`.
+  The last assertion is what stops the first two being satisfied by a record nothing reads:
+  `playwright.viewport.config.ts:184` builds its `projects[]` by **mapping** `VIEWPORTS`, so a fourth entry
+  IS a fourth Playwright project and every per-viewport sweep runs at it. The second assertion is the safe
+  direction — an edit that REPLACED 390 with 320 would satisfy the first and shrink coverage.
+  `device: 'iPhone SE'` and not `'iPhone 5'`: Playwright ships no `iPhone 5` descriptor (checked against
+  `@playwright/test`'s own `devices`), and the descriptor only contributes the non-viewport mobile
+  characteristics anyway — the config pins `viewport` after the spread.
+
+### ⚠ The baselines for this width do not exist, named here and in the source
+
+`tap-target-baseline.json`, `accessible-names-baseline.json` and the type-scale baseline are keyed
+`<viewport>|<route>` and all three **REFUSE a missing key rather than seeding it**
+(`responsive.spec.ts`'s own *"the suite refuses to invent one"*). So the first run of the viewport suite
+reports a missing baseline for each of the five routes at `phone-320` and stops — **loudly, in the safe
+direction, with no invented number committed.** **Owner: whoever next runs `test:e2e:viewport` against a
+live stack; record with `UPDATE_*_BASELINE=1` and commit the file.** This lane could not: Playwright needs
+its own `next dev`, and this lane runs in push-only mode with no stack. `viewports.ts` was reverted to
+`HEAD` for the RED run and restored from a sha256-compared backup. Web suite 650; `pnpm turbo run typecheck`
+17/17, which is what covers `tsconfig.e2e.json`.
