@@ -1123,6 +1123,30 @@ and the person loses the link.
 
 ---
 
+### E5-33 — MINOR · Pressing "Send magic link" with nothing typed makes a server round trip and paints the validator's own path — "[body.email] Invalid email address" `[BROWSER, devtools isolated context, 390 px]` `[SOURCE]`
+
+**WHAT.** `/sign-in`, signed out: the email input is `type="email"` with no `required` (`sign-in/page.tsx:356-369`),
+the control is a `<Button onClick>` rather than a form submit (`:378-388`), so nothing checks for an empty field
+before `authClient.signIn.magicLink({ email: '' })` is sent; the server's `400` message is rendered verbatim by
+`fail(linkError.message)` (`:188`, `:384-386`) in the card's `role="alert"` (`:485`). Painted after one press on
+an empty field: **`[body.email] Invalid email address`** (`[BROWSER]`, alerts list).
+
+**WHY.** The first sentence a new person can meet from the product is a zod path. The page's own default
+(`'Sign-in failed. Try again.'`, `:188`) shows the author expected to write sentences here; the branch that fires
+most — an empty or mistyped address — hands the wire's string through untouched.
+
+**WHAT WOULD HAVE BEEN BETTER.** `required` on the input and a `<form onSubmit>` so the browser refuses an empty
+press locally; map the validator's message to *"Enter the email address you signed up with."*
+
+**MEASUREMENT.** `[BROWSER]` second browser: `before: {inputType: "email", required: false}`; after clicking
+`Send magic link` with the field empty → alert `"[body.email] Invalid email address"` (the request went through
+better-auth's own fetch, not `window.fetch`, so the page-level patch saw `reqs: []`). `[SOURCE]` lines above. No
+token was minted: the server refused the body before any write.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1184,15 +1208,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**32 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 32). By claimed severity, read from the
-heading text: **Critical 1 · Important 22 · Minor 9** (1 + 22 + 9 = 32).
+**33 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 33). By claimed severity, read from the
+heading text: **Critical 1 · Important 22 · Minor 10** (1 + 22 + 10 = 33).
 
 - **Critical (1):** E5-13
 - **Important (22):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32
-- **Minor (9):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30
+- **Minor (10):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32 = 21 of 32. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 33. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
@@ -1228,7 +1252,7 @@ scope note) and the injected-403 refusal walks (below).
 **A second browser, for signed-out surfaces only (from ~11:20 IST).** The `chrome-devtools` MCP runs its own Chrome
 (no session cookie; I did not sign the owner's account in from it — that would write a session row into their
 stack). Its pages are visible and hydrate, and `emulate` gives a true 390×844 mobile viewport. Walked there,
-signed out, at 390 px: `/help`, `/account`, `/workspaces` (→ `/sign-in`), `/sign-in`. Findings from it: E5-31, E5-32, and
+signed out, at 390 px: `/help`, `/account`, `/workspaces` (→ `/sign-in`), `/sign-in`. Findings from it: E5-31, E5-32, E5-33, and
 E5-13's second reproduction. **NARROW VIEWPORT is therefore reached for the signed-out shell only**; every
 signed-in surface at phone width remains unmeasured by me (exec 4's E4-7/E4-9/E4-11 cover some of it).
 
@@ -1357,5 +1381,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 32 findings — Critical 1 · Important 22 · Minor 9 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 33 findings — Critical 1 · Important 22 · Minor 10 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
