@@ -184,7 +184,7 @@ first answer about moving work.
 
 **WHAT.** The export's board card (`EXPORT:357-379`) draws a `meta` line built at `:2493-2499`:
 `bits = [t.id]; … bits.push(chDone + "/" + ch.length + " subtasks"); … bits.push("waiting on " + t.blockedBy); …
-bits.push(di.label)` and colours it `di.late ? "var(--danger)" : "var(--label2)"` (`:2503`). The product's card
+bits.push(di.label)` and colours it `di.late ? "var(--danger)" : "var(--label2)"` (`:2504`). The product's card
 (`board.tsx:1029-1063`) renders title, an optional avatar, a `pending`/`reopened` chip, a rollup, and a `who · when`
 fold. **No key. No due date. No lateness.** Ticket `CCSO-3` is due `14 Sep 2026` (sheet `Due` row, `[BROWSER]`);
 today is `21 Sep 2026`; its board card is indistinguishable from an undated one — its meta div is literally empty
@@ -207,7 +207,7 @@ field; `ListRow` (`:316`) does.
 export's meta line — at minimum the due label with the late tone. If the wire gap is to stand, record the ruling at
 `board.tsx:1029` and say in the manual's Board section that lateness is shown on My Work and the List only.
 
-**MEASUREMENT.** `EXPORT:2493-2503` opened; `board.tsx:1029-1063` opened; `view-types.ts:204-214` opened;
+**MEASUREMENT.** `EXPORT:2493-2504` opened; `board.tsx:1029-1063` opened; `view-types.ts:204-214` opened;
 `prototype-delta-2026-09-18.md:526` opened. `[BROWSER]` sheet `Due 14 Sep 2026 · set by Kiro on 6 Sep 2026` for
 `CCSO-3`; board card `sample` HTML shows `gn-board-card__meta` empty.
 
@@ -819,7 +819,7 @@ brief's three categories.
 
 | # | surface | export | product | class | where |
 |---|---|---|---|---|---|
-| 1 | Board card meta (key · subtasks · blocker · source · due, red when late) | `:357-379`, `:2493-2503` | title + `who · when` fold; meta div empty | **3 — no ruling** (WIRE GAP is a record) | E5-2 |
+| 1 | Board card meta (key · subtasks · blocker · source · due, red when late) | `:357-379`, `:2493-2504` | title + `who · when` fold; meta div empty | **3 — no ruling** (WIRE GAP is a record) | E5-2 |
 | 2 | Board card `who · when` fold | static `card__prov` line | clickable fold to provenance | 2 — ruled, `docs/hig-reconciliation-audit.md:481` | — |
 | 3 | Board drag + arrows | drag `:372`, arrows `:378-381` | drag + arrows | 1 — matches (the HELP diverges) | E5-1 |
 | 4 | Sheet crumb chain | `epicId` and `parentId` distinct fields, `:3404-3425` | `epic` = nearest proper ancestor; duplicates when parent is epic | **3 — no ruling** | E5-3 |
