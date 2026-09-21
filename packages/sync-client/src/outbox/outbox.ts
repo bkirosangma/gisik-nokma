@@ -323,6 +323,32 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
     },
 
     async nextBatch(limit = 50, now = () => new Date()) {
+      // INVARIANT (E6-5): a queued claim is offered only when every queued
+      // claim enqueued before it is due too — the batch is the longest DUE
+      // PREFIX of the queue in position order, never the set of due rows.
+      //
+      // The filter used to be `WHERE … AND next_attempt_at <= ?`, which reads
+      // as "only rows that are due" and is: after `recordFailure` pushed a
+      // batch out by `backoffMs`, a claim enqueued AFTER the failure carried
+      // the schema's epoch default and was due at once, so the next flush —
+      // and the product flushes on every enqueue — offered it ALONE, ahead of
+      // the older claims on the same ticket it depends on. Measured
+      // 2026-09-21: batch1 = [CREATE, RENAME-1] fails transiently; RENAME-2 is
+      // enqueued; 500 ms later nextBatch = [RENAME-2]. The sync door then
+      // refused the rename as a claim on a ticket it had never seen, filed a
+      // `claim.contested` against the user's own ticket two seconds before it
+      // existed, and the outbox recorded that contest and dropped the edit. A
+      // queue that preserves order across a backoff boundary is what 12.144's
+      // sentence ("a batch that lost the order would send a `field_set` for a
+      // ticket the server has not been told about") already claimed.
+      //
+      // Liveness is unchanged: nothing retries a backing-off head on a timer —
+      // `flush()` runs on enqueue and on catch-up — so the head was already
+      // waiting for the next trigger, and now its tail waits with it. Rows in
+      // `failed` (refused/invalid, terminal) are not in the queue and block
+      // nothing, as before; a claim behind a terminally refused one is a
+      // different question and is not decided here.
+      //
       // `next_attempt_at` compares as TEXT, which IS instant comparison because
       // every value in the column is a Z-normalised ISO string — `toISOString()`
       // here, the schema's epoch default otherwise. A device-offset render on
@@ -330,10 +356,16 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
       // on every non-UTC machine; `schema.ts` stakes the same property on the
       // ledger's two clock columns.
       const rows = await storage.all(
-        "SELECT * FROM outbox WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY position LIMIT ?",
-        [now().toISOString(), limit],
+        "SELECT * FROM outbox WHERE status = 'queued' ORDER BY position LIMIT ?",
+        [limit],
       );
-      return rows.map(rowToItem);
+      const nowIso = now().toISOString();
+      const duePrefix: typeof rows = [];
+      for (const row of rows) {
+        if ((row.next_attempt_at as string) > nowIso) break;
+        duePrefix.push(row);
+      }
+      return duePrefix.map(rowToItem);
     },
 
     async applyResult(eventId, result) {
