@@ -1228,6 +1228,54 @@ the same shell invocation** (`git status --porcelain` empty afterwards). It impo
 adds the recording `onRequest` hook, and `app.inject`s each row above. Its `console.log` lines are the
 table.
 
+**DEFENCE — 2026-09-21 15:14 IST, phase 2 (lane relaunched on Opus 5; the finding's text above is frozen).**
+Executor 6's refutations file (`origin/exec6/review-functionality:docs/lanes/review-refutations-exec6.md`, row
+*E3-14* of its "candidates examined and NOT refuted" table) observes that two of the five routes —
+`POST /v1/invites/:token/accept` and `PUT /v1/me/preferences` — are **recorded exclusions** at
+`http-origin.ts:128-146`, each with a reason and an owner (*"excluded here rather than silently omitted"*).
+**Measured true, and the finding above should have said so:** I opened `http-origin.ts:128-146` this session, and
+`grep -cE "excluded here|they can leave|recorded exclusion" docs/lanes/review-functionality-exec3.md` over the frozen
+report returns **0** — the finding never engaged with that docblock. That is a correction against this report,
+recorded here rather than hidden. What it changes, and what it does not:
+
+1. **The Critical never rested on the two excluded routes.** §14.8 (*REFINED*) and §32 rest the severity on
+   `POST /v1/me/invitations/:inviteId/accept` and its `decline` sibling — the no-body, no-preflight, `requireSession`
+   doors that append `invite.accepted`, `membership.granted` and `project.member_added`. **The docblock does not
+   name them:** `grep -c "invitations" apps/server/src/http/http-origin.ts` → **0**. They were added on 2026-09-09
+   (`d3d0abdd`, #400, *"Task 17: caller-scoped pending invitations + Accept/Decline"*), three days **after** the
+   exclusion docblock was written (`935f5d66`, 2026-09-06, #190 — `git log -S'workspace they can leave'` and the
+   file's first commit are the same sha). The docblock hands the question to *"whichever revisits acceptance
+   first"*; #400 revisited acceptance, shipped a second accept door, and added neither door to the set. The three
+   unrecorded routes (the two `/v1/me/invitations/…` writes and `PUT /v1/me/notification-preferences`) are
+   category 3 by the brief's own classification, and exec 6's row concedes them: *"the other three routes are
+   genuinely unmentioned."*
+2. **For `POST /v1/invites/:token/accept`, the recorded reason is engaged, per rules §3, and it is measured false.**
+   The exclusion prices a forced acceptance as tolerable because the result is membership in *"a workspace they can
+   leave"* (`http-origin.ts:136`). Opened this session: `apps/server/src/permissions/check-permission.ts:641-643` —
+   `membership.revoked` refuses every actor for whom `!isWorkspaceAdmin`, with **no self arm**; and a sweep for a
+   leave door or ruling — `grep -rniE 'leav(e|ing) (a|the|this|their|any) workspace|self-revok|revoke (their|your)
+   own|leave workspace|un-member' --include='*.md' --include='*.ts' --include='*.tsx'` over `docs`, `Features.md`,
+   `test-cases`, `packages` and `apps/server` (reference/ and the review reports excluded) — returns **21 lines in
+   12 files**, read one by one: every hit is a *"leave the workspace <in some state>"* sentence (the *last-owner*
+   guard's *"with no owner"*, the founding/bootstrap invariants' *"able to accept its first ticket"* /
+   *"unusable"*, the auto-close setting's *"off"* / *"ON"*, a projection test's *"row"*), the navigation sense
+   (*"leaving a workspace for `/inbox`"*, `Features.md:121`) or an *"un-membered acceptor"* (`invites.ts:248`,
+   the mint-crash residue) — and **no leave door, no ruling deferring one, and no case naming one**. A member or guest forced in by this door **cannot take themselves out**; only an admin of the
+   attacker's workspace can. The ruling's premise does not hold, so the divergence it excuses does not stand on it.
+   Exec 6 reached the same measurement independently through the door (its E6-21, Appendix Y: *MEMBER / GUEST
+   revokes their own membership → refused*), and its row on E3-14 draws the same conclusion: *"the recorded
+   exclusion of the other two is weaker than it reads."*
+3. **For `PUT /v1/me/preferences`, I do not contest the recorded reason** (*"a nuisance the victim can undo"*), and
+   §14.8 already bounds both `PUT`s as not browser-reachable today (CORS preflight on a JSON `PUT`). The route is
+   in the table as a member of the class the control was written to cover, and the finding's WHAT is exactly that
+   it is outside the set — which the docblock confirms rather than denies.
+
+**So the claim that survives its harshest reading is:** three cookie-authenticated mutating routes outside the
+set with **no** record at all, two of them browser-reachable with no preflight and appending membership events (the
+Critical's basis, demonstrated §32); one recorded exclusion whose stated warrant is measured false; one recorded
+exclusion I do not contest. If the judge scopes the finding to the three unrecorded routes, nothing the severity
+rests on moves.
+
 ---
 
 ## 14.7.2 — `E3-15` (r2) — **IMPORTANT (claimed)** — The guard written to catch exactly this cannot catch it, and its own docblock says so
@@ -1280,6 +1328,20 @@ is the reason `E3-14` survived three waves of the same defect being found by han
 
 **MEASUREMENT.** The guard's body read at `:256-259`; the run above returns `1 passed | 72 skipped`; the
 probe in `E3-14` is the falsifier on the other side. Both from this sha.
+
+**DEFENCE — 2026-09-21 15:32 IST, phase 2.** The one attack this finding invites is *"the docblock records the
+guard's shape, so this is category 2 with no argument against the ruling."* Re-opened this session,
+`security-middleware.test.ts:236-252`: the docblock does not record a decision to compare two hand-written lists — it
+claims the opposite. *"Re-reading a list you already believe is complete cannot find that; **only comparing it
+against something independent can. So the comparison is here, in code.**"* and *"the assertion that makes drift a
+RED TEST rather than a silent gap."* Those are assertions of a property, and `:256-259` compares
+`HTTP_ORIGIN_PROTECTED_ROUTES` against `PROTECTED` — the suite's own table, two lines above — which is not
+independent of the set by any reading. Case **13.116 ✅** (`:253-255`) states the same property: *"Neither direction
+alone would catch a route added without a row."* A route added to **neither** artifact — the five in `E3-14`, which
+this branch's HEAD carries — leaves both directions satisfied and the test green (measured: `1 passed`). The common
+brief's own rule settles the classification: *"the reason a thing was built is not a ruling. A sentence explaining
+why a shortcut was taken is a record of the shortcut."* Here the sentence does not even explain a shortcut; it
+promises the property the code lacks. Category 3, with the promise as the falsified claim.
 
 ---
 
@@ -4031,3 +4093,374 @@ catalogue is not unaware of the problem. That is precisely what makes §5:397 a 
 countable bullets remain unchecked. **Ten wrong numbers of my own against fifteen clean claims** — and §63.1 is
 the first place in this report where I have written *"read, not verified"* **instead of** finding a countable proxy
 and treating it as the claim, which is the substitution that produced most of the ten.
+
+---
+
+# PHASE 2 — 2026-09-21, lane relaunched on Opus 5 at 15:05:23 IST
+
+**Everything above this line is the frozen phase-1 submission (`f8b5e929`, 14:57:35 IST).** Below: five findings
+filed in phase 2 at **half points** (rules §2) — `E3-30`–`E3-34`, counted in §71 — the corrections that produced
+two of them (§64), a source-comment sweep (§70) and the defences the brief permits (§67). No finding above is
+edited; the only insertions above this line are dated *DEFENCE* paragraphs under `E3-14` (§14.7.1) and `E3-15`
+(§14.7.2).
+
+## 64. Correction 8 — §30.1's "fully enumerated" table classifies **18** of its twenty lines, and says **6** where it lists **7**
+
+**WHAT I got wrong.** §30.1 says *"THE FILE IS NOW FULLY ENUMERATED — twenty open declarations"* and
+*"all twenty lines read in full … each checked."* Its table's five rows carry the counts **6 · 3 · 6 · 1 · 1**.
+Measured this session, by **membership rather than size** (compare the members, not the sizes):
+the ids at the twenty line numbers the section itself lists (`sed -n '<n>p' test-cases/06-auth-visibility.md`
+for each of `73 77 82 87 93 95 97 98 107 115 116 117 129 131 193 198 199 201 202 203`) are
+`6.61 6.65 6.66 6.71 6.51 6.53 6.57 6.58 6.77 6.82 6.83 6.84 6.94 6.96 6.130 6.31 6.41 6.123 6.124 6.125`.
+The table names **18** of them: the "live" row's count says **6** and its cell lists **seven** (`6.31`, `6.41`,
+`6.53`, `6.65`, `6.71`, `6.125`, `6.130`), and **`6.57` (`:97`) and `6.83` (`:116`) appear in no row at all.**
+6 + 3 + 7 + 1 + 1 = **18**, not 20. **Population control, not only a membership check:** `grep -c '❌' test-cases/06-auth-visibility.md` → **22**;
+the two lines outside the twenty are `:3` (the legend, *"`❌` not covered"*) and `:7` (the file's header narrative,
+*"6.52 flips from ❌ to ✅"*) — so the twenty is every ❌ **case** line in the file, and no table-row, heading or
+mid-sentence spelling hides another (`grep -E '^[[:space:]]*\|.*❌'` over `test-cases/*.md` → 0; the one `##`
+line with a ❌ is `13-step-audits-and-catalogue-hygiene.md:325`, narrative). The section's count was reproduced by
+executor 6 (its refutations file: *"20, at the same twenty line numbers"*) — the **twenty** is right; the claim that all twenty were classified was
+not, and a count that matched hid the two that were never read. **Both are read below, and both are stale** —
+which is what the table's *"45 %"* was about, and it is now **11 of 20**.
+
+Also in the same section's neighbour, §27's measurement paragraph says *"four lines checked in one file give two
+live and three stale"* — 2 + 3 = 5 (`6.71`, `6.125` live; `6.58`, `6.82`, `6.84` stale). The arithmetic is wrong;
+the members are right. Recorded rather than edited, because the finding's text is frozen.
+
+## 65. `E3-30` (phase 2, HALF) — **IMPORTANT (claimed)** — Case 6.83 is ❌ asking for a measurement; the measurement exists, is named *"MEASURES case 6.83"* in the test, is recorded ✅ as case 7.78, and is cited by the code — since 2026-09-02
+
+**WHAT.** `test-cases/06-auth-visibility.md:116` — case **6.83**, still **❌**: *"When `proj_rollups` lands this is
+not a column rename … the two totals have **different sources** … and nothing guarantees the sets are equal. So the
+substitution must be MEASURED rather than assumed to be a no-op. Owner: Plan 3 Task 11."*
+
+**WHY it is wrong — the ❌ describes a missing measurement that has existed for nineteen days, under the case's own
+number.**
+
+- `apps/server/test/read/ticket-cards.test.ts:507` — `it('MEASURES case 6.83: proj_visibility and proj_rollups do
+  not enumerate the same children, so the counts come from ONE of them', …)`, and `:462` a second test naming
+  `(case 6.83)`. Landed in `563c983e` (2026-09-02, #67, Plan 5).
+- `test-cases/07-api-realtime-search.md:101` — **7.78 ✅** *"Case 6.83 MEASURED rather than argued: `proj_visibility`
+  and `proj_rollups` do not enumerate the same children … 2 against 1 on one executed fixture."* Same commit.
+- `apps/server/src/visibility/rollup.ts:82-85` — *"case 6.83 asked for the reason to be MEASURED rather than assumed.
+  **It now has been** (`test/read/ticket-cards.test.ts`, "MEASURES case 6.83")."*
+- `proj_rollups` landed with **exactly the seven columns 6.83 predicted** (`migrations/1787961900000_proj-rollups.sql:66-73`)
+  and a constraint the case did not foresee: `:76-77` `CHECK (total_children = open_children + active_children +
+  terminal_children)` — the "different sources" question is answered in the schema for the one table, and in the
+  test for the two.
+- File 06 has been committed **seven times since** (`git log --since=2026-09-02T23:59 -- test-cases/06-auth-visibility.md`
+  → five on 2026-09-06, `c2c8be1c` 2026-09-17, `3a3a7ad4` 2026-09-19) without the marker moving. The workspace rule is *"flip the status
+  marker in the same commit as the test that covers it"* (`/Users/kiro/my_projects/CLAUDE.md`, §test-cases).
+
+This is the `E3-23` shape exactly (a ❌ whose closer names the case by number) with one more witness: a sibling
+**✅ case in another file** that says the ❌ is measured. A reader of file 06 is told the rollup substitution is
+unmeasured; a reader of file 07 is told it is; the code agrees with 07.
+
+**WHAT WOULD HAVE BEEN BETTER.** Flip 6.83 to ✅ citing `ticket-cards.test.ts:507` and 7.78 — one line. And the
+detector `E6-12`/`E3-22` already ask for: a ❌ line whose number appears in a test name is a ❌ that must answer for
+itself; `grep -rn "case 6\.83" apps/server/test` → 2 lines is the whole instrument.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:116`; `ticket-cards.test.ts:462`, `:505-507`;
+`07-api-realtime-search.md:101`; `rollup.ts:79-85`; `1787961900000_proj-rollups.sql:66-78`; `git log -S"MEASURES
+case 6.83" -- apps/server/test/read/ticket-cards.test.ts` → `563c983e 2026-09-02`. **Not run:** the test itself (it
+needs the shared test Postgres; one file of one package is within the rules, and I chose the four documentary
+witnesses over the run because the claim is about the marker, not the test's verdict). **Control:** at the same
+depth `6.61` (`:73`) read again holds partially as §30.1 says — its observation stands and only its reason is aged.
+
+**SEVERITY: Important (claimed), scored at half per rules §2.** Same class and same file as `E3-20`–`E3-25`; not
+Critical, nothing misbehaves.
+
+## 66. `E3-31` (phase 2, HALF) — **MINOR (claimed)** — Case 6.57 conditions on *"if Plan 3 admits a reparent that crosses projects"*; Plan 3 refused it on 2026-08-31 at both doors, and no event can move a ticket's project at all
+
+**WHAT.** `test-cases/06-auth-visibility.md:97` — case **6.57**, still **❌**: *"`proj_visibility.project_id` is
+written only at `ticket.created` and is never updated afterwards … **If Plan 3 admits a reparent that crosses
+projects, this column goes stale** … Owner: Plan 3 (whether a cross-project reparent is legal at all)."* The same
+conditional is in the schema: `migrations/1787961300000_proj-visibility.sql:39` `COMMENT ON COLUMN
+proj_visibility.project_id … "if Plan 3 ever admits a cross-project reparent this column goes stale"`.
+
+**WHY it is wrong.** The owner it names answered, and the answer closes the scenario:
+
+- `packages/rule-engine/src/checks/hierarchy.ts:274` — `if (newParent.projectId !== ticket.projectId) return
+  refuse('hierarchy.cross-project');` on `ticket.reparented`; `:125` the same refusal on `ticket.created`. Landed
+  `6b2fc768` (2026-08-31, #38, Plan 3 Chain A). Witnessed: `rule-engine/test/hierarchy.test.ts:92`, `:393`; case
+  **5.40 ✅** (*"Reparenting inherits both rulings the create path was corrected by"*, `05-tickets-hierarchy.md:56`).
+- No other door can move a ticket's project: across the thirteen `ticket.*` payloads in `packages/domain/src/events`,
+  `projectId` appears once — in `ticket.created` (`ticket-events.ts:43`). So the column the case worries about
+  **cannot** go stale through any event the engine accepts; its "written only at `ticket.created`" is not a gap but
+  the whole of the design.
+- The case was amended **twice after the refusal landed** (`6b2fc768` at 2026-08-31 15:43 IST): `40c52191` at
+  2026-08-31 22:41 (*"Task 7 has now run"*) and `dd7bfcfd` at 2026-09-01 18:51 (*"Task 8 has now run"*) — both to
+  strike a task from its owner line (its own parenthetical, `:97`) — and neither recorded the one answer that
+  mattered, Plan 3's, which was seven hours old at the first amendment. The column comment in the migration carries
+  the same unresolved conditional.
+
+**WHAT WOULD HAVE BEEN BETTER.** Strike 6.57 with the rule id and 5.40 as the witness (*"cross-project reparent is
+refused — `hierarchy.cross-project`, `hierarchy.ts:274`; the column cannot drift"*), and amend the column comment
+the next time that migration file is touched. The projection's `project_id` staying write-once is then a documented
+invariant rather than an open gap.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:97`; `1787961300000_proj-visibility.sql:39`;
+`hierarchy.ts:124-125`, `:250`, `:274`; `hierarchy.test.ts:83-92`, `:382-393`; `05-tickets-hierarchy.md:56`;
+`ticket-events.ts:43`; `grep -rhoE "ticket\.[a-z_]+" packages/domain/src/events/*.ts | sort -u` → 13 names, and
+`grep -n projectId packages/domain/src/events/ticket-events.ts` → one line. **Control:** `6.71` at `:87`, read at the
+same depth, holds (as §27 recorded).
+
+**ADDENDUM, 15:28 IST — the same false premise stands in two code comments, and one of them was false the day it was
+written.** `apps/server/test/routes/tickets-read.test.ts:465`: *"Nothing refuses a cross-project parent today (case
+6.57)."* — written in `dd7bfcfd` (2026-09-01, #57), **one day after** `6b2fc768` shipped `hierarchy.cross-project`;
+the fixture beneath it builds the cross-project child by writing projection rows directly, which is the only way it
+can now be built. And `apps/server/src/visibility/rollup.ts:204-209` names *"the family of unrefused corrupt parent
+links already recorded (6.57 the stale `project_id`, 6.58 the parent cycle)"* beside 6.84's *"no check compares
+them"* — **all three members of that family are refused today** at `hierarchy.ts:125`/`:274` (cross-project),
+`:237`/`:257-258` (cycle, `E3-22`) and `:124`/`:250` (a parent outside the workspace → `hierarchy.unknown-parent`,
+`E3-21`). So the catalogue line, a test comment and a source docblock carry one premise the engine contradicts at
+six lines. Neither comment was cited by `E3-21` or `E3-22` (`grep -c "family of unrefused" review-functionality-exec3.md`
+→ 0 before this addendum); they are recorded here as the wider true scope of the trio.
+
+**SEVERITY: Minor (claimed), scored at half.** A conditional the owner decided against, left standing in the
+catalogue, the migration's column comment, a test comment and a docblock; softer than `E3-30` because the case's
+mechanism sentence is still true and nothing reports false coverage — it reports an impossibility as open.
+
+## 67. DEFENCES — written pre-emptively, because this lane's phase 2 closes at 17:05:23 IST and the opponent's at 18:41:50
+
+Executor 6's phase-2 file reserves its refutations for after this lane can answer (*"if a turn comes in phase 2,
+the 'Refutations' section is finalised then"*), so the defences below answer the attacks its published reconnaissance
+names and the one attack every documentary finding invites. Each is dated and cites a line opened this session.
+
+### 67.1 `E3-14` — see the *DEFENCE* paragraph under §14.7.1 (15:14 IST)
+
+The recorded exclusions engaged; the warrant of one measured false at `check-permission.ts:641-643`; the
+Critical's basis (`/v1/me/invitations/:inviteId/{accept,decline}`, unrecorded, no-preflight, appending membership
+events) unmoved; the frozen text's failure to cite `http-origin.ts:128-146` recorded as a correction.
+
+### 67.2 The documentary class — `E3-1`, `E3-9`–`E3-13`, `E3-16`, `E3-17`, `E3-20`–`E3-31` (15:20 IST)
+
+**The attack:** *"a stale sentence in a docblock, a catalogue line or `Features.md` is not a product defect."*
+**The answer, in the order a judge can verify it:**
+
+1. **The scope was set by the owner, not by this lane.** Common brief §5: *"A case that asserts a property the product
+   has quietly stopped having is worse than no case, because it reports coverage that does not exist."* Role brief,
+   last line: *"If a claim in the docs does not survive your measurement, that is a finding, and the docs are where it
+   should go."* The workspace rule this repository is checked into (`/Users/kiro/my_projects/CLAUDE.md`, §Feature &
+   Test Tracking): *"No silent drift. Any PR that touches source files and leaves `Features.md` untouched is
+   incomplete"* and *"flip the status marker in the same commit as the test that covers it."*
+2. **The class has already been priced by the judge.** `docs/lanes/review-compiled-controller.md:548` —
+   `exec3-F1 · IMPORTANT · ACCEPTED`, with the controller's own re-measurement (*"`attachments.ts` `deleted` → 5
+   (claim: ZERO)"*) and its generalisation: *"a 'known gap' paragraph should be greppable by the number it is built
+   on."* Every member of this class is that sentence applied to a different line.
+3. **The opponent files the same class and reproduced three members of mine.** Executor 6's `E6-7`, `E6-12`, `E6-14`
+   and `E6-25` are documentary findings of the same shape (a record declaring a closed thing open, a reason that
+   stopped being true, a case that admits what the product refuses); its refutations file independently re-measured
+   `E3-25` (*"count reproduced by an independent instrument"*), `E3-26` and `E3-27` (*"holds"*) and `E3-20`/`E3-21`
+   (*"valid as filed"*). A lane that files the class cannot refute the class without refuting itself.
+4. **Each member carries a command, not an opinion.** `E3-9` `grep -c` over the schema's keys; `E3-11` the fixture
+   count; `E3-13` the cited line opened; `E3-22` `hierarchy.ts:237`/`:257`; `E3-23` the closer naming the case;
+   `E3-27` the export in `seed/templates.ts:41`; `E3-29` the registry's eighteen names; `E3-30` the test's own
+   `it(...)` string; `E3-31` `hierarchy.ts:274`. The judge's cheapest verification of any of them is under a minute.
+5. **The counts sub-class (`E3-9`, `E3-10`, `E3-11`, `E3-12`, `E3-17`, `E3-29`) is not "a wrong number".** Each number
+   is the argument of a claim: `E3-10`'s is a stated correctness invariant whose both terms are stale; `E3-29`'s
+   "eleven registered types" omits exactly the soft-delete and closure pair — the five the product added last, which
+   is to say the omission is the change history nobody wrote down. This report's own §64 is the same discipline
+   applied to itself: a count that matched (twenty) hid two lines never classified.
+
+### 67.3 `E3-18` — the bound is the defence (15:20 IST)
+
+§34 already revised it to **Minor** and stated the trigger is corrupt data. Executor 6's row concurs (*"valid … a
+doubtful remedy is not a false finding"*) and adds the sharper reading, which I adopt rather than resist: on a
+guest's replica a parent that exists but was never delivered is indistinguishable from one that never existed, so
+`reconcile`'s `restricted` is *right* for the first and an existence claim for the second — the divergence from the
+online read's `null` stands as measured — both opened this session: `routes/tickets.ts:399-404` (*"claiming a
+restricted parent would invent one"* → `parent = null`) and `replica-data-source.ts:1164-1175` (*"the conservative
+arm is the one that claims LESS"* → `{ kind: 'restricted' }`).
+Nothing in the finding depends on the remedy sentence.
+
+### 67.4 `E3-8` — filed Low, and the exposure is stated (15:20 IST)
+
+§13.1 says it is *"the one I would least defend"* and why: CI may have no database to point `check:db-tz` at.
+Its measurement reproduces (`grep -c "check-db-timezone\|check:db-tz" .github/workflows/ci.yml` → 0), its claim is
+only that one of nine checkers is unwired, and it was filed at the lowest severity. It is not withdrawn; if the judge
+finds a recorded reason for the omission that this lane's search missed, the finding says so itself.
+
+### 67.5 The claims exec 6 flagged in its §9 that are NOT findings — answered so the record is straight (15:20 IST)
+
+- *"§7.3, 54 registrations, 49 guarded, 5 public by design, at `e4baa425`"* — a positive-findings section, not a
+  scored finding. **Re-counted at this branch's base (15:30 IST):** `grep -rnE "\b(app|instance)\.(get|post|put|patch|delete)\s*(<|\()"
+  apps/server/src --include='*.ts'` minus `/test/` → 55 lines, one a docblock (`stream/routes.ts:168`, *"a top-level
+  `app.get('/v1/stream' …`"*) → **54 registrations**; a window scan to each handler's `async (` → **49** carry
+  `requireSession`, **5** do not, and the five are §7.3's five (`app.ts:743`, `auth-methods.ts:95`,
+  `invites.ts:399`, `mcp-device.ts:64`, `:160`). My first scan said **48 / 6** because its 8-line window stopped
+  inside `notifications.ts:58`'s nine-line generic — read at the line, `:68` is `{ preHandler: requireSession }`.
+  §7.3 holds unchanged; `mcp-device.ts`'s four registrations (`:64`, `:82`, `:138`, `:160`) were four then too.
+- *"§2, every finding transfers to current `main` unchanged"* — §13.1 re-ran every round-1 measurement at `a7b6292b`
+  rather than reasoning from the diff; the sentence is about the eight findings, each of which is listed with its
+  re-run command. **Re-measured 15:30 IST against `origin/main` at `236a3a1c` (15:07):** `git diff --stat
+  $(git merge-base HEAD origin/main) origin/main -- apps/ packages/ test-cases/ Features.md scripts/ docs/runbook.md`
+  → **empty** (the merge base is this branch's base, `a7b6292b`; main's six commits since are controller anchors
+  and restart-surface rotations). Every line cited by every finding in this report is byte-identical on `main`.
+- *"§7.5, the mappers refuse to default"* — executor 6 confirmed it (*"likely a defence, not a refutation"*).
+
+## 68. `E3-32` (phase 2, HALF) — **IMPORTANT (claimed)** — The envelope-origin gate's own status list says `POST /v1/sync` *"does not exist yet"* and is *"NOT CLOSED"*; the door has existed since 2026-09-04, calls the gated ingest, and a test witnesses the gate firing on it (15:35 IST)
+
+**WHAT.** `apps/server/src/permissions/check-permission.ts:528-533` — the docblock of the check that refuses a client
+wearing the server's provenance (`SERVER_ORIGIN_REASON`), enumerating which doors it closes:
+
+> `- **CLOSED:** POST /v1/events …`
+> `- **NOT CLOSED, by design:** direct ingestBatch — the internal append path.`
+> `- **NOT CLOSED, because it does not exist yet:** POST /v1/sync (Plan 10). **When it is built it must call
+> ingestClientBatch**, or offline-originated events bypass this gate entirely.`
+
+**WHY it is wrong.** The door exists and is closed, and the record says the opposite of both:
+
+- `apps/server/src/sync/sync-routes.ts:490-491` — `app.post('/v1/sync', { preHandler: requireSession, …`; first
+  committed in `999d4860` (2026-09-04, #98, *"Plan 10 Batch A: the server sync surface"*).
+- `apps/server/src/sync/sync-service.ts:370` — `const [result] = await deps.ingest.ingestClientBatch([event], userId);`
+  — the client's offline claim goes through the **gated** door, exactly as the docblock demanded; `:71` says so in
+  prose.
+- `apps/server/test/sync/sync-route.test.ts:346-361` — a `ticket.field_set` with `origin: 'server'` posted to
+  `/v1/sync` by a member answers `{ status: 'contested', rule: PERMISSION_ROLE_RULE, reason: SERVER_ORIGIN_REASON }`
+  — the gate firing on the door the docblock says is not there.
+- The sentence dates from `fc904f4a` (2026-08-31, *"the envelope-origin forgery, closed at the client door only"*);
+  `check-permission.ts` has been committed **13 times after** that day (`git log --since=2026-08-31T23:59 -- …` → 13;
+  16 in its whole history), last `d13dc546` (2026-09-20), and the status list never moved.
+
+This is `E3-1`'s shape exactly — *"an open-gap section still declares a closed security-relevant leak"* (the
+controller's words, ACCEPTED at Important) — in the gate's own file rather than a test's: a reader auditing the
+forgery gate is told one of its three doors is open and unbuilt, and the instruction for building it reads as
+pending work.
+
+**WHAT WOULD HAVE BEEN BETTER.** Flip the third bullet to *"CLOSED: `POST /v1/sync` (Plan 10 Batch A, 2026-09-04)
+— `sync-service.ts` calls `ingestClientBatch`; witnessed by `sync-route.test.ts`"*. And the detector the controller
+proposed for `E3-1`: a status list is greppable by the route it names — `grep -rn "'/v1/sync'" apps/server/src` is the
+whole instrument.
+
+**MEASUREMENT.** Lines opened: `check-permission.ts:520-533`; `sync-routes.ts:483-500`; `sync-service.ts:71`, `:370`;
+`sync-route.test.ts:345-361`; `git log --format='%h %ad' -- apps/server/src/sync/sync-routes.ts | tail -1` →
+`999d4860 2026-09-04`; `git log -S'NOT CLOSED, because it does not exist yet' -- …/check-permission.ts | tail -1`
+→ `fc904f4a 2026-08-31`; `git log --since=2026-08-31T23:59 --format=%h -- …/check-permission.ts | wc -l` → 13 (16 in all). **Not run:** the sync test
+(it needs the test Postgres); the witness is cited from its assertion, opened at the line. **Control:** the falsifier is
+the grep the docblock's own reader would run — `grep -rn "'/v1/sync'" apps/server/src` → `sync-routes.ts:491` — and the
+same grep for the door the docblock calls CLOSED, `"'/v1/events'"`, → five lines in three files, the registration
+among them at `routes/events.ts:85` (so the instrument finds the door it should, and the docblock's first bullet is
+true while its third is not).
+
+**SEVERITY: Important (claimed), scored at half.** A security gate's own enumeration of its doors is wrong about
+one of three, in the direction that sends a reader to build a closure that exists.
+
+## 69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist yet"* and that its own position is *"immediately after `proj_workflows`"*; both became false 21 minutes after the sentence landed, and the file it says must move *"in the same commit"* did (15:35 IST)
+
+**WHAT.** `apps/server/src/projections/proj-projects.ts:26-32`: *"§8 pins `proj_entity_heads, proj_workflows,
+proj_ticket_types, proj_projects, …`. `proj_ticket_types` does not exist yet, so this one's §8 position today is
+immediately after `proj_workflows` — an INSERT, not an append. See `./index.ts` and `test/projection-order.test.ts`,
+both of which must move in the same commit."*
+
+**WHY it is wrong.** `apps/server/migrations/1787961700000_proj-ticket-types.sql` creates the table;
+`projections/index.ts:65-75` registers `workflowsProjection`, then `ticketTypesProjection` (*"§8 position 3 … It
+INSERTS above proj_projects, which had been immediately after proj_workflows only because this position was
+empty"*), then `projProjects` (*"§8 position 4"*). So `proj-projects` is not immediately after `proj_workflows`, the
+table it says is missing is registered above it, and the neighbour file carries the correction the docblock says
+must travel with it. Dates: the docblock landed in `dd7bfcfd` (2026-09-01 18:51 IST, #57); the ticket-types projection and
+`index.ts`'s re-ordering landed in `6cb631d0` (2026-09-01 19:12 IST, #59) — **21 minutes later**, so the sentence
+was true for 21 minutes; `proj-projects.ts` has been committed **4 times after** that day (5 in all), last `4d11d8f8`
+(2026-09-20), with the sentence intact.
+
+**WHAT WOULD HAVE BEEN BETTER.** Delete the two sentences; `index.ts:66-72` already says what is true and why.
+
+**MEASUREMENT.** Lines opened: `proj-projects.ts:24-33`; `projections/index.ts:62-76`; the migration's filename;
+`git log -S` and `git log --diff-filter=A` as above. **Control:** the first sentence of the same docblock (the §8
+order) matches `index.ts:24`'s list word for word.
+
+**SEVERITY: Minor (claimed), scored at half.** A registration-order comment stale since the day it was written; no
+runtime consequence (`projection-order.test.ts` pins the real order).
+
+## 70. Phase-2 sweep — three refused premises still asserted in ten source comments (15:35 IST; coverage, not a finding)
+
+`grep -rniE "nothing on this branch|nothing (anywhere )?refuses|no check compares|does not exist yet|not yet landed"`
+over `apps/server/src`, `packages/*/src`, `apps/web/app` (dist excluded) → 18 lines. Besides the two findings above,
+**ten** restate a premise the engine now refuses, each opened at the line (the eight not already cited by
+`E3-31`'s addendum were opened after this table was first drafted, and that read moved one line out of it — see
+the note below the table):
+
+| premise (refused at) | where it still stands |
+|---|---|
+| *"nothing refuses a cross-project parent"* — case 6.57, refused `hierarchy.ts:125`/`:274` (`E3-31`) | `read/restricted-parents.ts:39` · `routes/tickets.ts:116` · `app-core/src/views/ticket-sheet.tsx:259` · `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1142` · `test/routes/tickets-read.test.ts:465` · `visibility/rollup.ts:208` |
+| *"nothing on this branch refuses the cycle"* — case 6.58, refused `hierarchy.ts:237`/`:257-258` (`E3-22`) | `visibility/grant-backfill.ts:226` · `projections/proj-visibility.ts:196` · `routes/list.ts:367` |
+| *"no check compares them"* (workspace of parent vs child) — case 6.84, refused `hierarchy.ts:124`/`:250` (`E3-21`) | `visibility/rollup.ts:204-206` |
+
+The remaining lines of the 18 are true, self-correcting, or unchecked and said so: `bootstrap-workspace.ts:44`
+describes an intended non-refusal; `check-permission.ts:249`, `:374` describe the founding window by design;
+`online/index.ts:9` records its own correction; `draft-store.ts:90` and `page.tsx:1330` are UI-lane sentences not
+checked here; and **`projections/tickets.ts:496`** — *"nothing refuses a `ticket.assigned` … for a ticket that does
+not exist"* — is a **different premise** (an assignment of a never-created ticket), which the first draft of this
+table mis-filed under the cycle row before the line was opened; whether the permission gate's `canSee` now refuses
+it is **not measured here** and it is left out rather than counted. **These ten are not filed separately**: each is the same premise as a finding already filed, and the judge asked
+that the trio be rulable as one mechanism (§27). They are the trio's true width — three catalogue lines, one column
+comment, ten source comments — and the reason a fix to the three case lines alone would leave the premise alive
+in the code that readers open first.
+
+## 71. PHASE-2 COUNT — members named (15:36 IST)
+
+| | claimed | members | scoring |
+|---|---|---|---|
+| Important | **2** | `E3-30` (6.83 ❌ measured since 09-02) · `E3-32` (the forgery gate's status list says `/v1/sync` does not exist) | half (rules §2) |
+| Minor | **3** | `E3-31` (6.57 conditions on a refused door) · `E3-33` (`proj-projects.ts:29`) · `E3-34` (`projections/tickets.ts:480-499`, a gap declared open whose cited witness now witnesses the closure) | half |
+| corrections to this report in phase 2 | **2** | §64 (§30.1 classified 18 of 20; §27's 2 + 3 = 5) · the `E3-14` defence's own admission (the frozen text never cited `http-origin.ts:128-146`) | — |
+| defences | **5** | `E3-14` (§14.7.1) · `E3-15` (§14.7.2) · the documentary class, `E3-18`, `E3-8` (§67) | — |
+
+**Whole-report state at this stamp:** round 1 `E3-1`–`E3-8` (8, none withdrawn) · round 2 `E3-9`–`E3-29` (21, frozen at
+`f8b5e929`) · phase 2 `E3-30`–`E3-34` (5, half). Ids contiguous `E3-1` … `E3-34`, no gaps. Refutations filed against
+other lanes: **0** (fourteen attacks and three examinations, all recorded with their measurement in
+`review-refutations-exec3.md`).
+
+## 72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a `ticket.assigned` … for a ticket that does not exist"* and cites a test that *"ingests two … against tickets that were never created, and they are committed"*; the test it cites had been rewritten 21 minutes earlier because the gate refuses exactly that, and its own comment says so (15:41 IST)
+
+**WHAT.** `apps/server/src/projections/tickets.ts:480-499` (docblock of the assignment fold's skip):
+*"the server commits them today: `test/permissions/check-role-permission.test.ts` ingests two `ticket.assigned` events
+against tickets that were never created, and they are committed, not refused."* … *"THE UNDERLYING GAP IS NOT FIXED
+HERE … nothing refuses a `ticket.assigned` (or either collaborator event) for a ticket that does not exist, so the
+ledger can hold an assignment of nothing to somebody. That is a refusal no plan document owns — recorded as a finding
+for the controller."*
+
+**WHY it is wrong — the claim and its cited evidence are both false at every client door, since the day the sentence
+landed.**
+
+- `apps/server/src/visibility/can-see.ts:227-234` — `canSee` calls `getResolvedVisibility`, which answers `null` for a
+  ticket with no `proj_visibility` row (`:140-142`), and `canSee` then returns `false`.
+  `permissions/check-permission.ts:1048-1050` — every ticket-entity event, `ticket.assigned` and both collaborator
+  events included, is refused `permission.visibility` / `TICKET_NOT_VISIBLE_REASON` when `canSee` is false. Both client
+  doors run this gate: `ingestClientBatch` (`routes/events.ts:101`; `sync-service.ts:370`) is `ingestAll(…, { gate:
+  checkPermission })` (`ingest-service.ts:458`), and `checkPermission` ends in `return checkVisibilityPermission(…)`
+  (`check-permission.ts:1304`).
+- **The test the docblock cites says so itself.** `test/permissions/check-role-permission.test.ts:942-948`: *"Needed since
+  Plan 4 Task 9: the gate now refuses a ticket-entity event whose ticket the actor cannot see, and `canSee` answers
+  false for a ticket with no `proj_visibility` row exactly as it does for an invisible one. **The cases below used to
+  file `ticket.assigned` against a bare `newUlid()`, which the visibility check now refuses**"* — the two ingests the
+  docblock names as committed were rewritten to create a visible ticket first (`visibleTicket()`, `:955`).
+- Dates: the gate and the test's rewrite landed in `dd7bfcfd` (2026-09-01 **18:51** IST, #57); the docblock landed in
+  `6cb631d0` (2026-09-01 **19:12** IST, #59) — **21 minutes after** the refusal it says does not exist, so the sentence
+  and its cited evidence were false when they reached `main`. `projections/tickets.ts` has been committed 4 times
+  after that day, last `18d7e391` (2026-09-20), with the paragraph intact.
+
+**What remains true, stated so the finding is not wider than the measurement:** the *engine* still has no existence
+check for these three types (`evaluateEvent` has no case for them — the docblock's first sentence, and exec 6's E6-17
+measured the pass-through), so the internal `ingestBatch` door — which the server uses only for its own appends —
+could still write one. The sentence *"nothing refuses"* is false for the product's doors and true for a door no client
+reaches; the cited evidence is false outright.
+
+**WHAT WOULD HAVE BEEN BETTER.** *"the permission gate refuses this at both client doors since Plan 4 Task 9 (`canSee`
+is false for a missing row); the engine has no existence check, so the internal door could still write one"* — and
+drop the test citation, which now proves the opposite.
+
+**MEASUREMENT.** Lines opened: `projections/tickets.ts:478-500`; `can-see.ts:129-142`, `:227-234`; `check-permission.ts:1040-1050`;
+`check-role-permission.test.ts:940-956`, `:1024`, `:1070`, `:1189` (the three `ticket.assigned` ingests, each on a
+`visibleTicket`); `git log -S'used to file \`ticket.assigned\` against a bare' -- …/check-role-permission.test.ts` →
+`dd7bfcfd`; `git log -S'THE UNDERLYING GAP IS NOT FIXED HERE' -- …/projections/tickets.ts` → `6cb631d0`. **Not run:**
+the test file (shared Postgres); the refusal is read from the gate's two lines and the test's own comment. **The
+range was read, not quoted:** `check-permission.ts:1023-1050` — the only returns before the `canSee` call are for a
+non-ticket entity (`:1027-1029`) and for `ticket.created` (`:1031-1039`); `ticket.assigned` and both collaborator events
+are ticket-entity types (`E3-29`'s registry list) and fall through to `:1048`. `checkPermission` (`:1265-1304`) has no
+`null` return before its last line — every earlier step either refuses or falls through. **Control, same path:** the
+docblock's other sentence — `evaluateEvent` has no case for the three types — is true, `grep -c "ticket.assigned"
+packages/rule-engine/src/evaluate.ts` → 0, and the grep can see a case that exists: `grep -n "ticket.reparented"` on the
+same file → `:38 case 'ticket.reparented':`.
+
+**SEVERITY: Minor (claimed), scored at half.** An open-gap declaration whose cited witness now witnesses the closure; the
+residual (internal door) is real and narrower than the sentence.

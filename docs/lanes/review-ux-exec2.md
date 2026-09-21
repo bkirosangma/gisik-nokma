@@ -1682,6 +1682,24 @@ contradiction is the finding.
 **Source:** carried candidate (round-1 §2d). **Severity: Minor.** The true half of the sentence is present,
 so the person is not left without information — they are left with a contradiction.
 
+> **DEFENCE — phase 2, 2026-09-21 15:23 IST, after exec 6's `R6-3 → E2-28` (their file at `23d4ab8d`, filed 15:20).**
+> **R6-3 is correct, and I re-ran its five measurements before writing this.** `<BulkCloseDialog` is mounted by two
+> files, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` and `packages/app-core/src/views/board.tsx`, and by
+> nothing under `apps/mobile` or `apps/desktop` (0 hits). The web constructs its data source at
+> `apps/web/src/providers.tsx:108` with `createOnlineDataSource` — `createReplicaDataSource` has 0 hits under
+> `apps/web` — and `packages/app-core/src/online/online-data-source.ts` contains the string `OfflineAcceptError`
+> **0 times** and never answers `'pending'`. So the `catch` at `bulk-close-dialog.tsx:230-233` can receive that error
+> from **no data source any shipped shell hands it**; the sentence this finding describes has no path to a screen
+> today. The finding's title says *"is reported as"* — a claim about a rendered outcome — and its MEASUREMENT lists
+> the catch and the throw site but not the wiring between them. That gap is the refutation, and it is the same
+> shape my round-1 `F9` marked as *"reasoned, not measured"*; here I did not mark it.
+>
+> **What survives is code-level, not person-level:** `board.tsx` is an app-core view — the layer the phone and
+> desktop shells are written to adopt (`apps/desktop/src/app.tsx:120-123` says the views are not yet mounted there)
+> — and the day a replica-backed shell mounts it, this catch will state *"could not reach the server"* over a queued
+> acceptance. That is a note for that day. As a UX finding about what a person meets on this build, **E2-28 does
+> not hold**; the ×3 on a Minor is the rule's and I do not argue it.
+
 ---
 
 *Batch 2 filed. Running total of round-2 new findings: `E2-20`–`E2-28` (9) — 5 Important, 4 Minor.*
@@ -1936,6 +1954,25 @@ reproduction. (b) needs a second prompt mounted while one is live, which `E2-34`
 **Source:** carried candidate (round-1 §2d, four separate leads folded into one finding because they are
 one defect). **Severity: Important.**
 
+> **DEFENCE — phase 2, 2026-09-21 15:30 IST, self-filed: a bound on (a) that the reachability paragraph above
+> gets wrong.** The paragraph says (a) *"is reachable on every ticket creation where the type read has not answered
+> by first paint."* The **swap** is — the dialog mounts under `createRegion` before `ticketTypes.data` arrives
+> (`page.tsx:1720-1745` gates on `ticketTypes.error`, the session and `list.rows`, not on `ticketTypes.data`,
+> opened) — but the **consequence** I drew from it (*"the control draws the placeholder … while `typeId` is non-empty
+> and Create is enabled"*) requires the seeded id to be absent from the real list, and on a product-founded workspace
+> it never is. `BUILTIN_TYPE_LADDER` (`page.tsx:133-136`) carries the seeds' own ids — `'epic'`, `'story'`,
+> `'task'`, `'sub-task'` (`packages/domain/src/ticket-types.ts:138-143`) — and every workspace materialises those same
+> ids at founding: `builtinTicketTypeDefs` keeps `id: seed.id` (`:151-159`), called from
+> `apps/server/src/workspaces/bootstrap-workspace.ts:87`. The only type event is `ticket-type.defined`; nothing
+> retires one. So after the swap `typeId === 'epic'` is still a member of `options`, the `Select` resolves its label,
+> and no placeholder is drawn. The mirror arm (*"a genuinely empty list at mount"*) is likewise unreachable: the
+> ladder is never empty and a founded workspace's list is never empty. **(a)'s person-visible consequence is
+> withdrawn**; what survives of (a) is the structural fact — no re-seed, an emptiness gate instead of a membership
+> gate — with no effect a person can meet today. **(b) and (c) are unchanged**: their inputs (`reopenPrompt`, set per
+> attempt at `create-ticket-flow.tsx:195`, and `current`, reloaded by the sheet's read) can change under a mounted
+> dialog, which is the CONCURRENT class, and the paragraph above already says neither was driven. Severity is the
+> judge's; if (b)+(c) alone read as Minor, that is the honest weight of what is left.
+
 ---
 
 ### E2-34 (r2) — MINOR · Two `aria-modal` dialogs open at once, and one Escape press closes both
@@ -2082,6 +2119,26 @@ the refusal arms that return without one).
 
 **Source:** carried candidate (round-1 §2e). **Severity: Minor** — the refusal is displayed, so the person
 is not misled about the outcome, only about the fields.
+
+> **DEFENCE — phase 2, 2026-09-21 15:33 IST, self-filed: the finding ignores the stream, and the stream does the
+> reload it says nobody does.** *"the sheet behind the dialog still draws the old priority, because nothing
+> re-read"* is false on the product's normal path. The sheet's read is a `useLiveQuery` (`ticket-sheet.tsx:515`),
+> and that hook refetches, debounced 200 ms, on every `event` frame from the workspace stream
+> (`use-live-query.ts:100-106`, opened). The committed field claim produces such a frame: the ingest service
+> fires `onEventCommitted` (`apps/server/src/ingest/ingest-service.ts:460`), `apps/server/src/app.ts:927` hands it to
+> the stream hub, the hub schedules every subscriber of that workspace (`stream/hub.ts:330-334`) and sends
+> `{ type: 'event', envelope }` (`:276`); the client's subscriber yields it as `{ type: 'event' }`
+> (`online/stream.ts:91-99`) and the hook reloads. So with the `/v1/stream` socket connected — the state every
+> web session is in unless the socket has dropped — the sheet re-reads within roughly a quarter of a second of the
+> refusal and draws the committed priority. I opened the handler and the throw site and did not open the seam
+> between them: the same gap `R6-3` found in `E2-28`.
+>
+> **What survives, stated narrower:** the explicit `read.reload()` is absent from the refusal arm (`:739-745`,
+> unchanged), so the correction depends entirely on the stream. When the socket is down — the
+> OFFLINE / REPLICA-DEGRADED class, which the web stream anticipates with a reconnect backoff of up to 30 s
+> (`online/stream.ts:21-30`, opened) — the sheet shows the old field beside a refusal about the new state, for as long as the socket stays
+> down. The always-reachable case is a window of one debounce plus one fetch. Filed as Minor; the judge may
+> weigh the surviving arm as narrower than the finding claimed, and I do not contest that.
 
 ---
 
@@ -2381,6 +2438,86 @@ which the comment names; the placeholder must not be a colleague.
 **Severity: Important.** ⚠ **Not verified:** whether this shell is built and distributed, and whether any
 member id can actually occupy `assigneeId` at the moment a comment is sent — both would need the app run
 against a real workspace. I claim the code path and the attribution semantics, not a reproduction.
+
+> **DEFENCE — phase 2, 2026-09-21 15:12 IST (Opus, inheriting the lane).** Written before any refutation of this
+> finding has landed, because the lane's own pushed refutations file (row `E5-21`, commit `ad054454`, 10:52 IST)
+> already concedes the half of this finding that is false, and a judge reading the title alone would not see the
+> concession. **Stated plainly: two sentences in this finding are FALSE as frozen** — the title's *"is recorded as
+> the ASSIGNEE's words"* and the WHY paragraph's *"is written to the ledger as that person's claim"*. Neither
+> happens. The correction block above (commit `0dff77cd`, 10:41 IST, four hours before the 15:05 freeze) says so;
+> this paragraph asks the judge to rule on the **narrowed claim**, which I re-measured today at `778a6439`:
+>
+> - **The door refuses, every time.** `apps/server/src/permissions/check-permission.ts:542-544` — `if (env.actorId
+>   !== ctx.sessionUserId) return refuse(IDENTITY_SPOOF_REASON)`; `:71` `IDENTITY_SPOOF_REASON = 'You cannot submit
+>   a claim as another person.'` The phone's `actorId` is `state.assigneeId ?? 'me'` (`ticket-screen.tsx:49`) — a
+>   value that equals the session user only by coincidence. The ledger is never written. (Opened.)
+> - **The composer can never learn the refusal.** `packages/app-core/src/replica/replica-data-source.ts:1391-1407`:
+>   the replica's `ingest` enqueues locally, fires `void engine.flush().catch(() => undefined)` un-awaited, and
+>   **throws `OfflineAcceptError` whenever any claim was queued** — its own docblock at `:1387-1389`: *"this method
+>   can never return `committed`, under any input"*. The phone's handler catches exactly that error and returns
+>   (`ticket-screen.tsx:54` *"queued locally — the expected offline outcome"*), so the `setError` arm at `:55`
+>   fires only for a LOCAL precheck refusal, never for the server's. The server's answer arrives later, inside
+>   the swallowed flush. (Opened.)
+> - **What the person is then told.** The outbox marks the row `status = 'failed'` with `last_error =
+>   'identity-spoof: You cannot submit a claim as another person.'` (`packages/sync-client/src/outbox/outbox.ts:411-412`),
+>   under a comment that says the person *"is owed the fact that it was refused and the words it was refused in"*
+>   (`:408-409`). The phone renders that debt as **`{failed} needs attention`** on the BOARD screen
+>   (`board-screen.tsx:53`) — a count, on a different screen from the one the words were typed on, with no reason,
+>   no ticket and no words. The ticket screen (`ticket-screen.tsx:124-127`) renders nothing after the press: the
+>   draft is not cleared, no sentence appears, and the Comment button remains offered. (Opened.) ⚠ So my
+>   correction block's *"no screen says so"* is itself over-broad by one count on one other screen; the precise
+>   sentence is the one just given.
+>
+> **The narrowed claim, for the judge to rule on:** the phone's Comment control **offers what can only be refused**
+> (every claim carries an `actorId` the door compares against a session the shell does not have), the refusal
+> **arrives after the press and off-screen**, and the words are lost — the SERVER-REFUSES-WHILE-CLIENT-BELIEVES
+> class the role brief names as this product's most expensive, in the form the brief states first: *"a refusal
+> that arrives after the press is a defect, even when the refusal is correct."* Severity claimed unchanged
+> (Important); if the judge scores the finding as frozen — title included — the ×3 penalty is the rule's and I do
+> not argue it. What I argue is that the record shows the false half was found and named by this lane, in phase 1,
+> before any peer filed against it. Sibling: exec 5's `E5-21`, independently measured, same door.
+>
+> **DEFENCE, CORRECTED — 15:17 IST, after reading exec 6's `R6-2 → E2-42` (their file at `213a25ad`, filed 15:16).**
+> R6-2 is **right**, and the paragraph above repeats the error it found: I named `/v1/events`' gate
+> (`checkRolePermission`, `IDENTITY_SPOOF_REASON`) as the door the phone meets. **It is not.** The phone's transport
+> pushes to **`/v1/sync`** (`packages/sync-client/src/net/http-transport.ts:157`, opened), and that door answers
+> `invalid: actor-mismatch` — *"A synced claim must belong to the signed-in user."* — at
+> `apps/server/src/sync/sync-service.ts:321-327` (opened) before any permission gate runs. So the outbox's `last_error`
+> I quoted above would read `actor-mismatch: A synced claim must belong to the signed-in user.`, not
+> `identity-spoof: …` (`outbox.ts:410-412` formats an `invalid` as `${code}: ${message}`). I cited the
+> `/v1/events` lines because the phase-1 correction did, and I opened them without asking whether the phone's path
+> passed through them — the exact failure my own record names. **And "the door refuses, every time" is false**: R6-1's
+> probe (run against the real server, `/v1/sync`, three shapes) shows a comment by the assignee on their own ticket
+> **commits** (`actorId = assigneeId = session user`), and that attribution is correct. I did not run a probe; theirs
+> is the measurement of record.
+>
+> One thing R6-1 left unmeasured, which I opened because it decides whether the phone ever speaks: is the `'me'` shape
+> (or another person's id) refused **locally** before it is queued, which would fire `setError` at
+> `ticket-screen.tsx:55`? **No.** `newSubmittedEvent` validates nothing (`packages/domain/src/submit.ts:9-30`,
+> opened — it copies `actorId` through); the outbox's `enqueue` runs only the rule engine (`outbox.ts:307-315`
+> `evaluateEvent(probe, ctx)` — no envelope parse, no actor check), so both non-self shapes queue, throw
+> `OfflineAcceptError`, and are swallowed at `:54`. The `malformed-envelope` and `actor-mismatch` answers arrive
+> later inside the un-awaited flush.
+>
+> **What survives of E2-42, stated for the last time and narrower than before:** on the phone, a comment on a ticket
+> **not assigned to the person typing it** — someone else's, or unassigned — is offered, accepted with silence,
+> and never posts; the ticket screen never says so; the only trace is a `{n} needs attention` count on the board.
+> A comment on the person's own assigned ticket posts correctly. The title's *"recorded as the ASSIGNEE's words"* is
+> false in both directions, as R6-2 says. Exec 5 withdrew its `E5-21` and refiled the same surviving core as `E5-44`;
+> I am not withdrawing (phase 2 has no free withdrawal) — the judge has the finding as frozen, this concession, and
+> exec 6's probe, and the severity of what survives is theirs to set.
+>
+> **Addendum — 15:42 IST, one more seam opened.** The paragraphs above say the phone renders the failure *"as
+> `{failed} needs attention` on the BOARD screen"*. That count is read by `refreshQueue`, which runs only from
+> `dataSource.subscribe(workspaceId, 0, refreshQueue)` (`apps/mobile/src/app.tsx:47-49`), and the replica's
+> `subscribe` fires only on an incoming engine item or a status flip to `live`
+> (`replica-data-source.ts:1445-1476`, opened). The flush that records the `invalid` answer does neither: `sync-engine.ts:844-870`
+> calls `outbox.recordFailure`/`recordOutcome` and emits no item and no status change (opened). So **immediately after
+> the failure, not even the count is shown**; it appears only when some later server event for the workspace
+> arrives, or the socket reconnects. The surviving claim is therefore slightly stronger than stated above — the
+> person is told nothing at the moment it happens, on any screen — and the sentence *"the only trace is a count"*
+> should read *"the only eventual trace"*. Exec 5's `E5-44` phrase *"sees neither a post nor a failure"* is right on
+> the immediate path; I note this here rather than in a refutation because it is a point in their favour.
 
 ---
 
@@ -2902,6 +3039,26 @@ eighth**.
 
 **Severity: Important**, with the Critical reading stated above.
 
+> **DEFENCE — phase 2, 2026-09-21 15:25 IST, self-filed before any refutation.** Re-opening the cause list *"offline,
+> a 5xx, a dropped connection"* against the client library found **one member false**. `authClient` is
+> `createAuthClient` from `better-auth@1.7.2` with no `throw` or `catchAllError` option (`apps/web/src/auth-client.ts:32-40`,
+> opened; `better-auth/dist/client/config.mjs` sets neither for `/sign-out`, `:68`). Under `@better-fetch/fetch@1.3.1`
+> (`dist/index.js`, opened): a **network-level failure** — offline, dropped connection — leaves `await fetch(…)` at `:628`
+> unguarded, so the promise **rejects** and the finding's account holds: `.then` never fires, nothing is pushed, the
+> session stays live, the closed menu is the only signal. But a **non-2xx answer** (a 5xx included) does not reject:
+> `:735-741` returns `{ data: null, error: { status, … } }` — the promise **resolves**, `.then` fires, and
+> `router.push('/sign-in')` runs on the strength of an answer the handler never read. So *"a 5xx"* belongs in the other
+> arm: on that path the product is not silent, it **navigates to Sign in as though the sign-out succeeded**, while the
+> server answered that it did not. Measured further at 15:44: better-auth's `/sign-out` route (`dist/api/routes/sign-out.mjs`,
+> opened) catches and logs a failed `deleteSession`, always runs `deleteSessionCookie(ctx)`, and answers 200 — so a
+> non-2xx from this route can come only from infrastructure in front of it (a proxy's 502/503), never from the route's
+> own failure. That makes the 5xx arm narrow and infra-dependent, which is why it is recorded here and not filed.
+>
+> **What this changes:** the finding's mechanism (one callback, no rejection arm, `close(false)` first) and its
+> offline/dropped-connection outcome are unchanged and re-verified at `account-menu.tsx:189-194`. The 5xx member is
+> withdrawn from the rejection list; the arm it actually takes is the SERVER-REFUSES-WHILE-CLIENT-BELIEVES class
+> and is stated here as a correction, not filed as a new finding. Severity claimed unchanged; the judge has both arms.
+
 ---
 
 # R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
@@ -3277,6 +3434,16 @@ depends on.
 the controller directed. **Severity: Minor** — nothing is broken by an unused export; what is wrong is a
 public symbol with an unclosed gap whose owner is named as a caller that does not exist, inside a sweep that
 counted its neighbours and not it.
+
+> **DEFENCE — phase 2, 2026-09-21 15:36 IST, self-filed: one supporting sentence is false; the claim is not.** The
+> sentence *"The one apparent hit, `ticket-sheet.tsx:897`, is the docblock text above"* does not survive re-measurement:
+> `grep -n transitionRequiresEvidence packages/app-core/src/views/ticket-sheet.tsx` returns **nothing**, and `:895-899`
+> (opened) names `EvidencePicker` and the two `compose*` exports, not this symbol. The hit I remembered was from a
+> different needle, and I wrote it into this finding as if it were this one's. The measurement that carries the
+> finding is unchanged and re-run at `a59ce9b9`: the symbol's only non-test, non-`dist` mentions in `apps/` and
+> `packages/` are its declaration (`require-evidence.ts:61`) and the barrel export (`packages/editor/src/index.ts:66`)
+> — **zero production callers**, with no apparent hit to explain away at all. The false sentence is withdrawn; the
+> finding stands on the two lines that remain.
 ### E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the symptom here is an empty board with no error
 
 **WHAT.** `apps/mobile/src/app.tsx:28-60`:
@@ -3423,6 +3590,17 @@ route files** (`my-work.ts` calls it twice), which is the measured unit behind t
 **Source:** the case catalogue — my largest named gap, reached in two bounded bites (`17-open-work.md`'s
 `17.005` and this). **Severity: Minor** — a comment, but a verified disagreement between two documents, with
 the correct value already written down three files away.
+
+> **DEFENCE — phase 2, 2026-09-21 15:35 IST, self-filed: this finding does not hold.** Re-reading the comment in its
+> own context (`apps/server/src/read/ticket-cards.ts:20-26`, opened again) — it sits on `workflow_version`, a row
+> field *"Selected for `ListCard.stateName`"*, i.e. written from the **list** route's standpoint — the word I
+> passed over is **"other"**: *"putting it on the card would change four **other** routes' bodies."* Other than the
+> list route. The five callers I measured are `attention`, `board`, `list`, `my-work`, `search`; take `list` out and
+> **four remain**. The comment's number and `Features.md:695`'s *"FIVE route files"* are the same fact from two
+> standpoints, and they agree. The catalogue log entry I quoted ("undercounted") reads the comment without its
+> standpoint, and I repeated that reading and then called the code wrong. **E2-50 is withdrawn in substance:** there
+> is no disagreement inside the repository; the only thing left is that the comment is standpoint-relative where an
+> absolute number would have been clearer, which is not a defect. The ×3 on a Minor is the rule's.
 ### E2-51 (r2) — MINOR · My own `13.761` still asserts an absence the product reversed, with a reason that is now false and a citation that points at a different case
 
 **WHAT.** `test-cases/13-second-wave-board-actions.md:49-58`, case **`13.761`** — one of seven ids I minted on 2026-09-18 for the members roster — says:
@@ -3517,6 +3695,30 @@ branch whose prop is undefined.
 **SEVERITY: Important.** Not Critical: nothing is lost and the editor still types. But it is a **false
 statement about the workspace's membership shown to every phone user who mentions anyone**, and it is the
 class this lane's brief calls the product's most expensive recurring shape.
+
+> **DEFENCE — phase 2, 2026-09-21 15:20 IST, self-filed before any refutation.** Re-opening this finding as its own
+> critic found **one false sentence, and it is the one the severity leans on.** The finding says the status node
+> *"is not a hidden announcement"* and that *"everyone who opens a mention on the phone reads the false sentence"*.
+> **That is false.** `packages/editor/src/styles/editor.css:50-62` (opened) styles `.mention-popup__status` as
+> screen-reader-only — `position:absolute; width:1px; height:1px; margin:-1px; overflow:hidden; clip-path:inset(50%)`
+> — under a comment that says so in words: *"The result count, for screen readers only."* That rule is inlined
+> verbatim into the phone's editor page (`apps/mobile/src/editor/editor-html.generated.ts`, one hit for
+> `.mention-popup__status`, opened). And `mention-popup.ts:27-28`, inside the very range this finding cites
+> (`:26-35`), says *"user-facing copy that only a screen reader ever receives"*. I quoted the range and did not read
+> its second line — the failure my own record names most often.
+>
+> **What a sighted person meets instead, measured:** on `@`, `onStart` (`mention-popup.ts:153-173`) appends a
+> `.mention-popup` container — `min-width: 10rem; border: 1px solid currentColor` (`editor.css:40-45`) — holding a
+> listbox with zero options; it stays empty for as long as the mention is open, because the host's reply is
+> always `users: []` (links 1–4 above, all re-opened today: `entry.tsx:55`, `editor-web-view.tsx:80-85`,
+> `ticket-screen.tsx:124`). Enter/arrows are declined while it is empty (`:190-196`), so the box neither fills nor
+> responds. **What a screen-reader user meets:** the polite announcement *"No people match"* (`:32`, `:100`).
+>
+> **What survives, stated narrower:** the phone's `@` trigger is **offered and can never succeed** — the host is
+> never asked, so no member can be mentioned from the phone — and the product answers the two audiences
+> differently: an empty box that never fills for sighted users, and a false statement about membership for
+> screen-reader users. The mechanism, the five links and the remedy are unchanged. The sentence *"shown to every
+> phone user"* in the severity paragraph is withdrawn as false; the severity of what remains is the judge's.
 
 ### E2-53 (r2) — MINOR · The mobile editor host has no refusal vocabulary at all: three doors, and silence is the answer at every one
 
