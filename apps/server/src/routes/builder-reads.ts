@@ -23,6 +23,7 @@ import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { ROSTER_VISIBLE_CLAUSE, isWorkspaceAdmin } from '../read/membership-roster.js';
 import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
+import { canSee } from '../visibility/can-see.js';
 
 /**
  * The BUILDER read surface (Plan 5 Task 9b): what a workspace IS, as opposed to
@@ -561,6 +562,20 @@ export const MIGRATION_RULES = {
    * row, Ruling 52(a), regardless of what the map says for it).
    */
   backlogNotMappable: 'migration.backlog-not-mappable',
+  /**
+   * E6-10 (release 2026-09-22): a ticket of the type the CALLER cannot see.
+   * The permission gate asks `canSee` per event (`check-permission.ts`), and
+   * `canSeeResolved` answers false for an `admin` on a project-mode ticket
+   * whose project they are not on — there is deliberately no admin read
+   * bypass. Asked here, over the whole ticket set, before one envelope
+   * exists, for the reason every other pre-flight question is: ingest
+   * commits one transaction per event, so a refusal that arrives on the
+   * second row leaves the first moved — a type split across two workflows
+   * under a `refused`. The count is in the reason because the remedy is
+   * the caller's (join those projects, or hand the migration to an owner),
+   * and the number is what tells them how far that is.
+   */
+  notVisible: 'migration.not-visible',
 } as const;
 
 export function registerBuilderReadRoutes(
@@ -841,11 +856,20 @@ export function registerBuilderReadRoutes(
    * whole ticket set, before one envelope exists — so a refusal appends nothing,
    * and the answered `count` equals the events appended. The remaining window is
    * stated rather than papered over: if ingest refuses or fails PART WAY through
-   * a batch it accepted the pre-flight of, earlier tickets stay moved. Nothing
-   * this route can construct reaches that window — the pre-flight covers every
-   * refusal `checkTicketWorkflowRebound` can produce — but an infrastructure
-   * failure mid-batch is not a refusal and is not covered. Recorded against the
-   * plan's Task 9b text: closing it needs a batch-scoped ingest transaction,
+   * a batch it accepted the pre-flight of, earlier tickets stay moved. The
+   * pre-flight covers every refusal `checkTicketWorkflowRebound` can produce
+   * AND, since E6-10 (2026-09-21, case 7.266), the one the permission gate
+   * produces ahead of the engine — `canSee` per ticket, which an `admin` fails
+   * on a project-mode ticket outside their projects. Before that question was
+   * asked here, an admin's migration moved the tickets they could see and was
+   * refused on the first they could not, splitting the type across two
+   * workflows under a `refused` the docblock had called unreachable. What is
+   * still not covered: an infrastructure failure mid-batch, which is not a
+   * refusal; and any refusal a LATER door adds that this pre-flight does not
+   * mirror (a soft-deleted ticket of the type, if the ingest door comes to
+   * refuse writes against one, is the next candidate — the SELECT below does
+   * not filter `deleted_at`). Recorded against the plan's Task 9b text:
+   * closing the window for good needs a batch-scoped ingest transaction,
    * which is a change to the ingest service and not to this route.
    */
   app.post<{ Params: { workspaceId: string; typeId: string } }>(
@@ -938,6 +962,32 @@ export function registerBuilderReadRoutes(
           ORDER BY ticket_id`,
         [workspaceId, typeId, fromWorkflowId],
       );
+
+      // E6-10: the permission gate's question, asked FIRST among the
+      // per-ticket questions and through the gate's own function, so the two
+      // cannot drift. `canSee` is what `checkVisibilityPermission` runs per
+      // event; an owner reads the whole workspace and still pays `canSee`'s
+      // two reads per ticket for an answer that is always yes, which is the
+      // price of one source of truth over a second SQL expression of the
+      // visibility table (`visibleTicketsWhere` is that second expression,
+      // and its docblock names the drift it costs). First,
+      // because it is the most fundamental refusal here: a caller who cannot
+      // see part of the set cannot run this migration AT ALL as they are, and
+      // sending them to fix the map before saying so would send them to fix
+      // the one thing that was never the problem (`checks/hierarchy.ts`'s
+      // ordering doctrine). Counted rather than named — the tickets are ones
+      // the caller may not see, so the reason carries how many, not which.
+      let hidden = 0;
+      for (const row of tickets) {
+        if (!(await canSee(deps.pool, request.currentUserId, row.ticket_id))) hidden += 1;
+      }
+      if (hidden > 0) {
+        return refuse(
+          reply,
+          MIGRATION_RULES.notVisible,
+          `${hidden} of the ${tickets.length} ticket${tickets.length === 1 ? '' : 's'} of this type ${hidden === 1 ? 'is' : 'are'} not visible to you; a migration moves every ticket of the type, so ask an owner to run it, or join the projects those tickets are in.`,
+        );
+      }
 
       // Every OCCUPIED state needs a target — EXCEPT `backlog`, which the
       // dialog can never map: `stateMap` is built from `fromWorkflow.states`
@@ -1041,10 +1091,10 @@ export function registerBuilderReadRoutes(
       const failure = results.find((result) => result.status !== 'committed');
       if (failure !== undefined) {
         // Reachable only through the window the docblock names: every refusal
-        // `checkTicketWorkflowRebound` can produce was asked up front over this
-        // exact ticket set. It is answered rather than swallowed because a
-        // partial migration the caller was not told about is worse than either
-        // population.
+        // `checkTicketWorkflowRebound` can produce, and the gate's `canSee`,
+        // were asked up front over this exact ticket set. It is answered
+        // rather than swallowed because a partial migration the caller was
+        // not told about is worse than either population.
         return refuse(
           reply,
           failure.status === 'refused' ? failure.rule : `ingest.${failure.code}`,

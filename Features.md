@@ -1013,7 +1013,14 @@ reason on record, not an oversight:*
   the states that have no target, and `migration.closed-to-non-terminal` (Ruling 53(ii), 2026-09-17)
   naming the count and the non-terminal state(s) a closed row would otherwise land on — the same
   closed-⇒-terminal invariant `ticket.workflow_rebound`'s own engine check holds, asked here up
-  front so a batch that would trip it per-event is refused before any event is built.
+  front so a batch that would trip it per-event is refused before any event is built. A fifth
+  since E6-10 (2026-09-21, case 7.266): `migration.not-visible` — the permission gate's own
+  question, `canSee` per ticket, asked first among the per-ticket questions and counted
+  (`1 of the 2 tickets of this type is not visible to you; a migration moves every ticket of the
+  type, so ask an owner to run it, or join the projects those tickets are in.`). Before it, an
+  `admin` not on one of the projects — who gets no read bypass — had the tickets they could see
+  moved and the first they could not refused mid-batch, splitting the type across two workflows
+  under a `refused` the route's docblock had called unreachable.
   **Parked tickets carry as parked** (Ruling 52(a), Finding 2, 2026-09-17): a `backlog` row is
   implicitly mapped to the universal Backlog state regardless of what `stateMap` says — the dialog
   builds its map from the source workflow's OWN declared states only, so backlog (never declared)
