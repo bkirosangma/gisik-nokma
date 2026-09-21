@@ -927,10 +927,12 @@ mutations were run; **none survived**.
   filed a `claim.contested` against the user's own ticket two seconds before it existed, and the outbox
   recorded that contest and dropped the edit (the reviewer's Appendices D, G and S). Liveness is
   unchanged: no timer retries a backing-off head — `flush()` runs on enqueue and on catch-up — so the
-  head already waited for the next trigger and the tail now waits with it. **Ids from block
-  `12.960`–`12.969` (release batch B16, 2026-09-21)**: section 12's declared ids run to `12.399`, and an
-  anchored cross-branch grep for `12.9xx` over every `origin/*` branch found zero hits against a
-  same-loop control of 3,167 hits for `12.39x`. **The finding's second half — the sync door should not
+  head already waited for the next trigger and the tail now waits with it. **Ids `12.960`–`12.961`
+  (release batch B16, 2026-09-21)** were minted before the controller's 22:0x rule for sections without a
+  block table (next free = max over `origin/main` and every `origin/rel/*` head, plus one): section 12's
+  declared ids ran to `12.399`, and an anchored cross-branch grep for `12.9xx` over every `origin/*` branch
+  found zero hits against a same-loop control of 3,167 hits for `12.39x`. They collide with nothing and
+  claim NO block; later mints in this section follow the controller's rule. **The finding's second half — the sync door should not
   file a contest on a ticket the ledger has never seen — is NOT done here, and the reason is a security
   one rather than effort:** the read routes answer an unknown ticket and an invisible one identically
   (404) on purpose, and `/v1/sync` today contests both; answering `refused` for the unknown one and
