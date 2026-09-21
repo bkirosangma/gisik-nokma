@@ -1424,7 +1424,7 @@ manual repeats the three-tab scope (`docs/manual.md:763-770`) and never says the
 *"The backlog is hidden while 'Only tickets in progress' is on."* — and the scope note naming the Backlog.
 
 **MEASUREMENT.** `[SOURCE]` `page.tsx:152-153`, `:342`, `:925-948`, `:2023-2027`; `docs/manual.md:763-770`;
-`test-cases/13-board-prototype-port.md` (`13.1044`). Not driven: the toggle and the Backlog tab need the session the
+`test-cases/13-owner-requests-and-backlog.md:2243` (`13.1044`). Not driven: the toggle and the Backlog tab need the session the
 browser lost (§6.1); the mechanism is a server-side filter plus one constant, both opened.
 
 **SEVERITY: Important** (claimed). The product tells a person the backlog is empty when it is not, and the sentence
