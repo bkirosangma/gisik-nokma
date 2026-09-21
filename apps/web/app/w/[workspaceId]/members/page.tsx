@@ -10,6 +10,7 @@ import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
+import { DocumentTitle } from '../../../../src/document-title.js';
 
 /**
  * The minted link's copy. Pinned by Plan 6 Task 15b item 2 and exported so the
@@ -383,6 +384,7 @@ export default function MembersPage() {
 
   return (
     <main className="gn-shell">
+      <DocumentTitle title="Members" />
       <AppNav workspaceId={workspaceId} />
       <div className="gn-members__head">
         <h1 className="gn-page-title">Members</h1>

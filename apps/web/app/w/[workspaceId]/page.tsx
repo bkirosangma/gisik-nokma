@@ -12,6 +12,7 @@ import { ShellRefusal } from '../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../src/providers.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../../src/expired-session.js';
 import { mayAdminister, restrictedLine, viewerOf } from '../../../src/workspace-viewer.js';
+import { DocumentTitle } from '../../../src/document-title.js';
 
 /**
  * Archiving and restoring are ONE control and one symmetric event pair, chosen
@@ -777,6 +778,11 @@ function WorkspaceHome({
 
   return (
     <>
+      {/* The route's title, set HERE rather than at the page root because this
+          is the component that holds the workspace's name — the page above it
+          has only the id. exec1 P12: the browser tab, the window title, history
+          and a screen reader's page announcement all read this. */}
+      <DocumentTitle title={workspace.name} />
       <div className="gn-workspace-home__header">
         {/* Tint keyed on the workspace ID, never the name — Task 18's own
             survivor mutation, restated here rather than re-measured: a rename

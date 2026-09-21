@@ -206,6 +206,47 @@ the gate would have stayed 33/33.*
 > is the copy rule, which is a person's judgement. This gate catches the LOSS, which is the half that
 > can be mechanised and the half a delegated implementer is most likely to cause by accident.
 
+## Every route names its view (exec1 P12, 2026-09-21) — case `13.1050`
+
+**Id `13.1050`, and the number is derived rather than guessed.** `13.922` — this file's next free id above
+its own last line — was ALREADY TAKEN in `13-settings-and-workflows.md:577`, and the guard caught it.
+`13.x` is ONE space across every `13-*.md` file, so the tip is the global high-water mark (`13.1046`), and
+the block `13.1034`–`13.1049` is another executor's with `13.1047`–`13.1049` recorded as reserved and
+deliberately unused (`13-owner-requests-and-backlog.md:2185`). `13.1048` is inside that reservation and
+must not be taken, so the first genuinely free id is the one after the block. **This lane's standing
+request for an allocated block, first recorded under `13.969`, is still open** — this task was dispatched
+without one, as that one was.
+
+- **13.1050** ✅ Every routing file under `app/` declares a title — Next's `metadata`/`generateMetadata`
+  on a server route, `<DocumentTitle>` on any route — and a `'use client'` route that leans on
+  `metadata` is caught, because that export is **silently IGNORED** in a client module and the page
+  keeps whatever the previous route left in `document.title`. The sweep walks `page.tsx` **and**
+  `not-found.tsx`, whose exclusion list (`app/page.tsx`, a bare `redirect`) is itself asserted to still
+  be a bare redirect so it cannot become a hiding place. Two further arms: every declared topic is
+  non-empty and none is the bare product name — the defect restated as a property — and a mounted
+  `<DocumentTitle>` really sets `document.title` and follows a topic that resolves late.
+  (`apps/web/test/document-title.test.tsx`)
+
+**The finding.** `app/layout.tsx` set `{ title: 'Gisik Nokma' }` and nothing else set a title, so
+`/sign-in`, `/inbox`, `/help`, a board, a ticket sheet, `/settings`, `/privacy`, `/terms` and the 404
+all read the same string. WCAG 2.2 §2.4.2 *Page Titled* is **Level A**, and its Understanding document
+speaks to exactly this shape: *"for web applications (single page applications) where the view changes
+dynamically, the title should also be changed dynamically to reflect the content or topic of the
+current view."*
+
+**Two mechanisms, one source for the format.** A `'use client'` route uses `<DocumentTitle>` (an
+effect; Next's `metadata` is not honoured in a client module); a server route uses
+`export const metadata`. Both read `documentTitleFor` from `src/page-title.ts`, so the two cannot
+disagree about what a title looks like. `apps/web/src/page-title.ts` carries no `'use client'` on
+purpose — a directive there would turn the helper into a client reference and break the server half.
+
+⚠ **What is MEASURED and what is not.** The server half is measured in the real build output:
+`next build` → `.next/server/app/privacy.html` carries `<title>Privacy · Gisik Nokma</title>` and
+`terms.html` carries `Terms · Gisik Nokma`. **The client half's title is NOT in the prerendered HTML —
+measured, and expected**: the effect runs after hydration, so a browser reading of a client route
+post-hydration is **OWED** and is not claimed. jsdom witnesses the mechanism (the mounted component
+sets `document.title`); the sweep witnesses DECLARATION on every route, never execution.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one

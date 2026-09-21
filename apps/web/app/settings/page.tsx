@@ -10,6 +10,7 @@ import { useAppServices } from '../../src/providers.js';
 import { NewTicketTypePane, TicketTypeEditorPane } from '../../src/ticket-type-editor-pane.js';
 import { useWorkspaceName } from '../../src/use-workspace-name.js';
 import { WorkspaceSettingsForm } from '../../src/workspace-settings-form.js';
+import { DocumentTitle } from '../../src/document-title.js';
 
 type SettingsTab = 'ticket-types' | 'workflows' | 'workspace';
 
@@ -150,9 +151,12 @@ function typeEditHref(workspaceId: string, typeId: string): string {
  */
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<main className="gn-shell" />}>
-      <SettingsContent />
-    </Suspense>
+    <>
+      <DocumentTitle title="Settings" />
+      <Suspense fallback={<main className="gn-shell" />}>
+        <SettingsContent />
+      </Suspense>
+    </>
   );
 }
 

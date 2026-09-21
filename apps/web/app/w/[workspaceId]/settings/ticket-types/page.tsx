@@ -4,6 +4,7 @@ import { useParams, useRouter } from 'next/navigation';
 import { TicketTypeListScreen } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../src/authoring/builder-wiring.js';
+import { DocumentTitle } from '../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/ticket-types` — the workspace's ticket types and
@@ -16,6 +17,7 @@ export default function TicketTypesPage() {
   const base = `/w/${workspaceId}/settings/ticket-types`;
   return (
     <main className="gn-shell">
+      <DocumentTitle title="Ticket types" />
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">Ticket types</h1>
       {wiring.kind !== 'ready' ? (

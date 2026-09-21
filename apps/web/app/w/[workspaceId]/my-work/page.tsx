@@ -9,6 +9,7 @@ import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
 } from '../../../../src/expired-session.js';
+import { DocumentTitle } from '../../../../src/document-title.js';
 
 export default function MyWorkPage() {
   const router = useRouter();
@@ -47,6 +48,7 @@ export default function MyWorkPage() {
 
   return (
     <main className="gn-shell">
+      <DocumentTitle title="My work" />
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">My Work</h1>
       <div className="gn-shell__main">

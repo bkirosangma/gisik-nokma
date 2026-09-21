@@ -18,6 +18,7 @@ import {
   viewerOf,
   type CardViewer,
 } from '../../src/workspace-viewer.js';
+import { DocumentTitle } from '../../src/document-title.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -45,6 +46,7 @@ export default function WorkspacesPage() {
 
   return (
     <main className="gn-shell">
+      <DocumentTitle title="Workspaces" />
       <AppNav />
       <div className="gn-workspaces">
         <div className="gn-workspaces__head">

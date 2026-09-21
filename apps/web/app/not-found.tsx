@@ -1,4 +1,5 @@
 import Link from 'next/link';
+import { DocumentTitle } from '../src/document-title.js';
 
 /**
  * The 404, written the way the rest of this product writes an absence.
@@ -75,6 +76,12 @@ import Link from 'next/link';
 export default function NotFound() {
   return (
     <main className="gn-shell gn-notfound">
+      {/* exec1 P12 names the 404 among the routes that all read "Gisik Nokma",
+          and it is the one route a reader reaches with no context at all — the
+          title is the only thing that says the page was not found before the
+          heading is read. `not-found.tsx` may not export Next's `metadata`, so
+          this route uses the component even though it is a server component. */}
+      <DocumentTitle title="Page not found" />
       {/* The export's 72px rounded tile (`:1847`), glyph paths verbatim. The
           whole tile is `aria-hidden`: it repeats what the h1 says, so a screen
           reader announcing it would be reading the heading twice. That is also

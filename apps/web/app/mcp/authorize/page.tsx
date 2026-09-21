@@ -6,6 +6,7 @@ import { Suspense, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
 import { createHttpClient, HttpError } from '@gisik-nokma/app-core/online';
 import { useSessionStatus } from '../../../src/providers.js';
+import { DocumentTitle } from '../../../src/document-title.js';
 
 /**
  * `/mcp/authorize` — the one place a person consents to an assistant acting as
@@ -130,6 +131,7 @@ function AuthorizeScreen(): React.JSX.Element {
 
   return (
     <main className="gn-shell gn-mcp-authorize">
+      <DocumentTitle title="Connect an assistant" />
       <h1 className="gn-page-title">Connect an assistant</h1>
 
       <Card className="gn-mcp-authorize__card">

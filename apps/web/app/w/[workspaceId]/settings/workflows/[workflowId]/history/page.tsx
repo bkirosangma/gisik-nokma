@@ -5,6 +5,7 @@ import { useParams } from 'next/navigation';
 import { WorkflowHistoryScreen } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../../src/authoring/builder-wiring.js';
+import { DocumentTitle } from '../../../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows/[workflowId]/history` — the version
@@ -35,6 +36,7 @@ export default function WorkflowHistoryPage() {
   const wiring = useBuilderWiring(workspaceId);
   return (
     <main className="gn-shell">
+      <DocumentTitle title="Workflow history" />
       <AppNav workspaceId={workspaceId} />
       <nav className="gn-builder-crumb" aria-label="Breadcrumb">
         <Link href={`/w/${workspaceId}/settings/workflows`}>Settings › Workflows</Link>

@@ -73,6 +73,7 @@ import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
 } from '../../../../../src/expired-session.js';
+import { DocumentTitle } from '../../../../../src/document-title.js';
 
 /**
  * Board | List | Calendar | Timeline.
@@ -1790,6 +1791,10 @@ function ProjectBoard() {
 
   return (
     <main className="gn-shell">
+      {/* The route's title. `projectName` is `null` until the read answers, and
+          a null name is not a title — the generic `Board` stands in until it
+          arrives, and the effect re-runs with the name when it does. exec1 P12. */}
+      <DocumentTitle title={projectName ?? 'Board'} />
       {/* No `projectId`: the nav's Board item was removed in Round 23 and that
           prop was its only consumer, so passing it would be feeding a parameter
           nothing reads. */}

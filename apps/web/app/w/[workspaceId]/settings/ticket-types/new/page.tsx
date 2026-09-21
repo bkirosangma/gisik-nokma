@@ -4,6 +4,7 @@ import { useParams } from 'next/navigation';
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { NewTicketTypePane } from '../../../../../../src/ticket-type-editor-pane.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
+import { DocumentTitle } from '../../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/ticket-types/new` — a fresh type. `NewTicketTypePane`
@@ -18,6 +19,7 @@ export default function NewTicketTypePage() {
   const base = `/w/${workspaceId}/settings/ticket-types`;
   return (
     <main className="gn-shell">
+      <DocumentTitle title="New ticket type" />
       <AppNav workspaceId={workspaceId} />
       {wiring.kind !== 'ready' ? (
         <WiringNotReady wiring={wiring} />
