@@ -72,3 +72,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-29 | done | 5fdf77c2 | Features.md vocabulary bullet scoped to Plan 3; the eight later types named |
 | T-E3-30 | done | dbf32834 | case 6.83 closed: the measurement exists, is named after the case (13 green) |
 | T-E3-31 | done | 25b8d5b7 | case 6.57 struck: cross-project reparent refused at both doors (tickets-read 14 green) |
+| T-E3-33 | done | 571ef830 | proj-projects position paragraph corrected; index.ts had the true account (order 3 green) |
