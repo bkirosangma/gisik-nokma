@@ -14,3 +14,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B07 | claimed | 2026-09-21 20:50 | /Users/kiro/my_projects/gisik-nokma-exec4 |
 | T-E6-24 | done | 24997d03e767466c7f1b0460674e6e72b445dd03 | replica-deleted-reads.test.ts E6-24 x4 (case 12.399) |
 | T-E6-2 | done | f6231926363f3245f98cd5a154fa8b43dcfa2417 | live-ticket.test.ts E6-2 x23 (mutation-witnessed) + soft-deleted-writes.test.ts x13 through POST /v1/events (case 17.121) |
+| T-E6-4 | done | 35c414f1910b69843641df43764a283e54e3243b | deleted-hierarchy.test.ts E6-4 x6 + soft-deleted-hierarchy.test.ts x4 through POST /v1/events (cases 17.122-17.123) |
