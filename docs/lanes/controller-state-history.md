@@ -4,6 +4,30 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~15:1x IST — **CYCLE 39: PHASE 1 CLOSED EARLY AT 15:05:23 ON THE OWNER'S WORD; PHASE 2 IS TWO HOURS, ENDS 17:05:23; ALL SIX LANES ARE OPUS.** `main` is **`aad3f511`** (#632); **zero open PRs**.
+
+### 1. THE FREEZE — findings are scored at THESE shas, nothing later
+Owner, 15:0x: *"lets start phase 2 early. lemme know when we can start."* → *"make phase 2 just 2 h instead of 3 h. then go."* The boundary script ran at **15:05:23 IST** and recorded (scratchpad `T0.txt`, `PHASE1_CLOSE` line):
+| lane | branch | phase-1 sha |
+|---|---|---|
+| exec 1 · UI · DeepSeek-authored | `exec1/review-ui-r2` | `2cfffc7a7c007b75d05c18b46dbb69664a347997` (+ one pending pre-death edit the Opus session commits first — the judge diffs that commit and counts it as phase-1 work only if it touches nothing but the report) |
+| exec 2 · UX · DeepSeek-authored | `exec2/review-ux-r2` | `778a6439793e074eb8dd819ce90dd7fefa910e1e` |
+| exec 3 · FUNC · DeepSeek-authored | `exec3/review-functionality-r2` | `f8b5e929efdef8aae6e01ab44d9e923eb4eb12c4` |
+| exec 4 · UI · Opus | `exec4/review-ui` | `98584aa36da8d23ede541cb94e7c917207165d38` |
+| exec 5 · UX · Opus | `exec5/review-ux` | `1641161de9e99be17d69c679af40c35db36cacf3` |
+| exec 6 · FUNC · Opus | `exec6/review-functionality` | `737294ae05f0a6671e018fb6dab625d622d4afe2` |
+The DeepSeek sessions had died at **14:57** on `API Error: 402 Insufficient Balance` (all three, twelve minutes into a turn); they were deliberately NOT relaunched before the boundary (Opus was ordered for phase 2, and Opus finishing a DeepSeek-authored phase-1 report would muddy the authorship comparison). Cost to them: ~8 minutes of phase 1; cost to the Opus lanes of the early close: ~36 minutes they were spending idle/tightening.
+
+### 2. WHAT RUNS NOW
+Execs 1–3 relaunched at 15:05 on the Claude API (status lines `opus-5`, no `backend deepseek` line) with `REVIEW-R2-PHASE2-OPUS-EXEC{1,2,3}-2026-09-21.md` (times substituted: close 15:05:23, end 17:05:23): inherit the lane, report frozen, refute with measurements, defend, push every 15 min. Execs 4–6 received PHASE 2 OPEN by paste (all three transcripts show it submitted). The recurring cron (v5) reads `PHASE2_END` from `T0.txt` and closes phase 2 with the paste + `PHASE2_CLOSE` shas; the 15:42 one-shot was cancelled so the boundary cannot run twice. Findings counted at 14:54 (pre-freeze; heading counts): UI 36 vs 37 · UX 61 vs 45 · FUNC 31 vs 27 — the reminder of 13:55 had produced 34 new findings in 90 minutes.
+
+### 3. FOR THE JUDGE, at 17:05:23
+Paste PHASE 2 CLOSED to all six; record `PHASE2_CLOSE` shas; read every report at its **phase-1 sha** and every refutation/defence at its **phase-2 sha**; one ledger row per finding and per refutation with the line the judge opened; per-pair totals; the loser ended (branch kept); everything in ONE PR with the seven checks and the forced gate at the landing tree; the anchor.
+
+---
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~15:0x IST — **CYCLE 38: PHASE 1 AT 5h20m — AN OUTAGE, A BACKEND THAT NEVER COMPACTS, AND THE OWNER'S ORDER TO MOVE LANES 1–3 TO OPUS AT THE BOUNDARY.** `main` is **`30fc083b`** (#631); **zero open PRs**.
 
 ### 1. THE FINDINGS PER LANE, from the pushed branches (heading counts; the lanes' own severity labels; not yet judged)
