@@ -1525,8 +1525,9 @@ see, each with the measurement I would run — **none is filed here**, per rules
   with reasons and owners** in the same docblock (`http-origin.ts:128-146`, *"excluded here rather than silently
   omitted"*), and the reasoning there (*"a workspace they can leave"*) prices the invitation-accept variant the
   finding's Critical rests on. The other three are genuinely unmentioned. **Not a refutation** — the finding is
-  valid for three routes and the judge sets severity — but the recorded half is what a refuter would cite, and my
-  E6-15 is the read-side complement measured independently (its §"Relation" paragraph says so).
+  valid for three routes and the judge sets severity — and the recorded half's reasoning (*"a workspace they can
+  leave"*) is measured false in E6-21, which connects the two rather than refuting either; my E6-15 is the read-side
+  complement measured independently (its §"Relation" paragraph says so).
 - **Where I would defend:** E6-2's weakest joint is *"committed is not a defect; the FAQ promises only views"* —
   the answer is `notifications/sweep.ts:175-177` (the product's own rule that a notification is a view) plus the
   measured letter, and the attachment-upload precedent (`ticketIsLive` at the upload door). E6-11's weakest joint
