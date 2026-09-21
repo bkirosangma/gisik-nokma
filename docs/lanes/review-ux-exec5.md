@@ -1729,7 +1729,11 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 
 ### 6.6 Held for phase 2 (refutations) — noted, not filed
 
-- exec 2's `V8` ("Opening any parent ticket raises a false alert") — I opened a parent-less child only; **not** tested.
+- exec 2's `V8` ("Opening any parent ticket raises a false alert") — **checked in source at `a7b6292b` and it HOLDS**:
+  `ticket-sheet.tsx:1278` `subtaskRows = subtasks.data ?? []`, `:1283` `subtasksIncomplete = rollup !== null &&
+  rows.length !== expected` with no `subtasks.data !== null` gate, `:591` the key re-keys on the ticket read's
+  `projectId`, and `use-live-query.ts:91-96` `setData(null)` on every key change. Not painted (CCSO-3 has no
+  children; the browser was lost before a parent was opened).
 - exec 2's `F9` reachability (comment box on a refused post) — not tested.
 - exec 2's `V1` (empty board invites a create; no web caller wires `onCreateTicket`) — **checked and it HOLDS**:
   `grep -c onCreateTicket apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` → 0 at `a7b6292b`, and my painted
