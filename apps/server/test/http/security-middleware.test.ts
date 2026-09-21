@@ -6,7 +6,7 @@ import { createAuth } from '../../src/auth/auth.js';
 import { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import { LogOtpSender } from '../../src/auth/otp-sender.js';
 import { createPool } from '../../src/db.js';
-import { HTTP_ORIGIN_PROTECTED_ROUTES } from '../../src/http/http-origin.js';
+import { HTTP_ORIGIN_PROTECTED_ROUTES, MUTATING_METHODS } from '../../src/http/http-origin.js';
 import type { IngestService } from '../../src/ingest/ingest-service.js';
 
 /**
@@ -265,20 +265,122 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
    * covered four routes while `HTTP_ORIGIN_PROTECTED_ROUTES` was believed
    * complete, and three cookie-authenticatable mutations — `POST /v1/workspaces`,
    * the ticket-type migration, and marking a notification read — were outside
-   * BOTH, under a docblock claiming the exclusions were enumerated. Re-reading
-   * a list you already believe is complete cannot find that; only comparing it
-   * against something independent can. So the comparison is here, in code.
+   * BOTH, under a docblock claiming the exclusions were enumerated.
+   *
+   * **This is ONE OF TWO layers (E3-15), and it alone is not "something
+   * independent."** Both sides here are hand-maintained: this table, and the
+   * production `Set`. A route missing from BOTH — the exact shape of E3-14's
+   * defect — leaves them equal and this test green, which is what the docblock
+   * above claimed could not happen. The instrument that actually cannot be
+   * satisfied by an omission from both lists is `13.198` below, which measures
+   * the ASSEMBLED APP rather than a second list. This test still earns its
+   * keep: it is what guarantees every production-protected route gets a named,
+   * per-route test row above rather than being covered only in aggregate.
    *
    * Set-equality in BOTH directions on purpose: a missing row means an
    * unprotected route with no test, and an extra row means a test asserting a
    * protection that no longer ships.
    */
   /**
-   * 13.116 — the set-equality drift guard: every protected route has a row in this suite AND every row is a protected route in production. Neither direction alone would catch a route added without a row.
+   * 13.116 — the set-equality drift guard: every protected route has a row in this suite AND every row is a protected route in production. Neither direction alone would catch a route added without a row. (Does NOT catch a route missing from both — see 13.198.)
    */
   it('every protected route has a row in this suite, and every row is a protected route', () => {
     const inTable = new Set(PROTECTED.map(([, , pattern]) => pattern));
     expect([...inTable].sort()).toEqual([...HTTP_ORIGIN_PROTECTED_ROUTES].sort());
+  });
+
+  /**
+   * 13.198 — E3-15 — the instrument the docblock above claims to be but is
+   * not: something INDEPENDENT of the two hand-maintained lists, so a
+   * mutating route omitted from BOTH of them still reddens.
+   *
+   * `buildApp`'s TEST-ONLY `options.onRoute` (`app.ts`, wired first, before a
+   * single route is registered) is what makes this reliable rather than
+   * `app.printRoutes()`: MEASURED, `printRoutes({ commonPrefix: false })`
+   * silently DROPS `/api/auth/*` from its tree entirely (a `find-my-way`
+   * internal node only prints under that option when `node.isLeafNode`, which
+   * a wildcard registered inside a child `app.register(...)` scope is not) —
+   * an instrument that can silently omit a route is the exact defect this
+   * task exists to close, so it is not the one used here. A hook added by a
+   * caller AFTER `buildApp()` returns has the OTHER failure: `onRoute` fires
+   * at REGISTRATION time (`fastify@5.12.1`'s `lib/route.js`), and every
+   * root-level route here registers synchronously inside `buildApp()`, before
+   * such a caller could ever attach anything — MEASURED, catching only the 2
+   * of ~20 routes declared inside a child `register()` scope, which is
+   * deferred to the `ready()` boot sequence. Wiring the hook INSIDE
+   * `buildApp`, first, sees everything either approach alone misses.
+   */
+  it('every mutating route the real app serves is protected or explicitly, reasonedly excluded — a route missing from every hand-maintained list still reddens', async () => {
+    const seen: Array<{ method: string; url: string }> = [];
+    const app = buildApp(
+      {
+        db: { query: async () => [{ ok: 1 }] },
+        pool: offlinePool,
+        ingest: fakeIngest(),
+        auth: createAuth({
+          pool: offlinePool,
+          otpSender: new LogOtpSender(() => {}),
+          magicLinkSender: new LogMagicLinkSender(() => {}),
+          baseUrl: 'http://localhost:3000',
+          secret: 'test-secret-not-used-anywhere-real',
+          webOrigin: 'http://localhost:3001',
+        }),
+        serverAppend: async () => [],
+        webOrigin: WEB_ORIGIN,
+        store: createObjectStoreFromEnv({}),
+      },
+      {
+        security: HTTP_ORIGIN_ON,
+        onRoute: (routeOptions) => {
+          const methods = Array.isArray(routeOptions.method) ? routeOptions.method : [routeOptions.method];
+          for (const method of methods) seen.push({ method, url: routeOptions.url });
+        },
+      },
+    );
+    await app.ready();
+    await app.close();
+
+    // The seam's own control: it must have seen BOTH a root-level route
+    // (`/v1/events`, registered synchronously) and a child-`register()` route
+    // (`/v1/attachments`) — otherwise this test would pass vacuously by
+    // observing nothing, the same way a `printRoutes` drop would.
+    expect(seen).toContainEqual({ method: 'POST', url: '/v1/events' });
+    expect(seen).toContainEqual({ method: 'POST', url: '/v1/attachments' });
+
+    const realMutatingPaths = new Set(
+      seen.filter((route) => MUTATING_METHODS.has(route.method)).map((route) => route.url),
+    );
+
+    /**
+     * The public doors: every mutating route the real app serves that is
+     * legitimately outside `HTTP_ORIGIN_PROTECTED_ROUTES`, each with its own
+     * reason — the honest form the file's own docblock argues for (above
+     * `HTTP_ORIGIN_PROTECTED_ROUTES`), extended here to the two the docblock
+     * does not carry because they are not COOKIE-authenticatable at all.
+     */
+    const publicMutatingRoutesOutsideTheCheck: ReadonlySet<string> = new Set([
+      // Recorded rulings — see `HTTP_ORIGIN_PROTECTED_ROUTES`'s own docblock.
+      '/v1/me/preferences',
+      '/v1/invites/:token/accept',
+      // A READ wearing a POST: no `INSERT`/`UPDATE`/`DELETE` anywhere in
+      // `reconcile-route.ts` (grepped) — it reports which presented ids are
+      // now restricted and appends nothing (ruling P37). CSRF is about
+      // causing a state change with an ambient credential; this route causes
+      // none, the same reasoning that excludes `GET /v1/sync/bootstrap`.
+      '/v1/sync/reconcile',
+      // No `preHandler: requireSession` — no cookie session is ever read, so
+      // there is no ambient credential to forge (`routes/mcp-device.ts`).
+      '/v1/mcp/device/code',
+      '/v1/mcp/device/token',
+      // better-auth's OWN CSRF middleware, not this file's: `auth.ts` wires
+      // `disableOriginCheck: false` and `trustedOrigins: [WEB_ORIGIN]`, which
+      // is a DIFFERENT check (better-auth's `api/middlewares/origin-check.mjs`)
+      // running INSIDE this route, not this hook running before it.
+      '/api/auth/*',
+    ]);
+
+    const expected = new Set([...HTTP_ORIGIN_PROTECTED_ROUTES, ...publicMutatingRoutesOutsideTheCheck]);
+    expect([...realMutatingPaths].sort()).toEqual([...expected].sort());
   });
 
   it.each(PROTECTED)(

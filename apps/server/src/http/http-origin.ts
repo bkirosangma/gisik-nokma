@@ -228,7 +228,10 @@ export function normalizeOrigin(webOrigin: string): string {
  *
  * Returns `true` when the request must be REFUSED.
  */
-const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// Exported so a test asserting "every mutating route in the real app is
+// covered" (E3-15) filters on the SAME set this file refuses by, rather than
+// a second, hand-copied literal that could drift from it unnoticed.
+export const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
 
 export function httpOriginRefused(input: {
   method: string;

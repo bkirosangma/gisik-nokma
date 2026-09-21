@@ -604,4 +604,15 @@ reconciled, never overwritten.
   `POST /v1/me/invitations/:inviteId/accept` (membership-granting) and its `/decline` sibling. Distinct
   from the invite TOKEN accept and `PUT /v1/me/preferences`, both still deliberately outside the set by a
   recorded ruling this case does not revisit (`http-origin.ts`'s own docblock)
+- 13.198 ✅ E3-15 — the set-equality drift guard (13.116) compares two hand-maintained lists (the suite's
+  table and the production `Set`), so a route missing from BOTH leaves it green — the exact shape 13.197
+  found. This case measures the ASSEMBLED APP instead: `buildApp`'s test-only `options.onRoute`, wired
+  before a single route is registered (a hook attached by the caller afterward misses every root-level
+  route — MEASURED, catching only 2 of ~20). Every mutating route the real app serves must be in
+  `HTTP_ORIGIN_PROTECTED_ROUTES` or a commented allow-list of the six public doors. Control asserted in
+  the same test: the seam must have observed both a root-level route and a child-`register()` route, or
+  it would pass vacuously. RED against the pre-13.197 route set (proven by temporarily removing one route
+  from both hand-maintained lists: 13.116 stayed green, this case reddened), GREEN at head.
+  `app.printRoutes({ commonPrefix: false })` was tried first and rejected — MEASURED, it silently drops
+  `/api/auth/*` from its tree (a `find-my-way` internal-node quirk under that option)
 

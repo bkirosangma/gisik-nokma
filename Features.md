@@ -2648,7 +2648,15 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   found the same way and added later (E3-14): `PUT /v1/me/notification-preferences`,
   `POST /v1/me/invitations/:inviteId/accept` (membership-granting) and its `/decline` sibling — distinct
   from the invite TOKEN accept and `PUT /v1/me/preferences`, both still deliberately outside the set by a
-  recorded ruling. Case 13.197. **Not covered:**
+  recorded ruling. Case 13.197. **The drift guard itself was found unable to catch a route missing from
+  BOTH the test's named table and the production set (E3-15) — the exact shape of the E3-14 gap.** Fixed
+  by a TEST-ONLY `onRoute` seam on `buildApp` (wired before any route is registered, since a hook attached
+  by a caller afterward misses every root-level route — `printRoutes({ commonPrefix: false })` was tried
+  first and rejected: MEASURED, it silently drops `/api/auth/*` from its tree). Case 13.198 asserts every
+  mutating route the real, assembled app serves is either in `HTTP_ORIGIN_PROTECTED_ROUTES` or a
+  commented, reasoned allow-list of the six public doors (two recorded rulings, a POST that reads and
+  writes nothing, two pre-session MCP device-flow routes, and better-auth's own CSRF middleware on
+  `/api/auth/*`). **Not covered:**
   `rateLimitKeyFor` has no standalone unit test, only indirect HTTP-integration coverage; whether
   `apps/web`'s proxy actually forwards `Origin` on same-origin requests is undemonstrated in this repo.
   `apps/server/src/http/http-origin.ts`, `apps/server/src/http/rate-limit.ts`, `apps/server/src/app.ts`
