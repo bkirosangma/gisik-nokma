@@ -743,6 +743,31 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **⚠ AND THE MOBILE SEVERITY CEILING, STATED SO THIS IS NOT INFLATED.** `Features.md` marks this shell `⚙️` deliberately: *"no simulator or physical device has ever shown this UI to a person"*. So this is a defect in a surface that has never been rendered — **real, and lower-consequence than the same defect on web**, which is why it is Minor and why the app-wide census is the part worth reading.
 
+### P29 — **MINOR** ⚠ **r2 NEW** — The mock-only suite claims each stub carries its server `file:line`; two of ten carry the file and no line, and they are the two whose contracts changed
+
+**WHAT.** `apps/web/e2e/smoke.spec.ts`'s docblock states the rule its own design rests on: *"Each entry below therefore carries the `apps/server/src/...:line` that registers it, and **every one of those was re-derived from the shipped source** rather than copied from the plan."* **Eight of the ten stubs carry a line number. Two carry the file and not the line.**
+
+**MEASUREMENT — every server citation in the file, in order:**
+```
+112  apps/server/src/auth/routes.ts:76           (SESSION stub)
+115  apps/server/src/routes/board.ts:286         (board)
+118  apps/server/src/routes/builder-reads.ts:547 (workflow builder)
+133  apps/server/src/routes/list.ts:480          (tickets*)
+142  apps/server/src/routes/attention.ts:328     (attention)
+147  apps/server/src/routes/preferences.ts:97    (preferences)
+152  apps/server/src/routes/workspaces.ts        ← NO LINE  → the /v1/me/workspaces stub at :177
+169  apps/server/src/routes/my-invitations.ts    ← NO LINE  → the /v1/me/invitations stub at :173
+220  apps/server/src/routes/invites.ts:378
+376  apps/server/src/routes/invites.ts:111
+```
+**⚠ AND THE TWO THAT LACK A LINE ARE THE TWO THIS SPEC'S OWN DOCBLOCK NAMES AS CHANGED.** The `/v1/me/workspaces` entry carries four paragraphs about how its shape drifted — *"The plan's stub … answers `{workspaces:[{id, name, projects:[…]}]}`. The shipped route answers `{workspaces:[{workspaceId, name, role}]}`"*, and the stub block itself records *"⚠ THIS STUB WAS STALE FOR A DAY BEFORE ANYTHING SAID SO … because `apps/web/e2e` is on NO GATE"*. The `/v1/me/invitations` entry is annotated **Task 17**. **So the citations are weakest exactly where the contracts moved most** — which is the opposite of what a citation is for.
+
+**WHY IT IS WRONG.** The docblock's claim is the mechanism by which a reader decides a stub is a stub *of something real*: it says a stub is a pointer at a live registration, and the pointer's precision is what makes it checkable. **A file name without a line is a weaker pointer than eight of its nine siblings**, and this file is the one that records what happens when a stub drifts from its route — it went stale for a day and nothing said so.
+
+**⚠ NOT A CLAIM THAT THE STUBS ARE WRONG.** I did not check the two routes' shapes; the stub bodies may be perfectly correct. **The finding is only that the citation's precision is not what the docblock says it is, on the two entries with the most drift history** — and the remedy is one line number each.
+
+**AND IT IS THE SAME CLASS AS P4 AND P25:** a sentence in the artefact making a claim about the artefact that is *nearly* true. `apps/web/e2e` is a UI suite in this lane's universe and it is where I would look for the mocked-contract failure the coordination doc records by name; **the discipline is genuinely there — this is a hole in it, not an absence of it.**
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -820,7 +845,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
 - `P26` ⚠ r2 — the prototype-delta document is stale in BOTH halves: **every numbered queue row is closed** and **two of five per-screen gap claims no longer describe the product**
 
-**MINOR — 16**
+**MINOR — 17**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -837,8 +862,9 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P25` ⚠ r2 — three live files cite the docblock of a deleted component, one of them an instrument
 - `P27` ⚠ r2 — the viewport suite's narrowest width is 390px; WCAG 1.4.10 names 320px and nothing tests it
 - `P28` ⚠ r2 — the mobile board's row is the one pressable of six with no accessibility role; its sibling sets one **(observation credited to the opposing lane; the census is the addition)**
+- `P29` ⚠ r2 — the mock suite says every stub carries its server `file:line`; two of ten carry the file only, and they are the two whose contracts drifted
 
-**Total 32.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 33.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
