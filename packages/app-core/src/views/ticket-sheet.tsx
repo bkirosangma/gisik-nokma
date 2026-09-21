@@ -668,10 +668,20 @@ export function TicketSheet({
    * it comes back as a REFUSAL naming the client's own payload as malformed,
    * which is a refusal about this code shown to a user as if it were about
    * their move.
+   *
+   * `fieldValues` is the OTHER half of "what the submission will carry", and it
+   * travels by a different road for a reason worth stating: `require-comment`
+   * and `require-evidence` are read from the CANDIDATE, so their values go into
+   * the payload above; `require-field` is read from the TICKET STATE
+   * (`rule-engine/src/rules/require-field.ts:9`), so a payload key could not
+   * reach it at all. The dialog's collected field values therefore ride
+   * `pendingFields`, which applies them to the ticket the engine sees — the
+   * preview's stand-in for the ordered batch the real path sends.
    */
   const precheck = async (
     toStateId: string,
     evidenceAttachmentId?: string | null,
+    fieldValues?: Record<string, string>,
   ): Promise<PrecheckResult> => {
     if (cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
     // The candidate must carry WHAT THE SUBMISSION WILL CARRY, or the engine
@@ -688,7 +698,7 @@ export function TicketSheet({
       type: 'ticket.transitioned',
       payload,
     });
-    return precheckEvent(candidate, cache);
+    return precheckEvent(candidate, cache, { pendingFields: fieldValues });
   };
 
   /**

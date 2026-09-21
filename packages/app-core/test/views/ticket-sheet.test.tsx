@@ -606,6 +606,56 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     expect(preview.textContent).not.toContain('malformed');
     expect(preview.textContent).not.toContain('toStateId');
   });
+
+  /**
+   * 3.178 (E2-40). `require-field` reads the value out of the TICKET STATE
+   * (`rule-engine/src/rules/require-field.ts:9`), not out of the candidate's
+   * payload — which is why the real path sends the field claims FIRST, in one
+   * ordered batch, before the transition. The preview evaluates ONE candidate
+   * against cached state and has no such batch, so a field the ticket does not
+   * already carry is invisible to it: the dialog's own input asks for the
+   * value, its gate clears the moment it is typed, and the preview beside it
+   * keeps saying the field is not set — for ever.
+   */
+  it('PLANTED DEFECT: the preview stops refusing once the field its own input asked for is filled', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'doing' && transition.to === 'done'
+          ? { ...transition, rules: [{ kind: 'require-field', field: 'invoiceNo' }] }
+          : transition,
+      ),
+    };
+    const read = ticketRead();
+    const cache = createClientStateCache();
+    cache.upsertTicket(read.ticket);
+    cache.upsertWorkflowDef(gated);
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => gated,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source, { cache });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    // Before anything is typed the refusal is CORRECT — the field has no value
+    // on the ticket and nothing has been collected. This is the control: the
+    // assertion below is about the refusal CLEARING, not about it being absent
+    // for some unrelated reason.
+    const preview = await screen.findByText(/instant check/);
+    expect(preview).toHaveTextContent('require-field');
+
+    await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+    // The person answered the question the dialog asked, and the answer reached
+    // the same evaluation the submission will cause — so the refusal goes.
+    expect(document.querySelector('.gn-refusal--preview')).toBeNull();
+  });
 });
 
 describe('TicketSheet — the attachment list (Task 12a wiring)', () => {
