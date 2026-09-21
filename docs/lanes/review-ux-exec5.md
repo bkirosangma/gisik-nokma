@@ -788,6 +788,30 @@ danger.
 
 ---
 
+### E5-22 — MINOR · "Add subtask" never says what it will file: under an Epic it silently births a Task (skipping Story); the fallback rule is flagged "for a ruling" and unruled `[BROWSER]` `[SOURCE]`
+
+**WHAT.** The subtask section reads `New subtask title` + `Add subtask` (`ticket-sheet.tsx:2295`, `:2306`; `[BROWSER]`
+on `CCSO-3`) and no sentence names the type the child will take. The type is chosen by `subtaskTypeFor`
+(`:118-131`): rule 1, the built-in `task` whenever legal; rule 2, otherwise the SHALLOWEST legal type. Under an Epic
+(rank 1) `task` (rank 3) is legal, so the child is a **Task** — the Story rank between them is skipped; under an
+Errand (rank 3) it is a Sub-task. `subtaskType.name` is read nowhere in the render (`grep -n 'subtaskType' …` → the
+predicate, the payload `:1388`, and the arm gates only).
+
+**WHY.** The fix of 2026-09-20 made the form ask before it offers (`:1303-1330`) — the right rule — and its own
+docblock says of rule 2: *"the one judgement in this change that is not forced, and it is flagged for a ruling
+rather than settled here"* (`:106-113`). A person on an Epic who wants a Story child must know to use New ticket
+with a Parent instead; the form beside them will make a Task without saying so. Two doors, two answers, one of them
+silent.
+
+**WHAT WOULD HAVE BEEN BETTER.** One clause: *"Adds a **Task** under this epic"* (the type is already in hand), or a
+type picker over the legal set when more than one qualifies.
+
+**MEASUREMENT.** `[BROWSER]` subtask section text; `[SOURCE]` `:96-131`, `:1334-1346`, `:1379-1388`, `:2294-2306`.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -849,14 +873,14 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**21 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 21). By claimed severity, read from the
-heading text: **Critical 0 · Important 16 · Minor 5** (16 + 5 = 21).
+**22 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 22). By claimed severity, read from the
+heading text: **Critical 0 · Important 16 · Minor 6** (16 + 6 = 22).
 
 - **Important (16):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-13, E5-15, E5-16, E5-20, E5-21
-- **Minor (5):** E5-12, E5-14, E5-17, E5-18, E5-19
+- **Minor (6):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed) = 17 of 21. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22 = 18 of 22. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
@@ -950,6 +974,23 @@ by one `grep -n` for the class or string — the graph's code layer is a leaf st
 nodes are all test/infra symbols), so its BFS would have pointed at test helpers. Tokens saved by the graph: the
 community index (~60 lines) in place of `ls -R` over 1,269 files; the report's own 357 KB was not read.
 
+### 6.4b Hypotheses opened and KILLED by reading — recorded so the judge can see the method, not just the hits
+
+- **"An epic band titled by a ULID under a Filters-sheet narrowing"** — `labels.epicTitle` (`page.tsx:1179-1200`)
+  falls back to the raw id unless `activeOnly`; but it reads `list.rows` UNnarrowed on purpose (`:655-666`: *"an epic
+  the filter dropped must still name itself above its surviving children"*), and `listNarrowing` (`:667-671`) is a
+  separate memo. So a Filters-sheet narrowing keeps the name; only the server-side `activeOnly` read can drop the
+  epic, and that arm has its sentence. **Not a finding.**
+- **"The Backlog's epic band with the epic row absent reads as a broken list"** (the brief's pointer) — the band is a
+  group label (`section.label`), the export does the same (`EXPORT:2896-2928`, and names an absent epic *"An epic
+  outside this narrowing"*), and the product names it too on the one path that can lose it. **Matches; not a finding.**
+- **"Delete with no confirmation"** (exec 2 §2d) — the export has none either (`EXPORT:3794-3799`, undo toast). **Category 1;
+  the finding that survived is the refusal's geometry (E5-9).**
+- **"`/mcp/authorize` has no deny path"** (`prototype-delta` entry) — stale: `Deny` is painted (`[BROWSER]`). **Not a
+  finding.**
+- **The workflow builder's read-only banner and the Workspace settings form's member arm** — both withhold with a
+  sentence (`read-only-banner.tsx:47-49`, `workspace-settings-form.tsx:442`). **The pattern done right; not findings.**
+
 ### 6.5 Stale figures I was handed, recounted
 
 | claim | measured | command |
@@ -968,5 +1009,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 21 findings — Critical 0 · Important 16 · Minor 5 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 22 findings — Critical 0 · Important 16 · Minor 6 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
