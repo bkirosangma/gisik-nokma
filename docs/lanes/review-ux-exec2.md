@@ -10,8 +10,8 @@
 # ⬛ THE SUBMISSION AT A GLANCE — one screen, for a judge ruling on six reports
 
 **Counts, measured from the sections below rather than written from memory.** 19 landed findings from
-round 1 (`E2-1`–`E2-19`; all 19 ACCEPTED, base 49 points) · **35 new** (`E2-20`–`E2-54`; **19 Important,
-16 Minor, 0 Critical**) · **54 in the report** · **93 root-relative cited paths, 0 missing** (universe stated
+round 1 (`E2-1`–`E2-19`; all 19 ACCEPTED, base 49 points) · **36 new** (`E2-20`–`E2-55`; **20 Important,
+16 Minor, 0 Critical**) · **55 in the report** · **93 root-relative cited paths, 0 missing** (universe stated
 because a bare-filename citation is the convention in parts of this file, so a resolver that treats every
 backticked token as a path reports false misses — measured, and the first version of this measurement did
 exactly that) · every line number inside its file · every finding carries a severity line.
@@ -56,7 +56,7 @@ failure mode of this session; it was caught only because a finding count I re-ru
 back **43** instead of 26. Restored from `ef219034` (verified clean before use) and redone with **function**
 replacements, which do not interpret dollar-patterns. The diff is now exactly the two intended edits.
 **A final automated audit of both artifacts, re-run after every repair, and clean on every section.**
-Counts measured against the sections rather than remembered: **35 round-2 findings, 19 Important / 16
+Counts measured against the sections rather than remembered: **36 round-2 findings, 20 Important / 16
 Minor, 0 Critical, every one with a severity line, headings in ascending numeric order with no duplicates;
 **and the refutations file re-measured with its units pinned: 23 check rows each beginning with a target id,
 naming 29 distinct peer findings, and 0 `R2-n` refutation ids — because it files no refutation and says so in
@@ -2779,7 +2779,7 @@ screen was not: `E2-44` is the finding. **The lesson I would keep: "I am finding
 reading about the files already opened, not about the files not yet opened** — and I nearly used it to skip
 two.
 
-**What phase 1 leaves, stated as the boundary:** 35 new findings on the landed 19, one withdrawal, one
+**What phase 1 leaves, stated as the boundary:** 36 new findings on the landed 19, one withdrawal, one
 standing-up against a ruling, six candidates examined and rejected with their measurements, one omission
 recorded as mine, and no refutations — because I read all three concurrent reports and could not falsify
 one.
@@ -3092,13 +3092,13 @@ Round 2 took me into **the workflow builder** (`E2-20`–`E2-22`), **`/account`*
 **`/inbox`** (`E2-26`), **the offline/degraded components and both other shells** (`E2-25`), and the
 shared **`Dialog`/`Select`/`Toast` primitives (`E2-27`, `E2-31`, `E2-34`, `E2-33`)**.
 
-**Sources of the 35 new findings, recounted at this push** (the earlier text here said 19; the paragraph
+**Sources of the 36 new findings, recounted at this push** (the earlier text here said 19; the paragraph
 is corrected rather than left to drift):
 
 | source | count | members |
 |---|---|---|
 | a lead **carried from round 1's two sweeps** (the ~40 at §2d/§2e, which the round-1 ruling left *"Carried, NOT raised"*) | **19** | `E2-20`–`E2-38` |
-| **work first done in round 2**, in six kinds: `E2-39` from a sweep I had not run before (all 59 `catch` sites); `E2-40` from tracing a lane-5 finding to the rule engine's own read site; `E2-41`–`E2-43` from `apps/mobile` and `apps/desktop`, both named unreached in my round-1 §6; `E2-44`–`E2-48` from working my own coverage list as the controller directed; `E2-52`, `E2-53` from **closing the last two files on that list** — mobile's `editor-web-view.tsx`, whose one caller's missing prop turns the mention popup's own copy into a false statement about the workspace, and which has no refusal vocabulary at all (§R2.21); and `E2-54` from **re-running exec 5's own collapse sweep as a control on `E5-13`** — my net returned its four sites and no fifth, and chasing why the net was that narrow landed on the shared refusal component's false claim of totality (§R2.22) | **13** | `E2-39`, `E2-40`, `E2-41`, `E2-42`, `E2-43`, `E2-44`, `E2-45`, `E2-46`, `E2-47`, `E2-48`, `E2-52`, `E2-53`, `E2-54` |
+| **work first done in round 2**, in six kinds: `E2-39` from a sweep I had not run before (all 59 `catch` sites); `E2-40` from tracing a lane-5 finding to the rule engine's own read site; `E2-41`–`E2-43` from `apps/mobile` and `apps/desktop`, both named unreached in my round-1 §6; `E2-44`–`E2-48` from working my own coverage list as the controller directed; `E2-52`, `E2-53` from **closing the last two files on that list** — mobile's `editor-web-view.tsx`, whose one caller's missing prop turns the mention popup's own copy into a false statement about the workspace, and which has no refusal vocabulary at all (§R2.21); `E2-54` from **re-running exec 5's own collapse sweep as a control on `E5-13`** — my net returned its four sites and no fifth, and chasing why the net was that narrow landed on the shared refusal component's false claim of totality (§R2.22); and `E2-55` from **the FAQ, which neither UX lane had swept** — the help names the *location* of the history-truncation notice and the product renders it at the other end of the list (§R2.26) | **14** | `E2-39`, `E2-40`, `E2-41`, `E2-42`, `E2-43`, `E2-44`, `E2-45`, `E2-46`, `E2-47`, `E2-48`, `E2-52`, `E2-53`, `E2-54`, `E2-55` |
 
 **Every measurement in the round-2 findings is mine and new, and each cites a line I opened.** ⚠ **The
 sentence that stood here carried a count — *"all 24"* — and I have removed it rather than correct it,
@@ -3452,8 +3452,8 @@ the correct value already written down three files away.
 *executor 2 — UX, round 2. **State at this push, and the phase is stated from the clock rather than from
 my sense of how much work I have done:** phase 1 runs to **15:41:50 IST** and **has not ended**; the wall
 clock at this edit is **13:48**. 
-**35 new findings** (`E2-20`–`E2-54`; **19 Important, 16 Minor**) on top of the landed 19
-(`E2-1`–`E2-19`) — **54 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling
+**36 new findings** (`E2-20`–`E2-55`; **20 Important, 16 Minor**) on top of the landed 19
+(`E2-1`–`E2-19`) — **55 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling
 (`E2-7`), every candidate I examined and deliberately did not file recorded individually in §R2.11 with
 its measurement, one omission recorded as mine, and **no refutations, because I read all five lanes and
 could not falsify one of the 37 peer findings I checked**. Branch `exec2/review-ux-r2`, pushed at every
@@ -3587,9 +3587,9 @@ Counted from the headings by matching each id to its own severity line, not writ
 ---
 
 *executor 2 — UX, round 2. **Phase-1 close, stated from the clock:** the wall clock at this edit is
-**15:37 IST** and the phase opens into refutation at **15:41:50**. **35 new findings**
-(`E2-20`–`E2-54`; **19 Important, 16 Minor, 0 Critical**) on top of the landed 19 (`E2-1`–`E2-19`) —
-**54 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling (`E2-7`), six
+**15:37 IST** and the phase opens into refutation at **15:41:50**. **36 new findings**
+(`E2-20`–`E2-55`; **20 Important, 16 Minor, 0 Critical**) on top of the landed 19 (`E2-1`–`E2-19`) —
+**55 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling (`E2-7`), six
 candidates killed on their last link and recorded with their measurements, no refutations (I read all five
 peer lanes and could not falsify one of the 37 peer findings I checked), and **this push's work: the last
 two files on my own not-reached list, closed** — which produced `E2-52`, `E2-53`, a clean verdict for
@@ -3708,8 +3708,8 @@ without measuring the state.** ⚠ **And it failed in the direction that hides i
 *ahead* of it would have been caught at once. It was caught only because a `date` call for an unrelated
 reason returned a time 2.5 hours earlier than the one I had written down.
 
-**State, measured: 35 new findings** (`E2-20`–`E2-54`; **19 Important, 16 Minor, 0 Critical**) on top of the
-landed 19 (`E2-1`–`E2-19`) — **54 as this lane's cross-round total, 35 as sections in this file** (§R2.23
+**State, measured: 36 new findings** (`E2-20`–`E2-55`; **20 Important, 16 Minor, 0 Critical**) on top of the
+landed 19 (`E2-1`–`E2-19`) — **55 as this lane's cross-round total, 36 as sections in this file** (§R2.23
 pins that unit). Added since the phase-1 report was finalised, all still **in phase 1**: **`E2-54`** (the
 shell's shared refusal component carries a false claim of totality, falsified by the register's own docblock
 and by `getTickets`' conditional `ServingGapError`), plus three corrections to this report's own text —
@@ -3724,12 +3724,12 @@ carries the checks, filed under phase 1 rather than after the boundary. **No fix
 
 ## R2.23 — WHAT "54 IN THE REPORT" MEANS, MEASURED, BECAUSE THE PHRASE COULD READ AS AN OVER-CLAIM
 
-**Measured in the pushed state at the phase-2 boundary, and it corrects a phrase this file uses nine times.**
-`re.findall(r'^### (E2-\d+)')` over this file returns **35** — the round-2 findings `E2-20`–`E2-54`. The
+**Measured in the pushed state, and it corrects a phrase this file uses nine times.**
+`re.findall(r'^### (E2-\d+)')` over this file returns **36** — the round-2 findings `E2-20`–`E2-55`. The
 landed round-1 findings `E2-1`–`E2-19` **are not written as `###` sections here**: `grep -o '\bE2-n\b'` over
 the whole file finds **only 10 of those 19 ids** (`E2-1..E2-19` minus `E2-3..E2-11`'s remainder — the ten
-that later sections cite by name). **So "54 in the report" must be read as *the lane's total across both
-rounds* — 19 landed + 35 new — and NOT as 54 finding sections in this file, of which there are 35.** The
+that later sections cite by name). **So "55 in the report" must be read as *the lane's total across both
+rounds* — 19 landed + 36 new — and NOT as 55 finding sections in this file, of which there are 36.** The
 round-1 report was landed in `#625` and is not reproduced here; where this file needs a landed finding it
 cites the id, which is why ten of them appear and nine do not.
 
@@ -3828,3 +3828,73 @@ reach is now **six ids by reading** (`17.005`, `5.8`, `5.13`, `5.21`, `13.941`, 
 decorative — the three I opened each had a witness that asserts the specific thing the case claims, and two
 of the three carry a control that would redden if the claim reversed.** That is a different statement from
 *"the catalogue holds"*, and it is the one I can make.
+
+---
+
+# R2.26 — THE HELP TELLS A PERSON WHERE TO FIND THE TRUNCATION DISCLOSURE, AND IT IS NOT THERE
+
+**One new finding, and it came out of the FAQ — which neither UX lane had swept.** exec 5 cited
+`docs/faq.md` twice (both in `E5-24`, for the role/removal passages); this lane had listed the FAQ as
+*targeted* rather than read. Working it for capability claims that are **numbers or locations** — the two
+things a stale sentence hides in — turned up one where the number is right and the **place** is wrong.
+
+### E2-55 (r2) — IMPORTANT · The FAQ and the manual both say the 200-entry history cap is disclosed *"at the top"*; the product renders the notice **after** the list, and the copy's own purpose is to stop a person believing they saw the whole history
+
+**WHAT.** Both help documents describe the truncation notice by its **location**, and the location is the
+opposite of where it renders:
+
+> `docs/faq.md:294` — *"Up to 200 entries. **It says so at the top** and there is no way to page further back,
+> so on a long-running job **the earliest history is currently unreachable**."*
+> `docs/manual.md:418` — *"**It stops at 200 entries**, **saying so at the top**. There is no way to page
+> further back. For a job with a very long history, **the older part is currently unreachable**."*
+
+**WHY it is wrong.** The history tab renders the list first and the notice second:
+
+```
+packages/app-core/src/views/ticket-sheet.tsx:2727   <HistoryList events={result.data} nameOf={nameOf} />
+packages/app-core/src/views/ticket-sheet.tsx:2728   {result.data.length >= HISTORY_PAGE_LIMIT ? (
+packages/app-core/src/views/ticket-sheet.tsx:2729-2731  `Showing the first ${HISTORY_PAGE_LIMIT} entries —
+                                                        this ticket's history may go on past them.`
+```
+
+**And the stylesheet is a third witness that it is a TRAILING element, not a leading one:**
+`packages/ui/src/ui.css:1882` — `.gn-ticket-sheet__history-partial { … margin: 0.6rem 0 0; }` — a **top**
+margin, the spacing of a paragraph that follows something. There is no `order`, no
+`flex-direction: column-reverse`, and no rule anywhere in either source stylesheet that reorders it
+(`grep -n 'history-partial' apps/web/app/globals.css packages/ui/src/ui.css` → **the one declaration**).
+
+**So a person who reads the FAQ is told to look at the top of the history for a sentence that is at the
+bottom of it** — and on a ticket with a long history, that is **below 200 rendered rows**. The copy's own
+justification is what makes this matter rather than being pedantry: it says *"the earliest history is
+currently unreachable"*. **The disclosure is the only thing standing between a person and the belief that
+they have read the whole record, and the sentence describing it points away from it.** ⚠ **The number in
+both documents is correct** — `HISTORY_PAGE_LIMIT = 200` (`ticket-sheet.tsx:71`) and the route's
+`DEFAULT_LIMIT = 200` (`apps/server/src/routes/ticket-history.ts:78`) — so this is not a stale count; it is
+a stale **location**, which is the same defect one layer down and which a count-checking sweep cannot see.
+**I reached this by checking the number and then checking the direction the sentence claims.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Either half fixes it, and the cheaper half is the copy: *"a line at the end
+of the list says so"*. ⚠ **But the placement is the part I would argue for changing**, and the file's own
+docblock is where the argument comes from: `ticket-sheet.tsx:61-70` reasons carefully about `>=` versus `==`
+and accepts over-reporting on purpose (*"an occasional 'there may be more' is a weaker claim than the truth,
+while a silent truncation is a stronger one"*). **That reasoning is about the claim's strength and it is
+right; the notice's position is a separate decision that undoes a large part of it**, because a disclosure a
+reader must scroll past 200 rows to meet is, for most readers, not a disclosure. Moving the sentence above
+`<HistoryList>` costs one JSX move and makes the help true as written.
+
+**MEASUREMENT.** Every line above was opened by me in this worktree: the JSX pair at
+`ticket-sheet.tsx:2727-2732`, the stylesheet declaration at `ui.css:1882` (searched in **source**
+stylesheets — ⚠ my first pass at this grep ran over the repo root and matched `apps/web/.next/`'s built CSS,
+a 242 KB result whose universe was the build tree rather than the source, so I re-ran it against the two
+stylesheet files by name), the constant at `ticket-sheet.tsx:71`, the route's default at
+`ticket-history.ts:78`, and both help sentences at `docs/faq.md:294` and `docs/manual.md:418`. ⚠ **What I did
+not measure:** the painted layout. I am not claiming a person has been misled — I am claiming the sentence
+that tells them where to look is false, which needs only the render order and the CSS, both read.
+
+**SEVERITY: Important** (claimed). **The argument for Minor, so the judge can rule down without
+reconstructing it:** nothing is broken, the notice *is* rendered, and a person who scrolls to the end reads
+it. **Against that, and why I claim Important:** the class is the one this lane's brief calls most-repeated —
+*a sentence that is true of one path and stated of the product* — the help is the product's own instruction
+about its own disclosure, and the failure mode it protects against is a person concluding a truncated record
+is complete. `E5-24`'s rows are the same class with the opposite error (the help denying a capability the
+product has); this one is the help **mis-describing** a capability it correctly denies.
