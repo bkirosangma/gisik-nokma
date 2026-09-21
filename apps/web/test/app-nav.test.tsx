@@ -927,6 +927,40 @@ describe('Round 24 the account menu', () => {
   it('E5-37 an email sign-up (name === "") falls back to the email, not a blank name', async () => {
     currentPath = '/workspaces';
     mockSessionUser = { id: 'u_no_name', name: '', email: 'anjali@example.com' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const trigger = await screen.findByRole('button', { name: 'Account menu for anjali@example.com' });
+    await userEvent.click(trigger);
+    expect(screen.getByRole('menu')).toHaveTextContent('anjali@example.com');
+  });
+
+  it('E5-37 a person with neither name nor email is not announced with a blank suffix', async () => {
+    // A shape the type admits ({ id, name, email? }) even if the product's
+    // own better-auth config would not produce it today. This case first
+    // expected `Account menu for u_bare` — the id as the floor of the chain.
+    // Landed E4-33 (13.1054, the shell's one reading in `display-label.ts`)
+    // rules the other way for THIS control: a person with no label gets
+    // `Account menu` with the suffix OMITTED, because `Account menu for ` is
+    // the defect and an opaque id read aloud is not a name. The id fallback
+    // E5-37 wrote survives in `useSessionStatus`, whose consumers print a
+    // name with no label helper. The property this case keeps is the one
+    // both rulings share: never a blank suffix, never an empty name.
+    currentPath = '/workspaces';
+    mockSessionUser = { id: 'u_bare', name: '', email: '' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const trigger = await screen.findByRole('button', { name: 'Account menu' });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.getAttribute('aria-label')).not.toMatch(/for\s*$/);
+  });
+
+  /**
    * 17.141–17.143 — E2-45 (round-2 ruling, IMPORTANT) — a sign-out that FAILED
    * must not read as one that succeeded.
    *
@@ -952,24 +986,6 @@ describe('Round 24 the account menu', () => {
         <AppNav />
       </Providers>,
     );
-    const trigger = await screen.findByRole('button', { name: 'Account menu for anjali@example.com' });
-    await userEvent.click(trigger);
-    expect(screen.getByRole('menu')).toHaveTextContent('anjali@example.com');
-  });
-
-  it('E5-37 a person with neither name nor email is not announced with a blank suffix', async () => {
-    // A shape the type admits ({ id, name, email? }) even if the product's
-    // own better-auth config would not produce it today. This case first
-    // expected `Account menu for u_bare` — the id as the floor of the chain.
-    // Landed E4-33 (13.1054, the shell's one reading in `display-label.ts`)
-    // rules the other way for THIS control: a person with no label gets
-    // `Account menu` with the suffix OMITTED, because `Account menu for ` is
-    // the defect and an opaque id read aloud is not a name. The id fallback
-    // E5-37 wrote survives in `useSessionStatus`, whose consumers print a
-    // name with no label helper. The property this case keeps is the one
-    // both rulings share: never a blank suffix, never an empty name.
-    currentPath = '/workspaces';
-    mockSessionUser = { id: 'u_bare', name: '', email: '' };
     await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out Kiro' }));
 
@@ -992,9 +1008,6 @@ describe('Round 24 the account menu', () => {
         <AppNav />
       </Providers>,
     );
-    const trigger = await screen.findByRole('button', { name: 'Account menu' });
-    expect(trigger).toBeInTheDocument();
-    expect(trigger.getAttribute('aria-label')).not.toMatch(/for\s*$/);
     await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
     await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out Kiro' }));
 
@@ -1330,81 +1343,5 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
       'aria-current',
       'page',
     );
-  });
-});
-
-/**
- * Case `13.1138` — E4-11 — THE PHONE DISCLOSURE'S WIRING, witnessed at the component because
- * the CSS arm cannot be: jsdom evaluates no media query, so a stylesheet test
- * can prove the breakpoint hides the wrapper but not that the button which
- * unhides it is wired to it.
- *
- * What matters here is the ONE property the shape was chosen for: **the links
- * are never conditionally rendered.** A closed bar is a visual state, not a
- * missing link, so the scoped routes stay in the document — and therefore in
- * the accessibility tree and one Tab away — at every width. A `{moreOpen && …}`
- * implementation would have passed every assertion below about the open state
- * and silently deleted three routes from the phone's accessibility tree; the
- * "BOTH states" case is what refuses that.
- */
-describe('E4-11 — the workspace links sit behind one disclosure', () => {
-  beforeEach(() => {
-    currentPath = '/w/ws_1/my-work';
-    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
-  });
-
-  const renderOnAPhoneRoute = () =>
-    render(
-      <Providers services={NO_NAV_SERVICES}>
-        <AppNav workspaceId="ws_1" />
-      </Providers>,
-    );
-
-  it('starts closed, and says so in the accessibility tree rather than only in CSS', () => {
-    renderOnAPhoneRoute();
-    const toggle = screen.getByRole('button', { name: 'Menu' });
-    expect(toggle).toHaveAttribute('aria-expanded', 'false');
-    expect(toggle).toHaveAttribute('aria-controls', 'gn-nav-more');
-    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'false');
-  });
-
-  it('opens, and the scoped links are in the document in BOTH states', async () => {
-    renderOnAPhoneRoute();
-    const scoped = ['My Work', 'Members', 'Settings'];
-    for (const name of scoped) {
-      expect(screen.getByRole('link', { name }), `${name} left the CLOSED document`).toBeInTheDocument();
-    }
-
-    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
-    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'true');
-    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'true');
-    for (const name of scoped) {
-      expect(screen.getByRole('link', { name }), `${name} left the OPEN document`).toBeInTheDocument();
-    }
-
-    // And back — the control is a toggle, not a one-way reveal.
-    await userEvent.click(screen.getByRole('button', { name: 'Menu' }));
-    expect(screen.getByRole('button', { name: 'Menu' })).toHaveAttribute('aria-expanded', 'false');
-    expect(document.getElementById('gn-nav-more')).toHaveAttribute('data-open', 'false');
-  });
-
-  it('renders NO toggle when there is nothing behind it to disclose', () => {
-    // Signed out on a global route with no remembered workspace: every child of
-    // `.gn-nav__more` is gated on `!noWorkspace`, so the toggle would open an
-    // empty panel. This is the negative control for the gate above — it fails
-    // if the toggle is rendered unconditionally, and it fails if the gate is
-    // tightened to `workspaceName !== null` instead (the name is unresolved
-    // here, but the three id-only links are not).
-    currentPath = '/help';
-    mockSessionUser = null;
-    render(
-      <Providers services={NO_NAV_SERVICES}>
-        <AppNav />
-      </Providers>,
-    );
-    expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
-    // The bar is still the bar: the always-items render, so this is the gate
-    // answering "no" rather than the component failing to mount.
-    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
   });
 });

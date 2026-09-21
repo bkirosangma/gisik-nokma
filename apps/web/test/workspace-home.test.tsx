@@ -1209,6 +1209,10 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
     expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
     expect(h1).toContainElement(control);
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+  });
+});
+
+/**
  * E5-23 (round-2 ruling, MINOR, 2026-09-21) — the workspace home's empty sentence
  * is written for the EXCLUDED MEMBER and was read by the FOUNDER.
  *
