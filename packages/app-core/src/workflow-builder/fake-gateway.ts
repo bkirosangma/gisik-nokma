@@ -41,6 +41,13 @@ export type FakeGatewaySeed = {
   typePopulationError?: boolean;
   /** Simulate the wide type-count read failing — the list's "unavailable" path (Task 8). */
   typeCountsError?: boolean;
+  /**
+   * Simulate the migration REQUEST being rejected rather than adjudicated —
+   * a dropped connection, which is neither `migrated` nor `refused` and
+   * therefore has no `MigrationOutcome` that could express it. The screen must
+   * survive it with the admin's authored mapping intact (E2-21).
+   */
+  migrationError?: boolean;
 };
 
 /**
@@ -131,6 +138,7 @@ export function createFakeGateway(
     },
     migrateTypeToWorkflow: async (input) => {
       migrations.push(input);
+      if (seed.migrationError === true) throw new Error('migration request failed (seeded)');
       const queued = pendingMigrations.shift();
       if (queued !== undefined) return queued;
       return { status: 'migrated', count: seed.typePopulation?.[input.typeId]?.[input.fromWorkflowId] ?? 0 };

@@ -1272,6 +1272,42 @@ describe('TicketTypeEditorScreen — re-binding a type to a different workflow (
   });
 
   /**
+   * 10.90 — a rejected migration REQUEST is not a refusal. The server said
+   * nothing about the move, so the mapping the admin just authored is the only
+   * copy of that work that exists anywhere, and the control that reopens the
+   * dialog is the only route back to it. The dialog therefore stays mounted
+   * through the in-flight phase: a remount would reset its local `stateMap` to
+   * `{}`, which is the loss this asserts against — the confirm button is
+   * enabled again only if every row still carries its destination.
+   */
+  it('keeps the authored mapping when the migration request is rejected', async () => {
+    const { user } = await rebind({
+      typePopulation: { task: { [kanbanPublished.id]: 14 } },
+      migrationError: true,
+    });
+    await user.click(screen.getByRole('button', { name: 'Save ticket type' }));
+    await screen.findByText('Ticket type saved.');
+    await user.click(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` }));
+
+    const dialog = await screen.findByRole('dialog', {
+      name: `Move existing tickets to "${errandPublished.name}"`,
+    });
+    for (const state of kanbanPublished.states) {
+      await user.click(within(dialog).getByRole('button', { name: new RegExp(`Send them to — ${state.name}`) }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'In progress' }));
+    }
+    await user.click(within(dialog).getByRole('button', { name: 'Move these tickets' }));
+
+    // The transport's own sentence, inside the surface the admin is looking at
+    // — never the server-refusal slot, which reports an adjudication nobody made.
+    expect(await within(dialog).findByText(/We could not reach the server for this move/)).toBeInTheDocument();
+    expect(within(dialog).getByRole('button', { name: 'Move these tickets' })).toBeEnabled();
+    // …and the control that reopens the mapping is not stranded disabled, which
+    // is what a phase left on `migrating` would have done.
+    expect(screen.getByRole('button', { name: `Move them to "${errandPublished.name}"…` })).toBeEnabled();
+  });
+
+  /**
    * A completed move is a record of something that happened. Re-reading the
    * combobox to name its destination let a later re-point rewrite that record
    * into a statement about a migration nobody ran.
