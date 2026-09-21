@@ -22,7 +22,16 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-_(written last)_
+**No Critical.** Twelve findings, nine Important, every one measured through a door the product ships. The recurring
+shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
+(E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
+republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
+part-way while the client is told nothing moved (E6-10), an offline edit turned into a false contest against the
+user's own ticket (E6-5), and an invite form whose channels the door refuses (E6-9). The second shape is **a record
+that describes a world the product has left**: the in-app help denying `Delete` (E6-1), three ❌ cases declaring
+guest admissions closed weeks ago (E6-12), and a "named, not decided" residual whose own commit decided it
+(E6-11). The round-1 lane's coverage boundary was the map: all nine Important findings are in the packages or the
+paths it said it did not reach.
 
 ---
 
@@ -142,11 +151,15 @@ in the log): writes on a deleted ticket; type re-rank; deleted children/parents;
 on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic header; guest doors.
 
 **Case ids:** every ✅ id in the eight core files is cited by name in a test (`check-case-citations` ratchet:
-0 uncited in each). Of the **44** ❌/🟡/🧪 ids in those files I read all 44 headlines (§1's table is their
-count) and measured **7** against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and 6.84 (still true of
-the projection's own robustness; the door refuses both inputs, so not filed), 7.45 and 12.144 (✅ cases whose
-sentence a new input falsifies — E6-10, E6-5), 4.23 (✅, bypassed — E6-8). Sample size: 7 gap ids of 44, 3 ✅
-ids of 1,155; **I did not walk the other 1,152 ✅ ids one by one.**
+0 uncited in each). By §1's counter (the status marker that follows the id — the first marker on the line), the
+eight files hold **1,120 ✅ · 33 ❌ · 11 🟡 · 5 🧪 · 22 🚫 · 8 unmarked = 1,199**. I listed every ❌/🟡/🧪 line
+with a second script whose regex matched a marker *anywhere* on the line; it printed 55 lines, of which 6 are ✅
+cases whose prose says "Was ❌" or carries a 🟡 mid-sentence (7.14, 7.241, 12.13, 12.16, 12.327, 12.328) — so
+the instruments disagree by exactly those six, and §1's is the one this paragraph counts by. **I read all 49
+❌/🟡/🧪 headlines** and measured **7** of them against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and
+6.84 (still true of the projection's own robustness; the door refuses both inputs, so not filed), and — from
+the ✅ set — 7.45 and 12.144 (sentences a new input falsifies: E6-10, E6-5) and 4.23 (bypassed: E6-8). Sample
+size: 5 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ ids one by one.**
 
 ### 2.3 Not reached — named rather than implied
 
@@ -981,6 +994,21 @@ commands the judge can re-run in under a minute each.
 ---
 
 ## 9. NOTES FOR PHASE 2 (refutation candidates, not filed here)
+
+Staged in `docs/lanes/review-refutations-exec6.md` (skeleton pushed with this report). Candidates I can already
+see, each with the measurement I would run — **none is filed here**, per rules §2:
+
+- **exec3 §7.3, "54 registrations, 49 guarded, 5 public by design"** at `e4baa425` — re-run the widened sweep at
+  `a7b6292b` and read every registration's options; `mcp-device.ts` now has `deny` (session-gated) and the count
+  may have moved.
+- **exec3 §2, "every finding transfers to current `main` unchanged"** — true at `33f14386`; `main` has since gained
+  #625–#630. `git diff --name-only 33f14386 a7b6292b` against the files its findings cite.
+- **exec3 §7.5, "the mappers refuse to default"** — confirmed by me for `FilterSpec` (§5); a refutation would need
+  a `??` that substitutes, and I found none in `:903-1001`. Likely a defence, not a refutation.
+- **Where I would defend:** E6-2's weakest joint is *"committed is not a defect; the FAQ promises only views"* —
+  the answer is `notifications/sweep.ts:175-177` (the product's own rule that a notification is a view) plus the
+  measured letter, and the attachment-upload precedent (`ticketIsLive` at the upload door). E6-11's weakest joint
+  is that it is recorded — the answer is the same-commit contradiction, which is why it is filed at Minor.
 
 ---
 
