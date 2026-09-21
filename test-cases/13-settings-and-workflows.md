@@ -1452,6 +1452,13 @@ tell them apart would not be a case.
 - **13.1111** ✅ The editor screen says the same sentence on a rejected `listWorkflows`, and **keeps its
   header** — the `type-editor-header` row naming the type under edit, which case `13.924` already holds
   for the loading arm for the same reason. — (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- **13.1114** ✅ **The OTHER half of each tuple.** Each screen loads through `Promise.all([A, B])`, and a
+  tuple rejects if EITHER element does; `13.1110` rejects `listTicketTypes` on the list screen and
+  `13.1111` rejects `listWorkflows` on the editor, so this case rejects the *other* promise at each of
+  the two sites and asserts the same pair. **Not a duplicate of the same assertion** — it is the half a
+  fix threaded onto one specific promise would miss, which is the shape a `Promise.all` defect actually
+  takes. Filed under E5-15, which reported this defect independently of E2-20 and was judged to score in
+  full alongside it. — (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 
 **The error arm comes before the loading gate** on both screens, the order
 `apps/web/app/settings/page.tsx:277-284` records — a failure and a read still in flight are different

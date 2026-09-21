@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax` — the same fix already
 // settled at test/views/board.test.tsx and test/workflow-builder/canvas.test.tsx.
@@ -1671,5 +1671,62 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
     expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
     expect(screen.queryByText('Loading ticket types…')).toBeNull();
     expect(screen.getByTestId('type-editor-header')).toBeTruthy();
+  });
+});
+
+describe('E5-15 — the OTHER half of each ticket-type tuple rejects', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+
+  /**
+   * 13.1114 — E5-15, filed independently against the same two screens as E2-20
+   * (*"A refused or failed ticket-types read leaves Settings on 'Loading ticket
+   * types…' for ever"*), and it exercises the rejecter the E2-20 cases do NOT.
+   *
+   * Each screen loads its environment through `Promise.all([A, B])`, and a tuple
+   * rejects if EITHER element does. `13.1110` rejects `listTicketTypes` on the list
+   * screen and `13.1111` rejects `listWorkflows` on the editor; this case rejects
+   * the OTHER promise at each site. **That is not a duplicate of the same
+   * assertion** — it is the half that a fix threaded onto one specific promise
+   * would miss, and a handler attached to the wrong element of the tuple is exactly
+   * the shape a `Promise.all` defect takes. Both halves are asserted in ONE case
+   * because they are one property measured at two sites, the way this file's
+   * sibling already batches arms of one property.
+   *
+   * Each arm asserts the pair — the sentence present AND `Loading ticket types…`
+   * absent — because the two live in one branch and a case asserting only the
+   * sentence passes on a screen that draws both.
+   */
+  it('13.1114 a rejected listWorkflows on the LIST screen, and a rejected listTicketTypes on the EDITOR, are both the load-error arm', async () => {
+    // ARM ONE — the list screen, `listWorkflows` rejecting.
+    render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={{
+          ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+          listWorkflows: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/workflows')),
+        }}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    cleanup();
+
+    // ARM TWO — the editor, `listTicketTypes` rejecting.
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={{
+          ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+          listTicketTypes: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/ticket-types')),
+        }}
+        initialDef={task}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
   });
 });
