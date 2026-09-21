@@ -4905,6 +4905,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   align-items: center;
   justify-content: center;
   min-height: 2.75rem;
+  /* E4-35 (2026-09-21). With no horizontal padding the item's width is its
+     LABEL's, wherever `flex: 1` has no free space to share — measured on
+     `/inbox`, where `div.gn-inbox__header` is `justify-content: space-between`
+     and the track is therefore content-sized: the *All* tab painted **31×44**
+     while *Unread* took 64 and *Mentions* 78, i.e. the width of the word. On
+     the board the same class paints 92×44 and is unchanged by this, because
+     that track already fills its row and `flex: 1` distributes the extra.
+
+     1rem is the prototype's own `padding:0 16px` on a segment. */
+  padding: 0 1rem;
   border: none;
   border-radius: var(--gn-radius-control);
   background: transparent;

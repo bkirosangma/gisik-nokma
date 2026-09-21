@@ -1781,3 +1781,40 @@ describe('13.1148 the overlay dismiss control meets the 44px standalone floor', 
     expect(rule(CLOSE)).toBe(combined?.[1]);
   });
 });
+
+/**
+ * Case `13.1153` — E4-35 — the segmented control's items carry horizontal
+ * padding, so a content-sized track does not shrink a tab to its word.
+ *
+ * `[role=tablist][aria-label="Filter notifications"]` on `/inbox`, 1512, owner:
+ * **`All` 31×44**, `Unread` 64×44, `Mentions` 78×44, each item
+ * `padding: 1px 6px` (the UA's) with `min-width: auto`. On the board the same
+ * class paints 92×44 because that track FILLS its row and `flex: 1` shares the
+ * free space; `div.gn-inbox__header` is `display:flex; justify-content:
+ * space-between`, so the track is content-sized and `flex: 1` has nothing to
+ * share. The width of a tab was the width of its word.
+ *
+ * **`padding: 0 1rem` and not a `min-width`, and the choice is the finding's
+ * own:** the prototype's segment carries `padding:0 16px`, so the padding is
+ * what the drawing asks for; a `min-width` would be a second number invented
+ * beside it, and it would not scale with the label the way padding does.
+ */
+describe('13.1153 the segmented item carries the prototype\'s horizontal padding', () => {
+  it('13.1153 the rule declares it', () => {
+    const body = rule('.gn-segmented__item');
+    expect(body).toMatch(/padding:\s*0 1rem/);
+  });
+
+  it('13.1153 it does not instead invent a min-width', () => {
+    // The negative half, and the reason it is worth asserting: a `min-width`
+    // would fix the 31px *All* tab and be wrong for every longer label — it is
+    // a fixed floor where the prototype has a padding.
+    expect(rule('.gn-segmented__item')).not.toMatch(/min-width/);
+  });
+
+  it('13.1153 the board\'s own reading is untouched — `flex: 1` still shares free space', () => {
+    // The other half of the finding: on the board this class paints 92×44 and
+    // must keep doing so. That comes from `flex: 1`, which must survive.
+    expect(rule('.gn-segmented__item')).toMatch(/flex:\s*1/);
+  });
+});

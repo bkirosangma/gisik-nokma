@@ -1983,3 +1983,25 @@ a live stack on `:3001` — the same deferral recorded under `13.1141` (E4-3) an
 `DENSE_IN_LIST` entries are likewise declared but not yet exercised. **Owner: whoever widens that pass
 (E4-12).** `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
 Package suites: ui 420, app-core 1725, web 643.
+
+## The segmented control's items carry the prototype's horizontal padding (lane ds1, 2026-09-21, batch B10) — case `13.1153`
+
+**The finding, round 2 `E4-35`, MINOR.** `[role=tablist][aria-label="Filter notifications"]` on `/inbox` at
+1512, owner: **`All` 31×44**, `Unread` 64×44, `Mentions` 78×44 — each item `padding: 1px 6px` (the UA's),
+`min-width: auto`. `.gn-segmented__item` declares no horizontal padding, so wherever `flex: 1` has no free
+space to share, **the width of a tab is the width of its word**. On the board the same class paints 92×44
+and is unaffected: that track fills its row and `flex: 1` distributes the extra. The difference is the
+container — `div.gn-inbox__header` is `display:flex; justify-content: space-between`, so the track is
+content-sized. The prototype's segment carries `padding:0 16px`.
+
+### The case
+
+- ✅ **13.1153 — the rule declares `padding: 0 1rem`, does not instead invent a `min-width`, and keeps
+  `flex: 1`.** `packages/ui/test/components.test.tsx`. The second assertion is the one that stops the
+  cheap wrong fix: a `min-width` would repair the 31-px *All* tab and be wrong for every longer label — a
+  fixed floor where the prototype has a padding, and one that does not scale with the text. The third
+  pins the board's own reading, which the finding requires be untouched. **Not painted** — the 31×44
+  above is the finding's own measurement. `ui.css` was reverted to `HEAD` for the RED run and restored
+  from a sha256-compared backup. Package suites: ui 423, web 647.
+
+**No `Features.md` bullet.** This corrects an existing control's metrics; it adds no affordance.
