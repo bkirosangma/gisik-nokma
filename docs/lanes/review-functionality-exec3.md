@@ -3603,3 +3603,33 @@ code holds. **The remaining 64 candidate bullets in §3, and the whole of §1, �
 or unchecked**, and §3's own four results now carry the same weight as any other verified-clean claim in §20. **The
 instrument record is the point of this section:** six wrong numbers against five clean claims, in a section whose
 bullets are densely tied to named modules — the opposite of §4 and §6, where the counts were the defect.
+
+## 55. Round 2 — `Features.md:20` is the counter-example that strengthens E3-29: the same file states the rule §5:397 broke
+
+`Features.md:20` ("Monorepo workspace") names seven workspace packages and then says what it will **not** do:
+
+> *"The gate is one `build`/`test`/`typecheck` triple per workspace package — **a count re-derived by running
+> it, never written down here, because a number in prose has a shelf life that ends at the next package.**"*
+
+**That is the discipline `E3-29` says §5:397 failed.** §5:397 hard-codes *"eleven registered types"* and
+enumerates a closed set; the registry has since grown to eighteen filed against `entityKind: 'ticket'`, and the
+five the enumeration omits are the closure and soft-delete pairs. §3:20 is a bullet in the **same file**, written
+by the same catalogue, that anticipated exactly that failure and refused to commit it — **and its reason is
+E3-29's own mechanism, stated independently**: *"a number in prose has a shelf life that ends at the next
+package."* Substituting *type* for *package* gives the finding.
+
+**So `E3-29`'s severity stands at Minor unchanged — the consequence is still a reader's, not the product's — but
+its standing is different now.** It is not a case of the catalogue having no policy on stale counts. It is a case
+of **the policy existing, being written down, being justified in the file's own words, and being broken in the
+same file.** §5:397 is the drift the policy predicts, in the place the policy was written to protect.
+
+**And the check that produced this was me being wrong a sixth time.** I nearly filed §3:20 as a finding: it names
+seven packages and the workspace has eleven, with `@gisik-nokma/desktop` and `@gisik-nokma/mobile` mentioned
+**nowhere** in `Features.md`. My count of "four packages" came from a 200-character truncation of the bullet in my
+own scan output, and my count of "eleven" came from `package.json` files. **Both numbers were mine, and the
+bullet's decision not to state one is the reason neither is its defect.** Verified clean.
+
+**§3 tally: five countable claims checked — `177` task headings, `35` `TOKEN_ROLES`, `nine` replica tables, the
+CI bullet's self-disclosed scope, and this one — all five exact.** Six of the wrong numbers produced along the way
+were mine. **The remaining 63 candidate countable bullets in §3, and the whole of §1, §2, §7, §8 and §10, stay
+unchecked**, and that is where this report's coverage ends.
