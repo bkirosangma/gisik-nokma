@@ -491,10 +491,11 @@ both"* and nothing about the field's shape; `docs/hig-reconciliation-audit.md:17
 
 **SEVERITY: Important** (claimed). The manual's own verdict.
 
-**Observation, not scored:** the `Channel` select (`email`/`sms`/`whatsapp`) MATCHES the export (`EXPORT:753-755`),
-and the manual (`:229-234`) says the product sends by none of them — the link is shown once and sent by hand. A
-control matching the prototype is category 1; that it names three delivery channels for a product that delivers by
-none is noted for the judge without a claim.
+**Observation, not scored — and corrected by another lane:** the `Channel` select (`email`/`sms`/`whatsapp`)
+MATCHES the export (`EXPORT:753-755`), and the manual (`:229-234`) says the product sends by none of them. I left it
+at category 1. exec 6's `E6-9` then measured the DOOR: `INVITE_CHANNELS = ['email', 'phone']`, so `sms` and
+`whatsapp` are refused with a 422 naming a value the form does not offer. That is the finding underneath this
+control, it is theirs, and it shows the limit of a drawing-match: **the export copied the form, not the door.**
 
 ---
 
@@ -1174,7 +1175,7 @@ brief's three categories.
 | 12 | New ticket default type | `"Defect"` (2nd) `:2216` | `typeOptions[0]` = Epic | **3 — no ruling** | E5-16 |
 | 13 | New ticket fields (Description/Priority/Column/Assignee/Due) | overlay labels | Title/Type/Parent | 3 — recorded gap; folded into E5-16 note, E5-6 | — |
 | 14 | Filters sheet person rows | `:1367-1417` (spec metrics) | same shape | 1 (blank rows are data-path) | E5-4, E5-5 |
-| 15 | Invite form Channel | `:753-755` | same three | 1 | E5-11 note |
+| 15 | Invite form Channel | `:753-755` | same three | 1 in the drawing — but the door refuses two of them (`exec6-E6-9`, measured through the route) | E5-11 note |
 | 16 | Invite form Project access (named select) | `:765-775` | comma-separated ids text box | **3 — no ruling** | E5-11 |
 | 17 | Invite landing (inviter, expiry, tray, Decline/Accept) | `:1761-1789` | one sentence + Join | **3 — recorded, unruled; wire-limited** | E5-18 |
 | 18 | `/mcp/authorize` shows code vs product types code | `:1828-1836` | person types the assistant's code; Deny present | 3 by the delta doc; product's direction is the standard device flow — **not filed** | — |
