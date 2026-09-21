@@ -321,3 +321,53 @@ describe('the second action reaches the history route, and that route renders th
     expect(screen.getByText('Review')).toBeInTheDocument();
   });
 });
+
+/**
+ * Case `13.1150` — E4-10 — the template gallery's four buttons are the shared
+ * `Button`, not bare `<button>`s painting as raw user-agent chrome.
+ *
+ * They carried **no `className` at all**, so nothing in the product's three
+ * stylesheets matched them: measured **143×29** ×3 and **95×29**, flagged by
+ * the UA-chrome detector (`borderTopStyle === 'outset'` or the UA's
+ * `rgb(239,239,239)` fill) on the route. **Round 1's `P1` population was "each
+ * static `className` literal on a `<button|input|…>`", so a class-less button
+ * was outside it by construction** — which is why this is its own finding and
+ * not a P1 member, and why "P1 is clean" could never have meant this file.
+ *
+ * Asserted at the ROUTE rather than on the component, because the finding's
+ * population is what the route renders; the case above already reads these four
+ * by accessible name and this one reads their classes. **The single assertion
+ * that can fail is the class**, and it is asserted as the exact pair the shared
+ * component emits (`gn-button` + its variant) rather than as a substring, so a
+ * hand-rolled `className="gn-button"` without the variant — which would render
+ * unbordered and unfilled — reddens here.
+ */
+describe('13.1150 the template gallery uses the shared Button', () => {
+  it('13.1150 all four gallery controls carry the shared component\'s classes', async () => {
+    render(
+      <Providers
+        services={stubServices({}, { authoring: { listMembers: async () => rosterWhereIAm('admin') } })}
+      >
+        <NewWorkflowPage />
+      </Providers>,
+    );
+
+    const blank = await screen.findByRole('button', { name: 'Start blank' });
+    const templates = screen.getAllByRole('button', { name: /^Use this template/ });
+    expect(templates.length, 'the gallery rendered no template buttons').toBeGreaterThan(0);
+
+    for (const control of [blank, ...templates]) {
+      const label = control.getAttribute('aria-label') ?? control.textContent;
+      expect(control, `${String(label)} is not the shared Button`).toHaveClass('gn-button');
+      // The variant class is what carries the fill and the border reset; a
+      // `gn-button` with no variant would satisfy a substring check and paint
+      // as nothing.
+      expect(
+        [...control.classList].some((name) => name.startsWith('gn-button--')),
+        `${String(label)} carries gn-button with no variant`,
+      ).toBe(true);
+      // And the negative the finding is about: no control is left class-less.
+      expect(control.className, `${String(label)} is back to a bare <button>`).not.toBe('');
+    }
+  });
+});
