@@ -14,3 +14,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P22 | done | 63519f7a | 13.1052 both menus named; new role="menu" source sweep + two runtime arms |
 | T-P31 | done | 1bcfbc94 | 13.1053 both nav landmarks named; product-wide <nav> sweep + two runtime arms; 13.685 moved with its reason written in |
 | T-E4-33 | done | 6fbe6ecc | 13.1054 the shell names a nameless person from the email; one displayLabel module for both labels |
+| T-P13 | done | 151cf55d | 13.1055 skip link as the first focusable element + id=gn-main on all 23 route mains; measured in the prerendered HTML |
