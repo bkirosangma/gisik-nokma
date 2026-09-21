@@ -1163,6 +1163,13 @@ button.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
+/* Spec 2026-09-22: every card carries a priority, and P1 takes the SAME ink the
+   late due label uses — the pair measured in the block above, on the same
+   ground, clearing 4.5 in all six style×theme combinations. P2 is the default
+   and is drawn (the level is a fact on every card) but not emphasised: a badge
+   that shouted on every card would say nothing. */
+.gn-board-card__priority { color: var(--gn-text-muted); font-size: 0.8rem; font-weight: 600; }
+.gn-board-card__priority--p1 { color: var(--gn-danger); }
 .gn-board-card__provenance {
   font: inherit;
   font-size: 0.78rem;

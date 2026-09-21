@@ -232,6 +232,10 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       typeId: 'task',
       parentId: null,
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -250,6 +254,10 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       typeId: 'task',
       parentId: '01J9TICKET00000000000000EP',
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 });
@@ -309,6 +317,10 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       typeId: 'task',
       parentId: null,
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -340,6 +352,10 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       typeId: 'task',
       parentId: null,
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 });
@@ -398,6 +414,10 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: null,
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -419,6 +439,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: 'parent_focus',
       start: 'focus',
+      priority: 'P2',
     });
   });
 
@@ -440,6 +461,10 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: 'parent_focus',
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -459,6 +484,10 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: 'parent_backlog',
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -502,6 +531,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: 'parent_focus_2',
       start: 'focus',
+      priority: 'P2',
     });
   });
 });
@@ -727,6 +757,10 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       typeId: 'task',
       parentId: null,
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -788,6 +822,10 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       typeId: 'errand',
       parentId: null,
       start: 'backlog',
+      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
+      // the middle — the wire's absence-means-P2 rule is for events older than
+      // the field, not for this client.
+      priority: 'P2',
     });
   });
 
@@ -896,5 +934,69 @@ describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () 
       names.some((name) => new RegExp(`\\.${name}(?![\\w-])`).test(UI_CSS)),
       `none of ${JSON.stringify(names)} matches a selector block in ui.css`,
     ).toBe(true);
+  });
+});
+
+/**
+ * 13.1234-13.1235 — the birth priority (spec 2026-09-22).
+ *
+ * The dialog offers the three levels as ONE segmented control, preselected at
+ * the middle, after the Type picker — the prototype's own placement
+ * (`desktop.dc.html:1592-1599`) and the owner's own words (*"everything starts
+ * at p2 the middle"*). Its own describe because the two cases below share a
+ * fixture and neither is about anything the describes above measure.
+ */
+describe('13.1234 the new-ticket dialog offers P1/P2/P3, preselected at P2', () => {
+  const CHOICES = [{ id: 'task', name: 'Task', rank: 3 }];
+
+  const renderDialog = (onCreate: (draft: unknown) => void | Promise<void> = vi.fn()) => {
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={CHOICES}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    return onCreate;
+  };
+
+  it('13.1234 the control is a `tablist` named Priority offering exactly P1, P2, P3 with P2 selected', () => {
+    renderDialog();
+    const control = screen.getByRole('tablist', { name: 'Priority' });
+    // The LABELS, in order — not just "three tabs". A control that offered the
+    // levels out of order, or spelled one of them differently, would pass a
+    // count and fail here.
+    expect(within(control).getAllByRole('tab').map((tab) => tab.textContent)).toEqual([
+      'P1',
+      'P2',
+      'P3',
+    ]);
+    // P2 is the MIDDLE and the selected one, asserted as one fact: the owner's
+    // ruling was about where a ticket starts, not merely that a control exists.
+    expect(within(control).getByRole('tab', { name: 'P2' })).toHaveAttribute(
+      'aria-selected',
+      'true',
+    );
+    expect(within(control).getByRole('tab', { name: 'P1' })).toHaveAttribute(
+      'aria-selected',
+      'false',
+    );
+  });
+
+  it('13.1235 a chosen level leaves in the draft, and the default is P2 when nothing is touched', async () => {
+    const user = userEvent.setup();
+    const onCreate = renderDialog();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    await user.click(
+      within(screen.getByRole('tablist', { name: 'Priority' })).getByRole('tab', { name: 'P1' }),
+    );
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    // `objectContaining` rather than the whole draft: this case is about the
+    // priority travelling, and the other three members are asserted by the
+    // describes above — a full `toEqual` here would be a second copy of them
+    // that could drift.
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ priority: 'P1' }));
   });
 });

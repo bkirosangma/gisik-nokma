@@ -1805,7 +1805,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "A small window opens with three things: - "
+                      "text": "A small window opens with four things: - "
                     },
                     {
                       "kind": "bold",
@@ -1822,6 +1822,14 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — what kind of job this is, from your workspace's list. - "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5). - "
                     },
                     {
                       "kind": "bold",
@@ -1930,7 +1938,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "three things"
+                    "text": "five things"
                   },
                   {
                     "kind": "text",
@@ -1994,6 +2002,42 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " row's date box. Clearing the box takes the claim off rather than claiming a blank date. (§5)"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set its priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " control, P1 / P2 / P3. Every job has one; new jobs start at P2. A job cannot be left without one, so there is nothing to clear. (§5)"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set or clear its start date"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Start"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row's date box, like Due. (§5)"
                     }
                   ]
                 ]
@@ -2286,7 +2330,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "A start date is no longer on this list — you can set one now."
+                      "text": "You can set a start date now."
                     },
                     {
                       "kind": "text",
@@ -2306,23 +2350,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", and clearing it takes the claim off. (The box below records the one thing that comes close and is "
-                    },
-                    {
-                      "kind": "italic",
-                      "text": "not"
-                    },
-                    {
-                      "kind": "text",
-                      "text": " the same thing.) "
+                      "text": ", and behaves the same way: type a day or clear the box to take the claim off. "
                     },
                     {
                       "kind": "bold",
-                      "text": "A due date is likewise no longer on this list"
+                      "text": "A due date is no longer on this list"
                     },
                     {
                       "kind": "text",
-                      "text": " — for the same reason, and with the same control."
+                      "text": " — see the row above for the precedent — because the website can now set one: the job panel's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row is a date box, and clearing it takes the claim off."
                     }
                   ],
                   [

@@ -126,15 +126,23 @@ The docblock's "the four built-ins" becomes five.
 
 ## Sync and mappers (`packages/app-core`)
 
-- `online/mappers.ts`: `mapPriority` beside `mapDueDate` at the three card
-  sites (`:566`, `:1582`, `:2222`); a card without a valid `priority` is a
-  mapper refusal, not a default. `LIST_COLUMN_IDS` (`:303`) gains
-  `'priority'`.
+- `online/mappers.ts`: `mapPriority` beside `mapDueDate` at the card sites
+  (`:566` and `:1582`); a card without a valid `priority` is a mapper refusal,
+  not a default. `LIST_COLUMN_IDS` (`:303`) gains `'priority'`.
 - `replica/replica-data-source.ts`: `priorityOf(state)` beside `dueDateOf`
   (`:738`) at both card sites; same throw-not-default rule as the server.
-- `view-types.ts`: `ListRow`, the board card row and the My Work row gain
+- `view-types.ts`: `ListRow` and the board card row gain
   `priority: { value: Priority; claim: ClaimProvenance }`. `ListColumnId`
   gains `'priority'`; `Grouping` follows `GROUPINGS`.
+  **DEVIATION, RECORDED 2026-09-22 (Task 10 of the plan): this bullet used to
+  name the My Work row too, and `MyWorkRow` was left unchanged.** My Work was
+  not among the surfaces the owner chose, nothing on that screen draws a
+  priority, and adding a required member to a type no view reads would oblige
+  every My Work fixture to carry a claim nothing renders. The plan's Task 5
+  states the same exclusion at its head; the third mapper card site (`:2222`)
+  is accordingly NOT a `mapPriority` call site, which is why the line above
+  names two. **If My Work ever draws a priority, `MyWorkRow` needs the member
+  and `:2222` needs the reader — that is the whole of the remaining work.**
 - `filter/list-filter.ts`: a `priorities` axis with the same narrow/exclude
   treatment `assigneeIds` has (`:35`, `:54`).
 - `views/list-model.ts`: `BUILTIN_COLUMN_LABELS.priority = 'Priority'`;

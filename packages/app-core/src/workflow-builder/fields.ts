@@ -2,7 +2,34 @@ import type { TicketTypeDef } from '@gisik-nokma/domain';
 
 export type FieldChoice = { id: string; name: string; source: string };
 
-/** Display names for Plan 3's BUILTIN_FIELD_IDS — every ticket carries these. */
+/**
+ * Display names for the BUILT-IN FIELDS a `require-field` rule may sensibly
+ * demand — and, since spec 2026-09-22, **deliberately NOT `BUILTIN_FIELD_IDS`**.
+ *
+ * ⚠ **This docblock read *"Display names for Plan 3's `BUILTIN_FIELD_IDS` —
+ * every ticket carries these"* until 2026-09-22, and it stopped being true the
+ * moment `priority` became the fifth built-in.** The two lists still coincided
+ * by accident, because nothing came back to this file; they are now different
+ * on purpose, and the reason is the point of this comment:
+ *
+ * - **`priority` is EXCLUDED because a `require-field` rule on it could never
+ *   refuse anything.** `evaluateRequireField` (`packages/rule-engine/src/rules/
+ *   require-field.ts`) refuses only when the ticket's value is absent, null or
+ *   blank — and `applyTicketEvent` writes a non-blank level on every
+ *   `ticket.created`, so `fields['priority'].value` is ALWAYS set. Offering it
+ *   in this picker would let an author write a rule that looks like a gate and
+ *   silently gates nothing, which is the failure mode `adviseWorkflowDef`
+ *   exists to warn about. **An option that can only produce a dead rule is
+ *   worse than an absent one.**
+ * - **The four that remain can all be genuinely unset**, so a rule on any of
+ *   them can actually refuse: a title can be blank, a description absent, and
+ *   either date claim can be cleared.
+ *
+ * `test/workflow-builder/summaries.test.ts` pins the difference as a SET
+ * DIFFERENCE against `BUILTIN_FIELD_IDS` (case `3.972`), so a new built-in
+ * forces the question and a well-meaning "fix" that puts `priority` back
+ * reddens rather than shipping.
+ */
 export const BUILTIN_FIELD_CHOICES: readonly FieldChoice[] = [
   { id: 'title', name: 'Title', source: 'Built-in' },
   { id: 'description', name: 'Description', source: 'Built-in' },

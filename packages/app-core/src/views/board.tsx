@@ -1147,6 +1147,21 @@ function BoardCardView({
         {card.rollup !== null ? (
           <span className="gn-board-card__progress">{formatRollup(card.rollup)}</span>
         ) : null}
+        {/* The priority badge (spec 2026-09-22), before the due label and
+            attributed like it. P2 is the birth default and is DRAWN — the level
+            is a fact on every card, so there is no absence arm — but only P1
+            takes the tone: on a dense grid the badge is the only priority
+            signal there is, and P1 is the one worth interrupting a scan for. */}
+        <span
+          className={
+            card.priority.value === 'P1'
+              ? 'gn-board-card__priority gn-board-card__priority--p1'
+              : 'gn-board-card__priority'
+          }
+          title={`${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
+        >
+          {card.priority.value}
+        </span>
         {card.dueDate !== null ? (
           <span
             className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}

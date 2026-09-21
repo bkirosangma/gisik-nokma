@@ -333,9 +333,10 @@ settings are kept for about a month in case they come back.
 
 1. Open the project you want the job in.
 2. Find the **New ticket** button, near the top by the view tabs.
-3. A small window opens with three things:
+3. A small window opens with four things:
    - **Title** — what the job is. "Fix Mrs. Patel's leaking pipe."
    - **Type** — what kind of job this is, from your workspace's list.
+   - **Priority** — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5).
    - **Parent** — which bigger job this sits under. It defaults to **None (project root)**. Leave it
      alone unless this job is part of a bigger one (§6).
 4. Press **Create**.
@@ -350,12 +351,15 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You
 get a panel with three tabs: **Details**, **History** and **Attachments**.
 
-On the Details tab you can do **three things**:
+On the Details tab you can do **five things**:
 
 1. **Move it to another stage** — the **Move…** button. (§7)
 2. **Change who can see it** — the pill on the **Visibility** row, which opens a menu. (§10)
 3. **Set or clear its due date** — the **Due** row's date box. Clearing the box takes the claim off
    rather than claiming a blank date. (§5)
+4. **Set its priority** — the **Priority** control, P1 / P2 / P3. Every job has one; new jobs start at
+   P2. A job cannot be left without one, so there is nothing to clear. (§5)
+5. **Set or clear its start date** — the **Start** row's date box, like Due. (§5)
 
 Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a
 **Restricted** chip when its audience is a named list rather than the project or the workspace, and a
@@ -390,11 +394,11 @@ This is the honest list. Each one is an absence, not a hidden button.
   It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not
   loaded, or the job is on a person outside the roster you can see. **On the phone and desktop apps
   there is no "Assignee" row at all**, so there a job's assignee can be neither read nor set.
-- **A start date is no longer on this list — you can set one now.** It is kept here, rather than
-  deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The
-  job panel's **Start** row is a date box beside **Due**, and clearing it takes the claim off. (The box
-  below records the one thing that comes close and is *not* the same thing.) **A due date is likewise no
-  longer on this list** — for the same reason, and with the same control.
+- **You can set a start date now.** It is kept here, rather than deleted, so a reader who remembers it
+  as an absence finds the correction where they last saw it. The job panel's **Start** row is a date box
+  beside **Due**, and behaves the same way: type a day or clear the box to take the claim off.
+  **A due date is no longer on this list** — see the row above for the precedent — because the website
+  can now set one: the job panel's **Due** row is a date box, and clearing it takes the claim off.
 - **The description is no longer on this list — you can write it now.** It is kept here, rather than
   deleted, so a reader who remembers it as an absence finds the correction where they last saw it.
   Type into the description on the job panel and save it; the panel reads back who set it and when.

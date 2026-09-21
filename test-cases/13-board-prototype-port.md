@@ -2353,3 +2353,31 @@ contract across a boundary was run at Node v22.22.2 and is green — `packages/e
 `packages/app-core` 1885 (the contract's other half), `apps/web` 747 (the app that mounts the slot),
 `apps/mobile` 59 (its webview bundle carries the editor's markup) — and both typechecks
 (`packages/editor`, `packages/app-core`) pass.
+
+## Priority is a built-in — the new-ticket dialog (spec 2026-09-22, Task 8)
+
+- **13.1234** ✅ The dialog offers exactly `P1`, `P2`, `P3` as ONE segmented control (`tablist` named
+  `Priority`, after the Type picker — the prototype's own placement), **preselected at the MIDDLE**: the
+  owner's ruling was about where a ticket starts, not merely that a control exists. The labels are asserted
+  in order, so a control offering them out of order passes a count and fails here. —
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`
+- **13.1235** ✅ A level chosen in the dialog leaves in the draft: the `onCreate` payload carries
+  `priority: 'P1'`. — `packages/app-core/test/views/new-ticket-dialog.test.tsx`
+- **13.1236** ✅ `CreateTicketFlow.create` sends the DRAFT's level onto the `ticket.created` payload, read
+  by the KEY's presence rather than by value — a `create()` that dropped the `priority:` line produces a
+  payload with no such key, which a value comparison cannot tell from one holding `undefined` (the same
+  reading `13.592` gives `start`). The chosen-P1 case is what separates "the draft travels" from "the door
+  mints a constant": the two `13.592` cases assert the default, which a hard-coded `'P2'` satisfies
+  perfectly. — `packages/app-core/test/views/reopen-flow.test.tsx`
+
+## Priority is a built-in — the board card badge (spec 2026-09-22, Task 9)
+
+- **13.1237** ✅ The board card draws the priority badge with the claimant as its `title` — the same
+  `'s claim` sentence the due label and every sheet claim line use — and `P1` carries
+  `gn-board-card__priority--p1`, the danger tone the late due label takes on the same measured pair. —
+  `packages/app-core/test/views/board.test.tsx`
+- **13.1238** ✅ CONTROL — `P2` and `P3` are drawn WITHOUT the tone, and the badge is on EVERY card: two
+  cards, two badges. **There is no absence arm to test** and that is the case's point — P2 is the birth
+  default, so a card without a level is not a state this product has; a one-armed assertion would be
+  satisfied by a tone that is always on and by one that is never on alike. —
+  `packages/app-core/test/views/board.test.tsx`
