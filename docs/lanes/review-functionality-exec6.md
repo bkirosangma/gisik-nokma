@@ -333,8 +333,13 @@ doors that were not walked.
 `:163`, `:185` — `transition_ticket`, `add_comment`, `assign_ticket` submit with no read-before-write, so an agent
 holding an id from an earlier `list` gets `committed` from the same product whose `get_ticket` answers not-found;
 (b) `POST /v1/sync` wraps the same ingest (`ingest-service.ts:221-223`), so an offline replica that still holds
-the ticket pushes its edits and gets no refusal and no contest; (c) any second user with the sheet open when the
-delete lands — `ticket-sheet.tsx` closes only for the actor who pressed `Delete`.
+the ticket pushes its edits and gets no refusal and no contest; (c) **every other client, measured** (Appendix R; 1 file / 1 test passed): a peer subscribed on `/v1/stream`
+receives `event:ticket.deleted` and then `event:ticket.assigned`, `event:comment.added`,
+`event:ticket.transitioned` for the same ticket as ordinary frames, and a fresh `GET /v1/sync/bootstrap` carries
+the deleted ticket with all five events (`ticket.created, ticket.deleted, ticket.assigned, comment.added,
+ticket.transitioned`) — by design for the replica, which gates in TypeScript (exec 3 F5), so every client is
+told about work on a ticket it has been told is gone; what each client's views do with those frames is the UX
+lane's question, and `ticket-sheet.tsx` closes only for the actor who pressed `Delete` (read, not measured).
 
 **WHAT WOULD HAVE BEEN BETTER.** One rule, in the engine where the deleted flag is already read: a ticket-scoped
 event other than `ticket.restored` (and `ticket.deleted` itself, which already refuses) is refused with a
@@ -3528,6 +3533,145 @@ describe('exec6 sweep: every read door, as a guest named on one ticket', () => {
     // control: the owner sees the marker on the detail door
     const own = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${T}`, headers: auth(ownerToken) });
     out.push(`control owner GET detail -> ${own.statusCode} marker present: ${own.body.includes('MARKER-TITLE-7')}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix R — probe for E6-2 door (c) — the stream and the bootstrap after a delete
+
+File path in the tree: `apps/server/test/zz-exec6-probe-stream-delete.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-stream-delete.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A plus a free `127.0.0.1:3061`. Output:
+`peer frames after subscribing: event:ticket.deleted, event:ticket.assigned, event:comment.added, event:ticket.transitioned` ·
+`peer bootstrap -> 200; carries the deleted ticket: true; … events on it: ticket.created,ticket.deleted,ticket.assigned,comment.added,ticket.transitioned`.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question (E6-2, door c): does a subscribed peer receive the writes made against a ticket AFTER its deletion, and does a fresh bootstrap carry the deleted ticket?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+import { openStream } from './helpers/stream.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: the stream and the bootstrap after a delete', () => {
+  it('records the frames a subscribed peer receives for a deleted ticket', async () => {
+    const out: string[] = [];
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'to be deleted live' }, ownerId, ownerToken)).status).toBe('committed');
+    await app.listen({ port: 3061, host: '127.0.0.1' });
+    const stream = await openStream(3061, { authorization: `Bearer ${peerToken}` });
+    stream.subscribe(WS, 0);
+    await stream.next((f) => (f as { type?: string }).type === 'caught-up', 5000);
+    const before = stream.frames.length;
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.deleted', {}, ownerId, ownerToken)).status).toBe('committed');
+    await stream.next((f) => JSON.stringify(f).includes('ticket.deleted') && JSON.stringify(f).includes(T), 5000);
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.assigned', { assigneeId: peerId }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'after delete' }] }] } }, ownerId, ownerToken)).status).toBe('committed');
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.transitioned', { to: 'doing' }, ownerId, ownerToken)).status).toBe('committed');
+    await stream.next((f) => JSON.stringify(f).includes('ticket.transitioned') && JSON.stringify(f).includes(T), 5000);
+    const after = stream.frames.slice(before).map((f) => { const j = f as Record<string, unknown>; const ev = (j['event'] ?? j['envelope'] ?? j) as Record<string, unknown>; return `${String(j['type'])}:${String(ev['type'])}`; });
+    out.push(`peer frames after subscribing: ${after.join(', ')}`);
+    await stream.close();
+    const boot = await app.inject({ method: 'GET', url: `/v1/sync/bootstrap?workspaceId=${WS}`, headers: auth(peerToken) });
+    const b = boot.json<{ tickets: Array<{ ticketId: string; state?: { deleted?: unknown }; snapshot?: unknown }> }>();
+    const row = b.tickets.find((t) => t.ticketId === T);
+    out.push(`peer bootstrap -> ${boot.statusCode}; carries the deleted ticket: ${row !== undefined}; keys: ${row ? Object.keys(row).join(',') : '-'}; snapshot excerpt: ${JSON.stringify(row?.snapshot).slice(0, 200)}; events on it: ${(row as { events?: Array<{ type: string }> } | undefined)?.events?.map((e) => e.type).join(',')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
