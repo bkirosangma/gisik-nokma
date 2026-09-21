@@ -358,6 +358,55 @@ test/zz-exec6-probe-children.test.ts --no-file-parallelism`, `rtk proxy` for raw
 listed way to find the blocker), reachable from the ordinary path: delete a child, then finish the parent. Not
 Critical: no data lost, workaround exists for someone who knows the cause.
 
+### E6-5 — IMPORTANT — After a transient sync failure, a later claim overtakes the backing-off claim it depends on; the server refuses it `ticket.unknown`, and that refusal is terminal — an offline edit is lost to a network blip
+
+**WHAT.** `packages/sync-client/src/outbox/outbox.ts:333` selects the next batch as
+`WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY position LIMIT ?`. `recordFailure` (transient — a
+transport throw, a short answer, a misaligned answer; `sync-engine.ts:860-880`) pushes `next_attempt_at` of the
+**failed batch** out by `backoffMs(attempts)` (2 s on the first failure). A claim enqueued *after* the failure
+carries the schema's epoch default and is due immediately. So the next flush — and the product flushes on every
+enqueue, `replica-data-source.ts:1405` `void engine.flush()` — offers the newer claim **alone**, ahead of the
+older claims it depends on. Measured on the outbox with its own fixtures (Appendix D; 1 file / 1 test passed):
+
+```
+PROBE batch1 (t0)        = [CREATE, RENAME-1]        ← transient failure recorded on this batch
+PROBE batch2 (t0+500ms)  = [RENAME-2]                ← offered to the server BEFORE the ticket.created it depends on
+PROBE batch3 (t0+2.5s)   = [CREATE, RENAME-1, RENAME-2]
+```
+
+The server answers a `ticket.field_set` on a ticket it has never been told about with `ticket.unknown`
+(`rule-engine/src/checks/fields.ts:116`), and the outbox treats a refusal as **terminal**: `outbox.ts:412`
+`UPDATE outbox SET status = 'failed'` — pinned as intended by case 12.147 (*"a refused answer is TERMINAL: the row
+is visibly failed and no longer offered"*). The pending overlay folds only `queued` rows
+(`precheck/local-context.ts:126`), so the user's second rename **disappears from their own screen**, marked
+failed with a reason (*"no such ticket is known"*) about a ticket they are looking at, while the create and the
+first rename land two seconds later.
+
+**WHY it is wrong.** The product states the property and then breaks it at the one boundary that matters. Case
+12.144 (`12-offline-sync-apps.md:905-907`): *"enqueue order is preserved … because a batch that lost the order
+would send a `field_set` for a ticket the server has not been told about."* `sync-engine.ts:845`: *"one drain at
+a time, so order holds."* `replica-data-source.ts:1404`: *"the outbox already owns ordering and retry."* All three
+are true **within one due set** and false across a backoff boundary — 12.144 tests only a fully-due queue, 12.148
+(`outbox.test.ts:226`, *"backs off, holds the batch"*) tests only that the failed batch is held, and no case
+enqueues **after** a failure. The realistic path is ordinary: work offline, connectivity returns flaky, the
+first push throws, the user keeps editing the ticket they can see, the next push carries only the new edit.
+
+**WHAT WOULD HAVE BEEN BETTER.** Head-of-line blocking is what "a queue preserves order" means for a dependent
+stream: `nextBatch` should return nothing while the earliest queued row is not yet due — i.e. `WHERE status =
+'queued' ORDER BY position LIMIT ?` and then check the head's `next_attempt_at` (or `MIN(next_attempt_at)` over
+queued rows) against `now`. Alternatively, treat `ticket.unknown` / `hierarchy.unknown-parent` on a claim whose
+target is itself queued as transient rather than terminal. And 12.144 should enqueue after a `recordFailure` and
+assert the batch is empty until the head is due.
+
+**MEASUREMENT.** Appendix D, run from `packages/sync-client` (`pnpm exec vitest run
+test/zz-exec6-probe-overtake.test.ts --no-file-parallelism`; imports `../src/*.js` relatively). Lines opened:
+`outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:860-880`; `replica-data-source.ts:1404-1405`;
+`local-context.ts:126`; `fields.ts:116`; `outbox.test.ts:119`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
+
+**SEVERITY: Important.** A user's edit reverts on their own screen with a nonsensical reason after a transient
+network error, on the headline offline path. Not filed as Critical because the claim is retained in
+`failedItems` with its error and can be redone by a user who notices.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
