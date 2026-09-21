@@ -1228,6 +1228,54 @@ the same shell invocation** (`git status --porcelain` empty afterwards). It impo
 adds the recording `onRequest` hook, and `app.inject`s each row above. Its `console.log` lines are the
 table.
 
+**DEFENCE — 2026-09-21 15:20 IST, phase 2 (lane relaunched on Opus 5; the finding's text above is frozen).**
+Executor 6's refutations file (`origin/exec6/review-functionality:docs/lanes/review-refutations-exec6.md`, row
+*E3-14* of its "candidates examined and NOT refuted" table) observes that two of the five routes —
+`POST /v1/invites/:token/accept` and `PUT /v1/me/preferences` — are **recorded exclusions** at
+`http-origin.ts:128-146`, each with a reason and an owner (*"excluded here rather than silently omitted"*).
+**Measured true, and the finding above should have said so:** I opened `http-origin.ts:128-146` this session, and
+`grep -cE "excluded here|they can leave|recorded exclusion" docs/lanes/review-functionality-exec3.md` over the frozen
+report returns **0** — the finding never engaged with that docblock. That is a correction against this report,
+recorded here rather than hidden. What it changes, and what it does not:
+
+1. **The Critical never rested on the two excluded routes.** §14.8 (*REFINED*) and §32 rest the severity on
+   `POST /v1/me/invitations/:inviteId/accept` and its `decline` sibling — the no-body, no-preflight, `requireSession`
+   doors that append `invite.accepted`, `membership.granted` and `project.member_added`. **The docblock does not
+   name them:** `grep -c "invitations" apps/server/src/http/http-origin.ts` → **0**. They were added on 2026-09-09
+   (`d3d0abdd`, #400, *"Task 17: caller-scoped pending invitations + Accept/Decline"*), three days **after** the
+   exclusion docblock was written (`935f5d66`, 2026-09-06, #190 — `git log -S'workspace they can leave'` and the
+   file's first commit are the same sha). The docblock hands the question to *"whichever revisits acceptance
+   first"*; #400 revisited acceptance, shipped a second accept door, and added neither door to the set. The three
+   unrecorded routes (the two `/v1/me/invitations/…` writes and `PUT /v1/me/notification-preferences`) are
+   category 3 by the brief's own classification, and exec 6's row concedes them: *"the other three routes are
+   genuinely unmentioned."*
+2. **For `POST /v1/invites/:token/accept`, the recorded reason is engaged, per rules §3, and it is measured false.**
+   The exclusion prices a forced acceptance as tolerable because the result is membership in *"a workspace they can
+   leave"* (`http-origin.ts:136`). Opened this session: `apps/server/src/permissions/check-permission.ts:641-643` —
+   `membership.revoked` refuses every actor for whom `!isWorkspaceAdmin`, with **no self arm**; and a sweep for a
+   leave door or ruling — `grep -rniE 'leav(e|ing) (a|the|this|their|any) workspace|self-revok|revoke (their|your)
+   own|leave workspace|un-member' --include='*.md' --include='*.ts' --include='*.tsx'` over `docs`, `Features.md`,
+   `test-cases`, `packages` and `apps/server` (reference/ and the review reports excluded) — returns **21 lines in
+   12 files**, read one by one: every hit is a *"leave the workspace <in some state>"* sentence (the *last-owner*
+   guard's *"with no owner"*, the founding/bootstrap invariants' *"able to accept its first ticket"* /
+   *"unusable"*, the auto-close setting's *"off"* / *"ON"*, a projection test's *"row"*), the navigation sense
+   (*"leaving a workspace for `/inbox`"*, `Features.md:121`) or an *"un-membered acceptor"* (`invites.ts:248`,
+   the mint-crash residue) — and **no leave door, no ruling deferring one, and no case naming one**. A member or guest forced in by this door **cannot take themselves out**; only an admin of the
+   attacker's workspace can. The ruling's premise does not hold, so the divergence it excuses does not stand on it.
+   Exec 6 reached the same measurement independently through the door (its E6-21, Appendix Y: *MEMBER / GUEST
+   revokes their own membership → refused*), and its row on E3-14 draws the same conclusion: *"the recorded
+   exclusion of the other two is weaker than it reads."*
+3. **For `PUT /v1/me/preferences`, I do not contest the recorded reason** (*"a nuisance the victim can undo"*), and
+   §14.8 already bounds both `PUT`s as not browser-reachable today (CORS preflight on a JSON `PUT`). The route is
+   in the table as a member of the class the control was written to cover, and the finding's WHAT is exactly that
+   it is outside the set — which the docblock confirms rather than denies.
+
+**So the claim that survives its harshest reading is:** three cookie-authenticated mutating routes outside the
+set with **no** record at all, two of them browser-reachable with no preflight and appending membership events (the
+Critical's basis, demonstrated §32); one recorded exclusion whose stated warrant is measured false; one recorded
+exclusion I do not contest. If the judge scopes the finding to the three unrecorded routes, nothing the severity
+rests on moves.
+
 ---
 
 ## 14.7.2 — `E3-15` (r2) — **IMPORTANT (claimed)** — The guard written to catch exactly this cannot catch it, and its own docblock says so
