@@ -87,3 +87,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-I5 | done | 3fe7d95e | executor-state: the older id block points forward; two dupes resolved |
 | T-P25 | done | ee15d4eb | back-button citations name the reason, not the deleted file (web 19 green) |
 | T-P26 | done | dbfd0dac | prototype-delta: 11 queue rows marked closed/undecided; 3 per-screen claims fixed |
+| T-P29 | done | ca2bf401 | smoke.spec: all ten stubs cite a line; seven drifted citations corrected |
