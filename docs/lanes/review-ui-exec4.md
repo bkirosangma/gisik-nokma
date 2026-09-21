@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-two of the twenty-five findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-three of the twenty-six findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a 21-px close glyph, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured — 26 route×theme passes, one third-party watermark failing — because a contrast instrument existed and was run at least once.
 
 ---
 
@@ -415,6 +415,17 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-26 — **MINOR** — In the List view the only two per-row controls — the collapse caret (22×22) and the title button (22 px tall) — sit under the product's own 24-px in-list floor, the row has no whole-row door, and the list route is swept by neither suite
+
+**MEASUREMENT (painted, List view, 1512).** `button.gn-list__collapse "Collapse Open questions"` **22×22**; `button.gn-list__open "Open questions"` **125×22** (×26 rows, `17px/22px`). `grep -n onClick packages/app-core/src/views/ticket-list.tsx` → three handlers (`:508` the Columns toggle, `:889` the caret, `:927` the title) — **no `<tr>`/row handler**, so unlike the board card (`13.523`) there is no larger equivalent target. Source: `ui.css:1419-1420` (`min-width/min-height: 1.375rem` = 22) and `:1433` (`line-height: 1.375rem`); `test-cases/13-board-prototype-port.md:758-760` records the 22 as the improvement it was on 2026-09-16 (*"gets a real `min-width`/`min-height: 22px` tap target"*).
+
+**PROTOTYPE.** `Desktop.dc.html:445` draws the caret at `min-width:22px;min-height:22px` and `:450` the title at `font-size:17px;line-height:22px` — **the product MATCHES the authority**, and both are 2 px under WCAG 2.5.8's minimum. What changed since the port is the product's own rule: the owner's 2026-09-20 ruling made 24 the floor for an in-list control (`tap-targets.ts:26-27`), and `tap-targets.ts:90-94` itself notes the list route *"is swept by neither suite's tap pass."* So this is a **MATCHES-the-prototype / FAILS-the-product's-own-rule** row, filed because no case, docblock or ruling reconciles the two and no instrument would notice.
+
+**WHAT WOULD HAVE BEEN BETTER.** `1.5rem` on both rules (the same 24 `.gn-my-work__title` and `.gn-attention__title` got on 2026-09-08), and the List view in the stack suite's route list with a `DENSE_IN_LIST` entry for each.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -516,10 +527,10 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 |---|---|---|
 | **Critical** | **0** | — |
 | **Important** | **17** | E4-1 · E4-2 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 |
-| **Minor** | **8** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 |
-| **total** | **25** | `17 + 8 = 25`; ids `E4-1` … `E4-25` with no gaps |
+| **Minor** | **9** | E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 |
+| **total** | **26** | `17 + 9 = 26`; ids `E4-1` … `E4-26` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
