@@ -501,6 +501,22 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** Adopt `SegmentedControl` itself rather than its classes — the component exists, the page already passes the same `options`/`value`/`onChange` shape the component takes, and it would supply the required `aria-label` by construction. Failing that, add `aria-label="Project view"` and the assertion the sheet has. The first is strictly better because the type system then prevents the recurrence.
 
+### P20 — **MINOR** ⚠ **r2 NEW** — The month grid and the week columns carry no table or grid semantics, so a screen reader loses the day-to-weekday association
+
+**WHAT.** The calendar's month grid and the timeline's week columns are built from `<div>`s and `<span>`s with **no `role="grid"`, `role="table"`, `role="row"`, `role="gridcell"` or `role="columnheader"` anywhere**. A day cell is not associated with the weekday column it sits under.
+
+**MEASUREMENT.**
+- `packages/app-core/src/calendar/calendar-view.tsx:395-425`: `<div className="gn-calendar__grid">` → `<div className="gn-calendar__weekday-head">` containing seven `<span className="gn-calendar__weekday">{label}</span>`, then one `<section className="gn-calendar__week" data-week={…}>` per week, each holding `<div className="gn-calendar__days">` with `<div className="gn-calendar__day">` cells. **Headers are plain spans; cells are plain divs; there is no role on any of them.**
+- `data-week` (`:409`) is a **data attribute** — it exists for the shells and the tests, not for assistive technology.
+- **Nothing in the file reasons about this.** The component reasons about a great deal else — `role="note"` for the empty month (`:312`), `aria-label` on the two month-nav buttons (`:279`, `:293`), `aria-hidden` on the legend swatches (`:342`, `:364`, `:371`), `aria-current` for today (`:422`), and an accessible name on items (`:483`). **The word grid appears in this file only about CSS.** So the omission is not a decision anyone wrote down; it is a property nobody considered.
+- **And nothing measures it.** `packages/app-core/test/calendar/calendar-view.test.tsx` calls `getByRole` **45 times** — the control that the suite does assert roles — and **not once for a grid, table, row, cell or columnheader**. The timeline is the same: `grep -nE 'role="grid|role="table|<table|<th'` over `timeline-view.tsx` → **no matches**.
+
+**WHY IT IS WRONG — and I am filing it MINOR on purpose, for the third time this round.** **WCAG 2.2 has no success criterion requiring a calendar to expose grid semantics**; the WAI-ARIA Authoring Practices pattern for a date picker is best practice, not conformance. What is true and worth fixing is narrower: **a person using a screen reader hears the seven weekday labels as a run of text and then a sequence of day numbers, with nothing tying "14" to "Friday"** — which is most of what a month view is for. The cells' own content is labelled, so nothing is *unreadable*; what is lost is the *relationship*.
+
+**⚠ AND THIS IS THE THIRD INSTANCE OF ONE PATTERN, WHICH IS THE ARGUMENT.** P17 (heading levels), P18 (route change announcement) and this finding are the same shape: **a structural property of the rendered output that no instrument measures, that no docblock reasons about, and that the accessible-name ratchet structurally cannot see because it counts four attributes and none of them is structure.** The owner's rule is explicit that *"reasons with connected findings/answers should be more convincing"*, and the connected answer here is a single remedy for all three: a structural sweep in the shape `accessible-names.ts` and `type-scale.ts` already establish — walk a route, collect headings/roles/landmarks, fail on a skip or a missing name — with a recorded baseline. **One new instrument closes three findings.** That is a better answer than three separate fixes, and it is why these are filed as three and read as one.
+
+**WHAT WOULD HAVE BEEN BETTER.** The APG's calendar grid pattern: `role="grid"` on the container, `role="row"` per week, `role="columnheader"` with `aria-label` on the seven labels, `role="gridcell"` on the day cells. The markup is already grouped exactly that way — grid → weekday-head → week → days → day — so the roles are an attribute apiece on a structure that already exists.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -562,7 +578,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 
-**MINOR — 11**
+**MINOR — 12**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -576,10 +592,11 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
+- `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (**the 2.4.1 claim is withdrawn in the body** — a landmark is a sufficient technique and `<main>` is on every route, so this is a keyboard-convenience finding, not a conformance one)
 
-**Total 23.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 24.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
