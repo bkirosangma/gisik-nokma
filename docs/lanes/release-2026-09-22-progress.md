@@ -79,3 +79,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-14 | done | 8ed0e6ce | delete toast names key ?? title; both arms pinned (app-core 1731, web 5) |
 | T-E6-25 | done | d2e2787a | deploy comments: all nine config vars consumed; four stale claims corrected |
 | T-F1-fn | done | 078a58de | attachment-leak gap marked closed; both stale numbers corrected (7 green) |
+| T-F3-fn | done | d3dda5f7 | §17 names the prototype copy and its sha, with the ruling's +1 offset |
