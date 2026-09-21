@@ -1661,8 +1661,9 @@ can be forged around — two "until it lands" sentences whose "it" landed within
 written. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
 Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
 a roster or a sweep (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`,
-`13-second-wave-roles-and-navigation.md:609`), and two landing claims I did NOT verify: `scripts/check-skipif-coverage.mjs:14` and the
-case-block allocation note at `13-deployment-dogfooding.md:104`.)
+`13-second-wave-roles-and-navigation.md:609`), `scripts/check-skipif-coverage.mjs:14` (verified still TRUE: `.github/workflows/ci.yml:454-492`'s `other-tests`
+runs `pnpm turbo run test --filter='!@gisik-nokma/server'` with no reporter and no guard), and one landing claim
+I did NOT verify: the case-block allocation note at `13-deployment-dogfooding.md:104`.)
 
 **WHAT WOULD HAVE BEEN BETTER.** The paragraph should say what `TRUST_PROXY=true` now means — the limiter
 keys on the rightmost entry, which the caller cannot write (`rate-limit.ts:89-99`) — and drop "not yet on
