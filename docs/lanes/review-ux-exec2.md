@@ -2282,6 +2282,32 @@ is the claim's own load-bearing line. The secondary citations in the longer find
 per-name greps, `E2-30`'s 31-hit producer count, `E2-35`'s bulk-close contrast) were verified when written
 and are not re-printed here.
 
+### ⚠ TWO FINDINGS I EXAMINED AND PASSED ON, WHICH A PEER FILED AND IS RIGHT ABOUT
+
+Recorded as mine rather than as theirs, because in both cases **the file was open in front of me and I
+reached the wrong conclusion.** Neither is a refutation candidate — both hold — and I am not filing either
+under my own id.
+
+1. **`E5-8` (lane 5) — the History tab prints `{event.type}` raw.** I read `history-list.tsx` in full in
+   round 1 (`history-list.tsx:45` renders the bare event type) and never filed it. Filing it now, after
+   reading their report, could not be separated from copying.
+2. **`E5-13` (lane 5) — a failed preferences read paints all five notifications ON, and one toggle PUTs a
+   whole document built from that guess.** This one is worse than an omission, and it is worth naming
+   precisely because of *how* I got it wrong. In my round-2 account-page sweep I opened
+   `apps/web/app/account/page.tsx:81`
+   (`notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }))`), read the docblock
+   at `:74-80` — *"the literal below merely renders every kind as on for this visit, **without asserting
+   that fact about the account**"* — checked that sentence against the **render**, found it true, and moved
+   on. **Lane 5 checked the same sentence against the WRITE.** `toggleKind` (`:215-232`) builds the next
+   document from `prefs.mutedKinds` and `save(next)` **PUTs the whole document**
+   (`notification-preferences-gateway.ts:18-22`: *"a PUT replaces it"*), so the guess the docblock says
+   asserts nothing is written to the server on the next toggle — silently un-muting kinds the person had
+   muted. Their reproduction captures the body: `{"mutedKinds":["assignment"]}`.
+
+   **The lesson, which is the same one this report files against other documents six times over:** the
+   sentence was true of the *render* and false of the *write*, and I tested it against the path I happened
+   to have open. A docblock's claim needs checking against every path that consumes the thing it
+   describes, not the one in the paragraph beside it.
 **Thirty-two of thirty-two is not a claim that the report has no errors.** It is a claim that the specific
 failure mode §3 prices most harshly — a citation that says something other than what the finding says — was
 searched for deliberately and not found in the primary citations.
