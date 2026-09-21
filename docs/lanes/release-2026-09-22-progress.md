@@ -13,6 +13,19 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-18 | done | 3570edf1 | ingest.test.ts 3.900-3.901 (invalid-byte, narrow scope stated) |
 | T-E6-21 | done | f4cb7c19 | check-role-permission.test.ts 6.150 (self-leave) |
 | T-E6-9 | done | d67cea23 | members-page.test.tsx 3.902-3.903 (INVITE_CHANNELS select) |
+| B06 | claimed | 2026-09-21 21:05 | /Users/kiro/my_projects/gisik-nokma-ds1 |
+| T-E2-21 | done | de7c4600 | ticket-types.test.tsx "keeps the authored mapping when the migration request is rejected" |
+| T-E2-40 | done | 6f004f9e | ticket-sheet.test.tsx "PLANTED DEFECT: the preview stops refusing once the field its own input asked for is filled" |
+| T-E5-7 | done | 1924fc9a | ticket-sheet.test.tsx "PLANTED DEFECT: the require-comment preview stops refusing once the comment its own box asked for is typed" |
+| T-V10 | done | 4cb4b110 | new-ticket-dialog.test.tsx "two presses in one commit call onCreate ONCE" + reopen-flow.test.tsx "two clicks in one commit record ONE ticket.created" |
+| T-E5-16 | done | 77e176f0 | new-ticket-dialog.test.tsx "PLANTED DEFECT: the control paints the everyday type, not rank 1" |
+| T-E5-20 | done | 41a47331 | ticket-sheet.test.tsx "PLANTED DEFECT: one Escape closes the Move dialog and leaves the sheet open" |
+| T-E5-9 | done | 40fda004 | ticket-sheet.test.tsx "PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body" (+ B06 case ids renumbered off B08: 3.178-3.182 -> 3.185-3.189, 10.90 -> 10.112) |
+| T-V8 | done | a8125d3b | ticket-sheet.test.tsx "PLANTED DEFECT: no false not-shown-rather-than-shown-short alert while the child read is in flight" |
+| T-E2-22 | done | bc14d674 | publish.test.tsx "PLANTED DEFECT: a refused publish keeps the mapping dialog, and the refusal lands inside it" |
+| T-E2-33 | done | d892a1ff | new-ticket-dialog.test.tsx "a ladder swap cannot leave the screen saying none chosen while a type travels" + reopen-flow.test.tsx "a swap cannot leave the payload carrying a state the picker no longer offers" + visibility-editor.test.tsx "the fieldset follows the standing claim" |
+| T-E2-34 | done | a2e64940 | reopen-flow.test.tsx "PLANTED DEFECT: the offer replaces the New-ticket dialog rather than stacking on it" |
+| T-E2-37 | done | e28e1434 | new-ticket-dialog.test.tsx "PLANTED DEFECT: reopening offers no title, and Create is disabled again" |
 | B03 | claimed | 2026-09-21 18:42 | /Users/kiro/my_projects/gisik-nokma-ds1 |
 | T-E4-4 | done | 61e0e575 | 9.257 both composers named (editor slot) · 9.258 named through the app + dt Description (web) |
 | T-E4-5 | done | fa9448d2 | 13.995 h1 named from the visible workspace name via aria-labelledby (web suite 624 passed) |

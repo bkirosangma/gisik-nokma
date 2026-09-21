@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default
 // export that survives `verbatimModuleSyntax`, settled at
 // packages/ui/test/components.test.tsx and repeated by board.test.tsx and
@@ -9,6 +9,7 @@ import type { IngestResult, SubmittedEvent, WorkflowDef } from '@gisik-nokma/dom
 import { createClientStateCache } from '../../src/cache.js';
 import { SERVING_GAPS, ServingGapError } from '../../src/online/mappers.js';
 import { CreateTicketFlow } from '../../src/views/create-ticket-flow.js';
+import { ReopenDialog } from '../../src/views/reopen-dialog.js';
 import type { TicketRead } from '../../src/view-types.js';
 import { parentTerminalRefusal, rankRefusal } from '@gisik-nokma/rule-engine';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
@@ -210,7 +211,7 @@ function renderFlow(
       workspaceId={WS}
       projectId="01J9GPRJ000000000000000000"
       currentUserId="user_kiro"
-      typeOptions={[{ id: 'task', name: 'Task' }]}
+      typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
       parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations', inFocus: false }]}
       onCreated={onCreated}
     />,
@@ -583,6 +584,43 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
 });
 
 /**
+ * 3.187 (V10) — THE LEDGER END OF THE SAME GUARD, which is the thing the
+ * finding is actually about. The dialog's own case pins "onCreate is called once"; this
+ * pins what that is FOR. `create-ticket-flow` mints
+ * `entity: { kind: 'ticket', id: newUlid() }` PER CALL, so two presses are two
+ * `ticket.created` events with two distinct ids — two tickets, in an append-only
+ * ledger. Asserted on the source's own recorded ingest and on the envelope ID,
+ * because "one call" and "one ticket" are different claims and only the second
+ * one is the product's.
+ */
+describe('V10 two presses on Create file ONE ticket, not two', () => {
+  it('PLANTED DEFECT: two clicks in one commit record ONE ticket.created', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
+    renderFlow(source, { parentCandidates: [] });
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+
+    // Both clicks land in ONE React batch, which is the case a committed
+    // `disabled` cannot guard — see the dialog's own case for the measurement
+    // that pins the discrimination.
+    const create = screen.getByRole('button', { name: 'Create' });
+    await act(async () => {
+      create.click();
+      create.click();
+    });
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const created = source.ingested.flat().filter((event) => event.type === 'ticket.created');
+    expect(created).toHaveLength(1);
+    // One event, one entity id — the id is minted per call, so a duplicate would
+    // be a second ULID and the ledger would hold two tickets nothing can merge.
+    expect(created[0]!.entity.id).toEqual(expect.any(String));
+    expect(source.ingested[0]).toHaveLength(1);
+  });
+});
+
+/**
  * 13.593 · T13.5 (view half, Ruling 38b) — creating under a CLOSED terminal
  * parent. `flows/guarded-child-event.test.ts`'s 13.593a/b pin the unit-level
  * batching; this case is the same behaviour proven end to end through the
@@ -828,5 +866,118 @@ describe('7.249 the fixture sentences are pinned to the producer they claim', ()
   // 7.251 — the rank reason in this file was a fabrication (test-cases/07); the pin below is that case's citation.
   it('7.249e the rank reason is byte-identical to rankRefusal("Task", "Sub-task")', () => {
     expect(RANK_REASON).toBe(rankRefusal('Task', 'Sub-task'));
+  });
+});
+
+/**
+ * 3.192 (E2-34) — TWO `aria-modal="true"` DIALOGS WERE OPEN AT ONCE.
+ *
+ * The `needs-reopen` arm opened the reopen offer WITHOUT closing the New-ticket
+ * dialog (`create-ticket-flow.tsx` returned early with `dialogOpen` untouched),
+ * and both surfaces render from the same fragment — so the DOM held two modal
+ * dialogs, and a screen reader told the person the top one was the only modal on
+ * the page. ONE MODAL AT A TIME is the invariant the primitive assumes.
+ *
+ * E5-20 (case 3.189) closed the other half of the same stack — one Escape no
+ * longer closes both — but it does not make a second `aria-modal` element
+ * honest.
+ */
+describe('E2-34 the reopen offer is the ONLY modal on screen', () => {
+  it('PLANTED DEFECT: the offer replaces the New-ticket dialog rather than stacking on it', async () => {
+    const user = userEvent.setup();
+    const source = flowSource((call, events) =>
+      call === 1
+        ? events.map((event) => parentTerminal(event.id))
+        : events.map((event) => committed(event.id)),
+    );
+    renderFlow(source);
+    // The parent must be CHOSEN: the offer is opened for a draft whose
+    // `parentId` is a real ticket (the arm checks `draft.parentId !== null`).
+    await createTicketUnderParent(user);
+
+    // The offer is up — and it is the only modal.
+    expect(await screen.findByRole('dialog', { name: 'Reopen parent?' })).toBeInTheDocument();
+    expect(screen.getAllByRole('dialog')).toHaveLength(1);
+    expect(screen.queryByRole('dialog', { name: 'New ticket' })).toBeNull();
+  });
+});
+
+/**
+ * 3.191 (E2-33b) — THE SAME ONCE-SEEDED CHOICE, AND HERE THE SCREEN LIES ABOUT IT.
+ *
+ * `ReopenDialog` seeds `toStateId` from `reopenStates[0]` once (`useState`) and
+ * guards its confirm on `toStateId === ''` — an emptiness test, not membership in
+ * the list being offered. `reopenStates` is set per ATTEMPT
+ * (`create-ticket-flow.tsx`), so a rerender can hand the mounted dialog a list
+ * that no longer holds the standing id. This `Select` is the NON-searchable
+ * variant, whose trigger renders `selected ? selected.label : placeholder` — so
+ * the button then reads `Select…` ("nothing chosen") while `toStateId` is
+ * non-empty and the confirm is ENABLED: the screen and the payload disagree in
+ * the one direction this product refuses by name.
+ *
+ * (The searchable variant does not show the placeholder — react-aria's combo
+ * keeps its input text — which is why (a)'s person-visible arm was withdrawn by
+ * its own author and this one was not.)
+ */
+describe('E2-33b the offer re-seeds when the states it offers change under it', () => {
+  const base = {
+    open: true,
+    parentTitle: 'Registrations',
+    parentStateName: 'Done',
+    refusal: { rule: 'hierarchy.parent-terminal', reason: 'Registrations is Done.' },
+    refusalOrigin: 'server' as const,
+    parentRefusal: null,
+    onCancel: vi.fn(),
+  };
+  const trigger = (): HTMLElement => screen.getByRole('button', { name: /Reopen to/ });
+
+  it('PLANTED DEFECT: a swap cannot leave the payload carrying a state the picker no longer offers', () => {
+    const onAccept = vi.fn();
+    const { rerender } = render(
+      <ReopenDialog {...base} reopenStates={[{ id: 'todo', name: 'To do' }]} onAccept={onAccept} />,
+    );
+    expect(trigger().textContent).toContain('To do');
+
+    // The attempt is replaced: the standing id is not in the new list.
+    rerender(
+      <ReopenDialog
+        {...base}
+        reopenStates={[
+          { id: 'doing', name: 'In progress' },
+          { id: 'waiting', name: 'Waiting on counterparty' },
+        ]}
+        onAccept={onAccept}
+      />,
+    );
+
+    // The control OFFERS `In progress` and paints it — it no longer says
+    // "nothing chosen" while carrying `todo`.
+    expect(trigger().textContent).toContain('In progress');
+    expect(trigger().textContent).not.toContain('Select…');
+
+    // …and what travels is what is shown.
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+    expect(onAccept).toHaveBeenCalledWith('doing');
+  });
+
+  it('a re-seed never overwrites a destination the picker still offers', () => {
+    const onAccept = vi.fn();
+    const { rerender } = render(
+      <ReopenDialog {...base} reopenStates={[{ id: 'todo', name: 'To do' }]} onAccept={onAccept} />,
+    );
+    expect(trigger().textContent).toContain('To do');
+    rerender(
+      <ReopenDialog
+        {...base}
+        reopenStates={[
+          { id: 'todo', name: 'To do' },
+          { id: 'doing', name: 'In progress' },
+        ]}
+        onAccept={onAccept}
+      />,
+    );
+    expect(trigger().textContent).toContain('To do');
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+    expect(onAccept).toHaveBeenCalledWith('todo');
   });
 });

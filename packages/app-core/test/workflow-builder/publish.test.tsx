@@ -300,6 +300,48 @@ describe('PublishControls — the state-mapping dialog', () => {
   });
 
   /**
+   * 10.113 (E2-22) — A REFUSAL THAT COSTS THE ADMIN THE MAPPING THEY JUST
+   * AUTHORED.
+   *
+   * `submitPayload` opens with `setState({ phase: 'submitting' })`, and the
+   * dialog rendered only while `state.phase === 'mapping'` — so the act of
+   * submitting unmounted the surface holding the mapping, before any verdict
+   * existed. `StateMappingDialog` keeps that mapping in its own `useState`, so
+   * it died with the unmount: a REFUSED publish left the admin with every row
+   * to author again, and the refusal banner rendered where the dialog had been.
+   *
+   * The dialog is now mounted through the whole attempt and dismissed only on
+   * `committed`, which is also where the refusal can be read without leaving the
+   * surface it is about.
+   */
+  it('PLANTED DEFECT: a refused publish keeps the mapping dialog, and the refusal lands inside it', async () => {
+    const user = userEvent.setup();
+    const workflowId = newUlid();
+    const store = draftDroppingReview(workflowId);
+    const reason =
+      'Version 3 drops state(s) "review" that version 2 has; publishing cannot see which tickets sit in which state, so every dropped state needs a stateMapping entry.';
+    setup(store, {
+      occupancy: { [workflowId]: { review: 4 } },
+      submitResults: [{ status: 'refused', eventId: 'evt', rule: 'workflow-state-mapping', reason }],
+    });
+    await user.click(screen.getByRole('button', { name: 'Publish' }));
+
+    const dialog = await screen.findByRole('dialog', { name: 'Every dropped state needs a destination' });
+    await user.click(within(dialog).getByRole('button', { name: /Send them to — Review/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'To do' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Publish with this mapping' }));
+
+    // The refusal is readable IN the surface the admin is working in…
+    expect(await within(dialog).findByText(reason)).toBeInTheDocument();
+    // …the mapping SURVIVED it: the confirm is live again, which it can only be
+    // if every row still holds the destination that was chosen…
+    expect(within(dialog).getByRole('button', { name: 'Publish with this mapping' })).toBeEnabled();
+    // …and the sentence is not ALSO printed outside the dialog, so one refusal
+    // is one sentence in one place.
+    expect(screen.getAllByText(reason)).toHaveLength(1);
+  });
+
+  /**
    * The stranding rule itself, and the reason the count can never become an
    * engine input: occupancy zero does NOT excuse the mapping. A client replica
    * is visibility-scoped, so a user who cannot see the tickets in a dropped

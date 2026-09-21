@@ -32,6 +32,21 @@ export function WorkflowRebindDialog(props: {
   toWorkflow: PublishedWorkflowDef;
   onCancel(): void;
   onConfirm(stateMap: Record<string, string>): void;
+  /**
+   * True while the migration request is in flight. The dialog is NOT unmounted
+   * for it — the calling screen keeps it mounted through `'migrating'` on
+   * purpose, because `stateMap` lives HERE: a remount would reset it to `{}`
+   * and a rejected request would cost the admin the mapping they just
+   * authored. This flag only states the state on the controls.
+   */
+  submitting?: boolean;
+  /**
+   * A TRANSPORT failure's sentence, rendered here rather than in the screen's
+   * shared refusal slot — the answer belongs on the surface the admin is
+   * looking at, and this dialog is the surface. Never a refusal: nothing was
+   * adjudicated.
+   */
+  error?: string | null;
 }) {
   const [stateMap, setStateMap] = useState<Record<string, string>>({});
   const complete = props.fromWorkflow.states.every((state) => stateMap[state.id] !== undefined);
@@ -62,17 +77,36 @@ export function WorkflowRebindDialog(props: {
         Leaving them is a real choice — a type can have tickets on two workflows, and the board shows each ticket under
         its own workflow&apos;s states.
       </p>
+      {/* The transport's own channel, and NOT the screen's server-refusal slot:
+          `.gn-refusal--transport` is the warning-leaning recipe the board uses
+          for "we could not reach the server", where `--server` says the server
+          adjudicated and declined. Nothing was adjudicated here — the rows above
+          are still the admin's to retry. */}
+      {props.error !== undefined && props.error !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--transport workflow-rebind-dialog__error">
+          {props.error}
+        </p>
+      ) : null}
       <div className="workflow-rebind-dialog__actions">
-        <button type="button" className="workflow-rebind-dialog__cancel" onClick={props.onCancel}>
+        {/* Both controls rest while the request is in flight. Confirm, because a
+            second press would submit the same map against a migration already
+            running; cancel, because the outcome of a request already sent
+            cannot be un-asked and would land on a screen that had moved on. */}
+        <button
+          type="button"
+          className="workflow-rebind-dialog__cancel"
+          disabled={props.submitting === true}
+          onClick={props.onCancel}
+        >
           Leave them where they are
         </button>
         <button
           type="button"
           className="workflow-rebind-dialog__confirm"
-          disabled={!complete}
+          disabled={!complete || props.submitting === true}
           onClick={() => props.onConfirm(stateMap)}
         >
-          Move these tickets
+          {props.submitting === true ? 'Moving…' : 'Move these tickets'}
         </button>
       </div>
     </div>

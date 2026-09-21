@@ -38,7 +38,14 @@ type SavePhase =
 type RebindPhase =
   | { phase: 'undecided' }
   | { phase: 'left' }
-  | { phase: 'mapping'; toWorkflowId: string }
+  /**
+   * `error` carries a TRANSPORT failure, which is not a refusal: the server
+   * never adjudicated the move, so there is no rule and no reason to quote. It
+   * lives on this phase rather than a state of its own because it is only ever
+   * shown where the mapping is — inside the still-mounted dialog — and it must
+   * therefore be cleared by the same act that reopens the mapping.
+   */
+  | { phase: 'mapping'; toWorkflowId: string; error: string | null }
   | { phase: 'migrating'; toWorkflowId: string }
   | { phase: 'migrated'; count: number; toWorkflowName: string }
   | { phase: 'refused'; rule: string; reason: string };
@@ -317,21 +324,51 @@ export function TicketTypeEditorScreen(props: {
   // tickets being moved land where NEW tickets of this type will also land.
   const bindingCommitted = def.workflowId === savedWorkflowId;
 
+  /**
+   * The one irreversible call on this screen, and the only one that had no
+   * handler for its own failure.
+   *
+   * A rejected request is NOT a refusal — the server never adjudicated the
+   * move, so there is no rule to quote and no verdict to render — and it used
+   * to leave `rebind.phase` on `'migrating'` for good. Three things then held
+   * at once: the dialog (rendered only in `'mapping'`) unmounted, taking the
+   * admin's authored `stateMap` with it; the `Move them to …` control, disabled
+   * on `phase === 'migrating'`, could never reopen the mapping; and the
+   * discarded promise surfaced as an unhandled rejection with nothing on screen.
+   * One dropped connection cost the admin the whole mapping and the only route
+   * back to it, silently.
+   *
+   * Restoring `'mapping'` is what puts all three back: the dialog is rendered
+   * for `'migrating'` too (see the gate below), so it is never unmounted and
+   * the mapping it holds in local state survives the round trip; the refusal
+   * lands as a sentence inside that dialog; and the control is live again.
+   */
   async function onMigrate(target: PublishedWorkflowDef, stateMap: Record<string, string>): Promise<void> {
     if (outgoingWorkflow === null) return;
     setRebind({ phase: 'migrating', toWorkflowId: target.id });
-    const outcome = await gateway.migrateTypeToWorkflow({
-      workspaceId,
-      typeId: def.id,
-      fromWorkflowId: outgoingWorkflow.id,
-      toWorkflowId: target.id,
-      stateMap,
-    });
-    setRebind(
-      outcome.status === 'migrated'
-        ? { phase: 'migrated', count: outcome.count, toWorkflowName: target.name }
-        : { phase: 'refused', rule: outcome.rule, reason: outcome.reason },
-    );
+    try {
+      const outcome = await gateway.migrateTypeToWorkflow({
+        workspaceId,
+        typeId: def.id,
+        fromWorkflowId: outgoingWorkflow.id,
+        toWorkflowId: target.id,
+        stateMap,
+      });
+      setRebind(
+        outcome.status === 'migrated'
+          ? { phase: 'migrated', count: outcome.count, toWorkflowName: target.name }
+          : { phase: 'refused', rule: outcome.rule, reason: outcome.reason },
+      );
+    } catch (cause) {
+      // The same channel and sentence the board's own move uses for a dropped
+      // connection — a transport failure is not an adjudication (ruling 27).
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setRebind({
+        phase: 'mapping',
+        toWorkflowId: target.id,
+        error: `We could not reach the server for this move — ${message}`,
+      });
+    }
   }
 
   async function onSave(): Promise<void> {
@@ -558,7 +595,7 @@ export function TicketTypeEditorScreen(props: {
                           type="button"
                           className="ticket-type-editor__divergence-move"
                           disabled={!canAuthor || !bindingCommitted || rebind.phase === 'migrating'}
-                          onClick={() => setRebind({ phase: 'mapping', toWorkflowId: def.workflowId })}
+                          onClick={() => setRebind({ phase: 'mapping', toWorkflowId: def.workflowId, error: null })}
                         >
                           {`Move them to "${incomingWorkflow.name}"…`}
                         </button>
@@ -594,10 +631,19 @@ export function TicketTypeEditorScreen(props: {
                       </p>
                       </>
                     )}
-                    {rebind.phase === 'mapping' && pendingTarget !== null ? (
+                    {/* Mounted through `'migrating'` as well as `'mapping'`, and
+                        that is load-bearing rather than cosmetic: the dialog
+                        holds the admin's `stateMap` in its own state, so
+                        unmounting it to show a spinner would discard the very
+                        work a rejected request needs to hand back. Keeping one
+                        instance across the round trip is what makes the retry
+                        free. */}
+                    {(rebind.phase === 'mapping' || rebind.phase === 'migrating') && pendingTarget !== null ? (
                       <WorkflowRebindDialog
                         fromWorkflow={outgoingWorkflow}
                         toWorkflow={pendingTarget}
+                        submitting={rebind.phase === 'migrating'}
+                        error={rebind.phase === 'mapping' ? rebind.error : null}
                         onCancel={() => setRebind({ phase: 'left' })}
                         onConfirm={(stateMap) => void onMigrate(pendingTarget, stateMap)}
                       />

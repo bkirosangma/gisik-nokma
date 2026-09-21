@@ -289,6 +289,40 @@ describe('precheckEvent — instant named-reason previews from the same engine t
     const result = await precheckEvent(transitionTo('done'), cache);
     expect(ruleOf(result)).toBe(REFUSAL_RULES.restrictTo);
   });
+
+  /**
+   * 3.185 (E2-40) — the OTHER half of "the candidate must carry what the
+   * submission will carry", and it travels by a different road. `require-field` reads the
+   * value out of the TICKET STATE (`rule-engine/src/rules/require-field.ts:9`),
+   * so no payload key can reach it; the dialog's collected values ride
+   * `pendingFields`, which applies them to the ticket the engine is handed —
+   * the preview's stand-in for the ordered batch the real path sends.
+   *
+   * The first assertion is the CONTROL, and it runs first on purpose: it shows
+   * this rule refuses this candidate when nothing has been collected, so the
+   * case below it is about the pending claim CLEARING the refusal rather than
+   * about the rule never firing.
+   */
+  it('previews a require-field move as passed once the pending field claim is supplied', async () => {
+    const def: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.to === 'done' ? { ...transition, rules: [{ kind: 'require-field', field: 'invoiceNo' }] } : transition,
+      ),
+    };
+    const cache = readyCache({}, def);
+    expect(ruleOf(await precheckEvent(transitionTo('done'), cache))).toBe(REFUSAL_RULES.requireField);
+    expect(await precheckEvent(transitionTo('done'), cache, { pendingFields: { invoiceNo: 'INV-7' } })).toEqual({
+      kind: 'passed',
+    });
+    // A BLANK pending value is not a claim. The engine's own `isSet` treats a
+    // whitespace-only string as unset — the same answer the submission's
+    // `(fieldValues[field] ?? '') !== ''` filter gives — so no value that can
+    // change the verdict differs between the preview and the real path.
+    expect(
+      ruleOf(await precheckEvent(transitionTo('done'), cache, { pendingFields: { invoiceNo: '   ' } })),
+    ).toBe(REFUSAL_RULES.requireField);
+  });
 });
 
 /**

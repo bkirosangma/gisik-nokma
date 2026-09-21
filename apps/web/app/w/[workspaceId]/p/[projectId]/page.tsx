@@ -135,6 +135,12 @@ export default function ProjectPage() {
 const BUILTIN_TYPE_LADDER = BUILTIN_TICKET_TYPE_SEEDS.map((seed) => ({
   id: seed.id,
   name: seed.name,
+  // The RANK travels with the ladder (E5-16): `NewTicketDialog` chooses which
+  // type a root ticket starts on, and a ladder without ranks left it naming
+  // `typeOptions[0]` — the top of the hierarchy. Derived from the domain's own
+  // seed list, like the two fields above it, so it cannot drift from the
+  // hierarchy the engine enforces.
+  rank: seed.rank,
 }));
 
 export const BUILTIN_LADDER_NOTICE =
@@ -1510,7 +1516,7 @@ function ProjectBoard() {
   const typeOptions =
     ticketTypes.data === null
       ? BUILTIN_TYPE_LADDER
-      : ticketTypes.data.map((type) => ({ id: type.id, name: type.name }));
+      : ticketTypes.data.map((type) => ({ id: type.id, name: type.name, rank: type.rank }));
 
   /**
    * The board's own column names, id → name, for the `stateIds` chip below.

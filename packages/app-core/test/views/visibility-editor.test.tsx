@@ -1,4 +1,4 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
@@ -654,5 +654,102 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
     // jobs are kept different on purpose.
     expect(typeof labelOf({ id: NAMELESS, name: '', role: 'guest' })).toBe('string');
     expect(labelOf({ id: NAMELESS, name: '', role: 'guest' })).toBe(NAMELESS);
+  });
+});
+
+/**
+ * 17.042 (E2-33c) — THE FIELDSET CANNOT OUTLIVE THE SENTENCE IT CONTRADICTS.
+ *
+ * The seed is one-shot (`useState`), and the ONE behaviour that re-runs it is a
+ * QUERYKEY change: `useLiveQuery` answers `null` and the "Loading…" branch
+ * remounts this subtree, so a ticket SWITCH is correct. A RELOAD keeps the key,
+ * so `current` updates IN PLACE with this component still mounted — and the
+ * standing sentence renders from `current` while the fieldset renders from the
+ * seeded state. Two modes on one screen, with Apply sending the stale one.
+ *
+ * The reconcile is keyed on the CLAIM'S CONTENT, not on the object: `current` is
+ * a fresh object on every read, so an identity key would wipe a half-authored
+ * fieldset whenever a stream event merely re-delivered the same claim. Both
+ * directions are asserted here, because only the pair distinguishes "reconciles"
+ * from "resets on every render".
+ */
+describe('E2-33c a reload that changes the standing claim re-seeds the fieldset', () => {
+  const standing = (ownMode: VisibilityClaim['ownMode'], userIds: string[]): VisibilityClaim => ({
+    ownMode,
+    // `resolvedMode` has no `inherit` member — resolution always RESOLVES, and
+    // `project` is what an inheriting ticket resolves to by default
+    // (`ROOT_DEFAULT_MODE`). Spelled rather than passed through, so the two
+    // fields cannot drift into a shape the wire cannot send.
+    resolvedMode: ownMode === 'inherit' ? 'project' : ownMode,
+    userIds,
+    claim: null,
+  });
+
+  function mountEditor(props: { current: VisibilityClaim | null }) {
+    const source = recordingSource();
+    const view = render(
+      <VisibilityEditor
+        dataSource={source.dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        canEdit
+        {...props}
+      />,
+    );
+    return view;
+  }
+
+  const chosenMode = (): HTMLInputElement | null =>
+    document.querySelector<HTMLInputElement>('input[name="gn-visibility-mode"]:checked');
+
+  it('PLANTED DEFECT: the fieldset follows the standing claim when the claim moves under it', () => {
+    const view = mountEditor({ current: standing('explicit', [ANSELMA]) });
+    expect(chosenMode()?.value).toBe('explicit');
+    expect(screen.getByRole('checkbox', { name: 'Anselma Marak' })).toBeChecked();
+
+    // Somebody else changed this ticket's audience and the read came back: same
+    // query key, so the component is STILL MOUNTED and the seed never re-ran.
+    view.rerender(
+      <VisibilityEditor
+        dataSource={recordingSource().dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        canEdit
+        current={standing('inherit', [])}
+      />,
+    );
+
+    // The fieldset now says what the sentence above it says: the mode moved, and
+    // `inherit` draws no people picker at all — so the roster the old claim named
+    // is not left standing under a sentence that no longer names it.
+    expect(chosenMode()?.value).toBe('inherit');
+    expect(screen.queryByRole('checkbox', { name: 'Anselma Marak' })).toBeNull();
+  });
+
+  it('a reload that re-delivers the SAME claim leaves a half-authored fieldset alone', () => {
+    const view = mountEditor({ current: standing('explicit', [ANSELMA]) });
+
+    // The person starts editing: somebody added to the roster.
+    const dipu = screen.getByRole('checkbox', { name: 'Dipu' });
+    fireEvent.click(dipu);
+    expect(screen.getByRole('checkbox', { name: 'Dipu' })).toBeChecked();
+
+    // Same claim, new object — a stream event re-delivered it.
+    view.rerender(
+      <VisibilityEditor
+        dataSource={recordingSource().dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        canEdit
+        current={standing('explicit', [ANSELMA])}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Dipu' })).toBeChecked();
   });
 });

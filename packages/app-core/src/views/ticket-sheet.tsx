@@ -448,6 +448,27 @@ export function TicketSheet({
    */
   const [transportError, setTransportError] = useState<string | null>(null);
   /**
+   * THE FOOTER'S OWN PAIR, and the same two facts as `serverRefusal` /
+   * `transportError` one screen down (E5-9, 2026-09-21).
+   *
+   * WHY PLACEMENT IS PART OF THE ANSWER HERE. `Delete` is the last thing in the
+   * sheet's body, and that body scrolls: the lane that filed this measured
+   * `.gn-ticket-sheet__body` at `clientHeight 756` against `scrollHeight 4036`,
+   * with the footer's top 3,942.8 px below the tab bar. The shared slots sit at
+   * the HEAD of that body, so a person who scrolled to the foot, pressed Delete
+   * and was refused was answered about five viewports above their own eyes —
+   * the sentence was on screen in the DOM and nowhere near the screen they were
+   * looking at. `TransitionDialog` already owns its own refusal slots for
+   * exactly this reason; Delete had none.
+   *
+   * These are separate STATE, not a flag on the shared pair, because the two
+   * sentences must never coexist: every submission clears BOTH pairs (see
+   * `submitTicketEvent`'s `clearBoth`), so one click's outcome is one sentence
+   * in one place.
+   */
+  const [footerRefusal, setFooterRefusal] = useState<{ rule: string; reason: string } | null>(null);
+  const [footerTransport, setFooterTransport] = useState<string | null>(null);
+  /**
    * A THIRD slot, and the third distinct fact: something the editor itself
    * could not do, where the server was never asked.
    *
@@ -668,27 +689,44 @@ export function TicketSheet({
    * it comes back as a REFUSAL naming the client's own payload as malformed,
    * which is a refusal about this code shown to a user as if it were about
    * their move.
+   *
+   * `fieldValues` is the OTHER half of "what the submission will carry", and it
+   * travels by a different road for a reason worth stating: `require-comment`
+   * and `require-evidence` are read from the CANDIDATE, so their values go into
+   * the payload above; `require-field` is read from the TICKET STATE
+   * (`rule-engine/src/rules/require-field.ts:9`), so a payload key could not
+   * reach it at all. The dialog's collected field values therefore ride
+   * `pendingFields`, which applies them to the ticket the engine sees — the
+   * preview's stand-in for the ordered batch the real path sends.
    */
   const precheck = async (
     toStateId: string,
     evidenceAttachmentId?: string | null,
+    fieldValues?: Record<string, string>,
+    comment?: string,
   ): Promise<PrecheckResult> => {
     if (cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
     // The candidate must carry WHAT THE SUBMISSION WILL CARRY, or the engine
     // evaluates a claim nobody is about to make — and `require-evidence` is
     // exactly that case: an absent id reads as "none was provided" and the
-    // preview refused a move the user had just satisfied.
+    // preview refused a move the user had just satisfied. `require-comment` is
+    // the second case of the same omission, read off the payload by
+    // `evaluateRequireComment`, so it rides the payload too — with the SAME
+    // trim the submission applies, so a whitespace-only comment is unset on
+    // both paths rather than on one.
     const payload: Record<string, unknown> = { to: toStateId };
     if (evidenceAttachmentId !== undefined && evidenceAttachmentId !== null) {
       payload['evidenceAttachmentId'] = evidenceAttachmentId;
     }
+    const text = comment?.trim() ?? '';
+    if (text !== '') payload['comment'] = { text };
     const candidate: SubmittedEvent = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
       type: 'ticket.transitioned',
       payload,
     });
-    return precheckEvent(candidate, cache);
+    return precheckEvent(candidate, cache, { pendingFields: fieldValues });
   };
 
   /**
@@ -1069,7 +1107,38 @@ export function TicketSheet({
   const submitTicketEvent = async (
     type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
     onCommitted: () => void,
+    /**
+     * WHERE this event's answer is shown (E5-9). `'sheet'` is the shared slot at
+     * the head of the body; `'footer'` is the one beside Delete.
+     *
+     * The state machine is SHARED on purpose — the refusal/transport split, the
+     * `submitting` latch and the three-outcome branch are one decision, and a
+     * delete that grew a private copy is how the two drift. What is NOT shared
+     * is the PLACEMENT, because the two controls are not equally far from the
+     * shared slot: `Delete` sits at the end of a body that legitimately scrolls
+     * thousands of pixels, and the lane that filed this measured the footer's
+     * top 3,942.8 px below the tab bar — so an answer rendered at the head is an
+     * answer the person who pressed the button cannot see. `Close`/`Reopen` sit
+     * in that same footer, but their refusals are rendered by `TransitionDialog`
+     * (which owns its own slot) or by the shared one while the person is still
+     * at the head of the body.
+     */
+    sink: 'sheet' | 'footer',
   ): Promise<void> => {
+    // ONE pair of writers per sink, chosen once. Every branch below states its
+    // outcome through these rather than through the setters directly, so a
+    // future outcome cannot land in the wrong place by omission.
+    const putRefusal = sink === 'footer' ? setFooterRefusal : setServerRefusal;
+    const putTransport = sink === 'footer' ? setFooterTransport : setTransportError;
+    // Both sinks are cleared by every submission, whichever one this is: two
+    // sentences about one click's outcome — one stale, one current — is the
+    // defect the shared slot's own comment below already refuses.
+    const clearBoth = (): void => {
+      setServerRefusal(null);
+      setTransportError(null);
+      setFooterRefusal(null);
+      setFooterTransport(null);
+    };
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -1083,20 +1152,19 @@ export function TicketSheet({
       const result = results[0];
       if (result === undefined) {
         // Ruling 27/33/34: silence is not a refusal — `transportError`, never
-        // a hand-built `{rule, reason}` pair standing in for one. `serverRefusal`
-        // is cleared here too, the same pairing the `catch` branch below
+        // a hand-built `{rule, reason}` pair standing in for one. The other
+        // slot is cleared here too, the same pairing the `catch` branch below
         // already does: without it, a REFUSED answer followed by a SILENT one
         // (two separate clicks, two separate ingests) would leave the old
         // "Refused by the server — …" notice on screen alongside the new
         // transport one — two notices for one click's outcome, the earlier one
         // describing an answer that is no longer what happened.
-        setServerRefusal(null);
-        setTransportError('The server did not answer this change.');
+        clearBoth();
+        putTransport('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
-        setServerRefusal(null);
-        setTransportError(null);
+        clearBoth();
         // What a COMMITTED event does next is the caller's — Close/Reopen
         // re-read (the ticket's own state moved), Delete closes and narrates
         // (the ticket is gone from every view). Everything before this line is
@@ -1106,16 +1174,16 @@ export function TicketSheet({
         onCommitted();
         return;
       }
-      setTransportError(null);
-      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
-      else setServerRefusal({ rule: result.code, reason: result.message });
+      clearBoth();
+      if (result.status === 'refused') putRefusal({ rule: result.rule, reason: result.reason });
+      else putRefusal({ rule: result.code, reason: result.message });
     } catch (error) {
       // Ruling 27/33: a transport failure is not a refusal either — same
       // `transportError` channel `board.tsx`'s `submitDirect` (`:1082-1088`)
       // uses, own sentence, never `serverRefusal`.
-      setServerRefusal(null);
+      clearBoth();
       const message = error instanceof Error ? error.message : String(error);
-      setTransportError(`We could not reach the server for this change — ${message}`);
+      putTransport(`We could not reach the server for this change — ${message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1214,10 +1282,19 @@ export function TicketSheet({
 
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
-    submitTicketEvent(type, () => {
-      read.reload();
-      history.reload();
-    });
+    submitTicketEvent(
+      type,
+      () => {
+        read.reload();
+        history.reload();
+      },
+      // The shared slot. Their own refusals are the one case that reaches it
+      // from the foot of the sheet: Close/Reopen are rendered only while
+      // `TransitionDialog` is closed, and its copy is not on screen then — see
+      // the slot's own comment, which is what makes that placement deliberate
+      // rather than an oversight.
+      'sheet',
+    );
 
   /**
    * `Delete` — the SOFT delete, and the sheet's only removal.
@@ -1242,12 +1319,23 @@ export function TicketSheet({
    * Delete gets the engine's own refusal in `gn-refusal--server` rather than a
    * button that silently is not there. **A hidden control cannot explain
    * itself.**
+   *
+   * ## ⚠ AND ITS REFUSAL ANSWERS IN THE FOOTER, NOT AT THE HEAD OF THE BODY
+   *
+   * The ruling above is about WHETHER Delete is offered; it never weighed
+   * WHERE its answer lands, and the answer landed five screens away (E5-9;
+   * the measurement is on `footerRefusal`). The sink is `'footer'` for that
+   * reason: the sentence renders beside the button the person just pressed.
    */
   const deleteTicket = (): Promise<void> =>
-    submitTicketEvent('ticket.deleted', () => {
-      onClose();
-      onDeleted?.(ticketId, ticketRead.title);
-    });
+    submitTicketEvent(
+      'ticket.deleted',
+      () => {
+        onClose();
+        onDeleted?.(ticketId, ticketRead.title);
+      },
+      'footer',
+    );
 
   const state = ticketRead.ticket;
   /**
@@ -1318,13 +1406,37 @@ export function TicketSheet({
    *
    * `rollup === null` is a real fact (no children at all, `ticket-cards.ts`'s
    * own reading), so it is not treated as an unknown to be excused.
+   *
+   * ⚠ **AND "UNREAD" IS NOT "EMPTY" — V8, 2026-09-21.** `subtaskRows` used to be
+   * `subtasks.data ?? []`, which reads an in-flight or failed read as a list of
+   * zero — and `useLiveQuery` resets `data` to `null` on every KEY change, which
+   * this one does the moment the ticket read lands (the key carries the project
+   * id; see its own comment). So on EVERY ordinary parent-ticket load, for the
+   * whole second round trip, `subtaskRows.length` was 0 while `subtaskExpected`
+   * was the server's real child count — and the section rendered a
+   * `role="alert"` telling the person the list was *"not shown rather than shown
+   * short"* about a list nobody had read yet. The reconciliation is now gated on
+   * the read having ANSWERED, which is strictly narrower and keeps the property
+   * this section exists for: a short list is still never drawn silently.
+   *
+   * ⚠ **A FAILED read is lumped in with a pending one here, and that is named
+   * rather than hidden:** `subtasks.error` is not consulted below, so a child
+   * read that REJECTS (past `LIST_ROW_CAP`, or a dropped connection) renders
+   * neither the alert, nor the empty sentence, nor a failure sentence — the
+   * section draws nothing at all. The empty sentence it used to draw in that
+   * case was a false claim about the ticket, so this is smaller, but it is still
+   * an absence: **owner — whoever next touches this section**, and the three-arm
+   * treatment `HistoryTab` already uses (error tested BEFORE `data === null`) is
+   * the model.
    */
+  const subtasksUnread = subtasks.data === null;
   const subtaskRows = subtasks.data ?? [];
   const subtaskExpected =
     ticketRead.rollup === null
       ? 0
       : ticketRead.rollup.totalChildren - ticketRead.rollup.restrictedCount;
-  const subtasksIncomplete = ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
+  const subtasksIncomplete =
+    !subtasksUnread && ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
 
   /**
    * The chip's two inputs, bound ONCE and outside the JSX.
@@ -2265,7 +2377,14 @@ export function TicketSheet({
                 {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
               </p>
             </div>
-            {subtasksIncomplete ? (
+            {/*
+              Nothing at all while the child read is in flight — not the alert,
+              and not the empty sentence either. Both are claims about a list
+              nobody has read yet; the alert is the louder one and the one V8
+              measured, and the empty arm was the same false claim one notch
+              quieter. What renders is decided by the ANSWER, never by `null`.
+            */}
+            {subtasksUnread ? null : subtasksIncomplete ? (
               // THE RECONCILIATION, rendered rather than swallowed. A short list
               // here is the one failure this section could hide, so it is said
               // in the server's own numbers instead of drawn.
@@ -2690,6 +2809,33 @@ export function TicketSheet({
           `ui.css` carries beside `.gn-ticket-sheet__footer` — the reason is a
           `Sheet` API change, measured there rather than asserted here. */}
       <footer className="gn-ticket-sheet__footer">
+        {/*
+          DELETE'S OWN ANSWER, HERE RATHER THAN AT THE HEAD OF THE BODY.
+
+          The shared slots above sit at the top of the one scrolling body; this
+          one is where the person is when they press the button. The lane that
+          filed E5-9 measured the footer's top **3,942.8 px** below the tab bar
+          (`scrollHeight 4036` against `clientHeight 756`), so an answer rendered
+          in the shared slot arrived about five viewports above the eyes that
+          asked for it. Same two facts, same sentences, own placement — the
+          reasoning, and why this is a separate PAIR of states rather than a flag
+          on the shared one, is on `footerRefusal`'s declaration.
+
+          It renders INSIDE the footer element so the answer is structurally
+          attached to the control, which is the property the case asserts: a
+          jsdom sheet lays nothing out, so the pixel claim is the lane's and the
+          containment claim is this test's.
+        */}
+        {footerRefusal !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--server">
+            {`Refused by the server — ${footerRefusal.rule}: ${footerRefusal.reason}`}
+          </p>
+        ) : null}
+        {footerTransport !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--transport">
+            {footerTransport}
+          </p>
+        ) : null}
         <button
           type="button"
           className="gn-ticket-sheet__delete"

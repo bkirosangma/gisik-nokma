@@ -669,6 +669,95 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     expect(preview.textContent).not.toContain('malformed');
     expect(preview.textContent).not.toContain('toStateId');
   });
+
+  /**
+   * 3.186 (E5-7). The candidate carries `{ to }` and nothing else, so the
+   * preview is
+   * asked a question the submission does not ask: the dialog shows
+   * `Comment (required by this transition)`, its own `blocked` clears the
+   * moment the person types, Move becomes ENABLED — and the refusal sentence
+   * beside it stays. `evaluateRequireComment` reads `payload.comment?.text`, so
+   * the comment is the one rule kind whose value the CANDIDATE can carry; the
+   * evidence fix beside it did exactly this and was never extended to the
+   * comment box.
+   */
+  it('PLANTED DEFECT: the require-comment preview stops refusing once the comment its own box asked for is typed', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    // doing → done declares require-comment.
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    // The CONTROL: nothing typed yet, so this refusal is CORRECT — the person
+    // has not answered, and Move is disabled. The case below is about the
+    // refusal CLEARING, not about it never having fired.
+    expect(await screen.findByText(/instant check/)).toHaveTextContent('require-comment');
+
+    const box = screen.getByLabelText('Comment (required by this transition)');
+    await user.type(box, 'review note');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+    expect(document.querySelector('.gn-refusal--preview')).toBeNull();
+
+    // …and a comment that is only WHITESPACE is not a comment: the submission
+    // sends `comment.trim()`, and `evaluateRequireComment` trims what it reads,
+    // so the two agree on every value that can change the verdict.
+    await user.clear(box);
+    await user.type(box, '   ');
+    expect(await screen.findByText(/instant check/)).toHaveTextContent('require-comment');
+  });
+
+  /**
+   * 3.185 (E2-40). `require-field` reads the value out of the TICKET STATE
+   * (`rule-engine/src/rules/require-field.ts:9`), not out of the candidate's
+   * payload — which is why the real path sends the field claims FIRST, in one
+   * ordered batch, before the transition. The preview evaluates ONE candidate
+   * against cached state and has no such batch, so a field the ticket does not
+   * already carry is invisible to it: the dialog's own input asks for the
+   * value, its gate clears the moment it is typed, and the preview beside it
+   * keeps saying the field is not set — for ever.
+   */
+  it('PLANTED DEFECT: the preview stops refusing once the field its own input asked for is filled', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'doing' && transition.to === 'done'
+          ? { ...transition, rules: [{ kind: 'require-field', field: 'invoiceNo' }] }
+          : transition,
+      ),
+    };
+    const read = ticketRead();
+    const cache = createClientStateCache();
+    cache.upsertTicket(read.ticket);
+    cache.upsertWorkflowDef(gated);
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => gated,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source, { cache });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    // Before anything is typed the refusal is CORRECT — the field has no value
+    // on the ticket and nothing has been collected. This is the control: the
+    // assertion below is about the refusal CLEARING, not about it being absent
+    // for some unrelated reason.
+    const preview = await screen.findByText(/instant check/);
+    expect(preview).toHaveTextContent('require-field');
+
+    await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+    // The person answered the question the dialog asked, and the answer reached
+    // the same evaluation the submission will cause — so the refusal goes.
+    expect(document.querySelector('.gn-refusal--preview')).toBeNull();
+  });
 });
 
 describe('TicketSheet — the attachment list (Task 12a wiring)', () => {
@@ -1865,6 +1954,51 @@ describe('F — the subtasks section', () => {
     // where the missing thing is a character rather than a pixel.
     expect(within(section).getByTestId('subtask-tkt-s1').textContent).toBe('Order the brochures · To do');
     expect(within(section).getByTestId('subtask-tkt-s2').textContent).toBe('Book the venue · Done');
+  });
+
+  /**
+   * 17.041 (V8) — THE FALSE ALERT EVERY PARENT TICKET RAISED ON ITS ORDINARY
+   * LOAD.
+   *
+   * `subtaskRows` was `subtasks.data ?? []`, so the in-flight window read as an
+   * EMPTY list — and `useLiveQuery` resets `data` to `null` on every KEY change,
+   * which the subtasks key does the moment the ticket read lands
+   * (`${ticketId}:subtasks:${projectId}`). So for the whole second round trip
+   * `subtaskRows.length` was 0 while `subtaskExpected` was the server's real
+   * child count, `subtasksIncomplete` was true, and the section rendered a
+   * `role="alert"` telling the person the list was *"not shown rather than shown
+   * short"* — about a list that was merely still being read.
+   *
+   * The child read is held open here rather than raced: a slow promise makes the
+   * window deterministic and lets the case assert BOTH ends of it.
+   */
+  it('PLANTED DEFECT: no false "not shown rather than shown short" alert while the child read is in flight', async () => {
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    let release: () => void = () => undefined;
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ projectId: 'prj_f', rows: [child({ ticketId: 'tkt-s1', title: 'Order the brochures' })] });
+        }),
+    });
+    renderSheet(read, source);
+    await settled();
+
+    // The ticket read has landed (the sheet is painted) and the child read has
+    // not. NEITHER arm may be drawn: the alert would be a lie about a list
+    // nobody has read yet, and the empty arm would be the same lie quieter.
+    expect(screen.queryByTestId('sheet-subtasks-incomplete')).toBeNull();
+    expect(screen.queryByTestId('sheet-subtasks-empty')).toBeNull();
+
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByTestId('subtask-tkt-s1')).toBeInTheDocument();
   });
 
   it('16.16 says what a subtask IS when there are none', async () => {
@@ -3459,5 +3593,102 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     // And the reason is not dressed as a wait — the failure arm this sheet
     // already draws for the ticket read and the ledger tab is the model.
     expect(notice.textContent).not.toContain('Loading');
+  });
+});
+
+/**
+ * 3.190 (E5-9) — A REFUSAL ANSWERS WHERE THE CONTROL IS.
+ *
+ * `Delete` sits in the sheet's footer, at the very END of a body that scrolls:
+ * the lane that filed this measured `.gn-ticket-sheet__body` at `clientHeight
+ * 756` against `scrollHeight 4036`, with the footer's top **3,942.8 px** below
+ * the tab bar — roughly five viewports. Delete's refusal rode the shared
+ * `gn-refusal--server` slot at the HEAD of that body, so a person who scrolled
+ * to the bottom, pressed Delete, and was refused got the answer where they
+ * could not see it. The recorded ruling (`deleteTicket`'s own docblock) chose
+ * "the engine's own refusal … rather than a button that silently is not there";
+ * that ruling is about WHETHER Delete is offered, not about where its answer
+ * lands, so this case does not disturb it.
+ */
+describe('E5-9 a refused Delete answers beside the button that was pressed', () => {
+  it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'permission.role',
+          reason: 'Only an admin may delete this ticket.',
+        })),
+    );
+    renderSheet(read, source);
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    const refusal = await screen.findByText(/Refused by the server/);
+    // One sentence, never two: the footer answer REPLACES the shared slot's,
+    // rather than being a second copy of the same fact on one screen.
+    expect(screen.getAllByText(/Refused by the server/)).toHaveLength(1);
+    // …and it is in the surface the person is looking at. `.closest('footer')`
+    // is the structural claim; the pixel claim is the lane's measurement above,
+    // which a jsdom sheet cannot make (it lays nothing out).
+    expect(refusal.closest('footer')).not.toBeNull();
+  });
+});
+
+/**
+ * 3.189 (E5-20) — ONE ESCAPE, TWO `role="dialog"` ELEMENTS, AND ONLY ONE OF
+ * THEM SHOULD CLOSE.
+ *
+ * `Move…` mounts `TransitionDialog` → `Dialog` INSIDE the sheet's own subtree,
+ * so the DOM holds two modal dialogs at once. `Dialog` installs a
+ * document-level `keydown` that closes on Escape and (until this change) never
+ * called `preventDefault()`; `Sheet` installs one that closes the sheet on
+ * Escape unless `event.defaultPrevented` — and its own docblock states the
+ * contract: *"A child that handles Escape must call `preventDefault()` for this
+ * guard to see it."* The guard was added for the title field and never reached
+ * the `Dialog` in the same package, which is the child every Move, Reopen and
+ * Bulk-close goes through.
+ *
+ * ⚠ **The harness has a vacuity the sibling case's docblock already names, and
+ * this one closes it by asserting the SPY.** `renderSheet`'s default `onClose`
+ * is a fresh `vi.fn()` that never unmounts anything, so "the sheet is still on
+ * screen" is true whatever happens — including on the defect. `open` is not a
+ * prop of this sheet at all; the caller owns it. So the assertion is that the
+ * sheet's `onClose` was NOT CALLED, and that is what a duplicate close would
+ * have done to the real app.
+ */
+describe('E5-20 Escape in the Move dialog does not close the sheet under it', () => {
+  it('PLANTED DEFECT: one Escape closes the Move dialog and leaves the sheet open', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read), { onClose });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+
+    // The stack the finding measured: two modal dialogs, the Move one on top.
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    // The Move dialog took the Escape — that is the gesture the person made…
+    expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull();
+    // …and the sheet underneath did NOT also take it. `onClose`, not the
+    // absence of the sheet, is the measurement: see this block's docblock.
+    expect(onClose).not.toHaveBeenCalled();
   });
 });

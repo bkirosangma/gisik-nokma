@@ -10,6 +10,7 @@ import {
   ticketTransitionedPayloadSchema,
   transitionsWithBacklog,
   type EventEnvelope,
+  type FieldClaim,
   type SubmittedEvent,
   type TicketState,
   type TicketTransitionedPayload,
@@ -37,6 +38,34 @@ export type PrecheckResult =
 export type PrecheckDeps = {
   evaluate?: typeof evaluateEvent;
   now?: () => Date;
+  /**
+   * Field claims the caller has COLLECTED BUT NOT YET SUBMITTED — the dialog's
+   * own typed inputs. Not a dependency in the injected-function sense; it lives
+   * here because this type is already the caller's channel into the evaluation,
+   * and it is deliberately not a fourth positional argument that every
+   * `precheckEvent(candidate, cache)` call site would have to spell `undefined`
+   * through.
+   *
+   * WHY IT IS NEEDED AT ALL. `evaluateRequireField`
+   * (`rule-engine/src/rules/require-field.ts:9`) reads
+   * `input.ticket.fields[rule.field]?.value` — the value comes out of the
+   * TICKET STATE, not out of the candidate's payload. The real path makes that
+   * work by sending the field claims FIRST and the transition last, in one
+   * ordered batch (`views/ticket-sheet.tsx` `submitTransition`, and the
+   * docblock there says why). A pre-check evaluates ONE candidate against
+   * cached state and has no such batch, so for a field the ticket does not
+   * already carry the engine sees the value as unset no matter what the dialog
+   * collected — and the preview refuses a move the person has just satisfied,
+   * permanently, beside an enabled primary control.
+   *
+   * The same argument the evidence fix made one line below: the candidate must
+   * carry WHAT THE SUBMISSION WILL CARRY. Blank values are passed through
+   * rather than filtered here — the engine's own `isSet` treats a
+   * whitespace-only string as unset, which is the same answer the submission's
+   * `(fieldValues[field] ?? '') !== ''` filter gives, so no value that can
+   * change the verdict differs between the two paths.
+   */
+  pendingFields?: Record<string, string>;
 };
 
 /** A fresh object each time: a shared literal would let one caller's mutation reach the next. */
@@ -138,7 +167,11 @@ export async function precheckEvent(
   if (!versionChainIsCached(cache, ticket, def)) return notEvaluated();
 
   const evaluate = deps.evaluate ?? evaluateEvent;
-  const verdict = await evaluate(completeForPrecheck(submitted, deps.now), contextFromCache(cache));
+  const envelope = completeForPrecheck(submitted, deps.now);
+  const verdict = await evaluate(
+    envelope,
+    contextFromCache(cache, pendingFieldClaims(envelope, deps.pendingFields)),
+  );
   // The engine's own door for this payload, asked again for the two questions
   // the verdict alone cannot answer: which state is being entered, and which
   // edge carries the rule that refused.
@@ -163,6 +196,43 @@ export function completeForPrecheck(submitted: SubmittedEvent, now: () => Date =
 }
 
 /**
+ * The field claims a caller has collected but not submitted, as claims the
+ * engine can read — built from the CANDIDATE'S OWN envelope, so the provenance
+ * is the provenance the `ticket.field_set` would really carry if the dialog
+ * sent it (`rule-engine/src/fixtures/harness.ts:534-539` folds exactly this
+ * four-field shape), never a fabricated one. `serverTime` and `seq` are the
+ * provisional pair `completeForPrecheck` already stands in for; nothing on the
+ * transitioned path reads either off a field claim.
+ */
+export type PendingOverlay = {
+  ticketId: string;
+  fields: Record<string, FieldClaim>;
+};
+
+function pendingFieldClaims(
+  envelope: EventEnvelope,
+  pending: Record<string, string> | undefined,
+): PendingOverlay | undefined {
+  if (pending === undefined) return undefined;
+  const entries = Object.entries(pending);
+  if (entries.length === 0) return undefined;
+  return {
+    ticketId: envelope.entity.id,
+    fields: Object.fromEntries(
+      entries.map(([field, value]) => [
+        field,
+        {
+          value,
+          actorId: envelope.actorId,
+          clientTime: envelope.clientTime,
+          serverTime: envelope.serverTime,
+        },
+      ]),
+    ),
+  };
+}
+
+/**
  * The cache seen as the engine sees any store. It answers only what it holds
  * and never invents: an uncached entity is `null`, and the gates in
  * `precheckEvent` — not this adapter — decide when that absence makes the whole
@@ -177,11 +247,18 @@ export function completeForPrecheck(submitted: SubmittedEvent, now: () => Date =
  * store, so there is nothing for a gate to interrogate — which is why that one
  * method throws instead of participating in it.
  */
-export function contextFromCache(cache: ClientStateCache): EngineContext {
+export function contextFromCache(cache: ClientStateCache, overlay?: PendingOverlay): EngineContext {
   return {
     async getEntityState(kind, id) {
       if (kind !== 'ticket') return null;
-      return cache.getTicket(id) ?? null;
+      const ticket = cache.getTicket(id) ?? null;
+      // The overlay is keyed by the ticket it belongs to and applies to that
+      // one only: the engine resolves OTHER entities too (a parent, a child),
+      // and a pending claim is about the candidate's own subject. This is the
+      // one place the pre-check's answer differs from "what the cache holds",
+      // and it is the whole of `pendingFields`.
+      if (ticket === null || overlay === undefined || overlay.ticketId !== id) return ticket;
+      return { ...ticket, fields: { ...ticket.fields, ...overlay.fields } };
     },
     async getChildrenStates(ticketId) {
       return cache.childrenOf(ticketId);

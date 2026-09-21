@@ -1,5 +1,47 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
+import { DEEPEST_RANK } from '@gisik-nokma/domain';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
+
+/**
+ * A ticket type as this dialog is handed it: the label to paint, and the RANK
+ * the root-creation rule turns on.
+ *
+ * `rank` is required, and that is the point rather than tidiness. The default
+ * below cannot be derived from an id and a name — the previous default was
+ * `typeOptions[0]`, which named the TOP of the hierarchy because the ladder
+ * arrives rank-ascending — so a caller that does not say what rank each type
+ * sits at leaves this dialog with no honest way to choose one. An optional
+ * `rank` would compile at every call site and silently restore that defect
+ * wherever it was omitted.
+ */
+export type TypeOption = { id: string; name: string; rank: number };
+
+/**
+ * The type a ROOT-LEVEL new ticket starts on: the deepest one that may sit at
+ * project root at all.
+ *
+ * `DEEPEST_RANK` is the hierarchy rule's own floor (`packages/domain/src/ticket-types.ts`):
+ * a type at that rank or below needs a parent, so offering one as the default
+ * for a ticket with no parent would pre-select an answer the engine refuses.
+ * Among the legal ones the DEEPEST is chosen, because rank is depth in the
+ * hierarchy and a root ticket is the broadest kind of work the workspace files
+ * — the same "nearest kind of work" reasoning `subtaskTypeFor` uses from the
+ * other direction (there the ladder is consulted downward from a parent; here
+ * upward from the root).
+ *
+ * Ties are broken by `id`, so the answer does not depend on the order the
+ * server happened to return the ladder in. `null` when NOTHING is legal: a
+ * workspace whose every type needs a parent has no root-legal default, and the
+ * honest answer is then an empty picker rather than a type the door will
+ * refuse.
+ */
+export function defaultRootTypeFor(ladder: readonly TypeOption[]): TypeOption | null {
+  const legal = ladder.filter((type) => type.rank < DEEPEST_RANK);
+  if (legal.length === 0) return null;
+  return legal.reduce((best, type) =>
+    type.rank > best.rank || (type.rank === best.rank && type.id < best.id) ? type : best,
+  );
+}
 
 export type NewTicketDraft = {
   title: string;
@@ -23,7 +65,7 @@ export type NewTicketDraft = {
 
 export type NewTicketDialogProps = {
   open: boolean;
-  typeOptions: Array<{ id: string; name: string }>;
+  typeOptions: readonly TypeOption[];
   /**
    * `inFocus` (backlog/closed spec §5.4, 2026-09-17): whether THIS candidate,
    * if chosen as parent, would show the "Start in focus" checkbox below — a
@@ -65,7 +107,14 @@ export type NewTicketDialogProps = {
    * find the control that caused it.
    */
   parentCandidatesNarrowing?: string;
-  onCreate: (draft: NewTicketDraft) => void;
+  /**
+   * The claim, handed up. May be ASYNCHRONOUS, and the dialog waits on it: that
+   * returning promise is the only thing that can tell the Create control when
+   * the attempt has settled, and without that this dialog cannot state the
+   * in-flight state it must not double-file through (see the guard below).
+   * A caller that returns nothing is still fine — `Promise.resolve` covers it.
+   */
+  onCreate: (draft: NewTicketDraft) => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -94,7 +143,75 @@ export function NewTicketDialog({
   onClose,
 }: NewTicketDialogProps) {
   const [title, setTitle] = useState('');
-  const [typeId, setTypeId] = useState(typeOptions[0]?.id ?? '');
+  /**
+   * NOT `typeOptions[0]`, which is what this was until 2026-09-21 (E5-16).
+   * The ladder arrives RANK-ASCENDING, so `[0]` was the top of the hierarchy —
+   * `epic`, rank 1 — and a person who typed a title and pressed Create filed an
+   * Epic. In the dev project's own distribution (Epic 3 · Errand 24 ·
+   * Story/Task/Sub-task 0) that was the least likely choice eight times in
+   * nine, and on the web the mistake is ONE-WAY: the sheet's `Type` row is
+   * read-only, so an accidental Epic has to be deleted and re-filed. An Epic is
+   * structurally different besides — it heads a hierarchy and appears in the
+   * Backlog as a group band rather than as a ticket.
+   *
+   * The empty string is now reachable only when the caller hands over a ladder
+   * with NO root-legal type at all; see `defaultRootTypeFor`.
+   */
+  const [typeId, setTypeId] = useState(defaultRootTypeFor(typeOptions)?.id ?? '');
+  /**
+   * ⚠ THE SEED RUNS ONCE, AND THE LADDER'S IDENTITY LEGITIMATELY CHANGES UNDER
+   * IT (E2-33a, 2026-09-21).
+   *
+   * The caller mounts this dialog under `BUILTIN_TYPE_LADDER` while the type read
+   * is in flight and hands the workspace's own list over afterwards
+   * (`page.tsx`'s `typeOptions`) — and a `useState` initialiser runs once, so
+   * nothing re-read the new list. With the old id still in state the control
+   * keeps PAINTING it (react-aria's combo keeps its input text) while the
+   * offered options no longer contain it, and Create submitted an id off the
+   * list.
+   *
+   * The re-seed below is deliberately narrow: it fires ONLY when the standing id
+   * has LEFT the list, and it re-asks the same question the initial seed asked
+   * (`defaultRootTypeFor`). It never overwrites a choice the person can still
+   * make — re-seeding on every list change would silently replace a type someone
+   * had picked, which is the opposite defect (E5-16's own).
+   */
+  useEffect(() => {
+    if (typeId === '') return;
+    if (typeOptions.some((option) => option.id === typeId)) return;
+    setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
+  }, [typeOptions, typeId]);
+  /**
+   * ⚠ A CLOSED DIALOG HOLDS NOTHING (E2-37, 2026-09-21).
+   *
+   * The flow mounts this component for its whole life and toggles `open`, so a
+   * Cancel and a successful create both only flipped the prop — none of the four
+   * `useState` values was ever reset, and reopening offered the LAST ticket's
+   * title with `Create` already enabled and a type already chosen. One press
+   * files a duplicate of a ticket the person has already filed.
+   *
+   * The rule is "empty on OPEN" rather than "clear on close", and the difference
+   * is the flow's reopen offer (E2-34): the offer REPLACES this dialog with
+   * `open={false}` and hands it back when it closes, so a clear-on-close would
+   * discard a draft the person was mid-way through for a detour that never
+   * touched it — while an empty-on-open leaves that draft alone, because `open`
+   * never went true in between.
+   *
+   * ⚠ The cost, stated rather than left to be discovered: a Cancel followed by a
+   * reopen abandons the typed title. That is the point of the rule — the draft
+   * that survives a close is the stale draft, and its visibility in a text input
+   * is the only reason the previous behaviour was merely Minor. `typeOptions` is
+   * deliberately NOT a dependency: the ladder's own identity change is E2-33a's
+   * re-seed above, which keeps a type the list still offers.
+   */
+  useEffect(() => {
+    if (!open) return;
+    setTitle('');
+    setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
+    setParentId('');
+    setStartInFocus(true);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [open]);
   const [parentId, setParentId] = useState('');
   // Checked by default (spec §5.4), PER CHOSEN PARENT — Ruling 40 (coordinator,
   // fix round 1, 2026-09-17): the Parent picker's own `onChange` below resets
@@ -122,6 +239,66 @@ export function NewTicketDialog({
   // backlog/closed one, which is exactly `chosenParent?.inFocus === true`.
   const startCheckboxVisible = chosenParent?.inFocus === true;
 
+  /**
+   * TWO flags, on purpose, because they answer different questions at different
+   * instants — the split `TicketEditorSlot` adopted after measuring this exact
+   * failure, and the reason its docblock is worth reading before touching this.
+   *
+   * `submitting` is render state and drives `disabled`. It is USELESS as a
+   * re-entrancy guard: the attribute is not re-read from the DOM between two
+   * clicks in one React batch, so both handlers run and both see the pre-commit
+   * `false`. (`disabled` carried only the title/type gates before this, so a
+   * second press was not even a race — the Create control had no guard of any
+   * kind.) `submittingRef` is set SYNCHRONOUSLY inside the handler, before the
+   * first await, which is the only place a second click in the same tick can be
+   * seen.
+   *
+   * THE COST IS NOT COSMETIC. `onCreate` reaches `create-ticket-flow.tsx`, which
+   * mints `entity: { kind: 'ticket', id: newUlid() }` PER CALL: two presses are
+   * two distinct `ticket.created` events with two distinct ids — two tickets, in
+   * an append-only ledger that cannot take either back.
+   */
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const create = (): void => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    // The guard LIFTS on settle either way: a refusal leaves the dialog open
+    // with nothing in flight, and the person must be able to press again. The
+    // rejection is NOT swallowed — `.finally` passes it through exactly as the
+    // previous fire-and-forget call did, so a transport failure still surfaces
+    // where it surfaced before rather than becoming a silent no-op here.
+    void Promise.resolve(
+      onCreate({
+        title,
+        typeId,
+        // `parentCandidatesUnavailable` is checked HERE and not only where the
+        // picker is drawn, because hiding a control does not clear the state
+        // behind it. `parentId` survives from any earlier selection, and this
+        // prop can arrive AFTER one: the list answers, the user picks a parent,
+        // a later read fails, and the picker is replaced by a sentence saying
+        // the ticket will be created at project root. Emitting `parentId` then
+        // would submit the ticket under a parent the dialog had just told the
+        // user it would not have — the screen saying one thing and the payload
+        // doing another, which is the exact defect this component's docblock
+        // exists to refuse. Witnessed at 3.157, with a control proving the
+        // parent still travels when the picker IS shown.
+        parentId: noUsableParent ? null : parentId,
+        // Spec §5.4: 'backlog' unless the checkbox above is BOTH visible
+        // and checked. `startCheckboxVisible` already carries "a usable,
+        // in-focus parent is chosen" — re-testing `noUsableParent` here
+        // would be a second, driftable spelling of the same fact this
+        // component already computed once above.
+        start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
+      }),
+    ).finally(() => {
+      submittingRef.current = false;
+      setSubmitting(false);
+    });
+  };
+
   return (
     <Dialog open={open} title="New ticket" onClose={onClose}>
       <label className="gn-new-ticket__field">
@@ -143,6 +320,11 @@ export function NewTicketDialog({
           value={typeId === '' ? null : typeId}
           onChange={setTypeId}
           searchable
+          // The empty start has to SAY it is empty. The shared Select's own
+          // default is the bare `Select…`; this names the thing being chosen,
+          // the way the Move dialog's destination names its own (`Choose a
+          // state`), so a disabled Create beside it has a readable reason.
+          placeholder="Choose a type"
           aria-label="Type"
         />
       </label>
@@ -277,31 +459,24 @@ export function NewTicketDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="primary"
-          disabled={title.trim() === '' || typeId === ''}
-          onClick={() =>
-            onCreate({
-              title,
-              typeId,
-              // `parentCandidatesUnavailable` is checked HERE and not only where the
-              // picker is drawn, because hiding a control does not clear the state
-              // behind it. `parentId` survives from any earlier selection, and this
-              // prop can arrive AFTER one: the list answers, the user picks a parent,
-              // a later read fails, and the picker is replaced by a sentence saying
-              // the ticket will be created at project root. Emitting `parentId` then
-              // would submit the ticket under a parent the dialog had just told the
-              // user it would not have — the screen saying one thing and the payload
-              // doing another, which is the exact defect this component's docblock
-              // exists to refuse. Witnessed at 3.157, with a control proving the
-              // parent still travels when the picker IS shown.
-              parentId: noUsableParent ? null : parentId,
-              // Spec §5.4: 'backlog' unless the checkbox above is BOTH visible
-              // and checked. `startCheckboxVisible` already carries "a usable,
-              // in-focus parent is chosen" — re-testing `noUsableParent` here
-              // would be a second, driftable spelling of the same fact this
-              // component already computed once above.
-              start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
-            })
+          // `submitting` is the third term and it is the RENDER half of the guard
+          // above: the ref is what actually stops a duplicate, and this is what
+          // tells the person a request is already on the wire. A control that
+          // looks pressable while it is not is the same lie in the other
+          // direction.
+          //
+          // The last term is MEMBERSHIP, not emptiness (E2-33a): `typeId === ''`
+          // is a string test, and it passes for an id the list no longer offers.
+          // The effect above re-seeds that case already, so this term is the
+          // belt to its braces — a payload may only ever carry a type the picker
+          // is offering, whatever a future seed does.
+          disabled={
+            title.trim() === '' ||
+            typeId === '' ||
+            !typeOptions.some((option) => option.id === typeId) ||
+            submitting
           }
+          onClick={create}
         >
           Create
         </Button>

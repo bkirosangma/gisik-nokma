@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { VISIBILITY_MODES, type VisibilityMode } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
@@ -217,6 +217,20 @@ type Submission = { kind: 'idle' } | { kind: 'sending' } | { kind: 'refused'; ru
  * entity on purpose and `parse-event.ts` refuses the two disagreeing, so both
  * are set from the one `ticketId` prop.
  */
+/**
+ * The server's own claim, reduced to the content a re-seed turns on: the mode
+ * the ticket asserts for itself and the roster it names. Sorted, because the
+ * wire's order is not a fact about the audience — two reads naming the same
+ * people in a different order are the same claim.
+ *
+ * `null` (`no read served one`) is its own key rather than an empty claim: a
+ * read that has not answered yet must not be read as "the claim moved".
+ */
+export function visibilityClaimKey(current: VisibilityClaim | null): string {
+  if (current === null) return 'none';
+  return JSON.stringify([current.ownMode, [...(current.userIds ?? [])].sort()]);
+}
+
 export function VisibilityEditor({
   dataSource,
   workspaceId,
@@ -241,6 +255,34 @@ export function VisibilityEditor({
   // reader sees the dependency instead of discovering it.
   const [mode, setMode] = useState<VisibilityMode>(current?.ownMode ?? 'inherit');
   const [userIds, setUserIds] = useState<string[]>(current?.userIds ?? []);
+  /**
+   * ⚠ A RELOAD IS NOT A REMOUNT, SO THE SEED ABOVE DOES NOT RE-RUN FOR IT
+   * (E2-33c, 2026-09-21).
+   *
+   * The docblock above names the ONE behaviour that re-seeds today: `useLiveQuery`
+   * answers `null` on a QUERYKEY change, and the "Loading…" branch remounts this
+   * subtree — so a ticket SWITCH is correct. A RELOAD keeps the key, so `data`
+   * (and `current`) updates IN PLACE with this component still mounted
+   * (`use-live-query.ts`, measured by the lane that filed this) — and the
+   * standing sentence above renders from `current` while the fieldset below
+   * renders from the seeded state. Two modes on one screen, with Apply sending
+   * the stale one.
+   *
+   * Re-seeded on the SERVER CLAIM, not on the object: `current` is a fresh
+   * object on every read, so keying the effect on identity would wipe a
+   * half-authored fieldset whenever a stream event merely RE-DELIVERED the same
+   * claim. The key is the claim's own content — its mode and its roster — so the
+   * fieldset is reset exactly when the standing claim has actually moved, which
+   * is the moment it would otherwise contradict the sentence above it.
+   */
+  const seededFrom = useRef(visibilityClaimKey(current));
+  useEffect(() => {
+    const next = visibilityClaimKey(current);
+    if (seededFrom.current === next) return;
+    seededFrom.current = next;
+    setMode(current?.ownMode ?? 'inherit');
+    setUserIds(current?.userIds ?? []);
+  }, [current]);
   const [submission, setSubmission] = useState<Submission>({ kind: 'idle' });
 
   const nameOf = (userId: string): string =>

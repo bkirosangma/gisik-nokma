@@ -139,8 +139,24 @@ export type TransitionDialogProps = {
    * needing a `ticketId`: **a contract that cannot carry a fact its caller
    * holds.** Advisory still — it decides nothing — but it must be able to see
    * what the submission will actually carry.
+   *
+   * ⚠ **THE SAME OMISSION, ONE RULE KIND OVER — E2-40.** `fieldValues` was
+   * missing here too, and the consequence is the same sentence: the dialog
+   * renders an input for every field a `require-field` rule names, its OWN gate
+   * clears the moment the person types (`missingFields`), and the submission
+   * sends those claims first in the ordered batch — while the preview, asked
+   * with two arguments, kept answering *"the field is not set"*. `require-field`
+   * differs from `require-evidence` in WHERE its value is read
+   * (`rule-engine/src/rules/require-field.ts:9` reads the ticket state, not the
+   * payload), so the value travels as a state overlay rather than a payload key;
+   * see `precheckEvent`'s `pendingFields` for that reasoning.
    */
-  precheck: (toStateId: string, evidenceAttachmentId?: string | null) => Promise<PrecheckResult>;
+  precheck: (
+    toStateId: string,
+    evidenceAttachmentId?: string | null,
+    fieldValues?: Record<string, string>,
+    comment?: string,
+  ) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
   /**
@@ -282,7 +298,7 @@ export function TransitionDialog({
     setPreview(null);
     if (toStateId === '') return;
     let cancelled = false;
-    void precheckRef.current(toStateId, evidenceAttachmentId).then((result) => {
+    void precheckRef.current(toStateId, evidenceAttachmentId, fieldValues, comment).then((result) => {
       if (!cancelled) setPreview(result);
     });
     return () => {
@@ -291,7 +307,20 @@ export function TransitionDialog({
     // `evidenceAttachmentId` is a dependency because it CHANGES THE ANSWER:
     // `require-evidence` is evaluated against the candidate, and attaching a
     // file between two runs of the same destination must re-ask.
-  }, [toStateId, evidenceAttachmentId]);
+    //
+    // `fieldValues` is here for the same reason one rule kind over:
+    // `require-field` is read from the ticket STATE the engine is handed, and
+    // this dialog's inputs are where that value lives before the submission
+    // carries it — so typing into a field the dialog itself asked for has to
+    // re-ask, or the refusal the person just answered stays on screen beside an
+    // enabled Move for ever.
+    //
+    // `comment` joins them for the third rule kind, and for the reason the
+    // evidence fix already recorded: the box appears because `require-comment`
+    // is on this edge, typing clears `blocked`, and the preview beside it was
+    // still answering "none was provided" because the candidate had never been
+    // told what the box holds.
+  }, [toStateId, evidenceAttachmentId, fieldValues, comment]);
 
   /**
    * ⚠ **EVIDENCE IS PER-MOVE, AND THE CLAIM IS NOW REACHABLE FOR THE FIRST TIME.**
