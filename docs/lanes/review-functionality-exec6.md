@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:41 IST — findings E6-1 … E6-24 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:43 IST — findings E6-1 … E6-25 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -23,7 +23,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Twenty-four findings — fifteen Important, nine Minor — every one measured through a door the
+**No Critical claimed. Twenty-five findings — fifteen Important, ten Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
@@ -42,7 +42,8 @@ The second shape is **a record that describes a world the product has left**: th
 (E6-1); three ❌ cases declaring guest admissions that closed weeks ago (E6-12); a "named, not decided" residual
 whose own commit decided it (E6-11); a stale "no ticket key" premise beside a crumb that reads the key (E6-14);
 and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an
-unassigned open question since before its trigger shipped (E6-13). Two instrument gaps, a due date that only has to look like one, and a blank-name rule applied to half its subjects, and a backup time that rolls over instead of refusing close the list (E6-6, E6-7, E6-19, E6-20, E6-23).
+unassigned open question since before its trigger shipped (E6-13). Two instrument gaps, a due date that only has to look like one, and a blank-name rule applied to half its subjects, a backup time that rolls over instead of refusing, and a deploy-spec comment declaring a closed rate-limit bypass
+open close the list (E6-6, E6-7, E6-19, E6-20, E6-23, E6-25).
 
 The round-1 lane's coverage boundary was the map: every Important finding is in a package or on a path it said
 it did not reach, and none re-files anything it found. Two read sweeps — every read door as a non-member and as
@@ -172,7 +173,8 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 `tools/sweep-user-preferences.ts` (whole), `gates/evidence-gate.ts` (whole: the evidence id IS verified server-side
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
 every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts`, `workspaces/workspace-name.ts`, `read/{workspace-counts,live-ticket,ticket-numbers,state-provenance,membership-roster}.ts`, `alerts/error-alerter.ts`,
-`workspaces/bootstrap-workspace.ts` (whole:
+`workspaces/bootstrap-workspace.ts`, `http/{security-headers,hsts}.ts`, `http/rate-limit.ts:74-135` (+ E6-25's
+calls), `deploy/do/app.yaml:95-106` (whole:
 resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
 the resolver's identity is not checked, which 12.204 records as *"attributed to whoever discarded"* — not filed),
 `read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
@@ -266,7 +268,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections
   `{rollups,proj-projects,ticket-comments,entity-heads,workspace-settings,rebuild,registry,
   index}.ts` (of the 16 files in `projections/`, five read whole — `contested`, `proj-visibility`, `proj-invites`, `search`, `workflows` —
-  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{workflow-defs,assigned-provenance,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{workflow-defs,assigned-provenance,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/rate-limit.ts` outside `:74-135`; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
   noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
@@ -327,6 +329,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 | E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
 | E6-24 | Important | Phone board / desktop list / phone search keep a soft-deleted ticket; the replica filter sits on the two reads the shells never call | App. AF |
+| E6-25 | Minor | `deploy/do/app.yaml` says the forged-XFF rate-limit bypass is "open on main"; it closed the same day the sentence was written | five calls in the finding |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1622,6 +1625,50 @@ floor; the defect and its one-line fix stand either way.
 
 ---
 
+### E6-25 — MINOR — The deploy spec tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"); T2 landed the same day, and the file was edited twice since without the sentence moving
+
+**WHAT.** `deploy/do/app.yaml:95-101`, the comment above `TRUST_PROXY: "true"`, verbatim: *"…lets a caller pick
+its own rate-limit bucket via a forged leftmost X-Forwarded-For entry — Plan 11 T2 (not yet on main) fixes
+this by keying the limiter on the RIGHTMOST XFF entry … Until T2 lands, TRUST_PROXY=true is still required
+here … but the forged-header gap above is open on whatever is on main."* Measured against the built server:
+
+```
+grep -c "entries[entries.length - 1]" apps/server/dist/http/rate-limit.js   -> 1   (the dist carries the rightmost key)
+rateLimitKeyFor('6.6.6.6, 2.2.2.2', '9.9.9.9', true)                          -> 2.2.2.2
+rateLimitKeyFor('7.7.7.7, 2.2.2.2', '9.9.9.9', true)                          -> 2.2.2.2   (a forged leftmost entry changes nothing)
+rateLimitKeyFor('6.6.6.6, 2.2.2.2', '9.9.9.9', false)                         -> 9.9.9.9   (control: without TRUST_PROXY the socket wins)
+rateLimitKeyFor(undefined, '9.9.9.9', true)                                   -> 9.9.9.9
+```
+
+**WHY it is wrong.** The sentence was written at 07:50 IST on 2026-09-06 (`git blame -L 95,103`, all nine lines
+`56cd0913`, #146); the rightmost keying it says is "not yet on main" merged at 14:02 IST the same day (`935f5d66`,
+#190, "Plan 11 seam 1"), is pinned by case **13.121 ✅** (*"a caller-prepended `X-Forwarded-For` entry does NOT
+buy a fresh rate-limit bucket … reddens under leftmost-keying"*), and `rate-limit.ts:74-99` records the
+measurement that motivated it. `app.yaml` was then edited twice more — `f4a8ccac` (#205, 2026-09-06) and
+`5b4f8fc9` (#369, 2026-09-08) — and the paragraph survived both. So the one file an operator reads before
+deploying declares a rate-limit bypass **open on main** that closed fifteen days ago. This is the class E6-12
+and exec 3's E3-22 … E3-27 record for `test-cases/` and `Features.md`, on the deploy spec, and for a
+security property rather than a feature count.
+
+**WHAT WOULD HAVE BEEN BETTER.** The paragraph should say what `TRUST_PROXY=true` now means — the limiter
+keys on the rightmost entry, which the caller cannot write (`rate-limit.ts:89-99`) — and drop "not yet on
+main" and "open on whatever is on main"; the change set that landed #190 owned that edit under the workspace
+rule that a record moves with the code. A `check-runbook`-style sweep for "not yet on main" / "not yet landed"
+across `deploy/`, `Features.md` and `test-cases/` (E3-27 found the same phrase in two more files) would have
+caught all three.
+
+**MEASUREMENT.** The five `node -e` calls above against `apps/server/dist/http/rate-limit.js` (dist checked
+with the code-only needle first); `sed -n 95,106p deploy/do/app.yaml`; `git blame -L 95,103 deploy/do/app.yaml`;
+`git log --format='%h %ad %s' -- deploy/do/app.yaml` (three commits); `git log -1 935f5d66`; lines opened:
+`rate-limit.ts:74-99`, `:112-123`; `test-cases/13-plan11-seams-and-scheduler.md:72-75` (13.121), `:90` (13.126 ❌,
+the unit-test gap, which is a different sentence and still true). Not previously filed: `grep -rn "not yet on
+main\|forged-header gap"` over the five lanes' review reports at their latest pushes → 0.
+
+**SEVERITY: Minor.** A stale comment in a deploy spec; nothing misbehaves. Filed rather than folded into E6-12
+because it is a security claim in the operator's own file, in the direction that invites a second fix.
+
+---
+
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
 
 Each of these was a hypothesis I opened a file or ran a command to break. They are recorded so the judge can see
@@ -1829,8 +1876,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **15** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18, E6-21, E6-24 |
-| Minor | **9** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20, E6-22, E6-23 |
-| **total** | **24** | E6-1 … E6-24, no gaps in the numbering |
+| Minor | **10** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20, E6-22, E6-23, E6-25 |
+| **total** | **25** | E6-1 … E6-25, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in an appendix (A–N, R–V, Y, AF) or on a printed line; the Minors
