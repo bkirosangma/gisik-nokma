@@ -44,6 +44,14 @@ the one set he is best placed to see:
 4. **A flaw in my own search pattern** nearly made me withdraw two valid findings, and was inside `E2-25`'s
    search too — so that measurement was re-run and survives.
 
+**A final automated audit of both artifacts, run after every correction above** — because re-measuring is
+what caught all five of my errors today, and none of them was caught by reading. Counts measured against the
+sections rather than remembered: **26 new findings, 16 Important / 10 Minor, 22 refutation rows, and every
+number stated in prose equal to the number measured.** Both files cited paths resolve (77 in the report, 17
+in the refutations file, 0 missing) and every line number is inside its file. No stale phase or clock claim
+remains. **All four sections clean**, which is the first time an audit of my own work has come back entirely
+OK this round — and it is OK because the five earlier failures were fixed, not because the earlier audits
+were too lenient.
 **The one boundary I could not close, stated as a fact rather than an excuse.** This lane has a browser but
 **no session**, and the dev stack's sign-in needs a credential I was not issued. Roughly thirty of the fifty
 peer findings rest on `[BROWSER]` evidence I can read but not reproduce, and obtaining a session would mean
