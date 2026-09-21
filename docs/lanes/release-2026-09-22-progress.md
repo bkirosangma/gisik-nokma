@@ -11,3 +11,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F1-ux | done | e33b7b8a | prose-only: manual nav/theme/card/comments/attachments/settings + faq; 11 sites |
 | T-E2-55 | done | 0f8fd1a9 | app-core ticket-sheet 110 tests green; notice moved above the list |
 | T-E5-38 | done | 7e1a791d | web legal 17 tests green; draft notice on both pages |
+| T-F5-ux | done | 28875a98 | founding lands on /w/<id>; founding.test 10 tests green |
