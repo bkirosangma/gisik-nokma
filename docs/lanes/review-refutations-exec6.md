@@ -41,6 +41,11 @@ in full for E3-14, E3-15, E3-18, E3-19, E3-20, E3-21; exec 5's E5-13 read in ful
   not close same-site siblings, and `deploy/do/app.yaml:5` deploying two siblings of one registrable domain.
 - **E6-16** — "the width is the product's decision." Agreed and said in the finding; the contradiction is the
   consent page's *"lasts until you revoke it"* against a measured successor that survives revocation.
+- **E6-24** — "16.90(c) already records the replica reads; category 2." Answer: 16.90(c) (`16-remaining-doors.md:923`)
+  asserts the replica *applies the same rule* at two lines and records that those two are unwitnessed; E6-24
+  measures three sibling reads — the ones `apps/mobile` and `apps/desktop` actually call — with no rule at all
+  (Appendix AF, five reads before/after, positive control). A case that says the rule is applied is not a record
+  that it is missing, and the commit that wrote the two gates says "a filter at every view-serving read".
 
 ## Refutations
 
