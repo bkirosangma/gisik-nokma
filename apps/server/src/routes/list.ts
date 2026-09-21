@@ -399,16 +399,24 @@ async function epicAncestors(
   // second time for no reason; the `$n` placeholders it returns address the same
   // parameters wherever they appear.
   const visible = visibleTicketsWhere(eff, viewerId, params);
-  // NO soft-delete predicate on either arm of the walk below, and this is the
-  // dispatch's own recorded open question rather than an oversight
-  // (`docs/lanes/executor-state.md`, "NAMED, NOT COVERED" item 7: *"Nothing here
-  // decides whether deleting a parent should cascade, refuse, or orphan.
-  // Named, not decided."*). Filtering the walk means a deleted epic's children
-  // silently lose their epic chip — a visible regression in the common case,
-  // against a title the reader could see before the delete. The scope decides
-  // it when the cascade question is ruled; the residual is named here instead
-  // of being papered over: a deleted epic's TITLE still travels on its live
-  // children's cards.
+  // THE SOFT-DELETE PREDICATE IS ON THE RECURSIVE MEMBER, and a deleted
+  // ancestor ends the walk exactly as an invisible one does: the children fall
+  // to `no-epic`, and the title never leaves the query (round-2 E6-11). This
+  // paragraph used to call that an open question — the cascade ruling, "named,
+  // not decided" — and it was decided in the same commit at the neighbouring
+  // door: `routes/tickets.ts` answers `restricted` for a deleted PARENT because
+  // *"the parent's TITLE is the deleted ticket's content, and the FAQ's 'stops
+  // appearing in views' is exactly a statement about content"*, and search
+  // withholds it too. The list was the one door of four still serving it — and
+  // in the group HEADER (`titleOfEpic`, the `case 'epic'` label), not on the
+  // card, which carries only `epicId` (`read/list-cards.ts`). The seed term
+  // needs no copy of it: its rows are the page's own cards, which `readList`
+  // already ANDs `LIVE_TICKET_WHERE` into.
+  //
+  // WHAT REMAINS OPEN, and it is the same question the docblock above already
+  // files: whether a deleted (or invisible) ancestor should be a DISTINCT
+  // `restricted-epic` bucket rather than `no-epic` is a response-shape decision
+  // Plan 5's contract pins — owner to rule. Nothing here pre-empts it.
   const depthParam = params.add(MAX_ANCESTRY_DEPTH);
   const rankParam = params.add(EPIC_RANK);
 
@@ -428,6 +436,7 @@ async function epicAncestors(
         WHERE t.workspace_id = ${workspaceParam}
           AND a.depth < ${depthParam}
           AND ${visible}
+          AND ${LIVE_TICKET_WHERE}
      )
      SELECT DISTINCT ON (start_id)
             start_id, ticket_id AS epic_id, fields -> 'title' ->> 'value' AS title

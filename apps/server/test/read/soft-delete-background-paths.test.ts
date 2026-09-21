@@ -52,8 +52,13 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  *      constant's own definition and the docblock that quotes it → **4 written
  *      LONGHAND**, in three functions on two different aliases.
  *
- * **13 + 4 = 17 SQL statements carry the rule.** One further application is
- * written in TypeScript and is published below rather than counted here.
+ * **13 + 4 = 17 SQL statements carry the rule** — as swept on 2026-09-20. Two
+ * have been added since and neither is in that arithmetic: `read/live-ticket.ts`
+ * (the attachments lane, 2026-09-20; recorded in `test-cases/16-remaining-doors.md`)
+ * and row 18 below (release batch B07, 2026-09-21). Re-run the two sweeps in
+ * the tree you are standing in rather than trusting either number. One further
+ * application is written in TypeScript and is published below rather than
+ * counted here.
  *
  * ⚠ **"Eleven" appears in the dispatch AND in a withdrawn sentence in
  * `visible-where.ts`'s own docblock. Neither is reproducible; these two sweeps
@@ -78,6 +83,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * | 15 | `routes/builder-reads.ts:504` | `readTicketCounts` (**longhand, on alias `k`**) | **THIS FILE** — case below |
  * | 16 | `projections/rollups.ts:221` | `recomputeParent` (**longhand**) | **Arm 1** — `proj_rollups.total_children` for a parent that KEEPS a row |
  * | 17 | `projections/rollups.ts:320` | the stale-row DELETE (**longhand**) | **Arm 1** — the same case |
+ * | 18 | `routes/list.ts`, `epicAncestors`' recursive member (`AND ${LIVE_TICKET_WHERE}` after the visibility hop) | the epic-group walk (round-2 E6-11) | `test/routes/list.test.ts` — "E6-11: a deleted epic ends the walk like an invisible one" (case 17.126) |
  *
  * ⚠ **Rows 6 and 7 were labelled the wrong way round** when this table was first
  * written — `:141` read "shared" and `:252` read "rest". Corrected at the line,

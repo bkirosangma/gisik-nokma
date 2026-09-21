@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.125`** |
+| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.126`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -225,3 +225,23 @@ in §12 because that section owns the replica.*
   content, witnessed, owner line discharged; 16.90's marker flips 🟡 → ✅ with this case, its third part. —
   (`packages/app-core/test/replica/replica-deleted-reads.test.ts`, "F5: getTickets drops a soft-deleted
   ticket…", "F5: getBoard drops it…")
+- **17.126** ✅ **The list's epic grouping no longer serves a soft-deleted epic's title as a group header:
+  a deleted ancestor ends the walk exactly as an invisible one does, and its children fall to `no-epic`**
+  (E6-11). `epicAncestors`' recursive member now carries `AND ${LIVE_TICKET_WHERE}` after the visibility
+  hop — the seed term needs no copy, its rows are the page's own cards, already live-filtered — so the
+  title never leaves the query. The list was the one door of four still serving the content: the detail
+  door answers `restricted` for a deleted parent, the crumb withholds the title, search withholds it; and
+  it served it in the group HEADER (`titleOfEpic`), not on the card, which carries only `epicId` — the
+  residual note had that wrong too. The paragraph that called this "named, not decided" is retired: the
+  cascade question (what happens to EXISTING children when a parent is deleted) stays open, but the title
+  question was decided in the same commit at the neighbouring door. Through the real door with a LIVE
+  epic and its child in the same project as the control: before the delete both epics head their groups
+  by title; after, the live one is unchanged, the deleted one is no key and no label, the body carries the
+  child but not the title, `no-epic` holds exactly the child, and the child's card keeps `parentId` (the
+  boundary 7.80 pins) with `epicId: null`. RED: `Tests 1 failed | 36 passed (37)` at the body containing
+  the title; GREEN: `37 passed (37)`. ⚠ **NOT decided here, and the same open question the walk's own
+  docblock already files with the owner: whether a deleted (or invisible) ancestor should be a DISTINCT
+  `restricted-epic` bucket rather than `no-epic` — the finding's remedy asks for it; it is a response
+  shape Plan 5's contract pins.** —
+  (`apps/server/test/routes/list.test.ts`, "E6-11: a deleted epic ends the walk like an invisible one —
+  its children fall to `no-epic` and its title is nowhere in the body")
