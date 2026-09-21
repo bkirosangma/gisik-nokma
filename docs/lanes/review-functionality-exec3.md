@@ -4098,10 +4098,11 @@ and treating it as the claim, which is the substitution that produced most of th
 
 # PHASE 2 — 2026-09-21, lane relaunched on Opus 5 at 15:05:23 IST
 
-**Everything above this line is the frozen phase-1 submission (`f8b5e929`, 14:57:35 IST).** Below: two findings
-filed in phase 2 at **half points** (rules §2), the correction that produced them, and the defences the brief
-permits. No finding above is edited; the only insertions above this line are dated *DEFENCE* paragraphs under
-`E3-14` (§14.7.1).
+**Everything above this line is the frozen phase-1 submission (`f8b5e929`, 14:57:35 IST).** Below: five findings
+filed in phase 2 at **half points** (rules §2) — `E3-30`–`E3-34`, counted in §71 — the corrections that produced
+two of them (§64), a source-comment sweep (§70) and the defences the brief permits (§67). No finding above is
+edited; the only insertions above this line are dated *DEFENCE* paragraphs under `E3-14` (§14.7.1) and `E3-15`
+(§14.7.2).
 
 ## 64. Correction 8 — §30.1's "fully enumerated" table classifies **18** of its twenty lines, and says **6** where it lists **7**
 
