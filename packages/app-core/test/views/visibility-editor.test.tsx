@@ -784,6 +784,8 @@ describe('E2-33c a reload that changes the standing claim re-seeds the fieldset'
       />,
     );
     expect(screen.getByRole('checkbox', { name: 'Dipu' })).toBeChecked();
+  });
+});
 
 describe('17.064 a rejected visibility write (V3)', () => {
   /**

@@ -3690,6 +3690,8 @@ describe('E5-20 Escape in the Move dialog does not close the sheet under it', ()
     // …and the sheet underneath did NOT also take it. `onClose`, not the
     // absence of the sheet, is the measurement: see this block's docblock.
     expect(onClose).not.toHaveBeenCalled();
+  });
+});
 
 describe('13.1112 the ticket read ANSWERS null (E4-23)', () => {
   /**
