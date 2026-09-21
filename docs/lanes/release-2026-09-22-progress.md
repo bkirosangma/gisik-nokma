@@ -17,3 +17,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E6-23 | done | 58197f25ba7a1b9e7145ddebee43cda2c76ee81e | schedule.test.ts 13.1200 (planted defect, RED→GREEN) + 13.1201 control |
 | T-E6-5 | done | 226645af1bf35e6180851131d27e4f7673404d3e | outbox.test.ts E6-5/12.960 (RED overtake → GREEN due-prefix) + 12.961 control; server half (contest on unknown ticket) needs-owner — see case 12.960 |
 | T-E6-17 | done | 1a5967d042ab35baf8cded278f46ab226199340e | check-visibility-permission.test.ts 6.151 (planted defect, RED→GREEN) + 6.152 controls; server package, not domain (brief header discrepancy noted in commit) |
+| T-E6-19 | done | 3fdb357810fa0a98567df6f146084fb8256ca56f | ist-day.test.ts 3.961 + ticket-types.test.ts 5.77 + rule-engine fields.test.ts 5.78 (RED→GREEN); filter bounds left shape-only, reason in commit |
