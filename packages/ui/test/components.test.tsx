@@ -14,6 +14,7 @@ import { Chip } from '../src/components/chip.js';
 import { Dialog } from '../src/components/dialog.js';
 import { InfoTip } from '../src/components/info-tip.js';
 import { SegmentedControl } from '../src/components/segmented-control.js';
+import { Select, type SelectOption } from '../src/select/select.js';
 import { Sheet } from '../src/components/sheet.js';
 import { Switch } from '../src/components/switch.js';
 import { Table, type TableColumn } from '../src/components/table.js';
@@ -693,6 +694,86 @@ describe('Select panel/option styling', () => {
 
   it('the option row background is the shared surface token, not a bespoke color', () => {
     expect(rule('.gn-select__panel')).toMatch(/background:\s*var\(--gn-surface(-raised)?\)/);
+  });
+});
+
+/**
+ * E4-21 — independently the same defect as P23 (rules §3: the two found it
+ * separately and both score in full), so the two cases are written against the
+ * same corrected behaviour from different angles rather than duplicated: this
+ * one owns the STYLESHEET half — that a ring exists at all, and that it carries
+ * `.gn-field__input`'s own offset so the searchable and non-searchable branches
+ * look identical — and P23's owns the keyboard half in `select.test.tsx`.
+ *
+ * The defect: `.gn-select__trigger--searchable input:focus { outline: none; }`
+ * (`ui.css:2474`) is the product REMOVING the focus indicator from the one
+ * control whose whole job is to be typed into. WCAG 2.2 §2.4.7 *Focus Visible*
+ * is Level AA, and because the removal is the product's own declaration no
+ * user-agent default can survive it. The searchable trigger is a WRAPPER `<div>`
+ * around that input — the div has no `tabIndex` of its own, so the input is what
+ * receives focus, which is exactly why the replacement has to be keyed on the
+ * wrapper's `:focus-within` rather than on the input.
+ */
+describe('E4-21 — the searchable Select paints a focus ring', () => {
+  const FRUIT: SelectOption[] = [
+    { value: 'apple', label: 'Apple' },
+    { value: 'banana', label: 'Banana' },
+  ];
+
+  it('E4-21: the trigger declares a :focus-within ring with .gn-field__input\'s own offset', () => {
+    // `rule()` throws "no rule for …" when the selector is absent, so this is the
+    // assertion that reddens while the removal has no replacement — the state the
+    // finding measured. The offset is asserted, not just the outline: `.gn-field__input`'s
+    // own rule carries `outline-offset: 1px` and the point of putting the ring here
+    // is that the two branches of this control look the same when focused.
+    const body = rule('.gn-select__trigger--searchable:focus-within');
+    expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(
+      /outline:\s*2px solid var\(--gn-focus-ring\)/,
+    );
+    expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(/outline-offset:\s*1px/);
+  });
+
+  it('E4-21: the suppression is still there and still scoped to the input alone', () => {
+    // The replacement must not be bought by deleting the suppression: `:focus` on
+    // the input would paint a ring on a click into a typeable field, and the
+    // wrapper's ring is what should carry focus indication here.
+    expect(rule('.gn-select__trigger--searchable input:focus')).toMatch(/outline:\s*none/);
+  });
+
+  it('E4-21: the class the ring is keyed on is an ancestor of the input that takes focus', () => {
+    // The stylesheet half above proves the rule EXISTS; this proves it can MATCH
+    // something, which a text scan cannot see — a ring keyed on a class nothing
+    // wraps the focused input in is a rule that paints nowhere. `:focus-within`
+    // matches only a descendant relationship, so `contains` is the precondition.
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    input.focus();
+    expect(input).toHaveFocus();
+    const trigger = input.closest('.gn-select__trigger--searchable');
+    expect(
+      trigger,
+      'the focused combobox input is not inside a `.gn-select__trigger--searchable` wrapper, so the :focus-within ring can never match',
+    ).not.toBeNull();
+    expect(trigger?.contains(document.activeElement)).toBe(true);
+  });
+
+  it('E4-21: no later stylesheet re-declares the trigger and forks the ring away', () => {
+    // `apps/web/app/layout.tsx` imports `ui.css` and then `globals.css`, so a rule
+    // appended there WINS at equal specificity — the same gap this file already
+    // closes for `.ticket-type-list__move`, and the reason a scan of `ui.css` alone
+    // is a check that cannot fail. Both files, same invocation.
+    //
+    // The positive control is on the file that MUST match, and it runs first: if the
+    // scan were silently reading an empty string, `globals.css`'s absence would be
+    // indistinguishable from a working check that found nothing.
+    expect(
+      UI_CSS.includes('.gn-select__trigger--searchable'),
+      'the scan cannot see .gn-select__trigger--searchable in ui.css, where it is declared — it is reading nothing',
+    ).toBe(true);
+    expect(
+      GLOBALS_CSS.includes('.gn-select__trigger--searchable'),
+      'globals.css re-declares .gn-select__trigger--searchable, which wins over ui.css by source order',
+    ).toBe(false);
   });
 });
 
