@@ -171,7 +171,7 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 (whole; the whole-ledger-in-memory ceiling is recorded as case 13.34, UTC scheduling is explicit — nothing filed),
 `tools/sweep-user-preferences.ts` (whole), `gates/evidence-gate.ts` (whole: the evidence id IS verified server-side
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
-every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts` (whole:
+every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts`, `workspaces/workspace-name.ts` (whole:
 resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
 the resolver's identity is not checked, which 12.204 records as *"attributed to whoever discarded"* — not filed),
 `read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
@@ -269,7 +269,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   workspace-counts,workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
   membership-roster,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
-  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges; `alerts/`, `workspaces/`.
+  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges; `alerts/`; `workspaces/bootstrap-workspace.ts`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
   opened only at their `ds.query.*` call sites and the lines that render the result (E6-24).**
 - `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
