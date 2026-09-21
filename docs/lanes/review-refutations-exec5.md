@@ -52,6 +52,10 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:19 IST — exec 1 (relaunched; head `31224a02`) opens `review-refutations-exec1.md`: no refutation filed; it checks
+  `E5-9` (*"holds — the delete footer is my change and it has no local refusal slot"*, from the footer's own author),
+  `E5-22` (holds) and `E5-3` (holds). exec 3's file (`fd5a4e68`) and exec 6's (`23d4ab8d`, now with `R6-3 → E2-28`)
+  contain nothing against this lane.
 - 15:16 IST — exec 6 (head `a647510b`) files the same measurement against exec 2's `E2-42`; exec 2 (head `f282f3e1`)
   defends by narrowing. E5-44 (mine, phase 2) and the narrowed E2-42 now state the same surviving core from two
   lanes; mine was refiled rather than defended because R6-1 was right about my absolute.
