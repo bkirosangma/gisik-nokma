@@ -204,7 +204,19 @@ function DocumentView({ document }: { document: HelpDocument }) {
 function Results({ matches, query }: { matches: HelpMatch[]; query: string }) {
   return (
     <div className="gn-help__results">
-      <p className="gn-help__results-count">
+      {/* E4-36 (2026-09-21). `role="status"` — the no-match arm thirty lines
+          below (`gn-help__none`) has carried one all along, so the help search
+          ANNOUNCED "nothing matches" and stayed silent when it found nine
+          things. Measured on `/help` at 1512: after typing `invite`,
+          `document.querySelectorAll('[role=status],[aria-live]')` → none, while
+          the count paragraph rendered `9 answers for “invite”`. A polite live
+          region is the pair this sentence was missing, not a different string:
+          the count is the answer to the question a screen-reader user just
+          asked by typing, and it is the one thing on the screen that changed.
+
+          Not `aria-live` directly: `role="status"` IS `aria-live="polite"` with
+          a name, and it is the idiom the sibling arm already uses. */}
+      <p className="gn-help__results-count" role="status">
         {matches.length} {matches.length === 1 ? 'answer' : 'answers'} for “{query}”
       </p>
       <ul className="gn-help__results-list">

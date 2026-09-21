@@ -2139,3 +2139,37 @@ heading-outline `2 failed | 1 passed (3)` (`/tmp/ds1-E4-24-red.log`), board-narr
 `1 failed | 19 passed (20)` (`/tmp/ds1-E4-24-red-web.log`), with the three views reverted to `HEAD` and
 rebuilt, then restored from sha256-compared backups and rebuilt again. Package suites: app-core 1728,
 web 652.
+
+## The help search announces how many answers it found (lane ds1, 2026-09-21, batch B10) — T-E4-36
+
+> **Case id PENDING ALLOCATION** — B10's section-13 block (`13.1137`–`13.1156`) is fully used and the ask is
+> recorded in `docs/lanes/release-2026-09-22-progress.md`. **No id was minted outside the block**; this
+> entry's marker is the task id, and the allocated id gets filled in when it arrives.
+
+**The finding, round 2 `E4-36`, MINOR.** `packages/app-core/src/help/help-browser.tsx:207` renders
+`<p className="gn-help__results-count">` — **no role** — while the no-match arm `thirty lines below**
+(`:684`, `gn-help__none`) carries `role="status"`. So the help search **announced "nothing matches" and
+stayed silent when it found nine things.** Measured on `/help` at 1512, owner: after typing `invite` into
+the search (`aria-label="Search the manual and FAQ"`, via the input's value setter + an `input` event),
+`document.querySelectorAll('[role=status],[aria-live]')` → **none**, while the count paragraph rendered
+`9 answers for “invite”` and nine `li.gn-help__result`. The mechanic the judge corrected is recorded rather
+than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* mechanism is FALSE
+(`git log -S` puts it at `8079e999`); the core — a status role on one arm and not the other — holds.
+
+### The case
+
+- ✅ **T-E4-36 — a search that finds something puts the count in a live region, the count is NOT a live
+  region before there is anything to announce, and the result link meets the 24-px in-list floor.**
+  `packages/app-core/test/help/help-browser.test.tsx`. **The count is the answer to the question the reader
+  just asked by typing** — it is the one thing on the screen that changed — so a polite live region is what
+  the sentence was missing, not a different string. `role="status"` and not a bare `aria-live`: that role
+  IS `aria-live="polite"` with a name, and it is the idiom the sibling arm already uses. The negative half
+  stops the first assertion being satisfied by a page that renders a status element unconditionally: an
+  empty search box draws no count and therefore no status. The second half of the remedy —
+  `min-height: 1.5rem` on `.gn-help__result-title` — is read out of `ui.css` the way this repo's other
+  cross-package cases do, with `display: inline-flex` asserted alongside it because an inline element's
+  height is its line box. `ui.css` and `help-browser.tsx` were reverted to `HEAD` for the RED run (with a
+  rebuild, so the revert reached the compiled artifact) and restored from sha256-compared backups. Package
+  suites: ui 426, app-core 1731, web 654.
+
+**No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.

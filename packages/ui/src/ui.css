@@ -4384,7 +4384,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    found on a sunken surface, which is why `textAccentLight`/`textAccentDark`
    are derived to clear `warmSunken`/both dark sunken hexes too, not only the
    two backgrounds the declared `CONTRAST_PAIRS` rows name. */
-.gn-help__result-title { color: var(--gn-text-accent); text-decoration: none; font-weight: 600; }
+/* `min-height: 1.5rem` for WCAG 2.5.8's 24px floor (E4-36, 2026-09-21). This
+   is a LINK in a result list, which is the in-list case the same floor covers
+   for `.gn-attention__title` above: a one-word title at this type size is
+   shorter than 24px, and every row in the list would then be a target under
+   the floor. `inline-flex` is the load-bearing half for the reason that rule's
+   own note gives — an inline element's height is its line box. */
+.gn-help__result-title { display: inline-flex; align-items: center; min-height: 1.5rem; color: var(--gn-text-accent); text-decoration: none; font-weight: 600; }
 .gn-help__result-title:hover { text-decoration: underline; }
 /* 13/18 and 15/20 from the reference — the two lines under a result title are
    deliberately SMALLER than the 17px body, not the same size. Both keep
