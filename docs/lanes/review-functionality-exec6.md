@@ -197,7 +197,7 @@ eight files hold **1,120 ✅ · 33 ❌ · 11 🟡 · 5 🧪 · 22 🚫 · 8 unma
 with a second script whose regex matched a marker *anywhere* on the line; it printed 55 lines, of which 6 are ✅
 cases whose prose says "Was ❌" or carries a 🟡 mid-sentence (7.14, 7.241, 12.13, 12.16, 12.327, 12.328) — so
 the instruments disagree by exactly those six, and §1's is the one this paragraph counts by. **I read all 49
-❌/🟡/🧪 headlines** and measured **8** of them against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and
+❌/🟡/🧪 headlines** and measured **9** of them against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and
 6.84 (still true of the projection's own robustness; the door refuses both inputs, so not filed), and 7.158 (🟡, measured still true: Appendix AE); and — from
 the ✅ set — 7.45 and 12.144 (sentences a new input falsifies: E6-10, E6-5) and 4.23 (bypassed: E6-8). Sample
 size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ ids one by one.**
