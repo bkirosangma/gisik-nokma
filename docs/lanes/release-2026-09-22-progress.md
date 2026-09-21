@@ -20,3 +20,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-7 | done | feeb1eb0364e039ff1d8a732e8f777693d9b2372 | components.test.tsx (13.1057); ui 402/402; not painted |
 | T-P1 | done | e105e218fd5a3885eb4a5c32caaa333ba0d73e48 | bare-control-coverage.test.ts (13.1058) 4/4; editor 188/188, ui 406/406; 4 of 6 fixed, 2 are <a> no-ops (recorded) |
 | T-P2 | done | eb7bba1cae6f205908c9500104897bd59c743ab8 | components.test.tsx (13.1059); ui 410/410; Features.md rationale added; not painted |
+| T-E4-31 | done | e4dd9c211f8d4820ec46dbbe4ce25008fe202675 | tokens.test.ts (13.1060); accent stepped both themes (#2d5488/#97bdf2); ui 410, web 639, app-core 1722 |
