@@ -1957,7 +1957,7 @@ one defect). **Severity: Important.**
 > **DEFENCE — phase 2, 2026-09-21 15:30 IST, self-filed: a bound on (a) that the reachability paragraph above
 > gets wrong.** The paragraph says (a) *"is reachable on every ticket creation where the type read has not answered
 > by first paint."* The **swap** is — the dialog mounts under `createRegion` before `ticketTypes.data` arrives
-> (`page.tsx:1721-1745` gates on `ticketTypes.error`, the session and `list.rows`, not on `ticketTypes.data`,
+> (`page.tsx:1720-1745` gates on `ticketTypes.error`, the session and `list.rows`, not on `ticketTypes.data`,
 > opened) — but the **consequence** I drew from it (*"the control draws the placeholder … while `typeId` is non-empty
 > and Create is enabled"*) requires the seeded id to be absent from the real list, and on a product-founded workspace
 > it never is. `BUILTIN_TYPE_LADDER` (`page.tsx:133-136`) carries the seeds' own ids — `'epic'`, `'story'`,
@@ -2119,6 +2119,26 @@ the refusal arms that return without one).
 
 **Source:** carried candidate (round-1 §2e). **Severity: Minor** — the refusal is displayed, so the person
 is not misled about the outcome, only about the fields.
+
+> **DEFENCE — phase 2, 2026-09-21 15:33 IST, self-filed: the finding ignores the stream, and the stream does the
+> reload it says nobody does.** *"the sheet behind the dialog still draws the old priority, because nothing
+> re-read"* is false on the product's normal path. The sheet's read is a `useLiveQuery` (`ticket-sheet.tsx:515`),
+> and that hook refetches, debounced 200 ms, on every `event` frame from the workspace stream
+> (`use-live-query.ts:100-106`, opened). The committed field claim produces such a frame: the ingest service
+> fires `onEventCommitted` (`apps/server/src/ingest/ingest-service.ts:460`), `apps/server/src/app.ts:927` hands it to
+> the stream hub, the hub schedules every subscriber of that workspace (`stream/hub.ts:330-334`) and sends
+> `{ type: 'event', envelope }` (`:276`); the client's subscriber yields it as `{ type: 'event' }`
+> (`online/stream.ts:91-99`) and the hook reloads. So with the `/v1/stream` socket connected — the state every
+> web session is in unless the socket has dropped — the sheet re-reads within roughly a quarter of a second of the
+> refusal and draws the committed priority. I opened the handler and the throw site and did not open the seam
+> between them: the same gap `R6-3` found in `E2-28`.
+>
+> **What survives, stated narrower:** the explicit `read.reload()` is absent from the refusal arm (`:739-745`,
+> unchanged), so the correction depends entirely on the stream. When the socket is down — the
+> OFFLINE / REPLICA-DEGRADED class, which this product's stream can enter (`sync/sync-status-bar.tsx` exists to
+> say so) — the sheet shows the old field beside a refusal about the new state, for as long as the socket stays
+> down. The always-reachable case is a window of one debounce plus one fetch. Filed as Minor; the judge may
+> weigh the surviving arm as narrower than the finding claimed, and I do not contest that.
 
 ---
 
