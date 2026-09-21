@@ -2255,3 +2255,19 @@ line names the range `13.1229`–`13.1233` while its Step 5 (the enumeration of 
 `13.1229`–`13.1232`, and the four cases its Step 1 writes carry those four ids. The number is left UNUSED
 rather than filled with a case invented to close it, per the catalogue's own rule that a deleted or skipped
 number is never renumbered.
+
+## Priority is a built-in — the new-ticket dialog (spec 2026-09-22, Task 8)
+
+- **13.1234** ✅ The dialog offers exactly `P1`, `P2`, `P3` as ONE segmented control (`tablist` named
+  `Priority`, after the Type picker — the prototype's own placement), **preselected at the MIDDLE**: the
+  owner's ruling was about where a ticket starts, not merely that a control exists. The labels are asserted
+  in order, so a control offering them out of order passes a count and fails here. —
+  `packages/app-core/test/views/new-ticket-dialog.test.tsx`
+- **13.1235** ✅ A level chosen in the dialog leaves in the draft: the `onCreate` payload carries
+  `priority: 'P1'`. — `packages/app-core/test/views/new-ticket-dialog.test.tsx`
+- **13.1236** ✅ `CreateTicketFlow.create` sends the DRAFT's level onto the `ticket.created` payload, read
+  by the KEY's presence rather than by value — a `create()` that dropped the `priority:` line produces a
+  payload with no such key, which a value comparison cannot tell from one holding `undefined` (the same
+  reading `13.592` gives `start`). The chosen-P1 case is what separates "the draft travels" from "the door
+  mints a constant": the two `13.592` cases assert the default, which a hard-coded `'P2'` satisfies
+  perfectly. — `packages/app-core/test/views/reopen-flow.test.tsx`

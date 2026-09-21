@@ -333,9 +333,10 @@ settings are kept for about a month in case they come back.
 
 1. Open the project you want the job in.
 2. Find the **New ticket** button, near the top by the view tabs.
-3. A small window opens with three things:
+3. A small window opens with four things:
    - **Title** — what the job is. "Fix Mrs. Patel's leaking pipe."
    - **Type** — what kind of job this is, from your workspace's list.
+   - **Priority** — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5).
    - **Parent** — which bigger job this sits under. It defaults to **None (project root)**. Leave it
      alone unless this job is part of a bigger one (§6).
 4. Press **Create**.

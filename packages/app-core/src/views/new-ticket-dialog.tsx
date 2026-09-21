@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
-import { DEEPEST_RANK } from '@gisik-nokma/domain';
-import { Button, Dialog, Select } from '@gisik-nokma/ui';
+import { DEFAULT_PRIORITY, DEEPEST_RANK, PRIORITIES, type Priority } from '@gisik-nokma/domain';
+import { Button, Dialog, SegmentedControl, Select } from '@gisik-nokma/ui';
 
 /**
  * A ticket type as this dialog is handed it: the label to paint, and the RANK
@@ -61,6 +61,16 @@ export type NewTicketDraft = {
    * rather than a silently-focused ticket nobody asked for.
    */
   start: 'backlog' | 'focus';
+  /**
+   * The ticket's birth priority (spec 2026-09-22) — the fifth built-in, starting
+   * at the MIDDLE. ALWAYS present here, exactly as `start` is and for the
+   * identical reason: `ticketCreatedPayload` treats an absent `priority` as
+   * `DEFAULT_PRIORITY` so that events written before the field keep their
+   * meaning, and that rule says nothing about what a client built AFTER the
+   * field exists is allowed to leave out. This dialog's control is preselected,
+   * so there is no "unset" state for it to send.
+   */
+  priority: Priority;
 };
 
 export type NewTicketDialogProps = {
@@ -159,6 +169,16 @@ export function NewTicketDialog({
    */
   const [typeId, setTypeId] = useState(defaultRootTypeFor(typeOptions)?.id ?? '');
   /**
+   * The birth priority (spec 2026-09-22), preselected at the MIDDLE — the
+   * owner's own words: *"everything starts at p2 the middle"*. The default is a
+   * CHOICE this control shows and this client therefore SENDS; it is never left
+   * to the wire's absence rule, which exists for events older than the field.
+   * `DEFAULT_PRIORITY` is imported rather than spelled `'P2'` so the ladder and
+   * its middle have one origin — the sheet, the list and the board all read the
+   * same constant.
+   */
+  const [priority, setPriority] = useState<Priority>(DEFAULT_PRIORITY);
+  /**
    * ⚠ THE SEED RUNS ONCE, AND THE LADDER'S IDENTITY LEGITIMATELY CHANGES UNDER
    * IT (E2-33a, 2026-09-21).
    *
@@ -210,6 +230,10 @@ export function NewTicketDialog({
     setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
     setParentId('');
     setStartInFocus(true);
+    // Priority is reset with the rest (spec 2026-09-22): "empty on OPEN" is the
+    // rule, and a priority left at the previous draft's level is the same
+    // stale-draft defect E2-37 names, one field over.
+    setPriority(DEFAULT_PRIORITY);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   const [parentId, setParentId] = useState('');
@@ -292,6 +316,11 @@ export function NewTicketDialog({
         // would be a second, driftable spelling of the same fact this
         // component already computed once above.
         start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
+        // Spec 2026-09-22. ALWAYS sent, like `start` and for the same reason:
+        // the wire's absence-means-P2 rule is for events older than the field,
+        // not for this client. The control is preselected, so this is always a
+        // level the person could see.
+        priority,
       }),
     ).finally(() => {
       submittingRef.current = false;
@@ -343,6 +372,26 @@ export function NewTicketDialog({
           aria-label="Type"
         />
       </label>
+      <div className="gn-new-ticket__field">
+        <span>Priority</span>
+        {/* The prototype's control (`desktop.dc.html:1592-1599`), preselected at
+            the middle — the owner's *"everything starts at p2 the middle"*. The
+            default is a CHOICE this client sends explicitly; it is never left to
+            the wire's absence-means-P2 rule, which exists for events older than
+            the field.
+
+            A `<div>` and not a `<label>`, unlike the three fields around it: a
+            `<label>` wrapping a `tablist` would absorb the three tabs into the
+            LABEL's own text and give the group a computed name made of its
+            options. `SegmentedControl` takes its accessible name as a required
+            prop for exactly this reason, and the name is `Priority`. */}
+        <SegmentedControl
+          options={PRIORITIES.map((level) => ({ value: level, label: level }))}
+          value={priority}
+          onChange={setPriority}
+          aria-label="Priority"
+        />
+      </div>
       <label className="gn-new-ticket__field">
         Parent
         {parentCandidatesUnavailable === undefined ? (
