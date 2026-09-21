@@ -692,7 +692,7 @@ only.
 
 ---
 
-### E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all three `[SOURCE]` — category 3, wire-limited
+### E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all three — and its dead arm offers no link at all `[SOURCE]` `[BROWSER: dead arm]` — category 3, wire-limited
 
 **WHAT.** `/invite/[token]` (`page.tsx:87-126`): *"You are invited to join **<ws>** as <role>."* + `Join <ws>`. The
 export (`EXPORT:1761-1789`; Decline `:1788`, Accept `:1789`): inviter name, workspace, role, member count, *"Invitation expires · In 4 days"*, a
@@ -707,7 +707,13 @@ of the export's rows are a wire gap; Decline is not (the decline door exists, `m
 **WHAT WOULD HAVE BEEN BETTER.** A Decline beside Join (the door exists), and expiry on the wire (the server holds
 `expires_at`, `routes/invites.ts:514-515`, `i.invited_by, i.invited_at, t.expires_at`).
 
-**MEASUREMENT.** `[SOURCE]` lines above; `EXPORT:1761-1789`. Not driven — I hold no live invitation token.
+**The page's other arm, measured at paint:** `/invite/not-a-real-token` signed out (second browser, 390 px) renders
+*"This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you
+for a new one."* with **`links: []` and no `<nav>`** — no Sign in, no Workspaces, no Help. A person who already has
+an account and a lapsed link is left on a page with nothing to press (`page.tsx:92-96`).
+
+**MEASUREMENT.** `[SOURCE]` lines above; `EXPORT:1761-1789`. The live arm not driven — I hold no live invitation
+token; the dead arm `[BROWSER]` as above.
 
 **SEVERITY: Minor** (claimed).
 
