@@ -303,3 +303,12 @@ section follow the controller's rule, so the next free id after B16 is one past 
   row (asserted, then asserted again after the write) — the older reducer no longer exists to produce one —
   and the read is asserted WORKING on the same row before the strip, so the control cannot be masked by
   the subject. — `packages/app-core/test/replica/replica-data-source.test.ts`
+- **3.972** ✅ The `require-field` picker's universe is `BUILTIN_FIELD_IDS` **MINUS `priority`** — asserted
+  as a SET DIFFERENCE rather than a fixed list, with the two sides named positively so an emptied
+  `BUILTIN_FIELD_IDS` could not satisfy the difference by making both sides empty, and a control proving
+  the picker still carries every other built-in. **The exclusion is deliberate:** a `require-field` rule
+  refuses only on an ABSENT or blank value, and `priority` is written on every `ticket.created`, so a rule
+  naming it could never fire — an option that can only produce a dead rule. Mutation-witnessed: putting
+  `priority` back into `BUILTIN_FIELD_CHOICES` reddens this case alone
+  (`Tests 1 failed | 8 passed`, `expected [] to deeply equal [ 'priority' ]`), which is what stops a
+  well-meaning "fix" shipping. — `packages/app-core/test/workflow-builder/summaries.test.ts`
