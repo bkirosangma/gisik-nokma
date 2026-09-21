@@ -23,7 +23,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Twenty-two findings — fourteen Important, eight Minor — every one measured through a door the
+**No Critical claimed. Twenty-three findings — fourteen Important, nine Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
@@ -41,7 +41,7 @@ The second shape is **a record that describes a world the product has left**: th
 (E6-1); three ❌ cases declaring guest admissions that closed weeks ago (E6-12); a "named, not decided" residual
 whose own commit decided it (E6-11); a stale "no ticket key" premise beside a crumb that reads the key (E6-14);
 and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an
-unassigned open question since before its trigger shipped (E6-13). Two instrument gaps, a due date that only has to look like one, and a blank-name rule applied to half its subjects close the list (E6-6, E6-7, E6-19, E6-20).
+unassigned open question since before its trigger shipped (E6-13). Two instrument gaps, a due date that only has to look like one, and a blank-name rule applied to half its subjects, and a backup time that rolls over instead of refusing close the list (E6-6, E6-7, E6-19, E6-20, E6-23).
 
 The round-1 lane's coverage boundary was the map: every Important finding is in a package or on a path it said
 it did not reach, and none re-files anything it found. Two read sweeps — every read door as a non-member and as
@@ -270,6 +270,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-20 | Minor | Ruling P15's blank-name refusal applied to half its subjects; a state named `" "` is a board column | App. X |
 | E6-21 | Important | A member or guest cannot leave a workspace; the export promises it; the CSRF exclusion assumes it | App. Y |
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
+| E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1432,6 +1433,39 @@ a bootstrap/stream path for a person with no workspace). The measured state is n
 picker cannot produce the claim; the divergence is real and unruled, and the API accepts a naming that means
 nothing.
 
+### E6-23 — MINOR — `BACKUP_TIME_UTC=25:00` or `99:99` is accepted and silently scheduled somewhere else (`99:99` → four days out), while `9:00` throws; the daemon reads the value raw
+
+**WHAT.** `ops/schedule.ts:13-30` `msUntilNextUtc` validates the time with `/^(\d{2}):(\d{2})$/` (`:14`) and then
+hands the two numbers to `setUTCHours`, which rolls over instead of refusing. Measured against `dist/ops/schedule.js`
+from `2026-09-21T07:30Z`:
+
+```
+21:00 -> next run 2026-09-21T21:00Z (+13.50 h)      24:00 -> 2026-09-22T00:00Z (+16.50 h)
+25:00 -> next run 2026-09-22T01:00Z (+17.50 h)      23:60 -> 2026-09-22T00:00Z (+16.50 h)
+99:99 -> next run 2026-09-25T04:39Z (+93.15 h)      9:00  -> throws "backup time must be HH:MM (UTC)"
+```
+
+(20,000 fuzzed *valid* times: 0 bad — the arithmetic is right for what it admits.)
+
+**WHY it is wrong.** The backup daemon takes the value straight from the environment
+(`ops/backup-daemon-main.ts:180` `process.env.BACKUP_TIME_UTC ?? '21:00'`; `:187` the ledger export's), with no
+schema between — `check-env-example` lists both as *"process.env access"* rather than config keys — so a typo in
+`deploy/do/app.yaml:297` moves the nightly `pg_dump` to a different hour, or to four days later, and the daemon
+starts cleanly. The refusal that exists (`:15`, for the wrong *shape*) shows the author meant to refuse bad
+times; the bound was the half not written. A backup that quietly runs at the wrong time is the class the runbook
+drill (E6-13) exists to catch, and it would not: the dump exists, just late.
+
+**WHAT WOULD HAVE BEEN BETTER.** Two comparisons after the match — hours `< 24`, minutes `< 60` — in the same
+`throw` the shape check already uses; and a `BACKUP_TIME_UTC` key in `config.ts`'s schema so the daemon fails at
+boot with the sentence rather than at 04:39 four days on.
+
+**MEASUREMENT.** The script above (six values through `msUntilNextUtc` from a fixed `from`; the fuzz over 20,000
+valid `HH:MM`/`dow` pairs asserting `0 < ms ≤ 24 h (7 d)` and the landed UTC hour/minute/day). Lines opened:
+`schedule.ts:13-30`; `backup-daemon-main.ts:180`, `:187`; `deploy/do/app.yaml:297`; `.env.example:305`.
+
+**SEVERITY: Minor.** Configuration validation on an operator-only knob; loud for one shape of typo and silent for
+the other.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1625,8 +1659,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **14** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18, E6-21 |
-| Minor | **8** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20, E6-22 |
-| **total** | **22** | E6-1 … E6-22, no gaps in the numbering |
+| Minor | **9** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20, E6-22, E6-23 |
+| **total** | **23** | E6-1 … E6-23, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
