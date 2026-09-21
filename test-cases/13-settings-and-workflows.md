@@ -1563,7 +1563,7 @@ background**, so nothing measured the pair at all.
 
 ### The case
 
-- ✅ **13.1146 (second arm) — the title declares no ink of its own, the panel it inherits from is a
+- **SECOND ARM (the same case) — the title declares no ink of its own, the panel it inherits from is a
   DECLARED pair on sunken, and the warning tone survives on the panel's edge.** Recorded as a **second arm
   of `13.1146` rather than a new case id, and the reason is in the arm itself**: the sweep that case
   carries looks for a `color` and a `background` **in the same rule**, and this pair is painted by a rule
