@@ -1,4 +1,4 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // `"type": "module"`, so NodeNext resolves its types as CJS and a default
 // import lands on the module namespace (no `.setup`) under this repo's
@@ -164,6 +164,89 @@ describe('Sheet', () => {
     expect(screen.getByRole('textbox', { name: 'Ticket title' })).toHaveValue('Uncommitted');
     expect(document.querySelector('.gn-sheet__title')).toBeNull();
   });
+});
+
+/**
+ * P8 — `Dialog` and `Sheet` both declare `aria-modal="true"`, which tells
+ * assistive tech that everything outside them is inert. Neither moved focus into
+ * itself, trapped it, or restored it on close, so the claim was asserted and not
+ * kept. The gap is not inert in the product either: `board.tsx:385-393` refuses a
+ * column action *because* it judges the interaction to have arrived "behind a
+ * modal — a keyboard-focus escape", so a workaround exists specifically for the
+ * leak.
+ *
+ * The standard already exists in this repo, tested, on a less-used surface: the
+ * project page's filters sheet moves focus in on open and returns it to the exact
+ * opening control on close, asserted by 13.445/13.446. These cases bring the two
+ * shared primitives up to it — focus in on open, Tab contained, focus returned to
+ * the opener on a keyboard close.
+ *
+ * Every case opens through a real button and asserts the control that focus
+ * demonstrably LEFT before asserting where it arrived, because "focus is inside
+ * the dialog" is vacuously true when the opener was never focused in the first
+ * place.
+ */
+describe('P8 — Dialog and Sheet contain focus while they claim aria-modal', () => {
+  function Opener({ kind }: { kind: 'dialog' | 'sheet' }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open panel
+        </button>
+        {kind === 'dialog' ? (
+          <Dialog open={open} title="Reopen parent?" onClose={() => setOpen(false)}>
+            <button type="button">Inner action</button>
+          </Dialog>
+        ) : (
+          <Sheet open={open} title="GST registration" onClose={() => setOpen(false)}>
+            <button type="button">Inner action</button>
+          </Sheet>
+        )}
+      </div>
+    );
+  }
+
+  for (const kind of ['dialog', 'sheet'] as const) {
+    it(`P8: ${kind} moves focus in on open and returns it to the opener on Escape`, async () => {
+      const user = userEvent.setup();
+      render(<Opener kind={kind} />);
+      const trigger = screen.getByRole('button', { name: 'Open panel' });
+      trigger.focus();
+      expect(trigger).toHaveFocus();
+
+      await user.click(trigger);
+      const panel = screen.getByRole('dialog', { name: kind === 'dialog' ? 'Reopen parent?' : 'GST registration' });
+      // Control: focus really LEFT the opener — without this, "focus is inside
+      // the panel" would be satisfied by a component that moved nothing.
+      expect(document.activeElement).not.toBe(trigger);
+      expect(panel.contains(document.activeElement)).toBe(true);
+
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      // Restored to the exact control that opened it, not to the body.
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
+
+    it(`P8: ${kind} keeps Tab inside itself`, async () => {
+      const user = userEvent.setup();
+      render(<Opener kind={kind} />);
+      const trigger = screen.getByRole('button', { name: 'Open panel' });
+      await user.click(trigger);
+      const panel = screen.getByRole('dialog', { name: kind === 'dialog' ? 'Reopen parent?' : 'GST registration' });
+
+      // The opener is the only tabbable thing outside the panel, so without
+      // containment enough Tabs reach it — which is exactly the escape the
+      // board refuses the interaction for.
+      for (let i = 0; i < 8; i += 1) {
+        await user.tab();
+        expect(
+          panel.contains(document.activeElement),
+          `after ${i + 1} Tab(s) focus left the ${kind} for ${document.activeElement?.tagName ?? 'nothing'}`,
+        ).toBe(true);
+      }
+    });
+  }
 });
 
 describe('Table', () => {
