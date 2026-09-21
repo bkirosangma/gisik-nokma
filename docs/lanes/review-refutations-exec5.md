@@ -52,6 +52,9 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 15:09 IST — exec 4 (head `674decb2`) adds a painted corroboration of `E5-32` (no `next`, and nothing stashed in
+  `sessionStorage`/`localStorage` either); noted under the finding. exec 1 relaunched (head `a07a7fc2`, a P35 at half
+  points); no refutation file yet.
 - 15:08 IST — exec 4's `review-refutations-exec4.md` (head `ccd60196`) read: no refutation of mine; it PAINTS `E5-20`'s outcome
   (both dialogs gone on one Escape, `?ticket=` dropped) and `E5-4`'s picker, and narrows E5-4's mention clause (excluded,
   not blank). Dated Defence/corroboration paragraphs added under both findings in my report.

@@ -1207,6 +1207,11 @@ four files away and the bounce simply does not use it.
 `docs/manual.md:107-110`; the four `sign-in?next=` sites (`grep -rn 'sign-in?next=' apps/web` → 4, none in the hook);
 `sign-in/page.tsx:56-66`.
 
+**Corroboration (15:09 IST, phase 2).** exec 4 reproduced this on its own stack in an isolated browser context:
+*"`…/p/<project>?ticket=<id>` → `location.href` = `http://localhost:3041/sign-in`, `sessionStorage` and
+`localStorage` both empty; `/workspaces` → the same — holds"* — which also closes a door this finding did not
+check: nothing is stashed client-side either, so the destination is not merely absent from the URL, it is gone.
+
 **SEVERITY: Important** (claimed). The help states a behaviour the product lacks on the most common signed-out entry,
 and the person loses the link.
 
