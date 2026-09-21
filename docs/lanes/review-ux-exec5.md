@@ -1347,8 +1347,10 @@ details"*.
 announcement, in the three places a reader looks (who operates this, under what law, whom to write to) — so the
 choice bought nothing it was meant to buy, and cost the one thing a draft can offer: a sentence saying so. The
 placeholders-not-invented-details half (`13.251`) is right and is not disputed; what is disputed is hiding the draft
-status. The precondition the warning names (*"before … one real user's data"*) is behind us for the owner's own
-work on this stack (`13-deployment-dogfooding.md`), and E5-33's flow asks every new person to agree to it.
+status. Whether the precondition the warning names (*"before … one real user's data"*) has been crossed I do not assert
+— what is measured is that the running stack carries the owner's signed-in account and a workspace whose seed the
+manual describes as *"modelled on a real shop's real process, warts included"* (`docs/manual.md:1062-1063`), and
+that E5-33's flow asks every new person to agree to this notice as it stands.
 
 **WHAT WOULD HAVE BEEN BETTER.** One visible line at the top of both legal pages — *"Draft notice: the bracketed
 details are not yet filled in"* — until the placeholders are, and the sign-in line phrased as *"… the draft Terms and
