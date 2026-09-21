@@ -758,13 +758,13 @@ became unusable before I returned to it (§6.1). `grep -n Escape packages/app-co
 ### E5-21 — IMPORTANT · The manual sends a person to the phone to comment; the phone files the comment under the ASSIGNEE's id (or the literal `'me'`), the server refuses that as identity spoofing, and the app shows nothing `[SOURCE]` — the phone half of exec 2's `F1(e)`, which it verified "on the web half only"
 
 **WHAT.** `docs/manual.md:365-366`: *"**The phone app has a Comment button on a job and the website does not.**"*
-The button exists (`apps/mobile/src/screens/ticket-screen.tsx:126`). Its handler (`:35-56`) submits
+The button exists (`apps/mobile/src/screens/ticket-screen.tsx:126`). Its handler (`:36-57`) submits
 `comment.added` with `actorId: state.assigneeId ?? 'me'` — the comment carries **the assignee's identity**, or a
 five-byte literal when nobody is assigned — under a comment that says so: *"Interim … the session user id is not
 wired up (no auth flow in this shell yet)."* The server refuses any event whose actor is not the session's:
 `check-permission.ts:542-545` `if (env.actorId !== ctx.sessionUserId) return refuse(IDENTITY_SPOOF_REASON)`, and the
 sync door independently: `sync-service.ts:321-324` `if (event.actorId !== userId) return { status: 'invalid' … }`.
-On the phone the submit's only failure arm swallows the expected outcome — `:53` `if (err instanceof
+On the phone the submit's only failure arm swallows the expected outcome — `:54` `if (err instanceof
 OfflineAcceptError) return; // queued locally — the expected offline outcome` — so the person sees no error and no
 posted comment.
 
@@ -779,7 +779,7 @@ early") do not mention that a phone comment is filed as somebody else.
 (the New-ticket rule: asks before it offers) rather than accept into a queue that will be refused; and correct the
 manual sentence to say the web has the thread and the phone does not yet post one as you.
 
-**MEASUREMENT.** `[SOURCE]` `ticket-screen.tsx:35-56`, `:126`; `check-permission.ts:542-545`;
+**MEASUREMENT.** `[SOURCE]` `ticket-screen.tsx:36-57`, `:54`, `:126`; `check-permission.ts:542-545`;
 `sync-service.ts:318-324`; `docs/manual.md:363-366`, `:1203-1216`. Not driven: no phone, no mobile session.
 
 **SEVERITY: Important** (claimed). A person loses the words they typed (Critical on my scale) — held at Important
