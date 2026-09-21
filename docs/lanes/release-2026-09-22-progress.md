@@ -77,3 +77,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-9 | done | e7d45076 | envelope field count named not counted; probe says eleven (domain 548 green) |
 | T-E6-12 | done | c2723621 | 6.51/6.77/6.123 superseded; 6.77 closed, two partial (perm 28 green) |
 | T-E6-14 | done | 8ed0e6ce | delete toast names key ?? title; both arms pinned (app-core 1731, web 5) |
+| T-E6-25 | done | d2e2787a | deploy comments: all nine config vars consumed; four stale claims corrected |
