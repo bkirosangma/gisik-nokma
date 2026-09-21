@@ -85,9 +85,10 @@ ticket claim on the sync door becomes a contest, `sync-service.ts:416-417`) — 
 that will be refused at the first sync" describes the wrong outcome too: they fail, once, and are not retried.
 
 **What survives.** The manual sentence is still wrong in the direction E5-21 says; an UNASSIGNED ticket's comment
-and a comment on SOMEONE ELSE's ticket never post, and the phone's only failure arm (`:54`) swallows nothing here —
-`ds.ingest` resolves for a queued claim and the `invalid` arrives later on the sync engine, where the ticket screen
-reads nothing back. The severity is the judge's; this refutation narrows the finding to "comments on tickets not
+and a comment on SOMEONE ELSE's ticket never post, and the phone's failure arm (`:54`) swallows the `OfflineAcceptError` that
+`ds.ingest` throws for every queued claim (`replica-data-source.ts`, the `ingest` arm) as "the expected offline
+outcome"; the `invalid` arrives later on the sync engine, where the ticket screen reads nothing back. (Whether the
+`'me'` shape is refused LOCALLY before it is queued — which would put a sentence on the screen — I did not measure.) The severity is the judge's; this refutation narrows the finding to "comments on tickets not
 assigned to you", it does not remove it.
 
 **MEASUREMENT.** `apps/server/test/zz-exec6-probe-phone-comment.test.ts` (never committed; verbatim below), run
