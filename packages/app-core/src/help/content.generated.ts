@@ -100,19 +100,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You cannot leave a comment on a job on the website."
+                  "text": "You can leave a comment on a job now, on the website and on the phone."
                 },
                 {
                   "kind": "text",
-                  "text": " The job screen shows the description and lets you write one; there is no free-standing box for a comment. The one comment the website does take is a "
-                },
-                {
-                  "kind": "bold",
-                  "text": "Move's"
-                },
-                {
-                  "kind": "text",
-                  "text": ": a move carrying a \"require a comment\" rule puts a box on the Move dialog, and what you type is recorded on the move. (§5)"
+                  "text": " The job screen shows the description, lets you write one, and carries a comment thread with its own box at the end of it. A move carrying a \"require a comment\" rule still puts a box on the Move dialog, and what you type there is recorded on the move. (§5)"
                 }
               ],
               [
@@ -560,7 +552,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "To sign out, use the "
+                    "text": "To sign out, open the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "account menu"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " at the right-hand end of the bar — the round button carrying your initial — and choose "
                   },
                   {
                     "kind": "bold",
@@ -568,7 +568,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " button on the right of the bar at the top of the screen. Signing out really does end it — the next thing you try on that device is refused immediately, not \"at some point later\". That matters if you have signed in on somebody else's laptop."
+                    "text": ". Signing out really does end it — the next thing you try on that device is refused immediately, not \"at some point later\". That matters if you have signed in on somebody else's laptop."
                   }
                 ]
               }
@@ -585,7 +585,7 @@ export const HELP_CONTENT: HelpContent = [
             "spans": [
               {
                 "kind": "text",
-                "text": "There is a small bar across the top of nearly every screen. It has three things and no more:"
+                "text": "There is a small bar across the top of nearly every screen. Inside a workspace it carries:"
               }
             ]
           },
@@ -610,7 +610,41 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " — the jobs assigned to you. This only appears once you are inside a workspace."
+                  "text": " — the jobs assigned to you."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
+                  "text": "Members"
+                },
+                {
+                  "kind": "text",
+                  "text": " — the people in this workspace, and what they are."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
+                  "text": "Settings"
+                },
+                {
+                  "kind": "text",
+                  "text": " — this workspace's own screens: its ticket types, its workflows, and the workspace itself (§11 and §12)."
+                }
+              ],
+              [
+                {
+                  "kind": "text",
+                  "text": "The "
+                },
+                {
+                  "kind": "bold",
+                  "text": "workspace's name"
+                },
+                {
+                  "kind": "text",
+                  "text": ", linking to its home page, with the project you were last in beside it — that one opens a menu of the workspace's other projects."
                 }
               ],
               [
@@ -620,7 +654,41 @@ export const HELP_CONTENT: HelpContent = [
                 },
                 {
                   "kind": "text",
-                  "text": " — with a small dot on it when you have unread messages."
+                  "text": " — a small icon at the right-hand end, with a dot on it when you have unread messages."
+                }
+              ],
+              [
+                {
+                  "kind": "bold",
+                  "text": "Your avatar"
+                },
+                {
+                  "kind": "text",
+                  "text": " — the round button with your initial on it, opening a menu with "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Help"
+                },
+                {
+                  "kind": "text",
+                  "text": ", "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Account"
+                },
+                {
+                  "kind": "text",
+                  "text": " and "
+                },
+                {
+                  "kind": "bold",
+                  "text": "Sign out"
+                },
+                {
+                  "kind": "text",
+                  "text": "."
                 }
               ]
             ]
@@ -629,29 +697,44 @@ export const HELP_CONTENT: HelpContent = [
             "kind": "paragraph",
             "spans": [
               {
+                "kind": "bold",
+                "text": "My Work, Members and Settings appear only once a workspace is open"
+              },
+              {
                 "kind": "text",
-                "text": "Plus your name and a "
+                "text": ", and the workspace's name and its last project appear only once that name has arrived. With no workspace open the bar says so — "
+              },
+              {
+                "kind": "italic",
+                "text": "\"No workspace selected — pick one to reach its board, members and settings.\""
+              },
+              {
+                "kind": "text",
+                "text": " "
               },
               {
                 "kind": "bold",
-                "text": "Sign out"
+                "text": "Signed out there is no avatar"
               },
               {
                 "kind": "text",
-                "text": " button on the right."
-              }
-            ]
-          },
-          {
-            "kind": "paragraph",
-            "spans": [
+                "text": ", so "
+              },
               {
                 "kind": "bold",
-                "text": "That is the entire menu."
+                "text": "Help"
               },
               {
                 "kind": "text",
-                "text": " There is no settings link, no search box, and no help link. The settings screens do exist (§11 and §12) and nothing anywhere links to them."
+                "text": " and "
+              },
+              {
+                "kind": "bold",
+                "text": "Account"
+              },
+              {
+                "kind": "text",
+                "text": " stay in the bar as plain links rather than moving into the menu."
               }
             ]
           }
@@ -666,7 +749,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is a small toggle button that cycles through three settings each time you press it:"
+                    "text": "On your "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " page there is a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Theme"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " control with the three choices side by side — not a button you press to cycle:"
                   }
                 ]
               },
@@ -681,7 +780,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — follow whatever your computer or phone is set to."
+                      "text": " — follow whatever your computer or phone is set to. This is the default."
                     }
                   ],
                   [
@@ -695,12 +794,6 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "bold",
                       "text": "Dark"
                     }
-                  ],
-                  [
-                    {
-                      "kind": "text",
-                      "text": "…and back to System."
-                    }
                   ]
                 ]
               },
@@ -709,7 +802,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If you pick Light or Dark, the product remembers your choice for next time. If you cycle back around to System, it forgets your choice and follows your device again."
+                    "text": "If you pick Light or Dark, the product remembers your choice for next time. Pick "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "System"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " again and it forgets your choice and follows your device, including its automatic day/night switch."
                   }
                 ]
               }
@@ -951,7 +1052,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Your name at the top, then a card for each workspace you belong to, with that workspace's projects listed underneath as links."
+                    "text": "Your name at the top, then a card for each workspace you belong to, carrying that workspace's project count and — once it has any projects — a line naming them."
                   }
                 ]
               },
@@ -962,21 +1063,25 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "Click a project name"
+                      "text": "Click anywhere on a card to open that workspace."
                     },
                     {
                       "kind": "text",
-                      "text": " to open its board."
+                      "text": " The whole card is one link, the workspace's name and its projects line included. This catches people out the other way round now: the name looks like a heading and is in fact the door."
                     }
                   ],
                   [
                     {
+                      "kind": "text",
+                      "text": "The projects on the card are a "
+                    },
+                    {
                       "kind": "bold",
-                      "text": "Clicking the workspace name does nothing."
+                      "text": "line of text, not links"
                     },
                     {
                       "kind": "text",
-                      "text": " It is a heading, not a link. Only the project links go anywhere. This catches people out."
+                      "text": ". There is nothing per-project to click there; the project list is one click further in, on the workspace's own page."
                     }
                   ]
                 ]
@@ -1890,41 +1995,37 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot leave a comment on a job."
+                      "text": "You can leave a comment on a job now."
                     },
                     {
                       "kind": "text",
-                      "text": " The writing box takes a description and not a comment, and nothing on the web shows a comment thread. "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job sheet carries a comment thread, with a box at the end of it reading "
                     },
                     {
-                      "kind": "bold",
-                      "text": "The one comment the website does take is a Move's"
+                      "kind": "italic",
+                      "text": "\"Add a comment — @ to mention someone\""
                     },
                     {
                       "kind": "text",
-                      "text": " — a move carrying the \"require a comment\" rule puts a box on the Move dialog (§7), and what you type is recorded on the move rather than shown back as a thread. "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "The phone app has a Comment button on a job and the website does not."
+                      "text": ". A move carrying the \"require a comment\" rule still puts its own box on the Move dialog (§7) and records what you type on the move."
                     }
                   ],
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot attach a file to a job."
+                      "text": "You can attach a file to a job now."
                     },
                     {
                       "kind": "text",
-                      "text": " There is no attachment list on the web job sheet, and a file dropped into the description box is refused rather than quietly lost. "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's files, and the comment box takes one too. The "
                     },
                     {
                       "kind": "bold",
-                      "text": "The one upload the website does take is a Move's"
+                      "text": "description"
                     },
                     {
                       "kind": "text",
-                      "text": " — a move carrying the \"require evidence\" rule puts a file box on the Move dialog and stays blocked until the server has stored the file (§7)."
+                      "text": " box is still the exception: a file dropped into it is refused rather than quietly lost. A move carrying the \"require evidence\" rule still puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7)."
                     }
                   ],
                   [
@@ -5218,11 +5319,19 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "Nothing in the app links to it."
+                    "text": "The app links to it."
                   },
                   {
                     "kind": "text",
-                    "text": " There is no settings entry in the top bar. The stage builder and the job-type editor can only be reached by typing their address into the browser bar."
+                    "text": " There is a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " link in the top bar; it appears once a workspace is open, and it opens that workspace's settings, where the stage builder and the job-type editor live."
                   }
                 ]
               },
@@ -5231,7 +5340,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is the honest answer, and it is a real problem — these are the screens that make the product yours, and they are invisible. Ask whoever set your workspace up for the addresses and bookmark them."
+                    "text": "Nothing to bookmark. One wrinkle worth knowing: the bare address "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "/settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " with no workspace on it offers nothing usable, because the shell remembers no \"current workspace\" outside a route or a query parameter. It still resolves, and what it says then is accurate — pick a workspace and it points you at the list. Reaching it through the link never has this problem."
                   }
                 ]
               }
@@ -7351,23 +7468,71 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "where-s-the-rest-of-the-menu-i-only-see-three-links",
-            "title": "Where's the rest of the menu? I only see three links.",
+            "id": "where-s-the-rest-of-the-menu-i-only-see-a-few-links",
+            "title": "Where's the rest of the menu? I only see a few links.",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "That is all there is: Workspaces, My Work (only inside a workspace), and Inbox. There are settings screens for stages and job types, and "
+                    "text": "The bar is short on purpose, and what it carries depends on where you are. Signed out it offers "
                   },
                   {
                     "kind": "bold",
-                    "text": "nothing anywhere links to them"
+                    "text": "Workspaces"
                   },
                   {
                     "kind": "text",
-                    "text": " — they can only be reached by typing their address. See "
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Help"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Account"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; once a workspace is open, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "My Work"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Members"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " join them, with the workspace's name and your inbox and avatar at the right-hand end. The settings screens for stages and job types are behind "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". See "
                   },
                   {
                     "kind": "link",
@@ -8463,7 +8628,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Nothing links to them. Not in the top bar, not anywhere. The stage builder and the job-type editor can only be reached by typing their address into the browser. That is a real problem — these are the screens that make the product yours, and they are invisible. Ask whoever set your workspace up for the addresses and bookmark them."
+                    "text": "In the top bar: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Settings"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". It appears once a workspace is open, and it opens that workspace's own screens — ticket types, workflows, and the workspace itself — where the stage builder and the job-type editor live. Nothing to bookmark."
                   }
                 ]
               }

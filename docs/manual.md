@@ -24,10 +24,10 @@ Read these five. They are the ones that catch everybody.
    The website's job panel has an "Assignee" picker. The phone and desktop apps have no Assignee row
    at all, so there you can neither see who a job is on nor set it. Due dates have no control on any
    screen. (§5)
-4. **You cannot leave a comment on a job on the website.** The job screen shows the description and
-   lets you write one; there is no free-standing box for a comment. The one comment the website does
-   take is a **Move's**: a move carrying a "require a comment" rule puts a box on the Move dialog, and
-   what you type is recorded on the move. (§5)
+4. **You can leave a comment on a job now, on the website and on the phone.** The job screen shows the
+   description, lets you write one, and carries a comment thread with its own box at the end of it. A
+   move carrying a "require a comment" rule still puts a box on the Move dialog, and what you type
+   there is recorded on the move. (§5)
 5. **Every date in the product is on Indian time**, wherever you are. "Today" changes over at midnight
    in India — which is early evening in the UK and late morning on the American west coast. (§14)
 
@@ -109,36 +109,44 @@ that is what happened. Sign in the same way as before.
 The same is true if you click a link (an invitation, or a link to a job) while signed out: it
 remembers where you were headed and sends you there afterwards.
 
-To sign out, use the **Sign out** button on the right of the bar at the top of the screen. Signing out
-really does end it — the next thing you try on that device is refused immediately, not "at some point
-later". That matters if you have signed in on somebody else's laptop.
+To sign out, open the **account menu** at the right-hand end of the bar — the round button carrying your
+initial — and choose **Sign out**. Signing out really does end it — the next thing you try on that
+device is refused immediately, not "at some point later". That matters if you have signed in on somebody
+else's laptop.
 
 ---
 
 ## §2 — Finding your way around
 
-There is a small bar across the top of nearly every screen. It has three things and no more:
+There is a small bar across the top of nearly every screen. Inside a workspace it carries:
 
 - **Workspaces** — the list of every workspace you are in.
-- **My Work** — the jobs assigned to you. This only appears once you are inside a workspace.
-- **Inbox** — with a small dot on it when you have unread messages.
+- **My Work** — the jobs assigned to you.
+- **Members** — the people in this workspace, and what they are.
+- **Settings** — this workspace's own screens: its ticket types, its workflows, and the workspace
+  itself (§11 and §12).
+- The **workspace's name**, linking to its home page, with the project you were last in beside it —
+  that one opens a menu of the workspace's other projects.
+- **Inbox** — a small icon at the right-hand end, with a dot on it when you have unread messages.
+- **Your avatar** — the round button with your initial on it, opening a menu with **Help**, **Account**
+  and **Sign out**.
 
-Plus your name and a **Sign out** button on the right.
-
-**That is the entire menu.** There is no settings link, no search box, and no help link. The settings
-screens do exist (§11 and §12) and nothing anywhere links to them.
+**My Work, Members and Settings appear only once a workspace is open**, and the workspace's name and its
+last project appear only once that name has arrived. With no workspace open the bar says so — *"No
+workspace selected — pick one to reach its board, members and settings."* **Signed out there is no
+avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
 
 ### Light or dark
 
-There is a small toggle button that cycles through three settings each time you press it:
+On your **Account** page there is a **Theme** control with the three choices side by side — not a button
+you press to cycle:
 
-1. **System** — follow whatever your computer or phone is set to.
+1. **System** — follow whatever your computer or phone is set to. This is the default.
 2. **Light**
 3. **Dark**
-4. …and back to System.
 
-If you pick Light or Dark, the product remembers your choice for next time. If you cycle back around
-to System, it forgets your choice and follows your device again.
+If you pick Light or Dark, the product remembers your choice for next time. Pick **System** again and it
+forgets your choice and follows your device, including its automatic day/night switch.
 
 ---
 
@@ -178,12 +186,14 @@ to put a project there for you. Once a project exists, everything in the rest of
 
 ### What the Workspaces page shows you
 
-Your name at the top, then a card for each workspace you belong to, with that workspace's projects
-listed underneath as links.
+Your name at the top, then a card for each workspace you belong to, carrying that workspace's project
+count and — once it has any projects — a line naming them.
 
-- **Click a project name** to open its board.
-- **Clicking the workspace name does nothing.** It is a heading, not a link. Only the project links go
-  anywhere. This catches people out.
+- **Click anywhere on a card to open that workspace.** The whole card is one link, the workspace's name
+  and its projects line included. This catches people out the other way round now: the name looks like a
+  heading and is in fact the door.
+- The projects on the card are a **line of text, not links**. There is nothing per-project to click
+  there; the project list is one click further in, on the workspace's own page.
 
 If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
 — or create your own."* Both of those are real options.
@@ -361,15 +371,16 @@ This is the honest list. Each one is an absence, not a hidden button.
   Type into the description on the job panel and save it; the panel reads back who set it and when.
   The same box handles formatting and mentions; dropping a file into it is refused rather than
   quietly lost.
-- **You cannot leave a comment on a job.** The writing box takes a description and not a comment, and
-  nothing on the web shows a comment thread. **The one comment the website does take is a Move's** — a
-  move carrying the "require a comment" rule puts a box on the Move dialog (§7), and what you type is
-  recorded on the move rather than shown back as a thread. **The phone app has a Comment button on a
-  job and the website does not.**
-- **You cannot attach a file to a job.** There is no attachment list on the web job sheet, and a file
-  dropped into the description box is refused rather than quietly lost. **The one upload the website
-  does take is a Move's** — a move carrying the "require evidence" rule puts a file box on the Move
-  dialog and stays blocked until the server has stored the file (§7).
+- **You can leave a comment on a job now.** It is kept here, rather than deleted, so a reader who
+  remembers it as an absence finds the correction where they last saw it. The job sheet carries a
+  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. A move
+  carrying the "require a comment" rule still puts its own box on the Move dialog (§7) and records what
+  you type on the move.
+- **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
+  remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's
+  files, and the comment box takes one too. The **description** box is still the exception: a file
+  dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
+  puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and type into the title at the top
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
@@ -1050,11 +1061,13 @@ before anything else.
 
 ### Getting to the screen
 
-**Nothing in the app links to it.** There is no settings entry in the top bar. The stage builder and
-the job-type editor can only be reached by typing their address into the browser bar.
+**The app links to it.** There is a **Settings** link in the top bar; it appears once a workspace is
+open, and it opens that workspace's settings, where the stage builder and the job-type editor live.
 
-That is the honest answer, and it is a real problem — these are the screens that make the product
-yours, and they are invisible. Ask whoever set your workspace up for the addresses and bookmark them.
+Nothing to bookmark. One wrinkle worth knowing: the bare address `/settings` with no workspace on it
+offers nothing usable, because the shell remembers no "current workspace" outside a route or a query
+parameter. It still resolves, and what it says then is accurate — pick a workspace and it points you at
+the list. Reaching it through the link never has this problem.
 
 ### Who can use it
 

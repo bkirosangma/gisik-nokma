@@ -102,10 +102,12 @@ to. It is recorded with a name on it and can be changed back, but it is untidy.
 Correct — "A workspace needs a name." Note that it does *not* trim spaces off a real name: type
 "  Marak Design  " and that is exactly what gets saved.
 
-**Where's the rest of the menu? I only see three links.**
-That is all there is: Workspaces, My Work (only inside a workspace), and Inbox. There are settings
-screens for stages and job types, and **nothing anywhere links to them** — they can only be reached by
-typing their address. See [Stages and moves](#stages-and-moves).
+**Where's the rest of the menu? I only see a few links.**
+The bar is short on purpose, and what it carries depends on where you are. Signed out it offers
+**Workspaces**, **Help** and **Account**; once a workspace is open, **My Work**, **Members** and
+**Settings** join them, with the workspace's name and your inbox and avatar at the right-hand end. The
+settings screens for stages and job types are behind **Settings**. See
+[Stages and moves](#stages-and-moves).
 
 ---
 
@@ -377,10 +379,9 @@ ticket types", with no New workflow button and every box switched off. They can 
 for a non-admin to accidentally publish something.
 
 **Where are the settings screens?**
-Nothing links to them. Not in the top bar, not anywhere. The stage builder and the job-type editor can
-only be reached by typing their address into the browser. That is a real problem — these are the
-screens that make the product yours, and they are invisible. Ask whoever set your workspace up for the
-addresses and bookmark them.
+In the top bar: **Settings**. It appears once a workspace is open, and it opens that workspace's own
+screens — ticket types, workflows, and the workspace itself — where the stage builder and the job-type
+editor live. Nothing to bookmark.
 
 **Can I rename "Epic" and "Story" to something that makes sense to me?**
 Yes. An admin can rename all four built-in types, change their icons, and change which stage set they
