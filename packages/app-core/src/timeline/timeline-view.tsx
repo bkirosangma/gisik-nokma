@@ -1,4 +1,4 @@
-import { useMemo, useState, type CSSProperties } from 'react';
+import { useId, useMemo, useState, type CSSProperties } from 'react';
 import type { UserNameFn } from '../claims/claim-labels.js';
 import { addDays, mondayOnOrBefore } from '../claims/dates.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
@@ -185,6 +185,7 @@ function sideEntryClassName(reason: TimelineSideReason): string {
 }
 
 export function TimelineView(props: TimelineViewProps) {
+  const idPrefix = useId();
   /**
    * The window's first Monday. Seeded from the prop, and `Today` re-seeds from
    * the prop rather than from whatever it was mounted with — so a shell that
@@ -289,29 +290,45 @@ export function TimelineView(props: TimelineViewProps) {
       {model.groups.map((group) => (
         <section key={group.epicId ?? 'no-epic'} className="gn-timeline__group">
           <h3 className="gn-timeline__group-heading">{group.epicTitle}</h3>
-          {group.rows.map((row) => (
-            <div key={row.ticketId} className="gn-timeline__row" data-ticket-id={row.ticketId}>
-              <div className="gn-timeline__title">
-                <div className="gn-timeline__title-text">{row.title}</div>
-                {row.customClaims.length > 0 && <CustomClaimList claims={row.customClaims} />}
+          {group.rows.map((row) => {
+            // E4-28: the bar's rendered text is the ticket title alone — the
+            // date span lives only in the `title` attribute, which is not
+            // reliably read by assistive tech (it requires hover, which
+            // touch/mobile AT has no equivalent for). Linked as a
+            // DESCRIPTION, not folded into the accessible NAME
+            // `timeline-view.test.tsx` pins to the ticket title alone — the
+            // same ARIA shape `WorkspaceLinks` already uses and documents
+            // (`apps/web/app/w/[workspaceId]/page.tsx`).
+            const detail = [row.provenance, ...row.customClaims.map((entry) => entry.label)].join(' · ');
+            const detailId = `${idPrefix}-detail-${row.ticketId}`;
+            return (
+              <div key={row.ticketId} className="gn-timeline__row" data-ticket-id={row.ticketId}>
+                <div className="gn-timeline__title">
+                  <div className="gn-timeline__title-text">{row.title}</div>
+                  {row.customClaims.length > 0 && <CustomClaimList claims={row.customClaims} />}
+                </div>
+                <button
+                  type="button"
+                  className="gn-timeline__bar"
+                  data-pending={row.pending ? 'true' : undefined}
+                  data-clipped-start={row.bar.clippedStart ? 'true' : undefined}
+                  data-clipped-end={row.bar.clippedEnd ? 'true' : undefined}
+                  /* Column 1 is the title, so week `i` is column `i + 2`; the end
+                     is exclusive, hence `+ 3`. The one genuinely computed style
+                     in this file. */
+                  style={{ gridColumn: `${row.bar.fromWeek + 2} / ${row.bar.toWeek + 3}` }}
+                  title={detail}
+                  aria-describedby={detailId}
+                  onClick={() => props.onOpenTicket(row.ticketId)}
+                >
+                  {row.title}
+                </button>
+                <span id={detailId} className="gn-visually-hidden">
+                  {detail}
+                </span>
               </div>
-              <button
-                type="button"
-                className="gn-timeline__bar"
-                data-pending={row.pending ? 'true' : undefined}
-                data-clipped-start={row.bar.clippedStart ? 'true' : undefined}
-                data-clipped-end={row.bar.clippedEnd ? 'true' : undefined}
-                /* Column 1 is the title, so week `i` is column `i + 2`; the end
-                   is exclusive, hence `+ 3`. The one genuinely computed style
-                   in this file. */
-                style={{ gridColumn: `${row.bar.fromWeek + 2} / ${row.bar.toWeek + 3}` }}
-                title={[row.provenance, ...row.customClaims.map((entry) => entry.label)].join(' · ')}
-                onClick={() => props.onOpenTicket(row.ticketId)}
-              >
-                {row.title}
-              </button>
-            </div>
-          ))}
+            );
+          })}
         </section>
       ))}
 

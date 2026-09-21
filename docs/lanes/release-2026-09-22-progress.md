@@ -197,3 +197,8 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P17 | done | 8371ef241670da406e51b2bada4902ffcd198829 | heading-outline.test.ts + board-narrowing.test.tsx; 7 headings h3->h2; app-core 1728, web 652; CASE ID PENDING ALLOCATION |
 | T-P36 | done | 4db375f10a7434227dbad06719e0711718cfe8fe | authoring-routes.test.tsx (T-P36 marker); both routes h1 -> Settings; web 654; CASE ID PENDING ALLOCATION (13.1157 minted then withdrawn before commit) |
 | T-E4-36 | done | 264d75bfe866e5d5505920b83e08d9a8d72c92fd | help-browser.test.tsx (T-E4-36 marker) 16/16; ui 426, app-core 1731, web 654; CASE ID PENDING ALLOCATION |
+| B15 | claimed | 2026-09-21 23:24 | /Users/kiro/my_projects/gisik-nokma-exec6 |
+| T-E4-16 | done | 251d634e | 18 passed (contrast override CSS-rule read); app-core suite 98 files/1732 tests |
+| T-E4-28 | done | 7833a945 | 5 new (11.216-11.218): aria-label day cells, aria-describedby bars; app-core 98/1737, ui 8/396 |
+| T-E4-20 | done | 1c7122bd | canvas.test.tsx 10.93 source-scan; height-floor deferred (Playwright, off-gate); app-core 98/1738 |
+| T-P20 | done | 5588b7e9 | 11.219 grid/row/columnheader/gridcell roles; app-core 98/1740 |

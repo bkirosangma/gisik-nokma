@@ -2473,6 +2473,18 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    fix; either half alone restores the bug. */
 .gn-workflow-canvas { display: grid; width: 100%; height: 100%; min-height: 480px; }
 
+/* E4-16: React Flow's own vendor stylesheet paints its required attribution
+   link at 10px with a fixed grey (`node_modules/@xyflow/react/dist/style.css`
+   `.react-flow__attribution`/`…a`) that measures 1.10:1 against this canvas's
+   dark-mode backdrop and 2.61:1 in light — both under the 4.5 body text needs.
+   Overridden here rather than via `colorMode` (which needs a theme prop the
+   canvas has no context for) with a role pair this file already declares and
+   tests: `textMuted` on `surfaceRaised` is in `CONTRAST_PAIRS`
+   (`packages/ui/src/tokens.ts`) and passes in every style/theme, so this
+   composition carries the same guarantee without adding a new one. */
+.react-flow__attribution { background: var(--gn-surface-raised); font-size: 0.75rem; }
+.react-flow__attribution a { color: var(--gn-text-muted); }
+
 .gn-state-node {
   background: var(--gn-surface-raised);
   color: var(--gn-text);
@@ -3426,6 +3438,31 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-shadow: var(--gn-shadow-raised);
   color: var(--gn-text-muted);
   font-size: 0.85rem;
+}
+
+/* E4-28: a visually-hidden description node, referenced by `aria-describedby`
+   rather than folded into the accessible NAME. This is the shape the
+   workspace-home links already use and document
+   (`apps/web/app/w/[workspaceId]/page.tsx`'s `WorkspaceLinks`): "Each link's
+   ACCESSIBLE NAME stays exactly its label … and the note is linked as a
+   DESCRIPTION via `aria-describedby` … aria-describedby is the correct ARIA
+   shape for 'a control with a name and a supplementary description'."
+   `.gn-calendar__item`/`.gn-timeline__bar` reuse it rather than folding their
+   date claim into the button's own text, which the calendar and timeline
+   suites pin to the ticket title alone. The classic clip recipe, not
+   `display:none`: a directly `aria-describedby`-referenced node's text is
+   read by assistive tech regardless of its visibility, but this keeps the
+   element in normal flow rather than removed from the render tree. */
+.gn-visually-hidden {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* --- The calendar month grid (Plan 9 Task 9) ------------------------------

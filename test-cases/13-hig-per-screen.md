@@ -27,6 +27,7 @@ session would be shared by two branches landing in either order.
 | **B13** (`rel/b13-due-date-soft-delete-undo-member`) | **`13.1177`–`13.1186`** |
 | **B14** (`rel/b14-minimal-shells-phone-and-desktop`) | **`13.1187`–`13.1196`** |
 | **B16** (`rel/b16-outbox-ordering-projection-verif`) | **`13.1197`–`13.1206`** |
+| **B15** (`rel/b15-calendar-timeline-and-canvas-for`) | **`13.1207`–`13.1216`** — self-allocated by the B15 driver (exec6, 2026-09-21 23:3x); absent from the controller's 22:0x table, next free block after B16's `13.1206` |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** Re-read it before minting, and if your own
 allocation changes, change it HERE in the same action. **When your block is empty, STOP AND ASK.** Do

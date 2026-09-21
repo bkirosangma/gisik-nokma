@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { IST_DAY_REGEX } from '@gisik-nokma/domain';
 import type { WeekDays } from '../claims/dates.js';
 import type { UserNameFn } from '../claims/claim-labels.js';
+import { formatDate } from '../provenance.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
 import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
@@ -132,6 +133,22 @@ const MONTH_NAMES = [
  */
 const WEEKDAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'] as const;
 
+/**
+ * P20: the full name behind each abbreviated weekday-head label, for the
+ * `columnheader`'s `aria-label` — a three-letter abbreviation read aloud by a
+ * screen reader is easy to mishear ("Tue" as "Toe"), and the full word costs
+ * nothing the visible header still shows the short form.
+ */
+const WEEKDAY_FULL_NAMES: Record<(typeof WEEKDAY_LABELS)[number], string> = {
+  Mon: 'Monday',
+  Tue: 'Tuesday',
+  Wed: 'Wednesday',
+  Thu: 'Thursday',
+  Fri: 'Friday',
+  Sat: 'Saturday',
+  Sun: 'Sunday',
+};
+
 function monthLabel(month: CalendarMonth): string {
   const name = MONTH_NAMES[month.month - 1];
   // Refused rather than coerced, the way `monthGridWeeks` refuses its bounds:
@@ -209,6 +226,7 @@ function itemClassName(item: CalendarItem, unplaceable: boolean): string {
 }
 
 export function CalendarView(props: CalendarViewProps) {
+  const idPrefix = useId();
   const [month, setMonth] = useState<CalendarMonth>(props.initialMonth ?? monthOf(props.today));
   const [expandedWeeks, setExpandedWeeks] = useState<ReadonlySet<number>>(new Set());
   /**
@@ -393,10 +411,18 @@ export function CalendarView(props: CalendarViewProps) {
         own single-grid vocabulary, the same shape `.gn-list__section-title`
         and `.gn-timeline__weeks` already declare for the identical reason.
       */}
-      <div className="gn-calendar__grid">
-        <div className="gn-calendar__weekday-head">
+      {/*
+        P20: the APG calendar-grid pattern's four roles, added as attributes
+        to the structure already here — `grid` on this wrapper, `row` on the
+        weekday head and on each week, `columnheader`/`gridcell` on the
+        labels and the day cells. No markup was reshaped for this: the grid
+        already groups grid → weekday-head → week → days → day, exactly the
+        shape the pattern asks for.
+      */}
+      <div className="gn-calendar__grid" role="grid" aria-label="Calendar">
+        <div className="gn-calendar__weekday-head" role="row">
           {WEEKDAY_LABELS.map((label) => (
-            <span key={label} className="gn-calendar__weekday">
+            <span key={label} className="gn-calendar__weekday" role="columnheader" aria-label={WEEKDAY_FULL_NAMES[label]}>
               {label}
             </span>
           ))}
@@ -407,7 +433,12 @@ export function CalendarView(props: CalendarViewProps) {
           const visibleItems = expanded ? week.items : week.items.slice(0, MAX_VISIBLE_PER_WEEK);
           const folded = week.items.length - visibleItems.length;
           return (
-            <section key={week.days[0]} className="gn-calendar__week" data-week={week.days[0]}>
+            <section
+              key={week.days[0]}
+              className="gn-calendar__week"
+              data-week={week.days[0]}
+              role="row"
+            >
               <div className="gn-calendar__days">
                 {week.days.map((day) => {
                   const isToday = day === props.today;
@@ -425,10 +456,15 @@ export function CalendarView(props: CalendarViewProps) {
                       className={['gn-calendar__day', outside ? 'gn-calendar__day--outside' : '']
                         .filter(Boolean)
                         .join(' ')}
+                      role="gridcell"
                       data-day={day}
                       data-today={isToday ? 'true' : undefined}
                       data-outside={outside ? 'true' : undefined}
                       aria-current={isToday ? 'date' : undefined}
+                      // E4-28: the day's full date, for the assistive-tech
+                      // reader landing on a cell whose only rendered text is
+                      // a bare number ("31", "1", "2") with no month or year.
+                      aria-label={formatDate(day)}
                     >
                       {/* The spec's "Today ring" — a 24px accent circle around
                           the NUMBER, not an outline around the whole cell (the
@@ -463,12 +499,24 @@ export function CalendarView(props: CalendarViewProps) {
                   // key is positional rather than id-derived.
                   const key = `${itemIndex}:${item.kind}:${item.ticketId}`;
                   const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
+                  // E4-28: a bar's rendered text is the ticket title alone —
+                  // unlike a marker's `item.label` (see the docblock below),
+                  // it names no date at all, and the date lives only in the
+                  // `title` attribute, which is not reliably read by
+                  // assistive tech (it requires hover, which touch/mobile AT
+                  // has no equivalent for). Linked as a DESCRIPTION, not
+                  // folded into the accessible NAME `calendar-view.test.tsx`
+                  // pins to the ticket title alone — the same ARIA shape
+                  // `WorkspaceLinks` already uses and documents
+                  // (`apps/web/app/w/[workspaceId]/page.tsx`).
+                  const detailId = `${idPrefix}-detail-${week.days[0]}-${itemIndex}`;
                   return (
                     <li key={key} className="gn-calendar__slot" style={{ gridColumn }}>
                       <button
                         type="button"
                         className={itemClassName(item, unplaceable)}
                         title={item.kind === 'bar' ? item.provenance : item.tooltip}
+                        {...(item.kind === 'bar' ? { 'aria-describedby': detailId } : {})}
                         data-pending={pending ? 'true' : undefined}
                         data-unplaceable={unplaceable ? 'true' : undefined}
                         {...(item.kind === 'marker' && item.marker === 'custom'
@@ -490,6 +538,11 @@ export function CalendarView(props: CalendarViewProps) {
                           </>
                         )}
                       </button>
+                      {item.kind === 'bar' && (
+                        <span id={detailId} className="gn-visually-hidden">
+                          {item.provenance}
+                        </span>
+                      )}
                     </li>
                   );
                 })}
