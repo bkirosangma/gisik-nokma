@@ -17,3 +17,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E2-43 | done | 450d9918 | init-replica.test.ts (12.402, 12.403) |
 | T-E2-48 | done | a5c3ec53 | init-replica.test.ts (12.404, 12.405) |
 | T-E2-52 | done | 8a31207e | mention-query.test.ts (12.406) |
+| T-E5-26 | done | 610bb9d0 | copy.test.ts (12.407) |
