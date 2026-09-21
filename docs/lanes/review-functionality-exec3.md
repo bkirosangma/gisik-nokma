@@ -3046,3 +3046,54 @@ would default, and the two substitutions it does make are each argued in place. 
 is the clearest statement of the rule I found anywhere in the tree**: *"The server's absence and the client's
 default are the same PIXELS and not the same fact: one is 'nobody arranged this', the other is 'this
 arrangement is yours'"* — which is `E3-14`'s and `E6-2`'s class, argued and refused in advance.
+
+---
+
+## 44. REACHING THE SECOND NAMED NOT-REACHED SURFACE — the rate-limit half of the security middleware
+
+§16.1 names it: *"the rate-limit buckets and the remaining `security-middleware.test.ts` surface — I read the
+CSRF half closely and the rate-limit half only enough to see it is a separate mechanism."* Method and result:
+
+**1. Coverage is STRUCTURAL, not enumerated — and that is the finding-shaped contrast in this lane.**
+`app.ts:488` registers the limiter as a **root `app.addHook('onRequest', …)`**, so it runs for every route
+the app declares, including encapsulated ones. **The rate limiter cannot miss a route the way `E3-14`'s CSRF
+control misses five**, because it is not a list — it is a hook. The CSRF control is an **exact-match
+`ReadonlySet`** consulted by a hook (`http-origin.ts:259-261`), so a route absent from the set is silently
+unprotected; the limiter classifies by `routeOptions.url` **inside** the hook and refuses whatever it does not
+recognise by charging it to the general bucket. **Two controls in one file, one structurally complete and one
+enumerable — and the enumerated one is where this report's Critical lives.** That contrast is worth a judge's
+attention on its own: it is the reason `E3-14` is a one-line fix and not a redesign.
+
+**2. The keying is unforgeable, and the reasoning is measured rather than asserted.** `rateLimitKeyFor`
+(`:113`) takes the **rightmost** `X-Forwarded-For` entry, because a proxy *appends* its observation and the
+caller controls every entry except the last; and it deliberately does NOT key on `request.ip`, whose
+docblock records that *"six requests varying it were bought six buckets"*. The hook repeats that at `:490-493`.
+**`E3-14`'s vulnerability is a control that does not run; this is the opposite discipline, in the same file.**
+
+**3. The bucket set is five, and the fifth's placement was argued against the obvious alternative.** `auth`,
+`events`, `invite`, `mcp`, and a PATH-classified `signin` charged **on top of** `auth` rather than instead of
+it — with the reason stated: replacing would *"loosen the mount rather than tighten it"*, since a caller would
+get `authMax + signInMax` where it gets `authMax` today. And a **refused** request is still charged to both
+(*"a refused attempt is still an attempt"*), so exhausting the general budget cannot hand out a fresh sign-in
+budget when the window rolls.
+
+**4. Two prose overclaims self-corrected in place, which is why this section is short.** The `isSignInPath`
+docblock (`:238-244`) withdraws its own earlier claim that the URL-parse `catch` was live safety — *"a comment
+asserting a property no input can demonstrate is this repo's own 'check that cannot fail' in prose form"* —
+and `:522-527` withdraws a `retry-after` invariant it had stated: *"It does not. The `Math.max` below covers
+only the case where both buckets refuse."* **Both corrections are the class this report files findings about,
+made by the author, in the file, with the correction kept rather than the claim.** A lane arriving here has
+less to find because someone already looked.
+
+**5. The over-match rule, which is the security reasoning worth naming.** `isSignInPath` resolves every
+ambiguous spelling by **matching** rather than skipping: a false positive costs one unit of the caller's own
+budget on a path that then 404s, while a false negative drops the request to the bucket that is twice the size
+— *"only one of those is a bypass"*. Dot segments are resolved because better-auth builds its `Request` from
+the same `new URL(target, base)` construction, so `/api/auth/x/../sign-in/magic-link` genuinely reaches the
+magic-link handler and a literal `startsWith` would not have seen it. Percent-encoding is tried as a SECOND
+candidate, so a malformed escape falls back to the raw spelling rather than to `false`.
+
+**RESULT: no finding.** Stated with the same boundary as §43: **I read the bucket classification, the keying,
+the hook and the sign-in matcher at the line; I did not audit the five budgets' VALUES against a traffic
+model, which is a capacity question rather than a correctness one.** `security-middleware.test.ts`'s
+rate-limit cases (`:463-760`) were read for what they assert, not re-run.
