@@ -140,7 +140,12 @@ attachments,tickets,notifications,mcp-device}.ts` (the routes named in findings;
 `read/{visible-where,restricted-parents}.ts`, `notifications/{fanout,sweep,store}.ts` (grep + the cited blocks),
 `auto-close/sweep.ts:176-206`, `sync/{sync-service,reconcile-route}.ts`, `stream/hub.ts:213-420`, `gates/
 evidence-gate.ts`, `auth/auth.ts:150-360` and `app.ts:477-612` (rate limits), `mcp/token-store.ts:1-80`,
-`tools/sweep-orphans.ts:100-125`, `attachments/sniff.ts:36-50`. `scripts/` — `check-case-ids.mjs` (header + regexes),
+`tools/sweep-orphans.ts:100-125`, `tools/verify-projections.ts` (whole), `attachments/sniff.ts:36-50`,
+`sync/contest-coherence.ts` (whole), `read/ancestry.ts` (whole), `routes/tickets.ts:396-446`, `:548-560`,
+`:617-670`, `routes/mcp-tokens.ts:72-80`, `auth/synthetic-address.ts` (whole), `ledger/event-store.ts:135-156`.
+`packages/rule-engine/src/contests.ts:1-45`; `packages/domain/src/ticket-state.ts:99-200` (the reducer's cases);
+`packages/sync-client/src/replica/replica.ts` (grep for `workflow.defined` / `foldTicketToWorkflowVersion`
+only — it refreshes on publish at `:285`, `:420`). `scripts/` — `check-case-ids.mjs` (header + regexes),
 `check-no-silent-skips.mjs` (whole), `check-skipif-coverage.mjs` (whole), `check-db-timezone.mjs` (whole),
 `check-migration-order.mjs:1-60`, `check-case-citations.mjs:1-40` — **6 of 9 read; `check-env-example`,
 `check-runbook-commands`, `check-task-ledger` run only** (all 9 were run green by exec 3; I re-ran `case-ids`,
@@ -163,12 +168,13 @@ size: 5 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 
 ### 2.3 Not reached — named rather than implied
 
-- `packages/rule-engine`: `contests.ts`, `memory-context.ts` (used, not reviewed), `refusal-rules.ts`,
-  `checks/{fields,rank,workflow-rebind,refusals,test-support}.ts`, `fixtures/harness.ts`, `rules/{index,types}.ts`.
-- `packages/domain`: 31 of 41 files, including `entity-state.ts`, `ticket-state.ts` (the reducer — used by every
-  probe, not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts`, `ist-day.ts`,
+- `packages/rule-engine`: `memory-context.ts` (used, not reviewed), `refusal-rules.ts`, `checks/{rank,
+  workflow-rebind,refusals,test-support}.ts` (`fields.ts` read at `:116-130` only), `fixtures/harness.ts`,
+  `rules/{index,types}.ts`; `contests.ts` beyond `:45`.
+- `packages/domain`: 30 of 41 files, including `entity-state.ts`, `ticket-state.ts` outside the reducer's event
+  cases (`:1-98`, `:200-496` — `foldTicketToWorkflowVersion` in particular, used by the probes and not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts`, `ist-day.ts`,
   `doc-*.ts`, `simple-kanban.ts`, `stream-frames.ts`, `read-models.ts`, `notification*.ts`, `preferences.ts`.
-- `packages/sync-client`: `replica/replica.ts` (1,312 lines), `storage/*`, `engine/sync-engine.ts` outside the
+- `packages/sync-client`: `replica/replica.ts` (1,312 lines; two lines grepped), `storage/*`, `engine/sync-engine.ts` outside the
   flush loop (bootstrap, subscribe, reconcile, `stall`).
 - `packages/mcp-server`: `device-login.ts`, `lazy-session.ts`, `login-prompt.ts`, `main.ts`, `config.ts`.
 - `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts`, `http.ts`
@@ -177,9 +183,12 @@ size: 5 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `apps/server/src`: 12 of 19 route modules not opened beyond a grep (`attention`, `auth-methods`, `board`,
   `events`, `mcp-tokens`, `my-invitations`, `my-work`, `notification-preferences`, `preferences`, `search`,
   `ticket-history`, `workspaces`); projections other than the three named; `read/` other than the two named;
-  `sync/{contest-coherence,contests-route,snapshot-*,stream-seq,sync-routes,ledger-deps}.ts`; `ledger/*`;
-  `ops/*`; `seed/*`; `auth/*` other than `auth.ts`; `tools/{sweep-invite-tokens,sweep-notifications,
-  sweep-user-preferences,verify-projections}.ts`; `visibility/{grant-backfill,rollup,visible-events-for,
+  `sync/{contests-route,snapshot-*,stream-seq,sync-routes,ledger-deps}.ts`; `ledger/event-store.ts` beyond
+  `readLedger`, `ledger/snapshot-store.ts`;
+  `ops/*`; `seed/*`; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
+  noted, not filed); `tools/{sweep-invite-tokens,sweep-notifications,
+  sweep-user-preferences}.ts`; `visibility/{grant-backfill,rollup,visible-events-for,
   visible-tickets}.ts` (rollup opened at `:258-266` only); `alerts/`, `workspaces/`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`, no `apps/mobile`, no
   `apps/desktop`.**
@@ -1013,6 +1022,11 @@ what was looked at and found sound, not only what was found wrong.
   holding 169 events — which is the "migration applied to a database that already holds data" property exec 3
   §7.6 called unwitnessed in tests, witnessed on the owner's stack (Appendix E).
 - **`check:db-tz` passes on both live databases** (`Asia/Kolkata` on 54329 and 54330).
+- **Rate limits cover the credential and write doors** (`/api/auth/*`, `/v1/events`, `/v1/sync`,
+  `/v1/sync/bootstrap`, `/v1/attachments`, the invite mint, the three MCP device doors — `app.ts:505-600`).
+  *Observation, not filed:* `POST /v1/workspaces` (founding), `/v1/sync/reconcile`, `…/migrate` and the
+  notification-read doors are outside the limited set; founding runs the whole bootstrap sequence per call. I did
+  not measure the per-call cost, so this is an absence read at the line, in the class of 6.123.
 - **Workspace settings are bounded** (`staleDays` 1–365, `dueSoonDays` 0–365, `autoCloseAfterDays` 1–365 or
   null, `workspace-settings.ts`).
 
