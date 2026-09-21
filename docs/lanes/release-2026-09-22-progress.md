@@ -16,6 +16,7 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-6 | done | 0f9005c603ec2931987c4dfc131c003a97315645 | ticket-sheet.test.tsx 13.1178 x6; 2 mutations (one SURVIVED first, case was vacuous, fixed) |
 | T-E5-43 | done | 13308826a93f325620e65fc873820f41fc42bd44 | project-calendar-timeline.test.tsx 13.1179 x3; 2 mutations, distinct signatures |
 | T-E2-30 | done | dcfd11c44ebf9c63714f2f7b7f18e8639db8c54b | sheet-delete.test.tsx 13.1180 x4; 2 mutations, both single-case |
+| T-E5-11 | done | d47193c315ed0344f80523deb873ee640275076c | members-page.test.tsx 13.1181 x3; 2 mutations (3-fail / 1-fail) |
 
 **§13 id block for B13 (controller allocation, 2026-09-21 22:0x): `13.1177`–`13.1186`** — §13 ids are now per release batch like §17; the block table lands in `test-cases/13-hig-per-screen.md`. B13 mints §13 ids only from this block, and inside the block in order. **Spent: `13.1177` (T-E5-2). Next free: `13.1178`.** If `check-case-ids` ever reds on a collision with `main`, `main`'s ids never move — renumber OURS into the block. For any section with no block table, the next free id is the max over `origin/main` AND every `origin/rel/*` head, verified by union==sum.
 
