@@ -962,6 +962,37 @@ three siblings that do it right.
 
 ---
 
+### E5-28 — IMPORTANT · A dropped connection during Publish leaves the workflow builder's Publish button disabled for ever with no sentence; a refusal discards the state mapping the person just built `[SOURCE]` (verifies exec 2 §2e's "state-mapping dialog unmounted before the server answers", and goes further)
+
+**WHAT.** `workflow-builder/ui/publish-controls.tsx:62-84` `submitPayload`: `setState({ phase: 'submitting' })`,
+then `await env.gateway.submit([event])` — **no `try`/`catch`** (the file's only `try` is around the occupancy READ,
+`:91-98`). Both callers discard the promise: `:87` `await submitPayload()` inside `onPublishClick` (itself invoked
+as `void onPublishClick()`, `:105`), and `:126` `onConfirm={(mapping) => void submitPayload(mapping)}`. The Publish
+button is `disabled={issues.length > 0 || state.phase === 'submitting'}` (`:103`), and nothing but a server answer
+ever leaves `submitting`. So a transport failure — the request never reaching the server — leaves the person with a
+greyed Publish, no banner (`:129-145` render only `published`/`refused`/`invalid`), and no way back but a reload.
+Separately, the confirm path sets `submitting` and so unmounts `StateMappingDialog` (`:116`, rendered only while
+`phase === 'mapping'`) before the server answers; on `refused` the banner says *"The server refused this publish."*
+under an idle Publish button and the mapping the person built is gone — pressing Publish again reopens an EMPTY
+mapping dialog.
+
+**WHY.** The builder is the one surface whose whole job is a deliberate, multi-step act (map every dropped state,
+confirm), and its final press has neither of the two arms the ticket sheet's `submitTicketEvent` has
+(`ticket-sheet.tsx:1040-1074`): no *"did not answer"* and no *"could not reach"*. Ruling 27/33's split is applied
+everywhere on the board and the sheet and not here. A refusal that throws away the mapping is a refusal that costs
+the person the work the dialog exists to collect.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `catch` that sets a `transport` phase with the sheet's sentence and re-enables
+Publish; on `refused`, keep the mapping in state and reopen the dialog pre-filled.
+
+**MEASUREMENT.** `[SOURCE]` `publish-controls.tsx:55-147` opened in full; `grep -n 'catch\|try {'` → the occupancy
+read only. Not driven (§6.1; the builder needs a draft to publish, which is a write).
+
+**SEVERITY: Important** (claimed). A stuck control with no sentence, on the surface the manual calls "the one thing
+that makes the product yours".
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1023,20 +1054,20 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**27 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 27). By claimed severity, read from the
-heading text: **Critical 1 · Important 19 · Minor 7** (1 + 19 + 7 = 27).
+**28 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 28). By claimed severity, read from the
+heading text: **Critical 1 · Important 20 · Minor 7** (1 + 20 + 7 = 28).
 
 - **Critical (1):** E5-13
-- **Important (19):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27
+- **Important (20):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28
 - **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 27. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 28. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
-Escape — the source mechanism, with the pair observed), E5-27 (Move's missing transport arm and latch). **Adjacent to a §2d
+Escape — the source mechanism, with the pair observed), E5-27 (Move's missing transport arm and latch), E5-28 (Publish stuck on a dropped connection). **Adjacent to a §2d
 candidate with a different measurement:** E5-9 (Delete: not "no confirmation" — which matches the export — but the
 refusal's geometry).
 
@@ -1098,9 +1129,9 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 1. **`apps/mobile` and `apps/desktop`** — of desktop I read only `app.tsx:14-135` (E5-26); of mobile only
    `screens/ticket-screen.tsx:30-130` (E5-21) and `board-screen.tsx:40-60` (the status wording). The storage layers,
    the help screens, the editor web view and every offline arm are unread.
-2. **The workflow builder as a person meets it** (canvas, inspector, publish, state-mapping dialog, history screen) —
-   read only its load arms as positive controls for E5-15. exec 2's §2e candidates there (`publish-controls.tsx:65/117`,
-   `state-mapping-dialog`, `workflow-rebind-dialog`) remain unverified by me.
+2. **The workflow builder as a person meets it** (canvas, inspector, history screen) — read its load arms as
+   positive controls for E5-15 and `publish-controls.tsx` in full (E5-28). `state-mapping-dialog.tsx`,
+   `workflow-rebind-dialog.tsx`, the inspectors and the canvas remain unread.
 3. **The comment thread, attachments door, subtask chain, close/reopen and delete/undo as END-TO-END FLOWS** — each
    needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
@@ -1176,5 +1207,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 27 findings — Critical 1 · Important 19 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 28 findings — Critical 1 · Important 20 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
