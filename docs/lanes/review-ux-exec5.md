@@ -193,6 +193,7 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-40 | Imp | Backlog tab under the toggle | EMPTY (withheld painted as absent) | source ("RECORDED, NOT FIXED") | — |
 | E5-41 | **Crit** | workflow builder draft | work lost on navigation (no guard, no persistence) | source | — |
 | E5-42 | Imp | List/Backlog/Calendar/Timeline refusal arms | ERROR (a preference failure painted as a data failure) | source | — |
+| E5-43 | Min | Calendar/Timeline "today" | stale day across the IST boundary | source ("RECORDED, NOT FIXED") | — |
 
 **Edge classes reached, by finding:** EMPTY (E5-4, 37, 40) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33, 42) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
@@ -1521,6 +1522,34 @@ with the fix already written twenty lines up for a sibling consumer.
 
 ---
 
+### E5-43 — MINOR · "Today" on the Calendar and Timeline is computed once per render, so a tab left open across the IST day boundary keeps yesterday's ring — and the manual places that boundary at half past six in the evening for London and late morning for Los Angeles `[SOURCE]` — recorded "NOT FIXED", unruled
+
+**WHAT.** `page.tsx:1235` `const today = istToday();` inside the render, and the note beneath it (`:1237-1245`):
+*"RECORDED, NOT FIXED: `today` is computed once per RENDER and never re-derived on its own, so a tab left open
+across IST midnight keeps yesterday's ring until something else re-renders this page … Deliberately not fixed here:
+the fix is a timer … OWNER: whoever next opens this page's date wiring."* `today` feeds `CalendarView` and
+`TimelineView` (`:2330-2334`, `:2394-2398`) — the today ring, the "Today" control's target, and every "due today /
+overdue" relation those views draw.
+
+**WHY.** The product's day is India's, deliberately and everywhere (`docs/manual.md:1354`: *"Every due date, every
+'today' ring on the calendar, and every day boundary means India's day"*). The manual also says when that day
+flips for the people the product names as its users (`:32`: *"early evening in the UK and late morning on the
+American west coast"*; `:1350-1351`: *"In London … half past six in the evening. In Los Angeles … late morning"*).
+So the stale-today window is not a midnight curiosity: for a west-coast user it opens mid-morning, in an open
+tab, and the ring, the Today button and the overdue judgement all stay on the previous day until they happen to
+click something. The recorded reason ("a timer needs its own case") is a reason the fix was deferred, not a ruling
+that the ring may lie.
+
+**WHAT WOULD HAVE BEEN BETTER.** Re-derive `today` on a visibility-change / focus event (no cadence argument) or a
+once-a-minute tick scoped to the two date tabs.
+
+**MEASUREMENT.** `[SOURCE]` `page.tsx:1225-1245`, `:2330-2334`, `:2394-2398`; `docs/manual.md:32`, `:1350-1354`.
+Not driven — it needs a session and a day boundary.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1589,16 +1618,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**42 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 42). By claimed severity, read from the
-heading text: **Critical 2 · Important 25 · Minor 15** (2 + 25 + 15 = 42).
+**43 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 43). By claimed severity, read from the
+heading text: **Critical 2 · Important 25 · Minor 16** (2 + 25 + 16 = 43).
 
 - **Critical (2):** E5-13, E5-41
 - **Important (25):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37, E5-40, E5-42
-- **Minor (15):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39
+- **Minor (16):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39, E5-43
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 42. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41, E5-42.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 43. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39, E5-40, E5-41, E5-42, E5-43.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1845,5 +1874,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 42 findings — Critical 2 · Important 25 · Minor 15 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 43 findings — Critical 2 · Important 25 · Minor 16 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
