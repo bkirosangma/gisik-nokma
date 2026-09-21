@@ -246,7 +246,7 @@ the server believes what its own reads decline.
 
 ### E6-3 — IMPORTANT — Re-ranking a custom ticket type is accepted with tickets already placed where the new rank forbids, so the ledger holds hierarchies the engine itself then refuses to produce
 
-**WHAT.** `packages/rule-engine/src/checks/ticket-type.ts:29-34` is the whole of the `ticket-type.defined` check
+**WHAT.** `packages/rule-engine/src/checks/ticket-type.ts:50-64` is the whole of the `ticket-type.defined` check
 beyond payload shape: it refuses a **built-in** type whose rank differs from its seed (`type.builtin-rank`) and
 accepts everything else. Nothing asks whether tickets of a custom type already exist, nor where they sit. The
 editor exposes the door: `ticket-type-editor-screen.tsx:336-345` is a bare `<input type="number" min={1}>` for
@@ -268,7 +268,7 @@ refusal copy in `refusals.ts` says *"always belongs to a parent ticket"*, presen
 ticket of the type). The type-definition door walks around all six: after a re-rank, the product holds a task
 under a feature it says a task cannot go under, and a root feature it says always has a parent. The user-facing
 dead end is concrete: drag `T` out of `F` and try to put it back — refused with a sentence that describes the
-placement it just came from. The editor's own copy (`rank.ts:16-18`, rendered at `:594` as
+placement it just came from. The editor's own copy (`rank.ts:38`, rendered at `ticket-type-editor-screen.tsx:594` as
 `data-testid="rank-implications"`) makes the promise in the present tense as the admin types the new rank —
 *"tickets of this type always belong to something bigger"* — and nothing makes it true for the tickets that exist.
 
@@ -290,8 +290,8 @@ is to record the decision that they are write-time-only and say so in the editor
 
 **MEASUREMENT.** Appendix B, run from `packages/rule-engine` with `pnpm exec vitest run
 test/zz-exec6-probe-rerank.test.ts --no-file-parallelism` (imports `../src/*.js` relatively — no `dist` in the
-path). Lines opened: `ticket-type.ts:29-34`; `hierarchy.ts` (`type.rank >= DEEPEST_RANK` ×2,
-`type.rank <= parentType.rank` ×2); `ticket-type-editor-screen.tsx:336-345`; `rank.ts:16-18`;
+path). Lines opened: `ticket-type.ts:50-64`; `hierarchy.ts:108`/`:228` (`type.rank >= DEEPEST_RANK`),
+`:133`/`:281` (`type.rank <= parentType.rank`); `ticket-type-editor-screen.tsx:336-345`; `rank.ts:38`; `refusals.ts:86`;
 `domain/src/ticket-types.ts:98` (`rank: z.number().int().min(1)` — no upper bound either) and `:136`
 (`DEEPEST_RANK = 4`); `test-cases/05-tickets-hierarchy.md:25` (5.9), `:52` (5.36).
 
