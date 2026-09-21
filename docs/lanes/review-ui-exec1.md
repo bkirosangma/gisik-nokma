@@ -481,6 +481,24 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** A route announcer is the small, standard remedy: on pathname change, set a visually-hidden live region to the new page's heading, or move focus to the `<main>`. In the App Router that is a ~15-line client component in `layout.tsx`. **It also fixes half of P12 incidentally** if it is fed the page name — which is why the two are filed separately and read together.
 
+### P19 — **IMPORTANT** ⚠ **r2 NEW** — The product's primary view switcher is a `role="tablist"` with NO accessible name, and the repo fixed the identical defect on the sheet's tablist
+
+**WHAT.** `role="tablist"` with no `aria-label` and no `aria-labelledby`, on the control that switches the project page between Backlog, Board, List, Calendar and Timeline.
+
+**MEASUREMENT.**
+- `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2058`: `<div className="gn-segmented" role="tablist">` — I read the whole element through its closing `</div>` at `:2081`; **there is no `aria-label` and no `aria-labelledby` anywhere in it.** Its five children carry `role="tab"` and `aria-selected` (`:2064-2079`).
+- **The product contains exactly two real `role="tablist"` elements**, comments excluded: this one, and `packages/ui/src/components/segmented-control.tsx:25`, which is `<div role="tablist" aria-label={ariaLabel}>` — **named, because `SegmentedControlProps` declares `'aria-label': string` as REQUIRED** (`segmented-control.tsx:9`, whose comment says *"Names the choice for assistive tech. Required, so it cannot be forgotten."*).
+- **AND THE REPO FIXED THIS EXACT DEFECT ON THE OTHER ONE.** `packages/app-core/src/views/ticket-sheet.tsx:1904-1907` records it: *"It also ADDS something: **this `role="tablist"` had no name at all**, and the component REQUIRES an `aria-label`."* The sheet migrated to the component; `ticket-sheet.test.tsx:2230` queries `getByRole('tablist', { name: 'Ticket sections' })` and `:2244` asserts `toHaveAccessibleName('Ticket sections')`.
+- **The project page did not migrate.** Its own docblock says why, and the reason is the defect: *"replacing the page-local `.gn-view-tabs`. Same roles, same handlers — **a restyle, not a rebuild**"* (`page.tsx:2031-2036`). **It adopted the shared CLASSES and kept its own markup** — `.gn-segmented`, `.gn-segmented__item`, `.gn-segmented__item--on` — so the restyle is visually identical and the required prop never entered the picture. **"A restyle, not a rebuild" is exactly the framing that hides an accessible name**, because a missing name changes nothing about how it looks.
+
+**WHY IT IS WRONG.** An unnamed `tablist` is a naming failure, not a preference: a screen-reader user reaching the project page's view switcher is told there is a tab list and not what it switches between. It is the product's primary mode control and it is the only unnamed one in the codebase — because the other is protected by a TypeScript-required prop.
+
+**AND THE RATCHET CANNOT SEE IT, which is P10's mechanism landing on a live defect.** `sweepAccessibleNames` counts `aria-label`, `role`, `aria-selected` and `aria-describedby` **as attribute occurrences**. This tablist contributes **six `role`s** (the `tablist` plus five `tab`s) and **five `aria-selected`s** to `/p/:projectId`'s baseline — and contributes **nothing to `ariaLabel`**, because it has none. **A count that only ever rises cannot notice an attribute that was never there**, so the ratchet would report this route's accessibility floor as healthy.
+
+**Fail-search for a ruling:** the page's docblock (`:2031-2056`) discusses the migration, the ordering of Backlog, and the removal of the dead `.gn-view-tabs` rules — and **never mentions naming, `aria-label`, or the component**. `ticket-sheet.tsx:1907` records the sheet's naming fix. **So the defect is named in the repo for one surface and unaddressed for its twin, with no ruling deciding that.**
+
+**WHAT WOULD HAVE BEEN BETTER.** Adopt `SegmentedControl` itself rather than its classes — the component exists, the page already passes the same `options`/`value`/`onChange` shape the component takes, and it would supply the required `aria-label` by construction. Failing that, add `aria-label="Project view"` and the assertion the sheet has. The first is strictly better because the type system then prevents the recurrence.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -531,7 +549,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 10**
+**IMPORTANT — 11**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -553,10 +571,11 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
+- `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (**the 2.4.1 claim is withdrawn in the body** — a landmark is a sufficient technique and `<main>` is on every route, so this is a keyboard-convenience finding, not a conformance one)
 
-**Total 22.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 23.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
