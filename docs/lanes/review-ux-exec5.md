@@ -909,7 +909,7 @@ token is read from `localStorage.getItem('gisik.token')` (`:40`) and the workspa
 `grep -rn "gisik.token\|gisik.workspaceId" apps/web/app apps/web/src` → **0** — no sign-in page sets them.
 `grep -rni settings apps/desktop/src/app.tsx` → only the hint itself — there is **no Settings screen** in the desktop
 app. And the web has no page that shows a token: `/mcp/tokens` says *"The connection itself is never shown — only a
-one-way hash of it is stored, so there is nothing here to copy"* (`[BROWSER]`, `mcp-tokens-screen.tsx:208-216`).
+one-way hash of it is stored, so there is nothing here to copy"* (`[BROWSER]`, `mcp-tokens-screen.tsx:343`).
 
 **WHY.** `docs/manual.md:1209-1211` describes this as *"It tells you to sign in on the website, then copy something
 across and paste it into the app's settings by hand. That is described as a temporary arrangement. It is not
