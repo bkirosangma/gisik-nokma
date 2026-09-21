@@ -25,6 +25,16 @@
 import Link from 'next/link';
 import { LegalTabs, LegalToc, sectionId, type LegalSection } from '../../src/legal-chrome.js';
 import { LegalNav } from '../../src/legal-nav.js';
+import { documentTitleFor } from '../../src/page-title.js';
+
+/**
+ * exec1 P12 — the route's title, and this page can use Next's own `metadata`
+ * because it is a SERVER component. A `'use client'` route cannot: an exported
+ * `metadata` there is ignored without a word, which is why the rest of the app
+ * uses `<DocumentTitle>`. Both read the format from `documentTitleFor`, so the
+ * two mechanisms cannot disagree about what a title looks like.
+ */
+export const metadata = { title: documentTitleFor('Privacy') };
 
 /**
  * The page's sections, declared ONCE.
@@ -173,7 +183,7 @@ const SECTIONS: readonly LegalSection[] = [
 
 export default function PrivacyPolicy() {
   return (
-    <main className="gn-shell gn-legal">
+    <main id="gn-main" className="gn-shell gn-legal">
       <LegalNav />
       <div className="gn-legal__column">
         <div className="gn-legal__head">

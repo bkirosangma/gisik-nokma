@@ -54,7 +54,7 @@ export default function EditWorkflowPage() {
   }, [gateway, workspaceId, workflowId]);
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       {/* The breadcrumb back to the workflow list. Two things make this the
           route's job rather than `WorkflowBuilderScreen`'s: routing is the one

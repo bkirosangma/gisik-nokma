@@ -1,4 +1,8 @@
 import { McpTokensScreen } from '../../../src/mcp-tokens-screen.js';
+import { documentTitleFor } from '../../../src/page-title.js';
+
+/** exec1 P12 — see `privacy/page.tsx` for why this SERVER route uses `metadata`. */
+export const metadata = { title: documentTitleFor('MCP tokens') };
 
 /**
  * `/mcp/tokens` — the revoke surface (owner ruling 5, MCP plan Task 12).
@@ -26,7 +30,7 @@ import { McpTokensScreen } from '../../../src/mcp-tokens-screen.js';
  */
 export default function McpTokensPage(): React.JSX.Element {
   return (
-    <main className="gn-shell gn-mcp-tokens">
+    <main id="gn-main" className="gn-shell gn-mcp-tokens">
       <McpTokensScreen />
     </main>
   );

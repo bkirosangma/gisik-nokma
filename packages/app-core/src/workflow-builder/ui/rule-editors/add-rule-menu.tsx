@@ -43,8 +43,12 @@ export function AddRuleMenu(props: { transitionIndex: number }) {
       >
         Add rule
       </button>
+      {/* exec1 P22: a `menu` is a name-requiring role and this one had none.
+          The words are the trigger's own (`:44`, "Add rule"), so the control and
+          the set it opens read as one thing rather than as an unnamed group a
+          screen reader can only call "menu". */}
       {open ? (
-        <ul className="add-rule-menu__list" role="menu">
+        <ul className="add-rule-menu__list" role="menu" aria-label="Add rule">
           {RULE_MENU.map((entry) => (
             <li key={entry.kind}>
               <button

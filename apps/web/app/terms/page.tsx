@@ -25,6 +25,10 @@
 import Link from 'next/link';
 import { LegalTabs, LegalToc, sectionId, type LegalSection } from '../../src/legal-chrome.js';
 import { LegalNav } from '../../src/legal-nav.js';
+import { documentTitleFor } from '../../src/page-title.js';
+
+/** exec1 P12 — see `privacy/page.tsx` for why this SERVER route uses `metadata`. */
+export const metadata = { title: documentTitleFor('Terms') };
 
 /**
  * The page's sections, declared ONCE — the same shape as `privacy/page.tsx`,
@@ -180,7 +184,7 @@ const SECTIONS: readonly LegalSection[] = [
 
 export default function Terms() {
   return (
-    <main className="gn-shell gn-legal">
+    <main id="gn-main" className="gn-shell gn-legal">
       <LegalNav />
       <div className="gn-legal__column">
         <div className="gn-legal__head">
