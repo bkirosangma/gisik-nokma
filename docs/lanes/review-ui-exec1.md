@@ -720,6 +720,29 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** A fourth entry in `VIEWPORTS` — `phone-320` at 320×568 — costs one object literal and puts the criterion's own number under the three sweeps that already run per viewport (tap targets, label text, accessible names, contrast), all of which assert per-width baselines. **The existing suite would then measure 1.4.10 rather than approach it.**
 
+### P28 — **MINOR** ⚠ **r2 NEW** — The mobile board's row is the one pressable in the app with no accessibility role, and its sibling sets one explicitly
+
+**WHAT.** `apps/mobile/src/screens/board-screen.tsx:60` renders `<TouchableOpacity onPress={() => navigation.navigate('Ticket', …)}>` with **no `accessibilityRole`** — so on iOS and Android the app's primary navigation target is announced as text rather than as a control.
+
+**⚠ THE OBSERVATION IS NOT MINE AND I AM NOT CLAIMING IT IS.** The opposing lane in this pair has it (its E4-22). **§3 scores a finding that adds *"a narrower or wider true scope"*, and what I am adding is a census the other finding does not state**: I enumerated **every** pressable control in `apps/mobile` and checked each for a role, rather than the one the finding names.
+
+**MEASUREMENT — all six pressables in the app, each opened:**
+
+| file:line | control | role |
+|---|---|---|
+| `screens/board-screen.tsx:60` | `<TouchableOpacity onPress=…>` | **NONE** |
+| `screens/ticket-screen.tsx:119` | `<Button title="Redo legally">` | implicit — RN's `Button` has one, and `title` is its label |
+| `screens/ticket-screen.tsx:120` | `<Button title="Convert to comment">` | implicit |
+| `screens/ticket-screen.tsx:121` | `<Button title="Discard">` | implicit |
+| `screens/ticket-screen.tsx:126` | `<Button title="Comment">` | implicit |
+| `screens/help-screen.tsx:296` | `<Pressable>` | **`accessibilityRole="button"` set explicitly** |
+
+**So the count is one of six — and that is the point, not a rounding of it.** The four `<Button>`s are fine because RN's `Button` carries an implicit role and its `title` names it. **`Pressable` and `TouchableOpacity` both lack an implicit role on this platform** — which is why `help-screen.tsx:299` sets `accessibilityRole="button"` on its `Pressable` by hand. **The same platform, the same missing default, two files: one supplies the role and one does not.**
+
+**WHY IT IS WORTH A ROW BEYOND THE OBSERVATION — IT IS THE FOURTH INSTANCE OF THIS REPORT'S PATTERN.** P19 (a `tablist` unnamed beside the sheet's named one), P21 (a textbox unnamed beside the labelled toolbar above it), P22 (a menu unnamed beside the identical named menu in the same bar), and now this: **the defect is consistently an instance missing from a pattern the product uses correctly feet away.** Four instances across three packages and two platforms is not a coincidence of carelessness; it is what the absence of any per-role check looks like, which is **P10 stated as a measurement** — the accessible-name ratchet counts four attributes, all of them web ARIA, and it does not run against React Native at all.
+
+**⚠ AND THE MOBILE SEVERITY CEILING, STATED SO THIS IS NOT INFLATED.** `Features.md` marks this shell `⚙️` deliberately: *"no simulator or physical device has ever shown this UI to a person"*. So this is a defect in a surface that has never been rendered — **real, and lower-consequence than the same defect on web**, which is why it is Minor and why the app-wide census is the part worth reading.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -797,7 +820,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
 - `P26` ⚠ r2 — the prototype-delta document is stale in BOTH halves: **every numbered queue row is closed** and **two of five per-screen gap claims no longer describe the product**
 
-**MINOR — 15**
+**MINOR — 16**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -813,8 +836,9 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 - `P25` ⚠ r2 — three live files cite the docblock of a deleted component, one of them an instrument
 - `P27` ⚠ r2 — the viewport suite's narrowest width is 390px; WCAG 1.4.10 names 320px and nothing tests it
+- `P28` ⚠ r2 — the mobile board's row is the one pressable of six with no accessibility role; its sibling sets one **(observation credited to the opposing lane; the census is the addition)**
 
-**Total 31.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 32.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
