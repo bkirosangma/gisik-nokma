@@ -1486,3 +1486,37 @@ is the settings sidebar, and the stack suite's tap route list is seven routes wi
   Package suites: web 642.
 
 **No `Features.md` bullet.** This corrects an existing control's metrics; it adds no affordance.
+
+## The type editor's Save and the builder's Publish are the shared `Button` (lane ds1, 2026-09-21, batch B10) — case `13.1152`
+
+**The finding, round 2 `E4-27`, MINOR.** `button.ticket-type-editor__save "Save ticket type"` measured
+**146×36** with `border: 1px solid var(--gn-accent)`, `border-radius: 6px` and `padding: 0.35rem 0.9rem`
+— a page-local copy of a control the product already has — beside a shared `Button` that is 44px,
+border-less and control-radiused, on a screen whose prototype draws 44. `.publish-controls__publish` is
+the same rule in a second file, and the judge's note enumerated the roster that made it a family
+(`.gn-button:61-68` = `min-height: 2.75rem` + control radius; the Publish rule the same idiom).
+
+### The case
+
+- ✅ **13.1152 — the rendered Save and Publish carry the shared primary variant, and the two page-local
+  rules kept only the layout they own.** Asserted in **two files, because the two controls render on two
+  routes and one case cannot reach both**: the Save in `apps/web/test/authoring-routes.test.tsx` on the
+  type-editor route, the Publish in `apps/web/test/builder-route.test.tsx` on the builder route. Both
+  assertions are made because either alone is passable while the defect survives: a tree that swapped the
+  component but left the old paint behind would still look right in jsdom — `classList` would hold
+  `gn-button--primary` either way — while the duplicate declarations went on competing in a browser. The
+  classes survive as **layout only** (`align-self: flex-start`, the one declaration the shared component
+  does not supply), asserted so a later tidy that deleted them does not let a column flex parent stretch
+  the control.
+
+### ⚠ Two things the first cut got wrong, both caught by an assertion rather than by review
+
+**The Publish loop was passing vacuously.** The first version looped over
+`[/^Publish$/, /^Use this template/]` **on the type-editor route**, and the population assertion added to
+stop an empty loop reading as a pass immediately failed: **that route renders no Publish at all.** The loop
+had been green for the wrong reason, and the fix is the split above. **And the first Save run reported
+"2 passed, 1 error"**: the editor's mount effect calls `listWorkflows`/`listTicketTypes` as well as the
+roster, and an un-stubbed read rejects **by name** — surfacing as an unhandled error, not a red assertion.
+A summary that counted only tests would have read it as green. `ui.css` and the two components were
+reverted to `HEAD` for the RED run (with a rebuild, so the revert reached the compiled artifact) and
+restored from sha256-compared backups. Package suites: ui 420, app-core 1725, web 647.

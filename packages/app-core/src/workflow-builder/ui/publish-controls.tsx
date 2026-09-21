@@ -1,5 +1,6 @@
 import { useState } from 'react';
 import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
+import { Button } from '@gisik-nokma/ui';
 import { selectIssues } from '../draft-store.js';
 import { buildPublishPayload, buildWorkflowDefinedEvent, droppedStates } from '../events.js';
 import { useBuilderEnv, useDraft } from './builder-context.js';
@@ -105,15 +106,18 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
 
   return (
     <div className="publish-controls">
-      <button
-        type="button"
+      {/* E4-27 — the shared `Button`, not a page-local control. The class
+          stays for `align-self: flex-start` (the one thing the shared
+          component does not supply); the paint is `gn-button--primary`'s. */}
+      <Button
+        variant="primary"
         className="publish-controls__publish"
         disabled={issues.length > 0 || state.phase === 'submitting'}
         title={issues.length > 0 ? 'Fix the issues below first.' : undefined}
         onClick={() => void onPublishClick()}
       >
         Publish
-      </button>
+      </Button>
       {state.phase === 'mapping' ? (
         <StateMappingDialog
           dropped={dropped}

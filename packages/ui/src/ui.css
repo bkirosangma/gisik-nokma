@@ -2501,18 +2501,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    can answer, an invalid envelope is a claim the server could not read at all,
    and the two must not look like one thing. The success banner is `success`. */
 .publish-controls { display: flex; flex-direction: column; gap: 0.5rem; }
-.publish-controls__publish {
-  align-self: flex-start;
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
-  border: 1px solid var(--gn-accent);
-  border-radius: 6px;
-  padding: 0.35rem 0.9rem;
-  font: inherit;
-  cursor: pointer;
-}
-.publish-controls__publish:disabled { background: var(--gn-surface-sunken); color: var(--gn-text-muted); border-color: var(--gn-border); cursor: not-allowed; }
-.publish-controls__publish:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+/* LAYOUT ONLY — the paint is `.gn-button--primary`'s (E4-27, 2026-09-21).
+   The rule used to carry its own accent fill, 1px accent border, 6px radius and
+   0.35rem/0.9rem padding, which is a second, hand-rolled copy of the shared
+   button: measured **146x36** against the 44px, border-less,
+   control-radiused `.gn-button` beside it, on the same screen. What is left is
+   the one declaration the shared component does NOT supply —
+   `align-self: flex-start`, which stops a column flex parent stretching the
+   control to full width. `:disabled` and `:focus-visible` went with the paint:
+   `.gn-button` already carries both (`:disabled` opacity, the focus ring). */
+.publish-controls__publish { align-self: flex-start; }
 .publish-controls__banner {
   margin: 0;
   border-left: 3px solid var(--gn-border);
@@ -2984,18 +2982,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font-size: 0.8rem;
   color: var(--gn-text);
 }
-.ticket-type-editor__save {
-  align-self: flex-start;
-  border: 1px solid var(--gn-accent);
-  border-radius: 6px;
-  padding: 0.35rem 0.9rem;
-  font: inherit;
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
-  cursor: pointer;
-}
-.ticket-type-editor__save:disabled { background: var(--gn-surface-sunken); color: var(--gn-text-muted); border-color: var(--gn-border); cursor: not-allowed; }
-.ticket-type-editor__save:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+/* LAYOUT ONLY — see `.publish-controls__publish` above; same fix, same day, same
+   finding (E4-27). Measured **146x36** with a 1px accent border and a 6px
+   radius, beside a shared `Button` that is 44px, border-less and
+   control-radiused, against a prototype that draws 44. */
+.ticket-type-editor__save { align-self: flex-start; }
 .ticket-type-editor__saved { margin: 0; font-size: 0.85rem; color: var(--gn-success); }
 .ticket-type-editor__refused,
 .ticket-type-editor__invalid {

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { render, screen } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import {
@@ -54,6 +57,9 @@ vi.mock('../src/auth-client.js', () => ({
 }));
 
 import EditWorkflowPage from '../app/w/[workspaceId]/settings/workflows/[workflowId]/page.js';
+
+/** This file's own directory — no helper here exports one. */
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 
 /**
  * THE REACT FLOW GLOBALS, SHIMMED HERE AND NOT IN `apps/web/test/setup.ts`.
@@ -257,5 +263,45 @@ describe('13.773 the crumb is a single link to the workflow list', () => {
     // anchor" just as well.
     expect(screen.getByRole('button', { name: 'Add state' })).toBeInTheDocument();
     expect(screen.getByRole('button', { name: 'Publish' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Case `13.1152` — E4-27, the Publish half. The Save half is in
+ * `authoring-routes.test.tsx`, because the two controls render on two routes and
+ * a single case cannot reach both.
+ *
+ * `.publish-controls__publish` was a hand-rolled `<button>` whose own rule
+ * re-declared the accent fill, a 1px accent border, a 6px radius and
+ * `0.35rem 0.9rem` padding — measured **146×36** beside a shared `Button` that is
+ * 44px, border-less and control-radiused, on a screen whose prototype draws 44.
+ * Swift to `@gisik-nokma/ui`'s `Button variant="primary"`; the page-local class
+ * survives for `align-self: flex-start`, the one declaration the shared
+ * component does not supply.
+ *
+ * **The page-local rule is asserted to carry NO paint**, in the same case: a
+ * tree that swapped the component but left the old rule behind would still look
+ * right in jsdom — `classList` would hold `gn-button--primary` either way — and
+ * the duplicate declarations would go on competing in a browser.
+ */
+describe('13.1152 the builder\'s Publish is the shared Button, and the page rule keeps only layout', () => {
+  it('13.1152 Publish carries the shared primary variant', async () => {
+    renderWithAuthoring({});
+    const publish = await screen.findByRole('button', { name: 'Publish' });
+    expect(publish).toHaveClass('gn-button');
+    expect(publish).toHaveClass('gn-button--primary');
+    // The class that survives, for `align-self`, must survive — a later tidy
+    // that deleted it would let a column flex parent stretch the control.
+    expect(publish).toHaveClass('publish-controls__publish');
+  });
+
+  it('13.1152 the page-local rule declares no fill, border or padding', async () => {
+    const css = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
+    const body = /\.publish-controls__publish\s*\{([^}]*)\}/.exec(css);
+    expect(body, 'no rule for .publish-controls__publish').not.toBeNull();
+    expect(body?.[1]).toContain('align-self: flex-start');
+    for (const paint of [/background:/, /border/, /padding/, /border-radius/]) {
+      expect(body?.[1], `.publish-controls__publish re-declared ${String(paint)}`).not.toMatch(paint);
+    }
   });
 });

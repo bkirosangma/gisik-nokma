@@ -6,7 +6,7 @@ import {
   type PublishedWorkflowDef,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Card, Select } from '@gisik-nokma/ui';
+import { Button, Card, Select } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -131,15 +131,18 @@ function EditorHeader(props: {
             flight, and it does not exist at all for a non-author. Moving it must
             not turn it into a button that reports success about a def the server
             will reject. */}
+        {/* E4-27 — the shared `Button`, not a page-local control. The class
+            stays for `align-self: flex-start` (the one thing the shared
+            component does not supply); the paint is `gn-button--primary`'s. */}
         {props.canAuthor ? (
-          <button
-            type="button"
+          <Button
+            variant="primary"
             className="ticket-type-editor__save"
             disabled={props.saveDisabled}
             onClick={props.onSave}
           >
             Save ticket type
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>
