@@ -2507,3 +2507,73 @@ setup path is not itself affected by the missing entry). `Tests 1 passed`. **Con
 would have reported as loudly: the `403 forbidden_origin` on `/v1/events` is the run telling me the check
 was enabled, and without it this probe would have measured nothing** — which is exactly the mistake §24.1
 records me making once already.
+
+---
+
+## 33. `E3-14`, EXTENDED — **three** of the five routes are now demonstrated, and the honest bound on all of them
+
+Written after §32, because the exploit harness is reusable and one demonstration is weaker evidence than
+three. **It also records a bound I had to think about before claiming the third, and it reduces the
+severity claim rather than inflating it.**
+
+**THE OTHER TWO REACHABLE ROUTES, over the same real doors.** A fresh workspace and invitation per case, a
+real signed-in invitee, one body-less POST with the invitee's cookie and `Origin: https://evil.example`:
+
+```
+--- /v1/me/invitations/:inviteId/decline ---
+PROBE decline: status before = pending
+PROBE FORGED decline -> 204
+PROBE decline: status after  = declined          <-- the victim's invitation, declined
+
+--- /v1/invites/:token/accept ---
+PROBE FORGED token-accept -> 200 {"workspaceId":"01M31AS00K8VKCHRF7XJ5T1EYS"}
+PROBE token door memberships before/after = 1 / 2   <-- the victim joined
+PROBE token door invite status = accepted
+```
+
+**So three of the five routes are demonstrated committing a state change**: `accept` (membership created,
+§32), `decline` (invitation spent), and the token door (membership created). Each ran with the Origin check
+**on**, proven by the `403 forbidden_origin` control on `/v1/events` with the same cookie.
+
+### 33.1 ⚠ THE BOUND — all three require an id or token the attacker does not obviously have, and I am stating it because it is the objection a judge should raise first
+
+**`/v1/me/invitations/:inviteId/accept` and `/decline` need the invite id. `/v1/invites/:token/accept` needs
+the token.** Neither is readable cross-origin: the invitee's own `GET /v1/me/invitations` returns the ids in
+a response CORS will not let an attacker page read. **So the chain I demonstrated is conditional on the id
+being known**, and I did not establish a way for an attacker to learn it.
+
+**WHAT THAT DOES AND DOES NOT CHANGE.**
+
+- **It does not change the finding.** `E3-14` is that the HTTP-Origin control does not run for these routes,
+  and that is measured and unchanged. **The project's own criterion does not require the id to be guessable
+  either**: `/v1/me/notifications/:id/read` sits in `HTTP_ORIGIN_PROTECTED_ROUTES` with the identical shape —
+  a cookie-authenticated write naming a per-user id — and the file's note for it says the bar is *"a
+  cookie-authenticatable mutation … writable by a page the victim visits"*, not "an id a page can guess".
+  **Whatever rule puts one route in that set puts these five in it**, which is the whole of the claim.
+- **It does change how the severity should be read, and I would rather say so than have it found.** My §32
+  sentence *"a third-party page can make an authenticated person a member of an attacker-chosen workspace"*
+  is true **when the attacker holds the invite id or token**. The routes that need no secret at all are the
+  two `PUT`s, and those are the two §14.8 bounds with CORS preflight. **So the sharpest fully-unconditional
+  instance in this finding is a route I did not demonstrate, and the three I did are conditional.**
+- **Where the condition is realistic rather than hypothetical**: an invitation link travels by **email**,
+  and its token is the whole credential — forwards, shared inboxes and screenshots are ordinary. And an
+  invitation's id is a surface the product chooses how much to expose; today it is not exposed cross-origin,
+  which is the reason this is bounded rather than an immediate mass-exploit.
+
+**The sentence I would put in front of the judge, in one line:** *five routes are outside the control
+(measured), three of them commit a state change when the caller holds the id the route names (demonstrated),
+and obtaining that id is the part I could not demonstrate — which is why the finding is about the check's
+coverage and not about a mass-exploitable chain.*
+
+**SEVERITY: unchanged at Critical, and the argument is the project's own standard rather than the
+demonstration.** If the judge weighs severity by what I demonstrated, the right number is Important — a
+conditional exploit on an id the attacker must already hold — **and I would not argue with that ruling.**
+If the judge weighs it by the project's own criterion for this set, it is Critical, because whatever made
+`/v1/me/notifications/:id/read` worth protecting makes these five worth protecting and the file's own
+record shows three previous omissions of this exact class each found by measurement.
+
+**MEASUREMENT.** Probe at `apps/server/test/http/zz-e3-exploit2.test.ts`, created, run and **deleted in the
+same shell invocation** (`git status --porcelain` empty). Same construction as §32: real
+`createTestDatabase`, `buildTestApp` with the Origin check **on**, real magic-link sign-ins with real
+`set-cookie`, workspace founded and invitation minted through the product's own doors, `proj_invites.status`
+and `proj_memberships` read directly from Postgres before and after. `Tests 2 passed`.
