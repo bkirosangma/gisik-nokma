@@ -119,9 +119,9 @@ describe('14.97 the list shows what is honestly available', () => {
   });
 });
 
-describe('14.113 a read of your connected assistants that FAILS', () => {
+describe('14.150 a read of your connected assistants that FAILS', () => {
   /**
-   * 14.113 — E2-44. `load`'s rejection arm was `() => setTokens([])`, and `[]` is
+   * 14.150 — E2-44. `load`'s rejection arm was `() => setTokens([])`, and `[]` is
    * exactly the value the empty arm asserts over ("No assistants are connected.
    * One appears here after you approve it on the connect page."). So a 500 was
    * drawn as a confident statement about the person's account, on the one screen
@@ -132,7 +132,7 @@ describe('14.113 a read of your connected assistants that FAILS', () => {
    * sentence is present AND the empty state is not. Asserting only the sentence
    * would pass on a screen that rendered both.
    */
-  it('14.113 a rejected read is a failure sentence, never “No assistants are connected”', async () => {
+  it('14.150 a rejected read is a failure sentence, never “No assistants are connected”', async () => {
     fetchStub(() => ({ status: 500, body: { error: 'internal' } }));
     mount();
 
@@ -143,12 +143,12 @@ describe('14.113 a read of your connected assistants that FAILS', () => {
   });
 
   /**
-   * 14.113, second half — the CONTROL that the pair is not satisfied by a screen
+   * 14.150, second half — the CONTROL that the pair is not satisfied by a screen
    * which simply never renders the empty state. An ANSWERED empty list still has
    * to say the empty sentence; otherwise "no assistants" is unreachable and the
    * fix would have traded one false statement for another.
    */
-  it('14.113 control: an ANSWERED empty list still renders the empty state', async () => {
+  it('14.150 control: an ANSWERED empty list still renders the empty state', async () => {
     fetchStub(() => ({ status: 200, body: { tokens: [] } }));
     mount();
 

@@ -1418,13 +1418,18 @@ driven through it would have passed against a page that sent no filter. It now *
 BEFORE cutting the page**, mirroring `store.ts`, where the filter joins the WHERE and therefore narrows
 what the cursor walks. (`packages/app-core/test/inbox/fake-gateway.ts`)
 
-## The two ticket-type screens report a rejected read instead of loading for ever — cases `13.1050`–`13.1051` (E2-20, 2026-09-21)
+## The two ticket-type screens report a rejected read instead of loading for ever — cases `13.1110`–`13.1111` (E2-20, 2026-09-21)
 
-**The id block is `13.1050`–`13.1051`, the next free ordinals in §13 when this lane recounted** (the
-maximum in use was `13.1049`, the tail of executor 1's reserved `13.1034`–`13.1049`; measured with
-`git grep -hoE '13\.[0-9]{3,4}([^0-9]|$)'` over `test-cases/`, `docs/superpowers/plans/` and
-`docs/lanes/`, with `13.1044` as a positive control in the same invocation — 9 hits, so the sweep can
-see ids at all). The cases sit in this part-file because the screens do.
+**The ids are `13.1110`–`13.1111`, taken as a BLOCK rather than from the tip — and the reason is a
+collision that actually happened.** These two were first minted as `13.1050`/`13.1051`, the tip of §13 as
+`origin/main` showed it (`13.1049`), and **B03 minted `13.1050`–`13.1056` in `13-hig-per-screen.md` the
+same day** — same section, same tip, neither merged. §16's header says §13 is closed to new ids and its
+window sits in an exhausted block; the release plan tells every batch to mint the next free id in its file;
+six batches were doing that at once. **So this lane renumbered its two** (the repo's rule: an id which has
+not merged can still be renumbered) **and took `13.1110`–`13.1119`, clear of every live tip.** Measured
+across ALL remote branches rather than one — §13's occupied ordinals ran to **`13.1103`**, B01's
+server-door cases, so `13.1100`–`13.1103` were taken too. The allocation is recorded in the index
+(`13-deployment-dogfooding.md`). The cases sit in this part-file because the screens do.
 
 **The defect.** Both screens load their whole environment through one `Promise.all` and gate every
 render on the loaded value being non-null. Neither call had a second argument to `.then`, and neither
@@ -1440,11 +1445,11 @@ present **and** the loading sentence is absent. Either alone passes over a scree
 and a reader cannot tell those two states apart — which is the whole defect, so a case that could not
 tell them apart would not be a case.
 
-- **13.1050** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types —
+- **13.1110** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types —
   reload to try again."* and no `Loading ticket types…`. The gateway is the shared fake with that one
   read replaced by a rejection, so the assertion is over the arm and not over a hand-built screen. —
   (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
-- **13.1051** ✅ The editor screen says the same sentence on a rejected `listWorkflows`, and **keeps its
+- **13.1111** ✅ The editor screen says the same sentence on a rejected `listWorkflows`, and **keeps its
   header** — the `type-editor-header` row naming the type under edit, which case `13.924` already holds
   for the loading arm for the same reason. — (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 

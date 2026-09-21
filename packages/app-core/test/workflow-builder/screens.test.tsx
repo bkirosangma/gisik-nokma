@@ -86,17 +86,17 @@ describe('WorkflowBuilderScreen', () => {
   });
 
   /**
-   * 10.91 — the justified half of the same catch, kept under the narrowed one.
+   * 10.111 — the justified half of the same catch, kept under the narrowed one.
    *
    * A guest may not call `GET /v1/workspaces/:id/members` (executor ruling
    * 2026-09-02), and THAT refusal is not a load failure — it is an empty roster,
    * and the builder mounts read-only. This test used to throw a bare `Error`
    * reading `403 guest cannot list members`, which the blanket catch could not
    * tell apart from a 500; it now throws the refusal class, which is the thing
-   * the catch is actually for. Without this half the narrowing of 10.90 could be
+   * the catch is actually for. Without this half the narrowing of 10.110 could be
    * a `throw everything` and still pass.
    */
-  it('10.91 a guest REFUSED the member list still degrades to an empty roster, not a fatal error', async () => {
+  it('10.111 a guest REFUSED the member list still degrades to an empty roster, not a fatal error', async () => {
     const gateway = createFakeGateway();
     gateway.listMembers = async () => {
       throw new AuthoringReadRefused('/v1/workspaces/ws/members');
@@ -114,7 +114,7 @@ describe('WorkflowBuilderScreen', () => {
   });
 
   /**
-   * 10.90 — E2-39. The roster read that fails for any reason OTHER than the
+   * 10.110 — E2-39. The roster read that fails for any reason OTHER than the
    * guest refusal is a load failure, and the screen already has the arm for it.
    *
    * `listMembers(...).catch(() => [])` is blanket, so a 500, a dropped connection
@@ -130,7 +130,7 @@ describe('WorkflowBuilderScreen', () => {
    * still fail. The thrown value is a bare `Error` — not the refusal type — so
    * this file does not depend on the refusal class existing to be RED.
    */
-  it('10.90 a roster read that fails for a reason other than the refusal is a LOAD FAILURE, not an empty roster', async () => {
+  it('10.110 a roster read that fails for a reason other than the refusal is a LOAD FAILURE, not an empty roster', async () => {
     const gateway = createFakeGateway();
     gateway.listMembers = async () => {
       throw new Error('HTTP 500 for /v1/workspaces/ws/members');

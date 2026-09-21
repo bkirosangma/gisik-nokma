@@ -1619,7 +1619,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
   const task = builtins.find((builtin) => builtin.id === 'task')!;
 
   /**
-   * 13.1050 — E2-20. The `Promise.all` at the top of the list screen's effect had
+   * 13.1110 — E2-20. The `Promise.all` at the top of the list screen's effect had
    * no rejection arm, and the screen gated its whole render on the loaded state, so
    * a rejected read was drawn as `Loading ticket types…` on a screen that would
    * never load. The file's own docblock at the SIBLING promise names that exact
@@ -1630,7 +1630,7 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
    * AND the loading sentence is gone. Either alone passes on a screen that renders
    * both — and a reader cannot tell the two apart, which is the whole defect.
    */
-  it('13.1050 a rejected ticket-type read renders the load-error sentence, never “Loading ticket types…” for ever', async () => {
+  it('13.1110 a rejected ticket-type read renders the load-error sentence, never “Loading ticket types…” for ever', async () => {
     const gateway = {
       ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
       listTicketTypes: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/ticket-types')),
@@ -1649,13 +1649,13 @@ describe('A rejected ticket-type read is an error, not an eternal load (E2-20)',
   });
 
   /**
-   * 13.1051 — E2-20, the editor half. Same missing arm, same gate. The header is
+   * 13.1111 — E2-20, the editor half. Same missing arm, same gate. The header is
    * asserted here for the reason case 13.924 records for the loading arm: the pane
    * draws the name and Cancel from its own fetch, and an error arm that dropped the
    * header would blank the row it belongs to at the moment a person needs to see
    * which type they were editing.
    */
-  it('13.1051 the editor screen says the same thing on a rejected read, and keeps its header', async () => {
+  it('13.1111 the editor screen says the same thing on a rejected read, and keeps its header', async () => {
     const gateway = {
       ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
       listWorkflows: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/workflows')),
