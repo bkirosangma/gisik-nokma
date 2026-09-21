@@ -78,7 +78,9 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 **WHAT.** `button.gn-sheet__close` ("×", `aria-label="Close sheet"`) — the one pointer-operated way out of the product's most-used overlay.
 
-**MEASUREMENT (painted, `:3041`, 1512×900, sheet open).** `getBoundingClientRect()` → `w 23.59, h 21.20`; `getComputedStyle` → `padding: 1px 6px` (the UA's), `min-width: auto`, `min-height: auto`, `font-size: 19.2px`, `background: rgba(0,0,0,0)`. **No backdrop element exists** (`document.querySelector('[class*="backdrop"]')` → `null`), so click-outside is not an equivalent; Escape is a key, not a control. Source: `packages/ui/src/ui.css:720-728` sets `font`, `font-size: 1.2rem`, `line-height: 1`, `border: none`, `background: none`, `color`, `cursor` — **no `min-height`, `min-width`, `padding` or `display`**. Markup `packages/ui/src/components/sheet.tsx:111`.
+**MEASUREMENT (painted, `:3041`, 1512×900, sheet open).** `getBoundingClientRect()` → `w 23.59, h 21.20`; `getComputedStyle` → `padding: 1px 6px` (the UA's), `min-width: auto`, `min-height: auto`, `font-size: 19.2px`, `background: rgba(0,0,0,0)`. **No backdrop element exists** (`document.querySelector('[class*="backdrop"]')` → `null`), so click-outside is not an equivalent; Escape is a key, not a control. Source: `packages/ui/src/ui.css:719-728` (`.gn-dialog__close, .gn-sheet__close`) sets `font`, `font-size: 1.2rem`, `line-height: 1`, `border: none`, `background: none`, `color`, `cursor` — **no `min-height`, `min-width`, `padding` or `display`**. Markup `packages/ui/src/components/sheet.tsx:111`.
+
+**THE DIALOG TWIN, same paint.** `button.gn-dialog__close` (`aria-label="Close dialog"`) in the New-ticket dialog measures **24×21** the same way (`packages/ui/src/components/dialog.tsx`, rule `ui.css:719-728` is the shared selector list `.gn-dialog__close, .gn-sheet__close`) — so every modal in the product closes through a 21-px glyph. Only the Filters panel moves focus into itself on open (`activeInDialog: true`); the Dialog and the Sheet leave `document.activeElement` on `body` — a painted reproduction of round 1's P8, recorded here as corroboration, not claimed as new.
 
 **PROTOTYPE.** `Gisik Nokma - Desktop.dc.html` (`3d142d46…`) `:1121`: the sheet's close is `width:32px;height:32px;border-radius:999px;background:var(--ctlBg);box-shadow:var(--ctlShadow)` — a 32-px filled circle. **Category 3: diverges with no ruling found.** `grep -n "gn-sheet__close\|close.*32\|Close sheet" packages/ui/src/ui.css docs/lanes/review-compiled-controller.md docs/superpowers/plans/*.md` → the only hits are the rule itself and the markup; no ruling text.
 
@@ -177,7 +179,7 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 **WHAT.** `/w/<id>/settings/workflows/<workflowId>` at `emulate 390x844`.
 
-**MEASUREMENT (painted).** `document.querySelectorAll('main')` → **2**: `main.gn-shell` (parent `body`) and `main.workflow-builder-screen__canvas` (parent `div.workflow-builder-screen__layout`, `nested: true`). Source: `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:131` `<main className="workflow-builder-screen__canvas">`, inside the app shell's `<main>` (`apps/web/app/layout.tsx`). `window.innerWidth` → **415** on a 390 emulation (every other route in this pass reads 390) and `document.documentElement.scrollWidth` → 415; the widest element is `input.workflow-builder-screen__name` at **403 px** — its rule (`packages/ui/src/ui.css:2968-2979`) sets `font-size: 2.125rem` and no `width`/`max-width`/`min-width: 0`, so the input's intrinsic `size=20` width at 34 px wins. `h1` count → **0** on the builder and **0** on `…/history` (the builder's h1 gap is recorded at `ui.css:2952-2959` as pre-existing with an owner — I list it as known, not as a finding). The crumb link `a "Settings › Workflows"` is `display: inline`, **126×15**, alone in `nav.gn-builder-crumb` (parent text == own text, so the sweep's inline-in-prose exemption does not apply) — judged at 44 by the product's rule.
+**MEASUREMENT (painted).** `document.querySelectorAll('main')` → **2**: `main.gn-shell` (parent `body`) and `main.workflow-builder-screen__canvas` (parent `div.workflow-builder-screen__layout`, `nested: true`). Source: `packages/app-core/src/workflow-builder/ui/workflow-builder-screen.tsx:131` `<main className="workflow-builder-screen__canvas">`, inside the app shell's `<main>` (`apps/web/app/layout.tsx`). `window.innerWidth` → **415** on a 390 emulation (every other route in this pass reads 390) and `document.documentElement.scrollWidth` → 415; the widest element is `input.workflow-builder-screen__name` at **403 px** — its rule (`packages/ui/src/ui.css:2968-2979`) sets `font-size: 2.125rem` and no `width`/`max-width`/`min-width: 0`, so the input's intrinsic `size=20` width at 34 px wins. `h1` count → **0** on the builder and **0** on `…/history` (the builder's h1 gap is recorded at `ui.css:2959-2967` ("AN `<h1>` BESIDE IT WOULD PRINT THE NAME TWICE … pre-existing … recorded with an owner") — I list it as known, not as a finding). The crumb link `a "Settings › Workflows"` is `display: inline`, **126×15**, alone in `nav.gn-builder-crumb` (parent text == own text, so the sweep's inline-in-prose exemption does not apply) — judged at 44 by the product's rule.
 
 **WHY IT IS WRONG.** HTML permits one visible `main` per document; a screen reader's landmark list offers "main" twice and the inner one is a canvas. The 415-px layout viewport means the phone shows the page zoomed out or side-scrolling — the `.gn-nav` overflow that the stack suite's docblock (`e2e-stack/viewport.spec.ts:47-54`) calls the bug this instrument exists to catch, on a route the instrument's overflow assertion does not visit.
 
@@ -220,6 +222,51 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 **WHY IT IS WRONG.** A ratchet whose population is one page reports "offenders=6" as if it were about the product. Round 1's P11 made this point for the Select panel; the true scope is wider — the population is the shape of the suite's route list, not of a component.
 
 **WHAT WOULD HAVE BEEN BETTER.** Run `measureTapTargets` inside the route loop (one line per route, with baselines recorded the way type-scale already does), lift `measureContrast` into a shared module the stack spec imports, and add the sheet-open and builder states.
+
+---
+
+
+### E4-13 — **IMPORTANT** — The New-ticket dialog's Title field is a bare `<input>` that paints as a 2-px inset user-agent box, 22 px tall, white, in a neumorphic dialog
+
+**WHAT.** Open *New ticket* on the board. The first control a person types into is `<label class="gn-new-ticket__field">Title<input value=""></label>`.
+
+**MEASUREMENT (painted, `:3041`, 1512, light).** `getComputedStyle(input)` → `border: 2px inset rgb(118,118,118)`, `background-color: rgb(255,255,255)`, `border-radius: 0px`, `padding: 1px 2px`, `font-size: 13.3333px`; `getBoundingClientRect` → **425×22**. Its two siblings in the same dialog (`Type`, `Parent`) are React Aria comboboxes inside `.gn-select__trigger` and paint at the product's 17 px in a border-less field. Source: `packages/app-core/src/views/new-ticket-dialog.tsx:127-130` — the `<input>` carries no class; `packages/ui/src/ui.css:2155` styles only the wrapper (`.gn-new-ticket__field { display: flex; flex-direction: column; … }`); `apps/web/app/globals.css:96` gives inputs `font-family: inherit` and nothing else.
+
+**PROTOTYPE.** `Gisik Nokma - Desktop.dc.html` (`3d142d46…`) `:1580`: the same field is `min-height:44px; padding:0 14px; border:none; border-radius:var(--ctlR); background:var(--fieldBg); box-shadow:var(--fieldShadow); font-size:17px`. **Category 3 for the BOX** — no ruling found; `grep -n "gn-new-ticket" packages/ui/src/ui.css` → the wrapper rule and the actions rule only. **The font SIZE is category 2 and I do not claim it:** `globals.css:86-95` records that the three form elements *"currently render at the UA's ~13.3333px on every screen"* and parks the decision at case `15.31`.
+
+**WHY IT IS WRONG.** It is the product's most-used input (every ticket starts here), it is 22 px tall against the product's own 44 floor and the prototype's 44, and it is the one white inset rectangle in a dialog whose every other surface is a soft fill. `16.83`'s *"grey OS buttons in a neumorphic page"* was treated as a defect; this is the same defect on an input.
+
+**WHAT WOULD HAVE BEEN BETTER.** `className="gn-field__input"` — the class `passkeys-section.tsx:114-120` and `profile-section.tsx:40-46` already use for exactly this (per `state-inspector.tsx:9-15`'s own note), which carries the fill, radius, 44-px height and the `neo` sunken override.
+
+---
+
+### E4-14 — **IMPORTANT** — The active-filter chip's remove control is an 8×13 px "×"
+
+**WHAT.** On Calendar and Timeline (and any view with a chip in the tray), `button.gn-project__filter-chip-remove` with `aria-label="Remove filter — Closed: hidden"`.
+
+**MEASUREMENT (painted, 1512).** `getBoundingClientRect` → **8.1×13**; `getComputedStyle` → `padding: 0`, `line-height: 13px`, `font-size: 13px`, `min-width/min-height: auto`. The chip itself (`span.gn-project__filter-chip`, 147×26) is a `<span>` with no handler, so nothing larger removes the filter. Source: `packages/ui/src/ui.css:4981-4990` — `border: none; background: none; padding: 0; margin: 0; font: inherit; line-height: 1` — no size; the chip's `font-size: 0.8125rem` (`:4972`) is what the × inherits.
+
+**WHY IT IS WRONG.** 8×13 is a third of WCAG 2.5.8's 24-px minimum and the smallest interactive target I measured anywhere in the product. It is not in `DENSE_IN_LIST`, so by the product's rule it is judged at 44. No sweep has ever seen it: the calendar and timeline views are not routes, and the tap pass runs on `/my-work` only (E4-12).
+
+**WHAT WOULD HAVE BEEN BETTER.** `min-width: 24px; min-height: 24px; display: inline-grid; place-items: center` on the button (the chip stays 26 tall), or make the whole chip the remove control with the × as its glyph.
+
+---
+
+### E4-15 — **MINOR** — The timeline's Earlier / Today / Later buttons paint with the browser's 2-px outset bevel: the class HAS a rule, and the rule forgot the border
+
+**WHAT.** `button.gn-timeline__nav` ×3 on the Timeline view.
+
+**MEASUREMENT (painted, 1512, light and dark).** `getComputedStyle` → `border: 2px outset rgb(0,0,0)` with the product's own `background: rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px` — i.e. the rule applied and the UA border survived. Source: `packages/ui/src/ui.css:3427-3434` sets `border-radius`, `background`, `color`, `font`, `padding`, `cursor` and **no `border`**. This is outside round 1's P1 population by construction: P1 selected classes with **zero** matching selector blocks; this class has one. A sweep keyed on "has a rule" reports it as styled.
+
+**PROTOTYPE.** `Desktop.dc.html:509-511`: `min-height:36px; padding:0 12px; border:none; border-radius:var(--ctlR); background:var(--ctlBg); box-shadow:var(--ctlShadow); color:var(--accent)`. **Category 3: diverges with no ruling found** — the sibling calendar nav (`.gn-calendar__nav`, 31×36) does follow the prototype's shape, and nothing records why the timeline's does not.
+
+**WHAT WOULD HAVE BEEN BETTER.** `border: none; min-height: 36px; background: var(--gn-fill-tertiary); color: var(--gn-text-accent)` — the calendar nav's own values.
+
+---
+
+### E4-16 — **MINOR** — React Flow's attribution link renders at 10 px with 1.10:1 contrast in dark mode (2.61:1 in light)
+
+**MEASUREMENT (painted, builder route).** `a "React Flow attribution"`: `font-size: 10px`, `color: rgb(153,153,153)` on the canvas backdrop `rgb(141,145,160)` (dark) → **1.10:1**; on `rgb(248,245,241)` (light) → **2.61:1**; both under 4.5. It is the only text-contrast failure in 12 dark-mode routes and 14 light-mode routes I measured (2,600+ text elements). **Caveat stated:** this is React Flow's own element (`.react-flow__attribution`), required by its licence unless the pro option is used; the product can still restyle it (`a` colour) without hiding it. Severity Minor: third-party, decorative, but it is on a shipping route and it fails.
 
 ---
 
