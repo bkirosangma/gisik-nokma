@@ -64,3 +64,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-21 | done | 70946c4b | case 6.84 split: refusal ✅ (hierarchy.ts:124/:250) + rollup property ✅ (rollup 6 green) |
 | T-E3-22 | done | cf12d5cc | case 6.58 closed: hierarchy.cycle refuses the repro at both walks |
 | T-E3-23 | done | a40f3b83 | case 6.124 closed: both URLs take httpUrl() (config 27 green) |
+| T-E3-24 | done | 952ac8e2 | case 6.66 closed: parent placeholder is existence-vs-TITLE, withheld-title assertion written |
