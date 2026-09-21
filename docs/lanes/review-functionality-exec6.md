@@ -221,7 +221,12 @@ ticket answers **404**.
    the comments door refuses to serve (case 16.72), and a `Restore` brings the ticket back in a state and with an
    assignee nobody saw set.
 
-**This is not a ruled divergence.** I searched for a ruling: `visible-where.ts:173-178` explains why the *engine
+**This is not a ruled divergence.** The nearest ruling is the Delete PR's own list (`executor-state-history.md:674-678`,
+"NAMED, NOT COVERED" item 1): *"a delivered notification stays exactly as delivered even after the underlying
+ticket's visibility narrows … 'a message you were sent is yours; revocation removes future sight, not letters
+delivered'"* — a ruling about letters delivered **before** the ticket went away. E6-2's letter is composed **after**
+the delete, about a ticket already gone; the ruling does not reach it, and the fanout's own sentence (*"a ticket the
+actor could see at the time"*) shows it was not meant to. Beyond that: `visible-where.ts:173-178` explains why the *engine
 context* must serve deleted rows — *"an engine that cannot see a deleted ticket refuses its own undo
 (`ticket.restored`) with `unknown-ticket`"* — which is a reason for the context's reader, not a ruling that other
 writes are accepted. Case `16.90` records *"`canSee` does not mean 'not deleted'"* as the reason the attachment
@@ -363,7 +368,9 @@ function's."* **The caller never added it.** The row it receives carries the fla
 filter at `transition.ts:134` is the whole fix; instead the engine refuses with a count (*"1 of its child
 tickets"*) that every view — the rollup (`visibility/rollup.ts:263`, `t.deleted_at IS NULL`), the board, the list
 — reports as **0**. The user's only way out is to know that a deleted child exists, find it (no view lists it) and
-restore it, close it, and delete it again.
+restore it, close it, and delete it again — and the Delete PR's own list records that after the 15 s undo toast
+**"there is no UI that emits `ticket.restored`, so a soft delete becomes permanent in practice"**
+(`executor-state-history.md:686-690`, item 6), so from the product's UI the parent can never be finished.
 
 The same reader is what `hierarchy.ts:123` (`getTicketState(ctx, p.parentId)`) and `:249` (`newParentId`) resolve
 a parent through, so a **live** child is placed under a parent that *"stops appearing in views"*. The read side
@@ -371,7 +378,10 @@ already had to invent an answer for this (`routes/tickets.ts:419-431`: a deleted
 *"there is a parent here whose name you do not get"*), which is an honest answer for a child that was orphaned by
 its parent's deletion and a strange one for a child the actor just created there.
 
-**Not a ruled divergence.** The recorded reason for the unfiltered reader is `ticket.restored`
+**Not a ruled divergence.** The Delete PR's item 7 (`executor-state-history.md:692-696`) names *"whether deleting a
+parent should cascade, refuse, or orphan"* as open — that is the fate of **existing** children when their parent is
+deleted; this finding is the two other directions (a deleted **child** blocking its live parent, and **new** children
+placed under an already-deleted parent), which item 7 does not name. The recorded reason for the unfiltered reader is `ticket.restored`
 (`projections/tickets.ts:216-222`), and that reason does not reach `getChildrenStates` — the restore check never
 reads children. The docblock's hand-off sentence is the closest thing to a ruling and it rules the *opposite*
 way: the predicate is the caller's to add. Cases `5.x` on the parent-terminal invariant (`05-tickets-hierarchy.md`)
