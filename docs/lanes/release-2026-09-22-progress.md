@@ -18,3 +18,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-15 | done | fa294812 | 13.1114 (ticket-types.test.tsx) — the OTHER half of each Promise.all tuple; RED observed against the reverted fix |
 | T-E5-40 | done | 7495e6fd | 13.1115 (backlog-tab.test.tsx) — the toggle-hidden backlog says so; scope note + manual name the Backlog |
 | T-E5-42 | done | f317d1c6 | 13.1116/13.1117 (ticket-list.test.tsx) — prefsError split from list.error; the column-chooser sentence |
+| T-V9 | done | 32fa059a | 17.061/17.062 (invite-page.test.tsx) — an unchecked link is not a dead link; retry added |
