@@ -4146,8 +4146,8 @@ number.**
   and a constraint the case did not foresee: `:76-77` `CHECK (total_children = open_children + active_children +
   terminal_children)` — the "different sources" question is answered in the schema for the one table, and in the
   test for the two.
-- File 06 has been edited **three times since** (`2f18f3f7` 2026-09-06, `c2c8be1c` 2026-09-17, `3a3a7ad4` 2026-09-19;
-  `git log -- test-cases/06-auth-visibility.md`) without the marker moving. The workspace rule is *"flip the status
+- File 06 has been committed **seven times since** (`git log --since=2026-09-02T23:59 -- test-cases/06-auth-visibility.md`
+  → five on 2026-09-06, `c2c8be1c` 2026-09-17, `3a3a7ad4` 2026-09-19) without the marker moving. The workspace rule is *"flip the status
   marker in the same commit as the test that covers it"* (`/Users/kiro/my_projects/CLAUDE.md`, §test-cases).
 
 This is the `E3-23` shape exactly (a ❌ whose closer names the case by number) with one more witness: a sibling
@@ -4316,8 +4316,8 @@ wearing the server's provenance (`SERVER_ORIGIN_REASON`), enumerating which door
   `/v1/sync` by a member answers `{ status: 'contested', rule: PERMISSION_ROLE_RULE, reason: SERVER_ORIGIN_REASON }`
   — the gate firing on the door the docblock says is not there.
 - The sentence dates from `fc904f4a` (2026-08-31, *"the envelope-origin forgery, closed at the client door only"*);
-  `check-permission.ts` has been committed **16 times** since, last `d13dc546` (2026-09-20), and the status list never
-  moved.
+  `check-permission.ts` has been committed **13 times after** that day (`git log --since=2026-08-31T23:59 -- …` → 13;
+  16 in its whole history), last `d13dc546` (2026-09-20), and the status list never moved.
 
 This is `E3-1`'s shape exactly — *"an open-gap section still declares a closed security-relevant leak"* (the
 controller's words, ACCEPTED at Important) — in the gate's own file rather than a test's: a reader auditing the
@@ -4332,7 +4332,7 @@ whole instrument.
 **MEASUREMENT.** Lines opened: `check-permission.ts:520-533`; `sync-routes.ts:483-500`; `sync-service.ts:71`, `:370`;
 `sync-route.test.ts:345-361`; `git log --format='%h %ad' -- apps/server/src/sync/sync-routes.ts | tail -1` →
 `999d4860 2026-09-04`; `git log -S'NOT CLOSED, because it does not exist yet' -- …/check-permission.ts | tail -1`
-→ `fc904f4a 2026-08-31`; `git log --format=%h -- …/check-permission.ts | wc -l` → 16. **Not run:** the sync test
+→ `fc904f4a 2026-08-31`; `git log --since=2026-08-31T23:59 --format=%h -- …/check-permission.ts | wc -l` → 13 (16 in all). **Not run:** the sync test
 (it needs the test Postgres); the witness is cited from its assertion, opened at the line. **Control:** the same
 docblock's first bullet (`POST /v1/events` → `ingestClientBatch`) is true — `routes/events.ts` is the door `E3-14`'s
 control row exercised.
@@ -4353,8 +4353,8 @@ INSERTS above proj_projects, which had been immediately after proj_workflows onl
 empty"*), then `projProjects` (*"§8 position 4"*). So `proj-projects` is not immediately after `proj_workflows`, the
 table it says is missing is registered above it, and the neighbour file carries the correction the docblock says
 must travel with it. Dates: the docblock landed in `dd7bfcfd` (2026-09-01, #57); the ticket-types projection landed in
-`6cb631d0` (2026-09-01, #59) — the same day; `proj-projects.ts` has been committed 5 times since, last `4d11d8f8`
-(2026-09-20), with the sentence intact.
+`6cb631d0` (2026-09-01, #59) — the same day; `proj-projects.ts` has been committed **4 times after** that day (5 in
+all), last `4d11d8f8` (2026-09-20), with the sentence intact.
 
 **WHAT WOULD HAVE BEEN BETTER.** Delete the two sentences; `index.ts:66-72` already says what is true and why.
 
