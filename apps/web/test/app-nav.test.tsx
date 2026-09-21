@@ -36,8 +36,12 @@ import { stubServices } from './helpers/stub-services.js';
 // this file need different routes, so each sets `currentPath` before
 // rendering rather than every case sharing one static mock.
 let currentPath = '/workspaces';
+// The push is a SHARED spy rather than a fresh `vi.fn()` per call (E2-45): the
+// sign-out failure arm's whole claim is that nothing is pushed, and an
+// assertion against a spy nobody holds cannot be made.
+const routerPush = vi.fn();
 vi.mock('next/navigation', () => ({
-  useRouter: () => ({ push: vi.fn() }),
+  useRouter: () => ({ push: routerPush }),
   useParams: () => ({}),
   usePathname: () => currentPath,
   useSearchParams: () => new URLSearchParams(),
@@ -57,9 +61,22 @@ let mockSessionUser: { id: string; name: string; email?: string } | null = {
 vi.mock('../src/auth-client.js', () => ({
   authClient: {
     useSession: () => ({ data: mockSessionUser === null ? null : { user: mockSessionUser } }),
-    signOut: async () => ({ data: {}, error: null }),
+    signOut: () => signOutImpl(),
   },
 }));
+
+/**
+ * What the sign-out call answers, per case (E2-45).
+ *
+ * Mutable for the same reason `currentPath` and `mockSessionUser` above are:
+ * the failure arm is the subject, and it cannot be reached through a mock that
+ * only ever answers success. Two shapes are reachable and they are DIFFERENT —
+ * `better-fetch` REJECTS on a dropped connection or an offline browser, and
+ * RESOLVES `{ data: null, error }` on a non-2xx answer, so an arm that handles
+ * only one of them is a real half-fix.
+ */
+let signOutImpl: () => Promise<{ data: object | null; error: { status: number; statusText: string } | null }> =
+  async () => ({ data: {}, error: null });
 
 import { AppNav } from '../src/app-nav.js';
 import { clearLastWorkspaceCache } from '../src/use-last-workspace.js';
@@ -144,6 +161,10 @@ beforeEach(() => {
   clearLastProjectCache();
   clearWorkspaceProjectsCache();
   mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+  // E2-45: the sign-out answer and the push spy are per-case state too — a case
+  // that made sign-out fail must not leave the next one failing.
+  signOutImpl = async () => ({ data: {}, error: null });
+  routerPush.mockClear();
 });
 
 /** A workspace already remembered for the seeded user, as Round 25 stores it. */
@@ -906,6 +927,26 @@ describe('Round 24 the account menu', () => {
   it('E5-37 an email sign-up (name === "") falls back to the email, not a blank name', async () => {
     currentPath = '/workspaces';
     mockSessionUser = { id: 'u_no_name', name: '', email: 'anjali@example.com' };
+   * 17.141–17.143 — E2-45 (round-2 ruling, IMPORTANT) — a sign-out that FAILED
+   * must not read as one that succeeded.
+   *
+   * The shipped control was `close(false)` first, then one `.then` with no
+   * rejection arm: offline, a dropped connection, or a proxy's 5xx closed the
+   * menu, pushed nothing, said nothing, and left the session live. The manual
+   * (`docs/manual.md:112-114`) sells this exact control as the thing that
+   * protects a person on somebody else's laptop — *"That matters if you have
+   * signed in on somebody else's laptop"* — so a silent failure here is the one
+   * outcome that sentence promises cannot happen.
+   *
+   * Three cases, because one is not enough to pin the shape: the rejection arm,
+   * the resolved-`{error}` arm (a different path through the same transport —
+   * `better-fetch` rejects only when `fetch` itself throws), and the success arm
+   * that says the menu still closes and navigates. Without the third, "leave the
+   * menu open and never navigate" would pass both failure cases.
+   */
+  it('17.141 E2-45 keeps the menu open and says the session is still signed in when the server refuses', async () => {
+    currentPath = '/workspaces';
+    signOutImpl = async () => ({ data: null, error: { status: 503, statusText: 'Service Unavailable' } });
     render(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav />
@@ -929,6 +970,23 @@ describe('Round 24 the account menu', () => {
     // both rulings share: never a blank suffix, never an empty name.
     currentPath = '/workspaces';
     mockSessionUser = { id: 'u_bare', name: '', email: '' };
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out Kiro' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('still signed in');
+    // The menu closing WAS the confirmation; it must not close on a refusal.
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('17.142 E2-45 treats a dropped connection as a failure, never as a sign-out', async () => {
+    currentPath = '/workspaces';
+    // The shape `await fetch()` produces when the request never reached a
+    // server: the promise REJECTS, so only a second callback can see it.
+    signOutImpl = async () => {
+      throw new Error('Failed to fetch');
+    };
     render(
       <Providers services={NO_NAV_SERVICES}>
         <AppNav />
@@ -937,6 +995,33 @@ describe('Round 24 the account menu', () => {
     const trigger = await screen.findByRole('button', { name: 'Account menu' });
     expect(trigger).toBeInTheDocument();
     expect(trigger.getAttribute('aria-label')).not.toMatch(/for\s*$/);
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out Kiro' }));
+
+    const alert = await screen.findByRole('alert');
+    // A different sentence from the refused arm: "the server refused" is a claim
+    // about a server that was never reached.
+    expect(alert).toHaveTextContent('could not reach the server');
+    expect(alert).toHaveTextContent('still signed in');
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+    expect(routerPush).not.toHaveBeenCalled();
+  });
+
+  it('17.143 E2-45 a sign-out that succeeded closes the menu and goes to sign-in — the control', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+    await userEvent.click(screen.getByRole('menuitem', { name: 'Sign out Kiro' }));
+
+    // The positive control for the two above: the menu DOES close and the push
+    // DOES happen when the answer is success.
+    await waitFor(() => expect(routerPush).toHaveBeenCalledWith('/sign-in'));
+    expect(screen.queryByRole('menu')).not.toBeInTheDocument();
+    expect(screen.queryByRole('alert')).not.toBeInTheDocument();
   });
 });
 
@@ -1148,13 +1233,72 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
         <AppNav />
       </Providers>,
     );
-    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
     expect(screen.getByRole('link', { name: 'Help' })).toHaveAttribute('aria-current', 'page');
-    expect(screen.getByRole('link', { name: 'Account' })).toBeInTheDocument();
+    // ⚠ THE SHAPE CHANGED ON 2026-09-21 (E5-31) and this case changed WITH it
+    // rather than being relaxed: `Workspaces` and `Account` are no longer in
+    // the signed-out bar at all. They were dead controls — both bounce to
+    // `/sign-in`, and Account's bounce repaints the page E5-13 describes — and
+    // what replaced them is the door in. See the E5-31 case below for the
+    // assertions that now own this arm.
+    expect(screen.queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
     // The one item that SHOULD disappear signed out — proving this case would
     // notice the opposite defect (everything rendering regardless of session).
     expect(screen.queryByRole('button', { name: /Sign out/ })).not.toBeInTheDocument();
     mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+  });
+
+  /**
+   * E5-31 (round-2 ruling, IMPORTANT) — the signed-out bar offers the door IN,
+   * and withholds what a visitor cannot use.
+   *
+   * Signed out on `/help` — the route `app-nav.tsx` itself calls *"the route
+   * most likely to be wanted by someone who cannot get in"* — the bar painted
+   * `Workspaces`, `Help`, `Account`, an unlabelled inbox icon and the scope
+   * note *"No workspace selected — pick one to reach its board, members and
+   * settings."*, and **no Sign in**. Pressing Workspaces signed out landed on
+   * `/sign-in` by a 401 bounce with no `next=`, so the destination was thrown
+   * away; Account repainted the page E5-13's second reproduction describes; the
+   * scope note told the person to pick something the bar was not offering. The
+   * legal pages' bar already had the right arm (`legal-nav.tsx:96-99`).
+   */
+  it('13.1159 E5-31 signed out, the bar offers Sign in (with next) and withholds the dead controls', () => {
+    currentPath = '/help';
+    mockSessionUser = null;
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // The door IN, remembering where they were headed.
+    expect(screen.getByRole('link', { name: 'Sign in' })).toHaveAttribute(
+      'href',
+      '/sign-in?next=%2Fhelp',
+    );
+    expect(screen.getByRole('link', { name: 'Help' })).toHaveAttribute('href', '/help');
+    // Every control the finding names as dead for this visitor:
+    expect(screen.queryByRole('link', { name: 'Workspaces' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Account' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: /Inbox/ })).not.toBeInTheDocument();
+    expect(screen.queryByText(/No workspace selected/)).not.toBeInTheDocument();
+    // The control that keeps this from passing on a bar that renders nothing
+    // at all signed out.
+    expect(screen.getByRole('link', { name: 'Help' })).toBeInTheDocument();
+
+    // The positive control for the same claim, in the same case: signed IN, all
+    // four of those come back.
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    cleanup();
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    expect(screen.getByRole('link', { name: /Inbox/ })).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Sign in' })).not.toBeInTheDocument();
   });
 
   /**

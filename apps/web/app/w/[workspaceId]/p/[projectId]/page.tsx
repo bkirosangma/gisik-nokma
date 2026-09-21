@@ -35,9 +35,11 @@ import {
   type ListFilterSpec,
   type ListRow,
   type TicketDatesInput,
+  writeFailureCopy,
+  writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
-import { Avatar, SegmentedControl, Switch, Toast, type SegmentedOption } from '@gisik-nokma/ui';
+import { Avatar, Chip, SegmentedControl, Switch, Toast, type SegmentedOption } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -70,6 +72,7 @@ import {
   type ProjectTab,
 } from '../../../../../src/use-last-project.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
+import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -237,6 +240,25 @@ function ProjectBoard() {
    * pending or refused; see each hook's own docblock.
    */
   const workspaceName = useWorkspaceName(workspaceId);
+  /**
+   * E2-38 (round-2 ruling, MINOR) — the project's OWN state, on the project's own
+   * page.
+   *
+   * This page had **zero occurrences of `archived`** (case-insensitive, the whole
+   * file, measured) while the screen a person must pass through to reach it
+   * carries it prominently — the workspace home matches 58 times, with the
+   * archive/restore controls and the *"N archived · show"* toggle. So an archived
+   * project's own board was indistinguishable from a live one's, which matters
+   * because the two differ in what the product will let you do.
+   *
+   * **The read is the one the nav and the home already make** —
+   * `useWorkspaceProjects`, module-cached, no new request — rather than a second
+   * way of asking. `null` (pending or refused) and "not in the list" are both
+   * SILENT here: an absence of the chip claims nothing, where a chip painted on a
+   * failed read would assert the project is live.
+   */
+  const workspaceProjects = useWorkspaceProjects(workspaceId);
+  const projectArchived = workspaceProjects?.find((p) => p.id === projectId)?.archived === true;
   const projectName = useProjectName(workspaceId, projectId);
   // Task 10 (backlog/closed spec §5.4, 2026-09-17) adds `'backlog'` to this
   // union. The default stays `'board'` — Backlog is the FIRST tab in the
@@ -553,6 +575,19 @@ function ProjectBoard() {
    * landed, but a keyboard exit always leaves focus somewhere real.
    */
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /**
+   * V1 (round-2 ruling, 2026-09-21) — the New-ticket flow's dialog, lifted so the
+   * BOARD'S empty state can open it.
+   *
+   * `Board`'s empty banner renders *"No tickets here yet — create one."* and a
+   * "Create a ticket" button that only appears when `onCreateTicket` is passed —
+   * and nothing in this app passed it, so the sentence instructed an action the
+   * page made impossible from where it was read. The control existed all along,
+   * three centimetres to the left in this header; what was missing was a way to
+   * open it from the banner, which is what `CreateTicketFlow`'s new
+   * `open`/`onOpenChange` props provide.
+   */
+  const [createOpen, setCreateOpen] = useState(false);
   const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeFilters = useCallback((returnFocus: boolean) => {
     setFiltersOpen(false);
@@ -938,9 +973,17 @@ function ProjectBoard() {
         }
         const reason = result.status === 'refused' ? result.reason : result.message;
         setDeleteNotice({ message: `The ticket could not be restored — ${reason}`, undoFor: null });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setDeleteNotice({ message: `We could not reach the server to restore it — ${message}`, undoFor: null });
+      } catch (cause) {
+        // E5-25: a 401 here is a session that ended, not an unreachable server.
+        // `writeFailureCopy` is the ONE place that is decided, for all nine
+        // write sites; the redirect is the shell's data-source guard.
+        setDeleteNotice({
+          message: writeFailureCopy(
+            cause,
+            (message) => `We could not reach the server to restore it — ${message}`,
+          ),
+          undoFor: null,
+        });
       }
     },
     [board.reload, currentUserId, dataSource, list.reload, workspaceId],
@@ -1909,6 +1952,8 @@ function ProjectBoard() {
     return (
       <>
         <CreateTicketFlow
+          open={createOpen}
+          onOpenChange={setCreateOpen}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}
@@ -1928,6 +1973,19 @@ function ProjectBoard() {
       </>
     );
   })();
+
+  /**
+   * V1 — whether the `Board`'s empty state may offer its create button.
+   *
+   * Derived from the SAME two facts `createRegion` branches on to decide whether
+   * the flow is offered at all (a signed-in person, and types that did not
+   * refuse), read once here rather than re-tested at the board. The transient
+   * arms above — the session still loading, the list still loading — are
+   * deliberately NOT mirrored: they end on their own, the flow's own dialog
+   * opens as soon as it mounts, and a button that disappears for a second and
+   * returns is worse than one that opens a dialog a moment later.
+   */
+  const canCreate = session.kind === 'signed-in' && ticketTypes.error === null;
 
   return (
     <main id="gn-main" className="gn-shell">
@@ -1980,6 +2038,16 @@ function ProjectBoard() {
               <p className="gn-project__breadcrumb">{workspaceName}</p>
             ) : null}
             {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+            {/* The SAME component and the SAME word the workspace home's card
+                uses for this state, so the two screens cannot describe one fact
+                two ways. A sentence is deliberately NOT added: everything else
+                worth saying about an archived project (who may restore it, where)
+                is admin-only and would be a second false claim for a member. */}
+            {projectArchived ? (
+              <p className="gn-project__archived">
+                <Chip tone="neutral">Archived</Chip>
+              </p>
+            ) : null}
 
             {/*
               `.gn-project__header` — Task 2 of the prototype port. Controls
@@ -2658,6 +2726,18 @@ function ProjectBoard() {
                 <Board
                   board={boardNarrowing.view}
                   onOpenTicket={openTicket}
+                  /*
+                    V1 (round-2 ruling, 2026-09-21) — the empty state's create
+                    affordance, wired to the SAME `CreateTicketFlow` the header
+                    renders. Gated on the same conditions that control whether
+                    that flow is OFFERED at all: the flow is not rendered when
+                    the types read refused or the session is not signed in, so
+                    the banner must not offer a button in those states either —
+                    and `emitting`/`session` are read here rather than
+                    re-derived, so the two doors cannot disagree about when
+                    creation is available.
+                  */
+                  {...(canCreate ? { onCreateTicket: () => setCreateOpen(true) } : {})}
                   isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
                   /*
                     WHICH OF THE TWO EMPTY SENTENCES (owner ruling, 2026-09-20). True
@@ -2868,7 +2948,7 @@ function ProjectBoard() {
                       className={
                         rankNotice.channel === 'server'
                           ? 'gn-refusal gn-refusal--server'
-                          : 'gn-refusal gn-refusal--transport'
+                          : writeFailureRefusalClass(rankNotice.text)
                       }
                     >
                       {rankNotice.text}
@@ -3500,9 +3580,22 @@ function FiltersSheet({
    */
   const clearAll = () => setFilter(clearFilterAxes);
 
-  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
+  /**
+   * E5-5: `note` is the third argument, and it exists for exactly one caller.
+   *
+   * The Filters sheet renders a `Collaborators` fieldset whose tri-state rows
+   * work — the filter keeps what you set — but **no view narrows by it**, and
+   * the only place the product said so was a strip printed AFTER the press
+   * (`docs/manual.md:826-828`: *"Collaborators is the one thing no tab applies
+   * — the strip's own sentence is 'Not applied on the board: collaborator.'"*).
+   * A control that looks like the six around it and quietly does nothing is the
+   * dead-affordance shape this shell refuses elsewhere; the remedy is to say so
+   * BEFORE the press, in the section that carries it.
+   */
+  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds', note?: string) => (
     <fieldset className="gn-filters__section">
       <legend className="gn-filters__section-label">{title}</legend>
+      {note !== undefined ? <p className="gn-filters__note">{note}</p> : null}
       {membersError !== null ? (
         <p className="gn-filters__pending">
           This workspace’s roster could not be loaded, so filtering by {title.toLowerCase()} is not
@@ -3567,7 +3660,14 @@ function FiltersSheet({
         </div>
         <div className="gn-filters__body">
           {personSection('Assignee', 'assigneeIds')}
-          {personSection('Collaborators', 'collaboratorIds')}
+          {/* The words are the manual's own; the strip's after-the-fact
+              sentence is not removed, because it still fires on the board for
+              anyone who sets this and forgets. */}
+          {personSection(
+            'Collaborators',
+            'collaboratorIds',
+            'No view narrows by this yet — you can set it and the filter keeps it, but nothing is filtered by it.',
+          )}
 
           <fieldset className="gn-filters__section">
             <legend className="gn-filters__section-label">Type</legend>

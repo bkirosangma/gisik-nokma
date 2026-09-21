@@ -1209,5 +1209,49 @@ describe('13.995 E4-5 the level-1 heading names the page, not the action', () =>
     expect(screen.getAllByRole('button', { name: /^Rename / })).toHaveLength(1);
     expect(h1).toContainElement(control);
     expect(screen.queryByRole('button', { name: 'Rename' })).toBeNull();
+ * E5-23 (round-2 ruling, MINOR, 2026-09-21) — the workspace home's empty sentence
+ * is written for the EXCLUDED MEMBER and was read by the FOUNDER.
+ *
+ * `page.tsx:887` renders *"No projects you can open are active here."* whenever
+ * the caller's live list is empty, and the comment above it says why that shape
+ * was chosen: *"A member outside every project has an empty live list in a
+ * workspace full of them, and 'there are no projects' would be a claim about the
+ * workspace."* **Correct for that member.** An owner who founded the workspace
+ * seconds ago has an empty live list for the other reason — the workspace has
+ * none — and the sentence they read says the opposite: *"you can open"*
+ * presupposes projects they cannot, and it sits directly above the New-project
+ * form that would fix it.
+ *
+ * Two different facts reach ONE arm, and `shown.length === 0` cannot separate
+ * them on its own. `isAdmin` plus the SERVED project count can.
+ */
+describe('E5-23 the empty workspace home speaks to whoever is actually reading it', () => {
+  it('13.1165 a founder with no projects is told to create the first one, not that they cannot open any', async () => {
+    mount([[workspaceAs('owner', { projects: [] })]]);
+
+    expect(
+      await screen.findByText('No projects yet — create the first one below.'),
+    ).toBeInTheDocument();
+    // And NOT the member's sentence, which is the claim the ruling is about —
+    // asserted as an absence, because a page drawing both would satisfy the
+    // assertion above on its own.
+    expect(screen.queryByText(/No projects you can open/)).toBeNull();
+    // The form the sentence points at really is on screen: a sentence naming a
+    // control that is not rendered is the same defect one line over.
+    expect(screen.getByRole('button', { name: 'Create project' })).toBeInTheDocument();
+  });
+
+  it('13.1165 CONTROL — a member with the same empty list keeps the member’s sentence', async () => {
+    // **THE TWO FIXTURES ARE DELIBERATELY IDENTICAL EXCEPT FOR THE ROLE**, which
+    // is the honest shape of the problem rather than a shortcut: the server
+    // serves a member only the projects they may see (`visible-projects.ts`), so
+    // "outside every project of a busy workspace" and "a workspace with none"
+    // BOTH arrive here as `projects: []`. The count cannot separate them; the role
+    // can, and it is the only signal the ruling's remedy uses.
+    mount([[workspaceAs('member', { projects: [] })]]);
+    expect(
+      await screen.findByText('No projects you can open are active here.'),
+    ).toBeInTheDocument();
+    expect(screen.queryByText(/create the first one below/)).toBeNull();
   });
 });

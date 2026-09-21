@@ -11,7 +11,13 @@ import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { isUlid, type IngestResult } from '@gisik-nokma/domain';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
-import { Board, EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY, useBoard } from '../../src/views/board.js';
+import {
+  Board,
+  EMPTY_BOARD_COPY,
+  EMPTY_BOARD_UNWIRED_COPY,
+  EMPTY_COLUMN_COPY,
+  useBoard,
+} from '../../src/views/board.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { formatDate } from '../../src/provenance.js';
 import { TICKET, WS, boardCardSeed, claim } from '../helpers/seed.js';
@@ -802,7 +808,10 @@ describe('3.112 an empty board says words, not nothing', () => {
    * use, so a re-export of a different string cannot satisfy the render
    * assertion; `queryAllByRole('region')` empty keeps it off scaffolding. */
   it('renders the pinned copy where it used to render an empty div', () => {
-    render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
+    // WIRED (V1, 2026-09-21): the pinned copy INSTRUCTS — "create one" — and
+    // since the ruling it renders only where a create handler exists, so this
+    // case hands one down. The unwired arm has its own case below (3.113).
+    render(<Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
     expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create one.');
     // No scaffolding: not one column region is drawn for a board with no groups.
@@ -824,9 +833,14 @@ describe('3.112 an empty board says words, not nothing', () => {
     expect(clicks).toEqual([1]);
   });
 
-  it('3.113 says the words and offers NO button when the shell handed none', () => {
+  it('3.113 says the situation and offers NO button when the shell handed none', () => {
     render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
-    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    // V1 (2026-09-21): the UNWIRED copy states the fact and instructs nothing.
+    // The pinned sentence above tells the reader to create a ticket, and a mount
+    // with no handler made that impossible from where it was read; the ruling's
+    // remedy is that the words follow the control.
+    expect(screen.getByText(EMPTY_BOARD_UNWIRED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
     // A no-op button here would look like a way out of an empty project and
     // would not be one.
     expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
@@ -870,11 +884,13 @@ describe('3.112 an empty board says words, not nothing', () => {
         },
       ],
     };
-    render(<Board board={noCards} onOpenTicket={() => {}} />);
+    render(<Board board={noCards} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     // The columns ARE the workflow's states and rendering them is the
     // promise this file's first describe makes — unchanged by R6.
     expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument();
     // R6: zero cards in total, even with a group present, says the sentence.
+    // (Wired, since V1: this fixture's own subject is R6's gate, not the
+    // handler's presence, which 3.113 owns.)
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 });
@@ -1009,12 +1025,23 @@ describe('Board — Ruling 19: isNarrowed suppresses the pinned sentence when ca
   });
 
   it('13.467 the IDENTICAL board, not narrowed, still says the R6 sentence — proving the flag is what discriminates', () => {
-    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} isNarrowed={false} />);
+    // Wired (V1, 2026-09-21): this case is about `isNarrowed`, and the sentence
+    // it discriminates on is `EMPTY_BOARD_COPY` — which since the ruling renders
+    // only where a create handler was handed down. The unwired arm's own copy is
+    // asserted by 3.113, so wiring here changes nothing this case is measuring.
+    render(
+      <Board
+        board={narrowedAwayBoard}
+        onOpenTicket={() => {}}
+        onCreateTicket={() => {}}
+        isNarrowed={false}
+      />,
+    );
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 
   it('13.467 CONTROL — omitting isNarrowed entirely behaves exactly like isNarrowed={false} (the default is "not narrowed")', () => {
-    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} />);
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 });
@@ -1113,5 +1140,62 @@ describe('13.1177 the board card draws the due label, and the late tone (ruling 
     render(<Board board={errandBoard([boardCardSeed()])} onOpenTicket={() => {}} today={TODAY} />);
     const card = screen.getByTestId(`ticket-card-${TICKET}`);
     expect(card.querySelector('.gn-board-card__due')).toBeNull();
+ * V1 (round-2 ruling, IMPORTANT, 2026-09-21) — the empty state's instruction and
+ * its control are ONE decision.
+ *
+ * `EMPTY_BOARD_COPY` says *"No tickets here yet — create one."* and the button
+ * beneath it renders only when `onCreateTicket` is passed. **Every mount in the
+ * product passed nothing** — measured at the ruling: `grep -rn 'onCreateTicket='
+ * apps/web/app apps/web/src` answered 0 across 63 files while the string appears
+ * 18 times in `board.tsx` — so the sentence told the reader to do something the
+ * mount made impossible, and the column's `+` glyph painted with nothing behind
+ * it.
+ *
+ * The fix has two halves and this case pins both: the WORDS follow the control
+ * (an unwired board states the situation instead of instructing), and the `+`
+ * glyph is never drawn unaccompanied. The shell's own half — the project page
+ * lifting `CreateTicketFlow`'s open state and passing a real handler — is
+ * asserted where that mount lives (`apps/web/test/project-create-gate.test.tsx`).
+ */
+describe('V1 the empty board never instructs an action it cannot offer', () => {
+  const emptyBoard: BoardView = { projectId: 'prj_1', groups: [] };
+
+  it('13.1162 unwired: states the situation, offers no button, draws no + glyph', () => {
+    render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
+    expect(screen.getByText(EMPTY_BOARD_UNWIRED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+    // The glyph is the one part of an empty column that reads as a control.
+    expect(document.querySelector('.gn-board__column-empty-icon')).toBeNull();
+  });
+
+  it('13.1162 wired: instructs, and the instruction has a control — on the board and in every empty column', () => {
+    const clicks: number[] = [];
+    const oneEmptyColumn: BoardView = {
+      projectId: 'prj_1',
+      groups: [
+        {
+          workflowId: 'wf-errand',
+          workflowVersion: 1,
+          workflowName: 'Errand',
+          columns: [
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+          ],
+        },
+      ],
+    };
+    render(
+      <Board
+        board={oneEmptyColumn}
+        onOpenTicket={() => {}}
+        onCreateTicket={() => clicks.push(1)}
+      />,
+    );
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    // Both affordances: the banner's, and the empty COLUMN's own "Add a ticket".
+    expect(screen.getByRole('button', { name: 'Create a ticket' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    // And the glyph accompanies the control rather than replacing one.
+    expect(document.querySelector('.gn-board__column-empty-icon')).not.toBeNull();
   });
 });

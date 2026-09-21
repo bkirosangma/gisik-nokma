@@ -8,6 +8,7 @@ import {
 } from '@gisik-nokma/domain';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 import type { PrecheckResult } from '../precheck.js';
+import { writeFailureRefusalClass } from '../session-expired.js';
 import { fieldAlreadyClaimed } from './field-claims.js';
 
 type TransitionRules = WorkflowDef['transitions'][number]['rules'];
@@ -551,9 +552,12 @@ export function TransitionDialog({
       ) : null}
 
       {/* Ruling 27 — never the same sentence, never the same class, never a
-          `{rule, reason}` pair: see this prop's own docblock above. */}
+          `{rule, reason}` pair: see this prop's own docblock above. The class
+          comes from the copy itself (E5-25) so a 401 — which this dialog meets
+          when a move's write outlives the session — is not painted as a
+          transport failure it is not. */}
       {transportError !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
+        <p role="alert" className={writeFailureRefusalClass(transportError)}>
           {transportError}
         </p>
       ) : null}

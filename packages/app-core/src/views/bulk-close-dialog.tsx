@@ -2,6 +2,7 @@ import { useEffect, useRef, useState } from 'react';
 import { Button, Dialog } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { makeSubmittedFactory } from '../submit.js';
+import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 
 export type BulkCloseTicket = { ticketId: string; title: string };
 
@@ -229,8 +230,9 @@ export function BulkCloseDialog({
       if (committed.length > 0) onClosed(committed);
     } catch (cause) {
       if (attemptRef.current !== attempt) return;
-      const message = cause instanceof Error ? cause.message : String(cause);
-      setTransportError(`We could not reach the server for this close — ${message}`);
+      setTransportError(
+        writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+      );
     } finally {
       // Gated, not merely tidy: an ungated reset would release the latch of a
       // LIVE attempt in the next opening.
@@ -260,7 +262,7 @@ export function BulkCloseDialog({
         </>
       ) : null}
       {transportError !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
+        <p role="alert" className={writeFailureRefusalClass(transportError)}>
           {transportError}
         </p>
       ) : null}

@@ -17,6 +17,7 @@ import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
+import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
@@ -207,6 +208,27 @@ export type BoardMoveCapability = {
  * spellings of one sentence is how a copy change passes a test it broke.
  */
 export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
+
+/**
+ * The words an empty board says when NOBODY WIRED THE CREATE AFFORDANCE (E5… V1,
+ * round-2 ruling, 2026-09-21).
+ *
+ * `EMPTY_BOARD_COPY` instructs — *"create one"* — and the button that would let a
+ * person do it renders only when `onCreateTicket` is passed. **A call site that
+ * passed nothing therefore told the reader to do something the mount made
+ * impossible**, and at the time of the ruling that was every mount in the
+ * product: `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered 0
+ * across 63 files, while the string appeared 18 times in this module. The
+ * sentence is therefore chosen by whether the control exists, exactly as the
+ * epics arm below is chosen by whether the epic rule is the reason.
+ *
+ * The alternative the ruling also allowed — wiring the shell's create region
+ * through — is still the better end state and is NOT ruled out by this constant:
+ * a mount that wires the handler gets `EMPTY_BOARD_COPY` back, and this string
+ * then renders nowhere. What the constant prevents is a THIRD state, where the
+ * copy instructs and the control is missing.
+ */
+export const EMPTY_BOARD_UNWIRED_COPY = 'No tickets here yet.';
 
 /**
  * The words an empty board says when the ONLY reason it is empty is the epic rule
@@ -513,7 +535,11 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
           prop's own docblock). Absent ⇒ the original sentence, unchanged.
         */}
         <p className="gn-board__empty-copy">
-          {epicsHidden === true ? EMPTY_BOARD_EPICS_COPY : EMPTY_BOARD_COPY}
+          {epicsHidden === true
+            ? EMPTY_BOARD_EPICS_COPY
+            : onCreateTicket === undefined
+              ? EMPTY_BOARD_UNWIRED_COPY
+              : EMPTY_BOARD_COPY}
         </p>
         {onCreateTicket !== undefined ? (
           <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
@@ -774,7 +800,13 @@ function BoardGroupSection({
              */}
             {column.cards.length === 0 ? (
               <div className="gn-board__column-empty">
-                <span className="gn-board__column-empty-icon" aria-hidden="true">
+                {/* V1: the `+` is the one part of an empty column that reads as
+                    a CONTROL, and it must never render unaccompanied — a glyph
+                    that looks pressable with nothing behind it is the dead
+                    affordance this board refuses elsewhere. Gated on the same
+                    prop the button below is. */}
+                {onCreateTicket !== undefined ? (
+                  <span className="gn-board__column-empty-icon" aria-hidden="true">
                   <svg
                     width="18"
                     height="18"
@@ -786,7 +818,8 @@ function BoardGroupSection({
                   >
                     <path d="M12 5.5v13M5.5 12h13" />
                   </svg>
-                </span>
+                  </span>
+                ) : null}
                 <p className="gn-board__column-empty-copy">
                   {column.epicsHidden === true ? EMPTY_COLUMN_EPICS_COPY : EMPTY_COLUMN_COPY}
                 </p>
@@ -1497,10 +1530,13 @@ function MoveArrows({
       }
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
-      // `transportError` channel, own sentence, never `serverRefusal`.
+      // `transportError` channel, own sentence, never `serverRefusal`. E5-25:
+      // a 401 is neither, and `writeFailureCopy` is the one place that is
+      // decided.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this move — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1599,10 +1635,11 @@ function MoveArrows({
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
       // `transportError` channel `submitDirect` uses, own sentence, never
-      // `serverRefusal`.
+      // `serverRefusal`. E5-25: the 401 arm joins it, one author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this close — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1804,9 +1841,11 @@ function MoveArrows({
       }
     } catch (cause) {
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
+      // E5-25: a 401 goes to the session sentence through the same author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this move — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        );
       }
     }
   };
@@ -1875,7 +1914,7 @@ function MoveArrows({
          * bug that would read as a query bug.
          */}
         {transportError !== null && dialog === null ? (
-          <p role="alert" className="gn-refusal gn-refusal--transport">
+          <p role="alert" className={writeFailureRefusalClass(transportError)}>
             {transportError}
           </p>
         ) : null}

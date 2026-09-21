@@ -2398,3 +2398,217 @@ withdrawn.
 **Three constants, not the bulk pair reused.** `ROW_REFUSED_COPY` / `ROW_UNREACHED_COPY` /
 `UNDO_FAILED_COPY` — the bulk sentences say *"Those notifications"*, and a plural said about one row is a
 second false statement laid on top of the missing one.
+## A write after the session ended — cases `13.1157`–`13.1158` (E5-25, 2026-09-21)
+
+**Why these cases are in this file, and where the ids come from.** Their subject is the shell's failure
+states — the same family `13.1118`–`13.1119` (the inbox's silent single-row reads) were minted into, by the
+same lane, one batch earlier. **The ids are from release batch B11's §13 block
+`13.1157`–`13.1166`, allocated by the controller 2026-09-21 22:0x** (the allocation table lands in
+`test-cases/13-hig-per-screen.md` with B03's PR; this line records it here so a minting session that reads
+only this file still knows the block and its owner). `13.1157`–`13.1158` are minted; the rest of the block
+stays free for the batch's remaining tasks.
+
+**The defect, in the finding's own words.** The events door answers refusals inside a `200` body, so the only
+`401` a write can meet is the session guard's — produced before the handler. The client transport throws
+`HttpError` with `message = "HTTP 401 for /v1/events"`, and **every write catch in the product painted that
+as transport**: *"We could not reach the server for this change — HTTP 401 for /v1/events"*
+(`ticket-sheet.tsx:1074`), and the same sentence at `board.tsx:1430`, `:1532`, `:1736`,
+`bulk-close-dialog.tsx:233`, `backlog-rank-controls.tsx:186`, `backlog-start-button.tsx:113`,
+`workspace-settings-form.tsx:298` and the project page's delete-Undo — **nine sites, and not one of them
+sent the person to sign in**, though every READ did. The person's typed comment or title draft stayed
+stranded behind a sentence that reads as a network problem, when no retry on that session could succeed.
+
+**Where the classification can be made, and where it cannot.** The remedy as filed —
+`error instanceof HttpError && error.status === 401` — is not writable in five of the nine sites:
+`packages/app-core/test/no-http-in-views.test.ts` (case 3.35, coordination amendment 10) fails any file
+outside `src/online/` that imports the transport. So the adapter that HAS the status re-throws it as
+`SessionExpiredError` (`packages/app-core/src/session-expired.ts`), and that class is what the nine catches
+branch on. `writeFailureCopy` is the ONE place a write's sentence is chosen, so a tenth write site cannot
+invent an eleventh rule.
+
+- **13.1157** ✅ A write whose session ended paints the product's own session sentence — never "we could not
+  reach the server" — in its own `gn-refusal--session` register, at the sheet's change path, the board's
+  move path and the bulk close, with the arrow/button usable again afterwards. The 401 becomes
+  `SessionExpiredError` at the adapter (proven over the real transport), and the sentence is chosen in one
+  place. — (`packages/app-core/test/views/ticket-sheet.test.tsx`,
+  `packages/app-core/test/views/board-moves-ui.test.tsx`,
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx`,
+  `packages/app-core/test/online/online-data-source.test.ts`)
+- **13.1158** ✅ **The control, and the other half of the fix:** a `500` and a `403` do NOT send anyone to
+  sign in and keep travelling as `HttpError` — so "wrap everything" cannot satisfy `13.1157` — while a
+  `401` on the shell's one `DataSource` pushes `/sign-in` exactly once and **re-throws** (a guard that
+  swallowed it would leave the calling view rendering a success it never had). —
+  (`apps/web/test/session-expired-writes.test.tsx`)
+
+## A signed-out bar that offered four dead controls and no door in — case `13.1159` (E5-31, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above for where the allocation is recorded). `13.1159` is minted here.
+
+**The defect.** Signed out on `/help` — the route `app-nav.tsx`'s own docblock calls *"the route most
+likely to be wanted by someone who cannot get in"* — the bar painted `Workspaces`, `Help`, `Account`, an
+unlabelled inbox icon and the scope note *"No workspace selected — pick one to reach its board, members
+and settings."* — **and no Sign in.** Pressing Workspaces signed out landed on `/sign-in` by a 401 bounce
+with no `next=`, so the destination was thrown away; pressing Account repainted the page E5-13's second
+reproduction describes; the inbox icon pointed at a session-gated route; and the note instructed a person
+to pick something the bar was not offering. The legal pages' bar had the right arm all along
+(`legal-nav.tsx:96-99`).
+
+- **13.1159** ✅ Signed out, the bar offers **Help + Sign in** (the sign-in link carrying
+  `next=<where they were>`), and withholds `Workspaces`, `Account`, the inbox icon and the scope note —
+  with the signed-in arm re-asserted in the same case as the positive control, so a bar that rendered
+  nothing signed out cannot pass it. — (`apps/web/test/app-nav.test.tsx`)
+
+## The expired-session redirect dropped the destination — case `13.1160` (E5-32, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1160` is minted here.
+
+**The defect.** `apps/web/src/expired-session.tsx:72` read `if (expired) router.push('/sign-in');` — no
+`next=` — and that hook is the ONE author of the 401 redirect for `/workspaces`, `/w/[workspaceId]`,
+`/w/…/my-work`, `/w/…/p/[projectId]` and `/inbox`. **Every one of the five dropped where the person was
+going**, while `docs/manual.md:109-110` promises the opposite in as many words, and the four sibling arms
+that keep a destination (`/invite/<token>`, `/mcp/authorize`, the settings shell, the nav's own Sign in
+link) showed the shape was already the house's.
+
+- **13.1160** ✅ A 401 on any of those five pages pushes
+  `/sign-in?next=<path + ?query>`, encoded by the SAME `signInWithNext` the product uses — asserted at
+  `/workspaces`, My Work, the project page and `/inbox`, so the case cannot pass on a redirect that
+  carries the destination for one page and not the others. The write guard's redirect carries it too
+  (`providers.tsx`), so a session that ends mid-write lands back where the write was. —
+  (`apps/web/test/page-refusals.test.tsx`, `apps/web/test/inbox-page.test.tsx`)
+
+**The manual was NOT edited.** The ruling offered *"or correct `docs/manual.md:109` to 'an invitation'"*;
+the code moved instead, so both manual sentences stay true as written.
+
+## An inert control that only said so afterwards — case `13.1161` (E5-5, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1161` is minted here.
+
+**The defect.** The Filters sheet renders a `Collaborators` fieldset with one tri-state row per member
+(`page.tsx:3317` `personSection('Collaborators', 'collaboratorIds')`), and **no tab narrows by it** — the
+manual's own words, `docs/manual.md:826-828`: *"Collaborators is the one thing no tab applies — the
+strip's own sentence is 'Not applied on the board: collaborator.' You can set it and the filter keeps it,
+but nothing narrows by it."* So the product knew, and said so **after** the press, in a strip, while the
+control itself looked exactly like the five sections around it that DO something.
+
+- **13.1161** ✅ The Collaborators section carries an inline sentence saying no view narrows by it yet —
+  **and the Assignee section does not**, which is the half that makes it a measurement: a note rendered by
+  the shared `personSection` unconditionally would satisfy the first assertion and be false about the
+  section beside it. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**What was NOT done, and why.** The ruling offered two remedies: withhold the fieldset until an axis
+applies it, or label it inline. The label was taken — the filter is real state the person can set and
+keep, and the board still prints its own strip for it, so withholding a working control would remove a
+capability to remove a sentence.
+
+## The empty board instructed an action it could not offer — case `13.1162` (V1, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1162` is minted here.
+
+**The defect.** `Board`'s empty state renders `EMPTY_BOARD_COPY` = *"No tickets here yet — create one."*,
+and the "Create a ticket" button beneath it — and the per-column "Add a ticket" — render only when
+`onCreateTicket` is passed (`board.tsx:493-497`, `:762-764`). **No web caller passed it**: measured at the
+ruling, `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered **0 across 63 files** while the
+string appears 18 times in `board.tsx`. So the board told the reader to create a ticket and the control
+that would let them was not drawn — and the empty column's `+` glyph, the one part of that state that
+reads as a control, painted with nothing behind it.
+
+- **13.1162** ✅ **Both arms, in both packages.** Unwired, the board states the situation
+  (*"No tickets here yet."*), offers no button and draws no `+` glyph; wired, it keeps the pinned sentence
+  and draws the banner button, the per-column button and the glyph. At the shell, an empty project's board
+  renders the pinned sentence and **its button opens the same New-ticket dialog the header's trigger
+  opens** — asserted by the Parent picker, a control that exists only inside it. —
+  (`packages/app-core/test/views/board.test.tsx`, `apps/web/test/project-create-gate.test.tsx`)
+
+**The shell wires it, and needed one small API to do so.** `CreateTicketFlow` owned its dialog's open
+state and rendered its own trigger, so nothing outside could open it; it now takes optional
+`open`/`onOpenChange` (absent ⇒ it owns the state exactly as before) and the project page lifts them, so
+the banner's button and the header's "New ticket" open the SAME dialog. `canCreate` gates the handler on
+the same two facts `createRegion` branches on — a signed-in person and types that did not refuse — so the
+two doors cannot disagree about when creation is available.
+
+## A dead click under a comment claiming completeness — case `13.1163` (V5, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1163` is minted here.
+
+**The defect.** The My Work page turns a title button's ticket id into a route by looking it up in the
+view — the sheet lives at `/w/:ws/p/:projectId?ticket=…`, so the id alone cannot build the URL. Its
+resolver searched `assigned`, `inTransit` and `shared` under a comment reading *"Every section this
+component renders a title button for must be resolvable here, and that is now all four."* **Three arms.**
+The fourth is `contested`, whose rows carry no `projectId` at all (`ContestedClaim` has `ticketId`,
+`title`, `rule`, `reason`, `claim`), so the lookup could never place one: `find` answered `undefined`, the
+guard swallowed it, and the click did nothing — no navigation, no error, indistinguishable from a slow
+page. Same dead-click class as 3.162, one section over, and hidden by a comment asserting the opposite.
+
+- **13.1163** ✅ A contested claim's title button routes to the ticket's own project, **placed by asking
+  the server** (`ticketLocation.locate`, the same one-shot gateway the inbox uses) — the id is asserted as
+  having been asked for, so a guessed project cannot pass on a fixture coincidence; and a ticket the
+  server will NOT place gets a sentence and **no navigation**, with the sentence forbidden from guessing
+  between "gone" and "not yours" (the route answers one frozen 404 for both). —
+  (`apps/web/test/my-work-open-shared.test.tsx`)
+
+**How a fifth section is stopped from reintroducing it.** The page now names the three locally-resolvable
+sections and, in a `Record` keyed on the REMAINDER of `keyof MyWorkView`, says where the rest are
+resolved. A new member on that type fails the `Record` to compile, so whoever adds one must state how its
+title button resolves — the comment that claimed "all four" was the only thing holding that door before,
+and it was wrong.
+
+## An archived project's own page did not say so — case `13.1164` (E2-38, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1164` is minted here.
+
+**The defect.** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` contained **zero occurrences of
+`archived`** (case-insensitive, whole file, measured) while the screen a person must pass through to reach
+it carries the fact prominently — `apps/web/app/w/[workspaceId]/page.tsx` matches 58 times, with the
+archive/restore controls and the *"N archived · show"* toggle. So an archived project's own board was
+indistinguishable from a live one's, and the two differ in what the product will let you do.
+
+- **13.1164** ✅ An archived project's own page carries the **same `Chip` and the same word the workspace
+  home's card uses**, in a line under the title rather than inside the heading — with a live project
+  asserted to carry neither the chip nor the line, so a chip rendered unconditionally cannot pass. The
+  flag comes from the SAME `getMyWorkspaces` read the page already makes for its own names; there is no
+  new request. — (`apps/web/test/project-page-chrome.test.tsx`)
+
+## The empty workspace home spoke to the member and was read by the founder — case `13.1165` (E5-23, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1165` is minted here.
+
+**The defect.** `apps/web/app/w/[workspaceId]/page.tsx:883-887` renders *"No projects you can open are
+active here."* whenever the caller's live list is empty, and its own comment says why that shape was
+chosen: *"A member outside every project has an empty live list in a workspace full of them, and 'there
+are no projects' would be a claim about the workspace."* Correct for that member. **An owner who founded
+the workspace seconds ago has an empty live list for the other reason — the workspace has none — and
+reads a sentence that says the opposite**, directly above the New-project form that would fix it.
+
+**The two cases arrive identically shaped, and that is measured rather than assumed.** The server serves
+a member only the projects they may see (`visible-projects.ts`), so "outside every project of a busy
+workspace" and "a workspace with none" both reach this arm as `projects: []`; the count cannot separate
+them and the ROLE can.
+
+- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and
+  not the member's sentence, and the form the sentence names really is on screen); a member with the
+  SAME empty list keeps the member's sentence. —
+  (`apps/web/test/workspace-home.test.tsx`)
+
+## The bar named a different project on an archived project's own page — case `13.1166` (E5-34, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). **This is the block's last id.**
+
+**The defect.** `last-project-nav.tsx:114-127` takes the route's project id from `useParams` and matches it
+against **live rows only** (`live = projects.filter(p => !p.archived)`), falling back to `live[0]`. On an
+archived project's own route the match missed, so the item showed the FIRST LIVE project's name, that
+project's `href`, and **no `aria-current`** — the docblock that calls the item "a function of the ROUTE" is
+true only for live routes, and the one route it is about is the project you are standing on.
+
+- **13.1166** ✅ Standing on an archived project's page, the item names and links **that** project — badged
+  with the same `Chip` and the same `", archived"` name the workspace home's card uses — and not the first
+  live one; the DROPDOWN stays live-only, because it offers somewhere to go. A live project's own route is
+  the control in the same case: named, unbadged. —
+  (`apps/web/test/last-project-nav.test.tsx`)

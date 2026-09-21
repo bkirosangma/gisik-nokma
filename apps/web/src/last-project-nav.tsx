@@ -2,6 +2,7 @@
 
 import Link from 'next/link';
 import { useParams, usePathname } from 'next/navigation';
+import { Chip } from '@gisik-nokma/ui';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import type { ProjectRef } from '@gisik-nokma/app-core';
 import {
@@ -125,7 +126,24 @@ export function LastProjectNav({
       : null;
   // The fallback is `live[0]`, which is the first non-archived project in
   // SERVED order — the order `/workspaces` renders. Not sorted, not re-derived.
-  const shown: ProjectRef | null = rememberedLive ?? live?.[0] ?? null;
+  //
+  // ⚠ **AND IT WAS A LIE ON AN ARCHIVED PROJECT'S OWN PAGE (E5-34, round-2
+  // ruling, 2026-09-21).** `live` filters archived projects out, so on
+  // `/w/…/p/<an archived id>` `find` missed and the fallback answered with the
+  // FIRST LIVE project: the item named it, linked it, and carried no
+  // `aria-current` (the pathname is not that href). The docblock above calls the
+  // item "a function of the ROUTE"; that is true only of live routes, and the
+  // one route this prop exists for is the project you are actually standing on.
+  //
+  // The route's own project is therefore resolved FIRST, archived or not — and
+  // only then the memory, then the served-order fallback. The DROPDOWN stays
+  // live-only (`live.map` below): it offers somewhere to GO, and an archived
+  // project is not somewhere the workspaces page will show you.
+  const routeProject =
+    projects === null || routeProjectId === undefined
+      ? null
+      : (projects.find((p) => p.id === routeProjectId) ?? null);
+  const shown: ProjectRef | null = routeProject ?? rememberedLive ?? live?.[0] ?? null;
 
   const [open, setOpen] = useState(false);
   const wrapperRef = useRef<HTMLDivElement | null>(null);
@@ -232,6 +250,9 @@ export function LastProjectNav({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-current={pathname === projectHref ? 'page' : undefined}
+        // The home's card carries exactly this string for exactly this state —
+        // one convention for "this project is archived", two surfaces.
+        aria-label={shown.archived ? `${shown.name}, archived` : undefined}
         onFocus={() => {
           // See the docblock: exactly the focus call `close(true)` makes is
           // ignored, so Escape does not immediately reopen the menu.
@@ -244,6 +265,16 @@ export function LastProjectNav({
         onClick={() => openProject(shown.id)}
       >
         {shown.name}
+        {/* E5-34: named as archived in the item itself, the way the workspace
+            home's card names it ("<name>, archived") — so the one route where
+            the bar names an archived project says so rather than looking like
+            every live one. The chip is the VISIBLE half; the name carries the
+            state through `aria-label` below rather than through content
+            concatenation, because the accessible-name algorithm inserts a
+            synthetic separator between sibling nodes (`tri-state-choice.tsx`
+            records that measurement) and a second visible string would be a
+            second thing to keep in step. */}
+        {shown.archived ? <Chip tone="neutral">Archived</Chip> : null}
       </Link>
       {open ? (
         <div ref={menuRef} id={menuId} role="menu" aria-label="Projects" className="gn-nav__menu">

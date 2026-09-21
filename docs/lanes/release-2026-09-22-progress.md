@@ -153,3 +153,15 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E2-35 | done | f0ba7753536f9d5d7eb9dd4ccdad1fb9bfaccf64 | ticket-sheet.test.tsx 13.1183 x3; 2 mutations (3-fail / 1-fail) |
 | T-E2-51 | done | ba7f52236e97d42b0c7730262099121a279d2a8e | prose-only: case 13.761 re-pointed, both citation sets verified; no suite moves |
 **§13 id block for B13 (controller allocation, 2026-09-21 22:0x): `13.1177`–`13.1186`** — §13 ids are now per release batch like §17; the block table lands in `test-cases/13-hig-per-screen.md`. B13 mints §13 ids only from this block, and inside the block in order. **Spent: `13.1177` (T-E5-2). Next free: `13.1178`.** If `check-case-ids` ever reds on a collision with `main`, `main`'s ids never move — renumber OURS into the block. For any section with no block table, the next free id is the max over `origin/main` AND every `origin/rel/*` head, verified by union==sum.
+| B11 | claimed | 2026-09-21 21:46 | /Users/kiro/my_projects/gisik-nokma-ds5 |
+| T-E2-45 | done | 856eddc9 | app-nav.test.tsx 17.141–17.143 (E2-45) |
+| T-E5-25 | done | 3f359c75 | 13.1157 session-expired write (sheet/board/bulk) + adapter; 13.1158 guard (mutation-witnessed) |
+| T-E5-31 | done | a3234e8c | 13.1159 app-nav signed-out arm (RED 2 / GREEN 33) |
+| T-E5-32 | done | 093526c9 | 13.1160 sign-in?next= on all five read arms (RED 4 / GREEN 634) |
+| T-E5-5 | done | 5c05e994 | 13.1161 Collaborators note (RED 1 / GREEN 635) |
+| T-V1 | done | ea000e4c | 13.1162 empty-board copy+glyph gating & shell wiring (RED 2 core / 1 web; 1728 + 636 green) |
+| T-V5 | done | ab79978e | 13.1163 contested arm via ticketLocation.locate (RED 2 / GREEN 638) |
+| T-E2-38 | done | af14c3f4 | 13.1164 archived chip on the project page (RED 1 / GREEN 640) |
+| T-E5-23 | done | 962eae8f | 13.1165 founder's empty home (RED 1 / GREEN 642) |
+| T-E5-34 | done | db88a264 | 13.1166 archived route named+badged (RED 1 / GREEN 644) |
+| B11 | integration pre-flight | bdd8fde6 | merge materialised in a disposable worktree: 4 additive conflicts, guards+suites green after union, 2 web cases need the documented post-merge patch |

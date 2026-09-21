@@ -250,9 +250,18 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           docblock in globals.css for why it is pinned instead of sharing
           this group's wrap. */}
       <div className="gn-nav__links">
-        <Link href="/workspaces" aria-current={current("/workspaces")}>
-          Workspaces
-        </Link>
+        {/* E5-31: gated on the session, because signed out there is nothing
+            behind it. The bar used to offer Workspaces, an inbox icon, an
+            account menu and a scope note to a visitor who could use none of
+            them — pressing Workspaces landed on `/sign-in` by a 401 bounce,
+            with no `next=` and no Sign in control anywhere on the page. The
+            house rule this restores is the one Rounds 22–23 set for the Board
+            item: the bar does not offer a link that cannot resolve. */}
+        {user !== null ? (
+          <Link href="/workspaces" aria-current={current("/workspaces")}>
+            Workspaces
+          </Link>
+        ) : null}
         {/* The workspace's own served name — ONE source, `getMyWorkspaces`, never
             a second derivation. Omitted (not id, not a placeholder) until the
             name arrives or if the read fails; see `useWorkspaceName` above. */}
@@ -345,8 +354,18 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             <Link href="/help" aria-current={current("/help")}>
               Help
             </Link>
-            <Link href="/account" aria-current={current("/account")}>
-              Account
+            {/* E5-31: the arm `legal-nav.tsx:96-99` already had and this bar
+                did not. `/account` is withheld with `Workspaces` above — it is
+                the signed-in person's own page and answers a 401 bounce for
+                anyone else — and the one destination a visitor with no session
+                needs is the door IN, carrying where they were headed so
+                signing in returns them to it (the same `next=` shape the
+                invite, consent and settings shells use). */}
+            <Link
+              className="gn-nav__signin"
+              href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+            >
+              Sign in
             </Link>
           </>
         ) : null}
@@ -387,7 +406,13 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             on a TRANSIENT read failure — destroying state on a network blip, to
             recover a hint. The note is a hint; `Workspaces` is still one click
             away and is the real route out. */}
-        {showScopeNote ? (
+        {/* E5-31: also withheld signed out, and the sentence is why — "pick
+            one to reach its board, members and settings" tells a person to do
+            something the bar is no longer offering them, and none of the three
+            nouns is reachable without a session. `showScopeNote` already
+            requires storage to have been read and to hold nothing; this adds
+            the positive session that the sentence presupposes. */}
+        {showScopeNote && user !== null ? (
           <span className="gn-nav__scope">
             No workspace selected — pick one to reach its board, members and settings.
           </span>
@@ -397,10 +422,16 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
       {/* The inbox icon sits immediately LEFT of the avatar (Round 24, owner),
           both outside `.gn-nav__links` so they stay pinned as a pair at the
           bar's end rather than wrapping into the destination group. */}
-      <div className="gn-nav__corner">
-        <InboxNavLink active={pathname === "/inbox"} />
-        <AccountMenu />
-      </div>
+      {/* E5-31: the whole corner is signed-in only. `AccountMenu` already
+          rendered nothing without a session, but `InboxNavLink` did — an
+          unlabelled icon pointing at a session-gated route, which is the
+          third of the dead controls this ruling names. */}
+      {user !== null ? (
+        <div className="gn-nav__corner">
+          <InboxNavLink active={pathname === "/inbox"} />
+          <AccountMenu />
+        </div>
+      ) : null}
       </div>
     </nav>
   );

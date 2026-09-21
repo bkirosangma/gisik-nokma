@@ -2222,6 +2222,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--transport`'s rule despite the identical tone. Reuses `--gn-warning`, so no
    new colour pairing is introduced for a contrast floor to have to carry. */
 .gn-refusal--editor { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
+/* E5-25 (2026-09-21): a session that ENDED, on a write. A fourth reason for the
+   same register and its own class for `--editor`'s own reason above: it is not a
+   transport failure (the server was reached and answered), and it is not the
+   server's verdict on the write either (no handler ran). Reuses `--gn-warning`
+   so no new colour pairing is introduced for a contrast floor to carry. */
+.gn-refusal--session { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
 
 .gn-attachments { list-style: none; margin: 0.8rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-attachment { display: flex; flex-direction: column; gap: 0.1rem; }
@@ -5055,6 +5061,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
+/* E2-38 (round-2 ruling, 2026-09-21): the archived chip on an archived project's
+   OWN page. It sits under the title as its own line rather than inside the
+   heading, so a screen reader hears the project's name as the heading and the
+   state as a separate fact — the shape `/workspaces`' card gets from its
+   `aria-label` instead, which a heading cannot carry. */
+.gn-project__archived { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0; }
 
 /* ── Board client narrowing (board-prototype-port, Task 4, 2026-09-16).
    Step 1's four rules, verbatim (`.gn-project__narrowing`/`__count`/
@@ -5298,6 +5310,22 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-filters__section > .gn-filters__section-label { padding: 0; margin: 0; }
 
 .gn-filters__pending {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  margin: 0;
+}.gn-filters__pending {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  margin: 0;
+}
+/* E5-5: the sentence a section carries when a control in it is set-but-unapplied.
+   Same muted metrics as `__pending` and a different reason, so a different
+   class: `__pending` says "this is not here YET" (a read in flight, or a roster
+   that failed), and this says "this is here and does nothing yet", which is a
+   statement about the product rather than about a read. */
+.gn-filters__note {
   font-size: 0.8125rem;
   line-height: 1.125rem;
   color: var(--gn-text-muted);

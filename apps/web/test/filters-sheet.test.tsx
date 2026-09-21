@@ -991,3 +991,36 @@ describe('13.600 the Closed control cycles and narrows the List tab; Backlog joi
     expect(within(group).getByRole('button', { name: 'Doing' })).toBeInTheDocument();
   });
 });
+
+/**
+ * E5-5 (round-2 ruling, IMPORTANT) — the Collaborators section SAYS what it
+ * does not do, before the press.
+ *
+ * The tri-state rows work and the filter keeps what you set, but no view
+ * narrows by `collaboratorIds`, and the ONLY place the product said so was a
+ * strip printed after the fact (`docs/manual.md:826-828`: *"Collaborators is
+ * the one thing no tab applies — the strip's own sentence is 'Not applied on
+ * the board: collaborator.'"*). A control that looks like the six around it and
+ * quietly does nothing is the dead-affordance shape this shell refuses
+ * elsewhere, and the ruling's remedy is to say it up front.
+ */
+describe('E5-5 the Collaborators section says it is not applied by any view', () => {
+  it('13.1161 carries the note in the Collaborators group, and the Assignee group does not', async () => {
+    render(
+      <Providers services={servedBoard(twoCards)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    const dialog = await openFilters();
+
+    const collaborators = within(dialog).getByRole('group', { name: 'Collaborators' });
+    expect(collaborators).toHaveTextContent('No view narrows by this yet');
+
+    // The control that makes this a measurement rather than "the sheet says it
+    // somewhere": Assignee IS applied by every view, so the sentence must be
+    // absent there — a note rendered by `personSection` unconditionally would
+    // satisfy the assertion above and be false about the section beside it.
+    const assignee = within(dialog).getByRole('group', { name: 'Assignee' });
+    expect(assignee).not.toHaveTextContent('No view narrows by this yet');
+  });
+});

@@ -18,6 +18,19 @@ import { stubServices } from './helpers/stub-services.js';
  * `renderHook` as installed cannot show it.
  */
 
+/**
+ * E5-25 — `Providers` now reads the router (it wraps the ONE `DataSource` in
+ * the session-expiry guard, so a write that ends in a 401 can send the person
+ * to `/sign-in` once). In the product it is mounted inside the app router and
+ * this is free; a test that renders it directly is not, and `useRouter()`
+ * throws `invariant expected app router to be mounted` before the memo can see
+ * the injected `services`. One `push` — the guard's only use of it.
+ */
+const routerPush = vi.fn();
+vi.mock('next/navigation', () => ({
+  useRouter: () => ({ push: routerPush }),
+}));
+
 let mockSessionUser: { id: string; name: string; email?: string } | null = {
   id: 'u_kiro',
   name: 'Kiro',
@@ -34,6 +47,7 @@ import { clearWorkspaceProjectsCache, useWorkspaceProjects } from '../src/use-wo
 
 beforeEach(() => {
   clearWorkspaceProjectsCache();
+  routerPush.mockClear();
   mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
 });
 
