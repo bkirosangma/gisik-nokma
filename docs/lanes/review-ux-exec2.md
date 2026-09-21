@@ -2638,8 +2638,16 @@ small:**
 1. **The bulk of the 13.x catalogue — 2600 of its 2606 ids.** Reached in three bounded bites
    (`17-open-work.md`'s `17.005`, this file's `13-second-wave-roles-and-navigation.md` log, and the
    `12-offline-sync-apps.md` edge-class entry). **0.2 % of the catalogue**, and I am not claiming more.
-2. **Three `packages/editor` files** — `src/index.ts` (86 lines, the barrel), `attachments/attachment-claims.ts`
-   (47), and the two `webview` files beyond `bridge.ts`, `entry.tsx` and `create-editor-bridge.ts`.
+2. ⚠ **CORRECTED — `packages/editor` is now COMPLETE, and the line above was wrong twice.** It named
+   `src/index.ts`, `attachments/attachment-claims.ts` and *"the two `webview` files beyond `bridge.ts`,
+   `entry.tsx` and `create-editor-bridge.ts`"* as unread. **The webview directory has exactly three files**
+   and I had read all three, and the claims module lives at `drive/attachment-claims.ts`, not `attachments/`.
+   All 24 files of the package are now read: the barrel, `doc.ts`, the schema pair, the extensions
+   (`mention`, `mention-popup`, `escape-suggestion`, `ticket-image`, `attachment-paste`), the components
+   (`TicketEditor`, `TicketEditorSlot`, `EditorToolbar`, `EvidencePicker`, `ImageWrapMenu`, `UploadChips`,
+   `AttachmentListItem`), `upload.ts`, the `drive/` pair, the `attachments/` pair, and the `webview` trio.
+   **No defect beyond `E2-46`, `E2-47` and `E2-49`.** Recording the miscount rather than quietly shrinking
+   the list is the point: a boundary nobody checks is a boundary that drifts.
 3. **`/members` and `/account` at screen level** — reached at component level and through their pages'
    loaders, but not walked as screens.
 4. **The painted half of the peer corpus.** Roughly thirty peer findings rest on `[BROWSER]` evidence I can
