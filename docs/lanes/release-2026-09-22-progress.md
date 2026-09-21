@@ -37,3 +37,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P27 | done | 04fec411582400e34ecb35972ed95f8cb4202f7c | viewport-reflow-320.test.ts (13.1155) 3/3; web 650; typecheck 17/17; phone-320 baselines MISSING (owner named) |
 | T-E4-9 | done | febbb3e6c84015fdd44b4bf726a811b6ff2bc682 | builder-route.test.tsx (13.1156) 10/10; ui 423, app-core 1725, web 652; overflow-loop third deferred |
 | T-E4-32 | done | 7eab13fb86445fdf38c25d1df3d158ae73b1edbd | tokens.test.ts, second arm of 13.1146 (no new id - the sweep is narrower than the finding); ui 426, web 652 |
+| T-P10 | done | 31f501bae4eff4b5ec5ad3bada029e4e1703245c | prose-only per its DONE WHEN; message + counter docblock; typecheck 17/17; web 652 |
