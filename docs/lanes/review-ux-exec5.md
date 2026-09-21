@@ -976,9 +976,9 @@ never brought under the same rule. The person's typed comment / title draft is a
 reads as a network problem, when no retry on this session can succeed.
 
 **WHAT WOULD HAVE BEEN BETTER.** One predicate on the catch — `error instanceof HttpError && error.status === 401` (the
-transport HAS the status, `http.ts:50`) — routing to the same `/sign-in?next=` redirect reads use, with a sentence
-*"Your session has ended — sign in again to send this."*; or feed each page's write-error state into its existing
-`useSignInOnExpiredSession` list.
+transport HAS the status, `http.ts:50`) — routing to the same `/sign-in?next=` redirect reads use, with the sentence the product already owns for exactly
+this — `EXPIRED_SESSION_COPY = 'Your session has ended. Taking you to sign in…'` (`expired-session.tsx:90`, mounted by
+five read arms) — or feed each page's write-error state into its existing `useSignInOnExpiredSession` list.
 
 **MEASUREMENT.** `[SOURCE]` every line above opened. Not driven: I will not sign the owner's session out, and the
 browser stopped hydrating before I could inject a `401` on `/v1/events` (§6.1) — the injection would have been the
