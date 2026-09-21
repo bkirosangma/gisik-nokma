@@ -1329,6 +1329,20 @@ is the reason `E3-14` survived three waves of the same defect being found by han
 **MEASUREMENT.** The guard's body read at `:256-259`; the run above returns `1 passed | 72 skipped`; the
 probe in `E3-14` is the falsifier on the other side. Both from this sha.
 
+**DEFENCE — 2026-09-21 15:32 IST, phase 2.** The one attack this finding invites is *"the docblock records the
+guard's shape, so this is category 2 with no argument against the ruling."* Re-opened this session,
+`security-middleware.test.ts:236-252`: the docblock does not record a decision to compare two hand-written lists — it
+claims the opposite. *"Re-reading a list you already believe is complete cannot find that; **only comparing it
+against something independent can. So the comparison is here, in code.**"* and *"the assertion that makes drift a
+RED TEST rather than a silent gap."* Those are assertions of a property, and `:256-259` compares
+`HTTP_ORIGIN_PROTECTED_ROUTES` against `PROTECTED` — the suite's own table, two lines above — which is not
+independent of the set by any reading. Case **13.116 ✅** (`:253-255`) states the same property: *"Neither direction
+alone would catch a route added without a row."* A route added to **neither** artifact — the five in `E3-14`, which
+this branch's HEAD carries — leaves both directions satisfied and the test green (measured: `1 passed`). The common
+brief's own rule settles the classification: *"the reason a thing was built is not a ruling. A sentence explaining
+why a shortcut was taken is a record of the shortcut."* Here the sentence does not even explain a shortcut; it
+promises the property the code lacks. Category 3, with the promise as the falsified claim.
+
 ---
 
 ## 14.8 `E3-14`, REFINED — which of the five are reachable by a browser, and why two of them are the sharp ones
@@ -4099,8 +4113,12 @@ for each of `73 77 82 87 93 95 97 98 107 115 116 117 129 131 193 198 199 201 202
 `6.61 6.65 6.66 6.71 6.51 6.53 6.57 6.58 6.77 6.82 6.83 6.84 6.94 6.96 6.130 6.31 6.41 6.123 6.124 6.125`.
 The table names **18** of them: the "live" row's count says **6** and its cell lists **seven** (`6.31`, `6.41`,
 `6.53`, `6.65`, `6.71`, `6.125`, `6.130`), and **`6.57` (`:97`) and `6.83` (`:116`) appear in no row at all.**
-6 + 3 + 7 + 1 + 1 = **18**, not 20. The section's count was reproduced by executor 6 (its refutations file:
-*"20, at the same twenty line numbers"*) — the **twenty** is right; the claim that all twenty were classified was
+6 + 3 + 7 + 1 + 1 = **18**, not 20. **Population control, not only a membership check:** `grep -c '❌' test-cases/06-auth-visibility.md` → **22**;
+the two lines outside the twenty are `:3` (the legend, *"`❌` not covered"*) and `:7` (the file's header narrative,
+*"6.52 flips from ❌ to ✅"*) — so the twenty is every ❌ **case** line in the file, and no table-row, heading or
+mid-sentence spelling hides another (`grep -E '^[[:space:]]*\|.*❌'` over `test-cases/*.md` → 0; the one `##`
+line with a ❌ is `13-step-audits-and-catalogue-hygiene.md:325`, narrative). The section's count was reproduced by
+executor 6 (its refutations file: *"20, at the same twenty line numbers"*) — the **twenty** is right; the claim that all twenty were classified was
 not, and a count that matched hid the two that were never read. **Both are read below, and both are stale** —
 which is what the table's *"45 %"* was about, and it is now **11 of 20**.
 
