@@ -75,7 +75,7 @@ import { DocumentTitle } from '../src/document-title.js';
  */
 export default function NotFound() {
   return (
-    <main className="gn-shell gn-notfound">
+    <main id="gn-main" className="gn-shell gn-notfound">
       {/* exec1 P12 names the 404 among the routes that all read "Gisik Nokma",
           and it is the one route a reader reaches with no context at all — the
           title is the only thing that says the page was not found before the

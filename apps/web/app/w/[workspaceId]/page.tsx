@@ -296,7 +296,7 @@ export default function WorkspaceHomePage() {
     workspaces === null ? null : (workspaces.find((entry) => entry.id === workspaceId) ?? null);
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       {expired ? (
         <ExpiredSessionNotice />

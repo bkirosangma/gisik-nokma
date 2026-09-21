@@ -35,7 +35,7 @@ export default function WorkflowHistoryPage() {
   const { workspaceId, workflowId } = useParams<{ workspaceId: string; workflowId: string }>();
   const wiring = useBuilderWiring(workspaceId);
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <DocumentTitle title="Workflow history" />
       <AppNav workspaceId={workspaceId} />
       <nav className="gn-builder-crumb" aria-label="Breadcrumb">

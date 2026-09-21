@@ -16,7 +16,7 @@ import { DocumentTitle } from '../../src/document-title.js';
  */
 export default function HelpPage() {
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <DocumentTitle title="Help" />
       <AppNav />
       <HelpBrowser />

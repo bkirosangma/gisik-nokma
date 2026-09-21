@@ -46,7 +46,7 @@ export default function WorkspacesPage() {
   const error = expired ? null : failure;
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <DocumentTitle title="Workspaces" />
       <AppNav />
       <div className="gn-workspaces">

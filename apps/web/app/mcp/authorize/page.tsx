@@ -130,7 +130,7 @@ function AuthorizeScreen(): React.JSX.Element {
   const returnPath = '/mcp/authorize';
 
   return (
-    <main className="gn-shell gn-mcp-authorize">
+    <main id="gn-main" className="gn-shell gn-mcp-authorize">
       <DocumentTitle title="Connect an assistant" />
       <h1 className="gn-page-title">Connect an assistant</h1>
 

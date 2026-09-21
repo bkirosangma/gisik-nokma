@@ -383,7 +383,7 @@ export default function MembersPage() {
   const rosterRows = (members ?? []).map((member) => ({ member, label: memberLabel(member) }));
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <DocumentTitle title="Members" />
       <AppNav workspaceId={workspaceId} />
       <div className="gn-members__head">

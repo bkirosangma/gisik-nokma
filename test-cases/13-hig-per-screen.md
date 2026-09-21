@@ -389,6 +389,46 @@ punctuation for a person who has neither a name nor an address. `useCurrentUser`
 E4-6 (provenance's raw-id fallback, where `provenance.ts` records a RULED decision to attribute rather
 than blank). This is the shell.
 
+## A skip link, for the person pressing Tab (exec1 P13, 2026-09-21) — case `13.1055`
+
+- **13.1055** ✅ The product's first focusable element is a `Skip to content` link whose target resolves:
+  the rendered anchor is asserted to be FIRST among the focusable elements and to point at an id that a
+  real element carries; a sweep asserts every route's RENDERING `<main>` carries that id, so the next
+  route added without one reddens rather than shipping a dead anchor; and the layout arm asserts the
+  control renders before `<Providers>` with comments stripped and that `.gn-skip`/`.gn-skip:focus` exist
+  as two rules read separately — hidden by clipping, never `display: none`, which would take it out of the
+  tab order. (`apps/web/test/skip-link.test.tsx`)
+
+**The finding, and the part of it that was WITHDRAWN.** The reviewer's sweep —
+`grep -rniE 'skip[ -]?(to|link)|gn-skip'` over `apps/web/app`, `apps/web/src`, `packages/app-core/src`
+and `packages/ui/src` — returned **zero lines**, while the same sweep with the needle `aria-label`
+returned 166, so the instrument traverses. **The lane withdrew the WCAG 2.4.1 *Bypass Blocks* citation**
+(landmarks satisfy it) and the surviving core is filed MINOR: a keyboard-only user Tabbed the whole nav on
+every navigation. **The fix is argued from the measurement, not from a criterion the product already
+meets.** Re-running the reviewer's own sweep after the change returns 12 lines.
+
+**What was built.** `apps/web/src/skip-link.tsx` (an anchor, no `'use client'` — a directive there would
+push the whole shell tree client-side for one `<a>`), rendered in `layout.tsx` before `<Providers>`, plus
+`id="gn-main"` on each route's rendering `<main>` and the `.gn-skip` rules in `globals.css`.
+
+**MEASURED in the real prerendered output** (`next build` → `.next/server/app/workspaces.html`):
+`<a class="gn-skip" href="#gn-main">Skip to content</a>` at byte **14060**, the first `<nav` at byte
+**14147** — the anchor precedes the chrome in the delivered HTML, which is what makes it the document's
+first focusable element.
+
+⚠ **What is NOT proved:** that the link is **invisible until focused**. jsdom applies no stylesheet and
+neither does this HTML, so a skip link drawn as a permanent banner would pass every assertion in the
+suite. The rules exist and are asserted as two separately-sliced blocks (an earlier cut sliced to EOF, so
+its `display: none` check was asserting a property of the rest of the file); the *visually hidden* half is
+a BROWSER reading and is **owed**, not claimed.
+
+**Two cuts of this test that could not have failed, both caught before commit:** the layout arm read
+`indexOf('<Providers>')` over RAW source and found the one in the docblock that explains the ordering —
+*the prose about the property defeated the check for the property*, `expected 2778 to be less than 2428`;
+and the id-placement pass over the routes was written with an inverted self-closing test, so the id landed
+on the five Suspense FALLBACK shells and on none of the real `<main>`s. Both are recorded because each
+looked green-ish for a moment.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one

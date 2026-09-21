@@ -184,7 +184,7 @@ const SECTIONS: readonly LegalSection[] = [
 
 export default function Terms() {
   return (
-    <main className="gn-shell gn-legal">
+    <main id="gn-main" className="gn-shell gn-legal">
       <LegalNav />
       <div className="gn-legal__column">
         <div className="gn-legal__head">

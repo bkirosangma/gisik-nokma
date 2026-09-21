@@ -4,6 +4,7 @@ import '@gisik-nokma/ui/ui.css';
 import '@gisik-nokma/editor/editor.css';
 import './globals.css';
 import { Providers } from '../src/providers.js';
+import { SkipLink } from '../src/skip-link.js';
 
 export const metadata = { title: 'Gisik Nokma' };
 
@@ -42,6 +43,14 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <style dangerouslySetInnerHTML={{ __html: themeStylesheet() }} />
       </head>
       <body>
+        {/* exec1 P13 — the FIRST focusable element on every route, which is what
+            makes it a skip control rather than one more thing to Tab past. It
+            must stay before `<Providers>` and outside it: rendering it inside
+            the app tree would put it after whatever that tree draws first.
+            The target `#gn-main` is carried by each route's own `<main>` and is
+            swept in `test/skip-link.test.tsx`, so a route added without one
+            reddens instead of shipping a dead anchor. */}
+        <SkipLink />
         <Providers>{children}</Providers>
       </body>
     </html>

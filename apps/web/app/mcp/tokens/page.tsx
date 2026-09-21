@@ -30,7 +30,7 @@ export const metadata = { title: documentTitleFor('MCP tokens') };
  */
 export default function McpTokensPage(): React.JSX.Element {
   return (
-    <main className="gn-shell gn-mcp-tokens">
+    <main id="gn-main" className="gn-shell gn-mcp-tokens">
       <McpTokensScreen />
     </main>
   );

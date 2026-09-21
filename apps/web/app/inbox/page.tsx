@@ -383,7 +383,7 @@ export default function InboxPage() {
   }
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <DocumentTitle title="Inbox" />
       <AppNav />
       {/*

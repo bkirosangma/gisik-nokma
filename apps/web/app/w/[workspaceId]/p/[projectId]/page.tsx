@@ -1816,7 +1816,7 @@ function ProjectBoard() {
   })();
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       {/* The route's title. `projectName` is `null` until the read answers, and
           a null name is not a title — the generic `Board` stands in until it
           arrives, and the effect re-runs with the name when it does. exec1 P12. */}

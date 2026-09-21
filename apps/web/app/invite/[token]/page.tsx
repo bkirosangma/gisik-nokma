@@ -86,7 +86,7 @@ export default function InvitePage() {
     );
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <DocumentTitle title="Invitation" />
       <h1 className="gn-page-title">Gisik Nokma</h1>
       <Card className="gn-invite">
