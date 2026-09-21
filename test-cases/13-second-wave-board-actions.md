@@ -1924,6 +1924,14 @@ with them.
   member.name)` too, so a nameless member reads by its raw id rather than as nothing — asserted with a
   seeded three-member roster (one carrying `name: ''`) against the full rendered option-text array, plus
   a direct check that no option's text is the empty string.
+  **A SIXTH arm, RULING E5-4 (closed), same no-new-id reasoning:** the @mention list's own `queryUsers`
+  filtered on `member.name.toLowerCase().includes(needle)` and mapped `name: member.name` verbatim, so a
+  nameless member was both an invisible (blank) row AND unreachable by typing — an empty string can
+  never match a needle. `queryUsers` now resolves the label through `actorLabel` BEFORE matching, not
+  after; asserted by capturing the closure off a fake `EditorSlotComponent` (the same dependency-
+  injection seam 13.989's own describe block uses) and calling it directly, since it is private to
+  `TicketSheet` — the resolved list contains the nameless member labelled by id, and querying by that id
+  finds them.
 
 ### What is NOT covered, named rather than implied
 

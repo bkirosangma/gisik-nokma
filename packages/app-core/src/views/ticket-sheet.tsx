@@ -964,9 +964,16 @@ export function TicketSheet({
   const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> => {
     const people = members.data ?? [];
     const needle = query.trim().toLowerCase();
+    // RULING E5-4: `member.name` verbatim is blank for the magic-link
+    // population (`name: ''`) — the same defect E4-18 closed on the
+    // Assignee picker, here on the @mention list. Resolved through
+    // `actorLabel` BEFORE matching, not after: a nameless member is
+    // otherwise never reachable by typing (their raw name never matches
+    // anything) and, once resolved, is found the same way any other
+    // person is — by what this list actually shows for them.
     return people
-      .filter((member) => needle === '' || member.name.toLowerCase().includes(needle))
-      .map((member) => ({ userId: member.id, name: member.name }));
+      .map((member) => ({ userId: member.id, name: actorLabel(member.id, member.name) }))
+      .filter((person) => needle === '' || person.name.toLowerCase().includes(needle));
   };
 
   /**

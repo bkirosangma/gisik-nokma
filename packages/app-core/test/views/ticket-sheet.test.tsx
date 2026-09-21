@@ -1454,6 +1454,48 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     }
   });
 
+  /**
+   * RULING E5-4 — the @mention list's own half of the same defect class
+   * E4-18 closed on the Assignee picker: `queryUsers` filtered on
+   * `member.name.toLowerCase().includes(needle)` and mapped `name:
+   * member.name` verbatim, so a nameless member was both invisible (a
+   * blank row, if listed at all) AND unreachable (typing anything could
+   * never match an empty string). `queryUsers` is captured off a fake
+   * `EditorSlotComponent`, the same dependency-injection seam 13.989's own
+   * describe block uses, since it is a closure private to `TicketSheet`
+   * and not otherwise reachable from a test.
+   */
+  it('the @mention list resolves a nameless member by id, and finds them by typing it', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_nameless', name: '', role: 'guest' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    let captured: ((query: string) => Promise<Array<{ userId: string; name: string }>>) | undefined;
+    const fakeSlot: EditorSlotComponent = (props) => {
+      captured = props.queryUsers;
+      return null;
+    };
+    renderSheet(read, source, { editorSlot: fakeSlot });
+    await settled();
+    expect(captured).toBeDefined();
+
+    const all = await captured!('');
+    expect(all).toContainEqual({ userId: 'user_nameless', name: 'user_nameless' });
+
+    // Reachable by typing the id — the raw empty name could never have
+    // matched anything, so this is the assertion that would fail if the
+    // resolved label were used only for DISPLAY and the OLD raw name were
+    // still what `.includes(needle)` matched against.
+    const found = await captured!('user_nameless');
+    expect(found.map((person) => person.userId)).toContain('user_nameless');
+  });
+
   it('names who assigned the ticket, in the sibling rows’ own shape', async () => {
     renderSheet(
       ticketRead({

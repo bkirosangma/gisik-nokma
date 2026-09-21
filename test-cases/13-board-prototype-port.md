@@ -167,6 +167,14 @@ reverted with a targeted edit (not `git checkout`), confirmed clean by re-runnin
   assertion. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.447** ✅ Checking a person row in the Assignee section narrows the board, shows the
   `assigneeIds` chip naming them, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
+  **RULING E5-4 (closed), same case's own describe block extended, no new id (§13's numeric space is
+  contested across concurrent batches tonight — controller allocation, 2026-09-21 21:0x):** both the
+  Assignee and Collaborators person-row lists (`personSection`, shared by both) rendered `member.name`
+  verbatim — blank for the magic-link population — painting a row with no visible text and no accessible
+  name, unfindable by the SAME `getByRole('button', { name: … })` query every other case in this file
+  already uses. Both rows now resolve through `actorLabel(member.id, member.name)`, the same fix E4-18
+  applied to the ticket sheet's own Assignee picker — asserted with a nameless member seeded into the
+  roster, found by id in BOTH groups. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.448** ✅ Pressing a Type chip (`aria-pressed` toggles true) narrows the board, shows the
   `typeIds` chip, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.449** ✅ Pressing a State chip discloses via the `stateIds` chip even when it removes no card
