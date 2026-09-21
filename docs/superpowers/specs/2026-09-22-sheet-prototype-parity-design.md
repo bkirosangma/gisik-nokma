@@ -171,11 +171,15 @@ the file's own measured contrast notes.
 - `docs/manual.md` §5 "the job panel": the order of the rows, the Attachments tab, the
   visibility menu ("click the visibility pill, choose, Apply"). `pnpm help:generate`.
 - `Features.md` §3 sheet bullet (line ~75) and the visibility bullet: order, tab, menu.
-- `test-cases/16-remaining-doors.md`: new cases in the block the controller allocates
-  (request `16.110`–`16.129`); §13 board-prototype-port block for the popover and the editor
-  chrome (request `13.1257`–`13.1276`). Amended cases: `16.81` (tabs are three), `16.23`–
-  `16.30` (row order), `13.1178` unchanged, the visibility suite's 30 cases (open the menu
-  first).
+- `test-cases/16-remaining-doors.md`: new cases in **`16.110`–`16.129`**; §13 cases (the
+  popover, the editor chrome) in **`13.1267`–`13.1286`**, filed in `13-board-prototype-port.md`.
+  **Both blocks are written into the allocation tables in this same commit** (`16-remaining-doors.md`
+  "THE BLOCKS" and `13-hig-per-screen.md` "§13 blocks"), beside rows recording the priority
+  built-in plan's `16.100`–`16.109` and `13.1227`–`13.1266` as landed in #672 — measured
+  2026-09-22 against `origin/main` `5de12392`: §16 catalogue tip `16.99`, §13 tip `13.1218`
+  with `13.1217`–`13.1226` held by `rel/browser-findings`. An executor takes from these rows
+  and never from the tip. Amended cases: `16.81` (tabs are three), `16.23`–`16.30` (row
+  order), `13.1178` unchanged, the visibility suite's 30 cases (open the menu first).
 
 ## Testing — the "nothing lost" contract
 
