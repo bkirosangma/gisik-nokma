@@ -13,7 +13,9 @@ line opened. A refutation costs the refuter the finding's points if rejected, so
 `origin/exec3/review-functionality-r2` at `7d75419b` (11:03 IST) · `origin/exec5/review-ux` at `cdffa421`
 (11:03) · `origin/exec4/review-ui` at `bf928c83` (10:59) · `origin/exec1/review-ui-r2` at `8dcf2cfb` ·
 `origin/exec2/review-ux-r2` at `ad054454` — headings of all five read; exec 3's round-2 findings E3-9 … E3-21 read
-in full for E3-14, E3-15, E3-18, E3-19, E3-20, E3-21; exec 5's E5-13 read in full.
+in full for E3-14, E3-15, E3-18, E3-19, E3-20, E3-21; exec 5's E5-13 read in full. **Re-fetched 14:30 IST:**
+`origin/exec3/review-functionality-r2` at `e2f74ec2` (14:21) — E3-22 … E3-27 and §36–§41 (their attacks on E6-3,
+E6-8, E6-9, E6-11: all "hold") read; E3-25, E3-26, E3-27 re-measured below.
 
 ## Candidates examined and NOT refuted — with the reason, so the judge can see the work
 
@@ -24,6 +26,9 @@ in full for E3-14, E3-15, E3-18, E3-19, E3-20, E3-21; exec 5's E5-13 read in ful
 | **E3-19** (Important — a child can be moved *out* of terminal under a terminal parent) | `transition.ts:132-142` guards only the terminal-**entering** direction, as they say. Adjacent to my E6-8 (republish promotion), different door. | **Valid; independent of E6-8.** |
 | **E3-20 / E3-21** (stale ❌ cases 6.82 and 6.84) | Same class as my E6-12 (6.51, 6.77, 6.123). On 6.84 I had judged the ❌ still true of the *projection's own* robustness and declined to file; exec 3 files it on the door's refusal (`hierarchy.ts:124`, ruling P12). | **Valid as filed; different reading of the same line, not a falsification.** |
 | **E5-13** (claimed Critical — `/account` PUTs a guessed notification-preferences document after a failed read) | Browser-reproduced with a mocked `fetch`; source lines at `account/page.tsx:81`, `:215-232` as cited. | **Valid.** Not this lane's to re-measure; the wire half (a whole-document PUT) is the gateway's stated contract. |
+| **E3-25** (Minor — `SyncItem` has four arms, not three; twenty ❌ lines in `06-auth-visibility.md`) | `sync-item.ts:96` is a four-arm union. Their "twenty" re-counted with my §1 first-marker instrument restricted to file 06: **20**, at the same twenty line numbers they list (`73 77 82 87 93 95 97 98 107 115 116 117 129 131 193 198 199 201 202 203`). | holds — count reproduced by an independent instrument |
+| **E3-26** (Important — `Features.md:2350` says no settings nav entry; `app-nav.tsx:299` renders one) | `grep -n "Nothing in the app links to any of them yet" Features.md` → `:2350`; `app-nav.tsx:299` is `href={\`/settings?workspaceId=…\`}`, and `:84` calls it *"`Settings`"*. | holds |
+| **E3-27** (Important — two files say `checkErrandTemplate` "not yet landed"; it landed) | `grep -rn "not yet landed on this branch"` → `Features.md:452` and `app-core/test/workflow-builder/templates.test.ts:66`; `apps/server/src/seed/templates.ts:41` exports `checkErrandTemplate`. | holds |
 | **E5-24** (help describes a product that no longer exists — "you cannot delete a job" among four passages) | Overlaps my **E6-1**, found independently (mine is stamped 10:0x IST, theirs pushed 11:03). | **Both stand; independent duplicates score in full (rules §3).** |
 
 ## Where this lane would DEFEND
