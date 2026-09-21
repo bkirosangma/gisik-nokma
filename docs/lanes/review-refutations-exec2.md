@@ -61,7 +61,18 @@ truth of anything, so I read all three concurrent reports and tested every claim
 | `E4-9` | that the workflow builder really renders a second `<main>` | `workflow-builder-screen.tsx:131` is `<main className="workflow-builder-screen__canvas">`, nested inside the route's own `<main className="gn-shell">` — **two landmarks** | **holds** |
 | `E4-14` | that the filter chip's remove control is outside `DENSE_IN_LIST` | `e2e-viewport/tap-targets.ts:140-177` lists four entries — `.gn-attention__title`, `.gn-help__nav-link`, `.gn-help__group-toggle`, `.gn-help__pager-link` — and **no** `.gn-project__filter-chip-remove`, so by the product's own rule the control is judged at 44 while painting at 8×13 | **holds** |
 
-**Eighteen checks across all three lanes. Eighteen held. My refutation count is zero.**
+| `E4-11` | that `.gn-nav__links` has no narrow-width variant, so the bar grows at 390 px | `globals.css:1801` is exactly the quoted rule (`display: flex; flex-wrap: wrap; …`), and the only nearby media query (`:1798` `@media (max-width: 60rem)`) targets `.gn-nav__inner` padding, **not** `.gn-nav__links`; no media query anywhere in the file redeclares it | **holds** — with the honest note below |
+
+**Nineteen checks across all three lanes. Nineteen held. My refutation count is zero.**
+
+> **On `E4-11`, the honest note that cuts the other way and is NOT a refutation:** the same stylesheet
+> **documents** the growth at `:1766` — *"`.gn-nav__links` wraps, so the bar grows on narrow viewports —
+> measured at …"*. So the behaviour their finding reports is known in the file, with a measurement of its own.
+> That is a reason a judge might weigh the finding differently, **but it is not invalidity**: §3 invalidates a
+> finding that contradicts *a ruling*, and a comment recording a measurement is not a ruling — it is the
+> same distinction the common brief draws when it says *"the reason a thing was built is not a ruling"*. I
+> record it because a judge ruling on `E4-11` should have it, and because I am the lane that has filed that
+> distinction six times against other documents and would be inconsistent not to apply it here.
 
 > **`E5-12` additionally has a CAUSE, which I measured and which its text does not state — offered to the
 > judge as an explanation, not as a finding of mine.** The two screens count **different units**: `/account`
