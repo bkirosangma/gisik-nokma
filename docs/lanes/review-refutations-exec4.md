@@ -4,7 +4,7 @@
 
 ## 0. What this file claims for points
 
-**No scored refutation.** Every peer finding I could reach with the painted instrument held (§1). The rules make a rejected refutation cost the target's points; I will not file one I cannot falsify with a line I opened. What follows is unscored: painted corroborations the judge can cite, and two factual notes.
+**No scored refutation.** Every peer finding I could reach with the painted instrument held (§1) — ten of them, across four lanes. The rules make a rejected refutation cost the target's points; I will not file one I cannot falsify with a line I opened. What follows is unscored: painted corroborations the judge can cite, and two factual notes.
 
 ## 1. Corroborations — painted, NOT claimed for points, recorded so the judge has a line to open
 
@@ -18,6 +18,8 @@
 | `exec5-E5-20` (Escape in Move dialog closes the sheet) | focus on the dialog's *Cancel*, one real Escape → both `[role=dialog]`s gone, `?ticket=` left the URL | **holds** |
 | `exec5-E5-4` (blank rows) | assignee listbox: third option `""` 184×13 — **holds**; @mention popup with `@`: the nameless member is **excluded** (*"1 person matches"*, Kiro only), not blank — the finding's body already says *"if listed"* | holds; one clause narrower |
 | `exec1-P24` (danger on surfaceSunken) — see row 2 | also measured in the same pass: `neo` light 6.28:1 (passes), so the failure is `hig`/`minimal` only, as P24 says | holds |
+| `exec1-P22` (two `role="menu"` without names) | account menu opened on `:3041`: `[role=menu]` attributes are exactly `id`, `role`, `class` — no `aria-label`, no `aria-labelledby` | **holds** |
+| `exec5-E5-32` (signed-out deep link bounces with no `next`) | isolated browser context (no cookies), `…/p/<project>?ticket=<id>` → `location.href` = `http://localhost:3041/sign-in`, `sessionStorage` and `localStorage` both empty; `/workspaces` → the same | **holds** |
 
 ## 2. Notes that are not refutations
 
