@@ -539,16 +539,26 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** The APG's calendar grid pattern: `role="grid"` on the container, `role="row"` per week, `role="columnheader"` with `aria-label` on the seven labels, `role="gridcell"` on the day cells. The markup is already grouped exactly that way — grid → weekday-head → week → days → day — so the roles are an attribute apiece on a structure that already exists.
 
-### P21 — **IMPORTANT** ⚠ **r2 NEW, PHRASING CORRECTED BEFORE THE BOUNDARY** — The description editor is an implicit `textbox` with no accessible name, and its visible label is not associated with it
+### P21 — **IMPORTANT** ⚠ **r2 NEW, MEASUREMENT CORRECTED TWICE BEFORE THE BOUNDARY — THE SECOND CORRECTION IS THE SUBSTANTIVE ONE** — The description editor is a `role="textbox"` with no accessible name, and its visible label is not associated with it
 
 **WHAT.** The ticket sheet's description composer is a `contenteditable` host with **no accessible name**, sitting inside a `<dl>` whose `<dt>description</dt>` is not programmatically attached to it. The toolbar directly above it is fully labelled; the field itself is not.
 
-**⚠ AND ITS ROLE, STATED PRECISELY BECAUSE MY FIRST VERSION SAID "NO ROLE" AND THAT IS NOT RIGHT.** The element carries **no `role` ATTRIBUTE** — measured, and the product sets no `editorProps` — but a `contenteditable` element has an **implicit ARIA role of `textbox`** under ARIA in HTML. **So it IS a textbox; what it lacks is a NAME.** The distinction matters twice over: it is what makes this a **4.1.2 Name, Role, Value** failure rather than a missing-role one — the role is there and unnamed — and it is the phrasing an opposing lane's independent finding uses. **Corrected before the boundary rather than defended after it.**
+**⚠⚠ TWO CORRECTIONS TO THIS PARAGRAPH, AND THE SECOND ONE OVERTURNS THE FIRST.**
+
+**First correction (wrong in a small way).** I wrote that the element has *"no `role`"*. The element has no role *implicit from `contenteditable` alone* in a browser that does not apply ARIA in HTML's mapping the way I assumed — so I softened it to *"no `role` ATTRIBUTE; the role is implicit."*
+
+**Second correction (and the first was wrong).** **Tiptap core SETS `role="textbox"` as an ATTRIBUTE.** `@tiptap/core@3.30.5`'s `dist/index.js:6453` constructs the editor with
+```
+attributes: { role: "textbox", ...editorProps?.attributes },
+```
+so the role is an attribute, set by the library, and **spread-overridable by `editorProps.attributes` — which this product does not supply**, so the default stands. **The repository said so already and I did not find it:** `packages/editor/src/extensions/mention-popup.ts:61` reads *"PROSEMIRROR ALREADY SETS `role=\"textbox\"` on the editor element — **observed, not assumed** — so the combobox attributes are SAVED AND RESTORED rather than set and removed."* **It is right; my measurement was wrong.**
+
+**⚠ WHY MY MEASUREMENT WAS WRONG, BECAUSE THE FAILURE MODE MATTERS MORE THAN THE FIX.** I grepped `prosemirror-view`'s dist and `@tiptap/react`'s dist, found no `textbox`, and reported an absence. **I searched the packages I knew about rather than the dependency chain**, and the package that sets it — `@tiptap/core` — was not among them. `grep -rl textbox node_modules/.pnpm/@tiptap+core@3.30.5*/dist` finds it in one command. **A sample is not a universe**, and an absence claim needs the universe enumerated.
 
 **MEASUREMENT — five checks, each opening the artefact.**
 1. **The host.** `packages/editor/src/components/TicketEditor.tsx:119` renders `<EditorContent editor={editor} className="ticket-editor__content" />` inside `<div className="ticket-editor">` (`:111`). **No `aria-label`, no `role` on either.**
 2. **Nothing adds one above it.** `grep -rn "editorProps|attributes:"` over `packages/editor/src`, `apps/web/src` and `packages/app-core/src` → **no matches**, so the product never overrides the editor's DOM attributes. `TicketEditorSlot.tsx` and `editor-slot.tsx` were checked too: neither supplies an `aria-label`.
-3. **And no library sets a `role` attribute either**, which is a statement about the ATTRIBUTE and not about the role. Searched: `prosemirror-view@1.42.3`'s `dist/index.js` contains **no `textbox`, no `role:` assignment and no `aria-multiline`** (while `contenteditable` appears 29 times); `@tiptap/react`'s `dist/index.js` contains **no `textbox`**; and `grep -rl "textbox"` over `node_modules/.pnpm/prosemirror*` returns **nothing**. **The implicit `textbox` role therefore comes from the `contenteditable` attribute itself, which is where ARIA in HTML puts it — and the absence of the attribute is why nothing names it.**
+3. **⚠ AND THE ROLE IS AN ATTRIBUTE, SET BY TIPTAP CORE — this step is CORRECTED, and the version it replaces claimed the opposite.** The first version of this step reported that no library sets a `role` attribute, on the strength of `prosemirror-view`'s and `@tiptap/react`'s dists containing no `textbox`. **Both of those greps are accurate and the conclusion drawn from them is false**, because the package that sets it is neither: **`@tiptap/core@3.30.5`, `dist/index.js:6453`, `attributes: { role: "textbox", ...editorProps?.attributes }`.** The product supplies no `editorProps`, so the library's default stands and the element carries `role="textbox"` as a real attribute. **The finding is unchanged in direction and stronger in accuracy: the role is explicit and unnamed.**
 4. **The visible label exists and is not attached.** `ticket-sheet.tsx:2404-2405` renders `<div className="gn-ticket-sheet__field" data-testid="field-description"><dt>description</dt>`. **The `<dt>` carries no `id`**, and `grep -c 'aria-labelledby'` over `ticket-sheet.tsx` and `TicketEditor.tsx` returns **0 for both** — so nothing points at it. **A visible label is not an accessible name**, and this is exactly the case that distinction exists for.
 5. **And the means is already in the product.** `aria-labelledby` is used deliberately elsewhere — `attention-strip.tsx:88-89` reasons about *"the region from the `<p>` via `aria-labelledby`, and the reason is measured rather than stylistic"*, and `help-browser.tsx:505` uses it *"on the landmark rather than an `aria-label`"*. `packages/editor/src` labels **five** other things: `EvidencePicker`'s dialog (`:117`), the mention popup's listbox (`mention-popup.ts:164`), `EditorToolbar`'s `role="toolbar" aria-label="Formatting"` plus every button and the link URL field (`:179`, `:189`, `:208`), and `ImageWrapMenu`'s toolbar and alt-text field (`:29`, `:46`).
 
@@ -863,7 +873,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
-- `P21` ⚠ r2 — the description editor's content area has no role and no accessible name
+- `P21` ⚠ r2 — the description editor is a `role="textbox"` with **no accessible name**, and its visible label is not associated **(reported as no role; corrected twice, the second time substantively)**
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
