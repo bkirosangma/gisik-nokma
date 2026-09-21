@@ -217,7 +217,7 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 **WHAT.** Round 1's I1 established that no browser instrument has executed since 2026-09-06. This is the finding underneath it: even executed, the signed-in suite cannot see most of what this report measured.
 
-**MEASUREMENT (source, opened).** `grep -n "measureTapTargets(" apps/web/e2e-stack/*.spec.ts` → **one** call, `viewport.spec.ts:170`, inside the `/my-work` test; the seven-route loop (`:469-513`) calls `measureTypeScale` (`:533`) and `sweepAccessibleNames` (`:611`) only. `apps/web/e2e-stack/tap-target-baseline.json` holds **one key** (`stack-phone-390|/my-work: 6`). `measureContrast` is a module-private function of the signed-out spec (`apps/web/e2e-viewport/responsive.spec.ts:456`, not exported; `grep measureContrast apps/web/e2e-stack/` → 0). The stack suite's docblock at `:223` still says *"`/my-work` is the ONLY route in this file"* — true of the first test, false of the file since the loop was added. **Consequence, measured in this report:** the board's 24 `who · when` buttons at 21 px (E4-3), the sheet's 21-px close (E4-2), the 41-px h1 button (E4-5), the builder's 415-px overflow (E4-9) and the UA-chrome gallery (E4-10) are all on routes or in states no tap, contrast or overflow assertion visits.
+**MEASUREMENT (source, opened).** `grep -n "measureTapTargets(" apps/web/e2e-stack/*.spec.ts` → **one** call, `viewport.spec.ts:170`, inside the `/my-work` test; the seven-route loop (`:469-513`) calls `measureTypeScale` (`:533`) and `sweepAccessibleNames` (`:611`) only. `apps/web/e2e-stack/tap-target-baseline.json` holds **one key** (`stack-phone-390|/my-work: 6`). `measureContrast` is a module-private function of the signed-out spec (`apps/web/e2e-viewport/responsive.spec.ts:456`, not exported; `grep measureContrast apps/web/e2e-stack/` → 0). The stack suite's docblock at `:223` still says *"`/my-work` is the ONLY route in this file"* — true of the first test, false of the file since the loop was added. The type-scale sweep's two populations (`apps/web/e2e-viewport/type-scale.ts:61` and `:86-87`) name neither `input`, `textarea`, `select` nor `h1–h6`, `legend`, `code`, `kbd`, `caption` — so the UA-sized input text that `globals.css:86-95` records as an unmade decision is text no instrument can see. **Consequence, measured in this report:** the board's 24 `who · when` buttons at 21 px (E4-3), the sheet's 21-px close (E4-2), the 41-px h1 button (E4-5), the builder's 415-px overflow (E4-9) and the UA-chrome gallery (E4-10) are all on routes or in states no tap, contrast or overflow assertion visits.
 
 **WHY IT IS WRONG.** A ratchet whose population is one page reports "offenders=6" as if it were about the product. Round 1's P11 made this point for the Select panel; the true scope is wider — the population is the shape of the suite's route list, not of a component.
 
@@ -267,6 +267,33 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 ### E4-16 — **MINOR** — React Flow's attribution link renders at 10 px with 1.10:1 contrast in dark mode (2.61:1 in light)
 
 **MEASUREMENT (painted, builder route).** `a "React Flow attribution"`: `font-size: 10px`, `color: rgb(153,153,153)` on the canvas backdrop `rgb(141,145,160)` (dark) → **1.10:1**; on `rgb(248,245,241)` (light) → **2.61:1**; both under 4.5. It is the only text-contrast failure in 12 dark-mode routes and 14 light-mode routes I measured (2,600+ text elements). **Caveat stated:** this is React Flow's own element (`.react-flow__attribution`), required by its licence unless the pro option is used; the product can still restyle it (`a` colour) without hiding it. Severity Minor: third-party, decorative, but it is on a shipping route and it fails.
+
+---
+
+
+### E4-17 — **IMPORTANT** — Every keyboard interaction with the shared `Select` ends with focus dropped to `<body>`
+
+**WHAT.** Open the ticket sheet, Tab to *Assignee*, press Enter (the listbox opens, focus on the selected option), press Escape — or press Enter to pick — and `document.activeElement` is `body`. The keyboard user is thrown out of the sheet to the top of the document.
+
+**MEASUREMENT (painted, real key events via CDP `press_key`, 1512).** Sequence 1: `trigger.focus()` → `activeElement = button.gn-select__trigger`; **Enter** → `[role=listbox]` present, `activeElement = li.gn-select__option "Unassigned"`; **Escape** → listbox gone, sheet still open, **`activeElement = BODY`**. Sequence 2: focus trigger, **Enter**, **Enter** (re-picks the already-selected *Unassigned*, so nothing is written) → listbox gone, **`activeElement = BODY`**. Control in the same session: the account menu (`.gn-nav__menu`, `role=menu`) moves focus to its first `menuitem` on open — so focus management is possible in this codebase and this component lacks it. Source: `packages/ui/src/select/select.tsx:187-190` wires `useOverlay({ isOpen, onClose, shouldCloseOnBlur, isDismissable })` and `:199-212` portals `SelectPanel` to `document.body`; `grep -n FocusScope packages/ui/src/select/select.tsx` → **0** (the package depends on `@react-aria/focus`, `packages/ui/node_modules/@react-aria/focus` is present, and `FocusScope restoreFocus` is the React Aria primitive that returns focus to the trigger; React Aria's own `Popover` wraps its content in it).
+
+**BLAST RADIUS.** Every `Select` mount: the sheet's Assignee, the New-ticket `Type`/`Parent` comboboxes, `/members` Role and Channel, `/account`'s style and theme toggles, the ticket-type editor's Workflow picker, the builder's per-state Category. Round 1's P11 said the panel had never been measured; this is the measurement, and it fails on focus rather than on size (the options are `184×36`, above the 24 in-list floor).
+
+**WHY IT IS WRONG.** WCAG 2.4.3 (Focus Order) and the ARIA listbox/select pattern both require focus to return to the control that opened the popup. On a sheet with ~37 focusables, landing on `body` means Tabbing from the nav again to get back.
+
+**WHAT WOULD HAVE BEEN BETTER.** Wrap `SelectPanel`'s content in `<FocusScope restoreFocus autoFocus>` (one import from `@react-aria/focus`), or call `triggerRef.current?.focus()` in the `onClose` passed to `useOverlay`.
+
+---
+
+### E4-18 — **IMPORTANT** — The Assignee picker renders a BLANK 13-px option for a member with no display name — the same member the visibility picker labels by ULID (E4-6), and this time the recorded rule is broken rather than stretched
+
+**WHAT.** The sheet's Assignee listbox has three rows: `Unassigned` (184×36), `Kiro` (184×36) and **`""` (184×13)** — no visible text, no accessible name.
+
+**MEASUREMENT (painted, listbox open).** `Array.from(listbox.querySelectorAll('[role=option]'))` → the third `li.gn-select__option` has `textContent === ''` and height 13 (line-height with no glyphs). Source: `packages/app-core/src/views/ticket-sheet.tsx:1672` — `...people.map((member) => ({ value: member.id, label: member.name }))` — `member.name` verbatim, no `actorLabel`. The member is `accountant@e2e.gisik-nokma.local`, `name = ''` in `"user"` (read-only select on 54330). `packages/app-core/src/provenance.ts:4-7`: *"the UI never launders a claim into an anonymous fact. A missing display name falls back to the raw actor id — attributed, **never blank**"*.
+
+**WHY IT IS WRONG.** One member, two pickers, two answers: a 26-character id in *Who can see this* (E4-6) and nothing at all in *Assignee*. The blank one violates the product's own written rule, is unselectable by label, and is announced as an empty option by a screen reader. A person cannot assign work to this member from the sheet.
+
+**WHAT WOULD HAVE BEEN BETTER.** One helper for "how a roster member is shown in a picker" — `name || email || id` — used by both pickers and by `standingSentence`; and a seed member with an empty name kept on purpose, because it is the fixture that reddens exactly this.
 
 ---
 
