@@ -193,7 +193,7 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 **WHAT.** `/w/<id>/settings/workflows/new`: `button "Use this template — Simple kanban"`, `… — Errand with waits`, `… — Approval chain`, `button "Start blank"`.
 
-**MEASUREMENT (painted, 390 and unchanged in shape at 1512).** My sweep's UA-chrome detector (`borderTopStyle === 'outset'` or the UA's `rgb(239,239,239)` fill) flagged exactly these four on the route; sizes `143×29` ×3 and `95×29`. Source: `packages/app-core/src/workflow-builder/ui/template-gallery.tsx:13-19` and `:23-25` — `<button type="button" …>` with **no `className`**. Round 1's P1 population was *"each static `className` literal on a `<button|input|…>`"*, so a class-less button was never a candidate; the compiled ruling's own verification (`review-compiled-controller.md`, `exec1-P1`) re-ran the same class-keyed extractor. **Wider population, measured:** a regex over every `<button|a|input|select|textarea|summary …>` opening tag in non-test `.tsx` under `packages/` and `apps/web/` finds **78** class-less tags in 123 files — most are inputs inside labelled wrappers or docblock prose (the regex does not skip comments, and I say so) — and the painted pass over every route I visited flagged UA chrome on **these four only**.
+**MEASUREMENT (painted, 390 and unchanged in shape at 1512).** My sweep's UA-chrome detector (`borderTopStyle === 'outset'` or the UA's `rgb(239,239,239)` fill) flagged exactly these four on the route; sizes `143×29` ×3 and `95×29`. Source: `packages/app-core/src/workflow-builder/ui/template-gallery.tsx:13-19` and `:23-25` — `<button type="button" …>` with **no `className`**. Round 1's P1 population was *"each static `className` literal on a `<button|input|…>`"*, so a class-less button was never a candidate; the compiled ruling's own verification (`review-compiled-controller.md`, `exec1-P1`) re-ran the same class-keyed extractor. **Wider population, measured:** a regex over every `<button|a|input|select|textarea|summary …>` opening tag in non-test `.tsx` under `packages/` and `apps/web/` finds **78** class-less tags in 123 files — most are inputs inside labelled wrappers or docblock prose (the regex does not skip comments, and I say so) — and the painted UA-chrome detector over every route I visited flagged: **these four** (class-less), the timeline's three `.gn-timeline__nav` (a class WITH a rule — E4-15), and, in dark mode only, the two `editor-slot__submit` buttons round 1's P1 already lists. Nothing else.
 
 **WHY IT IS WRONG.** Same cause and same look as `16.83`'s grey OS buttons, on the first screen of the workflow-authoring flow. `globals.css:84`'s `button { font: inherit }` fixes the font and nothing else.
 
@@ -340,13 +340,53 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 ---
 
+
+### E4-22 — **MINOR** — The mobile board's rows are `TouchableOpacity`s with no `accessibilityRole`, so VoiceOver/TalkBack reads each row as text, not as a button
+
+**MEASUREMENT (source; `apps/mobile` has never been rendered — `Features.md` marks it `⚙️`, and I did not run a simulator).** `apps/mobile/src/screens/board-screen.tsx:60-66`: `<TouchableOpacity onPress={() => navigation.navigate('Ticket', …)}>` with no `accessibilityRole`, `accessibilityLabel` or `accessibilityHint`; `grep -c "accessibilityRole\|accessibilityLabel"` → 2 in the file, both on the sync-status `<Text accessibilityRole="text">` (`:52-53`), none on the row. The row text is `{item.title} · {item.stateId}` — the raw state id, which `docs/pre-launch-checklist.md:402` records as *"keep the raw `stateId` display until a ruling"* (the HIG audit's row C at `docs/hig-reconciliation-audit.md:318` is the source), so the label is category 2 and not claimed; the missing role is not in that record.
+
+**WHY IT IS WRONG.** React Native's `TouchableOpacity` is `accessible` by default but announces no role; a screen-reader user hears *"Order more till roll · next"* with no indication it can be activated. `accessibilityRole="button"` is one prop.
+
+**WHAT WOULD HAVE BEEN BETTER.** `accessibilityRole="button"` and `accessibilityLabel={\`${item.title}, ${stateName}\`}` on the row; the same on `ticket-screen.tsx`'s contest `View` (`:108`), which carries `accessibilityRole="alert"` but whose three `<Button>`s are the only labelled controls.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
-_(so §3 is not a list of defects)_
+_(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
+
+| comparison | class | evidence |
+|---|---|---|
+| **Text contrast, light theme, neo style** | **MATCHES** (4.5:1 / 3:1) | my composited sweep over 14 signed-in routes + 4 project views + sheet open: `contrastMeasured` 12–1248 text elements per route, **0 failures** except React Flow's attribution (E4-16). Method: ancestor-composited `background-color`, alpha over white, WCAG 2.x luminance; gradients/images skipped (0 skipped on every route). |
+| **Text contrast, dark theme** (`emulate colorScheme: dark`, body `rgb(27,35,64)`) | **MATCHES** | same sweep over 12 routes + 4 views, **0 failures** except the attribution link (1.10:1). |
+| **Horizontal overflow at 390** | **MATCHES** on 13 routes; **FAILS** on the builder (E4-9) | `document.documentElement.scrollWidth` = 390 everywhere except `/settings/workflows/<id>` (415). |
+| **Horizontal overflow at 768** | **MATCHES** | 7 routes incl. sheet open, all 768. |
+| `.gn-nav` links at 390 | **MATCHES the 44 floor** (every link `h=44`) — the bar's HEIGHT is E4-11 | painted `y`/`h` per link. |
+| Segmented view tabs | **MATCHES** 44 tall at 390 and 1512 (`13-hig-per-screen.md:433` records the 40-px miss and its fix) | painted `92×44` ×5 / `69×44` ×5. |
+| Editor toolbar buttons `34×32` | **MATCHES the prototype's `min-height:32px;min-width:34px`** (`Desktop.dc.html:3679`) — below the product's 44 but the authority draws 32; only the FILL diverges (E4-8) | painted. |
+| Calendar nav `31×36` / Today `71×36` | **MATCHES** prototype `:483-486` (`min-height:36px; padding:0 12px`) | painted. |
+| Sheet width `640` vs prototype `min(660px,100%)` | **DIVERGES AND RECORDED** — `ui.css:387-391` states the 20-px difference and why it is harmless to the slide | painted `w=640`. |
+| Sheet close via Escape | **MATCHES** (Escape closes; with a Select open, a real Escape closes only the listbox) | `press_key Escape` ×2. |
+| Account menu (`role=menu`) | **MATCHES** 13.420/13.423 — focus moves to the first `menuitem` on open; items `212×44` | painted. |
+| Filters panel | **MATCHES** 13.445/13.446 — focus enters the panel on open (`activeInDialog: true`); choices `74–116×35` (in-list) | painted. |
+| Whole board card opens the ticket (13.523) | **MATCHES** — the `<li>` slot carries the handler, which is why the 23-px title button is exempt (E4-3) | `board.tsx:961-1000`. |
+| `Switch` (`51×31` input) | **MATCHES HIG** and exempt — wrapped in its `<label>` (`switch.tsx:22-31`) | painted. |
+| Visibility radios/checkboxes `13×13` | **exempt** — each wrapped in its `<label>` (`visibility-editor.tsx:404-411`); the LABEL text is E4-6 | painted `labels: 1` each. |
+| `lang="en"`, one `<main>` per route (except E4-9), no `<img>` without `alt`, no unlabelled standalone `<svg>` | **MATCHES** on every route swept | sweep counters `imgNoAlt: 0`, `svgUnlabelledStandalone: 0`, `mainCount: 1`. |
+| Headings: an `<h1>` on every route except the builder and its history page | **MATCHES / RECORDED** — the builder's h1 gap is written at `ui.css:2959-2967` with an owner | sweep `counts.h1`. |
+| The builder's `Settings › Workflows` crumb and the type editor's `Ticket types` back link | **MATCHES the prototype's shape** (`Desktop.dc.html:1016`, a 13-px link in a `<p>`) — 126×15 / 77×16 is what the authority draws | painted. |
+| Member roster's `HiddenSelect`s (`74×20`, `83×20`, `95×20`) | **not a defect** — React Aria's visually-hidden native select inside a `1×1 clip:rect(0,0,0,0)` wrapper, `tabindex=-1`; **but a note for the instrument:** the product's tap sweep's visibility test (`display`, `visibility`, `width===0`, `height===0`) would count them as offenders on any route with a `Select`, which is one more reason the population is one route | painted chain of five ancestors. |
+| Visibility roster cut (`own_user_ids`/`resolved_user_ids` refused) | **RULED** — already classified category 2 by the compiled ruling; not re-examined | — |
+| Whole-board empty state, parent crumb title-only, 4-mode visibility radio, visibility `<section>` outside the `<dl>` | **RULED** in `review-compiled-controller.md` §4 rows 1, 2, 6, 7 — not re-raised | — |
 
 ---
 
 ## 5. PHASE-2 CANDIDATES (noted now, filed in `review-refutations-exec4.md` after T0+6h)
+
+1. **`exec1-P1`'s stated cause for the seventh member.** P1 says `a.gn-nav__signin` is *"painted by accident"* because its class has no rule; `globals.css:1925-1926` `.gn-nav a, .gn-nav button` and `:1968` `.gn-nav a` style every anchor in the bar by descendant selector — the class is unnecessary, not the element unstyled. The finding's own paint (77×44, `offenders=0`) already showed it. A refutation of the *mechanism* of one member, not of the finding; to be measured against the painted `:3041` legal nav before filing.
+2. **`exec1-P13` severity.** Round 1 narrowed to keyboard-only non-AT users; `<main>` is a bypass for AT. Nothing to refute; noted only because the compiled ruling accepted it "in the narrowed form".
+3. **Round 1's coverage reason** (*"`:3001` serves a baked image predating `main`"*) was true when written; the container was re-created `2026-09-21T02:50Z`. Not a refutation of a finding — a note that the door I used (this tree on `:3041`) was open to any lane.
+4. **The controller's own §4 row 2** (parent crumb title-only "stands; a three-file change for a disambiguation case"): E4-1 shows the disambiguation case is the seed's majority case (23/26) and the crumb is not merely undifferentiated but DUPLICATED. If a peer files the title-only divergence again, this is the measurement that changes its weight.
 
 ---
 
