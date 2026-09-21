@@ -1877,3 +1877,109 @@ round-1 §2d.)
 ---
 
 *Batch 5 filed. Running total of round-2 new findings: `E2-20`–`E2-38` (19) — 9 Important, 10 Minor.*
+
+---
+
+# R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
+
+A candidate I checked and rejected is worth recording: it costs the judge nothing, it shows the boundary
+of what I actually looked at, and if the Opus lane files one of these, the measurement below is where I
+will meet it in phase 2. **Each entry says what I opened and why the claim does not stand.**
+
+### ❌ The sweep's calendar crash (`M4`) — **does not reproduce; the input cannot occur**
+
+The lead: `packages/app-core/src/calendar/calendar-view.tsx:148` `if (!IST_DAY_REGEX.test(isoDay)) throw
+new RangeError(…)`, called from a `useState` initialiser at `:211` (`monthOf(props.today)`), so a malformed
+`today` would throw during render and take the project page down — with the sweep's reason being *"the
+state a shell is in for the frame before its day source resolves"*.
+
+**I opened the supplier and it does not exist.** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1235`
+`const today = istToday();`, passed at `:2334` and `:2398`. And `apps/web/src/ist-today.ts:20-22` is
+`istDayOf(now().toISOString())` — **synchronous and total**, with the file's own reasoning at `:15-18`:
+*"A `Date` is an instant, so this call cannot throw for any clock the device has."* There is therefore no
+frame in which `today` is absent or malformed, so the throw is unreachable through the product's only
+supplier, and the guard is doing its job rather than failing at one. **Not filed.**
+
+### ❌ Exec 1's `Dialog` focus claim — already ruled, and I have nothing to add
+
+`packages/ui/src/components/dialog.tsx` does render `role="dialog" aria-modal="true"` (`:18-21`) with no
+focus move, no trap and no focus return — I read all 24 lines. **But the round-1 judge already ruled it**
+(`review-compiled-controller.md:86`: *"`aria-modal="true"` at `dialog.tsx:20` … attribute-level `inert`
+sweep → empty"*), and round-2 §3 gives **0** to a re-finding that adds nothing. The added measurement I
+would need is a keyboard-tab reproduction, which needs a browser I do not have. **Not filed** — and I say
+so rather than filing it quietly for points. The two *distinct* halves I could measure are `E2-34`.
+
+### ❌ The sweep's `AttachmentListItem` "no production caller" — folded, not filed
+
+The claim is real: `packages/editor/src/components/AttachmentListItem.tsx` has no mount outside its own
+declaration and the barrel. But it is the **same defect** as `E2-25` (a component written for a state that
+reaches no screen), so filing it separately would be two scores for one measurement. **Folded into
+`E2-25`.**
+
+### ❌ `AttachmentList` has no failure arm (`M6`), and `PlainTextEditorSlot` ignores three of its props (`M8`) — below the bar
+
+Both are true of the components in isolation and **neither reaches a person**: the sheet passes
+`attachmentsUnavailable` beside the entries and renders its own failure sentence
+(`ticket-sheet.tsx:2484-2487`), and `PlainTextEditorSlot` is the read-only fallback whose whole documented
+purpose is to ignore the capability props (its docblock at `editor-slot.tsx:120-129` says so). **Not
+filed** — a defect that no surface can exhibit is a style preference, and I would rather the judge spend
+its budget on the nineteen above.
+
+### ⏳ Still unverified at this push, and named rather than implied
+
+`M2` (a failed stream reload leaves stale `data` — **the file already records it as F6 with an owner**,
+`use-live-query.ts:71-74`, so it is a recorded absence rather than an undiscovered one);
+`M3` (no narrow-viewport rules for the calendar/timeline/sync strip/dialogs — closer to exec 1's concern
+than mine, and my round-1 §4 recorded the viewport suite as the strongest thing I found);
+`M5` (`aria-controls` naming an element rendered only while expanded, `help-browser.tsx:540` vs `:567`);
+`M7` (a permission-refused history read flattened to `[]` — the file argues it deliberately,
+`ticket-sheet.tsx:2696-2705`); and `M9` (the reopen seed, **folded into `E2-33`**).
+
+---
+
+# R2.12 — COVERAGE, ROUND 2 (the tiebreaker, stated honestly)
+
+**Gained since round 1.** Round 1's coverage statement named `apps/mobile`, `apps/desktop`, the workflow
+builder, `/inbox`, `/members`, `/account`, `/settings`, `/mcp/*` and the 13.x catalogue as unreached.
+Round 2 took me into **the workflow builder** (`E2-20`–`E2-22`), **`/account`** (`E2-23`, `E2-24`),
+**`/inbox`** (`E2-26`), **the offline/degraded components and both other shells** (`E2-25`), and the
+shared **`Dialog`/`Select`/`Toast` primitives (`E2-27`, `E2-31`, `E2-34`, `E2-33`)**.
+
+**Sources of the new findings, counted:** **all 19 trace to a lead carried from round 1's two sweeps** —
+the ~40 candidates at §2d and §2e, which the round-1 ruling left *"Carried, NOT raised"* — and **every
+measurement in them is mine and new**, made at `a7b6292b`. Each cites a line I opened.
+
+**Still not reached, and it is a shorter list than round 1's:** `apps/mobile` and `apps/desktop` beyond the
+three files `E2-25` needed; `/members` and `/settings` as screens; `packages/ui`'s eleven other
+components; the 13.x case catalogue id by id; and **no browser has been opened** — every finding here is a
+code reading, and each one says where that limits it.
+
+**How the graph was used (§6), stated for the judge.** Before opening anything I read
+`graphify-out/GRAPH_REPORT.md`'s community index and hub list, then ran
+`graphify query "ticket type list screen loading and error handling"`, which named the
+`ticket-type-editor-screen.tsx` community and the `ticket-types.test.tsx` / `workflow-builder/fake-gateway.ts`
+cluster and pointed me at the two screens in `E2-20` without my reading the tree. I then used
+`mcp__semble__search` for the cross-file questions structure could not answer (the `onCreateTicket` caller
+search in `E2-2`, and the `ticket.restored` producer search in `E2-30`), and `Read` only the ranges those
+named. ⚠ **The graph is built from `e2769d60`; my branch is `a7b6292b`** — checked, and all 15 commits
+between are docs-only (§R2.3), so the code layer is current. **Every claim cites a line I opened myself**;
+the graph pointed, it did not verify.
+
+**My own errors, recorded rather than tidied** (this repository's convention, and it is the right one):
+1. **Three running-total lines in this report had Important and Minor transposed.** I recomputed them by
+   matching ids to severity lines rather than trusting the text I had written — 9 → 5/4, 13 → 7/6, 15 and
+   19 → 9/10. **A count is not something to write from memory, including a count about myself.**
+2. **A malformed citation path** (`packages/app-core/src/workflow-builder/../views/bulk-close-dialog.tsx`) in the first draft of
+   `E2-28`, caught by a citation sweep over the round-2 half and corrected — **58 distinct paths cited in
+   the round-2 half, 0 missing**, re-measured after this line was written.
+3. **One candidate nearly filed that would have been invalid** — the calendar crash (`M4`). It was rated
+   Critical by the sweep; I found the only supplier is total and the input cannot occur, so filing it
+   would have cost **15** rather than earned 5. That is the clearest argument for verifying a lead before
+   filing it, and I am recording it because the near-miss is more instructive than the catch.
+
+---
+
+*executor 2 — UX, round 2. Phase 1 complete for this lane's current state: **19 new findings
+(`E2-20`–`E2-38`, 9 Important and 10 Minor) on top of the landed 19 (`E2-1`–`E2-19`), one withdrawal
+(`E2-9`), one standing-up against a ruling (`E2-7`), and five candidates examined and deliberately not
+filed — each with its reason.** Branch `exec2/review-ux-r2`, pushed at every checkpoint. **No fix, no PR.***
