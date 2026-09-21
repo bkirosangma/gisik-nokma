@@ -101,13 +101,15 @@ ctl_count_spinners() { grep -cE '… \(([0-9]+m )?[0-9]+s' || true; }
 #   idle lane: the box holds no real text, the needle count above the prompt rose, and a spinner is present now that
 #              was absent before (spinner lines: 0 before, 1 after, measured);
 #   busy lane: the box holds no real text and shows the dim queued-messages hint.
-# Polls for up to 10 s; exit 1 with nothing printed when neither proof holds — old scrollback satisfies nothing here.
+# Polls for up to 20 s (CTL_PROOF_TRIES); exit 1 with nothing printed when neither proof holds — old scrollback satisfies
+# nothing here. CTL_DEBUG=1 prints each poll's readings to stderr.
 ctl_delivered() {
   local target="$1" needle="$2" before="$3" i above n0 s0
   n0="$(grep -cF -- "$needle" "$before" || true)"; s0="$(ctl_count_spinners < "$before")"
-  for i in $(seq 1 "${CTL_PROOF_TRIES:-10}"); do
+  for i in $(seq 1 "${CTL_PROOF_TRIES:-20}"); do
     if [ -z "$(ctl_box_text "$target")" ]; then
       above="$(ctl_pane_above "$target")"
+      [ -n "${CTL_DEBUG:-}" ] && echo "ctl_delivered t+$i: needle $(printf '%s\n' "$above" | grep -cF -- "$needle" || true)>$n0? spinners $(printf '%s\n' "$above" | ctl_count_spinners)>$s0? queued=$(ctl_box_queued "$target" && echo y || echo n)" >&2
       if [ "$(printf '%s\n' "$above" | grep -cF -- "$needle" || true)" -gt "$n0" ] && [ "$(printf '%s\n' "$above" | ctl_count_spinners)" -gt "$s0" ]; then
         echo "echoed above the prompt, new turn running"; return 0
       fi

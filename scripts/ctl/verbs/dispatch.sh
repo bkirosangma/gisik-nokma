@@ -22,5 +22,5 @@ tmux load-buffer -b "$b" "$file" && tmux paste-buffer -b "$b" -d -t "$t" || ctl_
 sleep 1
 presses="$(ctl_submit "$t")" || ctl_fail dispatch "input box still holds text after 3 Enters: '$(ctl_box_text "$t" | cut -c1-60)' — not submitted"
 needle="$(grep -v '^[[:space:]]*$' "$file" | tail -1 | cut -c1-30)"
-proof="$(ctl_delivered "$t" "$needle" "$snap")" || ctl_fail dispatch "box emptied but no proof of delivery in 10 s: last line not echoed above the prompt with a new spinner, and no queued-messages hint"
+proof="$(ctl_delivered "$t" "$needle" "$snap")" || ctl_fail dispatch "box emptied but no proof of delivery in 20 s: last line not echoed above the prompt with a new spinner, and no queued-messages hint"
 ctl_ok dispatch "$t received $(wc -c < "$file" | tr -d ' ') bytes (Enter ×$presses; $proof)"
