@@ -17,3 +17,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E2-27 | done | c65d27ea | app-core skew-and-status 13 tests green; unknown arm returns queue sentence |
 | T-E2-36 | done | 0f1ed7b7 | app-core ticket-sheet 111 tests green; reload on every answer |
 | T-E2-47 | done | e5f5bd7a | prose-only: sweep names four; editor 10 + app-core 111 tests green |
+| T-E4-34 | done | 61f90bc4 | app-core ticket-types 52 tests green; guest row says Open |
