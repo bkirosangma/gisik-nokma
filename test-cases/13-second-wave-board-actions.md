@@ -2026,3 +2026,33 @@ measures another.**
   branch is what the mutation kills.
 - **No browser run yet.** The dispatch asks for one (*"a typed change survives a reload … the
   `set by {actor} on {date}` line moves"*) and it is owed.
+
+## The workflow canvas's vendor attribution link is readable (E4-16, batch B15, 2026-09-21) — block `13.1207`–`13.1216`
+
+Id minted from the B15 self-allocated block recorded in `13-hig-per-screen.md`'s block table (this
+batch is absent from the controller's 22:0x allocation, so its driver added the row rather than
+borrowing a neighbour's — the rule the block table itself states). Recounted before minting: the
+highest `13.120*` id anywhere in `test-cases/` + `docs/` at this tip was none — `git grep -nE
+'13\.120[7-9]|13\.121[0-6]'` returns zero hits, a genuinely free block.
+
+- ✅ **13.1207 — React Flow's own attribution link is overridden to a declared, checked contrast
+  pair, not left at its 1.10:1 vendor default.** `@xyflow/react`'s stylesheet paints
+  `.react-flow__attribution` at 10px in a fixed grey it does not theme, measured (painted, builder
+  route) at **1.10:1** against the canvas's dark-mode backdrop and **2.61:1** in light — both under the
+  4.5 body text owes (finding E4-16, `docs/lanes/review-ui-exec4.md:295`). Not re-painted here (no
+  browser in this suite); the fix is a repo override in `packages/ui/src/ui.css` —
+  `.react-flow__attribution { background: var(--gn-surface-raised); font-size: 0.75rem; }` and
+  `.react-flow__attribution a { color: var(--gn-text-muted); }` — composed from a pair this file
+  already declares and every style/theme already passes: `{ fg: 'textMuted', bg: 'surfaceRaised',
+  minimum: 4.5 }` in `CONTRAST_PAIRS` (`packages/ui/src/tokens.ts`), asserted live by
+  `packages/ui/test/tokens.test.ts`'s own loop on every commit. The case itself reads the CSS rule
+  rather than re-deriving the contrast number: `declarationsFor` on `.react-flow__attribution` and
+  `.react-flow__attribution a` must contain the three declarations above, plus a direct assertion that
+  `CONTRAST_PAIRS` still declares the row this override leans on — so a future edit that drops either
+  the override or the underlying guarantee reddens here, not silently. RED confirmed by removing the
+  override (`.react-flow__attribution lost its override`, 1 failed / 17 passed); GREEN with it restored
+  (18 passed). `packages/ui/src/ui.css`,
+  `packages/app-core/test/workflow-builder/builder-css-binding.test.tsx`
+
+**Recount, at this tip.** One id is minted here (`13.1207`), inside the self-allocated block
+`13.1207`–`13.1216`; the next free id inside this block is `13.1208`.
