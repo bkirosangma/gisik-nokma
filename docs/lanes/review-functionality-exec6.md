@@ -22,16 +22,27 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed.** Seventeen findings, twelve Important, every one measured through a door the product ships. The recurring
-shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
-(E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
-republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
-part-way while the client is told nothing moved (E6-10), an offline edit turned into a false contest against the
-user's own ticket (E6-5), and an invite form whose channels the door refuses (E6-9). The second shape is **a record
-that describes a world the product has left**: the in-app help denying `Delete` (E6-1), three ❌ cases declaring
-guest admissions closed weeks ago (E6-12), and a "named, not decided" residual whose own commit decided it
-(E6-11), and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an unassigned open question since before its trigger shipped (E6-13). The third shape has one member and it is the one I would put first: **the cross-site defence covers writes and not the socket** — a cookie plus a foreign Origin is refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15) — and beside it, an MCP token that can approve its own successor, so revoking it does not revoke it (E6-16). The round-1 lane's coverage boundary was the map: all twelve Important findings are in the packages or the
-paths it said it did not reach.
+**No Critical claimed. Seventeen findings — twelve Important, five Minor — every one measured through a door the
+product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
+refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
+token can approve its own successor, so revoking it does not revoke it (E6-16).
+
+Behind those, the recurring shape is **a door that accepts what every read surface says cannot be happening**:
+writes on a soft-deleted ticket, one of them manufacturing a notification into a 404 (E6-2); a deleted open child
+blocking its parent's close while the board shows zero (E6-4); a type re-rank and a workflow republish that leave
+hierarchies the engine then refuses to reproduce (E6-3, E6-8); a bulk migration refused part-way while the client
+is told nothing moved (E6-10); an offline edit turned into a false contest against the user's own ticket (E6-5);
+an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17).
+
+The second shape is **a record that describes a world the product has left**: the in-app help denying `Delete`
+(E6-1); three ❌ cases declaring guest admissions that closed weeks ago (E6-12); a "named, not decided" residual
+whose own commit decided it (E6-11); a stale "no ticket key" premise beside a crumb that reads the key (E6-14);
+and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an
+unassigned open question since before its trigger shipped (E6-13). Two instrument gaps close the list (E6-6, E6-7).
+
+The round-1 lane's coverage boundary was the map: every Important finding is in a package or on a path it said
+it did not reach, and none re-files anything it found. Two read sweeps — every read door as a non-member and as
+a guest — found no leak (§5).
 
 ---
 
