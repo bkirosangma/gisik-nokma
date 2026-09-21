@@ -32,7 +32,7 @@ writes on a soft-deleted ticket, one of them manufacturing a notification into a
 blocking its parent's close while the board shows zero (E6-4); a type re-rank and a workflow republish that leave
 hierarchies the engine then refuses to reproduce (E6-3, E6-8); a bulk migration refused part-way while the client
 is told nothing moved (E6-10); an offline edit turned into a false contest against the user's own ticket (E6-5);
-an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); one byte (U+0000) that 500s twenty-three doors, misreports a
+an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); one byte (U+0000) that 500s nineteen doors, misreports a
 batch and poisons the offline queue while the product's own guard for it sits unused (E6-18).
 
 The second shape is **a record that describes a world the product has left**: the in-app help denying `Delete`
@@ -1163,7 +1163,7 @@ user's role in `env.workspaceId` and refuse `null` (*"That person is not in this
 **SEVERITY: Minor.** Data integrity, not security: the claim is inert for the named non-person, and a member
 can re-assign. Filed because the door answers "committed" to a question it never asked.
 
-### E6-18 — IMPORTANT — One byte (U+0000) answers 500 on twenty-three doors — every raw id parameter, the founding name, the invite address, the ticket payload strings — commits a batch's earlier claims while reporting failure for all, and becomes a poison claim the offline outbox retries forever; the doors that refine or hash their input first answer 400/404
+### E6-18 — IMPORTANT — One byte (U+0000) answers 500 through twenty-three parameters on nineteen doors — every raw id parameter, the founding name, the invite address, the ticket payload strings — commits a batch's earlier claims while reporting failure for all, and becomes a poison claim the offline outbox retries forever; the doors that refine or hash their input first answer 400/404
 
 **WHAT.** Measured through the doors (Appendix T; 1 file / 1 test passed):
 
@@ -1216,8 +1216,10 @@ exactly the `22P05` explanation, and applies it to filters, search terms and pre
    `ticketId`, the query strings `cursor`/`parentId`/`workflowId`/`ticketId`, and the body strings `name`,
    `address`, `heldIds[]`, `toWorkflowId`, `ids[]`, `userCode` are used as-is; the same byte in `q`, `filter` or a
    preferences document is a 400 because those go through `noNul`, and in an invite token or device code a 404
-   because those are hashed before the lookup. Twenty-three doors 500; the distinction is exactly whether the
-   string met a refinement before the first query.
+   because those are hashed before the lookup. **Twenty-three parameters on nineteen doors** 500 (Appendix T: 3
+   payload fields on `/v1/events`, `/v1/sync`, 4 query strings on 3 read doors; U: 1; V: 14 on 13 doors — `reconcile`
+   counted once with two fields); the distinction is exactly whether the string met a refinement before the first
+   query.
 
 **WHAT WOULD HAVE BEEN BETTER.** One ULID check on every id parameter at the route (the envelope already has
 the predicate; a 400 `invalid_id` before the first query), `noNul` on the three ticket payload strings (and on `plainTextToDoc`'s input in
@@ -1230,7 +1232,7 @@ parameters, answering 400 like their siblings. Neither is more than the refineme
 `notifications.ts:71`; `builder-reads.ts:726`; the `pg` probe in Appendix T's header (`22021` / `22P05`).
 
 **SEVERITY: Important.** One byte, pasteable from ordinary sources and passable by an agent, turns a claim into a
-500 that both misreports the batch and poisons the offline queue, and 500s twenty-three doors from a path segment;
+500 that both misreports the batch and poisons the offline queue, and 500s nineteen doors from a path segment or a body string;
 the product already has the guard and applies it to the less consequential fields. Not Critical: nothing is
 disclosed or lost, and every 500 is a rolled-back transaction.
 
