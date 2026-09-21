@@ -1223,7 +1223,8 @@ OTHER DOORS, same byte (Appendix V):
   500  GET /v1/tickets/:id/history            500  GET /v1/attachments/:id               500  GET /v1/projects/:id/board
   500  GET /v1/sync/bootstrap/ticket?ticketId=
   — and the doors that refine or hash first: 400 PUT /v1/me/preferences (noNul) · 400 GET /v1/search?q= (noNul) ·
-    404 GET|POST /v1/invites/:token[/accept] (token hashed) · 404 POST /v1/mcp/device/token (hashed) · 404 …/migrate stateMap key
+    404 GET|POST /v1/invites/:token[/accept] (token hashed) · 404 POST /v1/me/invitations/:id/accept (looked up by id, not found) ·
+    404 POST /v1/mcp/device/token (hashed) · 404 …/migrate stateMap key (the type lookup 404s first)
 ```
 
 Underlying Postgres answers, measured directly (Appendix T's header): `SELECT $1::text` with the byte →
