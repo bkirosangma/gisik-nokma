@@ -376,10 +376,12 @@ describe('rollupFor — the role is resolved in each CHILD’s own workspace', (
     const b1 = newUlid();
     await seedTicket(db.pool, { workspaceId: wsA, projectId: prjA, ticketId: a1, parentId: parent });
     await seedTicket(db.pool, { workspaceId: wsA, projectId: prjA, ticketId: a2, parentId: parent });
-    // A ticket in workspace B naming a parent in workspace A. Nothing on this
-    // branch refuses that — `proj_visibility` writes `workspace_id` from the
-    // envelope and `parent_id` from the payload and no check compares them.
-    // Recorded as observed rather than asserted legal (case 6.84, owner Plan 3).
+    // A ticket in workspace B naming a parent in workspace A. NO DOOR CAN WRITE
+    // THIS ROW: `hierarchy.unknown-parent` compares the parent's workspace
+    // against the envelope's at both doors that set a parent (`hierarchy.ts:124`
+    // for `ticket.created`, `:250` for `ticket.reparented`, controller ruling
+    // P12). The fixture seeds `proj_visibility` directly, which is what keeps
+    // this a live defensive property rather than a reachable input (case 6.84).
     await seedTicket(db.pool, { workspaceId: wsB, projectId: prjB, ticketId: b1, parentId: parent });
     await applyAll(db.pool, [
       setVisibilityEnv(wsA, a1, 'workspace'),
