@@ -2719,6 +2719,35 @@ is exactly the shape that reads as verified. I first judged this candidate ~90 %
 `M3`'s coverage-elsewhere), and it is the reason the remaining candidates in this report are named rather
 than filed.
 
+### THE REST OF THE REACHABILITY AUDIT, AND A FLAW IN MY OWN INSTRUMENT THAT NEARLY COST TWO FINDINGS
+
+I finished the reachability audit on the four findings whose last link I had not opened — **and the first
+run said two of them were unreachable, which was wrong.** It is worth recording in full, because the error
+was in my instrument, not in the code, and acting on it would have withdrawn two valid findings.
+
+**The instrument.** I searched for a JSX render with `new RegExp("<" + name + "[\\s/>]")` — a pattern that
+requires **a character after the component name**. I was matching against lines split on `\n`, so a render
+written as `<BulkCloseDialog` with the props on the following line has **no** trailing character, the
+pattern cannot match, and the search returns a **silent empty**. It reported:
+
+| component | first run | corrected run | the truth |
+|---|---|---|---|
+| `PasskeysSection` | 0 mounts | **1** — `apps/web/app/account/page.tsx:274` | reachable; `E2-23` stands |
+| `BulkCloseDialog` | 0 mounts | **2** — `board.tsx:579` and `page.tsx:3005` | reachable; `E2-28` stands, and `E2-35`'s contrast is intact |
+| `PublishControls` | (not asked) | **1** — `workflow-builder-screen.tsx:122` | reachable; `E2-22` stands |
+
+**And the same flaw was in `E2-25`'s counterexample search**, which used the identical pattern — so that
+measurement could have been wrong in the *other* direction, missing a production render written at
+end-of-line. Re-run with `<Name` followed by whitespace, `/`, `>` **or end-of-line**: the five components
+still show **PRODUCTION = 0** (tests 13 / 6 / 3 / 3 / 8 — and note two of those went **up** from the first
+run, 1→3 and 2→3, so the corrected pattern does find renders the old one missed). **`E2-25` survives its own
+test re-run correctly.**
+
+**The lesson, and it is the same one this report files against other documents twice already:** a search
+that returns an empty has not told you the thing is absent — it has told you the search returned empty, and
+the two are only the same when the pattern is right. I nearly withdrew two valid findings on my own silent
+empty. **The reachability audit is now complete: all four of these pass, plus the three in the table above —
+every finding in this report that depends on a caller reaching a surface has had that link opened.**
 ### AND THE SAME TEST APPLIED TO MY OWN THREE LOAD-BEARING FINDINGS — they pass it
 
 The link that killed that candidate is a **reachability** link: is the code path actually reached by a
