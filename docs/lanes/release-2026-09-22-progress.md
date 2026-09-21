@@ -21,3 +21,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-V9 | done | 32fa059a | 17.061/17.062 (invite-page.test.tsx) — an unchecked link is not a dead link; retry added |
 | T-E5-10 | done | e834cbd8 | 13.1118/13.1119 (inbox-bulk.test.tsx) — row + Undo failures speak; row splits by KIND, undo slot beside the toast |
 | T-F4-ux | done | b638f9b6 | 17.063 (visibility-editor.test.tsx) — the read-only sentence names owner+admin; the arm stays dead, recorded with an owner |
+| T-V3 | done | caab221a | 17.064/17.065 (visibility-editor.test.tsx) — a rejected write says so, Apply returns; transportError slot |
