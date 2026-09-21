@@ -174,5 +174,25 @@ PROBE thread has "from the assignee": [33mtrue[39m | has "filed as the peer": 
       Tests  1 passed (1)
 ```
 
+### R6-2 → E2-42 (exec 2, Important) — PARTIAL, same measurement as R6-1
+
+E2-42 (`review-ux-exec2.md:2334-2389` at `778a6439`) is the same phone handler. After its own correction it
+states: *"the claim is REFUSED, never committed — the ledger is not falsified … refused at the first sync that has a
+session"*, naming `IDENTITY_SPOOF_REASON` (`check-permission.ts:542-545`) as the mechanism — and its WHY paragraph,
+left standing beneath the correction, still says the comment *"is written to the ledger as that person's claim …
+their name on words they did not write"*. R6-1's probe answers both sentences: (1) when the assignee IS the
+session user the comment **commits** (`seq 3`, served by the thread door) — and that attribution is correct, the
+words are the assignee's own; (2) when it is not, the sync door answers `invalid: actor-mismatch`
+(`sync-service.ts:325`), not `IDENTITY_SPOOF_REASON`, and an `invalid` is terminal in the outbox (`outbox.ts:412`)
+rather than "refused at the first sync" — the outbox marks the row `failed`, once. E2-42's own "⚠ Not verified"
+line concedes that whether a member id occupies `assigneeId` at send time was not measured; the probe measures the
+case where it is the sender's own id. What survives of E2-42 is the same core as E5-21's: for an unassigned
+ticket or someone else's ticket the comment never posts and no screen says so; the "wrong real person's name on
+the ledger" sentence is false in both directions (never written for another person; correctly written for oneself).
+
+**MEASUREMENT.** R6-1's probe and log, verbatim above; lines opened as listed there plus
+`review-ux-exec2.md:2334-2389`.
+
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
-**Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`.
+**Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`; R6-2 filed 15:16 IST against
+`origin/exec2/review-ux-r2` at `778a6439` (same probe).
