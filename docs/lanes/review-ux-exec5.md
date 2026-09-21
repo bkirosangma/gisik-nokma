@@ -928,6 +928,40 @@ Minor if the judge weighs the manual's "treat both as early" as sufficient warni
 
 ---
 
+### E5-27 — IMPORTANT · A Move that fails in transport is silence — no sentence, no latch, the dialog stays open — while Close, Reopen and Delete on the same sheet have both; the sheet's own comment records the gap and hands the dialog `transportError={null}` `[SOURCE]` (verifies exec 2 §2d's "a transport failure during a Move has no surface at all", unmeasured there)
+
+**WHAT.** `ticket-sheet.tsx:711-745` `submitTransition`: builds the events, `await dataSource.ingest([...])`, reads
+the results — **no `try`/`catch`, no `submitting` guard**. `transition-dialog.tsx:366-379` `submit()` and `:515`
+`<Button variant="primary" disabled={blocked} onClick={submit}>` — `blocked` (`:360-364`) is the form's validity
+only; nothing disables Move while a submission is in flight (`grep -n submitting transition-dialog.tsx` → 0). The
+sheet mounts the dialog with `transportError={null}` and says why at `:2637-2644`: *"`submitTransition` above stays
+unguarded … a rejected `ingest` here is an unhandled promise rejection, not a state this component tracks, so there
+is nothing to pass but `null`."* The sibling writes on the same sheet — `submitTicketEvent` for Close/Reopen/Delete
+(`:1025-1077`) — have the latch (`:1029` `if (submitting) return`), the transport arm (`:1071-1074` *"We could not
+reach the server for this change — …"*), and the silence arm (`:1040-1051` *"The server did not answer this
+change."*).
+
+**WHY.** Move is the most frequent write a person makes on a ticket. When the request drops, the dialog simply stays
+open with an enabled Move button and no sentence; the person presses again — and because there is no latch, a
+request that did go through and one that did not are both re-sent, so a slow network can file two transitions.
+The comment at `:2637-2644` ends *"Not Ruling 27's scope … it just never caught the rejection at all"* — an author
+naming the gap is a record of the gap, not a ruling that it should stay. The controller accepted `exec2-V10` (Create
+with no re-entrancy guard) as Critical; this is the same shape one dialog over, with the consequence bounded by the
+engine (a repeated same-state move is refused where the workflow declares no self-edge, `3.71`).
+
+**WHAT WOULD HAVE BEEN BETTER.** Wrap `submitTransition` in the same `try`/`catch`/`finally` as `submitTicketEvent`,
+feed the dialog's `transportError` prop (it already renders it, `transition-dialog.tsx:485-489`), and disable Move
+while in flight.
+
+**MEASUREMENT.** `[SOURCE]` `ticket-sheet.tsx:711-745`, `:1025-1077`, `:2637-2644`; `transition-dialog.tsx:360-379`,
+`:515`, `:485-489`. Not driven (§6.1); the reproduction is the E5-13/E5-15 technique: wrap `fetch` to throw on
+`POST /v1/events`, press Move, observe the dialog.
+
+**SEVERITY: Important** (claimed). A press that does nothing and says nothing, on the sheet's primary action, beside
+three siblings that do it right.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -989,20 +1023,20 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**26 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 26). By claimed severity, read from the
-heading text: **Critical 1 · Important 18 · Minor 7** (1 + 18 + 7 = 26).
+**27 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 27). By claimed severity, read from the
+heading text: **Critical 1 · Important 19 · Minor 7** (1 + 19 + 7 = 27).
 
 - **Critical (1):** E5-13
-- **Important (18):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26
+- **Important (19):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27
 - **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 26. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 27. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
-Escape — the source mechanism, with the pair observed). **Adjacent to a §2d
+Escape — the source mechanism, with the pair observed), E5-27 (Move's missing transport arm and latch). **Adjacent to a §2d
 candidate with a different measurement:** E5-9 (Delete: not "no confirmation" — which matches the export — but the
 refusal's geometry).
 
@@ -1142,5 +1176,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 26 findings — Critical 1 · Important 18 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 27 findings — Critical 1 · Important 19 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
