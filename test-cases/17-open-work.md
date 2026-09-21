@@ -26,6 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.062`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -138,3 +139,30 @@ a peer rather than by the author of the check.
 `origin/main` has not moved is *true when written* and *false within two minutes*; the `git log
 origin/main..HEAD` check the handoff itself prescribes is **structurally blind to being BEHIND**, so
 nothing in this lane's own machinery could have caught it.
+
+## The invite page's fourth arm: a link that could not be CHECKED — cases `17.061`–`17.062` (V9, 2026-09-21)
+
+**Why this case is in §17.** The invite page's older cases are §3 (`3.118`–`3.123`), and its newer
+token-page case is §16 (`16.44`) — but §16's blocks are spent and §3's tip is shared across live lanes
+with no block held here. §17's own table above carries this batch's allocation, so the case is minted
+from it. It is a door case, which is what that block was allocated for.
+
+**The defect.** `getInvite`'s rejection arm set `invite = null` for ANY failure, and the render gave
+`null` exactly one sentence: *"This invitation link does not open anything. It may have been used,
+withdrawn, or lapsed — ask whoever invited you for a new one."* So a dropped connection, a 500 or an
+unparseable body were all drawn as a dead link — and that sentence **sends the person to ask for a
+replacement, retiring a link that was never tried and may be perfectly good.** `null` is not nothing
+here: it is the transport's read affordance for the server's ONE frozen 404 body, which really does mean
+the link opens nothing.
+
+- **17.061** ✅ A transport failure says the link could not be CHECKED, says nothing has been used up,
+  and does not say the link opens nothing. Asserted on the pair, because the two sentences are
+  alternatives in one branch — a case asserting only the new one passes on a page drawing both. Plus the
+  retry, which re-asks and believes a second answer. — (`apps/web/test/invite-page.test.tsx`)
+- **17.062** ✅ An ANSWERED `null` still renders the dead-link sentence, and not the
+  unable-to-check one. Without it the fix could be "always say it could not be checked", which would be
+  false of every link the server actually refused. — (`apps/web/test/invite-page.test.tsx`)
+
+**The state is four-valued now** — `'loading' | 'unreachable' | null | InviteSummary` — where it was
+three. `3.121` keeps the ANSWERED-`null` arm and its own docblock; the half of it that asserted the
+transport failure was the defect, and it moved here rather than being renumbered.

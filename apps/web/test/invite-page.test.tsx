@@ -133,10 +133,73 @@ describe('3.121 the invite page — a dead link', () => {
     expect(screen.queryByRole('button', { name: /^Join / })).toBeNull();
   });
 
-  it('3.121 treats a transport failure the same way rather than claiming a workspace', async () => {
+});
+
+describe('17.061 the invite page — a link that could not be CHECKED (V9)', () => {
+  /**
+   * 17.061 — V9. This case used to be the second arm of `3.121`, under the title
+   * *"treats a transport failure the same way"*, and it asserted the defect: the
+   * rejection arm set `invite = null` for ANY failure, so a dropped connection, a
+   * 500 or an unparseable body were all drawn as
+   * *"This invitation link does not open anything. It may have been used,
+   * withdrawn, or lapsed — ask whoever invited you for a new one."*
+   *
+   * That sentence has a COST the transport failure does not: it sends the person
+   * to ask for a replacement for a link that was never tried. `3.121` keeps the
+   * ANSWERED `null` — the server's one-body 404 for used/withdrawn/lapsed, which
+   * really does mean the link opens nothing — and this case covers everything
+   * else, which the page now tells apart.
+   *
+   * Asserted on the pair, because the two sentences are alternatives in one
+   * branch: the unable-to-check sentence is present AND the dead-link sentence is
+   * absent. A case asserting only the first passes on a page drawing both.
+   */
+  it('17.061 a transport failure says the link could not be CHECKED, and does not send them to burn it', async () => {
     mount({ getInvite: async () => Promise.reject(new Error('network down')) });
+
+    const unreachable = await screen.findByTestId('invite-unreachable');
+    expect(unreachable.textContent ?? '').toMatch(/could not be checked/i);
+    // The dead-link sentence is the one this must NOT say: it tells the person to
+    // ask for a new link, which retires a working one.
+    expect(screen.queryByText(/does not open anything/)).toBeNull();
+    expect(screen.queryByText(/ask whoever invited you for a new one/)).toBeNull();
+    // And a retry is offered, because the failure is the transport's and may clear.
+    expect(screen.getByRole('button', { name: 'Try again' })).toBeInTheDocument();
+  });
+
+  /**
+   * 17.061's second half — the retry actually asks again, and a second answer is
+   * believed. A Retry that only re-rendered would leave the person with a button
+   * that reports nothing, which is the class of control this batch exists to
+   * remove.
+   */
+  it('17.061 Try again re-asks, and a live link is shown when the second answer is one', async () => {
+    let calls = 0;
+    mount({
+      getInvite: async () => {
+        calls += 1;
+        if (calls === 1) throw new Error('network down');
+        return SUMMARY;
+      },
+    });
+
+    await screen.findByTestId('invite-unreachable');
+    await userEvent.setup().click(screen.getByRole('button', { name: 'Try again' }));
+
+    expect(await screen.findByText(/invited to join/)).toBeInTheDocument();
+    expect(screen.queryByTestId('invite-unreachable')).toBeNull();
+    expect(calls).toBe(2);
+  });
+
+  /**
+   * 17.062 — the control for the two cases above: the ANSWERED `null` still renders the dead-link sentence.
+   * Without this the fix could be "always say it could not be checked", which
+   * would be false of every link the server actually refused.
+   */
+  it('17.062 an ANSWERED null still says the link does not open anything', async () => {
+    mount({ getInvite: async () => null });
     expect(await screen.findByText(/does not open anything/)).toBeInTheDocument();
-    expect(screen.queryByText(/invited to join/)).toBeNull();
+    expect(screen.queryByTestId('invite-unreachable')).toBeNull();
   });
 });
 
