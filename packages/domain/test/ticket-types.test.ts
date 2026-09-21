@@ -35,6 +35,28 @@ describe('customFieldDefSchema', () => {
   });
 
   /**
+   * 5.79 — E6-20, planted defect: a ticket-type name, a custom-field name and
+   * a select option of only spaces are refused with ruling P15's sentence,
+   * from the one `displayName` schema the workspace and project names use.
+   * Before the fix all three were `z.string().min(1)`: through
+   * `POST /v1/events` a type named `" "` committed and `GET ticket-types`
+   * listed it, and a `" "` option was a choice with no label. RED: `parse`
+   * returned the value on all three. The padded control keeps this a refusal,
+   * not a trim.
+   */
+  it('planted defect: a type, field or option name of only spaces names nothing', () => {
+    const sentence = /a name of only spaces names nothing/;
+    expect(() => customFieldDefSchema.parse({ id: 'notes', name: ' ', type: 'text' })).toThrow(sentence);
+    expect(() =>
+      customFieldDefSchema.parse({ id: 'stage', name: 'Stage', type: 'select', options: ['Draft', ' '] }),
+    ).toThrow(sentence);
+    expect(() =>
+      ticketTypeDefSchema.parse({ id: 'feature', name: ' ', icon: 'flag', rank: 2, workflowId: 'wf', fields: [] }),
+    ).toThrow(sentence);
+    expect(customFieldDefSchema.parse({ id: 'notes', name: '  Notes  ', type: 'text' }).name).toBe('  Notes  ');
+  });
+
+  /**
    * 13.781 — `required: true` survives the parse.
    *
    * The witness for the schema member being LOAD-BEARING rather than

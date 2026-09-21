@@ -1,11 +1,13 @@
 import { z } from 'zod';
+import { displayName } from './display-name.js';
 
 export const stateCategorySchema = z.enum(['open', 'active', 'terminal']);
 export type StateCategory = z.infer<typeof stateCategorySchema>;
 
 export const workflowStateSchema = z.object({
   id: z.string().min(1),
-  name: z.string().min(1),
+  // A state's name is a board column's header: P15's refinement (E6-20).
+  name: displayName,
   category: stateCategorySchema,
   // Amendment 9 (coordination doc): additive flag the attention strip's
   // "blocked" bucket reads — templates set it on their Blocked states, the
@@ -83,7 +85,7 @@ export function transitionsWithBacklog(def: WorkflowDef): Transition[] {
 export const workflowDefSchema = z.object({
   id: z.string().min(1),
   version: z.number().int().min(1),
-  name: z.string().min(1),
+  name: displayName,
   initialStateId: z.string().min(1),
   states: z.array(workflowStateSchema),
   transitions: z.array(transitionSchema),

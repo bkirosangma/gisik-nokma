@@ -1,6 +1,7 @@
 import { z } from 'zod';
 import type { WorkspaceRole } from '../entity-state.js';
 import { ulidString } from '../envelope.js';
+import { displayName } from '../display-name.js';
 import { prefixSchema } from '../prefix.js';
 
 /**
@@ -27,19 +28,12 @@ import { prefixSchema } from '../prefix.js';
  * person. This is stricter than the plan's `usr_1` fixtures, which the door
  * refuses anyway.
  */
-/**
- * A name someone will read. `.min(1)` alone admits `'   '`, which names nothing
- * while looking like a name everywhere it is displayed — the plan pinned that
- * refusal (`value.trim() === ''`) and it is kept. It REFUSES rather than trims:
- * the ledger stores the claim as it was made, so quietly rewriting `'  Corner '`
- * to `'Corner'` would put words in the actor's mouth. This tightens Plan 1's
- * provisional `z.string().min(1)` on the two workspace types, which is what
- * taking them over means.
- */
-const displayName = z
-  .string()
-  .min(1)
-  .refine((value) => value.trim() !== '', 'must not be blank — a name of only spaces names nothing');
+// `displayName` — a name someone will read, ruling P15's refinement — used to
+// be defined here for the two workspace types and the project name, tightening
+// Plan 1's provisional `z.string().min(1)`. It moved to `../display-name.ts`
+// (E6-20) so the five definition-side name fields in `workflow.ts` and
+// `ticket-types.ts` share the one schema and the one sentence; nothing about
+// the three payloads below changed.
 
 /**
  * The workspace prefix (owner spec 2026-09-20): up to three capital letters,
