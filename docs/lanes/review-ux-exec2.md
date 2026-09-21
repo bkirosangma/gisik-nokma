@@ -1682,6 +1682,24 @@ contradiction is the finding.
 **Source:** carried candidate (round-1 §2d). **Severity: Minor.** The true half of the sentence is present,
 so the person is not left without information — they are left with a contradiction.
 
+> **DEFENCE — phase 2, 2026-09-21 15:26 IST, after exec 6's `R6-3 → E2-28` (their file at `23d4ab8d`, filed 15:20).**
+> **R6-3 is correct, and I re-ran its five measurements before writing this.** `<BulkCloseDialog` is mounted by two
+> files, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` and `packages/app-core/src/views/board.tsx`, and by
+> nothing under `apps/mobile` or `apps/desktop` (0 hits). The web constructs its data source at
+> `apps/web/src/providers.tsx:108` with `createOnlineDataSource` — `createReplicaDataSource` has 0 hits under
+> `apps/web` — and `packages/app-core/src/online/online-data-source.ts` contains the string `OfflineAcceptError`
+> **0 times** and never answers `'pending'`. So the `catch` at `bulk-close-dialog.tsx:230-233` can receive that error
+> from **no data source any shipped shell hands it**; the sentence this finding describes has no path to a screen
+> today. The finding's title says *"is reported as"* — a claim about a rendered outcome — and its MEASUREMENT lists
+> the catch and the throw site but not the wiring between them. That gap is the refutation, and it is the same
+> shape my round-1 `F9` marked as *"reasoned, not measured"*; here I did not mark it.
+>
+> **What survives is code-level, not person-level:** `board.tsx` is an app-core view — the layer the phone and
+> desktop shells are written to adopt (`apps/desktop/src/app.tsx:120-123` says the views are not yet mounted there)
+> — and the day a replica-backed shell mounts it, this catch will state *"could not reach the server"* over a queued
+> acceptance. That is a note for that day. As a UX finding about what a person meets on this build, **E2-28 does
+> not hold**; the ×3 on a Minor is the rule's and I do not argue it.
+
 ---
 
 *Batch 2 filed. Running total of round-2 new findings: `E2-20`–`E2-28` (9) — 5 Important, 4 Minor.*
