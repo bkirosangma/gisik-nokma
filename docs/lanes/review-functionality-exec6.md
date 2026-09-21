@@ -1506,6 +1506,10 @@ what was looked at and found sound, not only what was found wrong.
   commit order over an append-only ledger (the trigger above), so an offline-born ticket that syncs later takes
   the next number rather than shifting earlier ones, and a soft delete (which removes no event) shifts nothing.
   Read at the line; the append-only half measured.
+- **A backlog-born ticket is served consistently across the read surfaces** (one probe, 1 passed, not appended):
+  `start: 'backlog'` lands in `state_id = backlog / open`; assigned and given a due date it appears in My Work
+  (`open` group), the list, attention (due-soon) and search, and is withheld from the board alone — the parked
+  state the backlog spec draws off the columns. Its focus-born sibling appears everywhere.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
