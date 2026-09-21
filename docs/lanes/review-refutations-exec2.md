@@ -169,7 +169,29 @@ environment.
 and I do not speculate. `check:db-tz`'s local failure is an unset variable rather than a defect — and it is
 the one checker `F8` found has no automated invocation anywhere, so nothing would have caught it either way.
 
-**Thirty-five checks across all five lanes. Thirty-five held. My refutation count is zero.**
+
+### Two more, one of them the class my own brief names
+
+| target | the clause I tried to falsify | what I opened | outcome |
+|---|---|---|---|
+| `E6-9` (exec 6, IMPORTANT) | that the invite form offers three channels while the door refuses two | **Both sides opened.** The form: `members/page.tsx:847-856` `<Select options={[{ value: 'email' }, { value: 'sms' }, { value: 'whatsapp' }]} aria-label="Channel" />`. The door: `packages/domain/src/events/invites.ts:70` `INVITE_CHANNELS = ['email', 'phone']`, `:73-74` the error map *"requires channel 'email' or 'phone'"*, `:115` `channel: inviteChannelSchema` | **holds** |
+| `E4-18` (exec 4, IMPORTANT) | that the Assignee picker renders a blank option for a member with no display name | `ticket-sheet.tsx:1672` `...people.map((member) => ({ value: member.id, label: member.name }))` — `member.name` **raw**, no `actorLabel`. ⚠ **I had already opened this exact line for `E5-4`**, so this is a second lane reaching the same site from a different direction | **holds** |
+
+**Thirty-seven checks across all five lanes. Thirty-seven held. My refutation count is zero.**
+
+> **`E6-9` is the brief's own named class, and the sharpest instance of it I have seen today:** *"A REFUSAL
+> THAT ARRIVES AFTER THE PRESS IS A DEFECT."* An admin picks `sms` or `whatsapp` — the two options that
+> describe a phone number — and gets a 422 naming `'phone'`, **a value the form does not offer**, so a phone
+> invitation cannot be minted from the shipped page at all while the value that would work is unreachable.
+> My own report has a finding of this shape (`E2-35`, the Delete with no confirmation, argued from the
+> product's contrary practice) and **`E6-9` is better evidence for the rule than mine is**: mine argues from
+> the absence of a decision point, theirs shows a *value* offered that the validator rejects by name.
+>
+> **And `E4-18` is the second time a peer has reached a line I had already opened.** `ticket-sheet.tsx:1672`
+> is the blank-label site from `E5-4`; here it is reached from the picker's rendering rather than from the
+> roster. **Two lanes converging on one line from different directions is the strongest form of confirmation
+> available in a review of this shape** — it is what makes me confident the finding is about the product
+> rather than about one reader's path.
 
 > **What I can add to `I1`, offered to the judge rather than filed as my own finding.** Its claim is that
 > no browser-based instrument has *executed*; the job table says why. The failure is in `scope`, the first
