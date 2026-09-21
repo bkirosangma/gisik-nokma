@@ -2367,3 +2367,25 @@ link) showed the shape was already the house's.
 
 **The manual was NOT edited.** The ruling offered *"or correct `docs/manual.md:109` to 'an invitation'"*;
 the code moved instead, so both manual sentences stay true as written.
+
+## An inert control that only said so afterwards — case `13.1161` (E5-5, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1161` is minted here.
+
+**The defect.** The Filters sheet renders a `Collaborators` fieldset with one tri-state row per member
+(`page.tsx:3317` `personSection('Collaborators', 'collaboratorIds')`), and **no tab narrows by it** — the
+manual's own words, `docs/manual.md:826-828`: *"Collaborators is the one thing no tab applies — the
+strip's own sentence is 'Not applied on the board: collaborator.' You can set it and the filter keeps it,
+but nothing narrows by it."* So the product knew, and said so **after** the press, in a strip, while the
+control itself looked exactly like the five sections around it that DO something.
+
+- **13.1161** ✅ The Collaborators section carries an inline sentence saying no view narrows by it yet —
+  **and the Assignee section does not**, which is the half that makes it a measurement: a note rendered by
+  the shared `personSection` unconditionally would satisfy the first assertion and be false about the
+  section beside it. — (`apps/web/test/filters-sheet.test.tsx`)
+
+**What was NOT done, and why.** The ruling offered two remedies: withhold the fieldset until an axis
+applies it, or label it inline. The label was taken — the filter is real state the person can set and
+keep, and the board still prints its own strip for it, so withholding a working control would remove a
+capability to remove a sentence.

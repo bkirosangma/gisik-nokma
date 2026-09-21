@@ -5135,6 +5135,22 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   line-height: 1.125rem;
   color: var(--gn-text-muted);
   margin: 0;
+}.gn-filters__pending {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  margin: 0;
+}
+/* E5-5: the sentence a section carries when a control in it is set-but-unapplied.
+   Same muted metrics as `__pending` and a different reason, so a different
+   class: `__pending` says "this is not here YET" (a read in flight, or a roster
+   that failed), and this says "this is here and does nothing yet", which is a
+   statement about the product rather than about a read. */
+.gn-filters__note {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  margin: 0;
 }
 
 /* Person row — `fieldBg + fieldShadow; radius 12px`, per the table:

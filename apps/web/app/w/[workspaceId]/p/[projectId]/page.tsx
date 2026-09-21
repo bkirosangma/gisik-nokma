@@ -3264,9 +3264,22 @@ function FiltersSheet({
    */
   const clearAll = () => setFilter(clearFilterAxes);
 
-  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
+  /**
+   * E5-5: `note` is the third argument, and it exists for exactly one caller.
+   *
+   * The Filters sheet renders a `Collaborators` fieldset whose tri-state rows
+   * work — the filter keeps what you set — but **no view narrows by it**, and
+   * the only place the product said so was a strip printed AFTER the press
+   * (`docs/manual.md:826-828`: *"Collaborators is the one thing no tab applies
+   * — the strip's own sentence is 'Not applied on the board: collaborator.'"*).
+   * A control that looks like the six around it and quietly does nothing is the
+   * dead-affordance shape this shell refuses elsewhere; the remedy is to say so
+   * BEFORE the press, in the section that carries it.
+   */
+  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds', note?: string) => (
     <fieldset className="gn-filters__section">
       <legend className="gn-filters__section-label">{title}</legend>
+      {note !== undefined ? <p className="gn-filters__note">{note}</p> : null}
       {membersError !== null ? (
         <p className="gn-filters__pending">
           This workspace’s roster could not be loaded, so filtering by {title.toLowerCase()} is not
@@ -3324,7 +3337,14 @@ function FiltersSheet({
         </div>
         <div className="gn-filters__body">
           {personSection('Assignee', 'assigneeIds')}
-          {personSection('Collaborators', 'collaboratorIds')}
+          {/* The words are the manual's own; the strip's after-the-fact
+              sentence is not removed, because it still fires on the board for
+              anyone who sets this and forgets. */}
+          {personSection(
+            'Collaborators',
+            'collaboratorIds',
+            'No view narrows by this yet — you can set it and the filter keeps it, but nothing is filtered by it.',
+          )}
 
           <fieldset className="gn-filters__section">
             <legend className="gn-filters__section-label">Type</legend>
