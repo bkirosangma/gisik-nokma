@@ -1769,6 +1769,33 @@ superseded by Round 24 — not renumbered, not reused.
   prevent, and it is written down rather than quietly backfilled. The case is also **13.420's
   precondition**: until focus moved into the menu on open, "Escape returns focus to the trigger" was
   vacuous, because focus had never left. — (`apps/web/test/app-nav.test.tsx`)
+- **13.1050** ✅ A client-side navigation TELLS assistive technology which page it landed on. Before this,
+  a route change in this single-page app was completely silent: focus stayed on the nav link that was
+  just activated, the title did not change (that is P12, a separate ruling for a separate batch), and
+  nothing was announced. **The measured mechanism is narrower than "the framework ships no announcer"** — the App
+  Router does mount one (`next/dist/client/components/app-router-announcer.js`, mounted unconditionally
+  at `next/dist/client/components/app-router.js:423`); it renders a visually-hidden `role="alert"` region,
+  reads `document.title`, falls back to `document.querySelector('h1')` **only when the title is empty**,
+  and speaks when that value differs from the last one it read. `app/layout.tsx:8` sets one static
+  `metadata.title`, so the value never differs and the `h1` fallback is unreachable — mounted, and
+  permanently silent. **The remedy is therefore deliberately NOT a second unconditional announcer**, which
+  would restore the announcement today and double every one of them the day per-route titles land: the new
+  `RouteAnnouncer` is written to be exactly COMPLEMENTARY to the framework's condition — silent when the
+  title changed or is empty (the framework has already spoken), and announcing the new page's own `<h1>`
+  when the title is non-empty and unchanged (the only case the framework cannot speak to). Four assertions,
+  each with a control: nothing is announced on the first render, because a screen reader announces the
+  loaded document itself; a route change announces the page it
+  ARRIVED at and not the one it left; it stays silent when the title changed, with a control proving the
+  page really did change underneath it; and the live region is rendered unconditionally and empty on every
+  page, because a region that mounts together with its text is not reliably spoken. Mutation-witnessed:
+  suppressing the announcement reddens only the second; removing the title guard reddens only the third;
+  mounting the region only when it has text reddens four. — (`apps/web/test/route-announcer.test.tsx`)
+
+  *Id note: `13.1047`–`13.1049` were skipped deliberately — they are reserved and unused in executor 1's
+  allocated block `13.1034`–`13.1049` (`13-deployment-dogfooding.md:140-142`,
+  `13-owner-requests-and-backlog.md:2185`). `13.1051` was then minted later in the same batch (P9, in
+  `13-hig-per-screen.md`) and `13.1052` by P8 (`13-board-prototype-port.md`), so the next free id in this
+  space is `13.1053`.*
 
 **Five existing cases in `inbox-nav-link.test.tsx` were re-aimed, not weakened.** 11.152, 11.155, 11.156,
 11.169 and the load-window case all asserted the count through `UnreadBadge`'s `role="img"`, which the
