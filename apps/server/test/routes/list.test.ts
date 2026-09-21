@@ -1087,7 +1087,18 @@ describe('GET /v1/projects/:projectId/tickets — the door', () => {
       [{ filter: 'not json' }, 'invalid_filter'],
       [{ filter: { velocity: 9 } as unknown as FilterSpec }, 'invalid_filter'],
       [{ filter: { assigneeId: '' } as FilterSpec }, 'invalid_filter'],
-      [{ groupBy: 'priority' }, 'invalid_grouping'],
+      // `'priority'` was this row's exemplar before the priority built-in (spec
+      // 2026-09-22) made it a genuinely legal grouping at the schema door — swapped
+      // to `'workflow'`, a value `groupingSchema` still refuses. PROVISIONAL: this
+      // route's `groupCards` (this file's `src/routes/list.ts`) has no `case
+      // 'priority':` and its switch has no `default`, so `groupBy=priority` now
+      // passes this door and then falls through to an UNDEFINED response body — a
+      // gap flagged for the controller, not fixed here (design call: teach
+      // `groupCards` a priority bucket, or narrow `groupingSchema`/this route's own
+      // validation to keep `priority` a 400 here). Whichever way that gap closes,
+      // re-add `groupBy: 'priority'` to this exact array on the side its answer
+      // says it belongs.
+      [{ groupBy: 'workflow' }, 'invalid_grouping'],
       [{ groupBy: '' }, 'invalid_grouping'],
       [{ limit: 0 }, 'invalid_limit'],
       [{ limit: 999 }, 'invalid_limit'],

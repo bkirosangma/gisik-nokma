@@ -102,6 +102,9 @@ export function compileFilterSpec(spec: FilterSpec, params: SqlParams): Compiled
   if (spec.typeId !== undefined) clauses.push(`t.type_id = ${params.add(spec.typeId)}`);
   if (spec.stateId !== undefined) clauses.push(`t.state_id = ${params.add(spec.stateId)}`);
   if (spec.stateCategory !== undefined) clauses.push(`t.state_category = ${params.add(spec.stateCategory)}`);
+  // `priority` (spec 2026-09-22): a plain comparison over `t` itself, so like
+  // `closed` below it reaches no other table and needs no correlation.
+  if (spec.priority !== undefined) clauses.push(`(t.fields -> 'priority' ->> 'value') = ${params.add(spec.priority)}`);
   if (spec.blocked !== undefined) {
     needsBlockedCte = true;
     clauses.push(spec.blocked ? BLOCKED_MEMBERSHIP : `NOT (${BLOCKED_MEMBERSHIP})`);

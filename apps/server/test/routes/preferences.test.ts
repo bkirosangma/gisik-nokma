@@ -299,7 +299,7 @@ describe('/v1/me/preferences — server-owned view preferences', () => {
     // non-object, an array, and a document missing a required slot.
     const malformed: unknown[] = [
       { ...EMPTY_PREFERENCES, theme: 'dark' },
-      { ...EMPTY_PREFERENCES, grouping: { [read.world.projectId]: 'priority' } },
+      { ...EMPTY_PREFERENCES, grouping: { [read.world.projectId]: 'workflow' } },
       { savedFilters: [] },
       [],
       'preferences',

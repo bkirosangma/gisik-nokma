@@ -888,6 +888,11 @@ reason on record, not an oversight:*
   within its workflow. `assembleTicketCards` also folds `closed_at`/`closed_by` into `TicketCard.closed`
   (backlog/closed spec §3.1/§3.3, 2026-09-17; Task 4; case 13.573) — `PROJ_TICKET_COLUMNS` selects the
   pair, and both NULL maps to `null`, the same fold `rowToTicketState` makes over the same two columns.
+  **`priority` is ALWAYS a claim (spec 2026-09-22, Task 3)** — `priorityOf(row)` beside `dueDateOf`, and a
+  row with no `priority` key THROWS naming the ticket and the repair (`rebuild:projection proj_tickets`)
+  rather than defaulting to P2: an absent claim after the built-in landed means the row's `proj_tickets`
+  predates the reducer that writes it, not that nobody claimed one — the same reasoning `title`'s throw
+  already follows. Cases 7.268–7.269.
   `apps/server/src/read/state-provenance.ts`,
   `apps/server/src/read/workflow-defs.ts`, `apps/server/src/read/ticket-cards.ts`
 - ⚙️ **`RollupView.terminal` and `RollupView.uncategorized`** — the "5 of 8 **done**" half of the
@@ -974,7 +979,17 @@ reason on record, not an oversight:*
   backlog and closed tickets and filters on it (backlog/closed spec §3.2/§3.3, 2026-09-17)** — a
   backlog row's `stateName`/`stateCategory` resolve through `statesWithBacklog`, its `closed` is
   `null`; `filterSpecSchema.closed` compiles through `compileFilterSpec` to `t.closed_at IS [NOT]
-  NULL`.
+  NULL`. **`filterSpecSchema.priority` (spec 2026-09-22, Task 3) compiles the same way**, to
+  `(t.fields -> 'priority' ->> 'value') = $n` — a plain bound comparison needing no other-table
+  correlation, like `closed` (case 7.270). **⚠ `groupBy=priority` is a KNOWN GAP, flagged rather than
+  fixed here:** `priority` is now a legal `Grouping` (Task 1 made it one of six), but this route's own
+  `groupCards` switch has no `case 'priority':` and no `default`, so a request naming it now passes the
+  door — the refusal `invalid_grouping` this paragraph names above no longer fires for it — and falls
+  through to an `undefined` response body instead of a card grouping OR a 400. Closing it is a design
+  call this plan does not make: either `groupCards` learns a priority bucket (the pattern `type`/`assignee`
+  already use), or this route's own validation is narrowed to keep `priority` a 400 here specifically
+  while it remains legal everywhere else `Grouping` is accepted. `test/routes/list.test.ts`'s case `7.22`
+  carries a provisional note at the exact line this gap touches.
   `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
 - ✅ **The builder read surface — `GET /v1/workspaces/:id/workflows`, `/workflows/:id`,
   `/ticket-types`, `/members`, `/workflows/:id/state-occupancy`, `/ticket-types/:id/population`** —
@@ -2921,6 +2936,16 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   contradict that.
   The cost is recorded with the decision: production drift surfaces at the next monthly drill, so the
   exposure window is up to a month. `apps/server/src/tools/verify-projections.ts`, `deploy/do/README.md`
+- ⚙️ **`rebuild:projection <name>` — the repair `verify:projections` detects the need for (spec
+  2026-09-22, Task 3)** — `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets` resets ONE
+  projection's LIVE tables and replays the whole ledger into it inside a single transaction
+  (`rebuildProjection`, already the projection-outer machinery `verify-projections`' own rebuild-and-diff
+  discipline uses, just pointed at the live table instead of a shadow schema). First use: after the
+  priority built-in ships, a live `proj_tickets` written by the OLDER reducer lacks the birth priority
+  claim, and every card read throws (`assembleTicketCards`'s `priorityOf`) until it is rebuilt. Reads
+  `DATABASE_URL` directly for the same reason `verify:projections` does — the runbook's drill cannot
+  demand three auth secrets to write a projection table. Case 13.1227.
+  `apps/server/src/tools/rebuild-projection.ts`, `apps/server/src/projections/rebuild.ts`
 - ⚙️ **The `test-cases/` <-> test citation check (Lane F Pass 1) — the gap the coordination doc named by
   hand, made falsifiable** — a checked (`✅`) catalogue case is supposed to name the test that proves it,
   but nothing enforced the reverse: the coordination doc recorded, 2026-08-31, that no test in the repo

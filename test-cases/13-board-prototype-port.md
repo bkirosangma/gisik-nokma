@@ -2216,4 +2216,12 @@ than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* m
   rebuild, so the revert reached the compiled artifact) and restored from sha256-compared backups. Package
   suites: ui 426, app-core 1731, web 654.
 
+## Priority is a built-in — the server assembler and the projection rebuild CLI (spec 2026-09-22, Task 3)
+
+- **13.1227** ✅ `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets` restores the birth
+  priority claim on a `proj_tickets` row written before the reducer learned to write one: the stale row is
+  manufactured by stripping the key from an otherwise real, ledger-created ticket, and `rebuildProjection`
+  replays the whole ledger into the live table inside one transaction, putting the claim back attributed to
+  the creator. — `apps/server/test/tools/rebuild-projection.test.ts`
+
 **No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.

@@ -23,7 +23,7 @@ describe('SqlParams', () => {
 });
 
 describe('compileFilterSpec — emitted SQL', () => {
-  it('compiles each clause with parameters only', () => {
+  it('7.270 compiles each clause with parameters only — priority included', () => {
     const params = new SqlParams();
     const { clauses, needsBlockedCte } = compileFilterSpec(
       {
@@ -32,6 +32,7 @@ describe('compileFilterSpec — emitted SQL', () => {
         typeId: 'task',
         stateId: 'doing',
         stateCategory: 'active',
+        priority: 'P1',
         due: { before: '2026-08-31', after: '2026-08-01' },
       },
       params,
@@ -42,10 +43,20 @@ describe('compileFilterSpec — emitted SQL', () => {
       't.type_id = $3',
       't.state_id = $4',
       't.state_category = $5',
-      "(t.fields -> 'dueDate' -> 'value' ->> 'date') <= $6",
-      "(t.fields -> 'dueDate' -> 'value' ->> 'date') >= $7",
+      "(t.fields -> 'priority' ->> 'value') = $6",
+      "(t.fields -> 'dueDate' -> 'value' ->> 'date') <= $7",
+      "(t.fields -> 'dueDate' -> 'value' ->> 'date') >= $8",
     ]);
-    expect(params.toArray()).toEqual(['usr_01', 'usr_02', 'task', 'doing', 'active', '2026-08-31', '2026-08-01']);
+    expect(params.toArray()).toEqual([
+      'usr_01',
+      'usr_02',
+      'task',
+      'doing',
+      'active',
+      'P1',
+      '2026-08-31',
+      '2026-08-01',
+    ]);
     expect(needsBlockedCte).toBe(false);
   });
 
@@ -133,6 +144,9 @@ describe('compileFilterSpec — emitted SQL', () => {
       { typeId: 't' },
       { stateId: 's' },
       { stateCategory: 'open' },
+      // `priority` (spec 2026-09-22) reaches no other table either — a plain
+      // comparison over `t` itself, the same shape as `closed` above.
+      { priority: 'P1' },
       { blocked: true },
       { blocked: false },
       // `closed` (backlog/closed spec §3.2) reaches no other table — it is a

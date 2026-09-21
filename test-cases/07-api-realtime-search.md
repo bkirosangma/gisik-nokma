@@ -765,3 +765,12 @@ is empty.
 - 7.266 ✅ The bulk rebind asks the permission gate's question up front (E6-10, B12): an `admin` not on one of the projects holding tickets of the type — who reads the ticket in their own project (200) and not the other (404), the gate's answer through the ticket door — is refused `422 migration.not-visible` with the count (`1 of the 2 tickets of this type is not visible to you; …`), the ledger row count unchanged and the type's population still `[2, 0]` across the two workflows; before the fix the same call moved the visible ticket, was refused `permission.visibility` on the hidden one, and left the populations `[1, 1]` under a `refused`. Positive control in the same case: the owner, same body, `200 {status:'migrated', count: 2}`, ledger `+2`, populations `[0, 2]`. Seeded in a workspace of its own (two people signed in over the wire via `read.otp`, two projects, one type, two tickets minted in visibility order) so nothing the shared world's cases count moves. — `apps/server/test/routes/builder-reads.test.ts` ("7.266")
 - 7.267 ✅ `filterSpecSchema.priority` accepts one of P1/P2/P3 and refuses anything else, including an array
   where a single level is required. — `packages/domain/test/filter-spec.test.ts`
+- 7.268 ✅ Every `TicketCard` carries a priority claim: a v1-shaped ticket (no `priority` on its
+  `ticket.created`) assembles to P2 attributed to the CREATOR and the creation clocks, and an explicit
+  `ticket.field_set` afterward assembles to that level and actor instead. — `apps/server/test/read/ticket-cards.test.ts`
+- 7.269 ✅ `assembleTicketCards` THROWS naming the ticket and the rebuild command when a row carries no
+  priority claim — the projection was written before the reducer learned to write one, and filling in P2
+  here would be the reader-side default the spec rejects. — `apps/server/test/read/ticket-cards.test.ts`
+- 7.270 ✅ `compileFilterSpec` compiles `priority` to `(t.fields -> 'priority' ->> 'value') = $n`, a plain
+  bound comparison over `t` itself needing no other-table correlation, alongside every other clause. —
+  `apps/server/test/read/compile-filter.test.ts`

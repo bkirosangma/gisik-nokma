@@ -1,10 +1,12 @@
 import type {
   FieldClaim,
+  PriorityClaim,
   StateCategory,
   TicketCard,
   TicketDueDate,
   TicketRollup,
 } from '@gisik-nokma/domain';
+import { PRIORITIES, prioritySchema } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { rollupFor } from '../visibility/rollup.js';
 import { stateProvenanceFor } from './state-provenance.js';
@@ -123,6 +125,7 @@ export async function fetchTicketRows(db: Queryable, ticketIds: string[]): Promi
  *   the same reason. `null` is the one non-date value that IS meaningful, and
  *   it means cleared.
  * - **`dueDate`** → the three-state `TicketDueDate`, never a bare null.
+ * - **No priority claim** → throw; see `priorityOf`.
  * - **`rollup: null`** → a real fact: no children at all. Restricted children
  *   make it non-null with `restrictedCount` set.
  *
@@ -180,6 +183,7 @@ export async function assembleTicketCards(
       collaboratorIds: row.collaborator_ids,
       title: titleOf(row),
       dueDate: dueDateOf(row),
+      priority: priorityOf(row),
       fields: row.fields,
       stateProvenance: prov,
       rollup,
@@ -256,4 +260,27 @@ function dueDateOf(row: ProjTicketRow): TicketDueDate {
       serverTime: claim.serverTime,
     },
   };
+}
+
+/**
+ * ALWAYS a claim (spec 2026-09-22). An absent key does not mean "never claimed" here
+ * as it does for `dueDate`: `applyTicketEvent` writes the birth priority on every
+ * `ticket.created`, so a row without one was written by a reducer that predates the
+ * field and has not been rebuilt — `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets`.
+ * Filling in P2 would be approach B of the spec by the back door.
+ */
+function priorityOf(row: ProjTicketRow): PriorityClaim {
+  const claim = row.fields['priority'];
+  if (claim === undefined) {
+    throw new Error(
+      `assembleTicketCards: no priority claim on ticket ${row.ticket_id} — every ticket.created writes one since 2026-09-22, so proj_tickets predates the reducer; rebuild it (rebuild:projection proj_tickets)`,
+    );
+  }
+  const parsed = prioritySchema.safeParse(claim.value);
+  if (!parsed.success) {
+    throw new Error(
+      `assembleTicketCards: the priority claim on ticket ${row.ticket_id} is not one of ${PRIORITIES.join('/')} — the door refuses that (checkTicketFieldSet), so this event did not come through it`,
+    );
+  }
+  return { value: parsed.data, actorId: claim.actorId, clientTime: claim.clientTime, serverTime: claim.serverTime };
 }
