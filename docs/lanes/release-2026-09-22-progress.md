@@ -26,3 +26,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F6-ux | done | 8706da3c | prose-only: guest chip claim scoped; workspaces-cards 16 tests green |
 | T-E5-36 | done | 9de2d115 | projectCountLine(0) says "No projects yet"; 25 tests green |
 | T-E5-12 | done | 04ac1714 | account row counts live + names archived; 18 tests green |
+| T-E5-33 | done | cf064cfe | sign-in requires the email in a real form; 25 tests green |
