@@ -1644,8 +1644,9 @@ rateLimitKeyFor(undefined, '9.9.9.9', true)                                   ->
 `56cd0913`, #146); the rightmost keying it says is "not yet on main" merged at 14:02 IST the same day (`935f5d66`,
 #190, "Plan 11 seam 1"), is pinned by case **13.121 ✅** (*"a caller-prepended `X-Forwarded-For` entry does NOT
 buy a fresh rate-limit bucket … reddens under leftmost-keying"*), and `rate-limit.ts:74-99` records the
-measurement that motivated it. `app.yaml` was then edited twice more — `f4a8ccac` (#205, 2026-09-06) and
-`5b4f8fc9` (#369, 2026-09-08) — and the paragraph survived both. So the one file an operator reads before
+measurement that motivated it. `app.yaml` has four commits: `56cd0913` (#146, 07:50) and `81a7e440` (#183, 12:50) before the fix, then
+`f4a8ccac` (#205, 18:50 the same day) and `5b4f8fc9` (#369, 2026-09-08) after it — and the paragraph survived both
+of the later two. So the one file an operator reads before
 deploying declares a rate-limit bypass **open on main** that closed fifteen days ago. This is the class E6-12
 and exec 3's E3-22 … E3-27 record for `test-cases/` and `Features.md`, on the deploy spec, and for a
 security property rather than a feature count.
@@ -1659,7 +1660,7 @@ caught all three.
 
 **MEASUREMENT.** The five `node -e` calls above against `apps/server/dist/http/rate-limit.js` (dist checked
 with the code-only needle first); `sed -n 95,106p deploy/do/app.yaml`; `git blame -L 95,103 deploy/do/app.yaml`;
-`git log --format='%h %ad %s' -- deploy/do/app.yaml` (three commits); `git log -1 935f5d66`; lines opened:
+`git log --format='%h %ad %s' -- deploy/do/app.yaml` (four commits, timed with `--date=iso`); `git log -1 935f5d66`; lines opened:
 `rate-limit.ts:74-99`, `:112-123`; `test-cases/13-plan11-seams-and-scheduler.md:72-75` (13.121), `:90` (13.126 ❌,
 the unit-test gap, which is a different sentence and still true). Not previously filed: `grep -rn "not yet on
 main\|forged-header gap"` over the five lanes' review reports at their latest pushes → 0.
