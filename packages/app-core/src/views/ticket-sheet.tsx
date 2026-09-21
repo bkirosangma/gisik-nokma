@@ -709,6 +709,21 @@ export function TicketSheet({
    * `require-field` rule sees the value the dialog just collected.
    */
   const submitTransition = async (submission: TransitionSubmission): Promise<void> => {
+    // E5-27 — the latch, the same one and the same shape `submitTicketEvent`
+    // above uses. The early return is the belt; the `disabled` the dialog
+    // renders off this same flag is the braces, and it is the primary defence:
+    // React re-renders `disabled` onto the DOM before a second click can land,
+    // and this line covers a synchronous double-invoke that lands in the same
+    // render pass.
+    //
+    // ONE LATCH FOR THE SHEET, deliberately, not a second one for the Move
+    // path: a sheet with two writes in flight at once has no single answer to
+    // "what is happening", and the Move dialog is modal, so the footer it
+    // would be racing is behind it anyway. The visible consequence — Close,
+    // Reopen and Delete are disabled for the lifetime of a Move's ingest — is
+    // the correct one rather than a cost.
+    if (submitting) return;
+    setSubmitting(true);
     const fieldEvents = Object.entries(submission.fieldValues).map(([fieldId, value]) =>
       make({
         workspaceId,
@@ -762,6 +777,11 @@ export function TicketSheet({
       const message = cause instanceof Error ? cause.message : String(cause);
       setServerRefusal(null);
       setTransportError(`We could not reach the server for this move — ${message}`);
+    } finally {
+      // In a `finally`, not after the await, for the reason `submitTicketEvent`'s
+      // own docblock records: a REJECTED ingest must not leave Move disabled for
+      // ever, which resetting only on the happy path would do.
+      setSubmitting(false);
     }
   };
 
@@ -2678,6 +2698,12 @@ export function TicketSheet({
           // same class, same Ruling 27 split: a dropped connection is not an
           // adjudication and never wears the refusal's words.
           transportError={transportError}
+          // E5-27 — the sheet's own latch, the one `submitTicketEvent` already
+          // wears for Close/Reopen/Delete and `submitTransition` now wears too.
+          // The dialog disables Move while it is true, so "still sending",
+          // "already failed" and "already succeeded" stop looking identical to
+          // the person deciding whether to press again.
+          submitting={submitting}
           uploadEvidence={uploadEvidence}
         />
       ) : null}

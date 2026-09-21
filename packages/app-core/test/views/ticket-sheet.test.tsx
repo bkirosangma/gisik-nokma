@@ -584,6 +584,85 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
   });
 
+  /**
+   * 3.182 / E5-27 — THE MOVE CONTROL HAS AN IN-FLIGHT STATE.
+   *
+   * E2-29's transport arm (3.178) gave a dropped connection a sentence. This is
+   * the other half of the same finding, and it is a different defect: with the
+   * request merely SLOW the dialog said nothing because there was nothing to
+   * say yet, and Move stayed enabled — so "still sending", "already failed" and
+   * "already succeeded" were indistinguishable to the person deciding whether
+   * to press again. `blocked` is the form's validity and only that; the dialog
+   * had no way to express "a submission is already in flight".
+   *
+   * The ingest is held open behind a deferred promise rather than rejecting,
+   * and that is the whole design of the case: a REJECTING ingest also reddens
+   * under a fix that only resets the latch on the error path, so it cannot
+   * distinguish a latch from a `finally`. Holding it open tests the window
+   * itself — the state the person is actually in while the network is slow.
+   *
+   * THE SECOND PRESS IS ASSERTED, not assumed away. Disabling a button is a
+   * DOM fact; whether a second submission can still be FILED is the property
+   * that matters, and the two come apart whenever the guard is missing and
+   * `userEvent` dispatches before React re-renders. `source.ingested` is the
+   * ledger of what actually went out.
+   */
+  it('3.182 / E5-27: a Move in flight disables the control, and a second press files nothing', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    let release: (() => void) | null = null;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      async (events) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-08-20T09:00:00.000Z',
+        }));
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'filed at the portal');
+
+    const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
+    const moveButton = within(dialog).getByRole('button', { name: 'Move' });
+    // Before the press it is enabled — the field the case moves must be the
+    // ONLY thing that turns it off, or "disabled" would prove nothing.
+    expect(moveButton).toBeEnabled();
+
+    await user.click(moveButton);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // The request is out and unanswered: the control says so.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Move' })).toBeDisabled(),
+    );
+    // And a second press — the person's natural response to a slow network —
+    // files nothing at all. Measured against the LEDGER, not the attribute.
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    expect(source.ingested).toHaveLength(1);
+
+    // Release: the latch clears, the dialog closes, and the button is gone
+    // with it — the happy path still works through the same flag.
+    await act(async () => {
+      release?.();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull());
+  });
+
   it('a committed batch closes the dialog and clears any earlier refusal', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());

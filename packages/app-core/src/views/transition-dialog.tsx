@@ -168,6 +168,28 @@ export type TransitionDialogProps = {
    * alongside the words "Refused by the server".
    */
   transportError: string | null;
+  /**
+   * E5-27 — is a submission IN FLIGHT? While true the Move button is disabled.
+   *
+   * `blocked` (`:360-364` below) is the FORM's validity and nothing else: it
+   * says whether what is on screen could be submitted, never whether something
+   * already was. Without this prop the dialog had no way to express the second
+   * fact, so a dropped connection left Move enabled and the person's natural
+   * response — press again — was indistinguishable from the first press for a
+   * request that had in fact gone through.
+   *
+   * OPTIONAL, and its absence means "no latch is worn on this mount" rather
+   * than "not submitting": `board.tsx`'s card dialog passes nothing, because
+   * the board holds its latch on the arrows (`MoveArrows.submitting`) and its
+   * dialog path is a different finding. A default of `false` would have made
+   * that call site assert something untrue about itself.
+   *
+   * The caller owns the flag, and it must clear it in a `finally` — this
+   * dialog cannot tell a resolved submission from a rejected one, and a latch
+   * cleared only on the happy path disables Move for ever the first time the
+   * network drops.
+   */
+  submitting?: boolean;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
   /**
    * The dialog only ever OFFERS what the gesture meant (owner request,
@@ -215,6 +237,8 @@ export function TransitionDialog({
   precheck,
   serverRefusal,
   transportError,
+  submitting,
+
   uploadEvidence,
   offerStateIds,
   initialToStateId,
@@ -512,7 +536,7 @@ export function TransitionDialog({
 
       <div className="gn-transition__actions">
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="primary" disabled={blocked} onClick={submit}>
+        <Button variant="primary" disabled={blocked || submitting === true} onClick={submit}>
           Move
         </Button>
       </div>
