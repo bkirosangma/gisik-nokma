@@ -401,6 +401,14 @@ describe('TicketEditorSlot', () => {
     const button = submitButton(view);
     expect(button.disabled).toBe(true);
     expect(button.title).toContain('without a submit handler');
+    // The reason is ATTACHED to the control, not merely hoverable: a disabled
+    // button is removed from the focus order, so `title` alone is spoken to
+    // nobody. `aria-describedby` must resolve to a node carrying the sentence.
+    const describedBy = button.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(button.ownerDocument.getElementById(describedBy!)?.textContent).toContain(
+      'without a submit handler',
+    );
     view.unmount();
   });
 
@@ -409,6 +417,10 @@ describe('TicketEditorSlot', () => {
     const button = submitButton(view);
     expect(button.disabled).toBe(true);
     expect(button.title).toContain('Read-only');
+    // Attached as well as hoverable — see the arm above for why.
+    const describedBy = button.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(button.ownerDocument.getElementById(describedBy!)?.textContent).toContain('Read-only');
     expect(editor.isEditable).toBe(false);
     view.unmount();
   });

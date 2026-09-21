@@ -215,3 +215,41 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P34 | done | cd77b2b2 | the four non-default project VIEWS now have keyed route entries with self-proving reach hooks (clicks the tab, reads aria-selected back); the List one also opens the Select panel (P11's other half, asserting a visible listbox when enabled, reporting when disabled); gate-level case with the default entry as control; mutation: dropping one reach reddens that case alone (1 failed | 6 passed) |
 | T-E6-26 | needs-owner | - | NOT IMPLEMENTED — the task is marked ⚠ THIS TASK NEEDS THE OWNER (OWNER-DECISION). What must be decided: `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the release-gate verifier, and read by NOTHING in the product (0 SQL readers outside projections/rollups.ts; `getRollup(` has one non-test occurrence — its own definition at rollups.ts:133; Features.md records it as interim "Nothing reads it yet…" for a reason that has since expired). The choice is READ IT (rollupFor could take its category counts from it once the 6.83 enumeration mismatch is resolved) or DROP the projection and its verifier row, saying which in Features.md:408. A projection kept "in case" is the rule this repo states for controls and components. |
 | T-E6-6 | done | 8ba02999 | the silent-skip guard can now FAIL on its own universe: an empty report REFUSES (was ok/EXIT=0 — reproduced at HEAD), .runIf( recognised, 6-case self-test; refuses on EMPTY rather than on the per-shard shortfall (the briefed form would redden 3 healthy shards) and STATES the shortfall instead |
+| B18 | claimed | 2026-09-21 23:24 | /Users/kiro/my_projects/gisik-nokma-ds1 |
+| T-E3-10 | done | 296629a2 | prose-only: sync-routes.ts docblock counts re-derived (18/15, union exact) |
+| T-E3-11 | done | ce641d60 | prose-only: Features.md fixture count dropped, pinned to the fixtures.test.ts gate |
+| T-E3-12 | done | 15bcaba9 | prose-only: Features.md "eleven checks" dropped; reserved-id class added to the enumeration |
+| T-E3-13 | done | 01c9de90 | prose-only: visible-where.ts cites the fixture row by content, not by :88 |
+| T-E3-16 | done | c0606d63 | citation sweep: 11 live sites cite the roster-cut clause by its words (ui 57, app-core 25) |
+| T-E3-17 | done | c97c7f31 | prose-only: outbox docblock drops the derived total (sync-client 90) |
+| T-E3-18 | done | 88f5a1ff | prose-only: replica dangling-parent comment stops claiming parity (app-core 1730) |
+| T-E3-20 | done | 0b13801a | prose-only: case 6.82 partially closed in place (term landed, open/active absent) |
+| T-E3-21 | done | 70946c4b | case 6.84 split: refusal ✅ (hierarchy.ts:124/:250) + rollup property ✅ (rollup 6 green) |
+| T-E3-22 | done | cf12d5cc | case 6.58 closed: hierarchy.cycle refuses the repro at both walks |
+| T-E3-23 | done | a40f3b83 | case 6.124 closed: both URLs take httpUrl() (config 27 green) |
+| T-E3-24 | done | 952ac8e2 | case 6.66 closed: parent placeholder is existence-vs-TITLE, withheld-title assertion written |
+| T-E3-25 | done | 1070b662 | case 6.96 closed: SyncItem has four arms; cited by the discriminator test (sync-client 90) |
+| T-E3-26 | done | 332dd81e | Features.md settings bullet: nav entry landed; reachability measured via router.push |
+| T-E3-27 | done | 770d8b47 | checkErrandTemplate "not yet landed" corrected in both files (app-core 9 green) |
+| T-E3-28 | done | b2a3d3fb | offline-born omission set names getTicket as the third omitting door |
+| T-E3-29 | done | 5fdf77c2 | Features.md vocabulary bullet scoped to Plan 3; the eight later types named |
+| T-E3-30 | done | dbf32834 | case 6.83 closed: the measurement exists, is named after the case (13 green) |
+| T-E3-31 | done | 25b8d5b7 | case 6.57 struck: cross-project reparent refused at both doors (tickets-read 14 green) |
+| T-E3-33 | done | 571ef830 | proj-projects position paragraph corrected; index.ts had the true account (order 3 green) |
+| T-E3-34 | done | 4c0d25ae | assignment-fold docblock: the door refuses it (role-permission 48 green) |
+| T-E3-9 | done | e7d45076 | envelope field count named not counted; probe says eleven (domain 548 green) |
+| T-E6-12 | done | c2723621 | 6.51/6.77/6.123 superseded; 6.77 closed, two partial (perm 28 green) |
+| T-E6-14 | done | 8ed0e6ce | delete toast names key ?? title; both arms pinned (app-core 1731, web 5) |
+| T-E6-25 | done | d2e2787a | deploy comments: all nine config vars consumed; four stale claims corrected |
+| T-F1-fn | done | 078a58de | attachment-leak gap marked closed; both stale numbers corrected (7 green) |
+| T-F3-fn | done | d3dda5f7 | §17 names the prototype copy and its sha, with the ruling's +1 offset |
+| T-F6-fn | done | 7d358fed | soft-delete enumeration: 14 constant uses, 18 SQL statements (10 green) |
+| T-F7-fn | done | e4d6236a | §17: a lane with no row must STOP AND ASK (the count half was superseded) |
+| T-I3 | done | 0bc9919c | tap-targets: the my-work exclusion names its real reason (stack window) |
+| T-I4 | done | 95d09284 | tap-targets cites the ui.css sentence by its words, not by a wrong range |
+| T-I5 | done | 3fe7d95e | executor-state: the older id block points forward; two dupes resolved |
+| T-P25 | done | ee15d4eb | back-button citations name the reason, not the deleted file (web 19 green) |
+| T-P26 | done | dbfd0dac | prototype-delta: 11 queue rows marked closed/undecided; 3 per-screen claims fixed |
+| T-P29 | done | ca2bf401 | smoke.spec: all ten stubs cite a line; seven drifted citations corrected |
+| T-P32 | done | 1d9db468 | three disabled controls attach their reason via aria-describedby (2 mutations killed) |
+| T-P33 | done | d1512158 | inbox row time: the omission is CLOSED by E5-35; toggle half still holds |

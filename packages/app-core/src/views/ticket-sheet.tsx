@@ -295,16 +295,22 @@ export type TicketSheetProps = {
    * sheet open with its own notice, and the host is told nothing: there is no
    * deletion to narrate.
    *
-   * ## `title`, not an id, and that is a departure from the prototype
+   * ## The KEY when there is one, the title when there is not
    *
-   * The prototype toast says `"GN-1183 deleted · …"` — a ticket KEY. **This
-   * product has no ticket key**; its ids are ULIDs (`01J9GEVT…`), which are not
-   * something a person reads back. The title is the only human name a ticket has
-   * here, so it is what the sentence carries. **Recorded rather than silent: a
-   * key is a migration, and the parity list already names the breadcrumb as its
-   * owner.** Reversing this is one string in the host.
+   * The prototype toast says `"GN-1183 deleted · …"` — a ticket KEY. ⚠ **This
+   * paragraph used to say "This product has no ticket key", and that stopped
+   * being true thirteen minutes before it was written:** `ac18f2bc` landed
+   * ticket keys at 13:04:40 IST on 2026-09-20, and this paragraph's own commit
+   * `18d7e391` is at 13:17:51. It was briefly defensible in a narrower form —
+   * the key was not ON THE WIRE until `277b5d22` at 23:07:56 that night — but
+   * the sentence as written was about the product, and the product had them.
+   * The detail door serves `key` and this very component reads it for its own
+   * breadcrumb (`ticketRead.key ?? ticketRead.title`), so the second argument is
+   * that same expression: the key when the workspace has a prefix, the title
+   * when it does not. The toast therefore says what the prototype says wherever
+   * a key exists, and still names the ticket where one does not.
    */
-  onDeleted?: (ticketId: string, title: string) => void;
+  onDeleted?: (ticketId: string, name: string) => void;
   /**
    * The two names the breadcrumb above the title shows — the workspace's and
    * the project's — supplied by the host, which already holds both.
@@ -1614,7 +1620,7 @@ export function TicketSheet({
       'ticket.deleted',
       () => {
         onClose();
-        onDeleted?.(ticketId, ticketRead.title);
+        onDeleted?.(ticketId, ticketRead.key ?? ticketRead.title);
       },
       'footer',
     );

@@ -63,8 +63,13 @@ describe('WORKFLOW_TEMPLATES', () => {
    */
   it('errand-with-waits trips rule-bypassable — recorded, not adjudicated (coordination doc §Plan 8/5)', () => {
     // ERRAND_WITH_WAITS_TEMPLATE is FROZEN — its shape is pinned by Plan 11's
-    // checkErrandTemplate oracle (not yet landed on this branch; verified
-    // absent by search this session) and must not be edited from Task 3.
+    // checkErrandTemplate oracle, which has LANDED since this comment was
+    // written (it read "not yet landed on this branch; verified absent by
+    // search this session"): the oracle is defined in
+    // `apps/server/src/seed/templates.ts`, its own suite is
+    // `apps/server/test/seed/templates.test.ts`, and the seeder calls it as a
+    // throwing guard before it writes — `seed-convenience-corner.ts`. It must
+    // not be edited from Task 3.
     // require-comment guards in-progress -> waiting, but later -> waiting and
     // next -> waiting both enter the same state with no require-comment rule,
     // one hop each — a pinned seeding path (Task 3's guard-step comment), so

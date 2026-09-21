@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useId, useState } from 'react';
 import type { PublishedWorkflowDef } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import { selectIssues } from '../draft-store.js';
@@ -99,6 +99,8 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
   const env = useBuilderEnv();
   const draft = useDraft();
   const [state, setState] = useState<PublishPhase>({ phase: 'idle' });
+  /** The id the disabled Publish button is described by — see its note below. */
+  const publishReasonId = useId();
   if (!env.canAuthor) return null;
 
   const issues = selectIssues(draft);
@@ -224,10 +226,38 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
         className="publish-controls__publish"
         disabled={issues.length > 0 || state.phase === 'submitting'}
         title={issues.length > 0 ? 'Fix the issues below first.' : undefined}
+        /*
+          THE REASON, REACHABLE. A `disabled` button is out of the focus order,
+          so this `title` was spoken to nobody — the pointer to the issues below
+          reached a mouse user who hovered. `aria-describedby` attaches the same
+          words to the control wherever it is reached; the `title` stays for the
+          hovering reader. Only rendered while there ARE issues, so an enabled
+          Publish button carries no description at all.
+        */
+        aria-describedby={issues.length > 0 ? publishReasonId : undefined}
         onClick={() => void onPublishClick()}
       >
         Publish
       </Button>
+      {issues.length > 0 && (
+        <span
+          id={publishReasonId}
+          /* Visually hidden, inline — the recipe `route-announcer.tsx` carries. */
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            margin: -1,
+            padding: 0,
+            border: 0,
+            overflow: 'hidden',
+            clipPath: 'inset(50%)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          Fix the issues below first.
+        </span>
+      )}
       {mappingDialogOpen ? (
         <StateMappingDialog
           dropped={dropped}

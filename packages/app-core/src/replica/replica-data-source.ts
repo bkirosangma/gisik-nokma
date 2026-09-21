@@ -1179,12 +1179,32 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         parent =
           found?.confirmed != null
             ? { kind: 'ticket', id: state.parentId, title: titleOf(found.confirmed) }
-            : // Existence without a title — the shape Plan 4's read uses for a
-              // parent this viewer may not have. Locally it also covers "not
-              // delivered yet", which `restrictedParent` gates for the list; the
-              // union has no third arm and inventing one is a type change, so
-              // the conservative arm is the one that claims LESS about the
-              // ticket itself.
+            : // Existence without a title. TWO cases land here and only the
+              // first is the shape Plan 4's read uses. (1) The parent's row
+              // exists and this viewer may not see it. (2) Nothing was
+              // delivered for the id at all — either it is genuinely absent
+              // from this replica, or the device is still catching up.
+              //
+              // Locally (1) and (2) are ONE observation: `restrictedParent`'s
+              // own docblock says so in as many words ("the server never sent
+              // me this parent because you may not see it" and "the server has
+              // not sent it YET" are the same observation), and that is why its
+              // true arm is gated on the engine being caught up. The union has
+              // no third arm and inventing one is a type change, so (2) takes
+              // this arm too.
+              //
+              // **That is a deliberate asymmetry with the online read, not
+              // parity with it.** `routes/tickets.ts` answers `null` for an id
+              // with no row ("claiming a restricted parent would invent one"),
+              // and hardened its crumb walk against exactly that (case 6.68).
+              // Here the two cannot be told apart, so `null` would render a
+              // RESTRICTED parent as a root — and a wrong ancestor is the
+              // defect class this product has already fixed twice. Recorded
+              // rather than justified away: the offline client answers
+              // `restricted` where the online one answers `null`. A dangling
+              // `parent_id` is reachable only as corrupt input — both doors
+              // that set a parent refuse an unknown id
+              // (`hierarchy.unknown-parent`).
               { kind: 'restricted', id: state.parentId };
       }
       // `claims.assigned` is the SAME field the local list already serves on every

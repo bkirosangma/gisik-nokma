@@ -487,14 +487,20 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
  * — and the throw stays for all four.
  *
  * It does NOT for these three. `evaluateEvent`'s switch has no case for them, so
- * they fall through to `{ refused: false }` with no existence check, and the
- * server commits them today: `test/permissions/check-role-permission.test.ts`
- * ingests two `ticket.assigned` events against tickets that were never created,
- * and they are committed, not refused. Folding one would throw INSIDE the ingest
- * transaction — turning a submission the product currently accepts into a 500 —
- * and would leave the table unrebuildable from a ledger the product itself
- * wrote. Registering this projection is what makes that reachable; it was
- * latent, and it becomes live in this commit.
+ * they fall through to `{ refused: false }` with no existence check OF THEIR OWN.
+ * **The door still refuses them, and this paragraph said it did not.** The
+ * permission gate runs before the engine: `checkPermission` asks `canSee` for the
+ * event's entity, and `canSee` answers `false` for a ticket with no
+ * `proj_visibility` row exactly as it does for an invisible one
+ * (`visibility/can-see.ts`), so a `ticket.assigned` naming a ticket that was
+ * never created is refused `TICKET_NOT_VISIBLE_REASON` at both client doors.
+ * The citation this paragraph used to carry is the proof of the opposite now:
+ * `test/permissions/check-role-permission.test.ts`'s `visibleTicket` helper
+ * exists precisely BECAUSE the gate started refusing a bare `newUlid()`, and its
+ * own docblock says so in as many words. Folding one would still throw INSIDE the
+ * ingest transaction — turning a submission into a 500 — and would leave the
+ * table unrebuildable from a ledger the product itself wrote, which is why the
+ * skip stays and why the set is keyed by name rather than by "unknown ticket".
  *
  * The skip is deliberately NOT "skip whenever the ticket is unknown". That is
  * the shape this series keeps catching — two cases that cannot be told apart,
@@ -502,12 +508,12 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
  * against what the door actually covers. Nothing is invented either way: there is
  * no ticket to assign, so there is no row to write.
  *
- * THE UNDERLYING GAP IS NOT FIXED HERE and is not this task's: nothing refuses a
- * `ticket.assigned` (or either collaborator event) for a ticket that does not
- * exist, so the ledger can hold an assignment of nothing to somebody. That is a
- * refusal no plan document owns — recorded as a finding for the controller.
- * When it lands, this set becomes unreachable rather than wrong, and the two
- * lines below can go.
+ * **What remains true is narrower than "the gap is open":** the ENGINE has no
+ * existence check for these three, so a caller that reached `evaluateEvent`
+ * without the permission gate — an internal door — could still write an
+ * assignment of nothing to somebody. That is an absence rather than a reachable
+ * hole: at both client doors the gate above answers first. The set below is what
+ * keeps the projection from throwing on the outcome if it ever happens.
  *
  * `comment.added` and `attachment.added` are the same gap and are absent from
  * this set only because `apply` has already returned for them above, before the

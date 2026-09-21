@@ -200,14 +200,20 @@ type ChildRow = {
  * other side: with a cross-workspace child in the set, whichever workspace
  * happened to sort first would decide the audience for all of them.
  *
- * **Reachable rather than hypothetical**, and stated as observed rather than as
- * legal: nothing on this branch refuses a `ticket.created` in workspace B naming
- * a `parentId` in workspace A — `proj_visibility` writes `workspace_id` from the
- * envelope and `parent_id` from the payload, and no check compares them. That
- * sits alongside the family of unrefused corrupt parent links already recorded
- * (6.57 the stale `project_id`, 6.58 the parent cycle). Whether a cross-workspace
- * parent link is legal at all is not this task's to decide. Case 6.84, owner
- * Plan 3.
+ * **NOT reachable through any door — corrected 2026-09-21.** This paragraph read
+ * *"nothing on this branch refuses a `ticket.created` in workspace B naming a
+ * `parentId` in workspace A — `proj_visibility` writes `workspace_id` from the
+ * envelope and `parent_id` from the payload, and no check compares them"*, and
+ * that is false: `hierarchy.unknown-parent` compares the parent's workspace
+ * against the envelope's at BOTH doors that set a parent (`hierarchy.ts:124` for
+ * `ticket.created`, `:250` for `ticket.reparented`, controller ruling P12 — one
+ * refusal for "no such parent" and "a parent this workspace does not hold"
+ * alike). The sibling links this paragraph grouped with it are refused too:
+ * `hierarchy.cross-project` (`:125`, `:274`) and `hierarchy.cycle` (`:237`,
+ * `:258`). So the cross-workspace child row is one only direct SQL can write —
+ * which is what the fixture in `test/visibility/rollup.test.ts` does, and that
+ * is the right shape for this property: the rollup must not depend on no such
+ * row ever existing. Case 6.84.
  *
  * Counting only the parent's own workspace would also be defensible; it is NOT
  * what is chosen, because it would silently drop children from a TRUE TOTAL,

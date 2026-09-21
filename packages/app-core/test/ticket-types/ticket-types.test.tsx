@@ -420,7 +420,14 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
 
     // Invoice's ↑ would swap it with the built-in directly above it.
-    expect(screen.getByRole('button', { name: 'Move Invoice up' })).toBeDisabled();
+    const up = screen.getByRole('button', { name: 'Move Invoice up' });
+    expect(up).toBeDisabled();
+    // And the reason is ATTACHED to it, not only hoverable: a disabled button is
+    // out of the focus order, so its `title` reaches a mouse user and nobody
+    // else. `aria-describedby` must resolve to a node carrying the sentence.
+    const describedBy = up.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(document.getElementById(describedBy!)?.textContent).toBe('Built-in types keep their rank.');
 
     // The same rule read from the other side: the bottom built-in's ↓ would
     // move it, so it is disabled — while its ↑, pointing at another built-in,

@@ -14,7 +14,18 @@ import { expect, test, type Page } from '@playwright/test';
  * difference between a stub of something real and a stub of something wished
  * for. Each entry below therefore carries the `apps/server/src/...:line` that
  * registers it, and every one of those was re-derived from the shipped source
- * rather than copied from the plan.
+ * rather than copied from the plan. **⚠ That sentence was false of two of the
+ * ten stubs when it was written, and they were the two whose contracts had
+ * changed:** `workspaces.ts` and `my-invitations.ts` carried the file and no
+ * line. Both carry one now — `:177` and `:184`, read off the shipped route
+ * handlers — so the rule is true of all ten, measured rather than assumed:
+ * `grep -c 'page.route('` answers 10 and the citations carrying a line answer 10.
+ * **Five of the eight that DID carry a line had drifted off the registration**, which is
+ * what a citation into a growing file does: four pointed at docblock prose and the fifth
+ * at a BLANK line inside its file, which reads as a citation that resolves until it is
+ * opened. Every line below was re-read at the `app.get` and now names the
+ * line the PATH is on, which is the line a reader wants — a registration is a path, and
+ * the path is what has to be found.
  *
  * ## The body SHAPES are the shipped ones, not the plan's
  *
@@ -112,10 +123,10 @@ async function stubApi(page: Page): Promise<void> {
   // better-auth's own handler, mounted as a wildcard — apps/server/src/auth/routes.ts:76.
   await page.route('**/api/auth/**', (route) => route.fulfill({ json: SESSION }));
 
-  // GET /v1/projects/:projectId/board — apps/server/src/routes/board.ts:286.
+  // GET /v1/projects/:projectId/board — apps/server/src/routes/board.ts:312.
   await page.route(`**/v1/projects/${PRJ}/board`, (route) => route.fulfill({ json: BOARD }));
 
-  // GET /v1/workspaces/:workspaceId/members — apps/server/src/routes/builder-reads.ts:547.
+  // GET /v1/workspaces/:workspaceId/members — apps/server/src/routes/builder-reads.ts:660.
   // The board's roster join reads this on every board load, to turn an actorId
   // into a display name. `MemberListResponse` — read-models.ts.
   await page.route(`**/v1/workspaces/${WS}/members`, (route) =>
@@ -130,7 +141,7 @@ async function stubApi(page: Page): Promise<void> {
     }),
   );
 
-  // GET /v1/projects/:projectId/tickets — apps/server/src/routes/list.ts:480.
+  // GET /v1/projects/:projectId/tickets — apps/server/src/routes/list.ts:505.
   // Stubbed so the List tab makes its request. The body is deliberately a
   // groupless one: `mapListView` maps it (it REFUSED outright until ruling P25
   // clause 1) and answers zero rows, so this stub still cannot make the list
@@ -139,7 +150,7 @@ async function stubApi(page: Page): Promise<void> {
     route.fulfill({ json: { projectId: PRJ, groups: [], nextCursor: null } }),
   );
 
-  // GET /v1/workspaces/:workspaceId/attention — apps/server/src/routes/attention.ts:328.
+  // GET /v1/workspaces/:workspaceId/attention — apps/server/src/routes/attention.ts:362.
   await page.route(`**/v1/workspaces/${WS}/attention`, (route) =>
     route.fulfill({ json: { workspaceId: WS, items: [] } }),
   );
@@ -149,7 +160,7 @@ async function stubApi(page: Page): Promise<void> {
     route.fulfill({ json: { version: 1, projects: {}, savedFilters: [] } }),
   );
 
-  // GET /v1/me/workspaces — apps/server/src/routes/workspaces.ts. This is the
+  // GET /v1/me/workspaces — apps/server/src/routes/workspaces.ts:177. This is the
   // route whose absence once hid behind this smoke, and the stub is written to
   // the shape it actually serves so that this file cannot be the reason a shape
   // drift goes unnoticed.
@@ -166,7 +177,7 @@ async function stubApi(page: Page): Promise<void> {
   // The values are an ADMIN's, matching `role` below: an admin is served every
   // count. A guest is served this object with the three count keys ABSENT,
   // which is what `WorkspaceRef`'s `number | null` means (cases 13.366, 13.372).
-  // GET /v1/me/invitations — apps/server/src/routes/my-invitations.ts (Task
+  // GET /v1/me/invitations — apps/server/src/routes/my-invitations.ts:184 (Task
   // 17). The `/workspaces` banner reads it, so leaving it unstubbed would let
   // this spec measure whichever stack happens to be up. `{invitations: []}` is
   // the case whose layout the smoke is about: the banner renders nothing.
@@ -217,7 +228,7 @@ async function stubApi(page: Page): Promise<void> {
     }),
   );
 
-  // GET /v1/invites/:token — apps/server/src/routes/invites.ts:378. No session
+  // GET /v1/invites/:token — apps/server/src/routes/invites.ts:399. No session
   // required, deliberately: the token IS the credential.
   await page.route('**/v1/invites/tok_e2e', (route) =>
     route.fulfill({

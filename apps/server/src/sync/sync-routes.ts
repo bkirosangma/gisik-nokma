@@ -28,18 +28,27 @@ import { registerReconcileRoute } from './reconcile-route.js';
  * **This list plus `TICKET_EVENT_TYPES` must equal the registry's whole
  * `entityKind: 'ticket'` set**, or "snapshot + tail ≡ full replay" is false for
  * any ticket whose stream carries the missing type below its snapshot seq. The
- * registry binds SIXTEEN types to that kind (`vocabulary.ts`);
- * `TICKET_EVENT_TYPES` is thirteen of them, and the three it omits —
+ * registry binds EIGHTEEN types to that kind (`vocabulary.ts`);
+ * `TICKET_EVENT_TYPES` is fifteen of them, and the three it omits —
  * `visibility.set`, `claim.contested`, `claim.contested_resolved` — are exactly
  * the three below that are not also folded. `comment.added` and
  * `attachment.added` appear in both lists on purpose: they fold into state AND
  * are content a replica needs verbatim.
  *
- * **FIFTEEN and twelve until Task 3 of the second wave (2026-09-18)**, and the
- * arithmetic is restated here rather than left to be re-derived, because BOTH
- * numbers moved together when Task 1 registered `ticket.ranked`: a reader who
- * trusted the old pair would compute the wrong total for the list below and
- * conclude a type was missing.
+ * **The pair has moved three times, and BOTH numbers moved together each time**,
+ * which is why the arithmetic is restated here rather than left to be
+ * re-derived: a reader who trusted an old pair would compute the wrong total for
+ * the list below and conclude a type was missing. Measured at each commit, not
+ * recalled: thirteen and ten before `253436d0`; fifteen and twelve at `253436d0`
+ * (Task 2, the closed flag); sixteen and thirteen at `b26d9cd6` (Task 1,
+ * `ticket.ranked`); **eighteen and fifteen at `18d7e391`** (the deleted/restored
+ * pair), which is still the pair at HEAD. The numbers in the paragraph above are
+ * that last pair, and they stood stale from `18d7e391` until this sentence was
+ * corrected. Re-derive them by parsing `vocabulary.ts`'s
+ * `domainRegistry.register` blocks for `entityKind: 'ticket'` and by reading
+ * `TICKET_EVENT_TYPES`, not by trusting this sentence — the union it describes
+ * was checked the same way (eighteen, empty symmetric difference) and is what
+ * makes the pair load-bearing.
  *
  * The closed flag's two events (backlog/closed spec §1.2, 2026-09-17) —
  * `ticket.closed` and `ticket.reopened` — are the other side of this same
@@ -67,9 +76,10 @@ import { registerReconcileRoute } from './reconcile-route.js';
  *
  * *Absence, named rather than implied: the membership rule above is held by
  * this comment and by arithmetic done once, NOT by a check. Nothing fails when
- * a fourteenth type is registered against `entityKind: 'ticket'` and added to
- * neither list — it reappears as exactly the defect 12.115 was written for, and
- * silently. Deriving this list from the registry instead would close it, but it
+ * a new type is registered against `entityKind: 'ticket'` and added to neither
+ * list — it reappears as exactly the defect 12.115 was written for, and
+ * silently — and nothing failed while the pair above went stale by two.
+ * Deriving this list from the registry instead would close it, but it
  * would also mean 12.94's hardcoded literals and this constant shrink together,
  * which is the property that check exists to deny. Owner: whoever registers the
  * next ticket-entity event type.*

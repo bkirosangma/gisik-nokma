@@ -66,7 +66,7 @@ const WF: WorkflowDef = {
   transitions: [{ from: 'todo', to: 'done', rules: [] }],
 };
 
-function ticketRead(): TicketRead {
+function ticketRead(readKey: string | null = null): TicketRead {
   const ticket: TicketState = {
     kind: 'ticket',
     id: TICKET,
@@ -110,8 +110,10 @@ function ticketRead(): TicketRead {
     // shape `subtasksIncomplete` reads (`rollup === null` means zero expected).
     parent: null,
     rollup: null,
-    // The breadcrumb's two crumb fields (2026-09-20); no case here reads them.
-    key: null,
+    // The breadcrumb's two crumb fields (2026-09-20). `key` is now read by the
+    // toast too (case 6.77's sibling, T-E6-14): the delete narration names the
+    // ticket by `key ?? title`, and `null` here is the fallback arm.
+    key: readKey,
     epic: null,
   };
 }
@@ -125,7 +127,7 @@ let ingested: SubmittedEvent[][] = [];
  */
 let listCalls = 0;
 
-async function openTheSheet(): Promise<void> {
+async function openTheSheet(readKey: string | null = null): Promise<void> {
   const services = stubServices({
     getTickets: async () => {
       listCalls += 1;
@@ -157,7 +159,7 @@ async function openTheSheet(): Promise<void> {
         ],
       },
     ],
-    getTicket: async () => ticketRead(),
+    getTicket: async () => ticketRead(readKey),
     getWorkflowDef: async () => WF,
     getTicketHistory: async () => [],
     getMembers: async () => [{ id: ANSELMA, name: 'Anselma Marak', role: 'owner' }],
@@ -256,6 +258,27 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     // is the TOAST's own Undo — the durable strip's carries a different
     // accessible name precisely so this query stays unambiguous.
     expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+  });
+
+  it('16.84 the toast names the ticket KEY when the read carries one — the prototype’s own sentence', async () => {
+    // The prototype's toast says `"GN-1183 deleted · …"` — a key. This file's
+    // docblock used to justify carrying the TITLE on the ground that "this
+    // product has no ticket key"; the read serves one and the same sheet reads
+    // it for its own crumb (`ticketRead.key ?? ticketRead.title`). So the arm
+    // above is the fallback and this is the sentence the prototype describes.
+    await openTheSheet('GH-1183');
+
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+
+    await waitFor(() => expect(ingested).toHaveLength(1));
+    await waitFor(() =>
+      expect(screen.getByText('GH-1183 deleted · you can also undo this on the page')).toBeInTheDocument(),
+    );
+    // The control, in the same run: with a key present the sentence does NOT
+    // carry the title, so a host still interpolating `${title}` reddens here.
+    // Asserted on the whole sentence rather than on the bare title, because the
+    // sheet draws the title as its own heading.
+    expect(screen.queryByText(`${TITLE} deleted · you can also undo this on the page`)).toBeNull();
   });
 
   it('16.84 the Undo posts ticket.restored FOR THE ID IT WAS OFFERED', async () => {

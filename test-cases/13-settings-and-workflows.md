@@ -1167,9 +1167,13 @@ control that silently does nothing is indistinguishable from one that worked.
   two ranks.** Asserted on the submitted payloads' `rank` values — a computed value, not the presence of a
   call — plus the two `id`s and `fields` carried through untouched, because this is a re-rank and not a
   redefinition. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
-- ✅ **13.931 — the arrow that would move a built-in is disabled, read from BOTH sides.** `Invoice`'s ↑
-  (pointing at the built-in above it) and the last built-in's ↓ (pointing at the custom type below it, but
-  itself a built-in) are both disabled. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- ✅ **13.931 — the arrow that would move a built-in is disabled, read from BOTH sides, and it SAYS WHY to
+  a reader who cannot hover it.** `Invoice`'s ↑ (pointing at the built-in above it) and the last built-in's
+  ↓ (pointing at the custom type below it, but itself a built-in) are both disabled. **Amended
+  2026-09-21 (T-P32):** the reason was in `title` on the disabled control, which a disabled button is out
+  of the focus order for — so it reached a mouse user who hovered and nobody else. It is now also attached
+  via `aria-describedby`, and the case asserts the attribute resolves to a node carrying the sentence.
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 - ✅ **13.932 — a server refusal is displayed with its reason rather than silently doing nothing.** Seeded
   as two refused `IngestResult`s; the server's own sentence reaches the reader through a `role="alert"`,
   and the list does not re-order for a swap whose ranks did not change.

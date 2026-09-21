@@ -1434,8 +1434,17 @@ failure this bucket has recorded before, caught here by a compiler instead of by
   *Mutation: delete the `itemListeners` fan-out at the end of the engine's `applyOne` → red HERE ALONE,
   `Tests 1 failed | 14 passed (15)`, with zero `event` frames delivered where the case expects one.*
 
-- 12.187 ✅ **a ticket born offline reaches THREE doors, and this case is the only thing that made them
-  agree.** One `ticket.created` submitted through `ingest` while offline, then all three read doors
+- 12.187 ✅ **a ticket born offline reaches three read doors that OMIT it — `getTickets`, `getBoard` and
+  `getTicket` — beside the one that CARRIES it, and this case is the only thing that made them agree.**
+  ⚠ **This header read "THREE doors" and then enumerated two of the three that omit.** `getTicket` is
+  the third name in `OFFLINE_BORN_OMISSIONS` (`packages/app-core/src/replica/replica-data-source.ts`)
+  and was missing from BOTH the registry and this enumeration — the registry's own comment records the
+  half that was fixed there: *"THE THIRD NAME WAS MISSING AND IS THE SAME ARGUMENT"*, since `getTicket`
+  returns `null` for exactly these tickets. **This case does not pin that name, and neither does
+  anything else:** `OFFLINE_BORN_OMISSIONS` is exported and no test asserts which members it holds, so
+  the membership is prose-only. *Owner: whoever adds another omitting door, or whoever wants the
+  registry to be the enumerable datum its own docblock claims it is.*
+  One `ticket.created` submitted through `ingest` while offline, then all three read doors
   asserted together: `listTicketSummaries` CARRIES it (`pending: true`, `pendingEventIds` the claim's
   id), `getTickets` does NOT contain it and does not throw, `getBoard` does NOT contain it.
   *The first draft of this task had all three behaving differently and the whole-file run was green.*

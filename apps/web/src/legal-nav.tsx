@@ -22,10 +22,13 @@ import { useCurrentUser } from './providers.js';
  * history-back control of any kind.
  *
  * The escape the reader had is not lost, and it is worth saying why rather than
- * assuming it. `BackButton`'s fallback destination — the branch for a reader
- * with no history, i.e. anyone who opened `/terms` in a new tab — is
- * `/sign-in`, and it is `/sign-in` because these pages are reached from the
- * sign-in card's legal line (`back-button.tsx`'s own docblock). The `Sign in`
+ * assuming it. The removed `BackButton`'s fallback destination — the branch for
+ * a reader with no history, i.e. anyone who opened `/terms` in a new tab — was
+ * `/sign-in`, and it was `/sign-in` because these pages are reached from the
+ * sign-in card's legal line, so the route the reader came from is the route
+ * back. (That control left in Step 2c-2, `17c8345c`, with the component; the
+ * REASONING is kept because the destination still has to be a real one, and this
+ * paragraph no longer resolves to a docblock that no longer exists.) The `Sign in`
  * link below points at the same route, so the reader with no history still has
  * a real destination, and the reader WITH history has the browser's own chrome
  * that the export leaves them. What genuinely changes is that the product no

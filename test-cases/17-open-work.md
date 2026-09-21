@@ -42,6 +42,14 @@ allocation changes, change it HERE in the same action** — not only in a handof
 **When your block is empty, STOP AND ASK.** Do not mint from the tip and do not borrow a neighbour's —
 that is the rule whose breach made §13 go red twice.
 
+**A lane with NO ROW in that table must also STOP AND ASK — silence is not a licence.** The escape hatch
+above fires on a block that has RUN OUT, and it said nothing about a lane that was never given one: those
+are different states with the same remedy, and the second is the easier one to read past, because a table
+that does not name you looks like a table that does not constrain you. ⚠ **When §17 was opened this table
+had ONE row** (exec 3's), and the count is the half that did not survive — the table grew to seven rows at
+cycle 46. **The sentence is the half that did**, and it is written here because the next lane to arrive
+without an allocation will read this table rather than the cycle it was allocated in.
+
 ## §16's WINDOW — the grant was exercised, and the measurement behind it is recorded rather than tidied
 
 The controller's 2026-09-21 dispatch opens §17 on the standing order. ⚠ **A future lane measuring §16 for
@@ -62,7 +70,7 @@ false.**
 the prototype's row, and it is neither the mode nor the roster.**
 
 ⛔ **§6's law, restated because it is the whole risk here: (b) KEEPS THE EXPLICIT AUDIENCE ROSTER CUT.**
-`apps/server/src/routes/tickets.ts:115-118` refuses to serve `own_user_ids` / `resolved_user_ids` —
+`apps/server/src/routes/tickets.ts` refuses to serve `own_user_ids` / `resolved_user_ids` —
 *"an explicit audience ROSTER, a disclosure no plan authorized."* **The prototype DRAWS that roster**
 (`design-system/interactive/desktop.dc.html`: a chip per viewer with a removable `×` at `:1214`–`:1224`,
 an *"Add someone who can see it…"* `<select>` over `viewerCandidates` at `:1225`–`:1229`, and a closing
@@ -93,6 +101,20 @@ Visibility as a `<dt>/<dd>` row **inside** the sheet's `<dl>` where the product 
 **binary toggle** where the product's is a **4-mode radio group** a toggle cannot express. Neither is
 fixed here; both are named in `docs/lanes/executor-3-state.md`.
 
+⚠ **WHICH COPY THESE NUMBERS ARE IN — named, because two files in this repository are called the
+prototype and only one of them is.** Every `:NNNN` in this group is a line in
+**`design-system/interactive/desktop.dc.html`** — the file `design-system/interactive/PROVENANCE.md`
+records as the 2026-09-18 owner export, sha256
+`2cda054b4320ebb6b379d290a6e8dba69ac45cd1eabe0da100b5425e45b6d90c`, 320,109 bytes, re-measured
+2026-09-21 and unchanged since it was written. **It is NOT the copy the controller's common brief rules
+on:** that ruling (`CTL-REVIEW-COMMON-2026-09-22.md`) names a later export (2026-09-20) as the ruled
+artifact and records every one of these numbers as **+1** against it. So a reader holding THAT file
+subtracts one and a reader holding this one does not — and the offset is carried from the ruling rather
+than re-measured here, because that artifact is not in this worktree. **The substance transfers either
+way:** the `letter-spacing:0.6px` / 12px outlier `17.002` rests on is present in both copies, which the
+review measured on each. Cite the file and its sha rather than a bare number whenever this group is
+quoted elsewhere.
+
 - **17.001** ✅ **The section had NO CSS RULE AT ALL, and now has one that carries the prototype's own column geometry.** This is the whole defect: every other case in this group asserts against a class that rendered as UA chrome precisely because this one was false. The rule takes `rowValueB` (`:3756`) whole — `display:flex; flex-direction:column; gap:4px; align-items:flex-end` — so the section is the right-aligned value column the prototype draws. Mutation-witnessed by deleting the rule: `rule()` **throws** ("no rule for .gn-visibility") rather than answering empty, so the case reddens by naming its own site. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
 - **17.002** ✅ **The eyebrow and the notes carry the ROW'S OWN 12px secondary-text scale — the prototype's outlier, MEASURED rather than inherited.** Of the **13** lines in `desktop.dc.html` carrying `letter-spacing:0.6px` (the eyebrow constant), **twelve are `13px/18px` and exactly one, `:1213` (this row), is `12px/16px`.** ⚠ **THIS LINE FIRST READ *"this row's `:1213` at 12px/16px is the ONLY 12px instance in the file"*, WHICH IS FALSE AND WAS FALSIFIED BY A REVIEWER: 61 other lines carry `12px/16px`** (a weekday header at `:497` among them), so the claim was wrong by a factor of sixty. The narrow claim above is the measured one. The row's own SECONDARY TEXT is consistent at 12px/16px — its `visNote` (`:1210`) and its closing note (`:1230`) — which is what makes this the row's scale rather than a slip; ⚠ **that consistency is the secondary text's and not the row's: the same row also draws a 13px/18px chip (`:1216`), a 15px `<select>` (`:1224`) and a 15px `<dt>` (`:3755`).** **The 1px difference from `.gn-comments__heading` (which transcribed the 13px/18px constant) is the PROTOTYPE's divergence, not an invention here**, and the case exists so that a later "harmonise the two" edit reddens here instead of landing quietly. Mutation-witnessed: `0.75rem` → `0.8125rem` reddens it and nothing else. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
 - **17.003** ✅ **The CONTROL block opts out to the LEFT, and the UA fieldset box is reset.** The prototype's row is right-aligned **except its control**, which carries `align-self:flex-start` (`visBtnStyle`, `:3786`) — that mixed geometry is the authority's own, and a form that right-aligned its own radio labels would be a transcription nobody could read. One wrapper carries it so the next control added to the block cannot miss it. **The fieldset reset is the defect `ui.css:4804` predicted one level up:** that comment names `.gn-visibility__modes`/`.gn-visibility__people` as selectors it assumed would "inherit a house rule already", while no rule anywhere provides one. Mutation-witnessed: removing `align-self` reddens it. — `packages/ui/src/ui.css`, `packages/ui/test/components.test.tsx`
@@ -117,16 +139,25 @@ fixed here; both are named in `docs/lanes/executor-3-state.md`.
 - **The `<dl>` placement and the binary toggle are NOT done, deliberately.** Both are structural
   divergences from the prototype and both are recorded in `docs/lanes/executor-3-state.md` § 2. **Owner:
   the controller, if either is ever wanted** — neither has a disclosure this dispatch names.
-- **A STALE `routes/tickets.ts:111-114` SURVIVES IN FOUR FILES THIS LANE DID NOT TOUCH, AND IS RECORDED
-  RATHER THAN FIXED.** At this head the roster-cut clause — *"an explicit audience ROSTER, a disclosure no
-  plan authorized"* — is at **`tickets.ts:115-118`**; `111-114` is the *"Reachable today, not
-  hypothetical"* paragraph above it. This lane corrected **every instance inside its own change set**
-  (`visibility-editor.tsx` ×2, `visibility-editor.test.tsx` ×1, `Features.md` ×1) so the change set does
-  not carry one sentence at two ranges. **The four it left alone are outside its scope and would push the
-  diff into unrelated files:** `packages/app-core/src/online/mappers.ts:1899`,
-  `packages/app-core/src/view-types.ts:391`, `test-cases/03-foundation-ledger.md` (×3) and
-  `docs/lanes/executor-state.md` (executor 1's handoff, which this lane must not edit). **Owner: whoever
-  next touches any of those four files** — it is a citation correction, no behaviour.
+- **THE STALE `routes/tickets.ts:111-114` IS CORRECTED AS OF 2026-09-21 — AND THIS NOTE WAS STALE IN THE
+  SAME WAY IT WAS WARNING ABOUT.** The roster-cut clause — *"an explicit audience ROSTER, a disclosure no
+  plan authorized"* — sits at **`tickets.ts:119-122`**. `:111-113` is the tail of the existence-disclosure
+  paragraph and `:114-117` is *"Reachable today, not hypothetical"*, so **`111-114` was wrong from the
+  start and `115-118` — the range this note named as the live one — was wrong too**: the clause had moved
+  again between this note and its reading. Neither range is replaced with a third. Every citation now
+  names the file and carries the quoted clause, so a reader greps the words instead of trusting a number
+  that has moved twice under this same sentence. Fixed here (task `T-E3-16`, batch B18): `mappers.ts`,
+  `view-types.ts`, `visibility-editor.tsx` ×2, `packages/ui/test/components.test.tsx`,
+  `visibility-editor.test.tsx` ×2, `Features.md`, `test-cases/03-foundation-ledger.md` ×2, and this file's
+  own line above — the last of those is why the earlier "four files this lane did not touch" is now empty
+  rather than four.  **Two corrections to this note's own bookkeeping, measured:** it said
+  `test-cases/03-foundation-ledger.md` held **three** occurrences — it held **two** (`:99`, `:172` at the
+  head before this change) — and it named `docs/lanes/executor-state.md`, which carries neither range; the
+  lane handoff that does is `docs/lanes/executor-3-state.md`. **Left alone deliberately: `docs/lanes/` —
+  four files still carry the old range** (`executor-3-state.md`, `executor-state-history.md`,
+  `review-compiled-controller.md`, `review-functionality-exec3.md`), and three of those are review reports
+  or lane history that quote what was written at the time. **Owner: the controller** — a lane that
+  rewrites another lane's report is a lane editing evidence.
 
 ## The ticket sheet's subtask reconciliation fired on an unread list (batch B06, 2026-09-21) — case `17.041`
 

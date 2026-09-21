@@ -343,7 +343,9 @@ describe('check 4 — acting on a ticket you cannot see', () => {
    * member's or a guest's rename must be refused**. So the assertion inverts,
    * and the case is kept here rather than moved because the reason it exists is
    * unchanged: **it is the pin that makes the ruling loud.** A future edit that
-   * re-opens the absence has to come through this test.
+   * re-opens the absence has to come through this test **(case 6.77)**. Its two
+   * refusal arms — a MEMBER here, a GUEST in the next test — and the ADMIN
+   * control after them are all read from this file.
    */
   it('the rename ruling: a MEMBER is refused, and the refusal names the act', async () => {
     const workspaceId = newUlid();
