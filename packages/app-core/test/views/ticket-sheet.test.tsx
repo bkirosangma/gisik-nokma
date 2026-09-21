@@ -3364,3 +3364,52 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     expect(notice.textContent).not.toContain('Loading');
   });
 });
+
+/**
+ * 3.182 (E5-20) — ONE ESCAPE, TWO `role="dialog"` ELEMENTS, AND ONLY ONE OF
+ * THEM SHOULD CLOSE.
+ *
+ * `Move…` mounts `TransitionDialog` → `Dialog` INSIDE the sheet's own subtree,
+ * so the DOM holds two modal dialogs at once. `Dialog` installs a
+ * document-level `keydown` that closes on Escape and (until this change) never
+ * called `preventDefault()`; `Sheet` installs one that closes the sheet on
+ * Escape unless `event.defaultPrevented` — and its own docblock states the
+ * contract: *"A child that handles Escape must call `preventDefault()` for this
+ * guard to see it."* The guard was added for the title field and never reached
+ * the `Dialog` in the same package, which is the child every Move, Reopen and
+ * Bulk-close goes through.
+ *
+ * ⚠ **The harness has a vacuity the sibling case's docblock already names, and
+ * this one closes it by asserting the SPY.** `renderSheet`'s default `onClose`
+ * is a fresh `vi.fn()` that never unmounts anything, so "the sheet is still on
+ * screen" is true whatever happens — including on the defect. `open` is not a
+ * prop of this sheet at all; the caller owns it. So the assertion is that the
+ * sheet's `onClose` was NOT CALLED, and that is what a duplicate close would
+ * have done to the real app.
+ */
+describe('E5-20 Escape in the Move dialog does not close the sheet under it', () => {
+  it('PLANTED DEFECT: one Escape closes the Move dialog and leaves the sheet open', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read), { onClose });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+
+    // The stack the finding measured: two modal dialogs, the Move one on top.
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    // The Move dialog took the Escape — that is the gesture the person made…
+    expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull();
+    // …and the sheet underneath did NOT also take it. `onClose`, not the
+    // absence of the sheet, is the measurement: see this block's docblock.
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
