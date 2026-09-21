@@ -181,10 +181,11 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-31 | Imp | signed-out app bar | PERMISSION-REFUSED / FIRST-RUN | browser (2nd, 390 px) + source | — |
 | E5-32 | Imp | signed-out deep link + help | FIRST-RUN (copy) | browser (2nd) + source | — |
 | E5-33 | Min | `/sign-in` | ERROR (copy) | browser (2nd, 390 px) + source | — |
+| E5-34 | Min | nav project item on an archived project | SOFT-DELETED (project) | source | extends `exec2-E2-38` |
 
 **Edge classes reached, by finding:** EMPTY (E5-4) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
-screens) · SOFT-DELETED (**not reached** by me; `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
+screens) · SOFT-DELETED (E5-34 for projects; tickets **not reached** by me — `exec4-E4-23` holds it, §6.6) · CONCURRENT (E5-20, 27) · NARROW
 VIEWPORT (signed-out only: E5-31, 33) · FIRST-RUN (E5-6, 16, 18, 23, 26, 31, 32) · SERVER-REFUSES-WHILE-CLIENT-BELIEVES
 (E5-7 inverted, 13, 21).
 
@@ -1199,6 +1200,35 @@ token was minted: the server refused the body before any write.
 
 ---
 
+### E5-34 — MINOR · On an archived project's own page, the bar's project item names and links a DIFFERENT project — the docblock that made the item "a function of the ROUTE" is true only for live routes `[SOURCE]` — SOFT-DELETED (project) — extends `exec2-E2-38` with the measurement it lacks
+
+**WHAT.** `apps/web/src/last-project-nav.tsx:114-127`: `routeProjectId` comes from `useParams`;
+`useLastProject(workspaceId, routeProjectId, userId)` answers `{status: 'remembered', projectId: routeProjectId}`
+whenever the route carries one (`use-last-project.ts:185-187`); then `live = projects.filter(p => !p.archived)`
+(`:121`), `rememberedLive = live.find(p => p.id === remembered.projectId) ?? null` (`:122-124`), and
+`shown = rememberedLive ?? live[0]` (`:127`). For an archived project's route, `find` misses and the item shows
+`live[0]`: the FIRST live project's name, `href` (`:188`), and no `aria-current` (`:234`, `pathname !== projectHref`).
+In the dev workspace: on `/w/…/p/01M25DBPXAK3NC9YRVS95MB7J6` (`gggg`, `archived: true` on the wire, §E5-12) the bar
+would read **Shop operations**.
+
+**WHY.** The docblock at `:100-113` records why the item reads the route: an earlier version *"named the project you
+had left … self-healed one navigation later, which is exactly what would have made it survive a casual look"*, fixed
+by *"Taking the id from `useParams` … so the ordering stops mattering."* The live filter re-introduces the same
+defect for exactly the population where orientation matters most — a person on a retired project's board — and
+`exec2-E2-38` measured that the page itself carries **0** occurrences of `archived`. So on that page nothing says
+"archived" and the one orientation control names somewhere else.
+
+**WHAT WOULD HAVE BEEN BETTER.** When `routeProjectId` names an archived project, show it (dimmed, badged, as the
+workspace home already draws archived cards) and keep the dropdown live-only; or, at minimum, keep `aria-current`
+honest by not substituting.
+
+**MEASUREMENT.** `[SOURCE]` `last-project-nav.tsx:100-127`, `:188`, `:234`; `use-last-project.ts:145-190`. Not driven
+(§6.1). The wire fact — one archived project in the dev workspace — is E5-12's `[BROWSER]` `GET /v1/me/workspaces`.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1262,16 +1292,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**33 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 33). By claimed severity, read from the
-heading text: **Critical 1 · Important 22 · Minor 10** (1 + 22 + 10 = 33).
+**34 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 34). By claimed severity, read from the
+heading text: **Critical 1 · Important 22 · Minor 11** (1 + 22 + 11 = 34).
 
 - **Critical (1):** E5-13
 - **Important (22):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32
-- **Minor (10):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33
+- **Minor (11):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 33. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33 = 22 of 34. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1436,5 +1466,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 33 findings — Critical 1 · Important 22 · Minor 10 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 34 findings — Critical 1 · Important 22 · Minor 11 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
