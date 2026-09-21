@@ -2217,3 +2217,31 @@ than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* m
   suites: ui 426, app-core 1731, web 654.
 
 **No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.
+
+### Popover (sheet prototype parity, 2026-09-22)
+
+**Task 1 of `docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md`.** A new primitive,
+`packages/ui/src/components/popover.tsx`: the product's first popover, built on the same
+`@react-aria/overlays`/`@react-aria/focus` pieces `select.tsx`'s `SelectPanel` already uses
+(`useOverlay`, `useOverlayPosition`, `FocusScope`, `DismissButton`, `createPortal`). It exists
+because the visibility menu (Task 5) needs an anchored dialog and `Select`'s listbox panel is not
+reusable for a fieldset. `.gn-popover`'s surface/shadow pair is `--gn-surface-raised`/
+`--gn-shadow-raised` — measured off `.gn-select__panel` itself, not the plan draft's
+`--gn-surface-overlay`/`--gn-shadow-overlay` guess, which is the full-screen scrim/dialog pair
+(`.gn-dialog__scrim`/`.gn-dialog`), a different role.
+
+### The case
+
+- ✅ **13.1267 — the popover opens as a named dialog portalled to `document.body`, moves focus
+  inside on open, and Escape closes it and returns focus to the trigger.** `packages/ui/test/popover.test.tsx`.
+  The focus-return assertion is awaited (`waitFor`), matching `select.test.tsx`'s own E4-17
+  cases: `FocusScope restoreFocus` restores inside a `requestAnimationFrame`, so the settle is
+  async — asserting synchronously right after `Escape` is a race, not a defect, and the plan's
+  own draft test read it synchronously and failed on the first run for exactly that reason.
+- ✅ **13.1268 — an outside click (mousedown+mouseup outside the dialog) closes it; a click on a
+  control INSIDE the dialog does not (the control).** `packages/ui/test/popover.test.tsx`. The
+  positive control clicks the dialog's own `Apply` button first and confirms the dialog is still
+  open before the outside click, so the assertion cannot pass by the dialog never having opened.
+
+`Features.md` §3 shared-components bullet: extended to name `Popover` beside `SegmentedControl`.
+`13.1269` stays free in this block for a future control arm.

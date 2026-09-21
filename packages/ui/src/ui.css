@@ -2898,6 +2898,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   box-shadow: var(--gn-shadow-raised);
 }
 
+/* Popover (spec 2026-09-22) — the visibility menu's container. The same
+   raised surface and shadow `.gn-select__panel` above uses (`--gn-surface-
+   raised`/`--gn-shadow-raised`, measured from that rule, not the plan
+   draft's `--overlay` guess: `--gn-surface-overlay`/`--gn-shadow-overlay`
+   are the full-screen scrim/dialog pair, a different role), because both
+   are anchored surfaces over the sheet and two treatments for one role is
+   the drift this file's comments exist to prevent. */
+.gn-popover {
+  position: absolute;
+  z-index: 30;
+  padding: 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  max-width: min(22rem, calc(100vw - 2rem));
+}
+
 .gn-select__list { list-style: none; margin: 0; padding: 0; }
 
 .gn-select__option {

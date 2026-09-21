@@ -1,0 +1,64 @@
+import { useRef } from 'react';
+import type { ReactElement, ReactNode, RefObject } from 'react';
+import { createPortal } from 'react-dom';
+import { FocusScope } from '@react-aria/focus';
+import { DismissButton, useOverlay, useOverlayPosition } from '@react-aria/overlays';
+
+export type PopoverProps = {
+  triggerRef: RefObject<HTMLElement | null>;
+  open: boolean;
+  onClose: () => void;
+  /** Names the dialog for assistive tech. Required, so it cannot be forgotten. */
+  'aria-label': string;
+  children: ReactNode;
+};
+
+/**
+ * A small anchored dialog — the product's first popover (the visibility menu,
+ * spec 2026-09-22). Built from the same react-aria pieces `select.tsx` uses,
+ * for the same reasons: `FocusScope restoreFocus` returns focus to the
+ * trigger when the portal unmounts, `useOverlay` closes on Escape and
+ * outside interaction, `DismissButton` gives screen-reader users a way out.
+ * `role="dialog"` and not `menu`: the content is a fieldset with radios and
+ * a button, not a list of commands.
+ */
+export function Popover({
+  triggerRef,
+  open,
+  onClose,
+  'aria-label': ariaLabel,
+  children,
+}: PopoverProps): ReactElement | null {
+  const overlayRef = useRef<HTMLDivElement>(null);
+  const { overlayProps: positionProps, placement } = useOverlayPosition({
+    targetRef: triggerRef,
+    overlayRef,
+    placement: 'bottom end',
+    offset: 6,
+    isOpen: open,
+    onClose,
+  });
+  const { overlayProps: dismissProps } = useOverlay(
+    { isOpen: open, onClose, isDismissable: true, shouldCloseOnBlur: false },
+    overlayRef,
+  );
+  if (!open) return null;
+  return createPortal(
+    <div
+      {...positionProps}
+      {...dismissProps}
+      ref={overlayRef}
+      role="dialog"
+      aria-label={ariaLabel}
+      className="gn-popover"
+      data-placement={placement}
+    >
+      <FocusScope contain restoreFocus autoFocus>
+        <DismissButton onDismiss={onClose} />
+        {children}
+        <DismissButton onDismiss={onClose} />
+      </FocusScope>
+    </div>,
+    document.body,
+  );
+}
