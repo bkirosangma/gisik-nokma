@@ -1149,7 +1149,10 @@ control that silently does nothing is indistinguishable from one that worked.
   inside it.** The whole row is one `<button aria-label="Edit …">` (the row-as-door ruling), so a control
   nested inside it would be a button inside a button — an invalid tree jsdom renders without complaint,
   which is why this asserts DOM containment (`not.toContainElement`) rather than that a control exists.
-  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+  **The door's VERB branches (E4-34, 2026-09-21):** it read a bare `Edit ${type.name}` for everyone, so a
+  person the read-only banner directly above the list addresses — *"You can look, not touch"* — heard
+  `Edit Invoice` five times over. The verb is now `canAuthor ? 'Edit' : 'Open'`, which is the branch the
+  same file already makes for the banner and for the reorder gate. (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
 - ✅ **13.929 — the ends are disabled, asserted on the RENDERED control, and the same test names a control
   that is NOT disabled.** The first row's ↑ and the last row's ↓ are `toBeDisabled()`; the movable control
   (`Invoice`, between a built-in and a custom type) is `toBeEnabled()`. The second half is not decoration —

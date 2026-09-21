@@ -11,11 +11,26 @@
  * `getTicket` refused too until ruling P25 clause 1 served their gaps…"*. **The
  * number is now ZERO** — it fell 6 → 4 (ruling P25 clause 1, `c86c4b5c`,
  * 2026-09-06) → 3 (P32/P38) → 1 (P39/P40) → 0 when `search` was served on
- * 2026-09-19, and `SERVING_GAPS` is empty — so NO read in this shell refuses for
- * a serving reason. **This component is not narrower for it, and that half was
- * true all along:** a read that ANSWERS can still fail (a transport error, a 404
- * turned back into an exception, a `MappingError`), and every such failure lands
- * here for the same reason. Every refusing read is called by a page in this
+ * 2026-09-19, and `SERVING_GAPS` is empty.
+ *
+ * **⚠ AND THAT EMPTINESS IS NOT WHAT THIS SENTENCE USED TO SAY IT WAS (E2-54).**
+ * It read: *"`SERVING_GAPS` is empty — so NO read in this shell refuses for a
+ * serving reason."* The register's own docblock denies exactly that inference
+ * (`online/mappers.ts`, beside the record: *"This record being empty is NOT a
+ * claim that no read is missing: it means no mapper in this file refuses
+ * outright."*), and the denial is not academic — `online/online-data-source.ts`
+ * still refuses for a serving reason, conditionally: its `getTickets` throws
+ * `ServingGapError('getTickets', [LIST_TOO_LARGE_ABSENCE])` when a cursor is still
+ * outstanding past the pages this client will fetch. So what the register
+ * establishes is narrower and is what is claimed here now: **no read refuses
+ * OUTRIGHT.** A read can still refuse conditionally, and such a refusal reaches
+ * this component like any other.
+ *
+ * The paragraph below is the half this file can actually support, and it never
+ * depended on the register at all: **a read that ANSWERS can still fail** — a
+ * transport error, a 404 turned back into an exception, a `MappingError` — and
+ * every such failure lands here for the same reason. Every refusing read is
+ * called by a page in this
  * shell, and the plan text (written before those refusals existed) renders each
  * of them as `data === null ? <p>Loading…</p> : …`, or, for the attention
  * strip, as `items={attention.data ?? []}`. Both of those are false claims:

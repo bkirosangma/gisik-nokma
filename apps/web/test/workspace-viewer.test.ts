@@ -15,10 +15,14 @@ describe('projectCountLine — the card meta line', () => {
     expect(projectCountLine(4)).toBe('4 projects');
   });
 
-  // Zero renders NOTHING, the same rule `restrictedLine` keeps: a card with no
-  // live projects must not announce "0 projects".
-  it('renders nothing at zero', () => {
-    expect(projectCountLine(0)).toBeNull();
+  // Zero SAYS SO (E5-36), and the rule it used to borrow does not reach here:
+  // `restrictedLine`'s zero rule is about a person with nothing withheld being
+  // told about withholding, and this line carries no withholding. What `null`
+  // bought was a founder's fresh card — avatar, name, chips, "You're an owner
+  // here." — with no mention of projects and no pointer to the New-project form.
+  // A withheld viewer never reaches this: the caller gates on it.
+  it('says an absence at zero rather than omitting the line', () => {
+    expect(projectCountLine(0)).toBe('No projects yet');
   });
 });
 

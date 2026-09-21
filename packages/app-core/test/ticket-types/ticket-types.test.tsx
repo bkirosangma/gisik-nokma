@@ -319,7 +319,8 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * 13.928 — every row carries both controls, and each is a SIBLING of the row
    * door rather than a child of it.
    *
-   * The row is one `<button aria-label="Edit …">` (`:387-416`). A control
+   * The row is one `<button aria-label="Edit …">` (`:392-421` — and the verb BRANCHES
+ * since E4-34: a non-author's row reads `Open …`). A control
    * nested inside it would be a button inside a button — an invalid tree that
    * jsdom will happily render, which is exactly why this is asserted on the
    * DOM containment rather than on the fact that a control exists.
@@ -494,6 +495,54 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
         onNew={() => {}}
       />);
     expect(await screen.findAllByRole('button', { name: 'Move Invoice down' })).not.toHaveLength(0);
+  });
+
+  it('E4-34 a non-author is offered a door that says Open, not Edit', async () => {
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'member' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    await screen.findByText('Invoice');
+    // The read-only banner sits directly above these rows and says "You can look,
+    // not touch". A row named "Edit Invoice" contradicts it in the same viewport,
+    // and it is the verb a screen reader hears.
+    expect(screen.queryByRole('button', { name: 'Edit Invoice' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open Invoice' })).not.toBeNull();
+    // Control on the same instrument: the AUTHOR's row still says Edit, so the
+    // null above is the verb branch and not a misspelt name.
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'owner' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    expect(await screen.findAllByRole('button', { name: 'Edit Invoice' })).not.toHaveLength(0);
+  });
+
+  it('E5-14 the page says why the arrows are disabled, not only in a hover title', async () => {
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'owner' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    await screen.findByText('Invoice');
+    const note = await screen.findByTestId('ticket-type-reorder-note');
+    // The reason all ten arrows are dead, as VISIBLE text. It lived only in each
+    // button's `title` attribute, which a phone cannot show and a keyboard cannot
+    // reach — so a reader met ten dead controls with no explanation on the page.
+    expect(note.textContent).toContain(
+      'Built-in types keep their rank; custom types reorder among themselves.',
+    );
+    // And the other half of the finding: the shipped seed already puts two types
+    // at rank 3, and the sentence says how a tie is drawn rather than leaving a
+    // reader to infer precedence from two rows that both read "rank 3".
+    expect(note.textContent).toContain('Two types that share a rank are drawn in id order.');
   });
 
   /**
@@ -715,6 +764,22 @@ describe('TicketTypeListScreen — the `"N tickets"` segment (Task 8, built 2026
 });
 
 describe('TicketTypeEditorScreen — creating a custom type', () => {
+  it('E4-29 an empty form names the FIELDS it is about, not the library default', async () => {
+    renderEditor(null);
+    // `freshDef()` starts `name` and `workflowId` at `''` and the schema is
+    // `z.string().min(1)` on both, so exactly two issues render.
+    await waitFor(() =>
+      expect(document.querySelectorAll('.ticket-type-editor__issues li')).toHaveLength(2),
+    );
+    const items = Array.from(document.querySelectorAll('.ticket-type-editor__issues li')).map(
+      (li) => li.textContent,
+    );
+    expect(items).toEqual(['Name is required', 'Workflow is required']);
+    // The library's own phrasing must not reach the screen: it named no field, so
+    // a reader was told twice that something was wrong and never what.
+    expect(document.body.textContent).not.toContain('String must contain');
+  });
+
   it('builds and submits ticket-type.defined from the filled form', async () => {
     const user = userEvent.setup();
     const { gateway, onSaved } = renderEditor(null);

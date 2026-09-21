@@ -1859,15 +1859,22 @@ file rather than shifted by a delta.
   the one that makes the count FALSIFIABLE:** every other arm renders a section whose rows and whose
   visible nodes are the SAME set, so `nodes.length` (the post-`visibleNodes` list) passes them all —
   measured: swapping the two in `ticket-list.tsx` compiled and left the whole suite green. The collapsed
-  arm collapses a parent under `epic` grouping and asserts the band still reads `epic · 2 tickets` while
+  arm collapses a parent under `epic` grouping and asserts the band still reads `epic · 2 rows` while
   the table shows one row; it is the only fixture arrangement where the two numbers differ (`status` puts
   the parent and child in different sections so they never nest, and `flat` has no band), and the same
-  mutation now reddens exactly that case with `epic · 1 ticket`. **A DECLARED DIVERGENCE rides with it:**
+  mutation now reddens exactly that case with `epic · 1 row`. **A DECLARED DIVERGENCE rides with it:**
   the prototype counts a group’s CHILDREN (`const n = g.items.length`, `:2920`, held separately from
   `g.epic` at `:2904`), so for the same two rendered rows it prints `1 ticket` where this prints
-  `2 tickets` — because here the epic IS a row (`list-model.ts`, `nestRows`) and the band answers for its
+  `2 rows` — because here the epic IS a row (`list-model.ts`, `nestRows`) and the band answers for its
   section the way the summary answers for the project. An earlier revision of this bullet cited a
   prototype expression that does not exist; the measured behaviour is what is recorded now.
+  **The unit word settles WHICH membership is being counted (F7, 2026-09-21):** the divergence above put
+  the same words on two different numbers, so a reader of either build could not tell which one the
+  sentence meant. The epic axis now says ROWS and the other three keep saying TICKETS. The finding's own
+  example also carried a parenthesised child count (`epic · 4 rows (3 tickets)`); that half was written
+  and DISCARDED, because `section.rows.length - 1` is not reliably "the children" — the `No epic` bucket
+  holds an epic row AND a ticket with no epic, so the subtraction would print a number that counts
+  nothing.
 
 - ✅ **13.663 — the title cell indents by depth, from the row’s own numbers.** `16 + depth*22`:
   epic 16px, child 38px, grandchild 60px, three distinct values, scoped to the List region because an

@@ -46,7 +46,24 @@ export function WorkspacesSection({ workspaces }: WorkspacesSectionProps) {
     <section className="gn-account__section gn-account__workspaces">
       <h2 className="gn-account__section-title">Your workspaces</h2>
       <ul className="gn-account__workspace-list">
-        {workspaces.map((workspace) => (
+        {workspaces.map((workspace) => {
+          /*
+            E5-12 — ONE UNIT UNDER THE WORD "PROJECT".
+
+            This row counted `workspace.projects.length`, the whole array, while
+            `/workspaces`' own card counts LIVE projects only and says "archived"
+            separately (`projectCountLine` + the archived chip). So one workspace
+            read "2 projects" here and "1 project · 1 archived" there, and NEITHER
+            screen named its unit — the same word for two different measurements.
+
+            The live-only count is what is kept, because that is the unit the
+            other screen and the manual already use, and the archived half is
+            named rather than dropped: a reader who sees "2 projects" on one page
+            and "1 project" on the other is owed the reason.
+          */
+          const live = workspace.projects.filter((project) => !project.archived);
+          const archived = workspace.projects.length - live.length;
+          return (
           <li key={workspace.id} className="gn-account__workspace-row">
             {/* THE ROW IS THE DOOR, the shape `.gn-workspace-card__door`
                 already established on the workspace card — a real `<a>`
@@ -73,15 +90,16 @@ export function WorkspacesSection({ workspaces }: WorkspacesSectionProps) {
                 <span className="gn-account__workspace-facts">
                   <span className="gn-account__workspace-role">{workspace.role}</span>
                   <span className="gn-account__workspace-count">
-                    {workspace.projects.length}{' '}
-                    {workspace.projects.length === 1 ? 'project' : 'projects'}
+                    {live.length} {live.length === 1 ? 'project' : 'projects'}
+                    {archived > 0 ? ` · ${archived} archived` : ''}
                   </span>
                 </span>
               </span>
               <span className="gn-account__workspace-open">Open</span>
             </Link>
           </li>
-        ))}
+          );
+        })}
       </ul>
     </section>
   );

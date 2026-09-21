@@ -7,6 +7,7 @@ import { describe, expect, it, vi } from 'vitest';
 import { NOTIFICATION_KINDS } from '@gisik-nokma/domain';
 import { notificationBody, notificationHeadline } from '../../src/inbox/format.js';
 import { InboxView } from '../../src/inbox/inbox-view.js';
+import { formatDateTime } from '../../src/provenance.js';
 import { notificationOf, oneOfEveryKind, userName } from './fixtures.js';
 
 /**
@@ -28,6 +29,55 @@ import { notificationOf, oneOfEveryKind, userName } from './fixtures.js';
  * `format.test.ts`, where the literals live.
  */
 const ROW = '.gn-inbox__row';
+
+describe('E5-35 a row says WHEN it arrived, and which ticket it is about', () => {
+  it('renders createdAt through the one date renderer, which it did not render at all', () => {
+    const notification = notificationOf('date-approaching');
+    render(
+      <InboxView
+        notifications={[notification]}
+        userName={userName}
+        onOpen={vi.fn()}
+        onMarkRead={vi.fn()}
+      />,
+    );
+    // `grep -n createdAt inbox-view.tsx format.ts` returned NOTHING before this:
+    // the wire carries it on every row and no row showed it.
+    const time = document.querySelector('.gn-inbox__time');
+    expect(time).not.toBeNull();
+    expect(time?.textContent).toBe(formatDateTime(notification.createdAt));
+  });
+
+  it('names the TICKET on a mention, whose body is the sender’s excerpt and not a title', () => {
+    const mention = notificationOf('mention');
+    render(
+      <InboxView
+        notifications={[mention]}
+        userName={userName}
+        onOpen={vi.fn()}
+        onMarkRead={vi.fn()}
+      />,
+    );
+    const ticket = document.querySelector('.gn-inbox__ticket');
+    expect(ticket?.textContent).toBe((mention.payload as { ticketTitle: string }).ticketTitle);
+    // And the body is UNTOUCHED — the excerpt exactly, with nothing appended.
+    // The obvious fix was to append "— on <title>" here; case 11.86 measures
+    // this body by exact equality because wrapping the sender's words adds this
+    // surface's own voice to them.
+    expect(document.querySelector('.gn-inbox__body')?.textContent).toBe(notificationBody(mention));
+    // Control: the four kinds whose body IS the title render no such line.
+    const other = notificationOf('date-approaching');
+    const { container } = render(
+      <InboxView
+        notifications={[other]}
+        userName={userName}
+        onOpen={vi.fn()}
+        onMarkRead={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.gn-inbox__ticket')).toBeNull();
+  });
+});
 
 describe('11.89 a row is the notification, whole', () => {
   it('renders the attributed headline, the body, the kind icon and the unread mark', async () => {

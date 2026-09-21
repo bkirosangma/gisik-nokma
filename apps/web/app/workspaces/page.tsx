@@ -18,6 +18,7 @@ import {
   viewerOf,
   type CardViewer,
 } from '../../src/workspace-viewer.js';
+import { displayLabelOf } from '../../src/display-label.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -44,11 +45,19 @@ export default function WorkspacesPage() {
   const error = expired ? null : failure;
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav />
       <div className="gn-workspaces">
         <div className="gn-workspaces__head">
-          <h1 className="gn-page-title">Workspaces{user !== null ? ` — ${user.name}` : ''}</h1>
+          {/* exec4 E4-33: the suffix is emitted only when there IS a label.
+              This heading read `"Workspaces — "` for every person created by
+              the default email sign-up (`name: ''`), because it interpolated
+              `user.name` unconditionally. `displayLabelOf` answers the address
+              for them, and answers `''` for someone with neither — and a
+              heading must not end in an em dash for that person either. */}
+          <h1 className="gn-page-title">
+            Workspaces{user !== null && displayLabelOf(user) !== '' ? ` — ${displayLabelOf(user)}` : ''}
+          </h1>
           {/* `workspaces !== null` FIRST, and it stays load-bearing: a REFUSED
               read is also `null` here, and short-circuiting on this term before
               `.length` is what keeps a refusal from throwing instead of merely
@@ -165,8 +174,17 @@ function ChipRow({
     // ONE chip, and no number anywhere in it. Printing `0` would be the claim
     // "nothing here you can see", which is exactly what the server declined to
     // say by omitting the key. `archivedCount` is deliberately not read on
-    // this branch either, for the same reason: a guest gets no numbers at all,
-    // not a subset of them.
+    // this branch either, for the same reason.
+    //
+    // ⚠ SCOPED 2026-09-21 (F6). This read "a guest gets no numbers at all, not a
+    // subset of them", and the same CARD falsifies it further down: a guest's
+    // project line renders the owner-ruled restriction sentence
+    // (`workspace-viewer.ts`'s `projectLine`, "1 project · name restricted"),
+    // which names a number — `workspace-viewer.ts` says so itself, at the line
+    // that records the same correction. So the claim is narrowed to what THIS
+    // branch governs: **no count CHIPS — a guest gets no ticket, member or
+    // archived numbers** — and the restriction sentence is the deliberate
+    // exception rather than an oversight.
     return (
       <div className="gn-workspace-card__chips">
         <Chip tone="restricted">Restricted</Chip>
@@ -611,7 +629,20 @@ function FoundingForm() {
     setSending(true);
     setRefusal(null);
     void founding.foundWorkspace(name, prefix === '' ? undefined : prefix).then(
-      ({ workspaceId }) => router.push(`/w/${workspaceId}/my-work`),
+      /*
+        THE WORKSPACE HOME, NOT MY WORK (F5). This pushed `/my-work`, and seconds
+        after founding every one of My Work's four sections is empty — the
+        founder met "Nothing assigned to you. / No claims in transit. / No
+        contested claims. / Nothing has been shared with you." and nothing that
+        said what to do next. The home carries the owner's **New project** form
+        (`w/[workspaceId]/page.tsx`) and the project grid, which is where the
+        manual already sends an owner for it (`docs/manual.md:174` — "an owner or
+        admin gets a New project form inside the workspace, and that is the only
+        control that creates one"). The prototype's own landing is the list with
+        a confirmation; this is the cheaper of the two remedies the finding
+        offers and the one that puts a working control in front of the person.
+      */
+      ({ workspaceId }) => router.push(`/w/${workspaceId}`),
       (cause: unknown) => {
         setSending(false);
         setRefusal(
