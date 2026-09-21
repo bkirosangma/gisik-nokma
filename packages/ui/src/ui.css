@@ -2911,6 +2911,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .ticket-type-editor__workflow { display: flex; flex-direction: column; gap: 0.2rem; font-size: 0.8rem; }
 .ticket-type-editor__builtin-note,
 .ticket-type-editor__implications { margin: 0; font-size: 0.75rem; color: var(--gn-text-muted); }
+/* P24 (2026-09-21). The LIST ITEM TEXT was `--gn-danger` on
+   `--gn-surface-sunken` at `font-size: 0.8rem` (12.8px — far below the
+   large-text exemption, so WCAG 2.2 §1.4.3 requires 4.5). Measured:
+   **3.844 in `hig`/`minimal` light and 4.191 in `hig`/`minimal` dark** — below
+   4.5 in both — and the pair was in NO `CONTRAST_PAIRS` row, so the token
+   suite's enforcement loop never evaluated it.
+
+   The tone is not lost by moving the text: **the danger is already carried by
+   the 3px left border**, which owes 3:1 as a non-text boundary and clears it
+   at those same ratios. `--gn-text` on `--gn-surface-sunken` is a pair that is
+   ALREADY DECLARED and already enforced (`tokens.ts` `CONTRAST_PAIRS`), and it
+   measures 9.97 light / 11.09 dark.
+
+   ⚠ THE REVIEWER'S SECOND OPTION IS REFUTED, with its number: it proposed
+   `dangerText` on this surface. `dangerText` is `onColorWarmLight` (`#fbf7f3`)
+   in light and `redInk` (`#300a06`) in dark — it is the ink that goes ON a
+   danger fill, not a danger-tinted ink — so on `surfaceSunken` it measures
+   **≈1.06:1 light**, the least legible value on the page. Recorded rather than
+   silently skipped, because the next reader of the finding will reach for it. */
 .ticket-type-editor__issues {
   list-style: none;
   margin: 0;
@@ -2918,7 +2937,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border-left: 3px solid var(--gn-danger);
   background: var(--gn-surface-sunken);
   font-size: 0.8rem;
-  color: var(--gn-danger);
+  color: var(--gn-text);
 }
 .ticket-type-editor__save {
   align-self: flex-start;

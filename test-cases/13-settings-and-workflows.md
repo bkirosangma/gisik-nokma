@@ -1417,3 +1417,42 @@ second argument — it compiled, because an implementation may take fewer parame
 driven through it would have passed against a page that sent no filter. It now **applies the filter
 BEFORE cutting the page**, mirroring `store.ts`, where the filter joins the WHERE and therefore narrows
 what the cursor walks. (`packages/app-core/test/inbox/fake-gateway.ts`)
+
+## The type editor's issues list stops painting danger-toned text on a sunken surface (lane ds1, 2026-09-21, batch B10) — case `13.1061`
+
+**The finding, round 2 `P24`, IMPORTANT, flagged `r2 NEW`.** `ui.css` `.ticket-type-editor__issues` set
+`background: var(--gn-surface-sunken)` **and** `color: var(--gn-danger)` at `font-size: 0.8rem` — 12.8px,
+far below the large-text exemption, so WCAG 2.2 §1.4.3 requires 4.5. Measured **3.844** (`hig`/`minimal`
+light) and **4.191** (dark) — below 4.5 in both — and **the pair is in no `CONTRAST_PAIRS` row**, so
+`tokens.test.ts`'s enforcement loop never evaluated it. The finding's own extraction found **46 rules
+setting both a token `color` and a token `background`, against 34 declared pairs — 14 of those rules naming
+a pair with no row, i.e. 7 distinct pairs.**
+
+### The remedy taken, and the one refuted
+
+**The text moves to `--gn-text` and the danger tone stays on the 3px left border.** `{ fg: 'text', bg:
+'surfaceSunken' }` is a pair that is **already declared and already enforced** (`tokens.ts`
+`CONTRAST_PAIRS`), measuring 9.97 light / 11.09 dark; the border owes 3:1 as a non-text boundary and
+clears it at the same ratios the text failed. **The reviewer's second option is REFUTED with its number:**
+it proposed `dangerText` on this surface, but `dangerText` is `onColorWarmLight` (`#fbf7f3`) in light and
+`redInk` (`#300a06`) in dark — the ink that goes ON a danger fill, not a danger-tinted ink — so on
+`surfaceSunken` it measures **≈1.06:1 light**, the least legible value on the page. Recorded in the rule so
+the next reader of the finding does not reach for it.
+
+### The case
+
+- ✅ **13.1061 — a gate-able sweep: every rule painting a token colour on `surfaceSunken` must name an fg
+  role the roster declares for it.** `packages/ui/test/tokens.test.ts`. This is the finding's own second
+  half, which it called *"the instrument this regime has never had"* — it reads two files, needs no
+  browser, and is scoped to `surfaceSunken` **because that is the surface the finding measured; widening it
+  to every surface is the right next move and is not claimed here.** **The control runs FIRST and in both
+  directions** — a planted `.gn-zz-planted { … color: var(--gn-danger) }` must be FOUND, and the same
+  plant with `--gn-text` must not be — because without it a regex that matched nothing would report "no
+  violations" over a stylesheet that had lost the family. The RED names the finding's own rule:
+  `.ticket-type-editor__issues -> color: var(--gn-danger)`. A third assertion pins that the danger signal
+  SURVIVED the fix (the border keeps `--gn-danger`, the text may not go back). **A source scan, and it says
+  so:** it proves the roster COVERS the pair, not that the pair passes — the enforcement loop above is what
+  measures ratios. `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared
+  backup. **The two ratios are computed, not painted.** Package suites: ui 413, web 639, all green.
+
+**No `Features.md` bullet.** This corrects an existing notice's paint; it adds no affordance.

@@ -2132,3 +2132,90 @@ describe('13.693 — the green700 calibration is computed on the shipped ground'
     expect(shipped).toBeGreaterThan(withApple);
   });
 });
+
+/**
+ * Case `13.1061` — P24 — every rule that paints a token colour on
+ * `surfaceSunken` names an fg role the roster actually declares for it.
+ *
+ * The finding's own second half: *"a sweep in the shape the extraction used
+ * here — every rule painting a token colour on a token surface, each pair
+ * required to appear in `CONTRAST_PAIRS` — is a gate-able check (it reads two
+ * files and needs no browser), and it is the instrument this regime has never
+ * had."* This is that instrument, deliberately scoped to `surfaceSunken`
+ * because that is the surface the finding measured; widening it to every
+ * surface is the right next move and is NOT claimed here.
+ *
+ * **The defect it catches, and why nothing else did:**
+ * `.ticket-type-editor__issues` set `color: var(--gn-danger)` on
+ * `background: var(--gn-surface-sunken)` at 12.8px — 3.844 in `hig`/`minimal`
+ * light, 4.191 dark, both below 4.5 — and the pair was in no `CONTRAST_PAIRS`
+ * row, so the enforcement loop above never evaluated it. A pair can only be
+ * enforced if it is declared, and nothing was checking that a pair which
+ * actually CO-OCCURS has been.
+ *
+ * A source scan, and it says so: it proves the roster COVERS the pair, not
+ * that the pair passes — the loop above is what measures the ratios.
+ */
+describe('13.1061 token colours on surfaceSunken are declared pairs', () => {
+  const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+  /** `surface-sunken` → `surfaceSunken`, the same transform `cssVariableName` inverts. */
+  const toRole = (kebab: string): string => kebab.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
+  const declaredSunkenFgs = new Set(
+    CONTRAST_PAIRS.filter((pair) => pair.bg === 'surfaceSunken').map((pair) => pair.fg),
+  );
+
+  /** Every `color: var(--gn-…)` sitting in a rule whose background is `surfaceSunken`. */
+  function undeclaredOnSunken(css: string): string[] {
+    const noComments = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const found: string[] = [];
+    for (const m of noComments.matchAll(/([^{}]+)\{([^}]*)\}/g)) {
+      const head = (m[1] ?? '').trim();
+      const body = m[2] ?? '';
+      if (head === '' || head.startsWith('@')) continue;
+      if (!/background:\s*var\(--gn-surface-sunken\)/.test(body)) continue;
+      const colour = body.match(/(?:^|;)\s*color:\s*var\(--gn-([a-z-]+)\)/);
+      if (colour?.[1] === undefined) continue;
+      const role = toRole(colour[1]);
+      if (!declaredSunkenFgs.has(role as (typeof CONTRAST_PAIRS)[number]['fg'])) {
+        found.push(`${head} -> color: var(--gn-${colour[1]})`);
+      }
+    }
+    return found;
+  }
+
+  it('13.1061 the sweep can see a violation — planted, in the same path', () => {
+    // CONTROL, FIRST and in both directions. Without it, a regex that matched
+    // nothing would report "no violations" over a stylesheet that had lost the
+    // family entirely — the same green-for-the-wrong-reason shape the sweep
+    // exists to catch.
+    const planted = `${UI_CSS_TEXT}\n.gn-zz-planted { background: var(--gn-surface-sunken); color: var(--gn-danger); }\n`;
+    const found = undeclaredOnSunken(planted);
+    expect(found, 'the sweep did not see a planted undeclared pair').toContain(
+      '.gn-zz-planted -> color: var(--gn-danger)',
+    );
+    // And the declared-and-passing direction, so "finds something" is not the
+    // only reading it can produce:
+    const plantedOk = `${UI_CSS_TEXT}\n.gn-zz-planted { background: var(--gn-surface-sunken); color: var(--gn-text); }\n`;
+    expect(undeclaredOnSunken(plantedOk)).toHaveLength(0);
+  });
+
+  it('13.1061 no rule in ui.css paints an undeclared token colour on surfaceSunken', () => {
+    const violations = undeclaredOnSunken(UI_CSS_TEXT);
+    expect(
+      violations,
+      `painted on surfaceSunken but absent from CONTRAST_PAIRS (declared fg roles there: ` +
+        `${[...declaredSunkenFgs].join(', ')}): ${violations.join(' | ')}`,
+    ).toEqual([]);
+  });
+
+  it('13.1061 the rule the finding named carries the tone on its BORDER, not its text', () => {
+    // The fix is only correct if the danger signal survives it. `danger` as a
+    // 3px non-text boundary owes 3:1, not 4.5, and clears it on this surface.
+    const rule = UI_CSS_TEXT.match(/\.ticket-type-editor__issues\s*\{([^}]*)\}/);
+    expect(rule, '`.ticket-type-editor__issues` has no rule').not.toBeNull();
+    const body = rule?.[1] ?? '';
+    expect(body).toMatch(/border-left:\s*3px solid var\(--gn-danger\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text\)/);
+    expect(body, 'the danger-toned TEXT came back').not.toMatch(/color:\s*var\(--gn-danger\)/);
+  });
+});
