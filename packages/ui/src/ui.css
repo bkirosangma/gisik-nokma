@@ -3682,6 +3682,26 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   text-overflow: ellipsis;
   white-space: nowrap;
 }
+/* E5-35 — WHEN the row arrived (`Notification.createdAt`, rendered nowhere
+   before this). Quieter than the body above it: it is metadata about the row,
+   not another sentence of it, and the three lines already share one clamped
+   column. `margin-top` rather than a gap, matching the body's own `display:
+   block` in the same flex-free stack. */
+.gn-inbox__time {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+}
+/* E5-35 — WHICH TICKET, for the one row whose body is not already its title (a
+   mention's body is the sender's excerpt). Shares the time line's register: it
+   is what the row is ABOUT, not another sentence OF it. */
+.gn-inbox__ticket {
+  display: block;
+  margin-top: 0.15rem;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+}
 /* Decorative: `data-unread` on the row is the fact, this is its picture. It is
    drawn from a rule keyed on that attribute rather than styled inline so the
    two cannot disagree about which rows are unread. */

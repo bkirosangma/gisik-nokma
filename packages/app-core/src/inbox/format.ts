@@ -81,8 +81,13 @@ export function notificationHeadline(notification: Notification, userName: UserN
       return `${userName(payload.mentionedBy)} mentioned you`;
     }
     case 'contested-claim': {
-      const payload = notification.payload as ContestedClaimNotificationPayload;
-      return `Your claim was contested — ${payload.rule}`;
+      // E5-35 — the rule SLUG is not a sentence for a person. This read
+      // `Your claim was contested — ${payload.rule}`, so a row headed
+      // "… — require-comment" printed the engine's internal name. The rule is
+      // still named where it belongs: the body under this headline is the
+      // engine's own `reason`, verbatim, which says what the rule wanted in the
+      // words the engine wrote.
+      return 'Your claim was contested';
     }
     case 'date-approaching': {
       const payload = notification.payload as DateApproachingNotificationPayload;
@@ -110,6 +115,14 @@ export function notificationHeadline(notification: Notification, userName: UserN
  * surface has no standing to rewrite it. A mention's body is the excerpt as
  * captured, and it is NOT re-checked against the reader's present visibility:
  * the letter was delivered.
+ *
+ * ⚠ The mention's TICKET is named by `notificationTicketLabel` below rather than
+ * appended here (E5-35). The obvious fix — `"${excerpt} — on ${ticketTitle}"` —
+ * was written first and reverted, because case 11.86 measures this body by EXACT
+ * equality for a stated reason: a body that wraps the sender's words adds this
+ * surface's own voice to them. That the added clause is metadata rather than
+ * commentary does not change what the assertion protects, and a row can name the
+ * ticket without touching the sentence.
  */
 export function notificationBody(notification: Notification): string {
   switch (notification.kind) {
@@ -128,6 +141,25 @@ export function notificationBody(notification: Notification): string {
       throw new RangeError(`unknown notification kind: ${String(exhaustive)}`);
     }
   }
+}
+
+/**
+ * The ticket a row is about, where the row's BODY does not already say it.
+ *
+ * E5-35. `mentionNotificationPayloadSchema` carries `ticketTitle`
+ * (`notifications.ts:66`) and neither the headline nor the body used it, so a
+ * mention said what was written and never where — the one row of the five whose
+ * body is not already the title. The other four return `null` here because their
+ * bodies ARE the title (`notificationBody` above), and repeating it would be the
+ * same fact twice on one row.
+ *
+ * Deliberately NOT folded into the body: see that function's docblock — case
+ * 11.86 measures the body by exact equality, because a body that wraps the
+ * sender's words adds this surface's voice to them.
+ */
+export function notificationTicketLabel(notification: Notification): string | null {
+  if (notification.kind !== 'mention') return null;
+  return (notification.payload as MentionNotificationPayload).ticketTitle;
 }
 
 /**
