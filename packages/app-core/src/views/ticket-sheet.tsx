@@ -2599,7 +2599,20 @@ export function TicketSheet({
           />
         </div>
       ) : (
-        <HistoryTab result={history} nameOf={nameOf} />
+        <HistoryTab
+          result={history}
+          nameOf={nameOf}
+          // E4-19 / E5-8 — the two resolvers `describeEvent` needs so a history
+          // line can name a state and a ticket type rather than printing the raw
+          // id the ledger carries. Both fall back to the id, the same `?? id`
+          // idiom `workflow-builder/summaries.ts:20` uses, so a state this
+          // ticket's workflow no longer declares — or a ladder that failed to
+          // read, leaving `ticketTypes.data` null — still names something.
+          stateName={(stateId) =>
+            workflow.data?.states.find((candidate) => candidate.id === stateId)?.name ?? stateId
+          }
+          typeName={(typeId) => ticketTypes.data?.find((def) => def.id === typeId)?.name ?? typeId}
+        />
       )}
 
       {/* The prototype's footer (`desktop.dc.html:1371-1373`), and it is now the
@@ -2728,9 +2741,13 @@ export function TicketSheet({
 function HistoryTab({
   result,
   nameOf,
+  stateName,
+  typeName,
 }: {
   result: LiveQueryResult<TicketHistoryEvent[]>;
   nameOf: (userId: string) => string;
+  stateName?: (stateId: string) => string;
+  typeName?: (typeId: string) => string;
 }) {
   if (result.error !== null) {
     return (
@@ -2747,7 +2764,7 @@ function HistoryTab({
   }
   return (
     <>
-      <HistoryList events={result.data} nameOf={nameOf} />
+      <HistoryList events={result.data} nameOf={nameOf} stateName={stateName} typeName={typeName} />
       {result.data.length >= HISTORY_PAGE_LIMIT ? (
         <p className="gn-ticket-sheet__history-partial">
           {`Showing the first ${HISTORY_PAGE_LIMIT} entries — this ticket's history may go on past them.`}

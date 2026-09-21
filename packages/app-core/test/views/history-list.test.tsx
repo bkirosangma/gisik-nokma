@@ -107,7 +107,174 @@ describe('3.69 HistoryList — the ledger filtered, never summarised (spec §3)'
     const earlier: TicketHistoryEvent = { ...SKEWED, id: 'e1', type: 'ticket.created', seq: 1 };
     const { container } = render(<HistoryList events={[earlier, SKEWED]} nameOf={(id) => id} />);
     const types = [...container.querySelectorAll('.gn-history__type')].map((n) => n.textContent);
-    expect(types).toEqual(['ticket.created', 'ticket.transitioned']);
+    // E4-19/E5-8 — the headline is now the SENTENCE. ⚠ `earlier` reuses
+    // SKEWED's payload (`{to: 'done'}`), which is the WRONG shape for a
+    // `ticket.created` — no `typeId` — so that row falls back to the wire name.
+    // That is the fallback working, not this fixture being sloppy: it is the
+    // one row here that proves an unreadable payload states the raw type rather
+    // than inventing "Created as undefined", and it is asserted as such in
+    // 3.179 below rather than left to be read as an accident.
+    expect(types).toEqual(['ticket.created', 'Moved to done']);
+    // One `<li>` per event, in the order given — still filtered, never merged.
+    expect(container.querySelectorAll('.gn-history__event')).toHaveLength(2);
+  });
+
+  /**
+   * 3.179 / E4-19 + E5-8 — THE MEASURED HISTORY, NARRATED.
+   *
+   * The defect is reproduced as a fixture rather than described in prose: the
+   * six rows the reviewers read on `CCSO-6`, in order — `ticket.created`,
+   * `ticket.field_set` three times, `ticket.transitioned`, `visibility.set` —
+   * carried the payloads the route already selects, and the tab printed the
+   * event type as the headline. Three consecutive rows reading
+   * `ticket.field_set`, nothing on any of them saying which field changed or to
+   * what.
+   *
+   * **The load-bearing assertion is not the six strings; it is that the three
+   * field rows are DISTINCT.** A `describeEvent` that mapped every
+   * `field_set` to the same generic sentence would satisfy a per-row
+   * "it narrates" check and still leave the reader unable to tell the rows
+   * apart — which is the whole complaint. `new Set(...).size` is what pins it,
+   * and it is checked against the raw-count case below it so the set is not
+   * trivially satisfied by having three rows.
+   *
+   * The third field row is the CLEARING claim (`value: null`), and it reads as
+   * an act ("Cleared priority") rather than as the not-set em dash the Details
+   * tab uses — clearing is something somebody did, and this is the ledger.
+   */
+  it('3.179 — the six measured CCSO-6 rows narrate, and the three field rows are DISTINCT', () => {
+    const rows: TicketHistoryEvent[] = [
+      {
+        ...SKEWED,
+        id: 'e1',
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: 'prj', parentId: null, title: 'HSN codes' },
+        seq: 1,
+      },
+      { ...SKEWED, id: 'e2', type: 'ticket.field_set', payload: { fieldId: 'title', value: 'HSN codes' }, seq: 2 },
+      {
+        ...SKEWED,
+        id: 'e3',
+        type: 'ticket.field_set',
+        payload: { fieldId: 'dueDate', value: { date: '2026-08-30' } },
+        seq: 3,
+      },
+      { ...SKEWED, id: 'e4', type: 'ticket.field_set', payload: { fieldId: 'priority', value: null }, seq: 4 },
+      { ...SKEWED, id: 'e5', type: 'ticket.transitioned', payload: { to: 'doing' }, seq: 5 },
+      { ...SKEWED, id: 'e6', type: 'visibility.set', payload: { mode: 'project' }, seq: 6 },
+    ];
+    const { container } = render(
+      <HistoryList
+        events={rows}
+        nameOf={() => 'Anselma Marak'}
+        stateName={(id) => (id === 'doing' ? 'Doing' : id)}
+        typeName={(id) => (id === 'task' ? 'Task' : id)}
+      />,
+    );
+
+    const headlines = [...container.querySelectorAll('.gn-history__type')].map((n) => n.textContent);
+    expect(headlines).toEqual([
+      'Created as Task',
+      'Set title to HSN codes',
+      'Set dueDate to 30 Aug 2026',
+      'Cleared priority',
+      'Moved to Doing',
+      'Visibility set to project',
+    ]);
+
+    // THE PROPERTY, stated separately from the strings: the three field rows
+    // differ. Reverting the headline to `event.type` makes this read
+    // `['ticket.field_set']` — size 1 — which is the measured defect exactly.
+    const fieldRows = headlines.slice(1, 4);
+    expect(fieldRows).toHaveLength(3);
+    expect(new Set(fieldRows).size).toBe(3);
+
+    // And the wire names are still on screen, in their own slot, one per row —
+    // the reviewers asked for the slug KEPT, and this is where it is kept.
+    const slugs = [...container.querySelectorAll('.gn-history__slug')].map((n) => n.textContent);
+    expect(slugs).toEqual([
+      'ticket.created',
+      'ticket.field_set',
+      'ticket.field_set',
+      'ticket.field_set',
+      'ticket.transitioned',
+      'visibility.set',
+    ]);
+  });
+
+  /**
+   * 3.180 / E4-19 — THE FALLBACK IS THE WIRE NAME, for an event this file has
+   * not learned and for a payload it cannot read.
+   *
+   * Two different failures, one answer, and the case holds them apart:
+   *
+   * 1. An UNRECOGNISED TYPE (`ticket.something_new`). A future event type must
+   *    render as it always did rather than as a guessed sentence about a claim
+   *    nobody described in `history-copy.ts`.
+   * 2. A RECOGNISED TYPE WITH AN UNREADABLE PAYLOAD (`ticket.field_set` with no
+   *    `fieldId`). The sentence cannot be built, and the honest answer is the
+   *    wire name — never "Set undefined to undefined", which reads as a fact
+   *    about the ticket.
+   *
+   * The slug is asserted ABSENT on both rows: when the headline already IS the
+   * wire name, a second copy beside it would say nothing that is not said.
+   */
+  it('3.180 — an unknown event type, and a recognised type with an unreadable payload, both fall back to the wire name', () => {
+    const rows: TicketHistoryEvent[] = [
+      { ...SKEWED, id: 'e1', type: 'ticket.something_new', payload: { anything: 1 }, seq: 1 },
+      { ...SKEWED, id: 'e2', type: 'ticket.field_set', payload: { value: 'orphan' }, seq: 2 },
+      { ...SKEWED, id: 'e3', type: 'ticket.field_set', payload: { fieldId: '', value: 'blank id' }, seq: 3 },
+    ];
+    const { container } = render(
+      <HistoryList
+        events={rows}
+        nameOf={() => 'Anselma Marak'}
+        stateName={(id) => id}
+        typeName={(id) => id}
+      />,
+    );
+
+    const headlines = [...container.querySelectorAll('.gn-history__type')].map((n) => n.textContent);
+    expect(headlines).toEqual(['ticket.something_new', 'ticket.field_set', 'ticket.field_set']);
+    // Nothing invented: no `undefined`, no empty interpolation, no double space.
+    for (const headline of headlines) {
+      expect(headline).not.toMatch(/undefined|\[object|null/);
+      expect(headline).not.toMatch(/\s\s/);
+    }
+    // No second copy of a name that IS the headline.
+    expect(container.querySelectorAll('.gn-history__slug')).toHaveLength(0);
+  });
+
+  /**
+   * 3.181 / E4-19 — WITH NO RESOLVERS the sentences still narrate, falling back
+   * to the raw ids.
+   *
+   * This is the same floor `nameOf` gives the actor line, and it is asserted
+   * rather than assumed because the sheet is not the only caller: a resolver
+   * that answers nothing — a workflow read that failed, a ladder that 404'd —
+   * must leave a sentence that names the id, never a blank and never an
+   * invented name.
+   */
+  it('3.181 — with no resolvers the sentence still names something, by raw id', () => {
+    const { container } = render(
+      <HistoryList
+        events={[
+          {
+            ...SKEWED,
+            id: 'e1',
+            type: 'ticket.created',
+            payload: { typeId: 'task', projectId: 'prj', parentId: null, title: 'x' },
+            seq: 1,
+          },
+          { ...SKEWED, id: 'e2', type: 'ticket.transitioned', payload: { to: 'doing' }, seq: 2 },
+          { ...SKEWED, id: 'e3', type: 'ticket.assigned', payload: { assigneeId: 'user_anselma' }, seq: 3 },
+        ]}
+        nameOf={() => ''}
+      />,
+    );
+    expect(
+      [...container.querySelectorAll('.gn-history__type')].map((n) => n.textContent),
+    ).toEqual(['Created as task', 'Moved to doing', 'Assigned to user_anselma']);
   });
 });
 

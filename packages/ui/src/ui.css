@@ -2113,6 +2113,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-history { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.8rem; }
 .gn-history__headline { display: flex; gap: 0.6rem; align-items: baseline; }
 .gn-history__type { font-weight: 600; }
+/* E4-19 / E5-8 — the wire name, kept beside the sentence rather than as it.
+   Muted and one step down from the sentence so the reading order is sentence
+   first, slug second, and a reader who wants the event's own name still has it
+   without hovering anything (the product rules against `title=` for this, and
+   a tooltip is unreachable by touch and keyboard anyway). `font-family:
+   ui-monospace` is the small honest signal that this text is a wire identifier
+   and not prose a person wrote. */
+.gn-history__slug { color: var(--gn-text-muted); font-size: 0.85rem; font-family: ui-monospace, SFMono-Regular, Menlo, monospace; }
 .gn-history__actor { color: var(--gn-text); }
 .gn-history__origin { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-history__clocks { display: grid; grid-template-columns: auto auto; gap: 0.1rem 0.8rem; margin: 0.2rem 0 0; font-size: 0.85rem; }
