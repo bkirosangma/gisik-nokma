@@ -975,3 +975,41 @@ describe('11.82 the window width is the model\'s, stated once', () => {
     expect(container.querySelectorAll('.gn-timeline__row').length).toBeGreaterThan(0);
   });
 });
+
+/**
+ * E4-28 (batch B15, case `11.218`) — the timeline's own half of the same
+ * finding calendar-view.test.tsx's `11.217` covers: a bar's rendered text is
+ * its ticket title alone, and the date span lives only in the `title`
+ * attribute, not reliably read by assistive tech (it requires hover, which
+ * touch/mobile AT has no equivalent for). `docs/lanes/review-ui-exec4.md:446`.
+ */
+describe("11.218 a timeline bar's date span is a linked DESCRIPTION, not folded into its accessible name", () => {
+  it('keeps the accessible NAME exactly the ticket title, and links the dates as aria-describedby', () => {
+    renderTimeline([
+      ticket({
+        fields: {
+          title: claimField('Dated'),
+          startDate: claimField({ date: '2026-08-24' }),
+          dueDate: claimField({ date: '2026-08-28' }),
+        },
+      }),
+    ]);
+    // Unchanged from 11.73 above: proves this fix did not fold the date into
+    // the name a caller already depends on to find the control.
+    const bar = screen.getByRole('button', { name: 'Dated' });
+    const describedById = bar.getAttribute('aria-describedby');
+    expect(describedById).not.toBeNull();
+    const description = document.getElementById(describedById!);
+    expect(description).not.toBeNull();
+    const provenance = barProvenance(
+      { date: '2026-08-24', actorId: 'user_kiro' },
+      { date: '2026-08-28', actorId: 'user_kiro' },
+      userName,
+    );
+    expect(description).toHaveTextContent(provenance);
+    // Not a second, competing statement of the same text: the attribute the
+    // hover-only title carried is unchanged, and the description is the SAME
+    // string linked a second, AT-reachable way — not a duplicate invention.
+    expect(bar).toHaveAttribute('title', description!.textContent);
+  });
+});

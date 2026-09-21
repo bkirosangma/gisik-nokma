@@ -1,7 +1,8 @@
-import { useMemo, useState } from 'react';
+import { useId, useMemo, useState } from 'react';
 import { IST_DAY_REGEX } from '@gisik-nokma/domain';
 import type { WeekDays } from '../claims/dates.js';
 import type { UserNameFn } from '../claims/claim-labels.js';
+import { formatDate } from '../provenance.js';
 import type { TicketDatesInput } from '../claims/ticket-dates.js';
 import type { IsEpicType } from '../hierarchy/epic-ancestor.js';
 import type { FilterSpec } from '../view-types.js';
@@ -208,6 +209,7 @@ function itemClassName(item: CalendarItem, unplaceable: boolean): string {
 }
 
 export function CalendarView(props: CalendarViewProps) {
+  const idPrefix = useId();
   const [month, setMonth] = useState<CalendarMonth>(props.initialMonth ?? monthOf(props.today));
   const [expandedWeeks, setExpandedWeeks] = useState<ReadonlySet<number>>(new Set());
   /**
@@ -428,6 +430,10 @@ export function CalendarView(props: CalendarViewProps) {
                       data-today={isToday ? 'true' : undefined}
                       data-outside={outside ? 'true' : undefined}
                       aria-current={isToday ? 'date' : undefined}
+                      // E4-28: the day's full date, for the assistive-tech
+                      // reader landing on a cell whose only rendered text is
+                      // a bare number ("31", "1", "2") with no month or year.
+                      aria-label={formatDate(day)}
                     >
                       {/* The spec's "Today ring" — a 24px accent circle around
                           the NUMBER, not an outline around the whole cell (the
@@ -462,12 +468,24 @@ export function CalendarView(props: CalendarViewProps) {
                   // key is positional rather than id-derived.
                   const key = `${itemIndex}:${item.kind}:${item.ticketId}`;
                   const pending = item.kind === 'bar' ? item.pending : item.claim.pending;
+                  // E4-28: a bar's rendered text is the ticket title alone —
+                  // unlike a marker's `item.label` (see the docblock below),
+                  // it names no date at all, and the date lives only in the
+                  // `title` attribute, which is not reliably read by
+                  // assistive tech (it requires hover, which touch/mobile AT
+                  // has no equivalent for). Linked as a DESCRIPTION, not
+                  // folded into the accessible NAME `calendar-view.test.tsx`
+                  // pins to the ticket title alone — the same ARIA shape
+                  // `WorkspaceLinks` already uses and documents
+                  // (`apps/web/app/w/[workspaceId]/page.tsx`).
+                  const detailId = `${idPrefix}-detail-${week.days[0]}-${itemIndex}`;
                   return (
                     <li key={key} className="gn-calendar__slot" style={{ gridColumn }}>
                       <button
                         type="button"
                         className={itemClassName(item, unplaceable)}
                         title={item.kind === 'bar' ? item.provenance : item.tooltip}
+                        {...(item.kind === 'bar' ? { 'aria-describedby': detailId } : {})}
                         data-pending={pending ? 'true' : undefined}
                         data-unplaceable={unplaceable ? 'true' : undefined}
                         {...(item.kind === 'marker' && item.marker === 'custom'
@@ -489,6 +507,11 @@ export function CalendarView(props: CalendarViewProps) {
                           </>
                         )}
                       </button>
+                      {item.kind === 'bar' && (
+                        <span id={detailId} className="gn-visually-hidden">
+                          {item.provenance}
+                        </span>
+                      )}
                     </li>
                   );
                 })}

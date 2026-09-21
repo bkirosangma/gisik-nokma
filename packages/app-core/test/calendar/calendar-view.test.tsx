@@ -692,3 +692,73 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
     expect(screen.queryAllByRole('button', { name: /needed by 27 Aug/ })).toHaveLength(0);
   });
 });
+
+/**
+ * E4-28 (batch B15, case block `11.216`-`11.217`) — the grid's date
+ * relationships stop living by position alone. `docs/lanes/review-ui-exec4.md:446`:
+ * day cells carry only `data-day`/`data-today`/`data-outside`/`aria-current`
+ * (no `aria-label`, no `<time>`), and a bar's rendered text is its ticket
+ * title alone — the date span lives only in the `title` attribute, which is
+ * not reliably read by assistive tech (it requires hover, which touch/mobile
+ * AT has no equivalent for). A marker's own accessible name already carries
+ * its date (`item.label`, e.g. "needed by 30 Aug — Kiro's claim" —
+ * `itemClassName`'s sibling docblock: "the accessible name is the claim and
+ * nothing else"), so this fix does not touch markers.
+ */
+describe('11.216 every day cell names its own full date', () => {
+  it('carries the full date as an aria-label, not just a bare day-of-month number', () => {
+    renderCalendar([]);
+    // `[data-day]` rather than a text query: August AND the outside-July row
+    // both draw a cell whose bare number is "31" (below), so a query keyed
+    // on the rendered digit alone is ambiguous by construction here.
+    const cell = document.querySelector('[data-day="2026-08-23"]');
+    expect(cell).toHaveAttribute('aria-label', '23 Aug 2026');
+  });
+
+  it('names an outside-month cell by ITS OWN month, not the grid header’s', () => {
+    renderCalendar([]);
+    // 2026-08-23 is a Sunday; the grid's first row runs into July. `31` is
+    // the last day of July, rendered as an outside cell — and August also
+    // has a 31st, which is why this is queried by `data-day`, not by text.
+    const cell = document.querySelector('[data-day="2026-07-31"]');
+    expect(cell).toHaveAttribute('data-outside', 'true');
+    expect(cell).toHaveAttribute('aria-label', '31 Jul 2026');
+  });
+});
+
+describe("11.217 a bar's date span is a linked DESCRIPTION, not folded into its accessible name", () => {
+  it('keeps the accessible NAME exactly the ticket title, and links the dates as aria-describedby', () => {
+    renderCalendar([
+      ticket({
+        fields: {
+          title: claimField('Span'),
+          startDate: claimField({ date: '2026-08-24' }),
+          dueDate: claimField({ date: '2026-08-30' }),
+        },
+      }),
+    ]);
+    // Unchanged from the pre-existing "spans Monday to Sunday" case above:
+    // proves this fix did not fold the date into the name a caller already
+    // depends on to find the control.
+    const bar = screen.getByRole('button', { name: 'Span' });
+    const describedById = bar.getAttribute('aria-describedby');
+    expect(describedById).not.toBeNull();
+    const description = document.getElementById(describedById!);
+    expect(description).not.toBeNull();
+    expect(description).toHaveTextContent("starts 24 Aug — Kiro's claim · needed by 30 Aug — Kiro's claim");
+    // Not a second, competing statement of the same text: the attribute the
+    // hover-only title carried is unchanged, and the description is the SAME
+    // string linked a second, AT-reachable way — not a duplicate invention.
+    expect(bar).toHaveAttribute('title', description!.textContent);
+  });
+
+  it('links no description onto a marker, whose own label already names the date', () => {
+    renderCalendar([
+      ticket({
+        fields: { title: claimField('DLT'), dueDate: claimField({ date: '2026-08-30' }) },
+      }),
+    ]);
+    const marker = screen.getByRole('button', { name: "needed by 30 Aug — Kiro's claim" });
+    expect(marker).not.toHaveAttribute('aria-describedby');
+  });
+});
