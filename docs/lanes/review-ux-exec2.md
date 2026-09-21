@@ -1753,3 +1753,127 @@ typed draft, and both surfaces are visible at once so the person can see what ha
 ---
 
 *Batch 4 filed. Running total of round-2 new findings: `E2-20`–`E2-34` (15) — 8 Important, 7 Minor.*
+
+---
+
+# R2.10 — NEW FINDINGS, BATCH 5
+
+---
+
+### E2-35 (r2) — IMPORTANT · Deleting a ticket asks nothing, while the bulk close of the same soft delete gets a whole dialog
+
+**WHAT.** `packages/app-core/src/views/ticket-sheet.tsx:2612-2621` is the footer's Delete: a bare
+`<button … disabled={submitting} onClick={() => void deleteTicket()}>Delete</button>`. One press performs
+the delete; `deleteTicket` (`:1202-1206`) then closes the sheet and hands the host the notice whose only
+undo is the 15-second toast measured in `E2-30`.
+
+Its docblock (`:1192-1200`) argues the control is offered to **everyone** and the server decides — about
+*permission*, and it says nothing about confirmation.
+
+**WHY it is wrong — the product's own contrary practice is the measurement.** Bulk close is **the same
+soft delete** (`ticket.closed` on many tickets, undone the same way) and it is reached through a whole
+confirmation surface: `packages/app-core/src/views/bulk-close-dialog.tsx` is a dialog with per-row
+outcomes and its own failure copy, and "confirm" appears in it five times. So the product treats a
+multi-ticket close as needing a decision point and a single-ticket delete as not — although the single
+one is the **harder to notice and easier to trigger by accident** of the two, and it is gated on
+project-admin rights, which is the product's own signal that the act is consequential. The two facts
+that make the press costly are both measured: it removes the ticket from every view
+(`deleted_at IS NULL` throughout), and its inverse expires in 15 seconds (`E2-30`). A destructive,
+admin-gated, quarter-minute-reversible act with no confirmation step is the "refusal that arrives after
+the press" shape inverted — nothing asks, and the consequence arrives whole.
+
+**WHAT WOULD HAVE BEEN BETTER.** One confirmation naming the ticket and the consequence, in the shape
+`BulkCloseDialog` already establishes. The sheet already owns the mechanism to *ask first* rather than
+merely warn — `precheck` (`:672-692`) runs the shared engine locally for exactly this purpose — so the
+accept path can be gated on a local check with the server's refusal still the authority and still
+rendered verbatim. ⚠ I am **not** proposing the control be hidden: the docblock's argument that a hidden
+control cannot explain itself is sound and my `E2-2`/`V1` findings run the other way. The ask is for a
+confirmation, not a concealment.
+
+**MEASUREMENT.** Opened: `ticket-sheet.tsx:2612-2621` (the button and its only `disabled` term),
+`:1178-1206` (the docblock, whose subject is permission and not confirmation), `:672-692` (`precheck`);
+`bulk-close-dialog.tsx` (the contrasting confirmation surface, read in my round-1 pass).
+
+**Source:** carried candidate (round-1 §2e). **Severity: Important.** Connected to `E2-30`, which is the
+other half of the same act — that connection is deliberate, since round-2 §3 weighs a reason more when it
+connects to measured consequences.
+
+---
+
+### E2-36 (r2) — MINOR · A partly committed Move batch never reloads, so the sheet behind the refusal shows state the server no longer has
+
+**WHAT.** `ticket-sheet.tsx:711-745`: the batch is ordered `[...fieldEvents, transition]` (`:731`), and
+the reload lives **only in the all-committed branch** — `:733-738` `if (failed === undefined) { … 
+read.reload(); history.reload(); return; }`. On any failure the function sets `serverRefusal` (`:743-744`)
+and returns: **no reload.**
+
+**WHY it is wrong.** The batch is deliberately not atomic — field claims go first so a `require-field`
+rule sees the value the dialog just collected (`:708-710`). So the reachable case is: the person sets a
+priority in the Move dialog, the priority commits, the transition is **refused** — and the sheet behind
+the dialog still draws the old priority, because nothing re-read. The screen then shows a value the server
+has already replaced. A refusal is an outcome too, and a partly committed batch changes the ticket
+regardless of which half spoke. `bulk-close-dialog.tsx` models the correct treatment for the same batch
+shape: it reads every index and reports per index rather than collapsing to one verdict.
+
+**WHAT WOULD HAVE BEEN BETTER.** Reload on **any** answer, not only the happy one.
+
+**MEASUREMENT.** Opened: `ticket-sheet.tsx:705-745` (the ordering rationale, the single reload site, and
+the refusal arms that return without one).
+
+**Source:** carried candidate (round-1 §2e). **Severity: Minor** — the refusal is displayed, so the person
+is not misled about the outcome, only about the fields.
+
+---
+
+### E2-37 (r2) — MINOR · The New-ticket draft survives its own close, so reopening offers the last ticket's title with Create enabled
+
+**WHAT.** `packages/app-core/src/views/new-ticket-dialog.tsx` contains **zero `useEffect`** (measured), so
+none of its four `useState` values (`:96-106` — `title`, `typeId`, `parentId`, `startInFocus`) is ever
+reset. The dialog is mounted for the flow's whole life — `create-ticket-flow.tsx:359` `<NewTicketDialog
+open={dialogOpen} … />` — and both a successful create (`:246 setDialogOpen(false)`) and a Cancel
+(`:368 onClose={() => setDialogOpen(false)}`) only toggle `open`.
+
+**WHY it is wrong.** Reopening "New ticket" presents the previous ticket's title and type, with Create
+enabled at `:280` (`title.trim() === '' || typeId === ''` — non-empty on both counts), so **one press
+files a second ticket carrying the first one's title.** The same state survives a Cancel, so an abandoned
+draft reappears the next time the dialog is opened for something unrelated.
+
+**WHAT WOULD HAVE BEEN BETTER.** Clear the draft when the dialog closes, or key it per opening. ⚠ The
+mitigation is real and I am pricing it in: the stale title is **visible** in a text input, so a person who
+looks before typing will notice — which is why this is Minor and not the duplicate-write Critical that
+`E2-19` is. `E2-19` is a latch that can double-file *inside* one interaction; this needs the person to
+ignore what is on screen.
+
+**MEASUREMENT.** Opened: `new-ticket-dialog.tsx:96-118` and `:276-306`;
+`create-ticket-flow.tsx:244-248`, `:355-369`; `useEffect` count for the file is the grep in `E2-33`.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor.**
+
+---
+
+### E2-38 (r2) — MINOR · An archived project's own board does not say it is archived
+
+**WHAT.** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` contains **0 occurrences of `archived`**
+(case-insensitive, whole file, measured), while the screen a person must pass through to reach it says it
+prominently: `apps/web/app/w/[workspaceId]/page.tsx` matches **58** times, carrying the archive/restore
+controls and the `N archived · show` toggle.
+
+**WHY it is wrong.** The disclosure exists one screen up and is **absent at the place the person acts**.
+Someone who follows a bookmark or a stale link straight into an archived project's board meets a screen
+that looks ordinary — same board, same columns, same controls — with nothing indicating the project is
+retired, and every action they take there is adjudicated against a state the screen does not show.
+⚠ **The last clause is the part I did not measure:** I read that the disclosure is absent, and I did
+**not** verify which writes an archived project refuses. The finding is the disclosure gap and the
+inconsistency with the screen above it; the severity rests on that alone.
+
+**WHAT WOULD HAVE BEEN BETTER.** One line on the board naming the project's state — the same fact the
+workspace home already carries, so no new read is needed.
+
+**MEASUREMENT.** Occurrence counts above, run over both files in full. (The `M1` lead carried from
+round-1 §2d.)
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor.**
+
+---
+
+*Batch 5 filed. Running total of round-2 new findings: `E2-20`–`E2-38` (19) — 9 Important, 10 Minor.*
