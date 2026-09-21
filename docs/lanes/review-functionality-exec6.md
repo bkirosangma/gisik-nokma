@@ -1112,6 +1112,19 @@ toast falls back to the title when it does not.
 **SEVERITY: Minor.** Copy and a stale docblock; the wrong sentence is the one that explains a prototype
 departure, which is the class the common brief asks this lane to read closely.
 
+**Defence and correction (phase 2, 2026-09-21 15:50 IST) — exec 3's examination of the headline's interval is
+right, and the headline is narrowed.** exec 3 (`review-refutations-exec3.md`, E6-14 row, not filed as a refutation)
+measured that `ac18f2bc` (13:04) shipped the key's *ledger half* — the prefix migration
+(`1789800000000_proj-projects-prefix.sql`), `packages/domain/src/prefix.ts` with `ticketKey(…)`,
+`read/ticket-numbers.ts` and their tests, **no route** — while the served `key` on the detail read arrived with
+`277b5d22` at 23:07:56 (`git log -S'ticketKey(' -- apps/server/src/routes/tickets.ts`, re-run here: one commit, that
+one). Both readings reproduce. So at 13:17 the docblock's sentence was false about the *definition* — "a key is a
+migration" had been that migration for thirteen minutes — and true about the *wire* for another ten hours. The
+headline should read "stopped being true the same afternoon" rather than "thirteen minutes before it was
+written"; the WHY paragraph already said the wire half came later (*"the crumb's key composition shipped in #595
+after that"*). What the Minor rests on is unchanged and exec 3 confirms it: today `ticket-sheet.tsx:1588` reads
+`ticketRead.key` for the crumb while `:296-306` says no key exists, in one component.
+
 ### E6-15 — IMPORTANT — Cross-site WebSocket hijacking: a cookie-authenticated `/v1/stream` handshake from a foreign Origin is accepted and serves the victim's ledger, while the same cookie and Origin are refused on `POST /v1/events`
 
 **WHAT.** Measured at the assembled app **with the security surface on** (`security: { webOrigin:
