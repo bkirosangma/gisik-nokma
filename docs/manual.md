@@ -990,15 +990,20 @@ The notice clears itself next time something opens successfully.
 
 ### Setting who can see a job
 
-Open the job. On the Details tab there is a section headed **"Who can see this"** with four choices:
+Open the job. On the Details tab, the **Visibility** row holds a pill showing who can see the job
+right now — click it. A menu opens with four choices:
 
 - **Everyone in the workspace**
 - **Everyone on the project**
 - **Only the people I name** — a checklist of your workspace's people appears; tick who you want.
 - **Inherited from the parent** — whatever the job above it decided.
 
-Under every one of those, all the time, there is a line: *"Visible to: these people — and the workspace
-owner, always."*
+Pick one and press **Apply**. The menu closes once the change lands; if it does not land — a rule
+refused it, or the server could not be reached — the menu stays open with the reason shown beside the
+button, so you can try again without losing what you picked.
+
+Under every one of those choices, all the time, there is a line: *"Visible to: these people — and the
+workspace owner, always."*
 
 That line is a fact, not a caution. **The workspace owner can always see every job, whatever you set
 here.** It is shown on every option — not only the private one — because showing it only there would

@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
@@ -105,6 +105,20 @@ function committed(): IngestResult {
   };
 }
 
+/**
+ * A REFUSED source, the shape 3.110's inline literal already builds — hoisted
+ * here because Task 5's popover cases (16.118–16.122) need one too and a
+ * second hand-typed literal is a second chance for the two to drift.
+ */
+function refusingSource(rule: string, reason: string) {
+  return recordingSource({
+    status: 'refused',
+    eventId: '01J0000000000000000000000E',
+    rule,
+    reason,
+  });
+}
+
 function mount(
   overrides: Partial<React.ComponentProps<typeof VisibilityEditor>> = {},
   source = recordingSource(),
@@ -124,6 +138,24 @@ function mount(
   return source;
 }
 
+/**
+ * The pill IS the menu trigger (sheet prototype parity, Task 5, 2026-09-22):
+ * the fieldset, the people picker, the lockout warning, Apply, the refusal
+ * and the unreached sentence all live inside the `Popover` this opens, so
+ * every pre-existing case that touches one of those controls — by clicking
+ * OR merely by querying — must open the menu first. The regex matches every
+ * shape the trigger's own text takes: `'Who can see this…'` (no served
+ * audience), `'Only: …'` (a named or unserved explicit audience) and the
+ * three standing-mode labels (`Everyone …`/`Whatever the parent decided`
+ * begins with neither `Only:` nor `Everyone` — matched by `Whatever` instead).
+ */
+async function openMenu(user = userEvent.setup()) {
+  await user.click(
+    screen.getByRole('button', { name: /who can see this|only:|everyone|whatever the parent decided/i }),
+  );
+  return screen.getByRole('dialog', { name: 'Change who can see this' });
+}
+
 describe('3.104 the owner’s read bypass is disclosed, on every mode', () => {
   it('renders the pinned sentence with no mode chosen at all', () => {
     mount();
@@ -139,6 +171,7 @@ describe('3.104 the owner’s read bypass is disclosed, on every mode', () => {
   it('3.104 renders it under every one of the four modes, each checked alone', async () => {
     const user = userEvent.setup();
     mount();
+    await openMenu(user);
     for (const label of [
       'Everyone in the workspace',
       'Everyone on the project',
@@ -192,6 +225,7 @@ describe('3.105 the lockout warning warns and changes nothing', () => {
   it('shows the pinned sentence when the authored list omits its own author', async () => {
     const user = userEvent.setup();
     mount();
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
     await user.click(screen.getByRole('checkbox', { name: 'Anselma Marak' }));
     expect(screen.getByRole('alert')).toHaveTextContent(LOCKOUT_WARNING_COPY);
@@ -200,6 +234,7 @@ describe('3.105 the lockout warning warns and changes nothing', () => {
   it('3.105 does not show it once the author names themselves', async () => {
     const user = userEvent.setup();
     mount();
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
     await user.click(screen.getByRole('checkbox', { name: 'Anselma Marak' }));
     expect(screen.queryByText(LOCKOUT_WARNING_COPY)).not.toBeNull();
@@ -222,6 +257,7 @@ describe('3.105 the lockout warning warns and changes nothing', () => {
     const user = userEvent.setup();
     const source = recordingSource();
     mount({}, source);
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
     await user.click(screen.getByRole('checkbox', { name: 'Anselma Marak' }));
     await user.click(screen.getByRole('checkbox', { name: 'Dipu' }));
@@ -248,6 +284,7 @@ describe('3.107 the payload is the domain’s, and the two refusals are never bu
     const user = userEvent.setup();
     const source = recordingSource();
     mount({}, source);
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Everyone on the project' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     const event = source.submitted[0];
@@ -268,6 +305,7 @@ describe('3.107 the payload is the domain’s, and the two refusals are never bu
     const user = userEvent.setup();
     const source = recordingSource();
     mount({}, source);
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
     await user.click(screen.getByRole('checkbox', { name: 'Kiro' }));
     await user.click(screen.getByRole('radio', { name: 'Everyone in the workspace' }));
@@ -279,14 +317,19 @@ describe('3.107 the payload is the domain’s, and the two refusals are never bu
     const user = userEvent.setup();
     const source = recordingSource();
     mount({}, source);
+    // Every iteration's Apply COMMITS (the default source), and a committed
+    // Apply closes the menu (16.118) — so each mode's radio has to be reached
+    // through a FRESH `openMenu()`, not one opened before the loop.
     for (const label of [
       'Everyone in the workspace',
       'Everyone on the project',
       'Whatever the parent decided',
     ]) {
+      await openMenu(user);
       await user.click(screen.getByRole('radio', { name: label }));
       await user.click(screen.getByRole('button', { name: 'Apply' }));
     }
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
     await user.click(screen.getByRole('checkbox', { name: 'Kiro' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
@@ -312,6 +355,7 @@ describe('3.107 the payload is the domain’s, and the two refusals are never bu
     const user = userEvent.setup();
     const source = recordingSource();
     mount({}, source);
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Only the people I name' }));
     expect(screen.getByRole('button', { name: 'Apply' })).toBeDisabled();
     await user.click(screen.getByRole('button', { name: 'Apply' }));
@@ -331,6 +375,7 @@ describe('3.110 a refusal reaches the screen in the authority’s own words', ()
       reason: 'Only a project admin, or whoever created this ticket, may change who sees it.',
     });
     mount({}, source);
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Everyone in the workspace' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     const alert = await screen.findByRole('alert');
@@ -349,6 +394,7 @@ describe('3.110 a refusal reaches the screen in the authority’s own words', ()
       message: 'visibility.set with explicit mode requires a non-empty userIds list',
     });
     mount({}, source);
+    await openMenu(user);
     await user.click(screen.getByRole('radio', { name: 'Whatever the parent decided' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
     const alert = await screen.findByRole('alert');
@@ -448,8 +494,10 @@ describe('3.111 the standing audience — served where it is served, absent wher
    * Apply would then FILE that claim, and the user would have made it by not
    * touching anything.
    */
-  it('3.171 seeds the picker from the ticket’s own mode, never from the resolved audience', () => {
+  it('3.171 seeds the picker from the ticket’s own mode, never from the resolved audience', async () => {
+    const user = userEvent.setup();
     mount({ current: { ownMode: 'inherit', resolvedMode: 'project', userIds: null, claim: null } });
+    await openMenu(user);
     expect(screen.getByRole('radio', { name: 'Whatever the parent decided' })).toBeChecked();
     expect(screen.getByRole('radio', { name: 'Everyone on the project' })).not.toBeChecked();
   });
@@ -599,7 +647,8 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
    * that can only be refused**, which is why this is a negative assertion with a
    * positive control rather than an omission.
    */
-  it('17.006 offers no audience picker and no chip, and the members picker is the control', () => {
+  it('17.006 offers no audience picker and no chip, and the members picker is the control', async () => {
+    const user = userEvent.setup();
     mount({
       current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: null, claim: null },
       // `explicit` opens the members fieldset, so the section is in its
@@ -607,12 +656,17 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
       // empty render.
       canEdit: true,
     });
-    const section = document.querySelector('.gn-visibility');
-    expect(section).not.toBeNull();
+    // The fieldset now lives inside the trigger's popover (Task 5,
+    // 2026-09-22), portalled to `document.body` rather than nested under
+    // `.gn-visibility` — so the query root moves from the section to the
+    // dialog, and the member-name walk below moves from the section to the
+    // whole document (the dialog is not a descendant of `.gn-visibility`
+    // either).
+    const dialog = await openMenu(user);
     // The PICKER half — the prototype's `<select>` over `viewerCandidates`
     // (`desktop.dc.html:1225-1229`). A tag name is a property, not a spelling.
-    expect(section?.querySelector('select')).toBeNull();
-    expect(section?.querySelector('option')).toBeNull();
+    expect(dialog.querySelector('select')).toBeNull();
+    expect(dialog.querySelector('option')).toBeNull();
 
     /**
      * ⚠ THE CHIP HALF WAS A CHECK THAT COULD NOT FAIL FOR WHAT IT NAMED, AND A
@@ -639,8 +693,7 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
     // two hand-written walks could disagree without either noticing.
     const walkForMemberNames = (where: 'outside-picker' | 'inside-picker'): string[] => {
       const found: string[] = [];
-      if (section === null) return ['<no section>'];
-      for (const element of Array.from(section.querySelectorAll('*'))) {
+      for (const element of Array.from(document.body.querySelectorAll('*'))) {
         const insidePicker = element.closest('.gn-visibility__person') !== null;
         if (where === 'outside-picker' ? insidePicker : !insidePicker) continue;
         // ⚠ EACH ELEMENT'S OWN TEXT, NOT `textContent`. The first version of
@@ -672,14 +725,14 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
     expect(walkForMemberNames('inside-picker')).toHaveLength(MEMBERS.length);
     // …and the control for THAT control: the picker is genuinely rendered, in
     // its most-populated state, so neither scan is passing over an empty shell.
-    expect(section?.querySelectorAll('.gn-visibility__person').length).toBe(MEMBERS.length);
-    expect(section?.querySelectorAll('.gn-visibility__mode').length).toBeGreaterThan(0);
+    expect(dialog.querySelectorAll('.gn-visibility__person').length).toBe(MEMBERS.length);
+    expect(dialog.querySelectorAll('.gn-visibility__mode').length).toBeGreaterThan(0);
 
     // E4-6 — AND THE NAMELESS MEMBER IS OFFERED BY EMAIL, NOT BY ULID. The picker
     // rendered `actorLabel(id, name)`, whose fallback is the raw id — right for a
     // CLAIM this screen attributes, wrong for a box a person ticks. The email is
     // the better handle; the id is still better than a blank.
-    const pickerText = Array.from(section!.querySelectorAll('.gn-visibility__person'))
+    const pickerText = Array.from(dialog.querySelectorAll('.gn-visibility__person'))
       .map((el) => el.textContent)
       .join('|');
     expect(pickerText).toContain('accountant@e2e.gisik-nokma.local');
@@ -738,8 +791,13 @@ describe('E2-33c a reload that changes the standing claim re-seeds the fieldset'
   const chosenMode = (): HTMLInputElement | null =>
     document.querySelector<HTMLInputElement>('input[name="gn-visibility-mode"]:checked');
 
-  it('PLANTED DEFECT: the fieldset follows the standing claim when the claim moves under it', () => {
+  it('PLANTED DEFECT: the fieldset follows the standing claim when the claim moves under it', async () => {
+    const user = userEvent.setup();
     const view = mountEditor({ current: standing('explicit', [ANSELMA]) });
+    // `menuOpen` is this component's own state, unaffected by the `rerender`
+    // below (same instance, same position) — opened once here, it stays open
+    // for both the pre- and post-rerender assertions.
+    await openMenu(user);
     expect(chosenMode()?.value).toBe('explicit');
     expect(screen.getByRole('checkbox', { name: 'Anselma Marak' })).toBeChecked();
 
@@ -764,8 +822,10 @@ describe('E2-33c a reload that changes the standing claim re-seeds the fieldset'
     expect(screen.queryByRole('checkbox', { name: 'Anselma Marak' })).toBeNull();
   });
 
-  it('a reload that re-delivers the SAME claim leaves a half-authored fieldset alone', () => {
+  it('a reload that re-delivers the SAME claim leaves a half-authored fieldset alone', async () => {
+    const user = userEvent.setup();
     const view = mountEditor({ current: standing('explicit', [ANSELMA]) });
+    await openMenu(user);
 
     // The person starts editing: somebody added to the roster.
     const dipu = screen.getByRole('checkbox', { name: 'Dipu' });
@@ -814,12 +874,15 @@ describe('17.064 a rejected visibility write (V3)', () => {
     };
     mount({}, source);
 
+    await openMenu(user);
     await user.click(await screen.findByRole('radio', { name: 'Everyone in the workspace' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
 
     expect(await screen.findByText(writeUnreachedCopy(cause))).toBeInTheDocument();
     // THE HALF THE DEFECT IS NAMED FOR: before the fix the control stayed
-    // disabled for ever, so a reader could neither retry nor understand.
+    // disabled for ever, so a reader could neither retry nor understand. A
+    // transport failure does NOT close the menu (only a committed write
+    // does, 16.118) — the Apply button is still there to find.
     expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 
@@ -834,11 +897,76 @@ describe('17.064 a rejected visibility write (V3)', () => {
     const onChanged = vi.fn();
     mount({ onChanged });
 
+    await openMenu(user);
     await user.click(await screen.findByRole('radio', { name: 'Everyone in the workspace' }));
     await user.click(screen.getByRole('button', { name: 'Apply' }));
 
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     expect(screen.queryByText(/could not reach the server/)).toBeNull();
-    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+    // ⚠ CHANGED FROM "Apply is enabled" TO "the menu closed" (Task 5,
+    // 2026-09-22): a committed write now closes the popover (16.118), taking
+    // the Apply button with it — there is no longer a button to find enabled.
+    // The dialog closing IS the stronger evidence a clean commit leaves
+    // nothing stuck; `waitFor` because the close is a state update the same
+    // `apply()` call makes, not a synchronous DOM mutation from the click.
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+});
+
+/**
+ * §16 `16.118`–`16.122` — sheet prototype parity, Task 5 (2026-09-22). The
+ * pill becomes a menu trigger; the controls it opens are unchanged (proven
+ * above, now reached through `openMenu()`); this block is what is NEW: the
+ * dialog itself, and the read-only viewer chips under it.
+ */
+describe('16.118 the visibility pill is a menu trigger', () => {
+  it('16.118 clicking the pill opens a dialog holding the four modes and Apply; Apply on success closes it', async () => {
+    const user = userEvent.setup();
+    const source = mount({ current: { ownMode: 'project', resolvedMode: 'project', userIds: null, claim: null } });
+    const dialog = await openMenu(user);
+    expect(within(dialog).getAllByRole('radio')).toHaveLength(4);
+    await user.click(within(dialog).getByRole('radio', { name: 'Everyone in the workspace' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+    expect(source.submitted).toHaveLength(1);
+  });
+
+  it('16.119 Apply on a REFUSAL leaves the menu open with the refusal inside it', async () => {
+    const user = userEvent.setup();
+    mount(
+      { current: { ownMode: 'project', resolvedMode: 'project', userIds: null, claim: null } },
+      refusingSource('visibility.forbidden', 'not yours'),
+    );
+    const dialog = await openMenu(user);
+    await user.click(within(dialog).getByRole('radio', { name: 'Everyone in the workspace' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Apply' }));
+    expect(await within(dialog).findByText(/not yours/)).toBeInTheDocument();
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+  });
+
+  it('16.120 an explicit audience draws one READ-ONLY chip per named person under the pill, with no remove control', () => {
+    mount({ current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: [KIRO, ANSELMA], claim: null } });
+    const viewers = screen.getByTestId('visibility-viewers');
+    expect(within(viewers).getByText('Kiro')).toBeInTheDocument();
+    expect(within(viewers).getByText('Anselma Marak')).toBeInTheDocument();
+    expect(within(viewers).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  it('16.121 with NO served audience the pill still exists so the menu can be reached', async () => {
+    const user = userEvent.setup();
+    mount({ current: null });
+    expect(await openMenu(user)).toBeInTheDocument();
+  });
+
+  it('16.122 Escape closes the menu and returns focus to the pill', async () => {
+    const user = userEvent.setup();
+    mount({ current: { ownMode: 'project', resolvedMode: 'project', userIds: null, claim: null } });
+    await openMenu(user);
+    await user.keyboard('{Escape}');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // `FocusScope` restores inside a `requestAnimationFrame` (`popover.tsx`'s
+    // own docblock; `select.test.tsx`'s E4-17 cases hit the same timing), so
+    // the settle is async.
+    await waitFor(() => expect(document.activeElement?.getAttribute('aria-haspopup')).toBe('dialog'));
   });
 });

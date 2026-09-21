@@ -5125,15 +5125,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open the job. On the Details tab there is a section headed "
+                    "text": "Open the job. On the Details tab, the "
                   },
                   {
                     "kind": "bold",
-                    "text": "\"Who can see this\""
+                    "text": "Visibility"
                   },
                   {
                     "kind": "text",
-                    "text": " with four choices:"
+                    "text": " row holds a pill showing who can see the job right now — click it. A menu opens with four choices:"
                   }
                 ]
               },
@@ -5180,7 +5180,24 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Under every one of those, all the time, there is a line: "
+                    "text": "Pick one and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Apply"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". The menu closes once the change lands; if it does not land — a rule refused it, or the server could not be reached — the menu stays open with the reason shown beside the button, so you can try again without losing what you picked."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Under every one of those choices, all the time, there is a line: "
                   },
                   {
                     "kind": "italic",

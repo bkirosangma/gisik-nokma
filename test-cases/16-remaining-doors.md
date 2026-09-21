@@ -1242,3 +1242,53 @@ using, and `docker compose` is forbidden in this topology. Owner: whoever next r
   was dismissed, not absent. Case `9.260` is the 2x2 that separates the trigger from the probe's conditions, and the typed
   link is now a row in `9.88`'s trigger table. No production behaviour changed — the mechanism was always generic; the record
   was the defect. Recorded in `packages/editor/src/schema/extensions.ts` and `packages/editor/test/schema.test.ts` (`9.95`).
+
+## Sheet prototype parity, Task 5 — the visibility pill becomes a menu trigger (lane A / claude-sonnet, 2026-09-22) — cases `16.118`–`16.122`
+
+Spec `docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, decision 6–7; plan
+`docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md` Task 5. Drawn from this lane's block
+`16.110`–`16.129`, minted `16.118`–`16.122`: `16.110`–`16.117` and `16.123`–`16.129` are Tasks 3, 4,
+6 and 8's, which touch `ticket-sheet.tsx` and wait for the priority-built-in PR to land before
+rebasing onto it — out of scope for this lane. The sheet-side mount of `VisibilityEditor` into the
+`field-visibility` row is Task 4's, not this one's (the plan's own Task 5 header says so); this
+component's tests drive it directly, as they always have.
+
+`VisibilityEditor`'s standing chip (`packages/app-core/src/views/visibility-editor.tsx`) is now the
+`aria-haspopup="dialog"` trigger for a `Popover` (Task 1) holding the SAME fieldset, people picker,
+lockout warning, Apply button, refusal and unreached sentence this component always had — moved,
+not rebuilt. Every pre-existing case in `visibility-editor.test.tsx` that touches one of those
+controls now opens the menu first, via an `openMenu()` helper; the file's own `it(` count moved from
+30 to 35 (5 new, 0 dropped) — see `test/views/visibility-editor.test.tsx`. `ticket-sheet.test.tsx`'s
+four `.gn-visibility__standing`/`role=region` cases (3.116, 3.117, 3.174, 3.175) are untouched and
+still pass: the trigger's dot/mode span nests inside `.gn-visibility__standing`, unchanged from
+before, and the section keeps its `aria-label`.
+
+- ✅ **16.118 — clicking the pill opens a `role="dialog"` named "Change who can see this", holding
+  all four visibility-mode radios and Apply; Apply on a committed write closes it.** The success arm
+  is asserted on TWO facts together — the dialog closes AND the write actually reached the source
+  (`source.submitted`) — because either alone passes over the other: a component that closed on
+  every click regardless of the write, or one that submitted but left the dialog stuck, would each
+  satisfy one half.
+- ✅ **16.119 — Apply on a REFUSAL leaves the menu open, with the refusal rendered inside it.** The
+  refusal text and the dialog's continued presence are the same case: a component that closed on
+  every Apply (success or not) would pass a "refusal renders" assertion taken alone, if the dialog
+  vanished before the text could be read.
+- ✅ **16.120 — an explicit, named audience draws one read-only chip per person under the pill, and
+  none of them is a button.** The prototype's row (`desktop.dc.html:1214-1222`) carries a `×` and an
+  `Add someone…` select; this build has neither, because both are per-person writes it does not
+  have — the people checklist inside the menu is the one write path and stays there. Asserted as a
+  `queryAllByRole('button')` count of zero, not as an absent class, so a future chip that grows a
+  remove control without renaming anything still reddens here.
+- ✅ **16.121 — with no served audience (`current: null`) the trigger still exists and still opens
+  the menu.** The unserved sentence ("not being served yet") is not an excuse to make the control
+  unreachable — a person on the offline replica still needs a way to set an audience going forward.
+- ✅ **16.122 — Escape closes the menu and returns focus to the pill.** `FocusScope`'s restore is
+  `requestAnimationFrame`-based (the same mechanism `Popover`'s own tests and `select.tsx`'s E4-17
+  cases hit), so the focus assertion is `waitFor`-wrapped rather than synchronous — a synchronous
+  read here is a timing race, not a measurement of the component being wrong, and the plan's own
+  draft test read it synchronously and would have failed on its first run for exactly that reason.
+
+`Features.md`'s visibility bullet is extended in the same commit: the pill is a menu trigger, the
+controls move into the popover unchanged, and read-only viewer chips appear under an explicit named
+audience. `docs/manual.md` §10 is rewritten to describe clicking the pill rather than a
+static section. — `packages/app-core/src/views/visibility-editor.tsx`, `packages/app-core/test/views/visibility-editor.test.tsx`, `packages/ui/src/ui.css`
