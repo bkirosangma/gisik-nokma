@@ -40,6 +40,12 @@ export type TicketEditorProps = {
    * mount is the description or the comment.
    */
   label?: string;
+  /**
+   * The `id` of a visible element whose words name this composer — exec1 P21.
+   * Beats `label` when both are given, because it points at the words rather
+   * than copying them; see the docblock at the host attribute below.
+   */
+  labelledBy?: string;
 };
 
 export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
@@ -130,7 +136,23 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
       attributes: {
         role: 'textbox',
         'aria-multiline': 'true',
-        ...(props.label === undefined ? {} : { 'aria-label': props.label }),
+        // TWO ways to be named, and they are MUTUALLY EXCLUSIVE on the host
+        // rather than a fallback chain, because `aria-labelledby` wins the
+        // accessible-name computation anyway: emitting both would put a second,
+        // silently-ignored copy of the words in the DOM for the next reader to
+        // find and trust.
+        //
+        // `labelledBy` points at the caption a sighted reader can see, so there
+        // is ONE source for the words (exec1 P21 — the description row's `<dt>`).
+        // `label` supplies words where no visible caption exists (the comment
+        // composer). Neither given → the host stays honestly unnamed rather than
+        // carrying an EMPTY `aria-label`, which is a name of zero characters: a
+        // labelled-but-silent field, the opposite of the gap.
+        ...(props.labelledBy === undefined
+          ? props.label === undefined
+            ? {}
+            : { 'aria-label': props.label }
+          : { 'aria-labelledby': props.labelledBy }),
       },
     },
     onCreate: () => {

@@ -93,6 +93,7 @@ type AppCoreEditorSlotProps = {
   ticketId: string;
   placeholder?: string;
   autoFocus?: boolean;
+  labelledBy?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
