@@ -382,7 +382,7 @@ export default function InboxPage() {
   }
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav />
       {/*
         The header ROW — title and filter beside each other, which is where the

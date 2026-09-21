@@ -452,6 +452,29 @@ describe('AccountPage — Your workspaces', () => {
     expect(screen.getByText('0 projects')).toBeInTheDocument();
   });
 
+  it('E5-12 counts LIVE projects and names the archived half, the unit /workspaces already uses', async () => {
+    render(
+      <Providers services={stubServices({
+        getMyWorkspaces: async () => [
+          // One live, one archived. This row counted the WHOLE array, so it read
+          // "2 projects" while `/workspaces`' card read "1 project · 1 archived"
+          // for the same workspace — one word, two measurements, neither screen
+          // naming its unit.
+          workspace({ id: 'w1', name: 'Convenience Corner', role: 'owner', projects: [
+            { id: 'p1', name: 'Delivery', prefix: 'DL', archived: false, ticketCount: 3, blockedCount: 0 },
+            { id: 'p2', name: 'Winter stock', prefix: 'WS', archived: true, ticketCount: 1, blockedCount: 0 },
+          ] }),
+        ],
+      }, {})}>
+        <AccountPage />
+      </Providers>,
+    );
+    expect(await screen.findByText('Convenience Corner')).toBeInTheDocument();
+    expect(screen.getByText('1 project · 1 archived')).toBeInTheDocument();
+    // The whole-array reading must be gone, not merely joined by the right one.
+    expect(screen.queryByText('2 projects')).toBeNull();
+  });
+
   /**
    * Added with the Account styling port, and the one piece of NEW BEHAVIOUR
    * in it: the desktop prototype's row is a control that opens the workspace,

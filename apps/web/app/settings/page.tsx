@@ -150,9 +150,11 @@ function typeEditHref(workspaceId: string, typeId: string): string {
  */
 export default function SettingsPage() {
   return (
-    <Suspense fallback={<main className="gn-shell" />}>
-      <SettingsContent />
-    </Suspense>
+    <>
+      <Suspense fallback={<main className="gn-shell" />}>
+        <SettingsContent />
+      </Suspense>
+    </>
   );
 }
 
@@ -167,7 +169,7 @@ function SettingsContent() {
   const workspaceName = useWorkspaceName(workspaceId ?? undefined);
 
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId ?? undefined} />
       <h1 className="gn-page-title">Settings</h1>
       {/* `gn-workspace-list__role--pinned` (Task 7 fix round 1, ROUTED 3): a

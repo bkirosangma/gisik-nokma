@@ -1412,7 +1412,13 @@ Task 4, Task 7 ×3, Task 8). Block `13.403`–`13.410`, minted per the corrected
   (`· +1 more`); and when `countsWithheld` is true the suffix drops the number (`· and more`) rather than
   leaking one to a guest — 13.380's own property ("no number anywhere") applied to a second surface. Six
   cases total (`projectLine`), plus three for the sibling `projectCountLine` (singular, plural, and
-  renders nothing at zero, the same withholding rule `restrictedLine` keeps). —
+  **says "No projects yet" at zero** — E5-36, 2026-09-21). That third one used to be "renders nothing at
+  zero, the same withholding rule `restrictedLine` keeps", borrowed from a rule whose reason does not
+  reach it: `restrictedLine`'s zero rule is about a person with nothing withheld being told about
+  withholding, and `projectCountLine` carries no withholding. What `null` bought was a founder's fresh
+  card — avatar, name, chips, "You're an owner here." — with no mention of projects and no pointer to the
+  New-project form that `docs/manual.md:174` sends an owner to. A withheld viewer is unaffected because
+  the caller gates the line on `!viewer.countsWithheld`, so the rule now lives where it was doing work. —
   (`apps/web/test/workspace-viewer.test.ts`)
 - **13.406** ✅ **The `/workspaces` page-head summary is gated on `workspaces !== null &&
   workspaces.length > 0`, both halves independently proven** — a REFUSED read is `null` exactly like an
@@ -2250,6 +2256,59 @@ would have missed it is a sweep of the files the change was *about*.
 - **No accessible-name baseline was re-run.** The control's accessible name is UNCHANGED in count and in
   string on this route (one `Rename <workspace>` before, one after — the second button never carried one),
   so the ratchet should not move; that is a prediction, not a measurement.
+
+## The level-1 heading names the PAGE, not the action (exec4 E4-5, 2026-09-21) — case `13.995`
+
+- **13.995** ✅ The workspace home's level-1 heading NAMES THE PAGE rather than the action: the `h1` takes
+  its accessible name from the `<span>` holding the visible workspace name via `aria-labelledby`, so a real
+  browser renders `heading "Convenience Corner" level="1"` with `button "Rename Convenience Corner"` still
+  its own node — where before it rendered `heading "Rename Convenience Corner" level="1"`, the heading
+  inheriting the rename button's label. The control's own `aria-label` is untouched, and the owner's
+  2026-09-19 shape (ONE control, inside the `h1`, its visible text the name) is intact. Mutation-witnessed:
+  removing the attribute reddens exactly this case and leaves the other thirty-two green
+  (`Tests 1 failed | 32 passed (33)`). ⚠ The suite arm asserts the MECHANISM, not the outcome — jsdom's
+  name computation answers `Convenience Corner` for the defective shape too, so the outcome is witnessed by
+  the browser reading below. (`apps/web/test/workspace-home.test.tsx`)
+
+**Id `13.995`**, minted above the section's previous high-water mark of `13.994` (`13.999` in this file is a
+false hit from a `13.9999` in prose, not a case). The lane's request for an allocated block, recorded under
+`13.969`, is still open — this task was dispatched without one too.
+
+**E4-5's measured defect.** In a real browser, `<h1 class="gn-page-title"><button aria-label="Rename
+Convenience Corner">Convenience Corner</button></h1>` renders as `heading "Rename Convenience Corner"
+level="1"` — the button's label is inherited by the heading, so the page's level-1 heading names an ACTION.
+Every other route's heading names its page (`/workspaces` → `Workspaces — …`, the board → `Shop
+operations`). Headings are the primary navigation structure for a screen-reader user; filed IMPORTANT.
+
+**The fix, and the remedy it does NOT take.** `13.969`'s own record says the *"accessible name still carries
+the WORKSPACE (`Rename Convenience Corner`), unchanged"* — that sentence is about the CONTROL and it stands.
+E4-5 is about the HEADING, which nothing ruled on. The finding's own remedy — a plain `<h1>` beside an
+adjacent rename button — **would reverse the owner's 2026-09-19 shape ruling** and break `13.969` arms 1 and
+3, so it was not taken. Instead the `h1` carries `aria-labelledby` pointing at the `<span>` that holds the
+visible name: the heading names the page, and the button's own `aria-label` is untouched. The finding's
+objection to naming the heading directly (`<h1 aria-label="…">` *"hides the button's purpose"*) does not
+reach this mechanism — that is why it is the one used.
+
+**MEASURED, both shapes, in Chrome** (`take_snapshot verbose`, real accessible-name computation):
+
+- BEFORE — `heading "Rename Convenience Corner" level="1"`, reproducing the finding's line 40.
+- AFTER — `heading "Convenience Corner" level="1"` with `button "Rename Convenience Corner"` still its own
+  node. The heading names the page; the control keeps its purpose; still ONE element, so `13.969` holds.
+
+⚠ **jsdom cannot witness this defect, and the case does not pretend it can.** `@testing-library`'s
+accessible-name computation answers `Convenience Corner` for the DEFECTIVE shape too — measured against an
+isolated `<h1><button aria-label="Rename X">X</button></h1>`, where it reports `Name "Convenience Corner"`
+for the h1 and `Name "Rename Convenience Corner"` for the button. `dom-accessibility-api` diverges from
+Chrome on a labelled descendant of a name-from-content element. So the outcome assertion in the case is
+**green before and after**, and is kept only because it pins the shape the browser measurement depends on.
+The witness is the `aria-labelledby`-resolves-to-the-visible-name arm, and it is **mutation-witnessed**:
+removing the attribute reddens exactly this case (`Tests 1 failed | 32 passed (33)`) while the other
+thirty-two stay green.
+
+**The browser reading is taken on the SHAPES as standalone HTML, not on the app's own render** — the app
+reading is the reviewer's painted measurement, which agrees with the BEFORE shape. What this case pins in
+the suite is the mechanism; the outcome witness lives in that browser reading and in
+`page.tsx`'s `RENAME_NAME_ID` docblock.
 
 ## The project description (door A, 2026-09-19) — cases `13.976`–`13.987`
 

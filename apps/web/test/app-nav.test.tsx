@@ -784,6 +784,55 @@ describe('Round 24 the account menu', () => {
   });
 
   /**
+   * 13.1059 — exec1 P22 — **the menu carries a NAME, and it reaches the DOM.**
+   *
+   * `role="menu"` requires an accessible name, and this one had none: a screen
+   * reader announced "menu" with nothing about whose. A third menu in the same
+   * product — `last-project-nav.tsx`'s `aria-label="Projects"` — already showed
+   * the pattern this one was missing.
+   *
+   * The declaration is swept in `menu-accessible-name.test.tsx`; THIS is the arm
+   * that reads the name off the rendered element, so a label declared but never
+   * reaching the DOM reddens here. Queried by role AND name on purpose: the
+   * fixture has no second menu, so `getByRole('menu')` alone would stay green
+   * against an unnamed menu.
+   */
+  it('13.1053 the top bar is a named "Main" landmark, reached by role and name', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+
+    // POSITIVE CONTROL: the bar rendered a navigation landmark at all, so a
+    // green below cannot mean "there was no landmark to name".
+    expect(screen.getByRole('navigation')).toBeInTheDocument();
+
+    // THE WITNESS — `Unable to find an accessible element with the role
+    // "navigation" and name "Main"` before the fix. This bar co-renders with a
+    // second, already-labelled `<nav>` on several routes, which is exactly why
+    // the name is the only thing telling a reader which one they are in.
+    expect(screen.getByRole('navigation', { name: 'Main' })).toBeInTheDocument();
+  });
+
+  it('13.1059 the account menu is named "Account", reached by role and name', async () => {
+    currentPath = '/workspaces';
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    // POSITIVE CONTROL: the trigger opened a menu at all.
+    await userEvent.click(screen.getByRole('button', { name: 'Account menu for Kiro' }));
+    expect(screen.getByRole('menu')).toBeInTheDocument();
+
+    // THE WITNESS — `Unable to find an accessible element with the role "menu"
+    // and name "Account"` before the fix.
+    expect(screen.getByRole('menu', { name: 'Account' })).toBeInTheDocument();
+  });
+
+  /**
    * 13.420 — Escape closes AND returns focus to the trigger.
    *
    * The focus half is the load-bearing one. Closing without it strands focus at
