@@ -11,6 +11,7 @@ import { IST_CLOCK_NOTE, newSubmittedEvent, plainTextToDoc, renderContestedClaim
 import { EDITOR_HTML } from '../editor/editor-html.generated.js';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
 import { loadTicket } from './ticket-read.js';
+import { buildCommentEvent } from './ticket-comment.js';
 
 type EditorDoc = Exclude<EditorWebViewProps['initialDoc'], null>;
 
@@ -49,20 +50,13 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
   const onComment = (): void => {
     if (state === null || state === undefined) return;
     setError(null);
+    // Interim, flagged by the plan this task adapts: the session user id is
+    // not wired up (no auth flow in this shell yet), so buildCommentEvent
+    // claims a placeholder that cannot resolve to any workspace member
+    // (E2-42) rather than guessing the ticket's assignee. Becomes the real
+    // signed-in user once Plan 6's session handling reaches this app.
     void ds
-      .ingest([
-        newSubmittedEvent({
-          workspaceId: state.workspaceId,
-          entity: { kind: 'ticket', id: ticketId },
-          type: 'comment.added',
-          payload: { body: draft },
-          // Interim, flagged by the plan this task adapts: the session user id
-          // is not wired up (no auth flow in this shell yet). Becomes the real
-          // signed-in user once Plan 6's session handling reaches this app.
-          actorId: state.assigneeId ?? 'me',
-          origin: 'mobile',
-        }),
-      ])
+      .ingest([buildCommentEvent({ workspaceId: state.workspaceId, ticketId, body: draft })])
       .catch((err: unknown) => {
         if (err instanceof OfflineAcceptError) return; // queued locally — the expected offline outcome
         setError(err instanceof Error ? err.message : 'comment refused');
@@ -136,6 +130,9 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
       ))}
       <EditorWebView initialDoc={draft} onChange={setDraft} html={EDITOR_HTML} />
       {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
+      <Text accessibilityRole="text">
+        Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.
+      </Text>
       <Button title="Comment" onPress={onComment} />
     </ScrollView>
   );

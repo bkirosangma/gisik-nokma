@@ -2821,3 +2821,20 @@ unheard.*
   loading) — the first fix's "no answer yet" vs "the answer failed" distinction the ruling asked for. —
   (`apps/mobile/src/screens/ticket-read.test.ts`)
 
+## Ruling E2-42 — a phone comment's envelope never claims a real member's id (2026-09-21, B14)
+
+*`onComment` claimed `actorId: state.assigneeId ?? 'me'` — a real workspace member's id whenever the
+ticket had one, which is the envelope's claim of authorship (`packages/domain/src/submit.ts:4-7`). The
+sync door's actor-mismatch check refuses the claim whenever the device's bound identity is not that
+member, so the spoof never lands today, but the shape ships a path that CAN claim to be someone else.
+Fixed by extracting `buildCommentEvent` (`ticket-comment.ts`) so the envelope always claims
+`UNATTRIBUTED_ACTOR_ID = 'me'`, a placeholder `packages/domain`'s own `actorId: ulidString` check
+refuses rather than resolving — the function takes no assignee-shaped input, so there is nothing left
+to guess from.*
+
+- 12.401 ✅ `buildCommentEvent` always claims the non-resolvable placeholder — RED confirmed against a
+  pre-fix version that adopted a passed assignee id as `actorId` (real-member-01 was returned
+  unchanged); GREEN once the function stopped accepting an assignee-shaped input at all. Also asserts
+  the workspace/entity/type/payload/origin pass through unchanged. —
+  (`apps/mobile/src/screens/ticket-comment.test.ts`)
+
