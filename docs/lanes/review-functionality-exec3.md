@@ -1633,7 +1633,7 @@ docblock's own parenthetical does the same and says so).
 
 ---
 
-## 19. `E3-18` (r2) — **IMPORTANT (claimed)** — The two shipped `DataSource` implementations disagree about a dangling parent, and the offline one makes the existence claim case 6.68 was fixed to stop
+## 19. `E3-18` (r2) — **MINOR — revised DOWN from Important at §34** — The two shipped `DataSource` implementations disagree about a dangling parent, and the offline one makes the existence claim case 6.68 was fixed to stop
 
 **WHAT.** A ticket whose `parent_id` names a **ticket that was never created** is a reachable state in
 this product, and the two implementations of the ticket read answer it **differently**:
