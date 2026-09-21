@@ -34,6 +34,19 @@ check "gate: local origin/main still stale before the verb runs" '[ "$(cd "$gr" 
 check "gate: main moved past the branch (seen only by fetching) → refuses, names the remedy" 'out=$(gate_dry); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "is not an ancestor of HEAD.*Remedy: git merge --no-edit origin/main && git push, then re-run ctl gate"'
 ( cd "$gr" && /usr/bin/git merge -q --no-edit origin/main )
 check "gate: after merging origin/main → proceeds again" 'gate_dry | tail -1 | grep -q "^OK gate dry-run"'
+# gate copies the gate-lock scripts PER RUN and never on --dry-run. Measured 2026-09-21: the copy went to one shared
+# dir on every call, so a sibling's `ctl checks` (→ selftest → gate --dry-run) rewrote locked-test.sh under a running gate.
+ld=$(mktemp -d)
+check "gate: --dry-run copies nothing into the log dir" 'CTL_LOG_DIR="$ld" gate_dry >/dev/null; [ "$(ls "$ld" | wc -l | tr -d " ")" -eq 0 ]'
+# a fixture gate.sh that prints what the verb reads: the summary lines into the log ($1), EXIT/NODE on its console
+( cd "$gr" && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    33 successful, 33 total\nCached:    0 cached, 33 total\n" > "$1"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo helper > docs/lanes/gate-lock/locked-test.sh && /usr/bin/git add -A && /usr/bin/git commit -q -m "fixture gate" && /usr/bin/git push -q origin HEAD:main && /usr/bin/git fetch -q origin )
+# CTL_DRY_RUN=0 explicitly: the arg-parsing check above leaves CTL_DRY_RUN=1 in this shell, and a "real run" that is
+# silently a dry run prints `OK gate dry-run` — which a loose `^OK gate` grep accepted (measured writing this test).
+gate_real() { ( cd "$gr" && CTL_DRY_RUN=0 CTL_LOG_DIR="$ld" "$HERE/ctl" gate "$(/usr/bin/git rev-parse HEAD)" --repo "$gr" 2>&1 ); }
+check "gate: a real run is green on the fixture (a sha follows OK gate — not dry-run)" 'gate_real | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0"'
+check "gate: the real run copied both scripts into a per-run dir named like its log" 'd=$(ls -d "$ld"/gate-lock-* | head -1); run=${d##*/gate-lock-}; [ -f "$d/gate.sh" ] && [ -f "$d/locked-test.sh" ] && [ -f "$ld/gate-$run.log" ]'
+check "gate: no shared gate-lock dir was created" '[ ! -e "$ld/gate-lock" ]'
+check "gate: a second real run gets its own dir, the first copy stays" 'sleep 1; gate_real >/dev/null; [ "$(ls -d "$ld"/gate-lock-* | wc -l | tr -d " ")" -eq 2 ]'
 # check-pr.py: the merge of origin/main that gate now requires is not a task commit; a non-merge non-ruling subject still fails.
 cb=$(mktemp -d); /usr/bin/git init -q --bare "$cb"
 cr=$(mktemp -d); ( cd "$cr" && /usr/bin/git init -q . && /usr/bin/git symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes && printf '#### T-X1 — a task\n' > plan.md && printf '| T-X1 | done | abc | note |\n' > docs/lanes/release-2026-09-22-progress.md && echo one > docs/x.md && /usr/bin/git add -A && /usr/bin/git commit -q -m base && /usr/bin/git remote add origin "$cb" && /usr/bin/git push -q -u origin main && /usr/bin/git checkout -q -b feat && echo two > docs/x.md && /usr/bin/git commit -q -am "X1: change x" )

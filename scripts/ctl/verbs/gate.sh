@@ -19,9 +19,15 @@ sha="$head"
 /usr/bin/git fetch -q origin main 2>/dev/null || echo "WARN gate: fetch of origin/main failed — ancestry checked against the local ref"
 main_sha="$(/usr/bin/git rev-parse origin/main 2>/dev/null)" || ctl_fail gate "no origin/main in this repo"
 /usr/bin/git merge-base --is-ancestor "$main_sha" "$head" || ctl_fail gate "origin/main ${main_sha:0:12} is not an ancestor of HEAD ${head:0:12} — a --merge landing would produce a tree this gate never saw. Remedy: git merge --no-edit origin/main && git push, then re-run ctl gate on the NEW head: scripts/ctl/ctl gate \$(git rev-parse HEAD) (merge, never rebase: PR bodies cite lane commits by sha)"
-work="$(ctl_log_dir)/gate-lock"; mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
 log="$(ctl_log gate)"; console="$log.console"
-if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console"; ctl_ok gate "dry-run"; fi
+# The gate scripts are copied PER RUN, beside the run's log, and never on --dry-run: the copy used to go to one shared
+# gate-lock/ dir on every call, and `ctl checks` (→ check:ctl → this verb's dry-run) from any sibling rewrote
+# locked-test.sh while a running gate's bash was executing it — bash resumes at its byte offset in the NEW text
+# (measured 2026-09-21 22:55 and 22:58: "line 216: timed: command not found", "line 238: code: unbound variable").
+# The copy is left in place after the run: it is the evidence of what ran.
+base="$(basename "$log" .log)"; work="$(dirname "$log")/gate-lock-${base#gate-}"
+if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console (scripts would be copied to $work; nothing copied on --dry-run)"; ctl_ok gate "dry-run"; fi
+mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
 GATE_REPO="$CTL_REPO" bash "$work/gate.sh" "$log" > "$console" 2>&1; echo "GATE_WRAPPER_EXIT=$?" >> "$console"
 E=$(grep -m1 '^EXIT=' "$console"); T=$(grep -m1 'Tasks:' "$log" | sed 's/^.*Tasks:/Tasks:/'); C=$(grep -m1 'Cached:' "$log" | sed 's/^.*Cached:/Cached:/')
 N=$(grep -m1 'NODE=' "$console"); eng=$(grep -c 'Unsupported engine' "$log"); to=$(grep -c 'Hook timed out' "$log")
