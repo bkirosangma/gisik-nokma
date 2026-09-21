@@ -186,8 +186,50 @@ export function describeEvent(event: TicketHistoryEvent, ctx: HistoryCopyContext
       return 'Restored';
     case 'comment.added':
       return 'Comment added';
+    /**
+     * E5-8 — THE TWO THE FIRST PASS MISSED, and the census is what found them.
+     *
+     * `attachment.added` and `claim.contested_resolved` are both registered
+     * against entity kind `ticket` (`vocabulary.ts`) and both reach this tab,
+     * and neither had a sentence — they fell through to the wire name, which is
+     * the exact defect E4-19/E5-8 is about, surviving in two rows out of
+     * eighteen. A hand-written switch looks complete from the inside; the
+     * census in `history-copy.test.ts` reads the DOMAIN's own lists instead and
+     * asks each member whether it is narrated, so this class of gap cannot come
+     * back silently.
+     *
+     * `attachment.added` is a discriminated union of exactly two kinds
+     * (`ticket-events.ts`), and the sentence names the FILE — `filename` for an
+     * upload this product holds, `name` for a Drive pointer it does not. They
+     * are separate fields in the schema and they are kept separate here rather
+     * than coalesced into one lookup: an upload and a link are different claims
+     * and the person reading the ledger is entitled to know which they are
+     * looking at.
+     */
+    case 'attachment.added': {
+      const kind = str(payload, 'kind');
+      if (kind === 'upload') {
+        const filename = str(payload, 'filename');
+        return filename === null ? event.type : `Attached ${filename}`;
+      }
+      if (kind === 'drive-reference') {
+        const name = str(payload, 'name');
+        return name === null ? event.type : `Linked Drive file ${name}`;
+      }
+      return event.type;
+    }
     case 'claim.contested':
       return 'Conflicting claim recorded';
+    case 'claim.contested_resolved': {
+      const resolution = str(payload, 'resolution');
+      // The three resolved values are a closed enum in the domain
+      // (`contest-events.ts`), but this reads them as an opaque string and
+      // PRINTS WHAT ARRIVED rather than mapping them through a table of its
+      // own: the same discipline the publish banner keeps for rule names, and
+      // for the same reason — a fourth resolution added to the domain should
+      // read as itself here, not as a missing case.
+      return resolution === null ? event.type : `Conflicting claim resolved — ${resolution}`;
+    }
     default:
       return event.type;
   }
