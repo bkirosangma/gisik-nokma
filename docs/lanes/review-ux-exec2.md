@@ -1783,6 +1783,9 @@ case, where the loss is the sheet itself. Both mechanisms are the same missing `
 shared primitive, which is why I kept this at Minor for its own scope — the sheet-closing case belongs to
 their finding and is the more expensive one.
 
+**Source:** carried candidate (round-1 §2d). **Severity: Minor** — the loss is one keypress's worth of
+typed draft, and both surfaces are visible at once so the person can see what happened.
+
 ---
 
 *Batch 4 filed. Running total of round-2 new findings: `E2-20`–`E2-34` (15) — 8 Important, 7 Minor.*
