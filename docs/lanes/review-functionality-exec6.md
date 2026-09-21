@@ -218,9 +218,10 @@ assignee; three full read-door sweeps (non-member, guest, member off the project
 doors and 11 hostile payload shapes; the upload door; impossible due dates; blank names; leaving a workspace; an
 external person on an explicit list; the replica's five reads after a delete.
 
-**Citations, resolved mechanically at the end (13:50 IST):** every backticked `file:line` or `file:a-b` in this
-report was extracted (280 distinct) and checked against the tree — the file must resolve to exactly one path under
-`git ls-files` and the line must be within `wc -l`. **272 resolve; the 8 that do not are the staged export's
+**Citations, resolved mechanically at the end (13:50 IST, re-run 14:25 IST after E6-24):** every backticked
+`file:line` or `file:a-b` in this report was extracted (314 distinct at the re-run; 280 at 13:50) and checked
+against the tree — the file must resolve to exactly one path under `git ls-files` and the line must be within
+`wc -l`. **306 resolve; the 8 that do not are the staged export's
 `github.md` / `workspaces-gap.md` (outside the repo, cited by their staged path in prose) and one
 `node_modules` line (better-auth's `routes.mjs`, version stated).** Two ranges had overrun their files by one
 or two lines and 32 basenames were ambiguous across packages; all were corrected in `2afaf4e2` and earlier.
