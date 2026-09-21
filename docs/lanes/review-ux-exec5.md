@@ -517,7 +517,7 @@ previously muted `mention` and `contest`, this body un-mutes both.
 
 **WHY.** The page's own comment (`:74-80`) says the literal *"merely renders every kind as on for this visit, without
 asserting that fact about the account"* — and then `toggleKind` asserts it to the server. The sessions section
-(`sessions-section.tsx:55-60`) hedges its empty sentence for the same collapsed read — *"this component cannot tell
+(`sessions-section.tsx:56-63`) hedges its empty sentence for the same collapsed read — *"this component cannot tell
 which"* — while a signed-in person always has at least the current session, so "No signed-in devices to show" on
 `/account` (`[BROWSER]`) can only be a failed read painted as an empty state. This is the brief's expensive shape
 inverted: the server ACCEPTS a claim the client invented.
@@ -528,11 +528,69 @@ sessions (`:91`).
 
 **MEASUREMENT.** `[BROWSER]` JS transcript above (`cap` array: `[{GET, blocked:true}, {PUT, body:"{\"mutedKinds\":[\"assignment\"]}"}]`).
 `[SOURCE]` `account/page.tsx:74-81`, `:91`, `:215-232`; `notification-preferences-gateway.ts:18-22`;
-`sessions-section.tsx:55-60`.
+`sessions-section.tsx:56-63`.
 
 **SEVERITY: Important** (claimed). A person's stored settings are overwritten by a default the product itself says it
 is not asserting. I considered Critical (data loss) and held at Important because the loss is a preference document,
 re-settable in five clicks once noticed — but it will not be noticed.
+
+---
+
+### E5-14 — MINOR · Ten reorder arrows, all disabled, the reason only in a hover `title`; and the shipped seed already carries the rank tie the arrows exist to prevent `[BROWSER]` `[SOURCE]`
+
+**WHAT.** `/settings` → Ticket types: five rows, each with `↑`/`↓`; **all ten are `disabled`** (`[BROWSER]` control
+list: `Move Epic up [disabled]` … `Move Sub-task down [disabled]`), including the custom `Errand`. The only
+explanation is `title={moveBlocker(index, -1) ?? …}` (`ticket-type-list-screen.tsx:365`) — *"Built-in types keep
+their rank."* — a hover tooltip, with no touch or keyboard equivalent and no sentence on screen. And the list reads
+`Errand · rank 3` and `Task · rank 3` (`[BROWSER]`) under the line *"5 types. Rank orders them in every picker."*
+(`:336`).
+
+**WHY.** `moveBlocker` (`:225-233`) disables an arrow when EITHER neighbour is built-in, so with the four built-ins at
+ranks 1–4 the first custom type a workspace adds can never be moved by arrows — its neighbours are always built-in.
+The docblock (`:214-222`) says a tie is *"the exact tie the two-event swap exists to prevent"*, resolved server-side
+by `ORDER BY rank, type_id` (`routes/builder-reads.ts:168`) — *"by nothing a person can see"* — and the seed ships
+one. The editor's rank is an integer `≥ 1` (`ticket-type-editor-screen.tsx:337-344`), so a custom type cannot sit
+between `Story (2)` and `Task (3)` without tying `Task`. The sentence *"Rank orders them in every picker"* is false
+for the tied pair; the order there is by id.
+
+**WHAT WOULD HAVE BEEN BETTER.** Say the blocker on screen (a line under the list: *"Built-in types keep their rank;
+custom types reorder among themselves"*), or hide arrows on built-in rows; and either forbid the tie at the editor
+(*"rank 3 is Task's"*) or describe tie-break in the sentence.
+
+**MEASUREMENT.** `[BROWSER]` control list and row text on `/settings?workspaceId=…`; `[SOURCE]` lines above.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
+### E5-15 — IMPORTANT · A refused or failed ticket-types read leaves Settings on "Loading ticket types…" for ever — the same file's own docblock names this failure while leaving it in `[BROWSER, reproduced]` `[SOURCE]` (verifies exec 2 §2e's top Critical candidate; claimed lower)
+
+**WHAT.** `ticket-type-list-screen.tsx:175-181`: `void Promise.all([gateway.listTicketTypes(…), gateway.listWorkflows(…)]).then(…)`
+— **no rejection handler**. `:182-185`, the very next comment: *"A SEPARATE promise, and its own rejection handler.
+Folded into the `Promise.all` above, a failed count would reject the whole tuple and leave the screen on 'Loading
+ticket types…' for ever"* — the counts promise was split out; the two-promise tuple was not given a handler. Same
+shape at `ticket-type-editor-screen.tsx:189-193` (`Promise.all([listWorkflows, listTicketTypes]).then(…)` only), with
+its own `Loading ticket types…` at `:248`.
+
+**Reproduction (read-only).** On `/settings`, `window.fetch` wrapped to answer `500 {"error":"Internal Server
+Error","message":"simulated"}` for `GET /v1/workspaces/<id>/ticket-types`; client-side `router.push('/workspaces')`
+then `router.push('/settings?workspaceId=…')`. Painted: `Loading ticket types…` at +5 s and still at +13 s; `alerts: []`;
+`cap: [{GET …/ticket-types, blocked: true}]`. No sentence, no control, no way forward but a reload the page never
+suggests.
+
+**WHY.** The sibling screens in the SAME package handle this: `workflow-list-screen.tsx:188-197` `.catch(() =>
+setLoadFailed(true))` → *"Could not load workflows — reload to try again."*; `workflow-builder-screen.tsx:77-92` →
+*"Could not load workspace people and types — reload to try again."* So the pattern exists, is used twice in the
+directory next door, and is absent on the two screens whose loading sentence the docblock worried about.
+
+**WHAT WOULD HAVE BEEN BETTER.** The sibling's `.catch(() => setLoadFailed(true))` and the sibling's sentence.
+
+**MEASUREMENT.** `[BROWSER]` transcript above; `[SOURCE]` `ticket-type-list-screen.tsx:172-199`,
+`ticket-type-editor-screen.tsx:186-197`, `:248`; positive controls `workflow-list-screen.tsx:180-202`,
+`workflow-builder-screen.tsx:66-95`.
+
+**SEVERITY: Important** (claimed). exec 2's sweep rated it Critical; nothing is lost and a reload recovers, so
+Important on my scale — but it is a whole settings surface with no error arm.
 
 ---
 
