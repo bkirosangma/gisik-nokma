@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 12:3x IST — findings E6-1 … E6-21 and Appendices A–Y were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 13:0x IST — findings E6-1 … E6-21 and Appendices A–Y were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -1602,6 +1602,9 @@ what was looked at and found sound, not only what was found wrong.
   *Observation, not filed:* `POST /v1/workspaces` (founding), `/v1/sync/reconcile`, `…/migrate` and the
   notification-read doors are outside the limited set; founding runs the whole bootstrap sequence per call. I did
   not measure the per-call cost, so this is an absence read at the line, in the class of 6.123.
+- **`scripts/restore.sh`'s scratch guard reads the database NAME, not the URL** (`DB_NAME="${TARGET_URL##*/}"`,
+  then `%%\?*`), so `…/gisik_nokma?application_name=drill` is refused and a URL with no path refuses too. Read at
+  the line, not executed (the script would run `pg_restore`).
 - **Workspace settings are bounded** (`staleDays` 1–365, `dueSoonDays` 0–365, `autoCloseAfterDays` 1–365 or
   null, `workspace-settings.ts`).
 
