@@ -103,6 +103,33 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
     }
   }
 
+  /**
+   * ⚠ THE DIALOG IS THE SURFACE THIS ATTEMPT IS BEING MADE ON, AND IT STAYS UP
+   * UNTIL THERE IS A VERDICT (E2-22, 2026-09-21).
+   *
+   * It used to render only while `state.phase === 'mapping'`, and `submitPayload`
+   * opens with `setState({ phase: 'submitting' })` — so PRESSING the dialog's own
+   * confirm unmounted it, in the instant before the request had even been sent.
+   * `StateMappingDialog` holds the authored mapping in its own `useState`, so a
+   * REFUSED publish cost the admin every row they had just filled in, and the
+   * refusal banner rendered where the dialog had been. Restoring `'mapping'` on a
+   * refusal is not enough (the remount would still have lost the map): the fix is
+   * to mount it for the WHOLE attempt and dismiss it only on `committed`, which
+   * is what `mappingDialogOpen` below says.
+   *
+   * `dropped.length > 0` is the discriminator and it is DERIVED, not a second
+   * state value: `onPublishClick` only ever enters `'mapping'` when there are
+   * dropped states, so a drop-free publish can be `'submitting'` or `'refused'`
+   * without ever having had a mapping to lose — and for those the banners below
+   * stay where they are.
+   */
+  const mappingDialogOpen =
+    dropped.length > 0 &&
+    (state.phase === 'mapping' ||
+      state.phase === 'submitting' ||
+      state.phase === 'refused' ||
+      state.phase === 'invalid');
+
   return (
     <div className="publish-controls">
       <button
@@ -114,14 +141,28 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       >
         Publish
       </button>
-      {state.phase === 'mapping' ? (
+      {mappingDialogOpen ? (
         <StateMappingDialog
           dropped={dropped}
-          occupancy={state.occupancy}
-          occupancyFailed={state.occupancyFailed}
+          occupancy={state.phase === 'mapping' ? state.occupancy : null}
+          occupancyFailed={state.phase === 'mapping' ? state.occupancyFailed : false}
           targetStates={draft.def.states.map((candidate) => ({ id: candidate.id, name: candidate.name }))}
           fromVersion={draft.base?.version ?? 0}
           toVersion={(draft.base?.version ?? 0) + 1}
+          submitting={state.phase === 'submitting'}
+          // The attempt's own outcome, rendered INSIDE the dialog — the same
+          // facts the banners below carry when there is no dialog to carry them.
+          outcome={
+            state.phase === 'refused'
+              ? { kind: 'refused', title: 'The server refused this publish.', rule: state.rule, detail: state.reason }
+              : state.phase === 'invalid'
+                ? {
+                    kind: 'invalid',
+                    title: 'The server could not read this claim.',
+                    detail: state.message,
+                  }
+                : null
+          }
           onCancel={() => setState({ phase: 'idle' })}
           onConfirm={(mapping) => void submitPayload(mapping)}
         />
@@ -131,14 +172,17 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
           {`Version ${state.version} published.`}
         </p>
       ) : null}
-      {state.phase === 'refused' ? (
+      {/* Both banners are gated on the dialog being CLOSED, so one outcome is one
+          sentence in one place: when a mapping attempt is refused, the refusal is
+          in the dialog the admin is still looking at. */}
+      {state.phase === 'refused' && !mappingDialogOpen ? (
         <div className="publish-controls__banner publish-controls__banner--refused">
           <p className="publish-controls__banner-title">The server refused this publish.</p>
           <p className="publish-controls__banner-reason">{state.reason}</p>
           <p className="publish-controls__banner-rule">{`rule: ${state.rule}`}</p>
         </div>
       ) : null}
-      {state.phase === 'invalid' ? (
+      {state.phase === 'invalid' && !mappingDialogOpen ? (
         <div className="publish-controls__banner publish-controls__banner--invalid">
           <p className="publish-controls__banner-title">The server could not read this claim.</p>
           <p className="publish-controls__banner-reason">{state.message}</p>
