@@ -2460,3 +2460,25 @@ indistinguishable from a live one's, and the two differ in what the product will
   asserted to carry neither the chip nor the line, so a chip rendered unconditionally cannot pass. The
   flag comes from the SAME `getMyWorkspaces` read the page already makes for its own names; there is no
   new request. — (`apps/web/test/project-page-chrome.test.tsx`)
+
+## The empty workspace home spoke to the member and was read by the founder — case `13.1165` (E5-23, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1165` is minted here.
+
+**The defect.** `apps/web/app/w/[workspaceId]/page.tsx:883-887` renders *"No projects you can open are
+active here."* whenever the caller's live list is empty, and its own comment says why that shape was
+chosen: *"A member outside every project has an empty live list in a workspace full of them, and 'there
+are no projects' would be a claim about the workspace."* Correct for that member. **An owner who founded
+the workspace seconds ago has an empty live list for the other reason — the workspace has none — and
+reads a sentence that says the opposite**, directly above the New-project form that would fix it.
+
+**The two cases arrive identically shaped, and that is measured rather than assumed.** The server serves
+a member only the projects they may see (`visible-projects.ts`), so "outside every project of a busy
+workspace" and "a workspace with none" both reach this arm as `projects: []`; the count cannot separate
+them and the ROLE can.
+
+- **13.1165** ✅ A founder with no projects is told *"No projects yet — create the first one below."* (and
+  not the member's sentence, and the form the sentence names really is on screen); a member with the
+  SAME empty list keeps the member's sentence. —
+  (`apps/web/test/workspace-home.test.tsx`)
