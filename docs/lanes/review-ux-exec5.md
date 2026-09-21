@@ -38,7 +38,7 @@ measurement the landed one lacks, the finding says so and names the landed id.
 
 | route | file | lines | walked in browser? |
 |---|---|---|---|
-| `/` | `app/page.tsx` | — | redirects to `/workspaces` | yes (landed on `/workspaces`) |
+| `/` | `app/page.tsx` | — (redirects to `/workspaces`) | yes (landed on `/workspaces`) |
 | `/workspaces` | `app/workspaces/page.tsx` | 669 | yes |
 | `/sign-in` | `app/sign-in/page.tsx` | 496 | no (already signed in) |
 | `/invite/[token]` | `app/invite/[token]/page.tsx` | 127 | no (no live token) — source |
