@@ -40,9 +40,14 @@ import { fileURLToPath } from 'node:url';
  *   | `.gn-help__pager-link`   | "sits in running text rather than on its own, so the 24px in-list floor is the applicable one" |
  *
  * So this is a change to make the CHECKER agree with a rule the product had
- * already written down — not a new threshold. `ui.css:1606-1616` states the
- * whole rule in one sentence: *"Dense in-list controls get 24, standalone
- * controls get 44 — the same call `/help`'s table-of-contents links got."*
+ * already written down — not a new threshold. `ui.css` states the whole rule in
+ * one sentence, in the docblock above `.gn-attention__title`: *"Dense in-list
+ * controls get 24, standalone controls get 44 — the same call `/help`'s
+ * table-of-contents links got."* ⚠ **This cited `ui.css:1606-1616`, a range that
+ * RESOLVES and misleads** — it holds this file's own paragraph about a removed
+ * `border-left` marker, and it looks substantive enough that a reader checking
+ * the citation would have believed it. The sentence is cited by its words now,
+ * because a grep for those words finds it and a range does not keep it.
  *
  * ## WHY MEMBERSHIP IS DECLARED AND NOT DERIVED
  *
