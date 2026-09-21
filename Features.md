@@ -1993,6 +1993,27 @@ and leaves the head lying, which is how a contradiction survives a whole task.)*
   unique violation anywhere on the path — see the "refusal whose contest the server's own door refuses"
   bullet above, which closes that one. The two are different mechanisms and only the `events_pkey` half
   is still open. `apps/server/src/sync/sync-service.ts`
+- ⚙️ **A third batch-killing throw, same shape, this time SHARED by both `ingestBatch` and
+  `ingestClientBatch` (E6-18)** — `commitOne`'s catch rethrew any Postgres error `isUniqueViolation`
+  did not name, `ingestAll` has no `try` around the call, and `POST /v1/events` awaits
+  `ingestClientBatch` with none either (`routes/events.ts`) — measured, `grep -c try` is 0 there. A
+  U+0000 byte in ANY payload string (a workspace name, a ticket title, …) reaches Postgres's `jsonb`
+  column unrefused — nothing in `packages/domain`'s schemas refines against it yet — and SQLSTATE
+  `22P05` ("unsupported Unicode escape sequence") escapes as an unhandled 500, aborting the whole
+  batch and answering failure for every event in it, including ones that had already committed.
+  Closed at the same choke point as the `events_pkey` fix above: a new `isInvalidUnicodeEscape`
+  predicate (`event-store.ts`) and a new `IngestErrorCode` member, `'invalid-byte'` — distinct from
+  `'invalid-payload'`, which is a PARSE-TIME zod refusal; this is COMMIT-TIME, the same layer
+  `'duplicate-event-id'` is caught at, for the same reason. **Scope, stated rather than implied: this
+  closes the mechanism (a thrown DB error aborting the whole batch) for ONE parameter class (an
+  ingest-batch payload STRING). It does NOT add `noNul` to any `packages/domain` schema, and it does
+  NOT touch a single raw id PATH parameter on a route** — the reviewer's own measurement found the
+  byte crashing 23 parameters across 19 doors, most of them route-level id parameters that 500 before
+  ever reaching `commitOne` at all (a bad query, not a bad transaction). *Owner: a route-level ULID
+  refinement pass over the cited doors — `filter-spec.ts`'s `noNul` is already exported and waiting for
+  the same treatment on the three ticket-payload strings and three raw query parameters the finding
+  names.* `apps/server/src/ingest/ingest-service.ts`, `apps/server/src/ledger/event-store.ts`,
+  `packages/domain/src/ingest-result.ts`
 - ⚙️ **The visibility pre-check the plan asked for is deliberately absent** — Plan 10's step 6 (an
   explicit `getResolvedVisibility` + `canSee` pass before ingest) duplicates
   `checkVisibilityPermission`, which already refuses every ticket-entity event whose ticket the caller
