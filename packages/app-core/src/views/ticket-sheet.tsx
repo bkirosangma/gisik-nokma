@@ -730,11 +730,31 @@ export function TicketSheet({
     });
     const results = await dataSource.ingest([...fieldEvents, transition]);
     const failed = results.find((result) => result.status !== 'committed');
+    /*
+      BOTH READS ARE RE-ASKED ON EVERY ANSWER, not only the happy one (E2-36).
+      The batch above is ordered `[...fieldEvents, transition]` so a
+      `require-field` rule sees what the dialog just collected (:708-710) — which
+      means a batch that is refused AT THE TRANSITION has usually already
+      committed its field claims. The refusal arms below set `serverRefusal` and
+      used to RETURN with no reload, so the sheet sat behind the refusal still
+      painted with the pre-move values while the server already held the new
+      ones.
+
+      ⚠ The staleness window is stated for what it is, because the finding's
+      first draft overstated it ("nothing re-read"). A committed
+      `ticket.field_set` moves the workspace stream, so with `/v1/stream` live
+      the sheet DOES re-read itself and the window is a beat. What does not
+      repair is the socket-absent or socket-slow case — the same case
+      `page.tsx`'s delete handler was fixed for on 2026-09-20 (see `onDeleted`'s
+      docblock: "with the `/v1/stream` socket absent the list still showed a row
+      the toast had just said was deleted"). One reload site for both answers
+      removes the question rather than narrowing the window.
+    */
+    read.reload();
+    history.reload();
     if (failed === undefined) {
       setServerRefusal(null);
       setMoveOpen(false);
-      read.reload();
-      history.reload();
       return;
     }
     // The authority's own words, carried without paraphrase. A refusal is a

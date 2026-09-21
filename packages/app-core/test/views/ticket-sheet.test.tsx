@@ -472,6 +472,57 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(batch[1]!.payload).toEqual({ to: 'done' });
   });
 
+  it('E2-36 — a PARTLY committed move batch reloads BOTH reads behind the refusal', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'doing' && transition.to === 'done'
+          ? { ...transition, rules: [{ kind: 'require-field', field: 'invoiceNo' }] }
+          : transition,
+      ),
+    };
+    const read = ticketRead();
+    let ticketReads = 0;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => {
+          ticketReads += 1;
+          return read;
+        },
+        getWorkflowDef: async () => gated,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      // The shape the dialog's own ordering creates on a refusal: the field
+      // claim the rule needs commits, and the move that needed it is turned away.
+      (events) =>
+        events.map((event) =>
+          event.type === 'ticket.field_set'
+            ? { status: 'committed' as const, eventId: event.id }
+            : {
+                status: 'refused' as const,
+                eventId: event.id,
+                rule: 'restrict-to',
+                reason: 'Only Anselma Marak may perform "Doing → Done" on this ticket.',
+              },
+        ),
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    const before = ticketReads;
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await screen.findByText(/restrict-to/);
+    // The refusal is on screen AND the sheet re-asked its read. Without the
+    // reload the sheet sits behind the refusal painted with the pre-move values
+    // while the server already holds the committed field claim.
+    expect(ticketReads).toBeGreaterThan(before);
+  });
+
   it("PLANTED DEFECT: when the server refuses, its reason renders verbatim — not the local preview's", async () => {
     const user = userEvent.setup();
     const read = ticketRead();
