@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
@@ -139,6 +142,68 @@ describe('Select — non-searchable focus restoration', () => {
     expect(onChange).toHaveBeenCalledWith('apple');
     expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
     await waitFor(() => expect(trigger).toHaveFocus());
+  });
+});
+
+/**
+ * P23 — the same defect E4-21 fixes, found independently by a second reviewer
+ * and scored in full on its own (rules §3). The two cases read it from opposite
+ * ends so neither is a restatement of the other: E4-21 owns the stylesheet half
+ * in `components.test.tsx` (that the ring exists, its offset, and that the class
+ * it is keyed on is an ancestor of the focused input). This one owns the half a
+ * person actually operates — that real keyboard focus reaches that input and
+ * stays there for the whole interaction, so the `:focus-within` the ring depends
+ * on is matched for the duration and not just at the instant of focus — and it
+ * asserts the finding's own claim as a PAIR: an outline removed by the product's
+ * own CSS, beside the replacement that exists for it.
+ */
+describe('Select — searchable trigger focus visibility (P23)', () => {
+  const UI_CSS = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/ui.css'), 'utf8');
+
+  it('P23: the stylesheet that removes the input outline declares a replacement for it', () => {
+    // The finding's whole argument is this pair, so assert it as one: a removal
+    // with no replacement is the defect, and a replacement added by DELETING the
+    // removal is a different control (an outline on a click into a typeable
+    // field). Both halves, read from the same stylesheet in the same assertion.
+    const removal = UI_CSS.match(/\.gn-select__trigger--searchable input:focus\s*\{([^}]*)\}/);
+    const replacement = UI_CSS.match(/\.gn-select__trigger--searchable:focus-within\s*\{([^}]*)\}/);
+    expect(
+      removal,
+      'the input-outline removal this finding rests on is gone from ui.css — the pair can no longer be read',
+    ).not.toBeNull();
+    expect(removal?.[1]).toMatch(/outline:\s*none/);
+    expect(
+      replacement,
+      'the removal is still there and the searchable trigger declares no focus ring in its place — exactly the state the finding measured',
+    ).not.toBeNull();
+    expect(replacement?.[1]).toMatch(/outline:\s*2px solid var\(--gn-focus-ring\)/);
+  });
+
+  it('P23: real keyboard focus lands on the input inside the ring-carrying wrapper and stays there', async () => {
+    const user = userEvent.setup();
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+
+    // Reached by keyboard, not by a `.focus()` call: this is the path a person
+    // uses, and it is the path the finding's CDP `press_key` measurement used.
+    await user.tab();
+    expect(input).toHaveFocus();
+
+    const trigger = input.closest('.gn-select__trigger--searchable');
+    expect(
+      trigger,
+      'the focused combobox input is not inside a `.gn-select__trigger--searchable` wrapper, so a ring keyed on its :focus-within can never match',
+    ).not.toBeNull();
+    expect(trigger?.contains(document.activeElement)).toBe(true);
+
+    // And it keeps matching while the control is USED, which is the half a
+    // static shape check cannot see: typing filters the list without focus
+    // leaving the input for the portalled panel.
+    await user.type(input, 'cher');
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: 'Cherry' })).toBeInTheDocument();
+    expect(input).toHaveFocus();
+    expect(trigger?.contains(document.activeElement)).toBe(true);
   });
 });
 
