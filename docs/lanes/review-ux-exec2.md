@@ -2039,6 +2039,101 @@ the shared predicate), `:281-294` (the preview call and its deps), `:360-364` (`
 
 ---
 
+## R2.15 — NEW FINDINGS, BATCH 8 — the mobile shell (a gap I named in round 1)
+
+`apps/mobile` and `apps/desktop` were named **unreached** in my round-1 §6 and again in §1.9 of the other
+lane's report. Both shells are small (`apps/mobile/src/screens/`: board 72, ticket 130, help 330 lines), so
+I read them in full. That the phone is a real user-facing surface is the product's own claim, not an
+assumption: `docs/manual.md:368` tells a reader that *"the phone app has a Comment button on a job and the
+website does not"* — a sentence whose **web half is part of my `E2-1` staleness finding** and whose **phone
+half is accurate about this file**.
+
+### E2-41 (r2) — IMPORTANT · Two screens in the phone shell render a failed read as a benign state — an empty board, and "Opening…" for ever
+
+**WHAT — two sites, one cause: a read with no rejection handler.**
+
+**(a) The board shows a failed read as an EMPTY BOARD.** `apps/mobile/src/screens/board-screen.tsx:16`
+`const [tickets, setTickets] = useState<TicketSummary[]>([]);` and `:26`
+`void ds.query.listTicketSummaries(workspaceId).then(setTickets);` — **no second argument, no `.catch`**.
+A rejection leaves `tickets` at `[]`, and the `FlatList` (`:56-68`) then draws nothing: no rows, no
+sentence, no spinner. A person offline or after a dropped connection sees a workspace that appears to
+contain no work.
+
+**(b) The ticket screen shows a failed read as an eternal "Opening…".** `ticket-screen.tsx:20`
+`const [ticket, setTicket] = useState<TicketWithPending>(null);`, `:26`
+`void ds.query.getTicketWithPending(ticketId).then(setTicket)`, and `:31`
+`if (ds === null || ticket === null) return <Text>Opening…</Text>;`. `ticket` is set **only** on success,
+so a rejection is drawn as a load that never ends — the same defect as my `E2-20` on the ticket-type
+screens, in a different app.
+
+**WHY it is wrong.** Both are the empty-vs-unread collapse, and (b) is the load-vs-error collapse as well.
+The product's own web shell draws this distinction everywhere (`ShellRefusal`, the three-arm reads in
+`my-work/page.tsx`, `settings/page.tsx:277-284` putting error before loading) — and the phone shell, which
+renders the *same* replica data, draws neither. `board-screen.tsx:30` shows the file already reasons about
+honesty in the same effect (the offline-search label is commented *"the label is the honesty"*), which is
+what makes the missing arm look like an omission rather than a decision.
+
+**WHAT WOULD HAVE BEEN BETTER.** A rejection handler per read writing into an error state the screen
+renders — RN's `Text` with `accessibilityRole="alert"`, the shape the ticket screen already uses for
+refusals (`ticket-screen.tsx:125`). For (b) specifically, a third state so "no answer yet" and "the answer
+failed" stop sharing one word.
+
+**MEASUREMENT.** Opened in full: `apps/mobile/src/screens/board-screen.tsx:16-42` (the state, both
+`.then` calls, the effect) and `:56-68` (the list); `apps/mobile/src/screens/ticket-screen.tsx:20-31` (the
+state, the read, the gate) and `:125` (the alert arm it already has).
+
+**Severity: Important.** Bounded honestly: this shell has **no session** yet (its own comments say so —
+`ticket-screen.tsx:46-48`), so the population that meets it today is whoever runs the app, not the whole
+user base. What makes it worth the severity rather than Minor is that the fix is one handler per read and
+the failure mode is a person concluding their work is gone.
+
+---
+
+### E2-42 (r2) — IMPORTANT · A comment posted from the phone is recorded as the ASSIGNEE's words
+
+**WHAT.** `apps/mobile/src/screens/ticket-screen.tsx:36-57`, the Comment button's handler
+(`:126` `<Button title="Comment" onPress={onComment} />`), builds the event with:
+```
+payload: { body: draft },
+// Interim, flagged by the plan this task adapts: the session user id
+// is not wired up (no auth flow in this shell yet). Becomes the real
+// signed-in user once Plan 6's session handling reaches this app.
+actorId: state.assigneeId ?? 'me',
+origin: 'mobile',
+```
+`actorId` is the envelope's **claim of authorship** — `packages/domain/src/submit.ts:4-7`:
+*"The one client-side envelope builder. **Everything a client claims is here**"*, with `actorId` a required
+field of the envelope (`:14`).
+
+**WHY it is wrong — the choice, not the absence, is the defect.** The comment records that the session id
+is not wired, so *some* placeholder is needed; the defect is **which** one. `state.assigneeId` is a **real
+member of the workspace**, so a comment typed by the phone's user is written to the ledger **as that
+person's claim** — their name on words they did not write. The fallback `'me'` is a non-user and reads as
+a placeholder; `assigneeId` does not, because it resolves. The product's stated rule is the opposite of
+this: `docs/manual.md:401-406` — *"nothing is shown as a bare fact … it is always somebody's claim, with
+their name and the time on it"* — and `provenance.ts:4-7`'s "Honesty contract 1: attributed, never blank".
+**An attribution that names the wrong real person is worse than a blank one**, which is exactly why the
+`?? 'me'` arm shows the author knew a fallback was needed and did not ask what the fallback claims.
+
+**WHAT WOULD HAVE BEEN BETTER.** A placeholder that cannot resolve to a member — the literal `'me'` arm
+alone, or a distinct `origin`-scoped sentinel the roster cannot contain — and a sentence on the composer
+saying the comment will not be attributed until sign-in reaches this shell. The real fix is the session,
+which the comment names; the placeholder must not be a colleague.
+
+**MEASUREMENT.** Opened: `apps/mobile/src/screens/ticket-screen.tsx:36-57` (the handler and the
+`actorId`), `:126` (the button); `packages/domain/src/submit.ts:1-31` (the envelope builder, `actorId` at
+`:14`, and its own docblock); `docs/manual.md:401-406`.
+
+**Severity: Important.** ⚠ **Not verified:** whether this shell is built and distributed, and whether any
+member id can actually occupy `assigneeId` at the moment a comment is sent — both would need the app run
+against a real workspace. I claim the code path and the attribution semantics, not a reproduction.
+
+---
+
+*Running total of round-2 new findings: `E2-20`–`E2-42` (23) — 13 Important, 10 Minor.*
+
+---
+
 # R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
 
 A candidate I checked and rejected is worth recording: it costs the judge nothing, it shows the boundary
