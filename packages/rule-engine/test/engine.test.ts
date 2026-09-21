@@ -678,6 +678,7 @@ describe('REFUSAL_RULES', () => {
       illegalTransition: 'illegal-transition',
       strandedState: 'stranded-state',
       parentTerminal: 'parent-terminal-with-open-children',
+      childOpenUnderTerminalParent: 'child-open-under-terminal-parent',
       workflowStructure: 'workflow-structure',
       workflowVersion: 'workflow-version',
       workflowStateMapping: 'workflow-state-mapping',

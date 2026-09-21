@@ -39,6 +39,7 @@ Fixture names refer to `packages/rule-engine/fixtures/`; unit tests to `packages
 ## The invariant above all workflows
 
 - **4.23** ✅ A parent cannot enter a terminal state while any child is non-terminal — open or active alike; it may once every child is terminal. — `invariant-refuses-terminal-parent-with-open-child`, `invariant-refuses-terminal-parent-with-active-child`, `invariant-accepts-terminal-parent-when-children-are-terminal`
+- **4.54** ✅ The same invariant from the child's side (E3-19, B12): a child in a terminal state cannot move to a non-terminal one while its parent is terminal — a closed parent included — refused `child-open-under-terminal-parent` with the parent's title and state named; the identical move is accepted under a non-terminal parent, for a root ticket, and terminal → terminal under a terminal parent; a child already open under a terminal parent keeps its ordinary moves (only the move that creates the relation is refused); the parent is read exactly once on the guarded move and not at all otherwise. The client pre-check defers (gate 5) rather than passing the move when the parent is not cached, and previews the engine's refusal when it is. — `packages/rule-engine/test/parent-terminal-symmetric.test.ts`, `packages/app-core/test/precheck.test.ts` ("gate 5")
 
 ## The rule vocabulary
 
