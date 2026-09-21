@@ -912,6 +912,27 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 ---
 
+### P35 — **MINOR** ⚠ **r2 NEW — PHASE 2 (written before the 15:05:23 freeze but not committed until after it; scores at HALF per rules §2, no claim otherwise)** — The timeline's nav buttons keep the browser's default bevel, and P1's sweep could not see it: the rule EXISTS, the property is missing
+
+**WHAT.** `.gn-timeline__nav` — the three Earlier / Today / Later buttons on the timeline (`packages/app-core/src/timeline/timeline-view.tsx:234-262`, three `<button type="button">`s with that class and no other) — is styled by a rule that declares a radius, a background, a colour, padding and a cursor, **and no `border`**. The product's only global button reset is font-only, so the control keeps the user agent's default **`2px outset` border**: a raised 3D bevel, in a flat design system, on a control that sits directly beside the timeline's bars.
+
+**MEASUREMENT.**
+1. **The rule, read in full** — `packages/ui/src/ui.css:3427-3434`: `border-radius: 6px; background: var(--gn-surface-raised); color: var(--gn-text); font: inherit; padding: 0.2rem 0.6rem; cursor: pointer;`. **No `border` property appears.**
+2. **And the only reset that would have covered it is font-only** — `apps/web/app/globals.css:84`: `button { font: inherit; }`, the sibling of `:96`'s `input, textarea, select { font-family: inherit }`. **This is P1's own measured fact**, re-verified here rather than quoted: `grep` for a top-level `button` selector across both stylesheets returns exactly those two lines plus `ui.css:672` and `:1863`, both of which are *member* selectors (`button.gn-ticket-sheet__crumb--link`, `button.gn-ticket-sheet__parent-chip`) that scope to other components.
+3. **And its own sibling resets it** — `.gn-timeline__bar` opens with **`border: none;`** (`ui.css:3532`), as does `.gn-timeline__open` (`:3585`). **So both of the button family's other members clear the bevel and this one does not.**
+4. **And the export has it too, on this exact control** — `Gisik Nokma - Desktop.dc.html:511,513`: `min-height:36px; padding:0 12px; **border:none**; border-radius:var(--ctlR); background:var(--ctlBg); box-shadow:var(--ctlShadow); color:var(--accent)`. **Four further properties differ besides the border** — the floor, the padding axis, the ground (`--ctlBg` vs `--gn-surface-raised`), and the ink (`--accent` vs `--gn-text`) — and **no docblock covers this control**: the nearest, at `:3450-3473`, sits *after* the rule and discusses `trayBg`/`fill4` on the weeks grid, never the nav. **So this is DIVERGES-WITH-NO-RULING on every one of the five.**
+
+**WHY IT IS WRONG — AND WHY THIS SURVIVED, WHICH IS THE PART WORTH KEEPING.** This is P1's class — raw user-agent chrome on a product control — **and P1's sweep is structurally blind to it.** P1's method was: *"for each static `className` literal on a `<button|input|…>`, require that at least one of its class tokens matches a selector block."* **`.gn-timeline__nav` matches a selector block.** The sweep asks *"is this control styled at all?"* and the answer is yes; **the defect is a missing PROPERTY inside an existing rule, which no question about a control's own classes can reach.** So the finding P1 would have wanted is the one its instrument was built not to find — and the same blind spot is why the *export* comparison is what surfaced it, not a sweep.
+**And nothing else would have caught it either:** per **P34**, the timeline is one of the four views the tap-target ratchet never renders, **and** the suite that would render it has not run since 2026-09-06 (**I1**). **Three findings meet on this one control**, which is the reason to file a cosmetic defect.
+
+**⚠ WHAT I DID NOT MEASURE.** I did not paint the control, so **I am not claiming its rendered height** — an estimate from the inherited `1.45` line-height, the `0.2rem` padding and a 2px border is arithmetic, not a measurement, and §3 makes an asserted-but-unmade measurement invalid. The **absence of `border`** is the measured claim, and it is sufficient: an `outset` border is what a `border`-less button gets.
+
+**WHAT WOULD HAVE BEEN BETTER.** One property — `border: none;`, which both of the family's other members already carry. **And the generalisable half:** P1's sweep should assert that a control's matched rule declares `border` (or that a global reset does), because *"matched a selector block"* and *"is fully styled"* are different questions. **The export is the cheaper check here, and it found it in one comparison.**
+
+**SEVERITY: MINOR.** A flat design meets a 1990s bevel — visible and unambiguous, but nothing is hidden, blocked or unreachable, so it is not scored above cosmetic.
+
+---
+
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
 
 | comparison | class | evidence |
@@ -1004,7 +1025,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P31` ⚠ r2 — the top bar is an UNNAMED `navigation` landmark beside a named one on at least seven routes
 - `P34` ⚠ r2 — FOUR of the project page's five views sit outside the tap-target ratchet's population, because the ratchet visits routes and the views are tabs
 
-**MINOR — 19**
+**MINOR — 20**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -1024,8 +1045,9 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P29` ⚠ r2 — the mock suite says every stub carries its server `file:line`; two of ten carry the file only, and they are the two whose contracts drifted
 - `P32` ⚠ r2 — why a control is disabled is put in `title` ON the disabled button, where a keyboard or screen-reader user cannot reach it
 - `P33` ⚠ r2 — the export draws a timestamp on every inbox row; the product draws none, and no client in the chain reads `createdAt`
+- `P35` ⚠ r2 **phase 2, half points** — the timeline's three nav buttons have a rule with no `border`, so they keep the UA's outset bevel; P1's sweep is structurally blind to a missing property inside an existing rule
 
-**Total 38.** `raised` and `sum by severity` agree by enumeration above.
+**Total 39** (38 at the 15:05:23 phase-1 freeze; `P35` added in phase 2 at half points). `raised` and `sum by severity` agree by enumeration above.
 
 
 ## 9. THE CLAIM I AM LEAST SURE OF
