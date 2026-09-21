@@ -1374,6 +1374,59 @@ between them is docs-only (§R2.3), so the code layer is current. The graph loca
 claim above cites a line I opened myself**, per the rules' warning that the graph's edge is a pointer and
 not evidence.
 
+# R2.19 — NEW FINDING, BATCH 9 — and it is about my own change
+
+### E2-46 (r2) — IMPORTANT · A typed `[text](url)` becomes markup with no escape suggestion, where every other formatting trigger offers one — a hole in §2's named property that my own change opened
+
+**WHAT.** Spec §2's named mechanic is that *"nothing silently becomes markup"*: when a typed reserved
+sequence triggers formatting, the editor surfaces an inline suggestion offering the escaped literal.
+`packages/editor/src/schema/extensions.ts:76-96` records that `markdownLinks` went **false → true** under the
+owner's 2026-09-20 ruling (*"both"*), **which my own change set landed**, and then records the consequence
+at `:91-96`:
+
+> *"⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT DOES NOT WIDEN THE ESCAPE MECHANIC: a typed link now
+> fires an input rule, but **typing one offers no escape suggestion where `**due soon**` does.** That
+> asymmetry is measured in `test/schema.test.ts` (9.95) with its cause left unestablished rather than
+> guessed — owner: whoever next touches the trigger coverage."*
+
+**And the measurement is a probe, not an inference.** `test/schema.test.ts:354-360` (case **9.95**): *"typing
+> this link does NOT offer the escape suggestion that `**due soon**` offers, even though both fire an input
+> rule and both are formatting the escape mechanic exists to let a user keep literal. **Measured, not
+> inferred** — a probe typed both and read `getEscapeSuggestion` on each."*
+
+**WHY it is wrong.** A person types `[the doc](https://gst.gov.in)` and the text becomes a **link** — the
+product's own example of markup — with **no suggestion to keep it literal**, where typing `**due soon**`
+offers exactly that. So the escape mechanic's coverage is now *smaller than the trigger set it exists to
+cover*, and the trigger set grew by one **because of a ruling whose premise was that the property §2 names
+already did not hold for pasted URLs** (`extensions.ts:79-86`). That premise is sound for the *paste* path —
+and the ruling did not address the *typed* path, on which the property now holds for `**bold**` and fails
+for a link. **The asymmetry is the defect: one trigger out of the set has no way back.**
+
+**Classification, stated plainly: this is a RECORDED, OWNED, OPEN gap — not "the product behaving as
+ruled."** The owner ruled on `markdownLinks`, not on the trigger table; the file names an owner for this
+asymmetry specifically (*"whoever next touches the trigger coverage in `extensions/escape-suggestion.ts`"*),
+and it says the cause is *unestablished*, which is an invitation rather than a decision. **I am filing it as
+the lane that caused it**, because my `markdownLinks: true` is what made a typed link fire an input rule at
+all — and because a reviewer who reports only other people's mistakes has skipped the set he is best placed
+to see.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either add the typed-link rule to the escape trigger table — so
+`[text](url)` offers *"Keep as literal text"* beside `**due soon**`'s — or record a ruling that the typed
+link is deliberately outside the mechanic, which would be a decision about §2 rather than a side effect of a
+decision about an option. ⚠ **I did not establish the cause either**, and I am not guessing at one: the
+file says the probe read `getEscapeSuggestion` on both paths, and the reason one is empty is the thing the
+next reader should open rather than inherit from me.
+
+**MEASUREMENT.** Opened: `packages/editor/src/schema/extensions.ts:76-96` (the reversal and the recorded
+asymmetry), `:195-196` (`EscapeSuggestion` **is** the last entry `buildEditorExtensions` returns — I checked,
+because the escape mechanic's command override depends on it), `packages/editor/test/schema.test.ts:342-361`
+(case 9.95, the measured probe), `packages/editor/src/extensions/escape-suggestion.ts:6-120` (the mechanism,
+its measured Tiptap failure, and the two-part fix).
+
+**Source:** new area — `packages/editor` beyond the four files I had read, reached by working my own
+coverage list as instructed. **Severity: Important.**
+
+---
 ---
 
 *executor 2 — UX, round 2. Phase 1 in progress. Branch `exec2/review-ux-r2`; pushed at each checkpoint.
