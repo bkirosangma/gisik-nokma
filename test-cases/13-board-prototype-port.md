@@ -2091,3 +2091,51 @@ text) in the same place the count is taken. **The finding's own instruction is k
 cheap and it does catch a dropped attribute** — so this is a wording fix, not a relaxation.
 `pnpm turbo run typecheck` 17/17 (the web package's `tsconfig.e2e.json` covers the edited spec); web suite
 652.
+
+## The board, the List and My Work stop skipping heading level 2 (lane ds1, 2026-09-21, batch B10) — T-E4-24 and T-P17
+
+> **Case id PENDING ALLOCATION.** These two tasks are one property measured on the same three screens, so
+> they are carried as ONE instrument with two arms — and B10's section-13 block (`13.1137`–`13.1156`) is
+> **fully used**. The ask for three more ids is recorded in
+> `docs/lanes/release-2026-09-22-progress.md`. **No id was minted outside the block**; this entry's case
+> marker is therefore the task id, and the allocated id gets filled in here when it arrives.
+
+**The findings, round 2 `E4-24` and `P17`, both MINOR.** Measured on every route: Board `H1 Shop operations`
+→ `H3 Simple kanban`, `H3 Errand with waits`; List `H1` → `H3 Recently assigned`, `H3 Open questions …`;
+My Work `H1 My Work` → `H3 Assigned to me` … (four). **The outline went h1 → h3 with no h2 anywhere in the
+path, on three of the product's main screens.** The page title is an `h1`; the first level under it is an
+`h2`. `P17` adds that no instrument measures heading level or order at all — the assertion below is a
+partial answer to that, and its remaining half is named.
+
+### The case
+
+- ✅ **T-E4-24 / T-P17 — every section heading under a page title is an `h2`, and none is an `h3`.**
+  `packages/app-core/test/views/heading-outline.test.ts`. **A SOURCE scan, and the reason is specific
+  rather than convenient:** the property IS the tag — `<h3 className="…">` and `<h2 className="…">` differ
+  by one character and nothing else about them changes — so the file is the authority. The extractor runs
+  through a positive control over the same reader (all three families found, ≥5 headings), the fix is
+  witnessed by planting the pre-fix tag back into the board's own source and reading it back as `h3` at the
+  same time as the real source reads `h2`, and the levels are asserted for **all three views at once**
+  because the finding measured them together.
+
+### ⚠ Two residuals, named rather than implied
+
+**(1) The builder is NOT covered.** `E4-24` also records that its aside panels' `h3`s hang under no `h1`
+at all — the route renders `main.gn-shell` and the screen's visible title is an editable
+`<input class="workflow-builder-screen__name">`, not a heading. That is a different defect (a MISSING
+`h1`, not a skipped `h2`) and needs a design decision about where a heading goes on a screen whose title
+is a field; the finding's own words call it *"which its own record already owes"*.
+**(2) `P17`'s second half — a per-route outline WALK that fails on a skip anywhere** — is not built. A
+source scan cannot see an `h2` nested under something that is not an `h1`; that needs the browser-side
+sweep `P17` describes, with a recorded baseline per route.
+
+### One existing assertion pinned the defect
+
+`apps/web/test/board-narrowing.test.tsx` queried the group headings at `level: 3` — so the assertion was
+holding the level the finding says is wrong. All four sites moved to `level: 2` **in the same change**, and
+the fact that this had to happen is the finding's point stated in reverse: no instrument measures heading
+level or order, so the only thing watching that number was an unrelated case's query. The RED pair:
+heading-outline `2 failed | 1 passed (3)` (`/tmp/ds1-E4-24-red.log`), board-narrowing
+`1 failed | 19 passed (20)` (`/tmp/ds1-E4-24-red-web.log`), with the three views reverted to `HEAD` and
+rebuilt, then restored from sha256-compared backups and rebuilt again. Package suites: app-core 1728,
+web 652.

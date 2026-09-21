@@ -613,7 +613,7 @@ export function TicketList({
 
       {pinned.length > 0 ? (
         <section role="region" aria-label="Recently assigned" className="gn-list__pinned">
-          <h3 className="gn-list__section-title">Recently assigned</h3>
+          <h2 className="gn-list__section-title">Recently assigned</h2>
           <ListTable
             nodes={pinned.map((row) => ({ row, depth: 0, hasChildren: false }))}
             columns={columns}
@@ -663,12 +663,12 @@ export function TicketList({
                 subtree, and a band that shrank when a row was collapsed would be
                 a count of the user's scroll position.
               */
-              <h3 className="gn-list__section-title">
+              <h2 className="gn-list__section-title">
                 <span className="gn-list__section-name">{section.label}</span>
                 <span className="gn-list__section-meta">
                   {`${groupMeta} · ${section.rows.length} ${section.rows.length === 1 ? 'ticket' : 'tickets'}`}
                 </span>
-              </h3>
+              </h2>
             )}
             <ListTable
               nodes={nodes}

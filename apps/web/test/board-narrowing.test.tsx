@@ -627,11 +627,12 @@ describe('13.556b the scope note names the LIST tab, not the board, when it rend
  *
  * `defaultWorkflow`/`bugWorkflow` deliberately reuse the workflow's own
  * NAME ("Default"/"Bug triage") on BOTH the board's group heading
- * (`<h3 className="gn-board__workflow">`, `board.tsx`) and the picker's own
+ * (`<h2 className="gn-board__workflow">`, `board.tsx` — an `h3` until E4-24,
+ * below) and the picker's own
  * `<option>` text — the picker's options are built from the same
  * `workflowName` field the heading reads. `screen.getByText('Default')`
  * would therefore match BOTH elements and throw on an ambiguous query; the
- * group-heading assertions below use `getByRole('heading', { level: 3,
+ * group-heading assertions below use `getByRole('heading', { level: 2,
  * name: … })` instead, which is also the MORE precise check (it proves the
  * board's own group rail rendered, not merely that the string exists
  * somewhere on the page — the option would have supplied that either way).
@@ -769,8 +770,8 @@ describe('13.468 the picker defaults to All workflows, and the default drops no 
     await screen.findByText('Default lane card one');
 
     expect(await workflowSelect()).toHaveValue('all');
-    expect(screen.getByRole('heading', { level: 3, name: 'Default' })).toBeInTheDocument();
-    expect(screen.getByRole('heading', { level: 3, name: 'Bug triage' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Default' })).toBeInTheDocument();
+    expect(screen.getByRole('heading', { level: 2, name: 'Bug triage' })).toBeInTheDocument();
     expect(screen.getAllByRole('listitem')).toHaveLength(5);
     // The resting state has dropped nothing, so the disclosure strip this
     // mechanism shares with the client filter (13.438's own rule) stays
@@ -789,7 +790,7 @@ describe('13.469 the picker does not render where it offers no real choice', () 
     // heading (`board.groups.length > 1 ? <h3>…`) is also absent here —
     // checked as a cross-confirmation that this fixture really does carry
     // only one workflow, not merely trusted from the fixture's own shape.
-    expect(screen.queryByRole('heading', { level: 3 })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: /workflow/i })).not.toBeInTheDocument();
   });
 });
@@ -818,7 +819,7 @@ describe('13.470 the picker discloses through the SAME count and chip the client
     // The dropped workflow's own group heading is gone too — Board renders
     // every group `boardNarrowing.view` hands it exactly once, and the
     // Default group is no longer one of them.
-    expect(screen.queryByRole('heading', { level: 3, name: 'Default' })).not.toBeInTheDocument();
+    expect(screen.queryByRole('heading', { level: 2, name: 'Default' })).not.toBeInTheDocument();
   });
 });
 

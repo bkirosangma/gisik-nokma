@@ -639,7 +639,7 @@ function BoardGroupSection({
 }) {
   return (
     <section className="gn-board__group">
-      {groupCount > 1 ? <h3 className="gn-board__workflow">{group.workflowName}</h3> : null}
+      {groupCount > 1 ? <h2 className="gn-board__workflow">{group.workflowName}</h2> : null}
       <div className="gn-board__rail">
         {group.columns.map((column) => (
           <section
