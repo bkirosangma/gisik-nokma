@@ -1694,3 +1694,48 @@ fallback. Test Files 1 passed, Tests 1 passed.
 **The online control, in the same round:** `test/routes/ticket-crumbs.test.ts:244-248` writes the same
 shape through the server and asserts `parent` is `null`. **Two shipped implementations, one input, two
 answers** — and the offline one manufactures the ancestor.
+
+---
+
+## 20. VERIFIED-CLEAN IN ROUND 2 — with the measurement, so nobody re-spends here
+
+Ten claims in this lane's concern that I tried to falsify and could not. Each names the command, so the
+check is re-runnable rather than a verdict.
+
+| # | claim | measurement | result |
+|---|---|---|---|
+| 1 | `REFUSAL_RULES` is the single spelling of every rule id (`refusal-rules.ts:8-12`) | parsed all 25 declarations against every `REFUSAL_RULES.x` use and every `rule: '…'` literal in `packages/rule-engine/src` + `apps/server/src` | **25 declared, 25 emitted, 0 undeclared, 0 declared-but-unused** |
+| 2 | `Features.md:532` — the filter compiler is "injection-proven against **thirteen** planted hostile inputs" | `HOSTILE` object keys in `test/read/compile-filter.test.ts` | **exactly 13** ✓ |
+| 3 | `Features.md:532` — U+0000 is refused "in all **seven** free-form string slots" | every `noNul(` in `packages/domain/src` | **7 in `filter-spec.ts`** (`:72`, `:90`, `:92`, `:121`-`:124`); the other 3 are `preferences.ts` and not FilterSpec ✓ |
+| 4 | the replica covers every query method | `DataSourceQuery` (16 members) vs `REPLICA_GAPS` (10) vs implemented (6) | **16 = 10 + 6**, and the object literal is compiler-checked ✓ |
+| 5 | `system-actors.ts:31` — "this constant is the only writer" | every use of `SYSTEM_ACTOR_AUTO_CLOSE` in `apps` + `packages` | **one write site** (`auto-close/sweep.ts:218`); every other use is a test or a read; the literal spelling appears only in its own definition ✓ |
+| 6 | `system-actors.ts:30` — "nothing in the product accepts an actor id from a client" | the refusal of `actorId !== sessionUserId` | **two doors**: `permissions/check-permission.ts:543` and `sync/sync-service.ts:321` ✓ |
+| 7 | every route module is registered | all `export function register*` vs their call sites | **23 modules, all reachable from `app.ts`** (see the note below — my first check said otherwise) ✓ |
+| 8 | the web client reaches the three admin routes `DataSourceQuery` has no method for (round-1 brief) | `apps/web/src/authoring/data-source-gateway.ts` | **all three**: `:250-255` (state-occupancy), `:261-267` (population), `:274-286` (ticket-counts). **The brief's claim holds: the blindness is a property of the TYPE, not the product** ✓ |
+| 9 | the MCP write path does not report a refusal as a success | `packages/mcp-server/src/tools/write-tools.ts:17-40` | it **reads `results[0]` and throws `refused by <rule>: <reason>` verbatim**; only `committed` returns ✓ — this product's most expensive shape, handled correctly |
+| 10 | the detail route's parent branch orders existence before `canSee` (the crumb-walk fix's own claim, `tickets.ts:633`) | `tickets.ts:400-405` | **true**: `loadTicketRow` → `undefined` ⇒ `parent = null`; the `restricted` arm at `:441` is reachable only when the row exists ✓ |
+
+**Suite baselines re-measured at this sha: `packages/domain` 548 passed / 0 failed; `packages/rule-engine`
+345 passed / 0 failed.** All 8 CI-wired checkers green (§7.4, re-run).
+
+### 20.1 The pattern in my own three narrow universes — worth more than any one of them
+
+**Three times in this exercise my sweep's universe was too small, and each time the number it returned
+was well-formed and wrong:**
+
+1. **Round 1** — the door sweep was `apps/server/src/routes/*.ts`, so it found 47 registrations and
+   missed **7** in `sync/`, `stream/` and `app.ts`. Fixed by widening to `apps/server/src`.
+2. **Round 2, §14.4** — "is the script named inside a test file" is not "does the script self-test", so I
+   concluded six checkers had no self-test and **withdrew it** when `check-case-ids.mjs:195` showed an
+   internal one that never names itself.
+3. **Round 2, §20 row 7** — "is `register*` called in `app.ts`" returned `registerReconcileRoute: 0`, which
+   reads as a dead module. **It is registered at `sync-routes.ts:282`, from `sync-routes.ts`, which
+   `app.ts:799` calls.** The module is live; my universe was the *file* rather than the *reachable set*.
+
+**And the same shape cost an entire instrument, §15's 439-hit sweep.** Four instances, one rule:
+**a sweep's output is a claim about the sweep, and the only thing that catches a narrow universe is a
+second, differently-drawn one.** The two that produced real findings this round are both cases where the
+second sweep was the app itself rather than a list about the app — `E3-14` compared
+`HTTP_ORIGIN_PROTECTED_ROUTES` against the **assembled Fastify route table**, and `E3-18` compared the
+replica's answer against the **online route's answer**. Both found a gap that every list-vs-list
+comparison in the tree had been passing.
