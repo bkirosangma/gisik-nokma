@@ -553,3 +553,16 @@ nobody ships and then defend it.
 > repo would have reminded anyone to write these three rows. Recorded rather than fixed: widening it is
 > a change to a shared instrument, not part of Task 4.
 
+## Ruling E4-22 — the board row carries an accessible name (2026-09-21, B14, block `13.1187`–`13.1196`)
+
+*`board-screen.tsx`'s row (`TouchableOpacity`) had no `accessibilityRole` or `accessibilityLabel`, so
+VoiceOver/TalkBack read it as unstructured text rather than as a button naming the ticket. Fixed by
+extracting `boardRowAccessibilityLabel` (`board-row-a11y.ts`, a sibling `.ts` — `apps/mobile/src`'s
+`.tsx` files stay thin and untested at this layer) and wiring
+`accessibilityRole="button"`/`accessibilityLabel={boardRowAccessibilityLabel(item)}` onto the row.*
+
+- 13.1187 ✅ `boardRowAccessibilityLabel` names the ticket's title and state, comma-separated, the
+  same pair the row's visible text shows — RED confirmed against a pre-fix stub that returned `''`
+  (no accessible name at all), GREEN after. —
+  (`apps/mobile/src/screens/board-row-a11y.test.ts`)
+

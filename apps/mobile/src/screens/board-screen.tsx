@@ -3,6 +3,7 @@ import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native'
 import { useNavigation } from '@react-navigation/native';
 import { syncStatusLabel, type ReplicaDataSource, type TicketSummary } from '@gisik-nokma/app-core';
 import { loadBoard } from './board-read.js';
+import { boardRowAccessibilityLabel } from './board-row-a11y.js';
 
 type Nav = { navigate(name: 'Ticket', params: { ticketId: string }): void };
 
@@ -57,7 +58,11 @@ export function BoardScreen(props: {
         data={tickets}
         keyExtractor={(t) => t.ticketId}
         renderItem={({ item }) => (
-          <TouchableOpacity onPress={() => navigation.navigate('Ticket', { ticketId: item.ticketId })}>
+          <TouchableOpacity
+            onPress={() => navigation.navigate('Ticket', { ticketId: item.ticketId })}
+            accessibilityRole="button"
+            accessibilityLabel={boardRowAccessibilityLabel(item)}
+          >
             <Text>
               {item.title} · {item.stateId}
             </Text>
