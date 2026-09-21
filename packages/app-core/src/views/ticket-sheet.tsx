@@ -3320,7 +3320,16 @@ export function TicketSheet({
                 the authority deliberately, which the indicator's docblock
                 records. */}
             <div className="gn-ticket-sheet__subtasks-head">
-              <p className="gn-ticket-sheet__subtasks-heading">
+              {/* ⚠ TWO CLASSES, AND THE SECOND IS THE SHEET'S SHARED CAPTION (spec
+                  decision 11): the prototype draws `SUBTASKS · …` and `Comments · N`
+                  in the SAME eyebrow style (`desktop.dc.html:1236`, `:1250`), so
+                  `.gn-ticket-sheet__caption` is the name for that style and
+                  `.gn-ticket-sheet__subtasks-heading` stays this block's own hook.
+                  The words are NOT retyped into caps — `text-transform` is paint,
+                  and `16.123` asserts exactly that, so a later edit that wrote
+                  `SUBTASKS` into the source reddens there instead of quietly
+                  breaking every `getByText` on this heading. */}
+              <p className="gn-ticket-sheet__subtasks-heading gn-ticket-sheet__caption">
                 Subtasks
                 {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
               </p>
@@ -3351,32 +3360,54 @@ export function TicketSheet({
             ) : (
               <ul className="gn-ticket-sheet__subtasks-list">
                 {subtaskRows.map((row) => (
-                  <li key={row.ticketId} data-testid={`subtask-${row.ticketId}`}>
-                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
-                    {/* THE SEPARATOR IS TEXT, NOT A GAP, and that is a decision
-                        rather than a preference.
-
-                        Two adjacent inline spans are ONE RUN OF GLYPHS — there is
-                        no text between them — so the row rendered
+                  <li
+                    key={row.ticketId}
+                    data-testid={`subtask-${row.ticketId}`}
+                    className="gn-ticket-sheet__subtask-card"
+                  >
+                    {/* THE TITLE IS THE CARD'S OWN LINE, and the meta row sits
+                        beneath it as a BLOCK rather than as a run of inline spans
+                        — which is the 2026-09-20 defect's own shape changed on
+                        purpose. The row used to be three adjacent inline spans
+                        with a text ` · ` between them, because two adjacent spans
+                        are ONE RUN OF GLYPHS: the row rendered
                         `Order the brochuresTo do` on screen AND in the accessible
-                        name. The controller's browser pass caught it on
-                        2026-09-20 in this section, and the unit cases could not:
-                        `16.15` queries each span's own text, which passes while
-                        the row itself reads as one word.
+                        name. **A card separates the title from the meta row by
+                        BLOCK, so no separator text is needed there** — assistive
+                        tech pauses at the element boundary, and jsdom cannot see
+                        layout either way. */}
+                    <span className="gn-ticket-sheet__subtask-title">{row.title}</span>
+                    <span className="gn-ticket-sheet__subtask-meta">
+                      {/* The child's OWN state, spelled from the served row — the
+                          empty state's sentence claims a subtask gets a state, so
+                          the list has to show one or the claim is decoration.
+                          Drawn as a CHIP (prototype `:1241`), and the chip is the
+                          same component the sheet's header line uses. */}
+                      <Chip tone={row.stateCategory}>{row.stateName}</Chip>
+                      {/*
+                        ⚠ THE SEPARATOR IS STILL TEXT, AND IT IS STILL LOAD-BEARING
+                        — this is the SAME property the 2026-09-20 defect was
+                        about, one element to the right. The chip and this detail
+                        line are two flex items on ONE line with a CSS `gap`
+                        between them, and a gap is not a glyph: without the
+                        leading ` · ` inside this string the meta row reads
+                        `To dotask`, on screen and in the accessible name alike,
+                        and jsdom has no layout engine to tell the two treatments
+                        apart. So the separator lives INSIDE the detail string and
+                        the case reads `textContent`, which is the one surface
+                        both a person and a unit case can see.
 
-                        A CSS `gap` would have fixed the screen and left the name
-                        joined, and it would have been UNMEASURABLE here — this
-                        section declares no stylesheet rule at all and jsdom has
-                        no layout engine, so no case could tell the fix from its
-                        absence. That is the same shape as the defect: a check
-                        passing for a reason unrelated to what a person reads.
-                        Text is the one treatment both surfaces, and the case,
-                        can see. */}
-                    <span className="gn-ticket-sheet__subtask-sep">{' · '}</span>
-                    {/* The child's OWN state, spelled from the served row — the
-                        empty state's sentence claims a subtask gets a state, so
-                        the list has to show one or the claim is decoration. */}
-                    <span className="gn-ticket-sheet__subtask-state">{row.stateName}</span>
+                        The type is the CHILD's, read off the served row; the due
+                        day goes through the ONE date renderer, never an ISO
+                        slice. An absent date draws the type alone — no dangling
+                        separator, which `16.124`'s control asserts.
+                      */}
+                      <span className="gn-ticket-sheet__subtask-detail">
+                        {row.dueDate === null
+                          ? ` · ${row.typeId}`
+                          : ` · ${row.typeId} · Due ${formatDate(row.dueDate.date)}`}
+                      </span>
+                    </span>
                   </li>
                 ))}
               </ul>
@@ -3417,21 +3448,40 @@ export function TicketSheet({
                   the child is a Task and the Story rank between them is SKIPPED —
                   and nothing on screen named it. `subtaskType.name` was read
                   nowhere in the render before this line.
+
+                  ⚠ IT STAYS THE ROW'S NOTE, and the row is now ONE line (spec
+                  decision 10, `desktop.dc.html:1258-1261`): input and button side
+                  by side, with this sentence above them both. `flex-wrap` on the
+                  rule means it shares their line when the sheet is wide and takes
+                  its own when it is not, which is the prototype's own behaviour
+                  rather than a second layout.
                 */}
                 <p className="gn-ticket-sheet__subtask-target" data-testid="sheet-subtask-target">
                   {`Adds a ${subtaskType.name}.`}
                 </p>
-                <label className="gn-field" htmlFor="gn-new-subtask-title">
-                  <span className="gn-field__label">New subtask title</span>
-                  <input
-                    id="gn-new-subtask-title"
-                    className="gn-field__input"
-                    data-testid="sheet-subtask-title"
-                    value={newSubtaskTitle}
-                    onChange={(event) => setNewSubtaskTitle(event.target.value)}
-                    disabled={addingSubtask}
-                  />
-                </label>
+                {/*
+                  ⚠ THE VISIBLE `<label>` IS GONE, AND ITS WORDS ARE STILL HERE —
+                  twice, in the input's `placeholder` and its `aria-label`. The
+                  label was the only visible text on the row besides the button,
+                  and an inline row has no room for it; but a placeholder alone is
+                  NOT an accessible name (it vanishes the moment anything is typed
+                  and several assistive technologies ignore it), so the `aria-label`
+                  carries the words the label used to. **Every pre-existing
+                  add-subtask case queries `getByLabelText('New subtask title')`
+                  and keeps resolving through it** — which is the half of this
+                  change that could have silently broken a dozen cases, and the
+                  reason the two are asserted to agree in `16.125`.
+                */}
+                <input
+                  id="gn-new-subtask-title"
+                  className="gn-field__input gn-ticket-sheet__subtask-input"
+                  data-testid="sheet-subtask-title"
+                  placeholder="New subtask title"
+                  aria-label="New subtask title"
+                  value={newSubtaskTitle}
+                  onChange={(event) => setNewSubtaskTitle(event.target.value)}
+                  disabled={addingSubtask}
+                />
                 <Button data-testid="sheet-subtask-add" type="submit" disabled={addingSubtask}>
                   {addingSubtask ? 'Adding…' : 'Add subtask'}
                 </Button>

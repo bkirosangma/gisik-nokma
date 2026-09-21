@@ -240,7 +240,7 @@ them all and `restrictedCount` names the ones this viewer may not see — so the
 against it on every render, and a disagreement is **said** rather than drawn. `16.17` is what makes that
 falsifiable; `16.18` is its control, without which a section that refused everything would pass.
 
-- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words. **And the ROW is read as a row** — `textContent` exactly `Order the brochures · To do`. The first version of this case did not, and that is the whole of the defect below: it queried each span's own text, so it passed while the row rendered `Order the brochuresTo do`. Two adjacent inline spans with no text between them are ONE RUN OF GLYPHS on screen and in the accessible name, and nothing in the case read the row as anything but two independent strings. **Found by the controller's browser pass on 2026-09-20** (`HSN codes for the real catalogueWaiting`); removing the separator now reddens this case with the defect itself in the message (`expected 'Order the brochuresTo do' to be 'Order the brochures · To do'`). **The treatment is TEXT rather than a CSS gap, deliberately**: this section declares no stylesheet rule at all and jsdom has no layout engine, so a gap would have been UNMEASURABLE — the unverifiable fix and the defect are the same shape.
+- **16.15** ✅ Lists this ticket's children, **each with its OWN state** — the empty state's claim ("a subtask is a ticket of its own") asserted in structure, not just in words. **And the ROW is read as a row** — `textContent` exactly `Order the brochures · To do`. The first version of this case did not, and that is the whole of the defect below: it queried each span's own text, so it passed while the row rendered `Order the brochuresTo do`. Two adjacent inline spans with no text between them are ONE RUN OF GLYPHS on screen and in the accessible name, and nothing in the case read the row as anything but two independent strings. **Found by the controller's browser pass on 2026-09-20** (`HSN codes for the real catalogueWaiting`); removing the separator now reddens this case with the defect itself in the message (`expected 'Order the brochuresTo do' to be 'Order the brochures · To do'`). **The treatment is TEXT rather than a CSS gap, deliberately**: this section declares no stylesheet rule at all and jsdom has no layout engine, so a gap would have been UNMEASURABLE — the unverifiable fix and the defect are the same shape. ⚠ **AMENDED 2026-09-22 (sheet prototype parity, Task 6): the ROW IS A CARD NOW and the whole-row `textContent` string it used to assert is unreachable.** It read `toBe('Order the brochures · To do')`; a card is a title element with a meta row BENEATH it, so the same correct rendering now reads `Order the brochuresTo do · task`. **The amendment keeps the property in both halves rather than dropping it:** the title and the meta row are asserted as separate ELEMENTS (a block boundary, not a run of glyphs), and WITHIN the meta row — where the chip and the detail DO share a line — the separator is still asserted as real characters, `To do · task` and not `To dotask`. That second half is the 2026-09-20 defect's exact shape one element to the right, and mutation `M8` (the leading glyph removed from the detail string) reddens this case, `16.124` and `16.124`'s control. — **The plan's Task 6 text claimed the pre-existing subtask cases would pass unchanged; this is the one that could not, and it is recorded rather than quietly edited.**
 - **16.16** ✅ The empty state draws the prototype's sentence, verbatim, when `rollup` is null (the server's own spelling for "no children at all").
 - **16.17** ✅ **Refuses to render a short list:** when the rollup counts more children than were read, the section says so in the server's numbers and **draws no rows**.
 - **16.18** ✅ The control for 16.17 — with the count AGREEING, the list IS drawn and no refusal appears.
@@ -444,7 +444,10 @@ specific mutation, not about a sentence.**
 case that asserts the parent's id is absent from the body, so **the leak guard can fail**; dropping the
 state from a subtask row reddens **16.15**; and moving the separator INSIDE the title span stays **green**,
 correctly — the row's text and its accessible name are byte-identical either way, so green is the right
-answer there rather than a blind spot.
+answer there rather than a blind spot. ⚠ **The second reading EXPIRED ON 2026-09-22 with the card (Task 6):** the
+separator now sits in a DIFFERENT element from the title, so moving it into the title span changes the meta
+row's text and reddens `16.15` — the mutation's verdict is a fact about the markup it was run against, not
+about the sentence, which is what the paragraph above this one already records.
 
 **The review round's five findings, all applied BEFORE the PR opened:** the stale authority (this section's
 `16.40` cited 6.66's *"no table stores a ticket title"*, true when written and false since `proj_tickets`
@@ -1570,3 +1573,76 @@ as a kill.)
   control was the weaker one:** it catches the case where the block is the grid's FIRST CHILD — a position
   where the order assertion alone would be ambiguous — and the order assertion catches the inside-anywhere
   case on its own.
+
+## Sheet prototype parity, Task 6 — subtask cards, a caption heading, an inline add row (tail lane, 2026-09-22) — cases `16.123`–`16.125`
+
+**Task 6 of the same plan, the next commit of the same lane.** The subtask rows become CARDS with the
+prototype's clothes (`desktop.dc.html:3629`), the section heading takes the sheet's shared caption, and the
+add row goes inline (`:1258-1261`).
+
+**⚠ NO TICK BOX, AND ITS ABSENCE IS A DECISION RATHER THAN AN OMISSION.** The prototype's cards carry a box
+that advances the child's state on click. Drawing one that does nothing would be a control that LIES, and
+wiring it would be functionality this plan explicitly does not add (spec decision 10, and the plan's
+out-of-scope list). Nothing asserts its absence, because there is no id allocated to it and a case for a
+control nobody proposed is the inventing direction.
+
+**⚠ THE SEPARATOR SURVIVES THE CARD, ONE ELEMENT TO THE RIGHT, AND THAT IS THE POINT OF THIS SECTION.** The
+2026-09-20 defect in this very section was *"two adjacent inline spans with no text between them are one run
+of glyphs"* — the row read `Order the brochuresTo do` on screen and in the accessible name. A card separates
+the TITLE from the meta row by BLOCK, so no separator is needed there. But the meta row puts the state CHIP
+and the `type · Due day` DETAIL on ONE line with only a CSS `gap` between them, and **a gap is not a glyph**
+— so the markup carries a leading ` · ` inside the detail string, and the cases read `textContent` rather
+than a normalizing text query, because the assertion's subject is a character. Mutation `M8` is the witness.
+
+**⚠ THE PLAN SAID THE PRE-EXISTING SUBTASK CASES WOULD PASS UNCHANGED, AND ONE DOES NOT.** `16.15` asserted
+the whole row's `textContent` as one exact string — precisely the assertion a card invalidates. It is
+AMENDED rather than the card being bent to satisfy it, and its own entry (above) records the amendment with
+both halves of the property it keeps. **This is the plan's own Task 6 note being one case short, not a test
+edited to suit new code:** the old string is not reachable by ANY correct card rendering, and a case that
+pinned the card back into three inline spans would be pinning the markup the owner ruled away.
+
+**⚠ AND THE ADD ROW'S VISIBLE `<label>` IS GONE, WHICH IS THE ONE EDIT HERE THAT COULD HAVE BROKEN A DOZEN
+CASES SILENTLY.** The label's words moved into the input's `placeholder` AND its `aria-label`; a placeholder
+alone is not an accessible name (it disappears the moment something is typed), so every pre-existing
+`getByLabelText('New subtask title')` keeps resolving through the `aria-label`. `16.125` asserts the two
+agree, which is what makes the substitution checkable rather than assumed. **The `Adds a <type>.` sentence
+stays** as the row's note, above input and button, and it keeps its `data-testid`.
+
+### The case
+
+- **16.123** ✅ The Subtasks heading wears `gn-ticket-sheet__caption` — and the words are NOT retyped:
+  `textContent` still starts `Subtasks` and does not contain `SUBTASKS`, so the caps come from
+  `text-transform` (paint, not content) and every existing `getByText` on this heading keeps matching.
+- **16.124** ✅ Each subtask is a card — the `gn-ticket-sheet__subtask-card` class, the title in its own
+  element, the state as a CHIP (asserted on the `gn-chip` class, because the chip is the change), and the
+  detail line carrying `type · Due <day>` through the ONE date renderer rather than an ISO slice.
+- ✅ **The CONTROL arm of `16.124`** — a child with NO due day draws the type alone and no dangling separator.
+  Written with the id in prose rather than at the line head for the reason `16.110`'s control records: **an id
+  at a bullet's head IS a declaration**, and this would be a second one for the same number
+  (`scripts/check-case-ids.mjs` caught it on the first run, exactly as it did there). The
+  direction the case above cannot see: its fixture HAS a date, so a build that rendered
+  ` · task · Due ` unconditionally would print a separator with nothing after it and pass. It also asserts
+  `Due` is absent from the card, so the control is about the string rather than about a class.
+  `No date claimed` is deliberately NOT drawn on the card — the card is a summary and the child's own sheet
+  is where an absence is stated.
+- **16.125** ✅ The add row is one line — the input carries its former label as `placeholder` AND
+  `aria-label`, it sits inside `.gn-ticket-sheet__subtask-add`, and the button shares that same parent.
+
+**Mutations — TWO, both run, both killed (160 collected in each run).**
+
+- **M7 — the caption class dropped from the Subtasks heading. KILLS `16.123` ONLY (1 failed / 159 passed).**
+  Note the shape: the heading keeps its own class and its own text, so no other case can see this — which is
+  why `16.123` reads the class off the element rather than trusting the shared rule's existence.
+- **M8 — the leading separator glyph removed from the detail string (` · task` → `task`). KILLS THREE: `16.15`,
+  `16.124` and `16.124` CONTROL (3 failed / 157 passed).** Three, because two of them read the character and
+  the third reads the exact string it is part of — the same mutation, three independent readings, which is
+  the arrangement the 2026-09-20 defect showed was missing in the other direction.
+
+**⚠ ONE CROSS-PACKAGE COLLISION, MEASURED RATHER THAN AVOIDED.** The add row's input was first styled with
+`.gn-ticket-sheet__subtask-add .gn-field__input`. That reddened `13.291` and `13.339` in
+`packages/ui/test/components.test.tsx`: its `rule()` helper (`:548`) resolves a selector with a FIRST-MATCH
+regex over `ui.css`, so a DESCENDANT selector ending in `.gn-field__input` becomes the rule it returns, and
+those two cases then asserted against this row's `flex`/`min-width`. **Fixed by giving the input its own
+class** (`.gn-ticket-sheet__subtask-input`), which keeps both rules addressable — `.gn-field__input` still
+supplies the box. A third package's pinned case reading `ui.css` by selector is the trap the plan's Task 8
+sweep exists for, and it fired here rather than at the gate.

@@ -2098,6 +2098,37 @@ button.gn-ticket-sheet__crumb--link {
    engine); the shape it actually shipped is unstyled markup. Named here, not
    widened — this change is the chip. */
 .gn-ticket-sheet__subtasks-head { display: flex; align-items: baseline; gap: 0.625rem; flex-wrap: wrap; }
+/* THE SUBTASK ROWS ARE CARDS (spec 2026-09-22 decision 10, `desktop.dc.html:3629`):
+   a tinted block, the child's title, then a meta row carrying its state chip and
+   its `type · Due day` detail. **No tick box** — the prototype's box advances the
+   child's state on click, and drawing one that does nothing would be a control
+   that lies, while wiring it would be functionality this plan does not add.
+
+   ⚠ THE CARD IS A COLUMN, AND THAT IS WHAT REPLACES THE 2026-09-20 SEPARATOR
+   between the title and the state: two adjacent INLINE spans are one run of
+   glyphs, but a block boundary is not, so the title needs no ` · ` after it. The
+   separator is still required INSIDE `.gn-ticket-sheet__subtask-meta`, where the
+   chip and the detail ARE on one line with only a `gap` between them — and a gap
+   is not text, so the markup carries the glyph (see the render site). */
+.gn-ticket-sheet__subtasks-list { list-style: none; margin: 0.5rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
+.gn-ticket-sheet__subtask-card { display: flex; flex-direction: column; gap: 0.1875rem; background: var(--gn-fill-quaternary); border-radius: 0.75rem; padding: 0.75rem; }
+.gn-ticket-sheet__subtask-meta { display: flex; gap: 0.4375rem; align-items: center; flex-wrap: wrap; }
+.gn-ticket-sheet__subtask-detail { font-size: 0.75rem; line-height: 1rem; color: var(--gn-text-muted); }
+/* The inline add row (`:1258-1261`) — input and button on one line, the row's own
+   `Adds a <type>.` note sharing it when there is room and wrapping above it when
+   there is not. `flex-wrap` is the whole responsive story here; there is no second
+   rule for the phone. */
+.gn-ticket-sheet__subtask-add { display: flex; gap: 0.625rem; align-items: flex-end; flex-wrap: wrap; margin-top: 0.75rem; }
+/* ⚠ THE INPUT CARRIES ITS OWN CLASS RATHER THAN BEING REACHED THROUGH
+   `.gn-ticket-sheet__subtask-add .gn-field__input`, and the reason is a PINNED
+   TEST rather than taste. `packages/ui/test/components.test.tsx` reads
+   `.gn-field__input`'s own rule with a FIRST-MATCH regex over this file
+   (`rule()`, `:548`), so a DESCENDANT selector ending in that literal becomes the
+   rule it returns — the mutation `13.291`/`13.339` then assert against these two
+   declarations and redden. Measured: it did exactly that on the first run of this
+   change. A distinct class keeps both rules addressable, and `.gn-field__input`
+   still supplies the box itself. */
+.gn-ticket-sheet__subtask-add .gn-ticket-sheet__subtask-input { flex: 1; min-width: 12.5rem; }
 button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }

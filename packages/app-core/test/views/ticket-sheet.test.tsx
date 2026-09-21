@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
 import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
+import { formatDate } from '../../src/provenance.js';
 import { ServingGapError, SERVING_GAPS } from '../../src/online/mappers.js';
 import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
@@ -2120,8 +2121,29 @@ describe('F — the subtasks section', () => {
     // no layout engine, so `textContent` is the strongest claim a unit case can
     // make about what a reader sees — and it is strong enough for THIS defect,
     // where the missing thing is a character rather than a pixel.
-    expect(within(section).getByTestId('subtask-tkt-s1').textContent).toBe('Order the brochures · To do');
-    expect(within(section).getByTestId('subtask-tkt-s2').textContent).toBe('Book the venue · Done');
+    //
+    // ⚠ **THIS ASSERTION WAS A WHOLE-ROW `textContent` AND THE ROW IS A CARD NOW
+    // (sheet prototype parity, Task 6, 2026-09-22).** It read
+    // `toBe('Order the brochures · To do')` — one exact string for the whole
+    // `<li>`. A card is a title element with a meta row BENEATH it, so the whole
+    // row now reads `Order the brochuresTo do · task` and the old string is not
+    // reachable by any correct rendering. **The amendment KEEPS THE PROPERTY
+    // rather than dropping it, and it is asserted in BOTH halves:**
+    //
+    //   1. the title and the meta row are separate ELEMENTS — a block boundary,
+    //      not a run of glyphs — which is what makes the missing separator between
+    //      them a layout fact rather than a text defect; and
+    //   2. WITHIN the meta row, where the chip and the detail DO share one line,
+    //      the separator is still real characters — `To do · task`, not
+    //      `To dotask`. That is the 2026-09-20 defect's exact shape, one element
+    //      to the right, and it is why the markup carries a ` · ` glyph inside the
+    //      detail string rather than relying on the flex `gap`.
+    const cardOne = within(section).getByTestId('subtask-tkt-s1');
+    const cardTwo = within(section).getByTestId('subtask-tkt-s2');
+    expect(cardOne.querySelector('.gn-ticket-sheet__subtask-title')?.textContent).toBe('Order the brochures');
+    expect(cardTwo.querySelector('.gn-ticket-sheet__subtask-title')?.textContent).toBe('Book the venue');
+    expect(cardOne.querySelector('.gn-ticket-sheet__subtask-meta')?.textContent).toBe('To do · task');
+    expect(cardTwo.querySelector('.gn-ticket-sheet__subtask-meta')?.textContent).toBe('Done · task');
   });
 
   /**
@@ -3011,6 +3033,102 @@ describe('sheet prototype parity — the details body order and chrome', () => {
     // of the `<dl>` would also precede `field-state`, and the prototype puts it
     // above the grid ENTIRELY. `closest('dl')` from the block is the measurement.
     expect(grid.contains(screen.getByTestId('field-description'))).toBe(false);
+  });
+});
+
+/**
+ * TASK 6 of `docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md` — the
+ * subtask rows become CARDS, the heading wears the sheet's caption, and the add
+ * row goes inline.
+ *
+ * ⚠ **THE PLAN SAID THE EXISTING SUBTASK CASES WOULD PASS UNCHANGED, AND `16.15`
+ * DOES NOT.** It asserts each row's `textContent` as one exact string
+ * (`'Order the brochures · To do'`), which is precisely the assertion a card
+ * changes — the row is now a title element and a chip row. That case is amended in
+ * this change rather than the card being bent to fit it, and the amendment KEEPS
+ * the property it was written for (see its own comment).
+ */
+describe('sheet prototype parity — the subtasks section', () => {
+  const child = (over: Partial<ListRow> = {}): ListRow => listRowSeed({ parentId: TICKET, ...over });
+
+  it('16.123 the Subtasks heading wears the caption class (uppercase by CSS, text unchanged)', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const heading = within(screen.getByTestId('sheet-subtasks')).getByText(/^Subtasks/);
+    expect(heading.className).toContain('gn-ticket-sheet__caption');
+    // ⚠ AND THE WORDS ARE NOT RETYPED. The prototype draws `SUBTASKS`; this build
+    // gets the caps from `text-transform`, which is PAINT and not content — so
+    // every `getByText` on this heading in every other case keeps matching, and
+    // this arm is what stops a later "just write it in caps" edit from looking
+    // like the same thing.
+    expect(heading.textContent).toMatch(/^Subtasks/);
+    expect(heading.textContent).not.toContain('SUBTASKS');
+  });
+
+  it('16.124 each subtask is a card: the title, then a chip row carrying the state chip and `type · Due day`', async () => {
+    const kid = child({
+      ticketId: 'kid',
+      title: 'Mint tokens',
+      typeId: 'task',
+      stateName: 'Blocked',
+      stateCategory: 'open',
+      dueDate: { date: '2026-09-10', claim: claim() },
+    });
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    renderSheet(read, sheetSource(read, [], [kid]));
+    await settled();
+
+    const card = screen.getByTestId('subtask-kid');
+    expect(card.className).toContain('gn-ticket-sheet__subtask-card');
+    expect(within(card).getByText('Mint tokens').className).toContain('gn-ticket-sheet__subtask-title');
+    // The state is a CHIP now, not a bare span — asserted on the class rather
+    // than on the words, because the chip is the change.
+    expect(within(card).getByText('Blocked').className).toContain('gn-chip');
+    // The detail line names the child's TYPE and, when it has one, its due day —
+    // through the ONE date renderer, never a raw ISO slice.
+    //
+    // ⚠ READ AS THE ELEMENT'S `textContent`, NOT THROUGH `getByText`, and the
+    // reason is the PROPERTY rather than a workaround: the leading ` · ` is the
+    // separator that keeps this line from reading as `To dotask` in the same row,
+    // so the assertion's subject is the exact string INCLUDING it. A text query
+    // compares a normalized form, and a normalized comparison is the wrong
+    // instrument for a claim about a character. (**`getByText` did not resolve
+    // this string on the first run and I did NOT establish why** — the codepoints
+    // on both sides are the same `U+00B7`, and the mechanism is not recorded here
+    // because it was not measured. What is recorded is the probe that works.)
+    expect(card.querySelector('.gn-ticket-sheet__subtask-detail')?.textContent).toBe(
+      ` · task · Due ${formatDate('2026-09-10')}`,
+    );
+  });
+
+  it('16.124 CONTROL — a child with NO due day draws the type alone, and no dangling separator', async () => {
+    const kid = child({ ticketId: 'kid', title: 'Mint tokens', typeId: 'task', dueDate: null });
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    renderSheet(read, sheetSource(read, [], [kid]));
+    await settled();
+    const card = screen.getByTestId('subtask-kid');
+    // The direction 16.124 cannot see: its fixture HAS a due day, so a build that
+    // rendered ` · task · Due ` unconditionally would print a separator with
+    // nothing after it and pass. `No date claimed` is deliberately NOT drawn here
+    // — the card is a summary, and the child's own sheet is where an absence is
+    // stated.
+    expect(card.querySelector('.gn-ticket-sheet__subtask-detail')?.textContent).toBe(' · task');
+    expect(card.textContent).not.toContain('Due');
+  });
+
+  it('16.125 the add row is one line: the input carries its label as placeholder AND accessible name, and the button sits beside it', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    // ⚠ THE ACCESSIBLE NAME IS THE WHOLE PROPERTY. The visible `New subtask title`
+    // label became the input's placeholder, so `getByLabelText` — which every
+    // pre-existing add-subtask case uses — must keep resolving. It does, through
+    // `aria-label`, and this asserts the two agree.
+    const input = screen.getByLabelText('New subtask title');
+    expect(input).toHaveAttribute('placeholder', 'New subtask title');
+    expect(input.closest('.gn-ticket-sheet__subtask-add')).not.toBeNull();
+    expect(
+      screen.getByRole('button', { name: 'Add subtask' }).closest('.gn-ticket-sheet__subtask-add'),
+    ).toBe(input.closest('.gn-ticket-sheet__subtask-add'));
   });
 });
 
