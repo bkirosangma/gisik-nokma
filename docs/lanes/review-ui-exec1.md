@@ -12,7 +12,7 @@
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
 | **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
-| **P16–P21** | — | **6 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important). |
+| **P16–P22** | — | **7 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
@@ -553,6 +553,30 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **WHAT WOULD HAVE BEEN BETTER.** Either `aria-label="Description"` on the editor host, or an `id` on the `<dt>` plus `aria-labelledby` — the second is better because it keeps one source for the words, and it is the mechanism the product already reaches for. Either is one attribute at `TicketEditor.tsx:119` or one prop threaded through `editorProps.attributes`.
 
+### P22 — **IMPORTANT** ⚠ **r2 NEW** — Two `role="menu"` elements have no accessible name, and one of them has a named twin in the same product
+
+**WHAT.** Two menus declare `role="menu"` and carry no `aria-label` and no `aria-labelledby`.
+
+**MEASUREMENT — the sweep, then each hit opened.**
+I swept every `role="…"` on a role that requires an accessible name, across six source trees, comments stripped and taking the element's **whole opening tag** rather than its line. **Control: 23 name-requiring roles seen; 5 lacked a name in the tag.** One of the five is a string constant (`board.tsx:893`'s `CARD_CLICK_BAIL_SELECTOR`), one is **P19's tablist**, and **one was a false positive of my own sweep** — `unread-badge.tsx:75` *is* labelled, but its `data-capped={count > CAP ? …}` contains a `>` that truncated my tag-slice before the `aria-label` three lines below. **A sweep that finds a `>` inside a JSX expression stops early, and the two that survived were opened by hand.**
+
+The two that stand:
+- **`apps/web/src/account-menu.tsx:148`** — `<div ref={menuRef} id={menuId} role="menu" className="gn-nav__menu">`. **No name.**
+- **`packages/app-core/src/workflow-builder/ui/rule-editors/add-rule-menu.tsx:47`** — `<ul className="add-rule-menu__list" role="menu">`. **No name.**
+
+**⚠ PRE-EMPTING THE OBVIOUS DEFENCE: `aria-controls` IS NOT A NAME.** `account-menu.tsx:138` does carry `aria-controls={open ? menuId : undefined}`, and the menu carries `id={menuId}` — but `aria-controls` asserts *which element this control operates*, not *what the menu is*. `grep -n "menuId"` over that file returns three lines and **none of them is a labelling relationship**: the id is used once as a target for `aria-controls` and once as the element's own id. `aria-labelledby` appears nowhere in the file.
+
+**⚠ AND THE SAME PRODUCT CONTAINS THE NAMED TWIN.** `apps/web/src/last-project-nav.tsx:249` is the **same element with the same class and the same role** — `<div ref={menuRef} id={menuId} role="menu" aria-label="Projects" className="gn-nav__menu">` — carrying the `aria-label` the account menu lacks. **Identical markup, identical class, one line apart in what it declares.**
+
+**WHY IT IS WRONG — AND THIS IS NOW THE THIRD INSTANCE, WHICH IS THE ARGUMENT.** `role="menu"` is a name-requiring role: a person using a screen reader is told there is a menu and not what it holds. And this is the third time in this lane that the defect is *an instance missing from a pattern the product uses correctly elsewhere*:
+- **P19** — a `tablist` with no name, beside the sheet's `tablist` that requires one by type;
+- **P21** — a content area with no name, beside the toolbar immediately above it that has one;
+- **P22** — a menu with no name, beside the identical menu in the same bar that has one.
+
+**Three instances is a pattern rather than a coincidence**, and it is the strongest single argument in this report: whatever produces these is not ignorance of the technique, because the technique is in use feet away in every case. **The owner's rule is explicit that a reason connecting to other findings weighs more**, and the connection here is a mechanism: the accessible name is applied *per element* and nothing checks it *per role*. **P10 is that gap stated as a measurement** — the accessible-name ratchet counts four attributes, so a `role="menu"` with no name contributes +1 to `role` and +0 to `ariaLabel`, and a count that only falls on a *loss* cannot notice a name that was never there.
+
+**WHAT WOULD HAVE BEEN BETTER.** `aria-label` on both — `"Account"` and `"Add rule"` name them exactly, and the workflow-builder menu's trigger already reads *"Add rule"* three lines above it (`add-rule-menu.tsx:44`). Better still, the same structural remedy P19 asks for: a shared menu component that requires the label by type, which is how `SegmentedControl` prevents P19's version of this.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -607,7 +631,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 11**
+**IMPORTANT — 12**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -616,6 +640,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
 - `P21` ⚠ r2 — the description editor's content area has no role and no accessible name
+- `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
@@ -635,7 +660,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 
-**Total 25.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 26.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
