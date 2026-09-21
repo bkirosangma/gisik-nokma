@@ -35,7 +35,7 @@ const on = (id: string, type: string, payload: unknown): EventEnvelope =>
 
 const defs = () => [typeDefined(STORY), typeDefined(TASK)];
 
-describe('E6-4 — a soft-deleted child is not open work', () => {
+describe('17.122 E6-4 — a soft-deleted child is not open work', () => {
   it('E6-4: a parent closes over a DELETED open child, and is still refused over a LIVE one', async () => {
     // P has two open children. Delete one; the other is the control that the
     // count is still taken — it refuses with "1", which is the live child and
@@ -94,7 +94,7 @@ describe('E6-4 — a soft-deleted child is not open work', () => {
   });
 });
 
-describe('E6-4 — a soft-deleted ticket is not a parent', () => {
+describe('17.123 E6-4 — a soft-deleted ticket is not a parent', () => {
   /** A deleted story DP and a live story LP, side by side, in the same project. */
   const parents = (...after: EventEnvelope[]) =>
     buildMemoryContext([WF], [

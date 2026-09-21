@@ -92,7 +92,7 @@ afterAll(async () => {
   await db.drop();
 });
 
-describe('E6-4 — a soft-deleted child is not open work', () => {
+describe('17.122 E6-4 — a soft-deleted child is not open work', () => {
   it('E6-4: a parent closes over a deleted open child; a LIVE open child still blocks it; a DONE child lets it close', async () => {
     // P with one open child C. Delete C; P closes.
     const P = newUlid();
@@ -128,7 +128,7 @@ describe('E6-4 — a soft-deleted child is not open work', () => {
   });
 });
 
-describe('E6-4 — a soft-deleted ticket is not a parent', () => {
+describe('17.123 E6-4 — a soft-deleted ticket is not a parent', () => {
   const REFUSAL = {
     status: 'refused',
     rule: 'hierarchy.parent-deleted',

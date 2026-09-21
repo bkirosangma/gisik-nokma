@@ -84,7 +84,7 @@ const EXEMPT: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown, 
   ['claim.contested_resolved', () => ({ contestedEventId: CONTEST, resolution: 'withdrawn' }), 'bookkeeping about a contest, not a write to the ticket'],
 ];
 
-describe('E6-2 — the live-ticket gate refuses every ordinary write against a soft-deleted ticket', () => {
+describe('17.121 E6-2 — the live-ticket gate refuses every ordinary write against a soft-deleted ticket', () => {
   it('E6-2: the two tables together are the WHOLE ticket-scoped vocabulary — a new type must pick a side', () => {
     // The registry exposes no enumeration, so the universe is the source that
     // REGISTERS it, read as text — the same set-difference the finding ran by

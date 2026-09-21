@@ -123,7 +123,7 @@ afterAll(async () => {
   await db.drop();
 });
 
-describe('E6-2 — the ingest door refuses every ordinary write against a soft-deleted ticket', () => {
+describe('17.121 E6-2 — the ingest door refuses every ordinary write against a soft-deleted ticket', () => {
   it('E6-2: control — the deleted twin is gone from the detail door and the live one is not', async () => {
     const gone = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${DELETED}`, headers: auth(ownerToken) });
     const here = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/tickets/${LIVE}`, headers: auth(ownerToken) });
