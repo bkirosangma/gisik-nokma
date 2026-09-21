@@ -10,6 +10,7 @@
 | **P13** | MINOR, cited WCAG 2.4.1 | **MINOR, claim WITHDRAWN** | ARIA11 (landmarks) is a sufficient technique for 2.4.1 and `<main>` is on every route, so the product probably **conforms**. Kept as a keyboard-convenience finding with the conformance claim removed. |
 | **P12** | IMPORTANT, argued from uniqueness | **IMPORTANT, re-argued** | the WCAG Understanding document **disclaims** a uniqueness requirement, and supplies a better argument: *"for web applications (single page applications) where the view changes dynamically, the title should also be changed dynamically to reflect the content or topic of the current view."* |
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
+| **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
 | **P16–P20** | — | **5 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
@@ -163,9 +164,9 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 ## 4. RENDER FINDINGS
 
-### P1 — **IMPORTANT** — Seven interactive controls are styled by no rule at all, so they paint as raw user-agent chrome
+### P1 — **IMPORTANT** ⚠ **r2 CORRECTION — SIX, NOT SEVEN: the seventh was refuted by an ancestor rule and is withdrawn** — interactive controls styled by no rule of their own
 
-**WHAT.** Nine source sites, seven distinct controls, where **no class on the element matches any selector block** in the product's three stylesheets.
+**WHAT.** **Eight source sites, six distinct controls** (filed as nine and seven — see the withdrawal below), where **no class on the element matches any selector block** in the product's three stylesheets.
 
 | element | site |
 |---|---|
@@ -175,9 +176,10 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 | `attachment-item__name` (`<a>` ×2) | `packages/editor/src/components/AttachmentListItem.tsx:106`, `:128` |
 | `evidence-picker__cancel` (`<button>`) | `packages/editor/src/components/EvidencePicker.tsx:149` |
 | `editor-slot__submit` (`<button>`) | `packages/editor/src/components/TicketEditorSlot.tsx:216` |
-| **`gn-nav__signin` (`<Link>` → `<a>`)** | `apps/web/src/legal-nav.tsx:97` |
 
-**The seventh was found by a corrected sweep, and its outlier status is measured:** every other class in `legal-nav.tsx` has a rule — `.gn-nav` **24**, `.gn-nav__inner` **4**, and `.gn-nav__brand`, `--brand-tile`, `__corner`, `__spacer`, `__wordmark` **1 each** — while `.gn-nav__signin` has **0**. It is the one control in that bar painted by accident.
+**⚠ THE SEVENTH MEMBER IS WITHDRAWN, AND ITS REFUTATION IS THE SAME LESSON AS P15.** My `<Link>`-widened sweep added `gn-nav__signin` on the ground that every other class in `legal-nav.tsx` has a rule while that one has **0** — `.gn-nav` **24**, `.gn-nav__inner` **4**, five others **1 each**. **That measurement is true and the conclusion drawn from it is false**, because `globals.css:1968` carries **`.gn-nav a { border-radius: 0.375rem; padding-inline: 0.875rem; font-weight: 500; letter-spacing: -0.1px; color: var(--gn-text-muted); text-decoration: none; … }`** with a matching hover/focus rule at `:1977-1978` — **a DESCENDANT rule from an ancestor class**, which styles the element completely. The element's own docblock says so too: `legal-nav.tsx:60` cites *"`.gn-nav a`'s 2.75rem minimum in BOTH dimensions"*. So it is painted by design, not by accident, and the seventh member is withdrawn.
+
+**⚠ AND THE BLIND SPOT IS STRUCTURAL, SO I RE-CHECKED ALL OF THEM.** My sweep tests whether an element's **own** classes match a selector — it is invisible to a descendant rule that reaches the element from an ancestor. I enumerated every descendant selector ending in `a` or `button` across the three stylesheets — `globals.css:1283/1290-1291` (`.gn-settings__sidebar a`), `:1925-1926` and `:1968/1977-1978` (`.gn-nav a`, `.gn-nav button`), `:2280` (`.gn-legal__toc a`), `:2428-2429` (`.gn-legal a`, `.gn-sign-in__legal a`), and `ui.css`'s three `.gn-button` rules — and **none of those ancestors is an ancestor of the six that remain**. The six stand against that check; the seventh did not.
 
 **MEASUREMENT.** Extracted all **702 selector blocks** from `ui.css` (comments stripped), plus `globals.css` and `editor.css`; for each static `className` literal on a `<button|input|select|textarea|summary|a>`, required that **at least one** of its class tokens matches a selector block. Nine results; `nodrag` (`state-node.tsx:47`) is React Flow's own marker and is excluded as not ours. **Positive control, same extractor, same path: `.gn-board-card__move` → 4 blocks; `.ticket-type-list__move` → 3 blocks.** The load-bearing fact: **`apps/web/app/globals.css:84` sets `button { font: inherit }` — font only**, with no `border`, `background` or `padding` reset, so an unstyled `<button>` keeps the UA's `outset` border and grey fill. The `<a>` elements are painted by the global `a { color: var(--gn-text-accent) }` (`globals.css:39`) and keep the UA underline; their **class** has no rule.
 
@@ -185,8 +187,9 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 
 **WHAT WOULD HAVE BEEN BETTER.** One shared bare-control reset — `border:none; background:transparent; padding:0; font:inherit; color:inherit` — applied as a class (the shape `button.gn-ticket-sheet__crumb--link` already uses at `ui.css:672`), or per-class rules for the six. The `.gn-*` convention in `ui.css` already exists for exactly this; these six simply never joined it.
 
-**⚠ NOT MEASURED AT PAINT — except for one, and that one BOUNDS the rest.** Six of the seven are **static and stylesheet** measurements: I did **not** confirm their painted result in a browser (I2's reason — `:3001` serves a baked image predating `main`). The `ticket-type-list__move` precedent was confirmed in Chromium (`border: 2px outset`, `background: rgba(239,239,239,0.3)`); **I am asserting the same cause from the same kind of evidence and not the same kind of confirmation.**
-**But the seventh IS painted-measured, and what it shows is worth as much as a violation would have been:** the viewport suite renders `a.gn-nav__signin "Sign in"` at **77×44** on `/privacy`, `/terms` and `/sign-in` at all three widths, `offenders=0`. So **the missing rule here is a styling defect and NOT a tap-target violation** — the element is large enough without any rule, because it is plain text in a flex bar. That is the honest shape of this finding: *painted by accident* is not the same as *broken*, and the one member I could check at paint came back passing.
+**⚠ NOT MEASURED AT PAINT — NONE OF THE SIX.** All six are **static and stylesheet** measurements: I did **not** confirm their painted result in a browser (I2's reason — `:3001` serves a baked image predating `main`). The `ticket-type-list__move` precedent was confirmed in Chromium (`border: 2px outset`, `background: rgba(239,239,239,0.3)`); **I am asserting the same cause from the same kind of evidence and not the same kind of confirmation.**
+
+**⚠ AND THE ONE MEMBER THAT *WAS* PAINTED-MEASURED IS THE ONE THAT GOT WITHDRAWN.** The `<Link>`-widened sweep's seventh member, `gn-nav__signin`, is the only one the viewport suite renders where I could read it — and it came back **77×44, `offenders=0`, because `.gn-nav a` styles it**. So the single painted data point I had pointed at the member that did not belong, and the six that remain have none. **The honest position for the finding as it now stands: six static measurements, zero painted confirmations, and a mechanism proven by precedent on a different class.** That is why it is Important and not higher, and I would not defend it as more than that.
 
 ---
 
@@ -588,7 +591,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 **IMPORTANT — 10**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
-- `P1` seven interactive controls styled by no rule at all (raw UA chrome)
+- `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
 - `P2` the board's whole-board empty state has no prototype counterpart and no styling
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
@@ -619,7 +622,7 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 ## 9. THE CLAIM I AM LEAST SURE OF
 
 **P1.** Its *measurement* is solid and reproducible (the extractor has a positive control and the `ticket-type-list__move` precedent proves the extractor sees a rule when one exists), and **it has already survived one correction that widened it** — the `<Link>` blindness (§10), which grew the list rather than shrinking it. But what I have not done is **look at six of the seven controls on a screen**. The precedent's own evidence was a Chromium reading of computed `borderStyle: outset`; mine is the absence of a selector block. If a React Flow or editor stylesheet I did not enumerate reaches them, P1 collapses. **The three stylesheets are the entire product's CSS as measured by `find . -name '*.css'` excluding `node_modules`/`.next`/`dist` — if a fourth exists under a path I excluded, this is where it would hide.**
-**And the one member I *could* check at paint came back passing** (77×44, `offenders=0`), which is the honest reason to hold this finding at Important rather than higher: the mechanism is proven by precedent on one class, the *consequences* are unproven on six of the seven.
+**And the one member I *could* check at paint came back passing** (77×44, `offenders=0`) — which is now the *withdrawn* seventh, so it is no longer evidence either way for the six that remain. **That withdrawal is itself the answer to the question §9 asks:** the sweep's blind spot was descendant rules from ancestors, one member fell to it, and the other six were re-checked against every `a`/`button` descendant selector in the three stylesheets before the correction was written. **What keeps this at Important and not higher is unchanged: the mechanism is proven by precedent on one class, and the painted consequence is unproven on all six.**
 
 **Second:** I3's *consequence* (a slackened baseline) is an inference from `8e742d18`'s arithmetic, not a measurement. The two controls it moves are named; the number they leave behind is not measured. Marked unverified in place.
 
