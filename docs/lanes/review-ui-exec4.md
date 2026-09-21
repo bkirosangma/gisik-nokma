@@ -9,7 +9,7 @@
 
 ## 0. THE ONE-LINE ANSWER
 
-**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-six of the twenty-nine findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and the one real failure the round found (exec 1's P24, 3.84:1 in `hig`/`minimal`) I painted and confirmed for them rather than claimed.
+**The floors this product wrote for itself hold exactly where an instrument watches and fail where none does.** Twenty-seven of the thirty findings below are painted measurements of THIS tree's signed-in routes on `:3041` — the half round 1 stated it could not reach — and they cluster on the surfaces no sweep visits: the open ticket sheet (a doubled breadcrumb on 23 of 26 seeded tickets, a nameless editor, a clipped description at phone width), the board's cards (24 disclosure buttons at 21 px), the dialogs (a bare UA input as the primary Title field), the shared `Select` (keyboard focus stranded on `<body>` after every use; no focus ring on its searchable form), the builder (two `<main>`s, a 415-px page on a 390-px phone), the phone-width shell (a 310-px nav), and the one edge class the brief calls the most expensive — a `404` ticket paints *Loading…* forever. Text contrast, by contrast, is clean everywhere I measured in the shipped `neo` style — 26 route×theme passes, one third-party watermark failing — and the one real failure the round found (exec 1's P24, 3.84:1 in `hig`/`minimal`) I painted and confirmed for them rather than claimed.
 
 ---
 
@@ -463,6 +463,21 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 ---
 
+
+### E4-30 — **IMPORTANT** — The sheet's ancestor crumbs are links painted in exactly the ink of the non-link crumbs beside them, on the strength of a docblock that says the prototype does the same — and the prototype's stylesheet says the opposite
+
+**WHAT.** In the crumb bar `Convenience Corner › Shop operations › Open questions › … › CCSO-6`, the first two are plain `<span>`s and *Open questions* is a `<button>` that opens the epic. Nothing visible separates them.
+
+**MEASUREMENT (painted, 1512).** `span.gn-ticket-sheet__crumb` (plain): `color: rgb(60,60,67)`, `13px/18px`; `button.gn-ticket-sheet__crumb--link`: `color: rgb(60,60,67)`, `text-decoration: none`, `13px` — **identical ink, no underline, no weight change**; only `cursor: pointer` and the UA focus ring differ. The current crumb is `600` in `rgb(32,43,73)` (that part matches the prototype). Source: `packages/ui/src/ui.css:672-679` — `button.gn-ticket-sheet__crumb--link { … color: inherit; }`, and the docblock at `:668-671`: *"`color: inherit` takes the nav's own `--gn-text-muted` … **which is also what the prototype does: its `<a>` sits in a nav declaring `color:var(--label2)` and sets no colour of its own** (`:1101`, `:1103`)."*
+
+**PROTOTYPE — the premise is false, measured.** `Gisik Nokma - Desktop.dc.html` (`3d142d46…`) **`:86`**: `a{color:var(--accent);text-decoration:none;…}` and `:87`: `a:hover,a:focus-visible{…opacity:0.68}` — a global rule, so every crumb `<a>` (`:1104`, `<a href="#" onClick="{{ c.go }}" style="font-size:13px;line-height:18px">`) paints in the **accent**, distinct from the `label2` nav around it; the docblock's cited `:1101`/`:1103` are the `<nav>` and the `<span>` wrapper, not a colour rule for the anchor. **Category 3: diverges with no ruling found** — the only text on the point is the docblock, and its stated reason is a misreading of the export.
+
+**WHY IT IS WRONG.** A link that looks exactly like the static text beside it has no affordance; a person cannot tell that *Open questions* opens anything while *Shop operations* does not. And this is the shape the repository's own memory names first — a sentence in a docblock asserting a fact about the artifact it cites, which the artifact contradicts (*"prose is the untested artifact"*). It compounds E4-1: two identical, un-affordanced link crumbs in a row.
+
+**WHAT WOULD HAVE BEEN BETTER.** `color: var(--gn-text-accent)` on `button.gn-ticket-sheet__crumb--link` (the role the product already resolves the prototype's `accent` to for text, per `.gn-button`'s and `.gn-board-card__move`'s docblocks), and the docblock rewritten to cite `:86`.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects — each row is a measurement I took that came back clean or ruled)_
@@ -494,6 +509,7 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 | The style axis (`data-style` = `hig` / `minimal` / `neo`, set on `<html>` client-side, nothing persisted) | **MATCHES** — 230 text elements with the sheet open, **0** contrast failures in each of the three; the same UA-chrome set in each | painted at 500 px. |
 | `.ticket-type-editor__issues` in `hig` / `minimal` light (exec 1's round-2 **P24**, which its author states was computed, not painted) | **CONFIRMED AT PAINT — exec 1's finding, not mine**: `rgb(215,0,21)` on `rgb(228,216,204)` at `12.8px` → **3.84:1** in both `hig` and `minimal`; `neo` → 6.28:1 (`rgb(158,42,32)` on `rgb(241,234,227)`). Recorded so the judge has the paint; my own 0-failure sweeps were `neo` (and dark), which is why my instrument did not see it | painted, `data-style` set client-side on `/settings/ticket-types/new`. |
 | The @mention popup in the comment composer (typed `@`, `@k`, `@a` with real keys; the draft was deleted afterwards, nothing posted) | **MATCHES / GOOD** — `div.mention-popup` in `body` with `role="option"` rows (`158×31`), a `role="status"` live region (*"1 person matches"* / *"No people match"*), and the editor carries `aria-haspopup="listbox"`, `aria-expanded`, `aria-controls`, `aria-activedescendant`; Escape closes the popup and leaves focus in the editor. **The nameless member is EXCLUDED from the list, not blank** (`@` → only *Kiro*, *"1 person matches"*) — a fact for the judge on exec 5's `E5-4`, whose body already hedges *"if listed"* | painted, 1512. |
+| Sheet header typography | **MATCHES** — title input `22px/28px/600`, borderless, transparent, `padding 0` (prototype `:1115`); crumb bar `13px/18px` in `label2` (`:1100`); current crumb `600` in `--gn-text` | painted. |
 | Visibility roster cut (`own_user_ids`/`resolved_user_ids` refused) | **RULED** — already classified category 2 by the compiled ruling; not re-examined | — |
 | Whole-board empty state, parent crumb title-only, 4-mode visibility radio, visibility `<section>` outside the `<dl>` | **RULED** in `review-compiled-controller.md` §4 rows 1, 2, 6, 7 — not re-raised | — |
 
@@ -568,11 +584,11 @@ The owner ordered graph-first. I did: `graphify-out/GRAPH_REPORT.md` header, hub
 | claimed severity | count | members |
 |---|---|---|
 | **Critical** | **0** | — |
-| **Important** | **17** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 |
+| **Important** | **18** | E4-1 · E4-3 · E4-4 · E4-5 · E4-7 · E4-8 · E4-9 · E4-11 · E4-12 · E4-13 · E4-14 · E4-17 · E4-18 · E4-19 · E4-21 · E4-23 · E4-28 · E4-30 |
 | **Minor** | **12** | E4-2 · E4-6 · E4-10 · E4-15 · E4-16 · E4-20 · E4-22 · E4-24 · E4-25 · E4-26 · E4-27 · E4-29 |
-| **total** | **29** | `17 + 12 = 29`; ids `E4-1` … `E4-29` with no gaps |
+| **total** | **30** | `18 + 12 = 30`; ids `E4-1` … `E4-30` with no gaps |
 
-**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28. Matches the prototype, fails the product's own later rule: E4-26.
+**Prototype classification of the 22:** category 3 (diverges, no ruling found): E4-1, E4-2, E4-7, E4-11, E4-13, E4-15, E4-19, E4-20, E4-24, E4-27, E4-29, E4-30. Category 2 argued against the record: E4-6, E4-8, E4-25, E4-3 (record superseded by the 2026-09-20 ruling). No prototype counterpart / pure accessibility, instrument or edge-class: E4-4, E4-5, E4-9, E4-10, E4-12, E4-14, E4-16, E4-17, E4-18, E4-21, E4-22, E4-23, E4-28. Matches the prototype, fails the product's own later rule: E4-26.
 
 **Overlap with round 1, stated:** E4-10 and E4-15 are new members of P1's class found by widening the population (class-less tags; classes whose rule forgot the border) and painted; E4-12 widens P11's scope from one component to the suite's population; E4-2 carries a painted reproduction of P8's focus finding as corroboration only. Nothing else overlaps.
 
