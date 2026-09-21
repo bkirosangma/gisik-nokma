@@ -13,3 +13,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P8 | done | cf7ee59ab84197edd42fe884ef168ae5126348de | components.test.tsx P8 x4 |
 | B07 | claimed | 2026-09-21 20:50 | /Users/kiro/my_projects/gisik-nokma-exec4 |
 | T-E6-24 | done | 24997d03e767466c7f1b0460674e6e72b445dd03 | replica-deleted-reads.test.ts E6-24 x4 (case 12.399) |
+| T-E6-2 | done | f6231926363f3245f98cd5a154fa8b43dcfa2417 | live-ticket.test.ts E6-2 x23 (mutation-witnessed) + soft-deleted-writes.test.ts x13 through POST /v1/events (case 17.121) |
