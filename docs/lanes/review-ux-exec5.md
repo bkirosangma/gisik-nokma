@@ -1267,9 +1267,9 @@ painted: the owner's inbox is empty (`[BROWSER]` `EMPTY_INBOX_COPY`) and I mint 
 
 **WHAT.** `apps/web/src/workspace-viewer.ts:127-130` `projectCountLine(0)` → `null`; `:169-173` `projectLine([])` →
 `null`. `workspaces/page.tsx:264`, `:267` feed those into the card, which renders the meta line only when
-`meta !== null` and the project line only when `projects !== null` (`:296-298`, `:313-315`). So a founder's fresh
+`meta !== null` and the project line only when `projects !== null` (`:296`, `:314`). So a founder's fresh
 workspace card is avatar, name, chips, *"You're an owner here."* — and nothing about projects, no *"No projects
-yet"*, no pointer. The export's card meta reads `"N members · M projects"` (`EXPORT:2734`, cited in the delta doc),
+yet"*, no pointer. The export's card meta reads `"N members · M projects"` (`EXPORT:2732`: `live.length + (live.length === 1 ? " project" : " projects")`),
 which for a new workspace at least says `0 projects`.
 
 **WHY.** The owner's own note in the export — `workspaces-gap.md`, *"Also absent, found by comparing against the
@@ -1283,7 +1283,7 @@ first project" until the form itself.
 **WHAT WOULD HAVE BEEN BETTER.** `projectCountLine(0)` → *"No projects yet"* for a non-guest viewer (guests keep
 the withheld arm), matching the manual's convention of saying an absence rather than omitting it.
 
-**MEASUREMENT.** `[SOURCE]` lines above opened; `workspaces-gap.md:18-28` (the owner's list) opened. Not painted — the
+**MEASUREMENT.** `[SOURCE]` lines above opened; `workspaces-gap.md:31` (*"12. No empty-project case on a card"*) opened. Not painted — the
 dev workspace has a live project.
 
 **SEVERITY: Minor** (claimed).
