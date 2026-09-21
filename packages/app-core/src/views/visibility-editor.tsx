@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from 'react';
 import { VISIBILITY_MODES, type VisibilityMode, type IngestResult } from '@gisik-nokma/domain';
-import { Button } from '@gisik-nokma/ui';
+import { Button, Popover } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDateTime } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
@@ -344,6 +344,16 @@ export function VisibilityEditor({
    */
   const [transportError, setTransportError] = useState<string | null>(null);
 
+  /**
+   * The standing chip is a menu trigger (spec 2026-09-22, Task 5): its own
+   * `useRef`/`useState` pair for the `Popover` it opens, independent of the
+   * submission/seed state above. `menuOpen && canEdit` gates the portal itself
+   * (belt-and-braces beside the trigger's own `disabled`): a viewer who cannot
+   * edit never opens this, whatever `menuOpen` happens to hold.
+   */
+  const triggerRef = useRef<HTMLButtonElement>(null);
+  const [menuOpen, setMenuOpen] = useState(false);
+
   const nameOf = (userId: string): string =>
     actorLabel(userId, members.find((member) => member.id === userId)?.name ?? null);
 
@@ -424,6 +434,11 @@ export function VisibilityEditor({
     if (result.status === 'committed') {
       setSubmission({ kind: 'idle' });
       onChanged?.();
+      // Apply closes the menu on success and leaves it open on refusal (spec
+      // decision 6): a refusal or an unreached write needs to stay visible
+      // beside the controls that produced it, but a committed write has
+      // nothing more to say here.
+      setMenuOpen(false);
       return;
     }
     // The authority's own words, carried without paraphrase — a refusal is a
@@ -435,72 +450,136 @@ export function VisibilityEditor({
   };
 
   return (
-    <section className="gn-visibility" aria-label="Who can see this">
-      <h3 className="gn-visibility__heading">Who can see this</h3>
-
+    <section className="gn-visibility" aria-label="Who can see this" data-testid="visibility-editor">
+      {/*
+        The standing chip IS the menu trigger now (spec 2026-09-22, Task 5):
+        clicking it opens the `Popover` below holding the SAME fieldset this
+        section always had, moved rather than rebuilt — every control inside
+        keeps its role, name and behaviour. Two renders rather than one
+        conditional's worth of extra JSX, because they differ in more than the
+        children: only the served-claim branch carries `.gn-visibility__standing`
+        (and the dot/mode span inside it), which is load-bearing for
+        `ticket-sheet.test.tsx`'s existing `.gn-visibility__standing` queries and
+        for 17.004's "no pill, no dot when unserved" cases — inventing either on
+        an unserved read would be exactly the invention `current === null`
+        exists to refuse.
+      */}
       {current === null ? (
-        <p className="gn-visibility__unserved" role="status">
-          The audience this ticket has now is not being served yet — no read on this branch carries
-          it. Anything shown here would be a guess.
-        </p>
+        <button
+          ref={triggerRef}
+          type="button"
+          className="gn-visibility__trigger"
+          aria-haspopup="dialog"
+          aria-expanded={menuOpen}
+          disabled={!canEdit}
+          onClick={() => setMenuOpen((open) => !open)}
+        >
+          Who can see this…
+        </button>
       ) : (
-        <p className="gn-visibility__standing">
-          <span
-            className={
-              restricted
-                ? 'gn-visibility__standing-mode gn-visibility__standing-mode--restricted'
-                : 'gn-visibility__standing-mode'
-            }
+        <div className="gn-visibility__standing">
+          <button
+            ref={triggerRef}
+            type="button"
+            className="gn-visibility__trigger"
+            aria-haspopup="dialog"
+            aria-expanded={menuOpen}
+            disabled={!canEdit}
+            onClick={() => setMenuOpen((open) => !open)}
           >
-            <span className="gn-visibility__dot" aria-hidden="true" />
-            {standingSentence(current, nameOf)}
-          </span>
+            <span
+              className={
+                restricted
+                  ? 'gn-visibility__standing-mode gn-visibility__standing-mode--restricted'
+                  : 'gn-visibility__standing-mode'
+              }
+            >
+              <span className="gn-visibility__dot" aria-hidden="true" />
+              {standingSentence(current, nameOf)}
+            </span>
+          </button>
           {current.resolvedMode === 'explicit' && namedAudience(current) === null ? (
             // The MODE is served and the LIST is not (ruling: the roster stays
             // cut). "Only the people this ticket names" without this clause
             // would be a partial answer wearing the shape of a complete one —
             // the reader cannot tell a name withheld by policy from a list that
             // was simply never drawn.
-            <>
-              {' '}
-              <span className="gn-visibility__roster-unserved">
-                The list itself is not being served — this read carries the ticket’s audience mode
-                and not the names it holds.
-              </span>
-            </>
+            <span className="gn-visibility__roster-unserved">
+              The list itself is not being served — this read carries the ticket’s audience mode
+              and not the names it holds.
+            </span>
+          ) : null}
+          {namedAudience(current) !== null ? (
+            // The prototype's `WHO CAN SEE IT` caption and one READ-ONLY chip
+            // per named person (`desktop.dc.html:1214-1222`) — no × and no
+            // `Add someone…` select, because both are per-person writes this
+            // build does not have; the people checklist inside the menu is the
+            // one write path and it stays there.
+            <div className="gn-visibility__viewers" data-testid="visibility-viewers">
+              <p className="gn-visibility__viewers-caption">Who can see it</p>
+              <div className="gn-visibility__viewer-chips">
+                {namedAudience(current)!.map((userId) => (
+                  <span key={userId} className="gn-visibility__viewer">
+                    {nameOf(userId)}
+                  </span>
+                ))}
+              </div>
+            </div>
           ) : null}
           {current.claim === null ? null : (
-            <>
-              {' '}
-              <span className="gn-visibility__standing-claim">
-                set by {actorLabel(current.claim.actorId, current.claim.actorName)} on{' '}
-                {formatDateTime(current.claim.serverTime)}
-              </span>
-            </>
+            <span className="gn-visibility__standing-claim">
+              set by {actorLabel(current.claim.actorId, current.claim.actorName)} on{' '}
+              {formatDateTime(current.claim.serverTime)}
+            </span>
           )}
-        </p>
+        </div>
       )}
+
+      {current === null ? (
+        <p className="gn-visibility__unserved" role="status">
+          The audience this ticket has now is not being served yet — no read on this branch carries
+          it. Anything shown here would be a guess.
+        </p>
+      ) : null}
 
       {/* ALWAYS, on every mode and whether or not this viewer may edit. */}
       <p className="gn-visibility__owner-note">{OWNER_ALWAYS_SEES_COPY}</p>
 
-      {canEdit ? (
-        // ONE wrapper, for the geometry and not for grouping semantics: the
-        // section is the prototype's right-aligned value column, and this block
-        // is the ONE part of the row that opts out to the left.
-        //
-        // ⚠ THE OPT-OUT IS MOVED, NOT TRANSCRIBED, AND A REVIEWER CAUGHT THIS
-        // COMMENT AND `ui.css`'s DISAGREEING ABOUT WHICH ELEMENT IT BELONGS TO.
-        // The prototype's `align-self:flex-start` (`visBtnStyle`,
-        // `desktop.dc.html:3786`) belongs to its PILL BUTTON; this product's
-        // control is a four-mode radio fieldset, so the property is applied to
-        // the BLOCK that holds the controls rather than to the button that no
-        // longer exists. Saying "the prototype's own" without that clause read
-        // as a transcription of the pill, which sits at the right edge instead.
-        //
-        // Without a single element to hang it on, the fieldsets, the warning
-        // and the Apply button would each have to carry it separately, and the
-        // next control added to this block would silently miss it.
+      {canEdit ? null : (
+        /*
+          ⚠ **THE ARM IS DEAD IN THE SHIPPED PRODUCT, AND THAT IS RECORDED RATHER
+          THAN FIXED HERE (F4, 2026-09-21).** It renders only when `canEdit` is
+          false, `canEdit` is `TicketSheet`'s `canSetVisibility` prop, whose
+          declared default is `true` (`ticket-sheet.tsx:422`), and a sweep of
+          `apps/web/**`, `apps/desktop/**` and `apps/mobile/**` for
+          `canSetVisibility` finds ONE hit and it is a COMMENT
+          (`page.tsx:2825`) — no caller anywhere passes it, so no shipped surface
+          can render this. **The sentence is corrected above regardless**, because
+          a wrong permission statement is not made less wrong by being
+          unreachable, and because the prop is a declared part of this component's
+          public surface that a caller may pass at any time. **Deleting the arm —
+          or giving it the read that makes it reachable — is a decision about
+          `canSetVisibility` rather than about this sentence**, and the sheet's
+          own docblock (`ticket-sheet.tsx:225-241`) argues at length that the
+          client cannot know role or creator, which is a sound argument for
+          showing the control and letting the door refuse. **Owner: whoever next
+          revisits `canSetVisibility`.**
+        */
+        <p className="gn-visibility__read-only">{READ_ONLY_COPY}</p>
+      )}
+
+      {/*
+        The controls move into the trigger's popover, unchanged markup (spec
+        decision 6). `open` is gated on `canEdit` too, belt-and-braces beside
+        the trigger's own `disabled`. `Popover` itself renders nothing when
+        `open` is false, so a viewer who cannot edit never portals this.
+      */}
+      <Popover
+        triggerRef={triggerRef}
+        open={menuOpen && canEdit}
+        onClose={() => setMenuOpen(false)}
+        aria-label="Change who can see this"
+      >
         <div className="gn-visibility__controls">
           <fieldset className="gn-visibility__modes">
             <legend>Change who can see this</legend>
@@ -573,28 +652,7 @@ export function VisibilityEditor({
             </p>
           )}
         </div>
-      ) : (
-        /*
-          ⚠ **THE ARM IS DEAD IN THE SHIPPED PRODUCT, AND THAT IS RECORDED RATHER
-          THAN FIXED HERE (F4, 2026-09-21).** It renders only when `canEdit` is
-          false, `canEdit` is `TicketSheet`'s `canSetVisibility` prop, whose
-          declared default is `true` (`ticket-sheet.tsx:422`), and a sweep of
-          `apps/web/**`, `apps/desktop/**` and `apps/mobile/**` for
-          `canSetVisibility` finds ONE hit and it is a COMMENT
-          (`page.tsx:2825`) — no caller anywhere passes it, so no shipped surface
-          can render this. **The sentence is corrected above regardless**, because
-          a wrong permission statement is not made less wrong by being
-          unreachable, and because the prop is a declared part of this component's
-          public surface that a caller may pass at any time. **Deleting the arm —
-          or giving it the read that makes it reachable — is a decision about
-          `canSetVisibility` rather than about this sentence**, and the sheet's
-          own docblock (`ticket-sheet.tsx:225-241`) argues at length that the
-          client cannot know role or creator, which is a sound argument for
-          showing the control and letting the door refuse. **Owner: whoever next
-          revisits `canSetVisibility`.**
-        */
-        <p className="gn-visibility__read-only">{READ_ONLY_COPY}</p>
-      )}
+      </Popover>
     </section>
   );
 }

@@ -15,6 +15,8 @@ leaving it outside, so the section was opened.
 |---|---|
 | **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.71`** (the `3b` allocation, **NARROWED 2026-09-21 — see the reallocation note below**), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak** and **`16.91`–`16.95` are MINTED 2026-09-20 for the Add-subtask affordance**. ⚠ **THE BLOCK `16.81`–`16.99` IS NOW FULLY SPENT**; exec 1's next free ids are `16.63`–`16.71` (of which only `16.61`–`16.62` are minted) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91` — ⚠ **a reading SUPERSEDED by the reallocation note below**); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time — **then `16.72`–`16.80`** (**REALLOCATED to exec 2 on 2026-09-21 — see the reallocation note below**), of which **`16.72`–`16.75` are MINTED 2026-09-21 for the comment thread** and **`16.76`–`16.80` are MINTED 2026-09-21 for the markdown-editing item** (the seeds parsed + `markdownLinks` on) — ⚠ **so exec 2's block is now FULLY SPENT and its next free ids are NOT `16.81`–`16.99` (exec 1's, fully spent too): it must be reallocated by the controller before the next mint** |
+| **priority built-in** (`docs/superpowers/plans/2026-09-22-priority-builtin.md`, #672) | **`16.100`–`16.109`** — the sheet's Priority editor and Start row (Task 7 of that plan); allocated 2026-09-22 against the catalogue tip `16.99`. ⚠ `16.100` also appears in this file's own prose above and in `17-open-work.md` as a WIDTH example, not a case — a line-head declaration is the only claim |
+| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block |
 
 **✅ ANSWERED 2026-09-21 21:0x — THE PROPERTIES WERE MINTED IN §17, NOT HERE, AND THIS NOTE IS KEPT AS THE RECORD OF WHY (lane ds3 / batch B08).** The controller allocated `17.021`–`17.040` to this lane and directed the mint into `test-cases/17-open-work.md`; F3 is `17.021` and V4 is `17.022`, and each entry names **the §16 door it belongs to** (the comment thread, case `16.74`) so a reader arriving from this file's comments-thread section can find them. **§16 was not touched to mint them.** Original request follows, because a note that is deleted rather than discharged is how the next lane concludes the rule was never applied:
 
@@ -1261,3 +1263,53 @@ using, and `docker compose` is forbidden in this topology. Owner: whoever next r
   was dismissed, not absent. Case `9.260` is the 2x2 that separates the trigger from the probe's conditions, and the typed
   link is now a row in `9.88`'s trigger table. No production behaviour changed — the mechanism was always generic; the record
   was the defect. Recorded in `packages/editor/src/schema/extensions.ts` and `packages/editor/test/schema.test.ts` (`9.95`).
+
+## Sheet prototype parity, Task 5 — the visibility pill becomes a menu trigger (lane A / claude-sonnet, 2026-09-22) — cases `16.118`–`16.122`
+
+Spec `docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, decision 6–7; plan
+`docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md` Task 5. Drawn from this lane's block
+`16.110`–`16.129`, minted `16.118`–`16.122`: `16.110`–`16.117` and `16.123`–`16.129` are Tasks 3, 4,
+6 and 8's, which touch `ticket-sheet.tsx` and wait for the priority-built-in PR to land before
+rebasing onto it — out of scope for this lane. The sheet-side mount of `VisibilityEditor` into the
+`field-visibility` row is Task 4's, not this one's (the plan's own Task 5 header says so); this
+component's tests drive it directly, as they always have.
+
+`VisibilityEditor`'s standing chip (`packages/app-core/src/views/visibility-editor.tsx`) is now the
+`aria-haspopup="dialog"` trigger for a `Popover` (Task 1) holding the SAME fieldset, people picker,
+lockout warning, Apply button, refusal and unreached sentence this component always had — moved,
+not rebuilt. Every pre-existing case in `visibility-editor.test.tsx` that touches one of those
+controls now opens the menu first, via an `openMenu()` helper; the file's own `it(` count moved from
+30 to 35 (5 new, 0 dropped) — see `test/views/visibility-editor.test.tsx`. `ticket-sheet.test.tsx`'s
+four `.gn-visibility__standing`/`role=region` cases (3.116, 3.117, 3.174, 3.175) are untouched and
+still pass: the trigger's dot/mode span nests inside `.gn-visibility__standing`, unchanged from
+before, and the section keeps its `aria-label`.
+
+- ✅ **16.118 — clicking the pill opens a `role="dialog"` named "Change who can see this", holding
+  all four visibility-mode radios and Apply; Apply on a committed write closes it.** The success arm
+  is asserted on TWO facts together — the dialog closes AND the write actually reached the source
+  (`source.submitted`) — because either alone passes over the other: a component that closed on
+  every click regardless of the write, or one that submitted but left the dialog stuck, would each
+  satisfy one half.
+- ✅ **16.119 — Apply on a REFUSAL leaves the menu open, with the refusal rendered inside it.** The
+  refusal text and the dialog's continued presence are the same case: a component that closed on
+  every Apply (success or not) would pass a "refusal renders" assertion taken alone, if the dialog
+  vanished before the text could be read.
+- ✅ **16.120 — an explicit, named audience draws one read-only chip per person under the pill, and
+  none of them is a button.** The prototype's row (`desktop.dc.html:1214-1222`) carries a `×` and an
+  `Add someone…` select; this build has neither, because both are per-person writes it does not
+  have — the people checklist inside the menu is the one write path and stays there. Asserted as a
+  `queryAllByRole('button')` count of zero, not as an absent class, so a future chip that grows a
+  remove control without renaming anything still reddens here.
+- ✅ **16.121 — with no served audience (`current: null`) the trigger still exists and still opens
+  the menu.** The unserved sentence ("not being served yet") is not an excuse to make the control
+  unreachable — a person on the offline replica still needs a way to set an audience going forward.
+- ✅ **16.122 — Escape closes the menu and returns focus to the pill.** `FocusScope`'s restore is
+  `requestAnimationFrame`-based (the same mechanism `Popover`'s own tests and `select.tsx`'s E4-17
+  cases hit), so the focus assertion is `waitFor`-wrapped rather than synchronous — a synchronous
+  read here is a timing race, not a measurement of the component being wrong, and the plan's own
+  draft test read it synchronously and would have failed on its first run for exactly that reason.
+
+`Features.md`'s visibility bullet is extended in the same commit: the pill is a menu trigger, the
+controls move into the popover unchanged, and read-only viewer chips appear under an explicit named
+audience. `docs/manual.md` §10 is rewritten to describe clicking the pill rather than a
+static section. — `packages/app-core/src/views/visibility-editor.tsx`, `packages/app-core/test/views/visibility-editor.test.tsx`, `packages/ui/src/ui.css`

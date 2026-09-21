@@ -2246,6 +2246,16 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   text-transform: uppercase;
   letter-spacing: 0.6px;
 }
+/*
+ * ⚠ UNUSED BY THE COMPONENT AS OF SHEET PROTOTYPE PARITY TASK 5 (2026-09-22).
+ * The `<h3>Who can see this</h3>` this rule painted is dropped per spec
+ * decision — the row label `Visibility` (Task 4's `<dt>`, landing on a later
+ * rebase) names the section now. The rule itself is kept, not deleted: it is
+ * still pinned by `packages/ui/test/components.test.tsx`'s 17.002 (the 12px
+ * scale) and 17.005 (the "declared exactly once" family sweep), both outside
+ * this task's file scope, and neither is Task 5's to edit. Whoever next
+ * revisits those cases can retire this rule in the same change.
+ */
 /* The standing audience, and it is the product's counterpart of the prototype's
    control (`visBtnStyle`, `:3786`): a pill carrying a dot and a label. It is
    styled as ONE and is deliberately NOT a `<button>` — in this product it is a
@@ -2316,6 +2326,65 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   background: var(--gn-success);
 }
 .gn-visibility__standing-mode--restricted .gn-visibility__dot { background: var(--gn-restricted); }
+
+/* The trigger (sheet prototype parity, Task 5, 2026-09-22): a plain button
+   reset, because the pill's own look is entirely `.gn-visibility__standing-mode`
+   above, unchanged — this wraps it rather than repainting it. The 44px floor
+   is the button's, not the pill's: the prototype's `visBtnStyle` draws 36px
+   (`.gn-visibility__standing-mode`'s own `min-height`), and the extra tap area
+   comes from this rule's padding rather than growing the pill past its own
+   measured height. `[disabled]`, for the unserved-and-no-edit corner: the
+   trigger stays reachable in the null-audience case (case 16.121) but must
+   not invite a click nobody can act on. */
+.gn-visibility__trigger {
+  min-height: 2.75rem;
+  padding: 0;
+  border: none;
+  background: none;
+  color: inherit;
+  font: inherit;
+  cursor: pointer;
+  text-align: right;
+}
+.gn-visibility__trigger:disabled { cursor: not-allowed; opacity: 0.7; }
+.gn-visibility__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+
+/* Read-only viewer chips (spec decision 7, `desktop.dc.html:1214-1222`): no ×
+   and no `Add someone…` select — both are per-person writes this build does
+   not have. `--gn-fill-tertiary`/`--gn-shadow-raised` is the file's own
+   established chip recipe (`.gn-select__chip` uses the same pair). */
+.gn-visibility__viewers {
+  display: flex;
+  flex-direction: column;
+  gap: 0.5rem;
+  align-items: flex-end;
+  margin-top: 0.25rem;
+}
+.gn-visibility__viewers-caption {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.75rem;
+  line-height: 1rem;
+  text-transform: uppercase;
+  letter-spacing: 0.6px;
+}
+.gn-visibility__viewer-chips {
+  display: flex;
+  gap: 0.4375rem;
+  flex-wrap: wrap;
+  justify-content: flex-end;
+}
+.gn-visibility__viewer {
+  display: inline-flex;
+  align-items: center;
+  padding: 0.25rem 0.625rem;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
+  box-shadow: var(--gn-shadow-raised);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
 /* The notes. `visNote` (`:3782`) is the prototype's, and `text-wrap:pretty` is
    the prototype's own declaration on the same line. */
 .gn-visibility__owner-note,
@@ -2915,6 +2984,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      changed it would need this line to still say so, and the test above
      pins this selector existing for that reason. */
   box-shadow: var(--gn-shadow-raised);
+}
+
+/* Popover (spec 2026-09-22) — the visibility menu's container. The same
+   raised surface and shadow `.gn-select__panel` above uses (`--gn-surface-
+   raised`/`--gn-shadow-raised`, measured from that rule, not the plan
+   draft's `--overlay` guess: `--gn-surface-overlay`/`--gn-shadow-overlay`
+   are the full-screen scrim/dialog pair, a different role), because both
+   are anchored surfaces over the sheet and two treatments for one role is
+   the drift this file's comments exist to prevent. */
+.gn-popover {
+  position: absolute;
+  z-index: 30;
+  padding: 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  max-width: min(22rem, calc(100vw - 2rem));
 }
 
 .gn-select__list { list-style: none; margin: 0; padding: 0; }
