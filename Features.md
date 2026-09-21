@@ -981,15 +981,15 @@ reason on record, not an oversight:*
   `null`; `filterSpecSchema.closed` compiles through `compileFilterSpec` to `t.closed_at IS [NOT]
   NULL`. **`filterSpecSchema.priority` (spec 2026-09-22, Task 3) compiles the same way**, to
   `(t.fields -> 'priority' ->> 'value') = $n` — a plain bound comparison needing no other-table
-  correlation, like `closed` (case 7.270). **⚠ `groupBy=priority` is a KNOWN GAP, flagged rather than
-  fixed here:** `priority` is now a legal `Grouping` (Task 1 made it one of six), but this route's own
-  `groupCards` switch has no `case 'priority':` and no `default`, so a request naming it now passes the
-  door — the refusal `invalid_grouping` this paragraph names above no longer fires for it — and falls
-  through to an `undefined` response body instead of a card grouping OR a 400. Closing it is a design
-  call this plan does not make: either `groupCards` learns a priority bucket (the pattern `type`/`assignee`
-  already use), or this route's own validation is narrowed to keep `priority` a 400 here specifically
-  while it remains legal everywhere else `Grouping` is accepted. `test/routes/list.test.ts`'s case `7.22`
-  carries a provisional note at the exact line this gap touches.
+  correlation, like `closed` (case 7.270). **`groupBy=priority` groups server-side like every other
+  `Grouping`** (case 7.271): `priority` became the sixth legal `Grouping` in Task 1, and because this
+  route validates `groupBy` with the SHARED `groupingSchema`, it began accepting the value the moment
+  `GROUPINGS` grew it — so `groupCards` gained the arm its switch needed, bucketing on
+  `card.priority.value` with the level ITSELF as the key and label, the pattern `type`/`assignee`
+  already use (this route reads no ladder vocabulary and imports no `PRIORITIES`; `bucket`'s key sort
+  yields P1, P2, P3 because that is string order). Without the arm the switch fell through and the 200
+  carried no `groups` at all — a build failure (`tsc` requires the switch be exhaustive) as well as a
+  runtime one, and the gap was flagged by Task 1's and Task 3's executors before this lane closed it.
   `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
 - ✅ **The builder read surface — `GET /v1/workspaces/:id/workflows`, `/workflows/:id`,
   `/ticket-types`, `/members`, `/workflows/:id/state-occupancy`, `/ticket-types/:id/population`** —

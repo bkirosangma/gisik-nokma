@@ -265,6 +265,26 @@ async function groupCards(
       );
     }
 
+    case 'priority':
+      // The sixth grouping (priority built-in, spec 2026-09-22). Same shape as
+      // `type` above: the key AND the label are both the level, because this
+      // route reads no ladder vocabulary and printing a name it did not fetch
+      // would be a label nobody claimed. `bucket` sorts its keys and P1/P2/P3
+      // sort as strings exactly as the ladder orders them, so the buckets come
+      // out P1, P2, P3 without this route importing `PRIORITIES` — the client
+      // owns the ladder and this route owns only the partition.
+      //
+      // This arm is required for EXHAUSTIVENESS, not merely for the value: the
+      // door validates `groupBy` with the shared `groupingSchema`, so 'priority'
+      // became an accepted input the moment `GROUPINGS` grew it. A switch with
+      // no arm for it fell through to `undefined` — a 200 whose body carried no
+      // `groups` at all, which is worse than the compile error it also caused.
+      return bucket(
+        cards,
+        (card) => card.priority.value,
+        (key) => key,
+      );
+
     case 'epic':
       // The walk moved to `readList` (it feeds `ListCard.epicId` under every
       // grouping); the key is now read off the card the walk already filled, so

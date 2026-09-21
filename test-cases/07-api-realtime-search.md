@@ -774,3 +774,9 @@ is empty.
 - 7.270 ✅ `compileFilterSpec` compiles `priority` to `(t.fields -> 'priority' ->> 'value') = $n`, a plain
   bound comparison over `t` itself needing no other-table correlation, alongside every other clause. —
   `apps/server/test/read/compile-filter.test.ts`
+- 7.271 ✅ `groupBy=priority` returns real groups: one bucket per level present, keyed AND labelled by the
+  level itself (the route reads no ladder vocabulary and invents no name), with the buckets' union the
+  same card ids the `flat` grouping carries — grouping ARRANGES truth and never changes which tickets
+  match. One bucket before any `field_set` (every seeded ticket is born P2), two after one is raised to
+  P1. Before `groupCards` had this arm the switch fell through and the 200 carried no `groups` at all,
+  which is the failure the first assertion reads. — `apps/server/test/routes/list.test.ts`
