@@ -53,18 +53,26 @@ pre-match text was spliced back in, repeatedly. **It did not error**, which is w
 failure mode of this session; it was caught only because a finding count I re-run after every edit came
 back **43** instead of 26. Restored from `ef219034` (verified clean before use) and redone with **function**
 replacements, which do not interpret dollar-patterns. The diff is now exactly the two intended edits.
-**A final automated audit of both artifacts, re-run at the end of phase 1 and clean on every section.**
+**A final automated audit of both artifacts, re-run after every repair, and clean on every section.**
 Counts measured against the sections rather than remembered: **30 round-2 findings, 18 Important / 12
-Minor, 0 Critical, every one with a severity line; 43 refutation targets and 43 rows, no duplicates, and the
-stated count equal to the measured one.** Both files' citations resolve — **79 distinct paths in the report
-and 22 in the refutations file, none missing, every line number inside its file.** No duplicated finding
-headings, and the closing line intact after the rebuild described below.
+Minor, 0 Critical, every one with a severity line, headings in ascending numeric order with no duplicates;
+43 refutation targets and 43 rows with no duplicates.** Both files' citations resolve — **90 distinct paths
+in the report and 22 in the refutations file, none missing, every line number inside its file.**
 
-⚠ **One section reported FAIL and the failure was my audit's regex, not the file** — I checked for the clock
-sentence with a pattern that did not allow for its bold markers. That is the **fourth time today my own
-instrument produced a false reading** (a mount search that could not match end-of-line, a count pattern that
-excluded hyphens, a string replacement that expanded a dollar-pattern, and now this), and it is the reason
-every section of this audit names what it measured rather than reporting a verdict alone.
+⚠ **FIVE of my own instruments produced a false reading today, and every one is recorded rather than
+tidied** — a mount search that could not match end-of-line, a count pattern that excluded hyphens, a
+`String.replace` whose replacement expanded a dollar-pattern and **tripled this file**, a bulk-edit whose
+/g flag **overwrote six separate per-batch history lines with one identical sentence**, and finally an audit
+check too coarse to tell a *current-state* total from a *historical* snapshot, which reported FAIL against a
+line that was correct. **The pattern is the point: my verification tooling fails silently and in the
+confident direction, which is the same class this report files against the product six times.** Every
+section of the audit names what it measured rather than reporting a verdict, which is why each failure was
+findable at all.
+
+And a sixth, larger error was mine in a different way: I twice inferred the phase from my own turn count
+instead of reading the clock, told the controller the boundary had passed when it had not, and built an
+argument on phase-2 half credit while still in phase 1. The report's closing states the phase from a
+measured clock now.
 
 Five errors of mine were found and corrected in place across the round, **all five by re-measuring and none
 by reading**: `E2-42`'s stated outcome, `E2-34`'s lost severity line, a claim about a browser I did have, a
