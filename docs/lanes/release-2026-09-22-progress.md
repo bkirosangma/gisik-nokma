@@ -62,3 +62,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-18 | done | 88f5a1ff | prose-only: replica dangling-parent comment stops claiming parity (app-core 1730) |
 | T-E3-20 | done | 0b13801a | prose-only: case 6.82 partially closed in place (term landed, open/active absent) |
 | T-E3-21 | done | 70946c4b | case 6.84 split: refusal ✅ (hierarchy.ts:124/:250) + rollup property ✅ (rollup 6 green) |
+| T-E3-22 | done | cf12d5cc | case 6.58 closed: hierarchy.cycle refuses the repro at both walks |
