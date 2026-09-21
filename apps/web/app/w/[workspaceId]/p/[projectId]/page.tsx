@@ -38,7 +38,7 @@ import {
   writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
-import { Avatar, Switch, Toast } from '@gisik-nokma/ui';
+import { Avatar, Chip, Switch, Toast } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -71,6 +71,7 @@ import {
   type ProjectTab,
 } from '../../../../../src/use-last-project.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
+import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -190,6 +191,25 @@ function ProjectBoard() {
    * pending or refused; see each hook's own docblock.
    */
   const workspaceName = useWorkspaceName(workspaceId);
+  /**
+   * E2-38 (round-2 ruling, MINOR) — the project's OWN state, on the project's own
+   * page.
+   *
+   * This page had **zero occurrences of `archived`** (case-insensitive, the whole
+   * file, measured) while the screen a person must pass through to reach it
+   * carries it prominently — the workspace home matches 58 times, with the
+   * archive/restore controls and the *"N archived · show"* toggle. So an archived
+   * project's own board was indistinguishable from a live one's, which matters
+   * because the two differ in what the product will let you do.
+   *
+   * **The read is the one the nav and the home already make** —
+   * `useWorkspaceProjects`, module-cached, no new request — rather than a second
+   * way of asking. `null` (pending or refused) and "not in the list" are both
+   * SILENT here: an absence of the chip claims nothing, where a chip painted on a
+   * failed read would assert the project is live.
+   */
+  const workspaceProjects = useWorkspaceProjects(workspaceId);
+  const projectArchived = workspaceProjects?.find((p) => p.id === projectId)?.archived === true;
   const projectName = useProjectName(workspaceId, projectId);
   // Task 10 (backlog/closed spec §5.4, 2026-09-17) adds `'backlog'` to this
   // union. The default stays `'board'` — Backlog is the FIRST tab in the
@@ -1873,6 +1893,16 @@ function ProjectBoard() {
               <p className="gn-project__breadcrumb">{workspaceName}</p>
             ) : null}
             {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+            {/* The SAME component and the SAME word the workspace home's card
+                uses for this state, so the two screens cannot describe one fact
+                two ways. A sentence is deliberately NOT added: everything else
+                worth saying about an archived project (who may restore it, where)
+                is admin-only and would be a second false claim for a member. */}
+            {projectArchived ? (
+              <p className="gn-project__archived">
+                <Chip tone="neutral">Archived</Chip>
+              </p>
+            ) : null}
 
             {/*
               `.gn-project__header` — Task 2 of the prototype port. Controls

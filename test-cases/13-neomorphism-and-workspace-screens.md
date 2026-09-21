@@ -2443,3 +2443,20 @@ sections and, in a `Record` keyed on the REMAINDER of `keyof MyWorkView`, says w
 resolved. A new member on that type fails the `Record` to compile, so whoever adds one must state how its
 title button resolves — the comment that claimed "all four" was the only thing holding that door before,
 and it was wrong.
+
+## An archived project's own page did not say so — case `13.1164` (E2-38, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1164` is minted here.
+
+**The defect.** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` contained **zero occurrences of
+`archived`** (case-insensitive, whole file, measured) while the screen a person must pass through to reach
+it carries the fact prominently — `apps/web/app/w/[workspaceId]/page.tsx` matches 58 times, with the
+archive/restore controls and the *"N archived · show"* toggle. So an archived project's own board was
+indistinguishable from a live one's, and the two differ in what the product will let you do.
+
+- **13.1164** ✅ An archived project's own page carries the **same `Chip` and the same word the workspace
+  home's card uses**, in a line under the title rather than inside the heading — with a live project
+  asserted to carry neither the chip nor the line, so a chip rendered unconditionally cannot pass. The
+  flag comes from the SAME `getMyWorkspaces` read the page already makes for its own names; there is no
+  new request. — (`apps/web/test/project-page-chrome.test.tsx`)
