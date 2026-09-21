@@ -1939,3 +1939,47 @@ that opens a sheet before measuring"*, because no current sweep enters a state w
 (`UNAUTHED_ROUTES` covers `/help`, `/privacy`, `/terms` and a 404 probe; the stack suite's tap pass
 measures `/my-work` alone). That is a Playwright change needing a live stack on `:3001`, out of this
 lane's reach; the owner is whoever widens that pass, and the same gap is recorded under `13.1141`.
+
+## The List row's two controls meet the 24-px floor, and the spacer follows (lane ds1, 2026-09-21, batch B10) — case `13.1151`
+
+**The finding, round 2 `E4-26`, MINOR.** On the List at 1512: `button.gn-list__collapse "Collapse Open
+questions"` **22×22** and `button.gn-list__open "Open questions"` **125×22** (×26 rows, `17px/22px`) — both
+under WCAG 2.5.8's 24px in-list floor, the same floor `.gn-my-work__title` and `.gn-attention__title` were
+moved to on 2026-09-08. `grep -n onClick packages/app-core/src/views/ticket-list.tsx` finds **three
+handlers** — the Columns toggle, the caret and the title — and **no `<tr>`/row handler**, so unlike the
+board card (`13.523`) there is no larger equivalent target and 2.5.8's *Equivalent* exception does not
+apply. The prototype draws 22px; the floor wins, as it did for `.gn-attention__title`.
+
+### The case
+
+- ✅ **13.1151 — the caret is 24×24, the title's LINE BOX is 24px, the floor is asserted as a floor, and a
+  planted 22px caret reddens the same reader.** `packages/app-core/test/views/ticket-list-css-binding.test.tsx`.
+  **The title is raised through its line box and that is asserted rather than assumed:** `.gn-list__open`
+  declares `font-size`/`line-height` only, so its height IS its line box and a `min-height` there would be
+  a second, competing mechanism. `>= 24` on the two min sizes rather than `=== 24`, because a larger in-list
+  target is an improvement and an equality would redden on it; the exact values are pinned in the
+  assertion above. The mutation plant REPLACES the real rule rather than appending — a rule appended at the
+  end leaves `declarationsFor` reading the real one, so the plant would be inert, the same lesson
+  `settings-shell-tokens.test.ts`'s `withRule` records.
+
+### ⚠ Two consequences, both recorded rather than discovered later
+
+**(1) `.gn-list__caret-spacer` moved with the caret, and had to.** The prototype's spacer is 22px to match
+its 22px caret; a 24px caret beside a 22px spacer **shears every leaf off its parent's left edge by 2px**,
+which is the exact failure the `13.671` binding test exists to catch. Both absolutes in that test moved
+`1.375rem` → `1.5rem` together, which is why that test carries two absolutes beside its relative one.
+
+**(2) `declarationsFor` RETURNED THE WRONG RULE FOR `.gn-list__open`, and nothing had read it before now.**
+Its docblock claimed the line-start anchor handled selector LISTS; it happens to work for
+`.gn-list__collapse` (whose shared-rule line ends in a comma) and silently fails for `.gn-list__open`
+(whose shared-rule line IS `^.gn-list__open {`) — returning the two-head rule's body. The helper now skips
+a candidate whose preceding text ends in a comma. **The limitation was written down as if it were handled,
+and it was handled for one of the two names** — which is why the fix is in the helper rather than in this
+case's own reader.
+
+**One half of the remedy is NOT done, named rather than implied:** the finding also asks for the List view
+in the stack suite's route list with a `DENSE_IN_LIST` entry for each. That is a Playwright change needing
+a live stack on `:3001` — the same deferral recorded under `13.1141` (E4-3) and `13.1148` (E4-2), whose
+`DENSE_IN_LIST` entries are likewise declared but not yet exercised. **Owner: whoever widens that pass
+(E4-12).** `ui.css` was reverted to `HEAD` for the RED run and restored from a sha256-compared backup.
+Package suites: ui 420, app-core 1725, web 643.
