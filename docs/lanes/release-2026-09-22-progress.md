@@ -23,3 +23,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-17 | done | 02d97609 | mcp-tokens page mounts AppNav; 12 tests green |
 | T-E5-22 | done | 7815bcd6 | subtask form names the type; ticket-sheet 112 tests green |
 | T-E5-29 | done | e7f5f91f | dialog copy corrected; publish 20 tests green |
+| T-F6-ux | done | 8706da3c | prose-only: guest chip claim scoped; workspaces-cards 16 tests green |
