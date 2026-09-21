@@ -1848,6 +1848,12 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   CONCERNS — `E5-6` (the UX lane) holds"*; exec 3's earlier attempt on `E5-3`, *"premise holds — not refutable"*.
   exec 4's `E4-33` paints E5-37's population (their guest session) and describes the same three sites; exec 4 notes
   E5-3/E5-4/E5-8 overlap with E4-1/E4-18/E4-19 and that *"their pushes came first"*. Nothing withdrawn.
+- **exec 2's phase-1 refutation attempts on my two Criticals and one Minor (their file, read 15:03 IST):** `E5-13`
+  *"HOLDS, and the check found the remedy is one line"*; `E5-41` *"HOLDS: no leave guard and no persistence, measured
+  by absence"* (their own greps: `beforeunload|dirty|unsaved` → none in the builder; `localStorage|sessionStorage|persist`
+  → 0); `E5-12` *"HOLDS in substance"* (the unit difference is the finding's own cause). Their report also re-ran my
+  failed-read collapse sweep as a **control** on E5-13 (*"returned its four sites and no fifth"*) and cites `E5-42` as
+  what falsifies `shell-refusal.tsx:29`'s totality claim. **Nothing withdrawn.**
 - **The two refutation files already pushed (read 12:42 IST):** `exec2/review-ux-r2:docs/lanes/review-refutations-exec2.md`
   — *"THIS FILE CONTAINS NO REFUTATION"*; it opened E5-1, 2, 3, 4, 6, 7, 12, 13, 17, 21 against the lines and records each
   as holding (E5-21 *"CORRECTED MY OWN E2-42"*). `exec6/review-functionality:docs/lanes/review-refutations-exec6.md` —
