@@ -35,5 +35,30 @@ check "gate: main moved past the branch (seen only by fetching) → refuses, nam
 ( cd "$gr" && /usr/bin/git merge -q --no-edit origin/main )
 check "gate: after merging origin/main → proceeds again" 'gate_dry | tail -1 | grep -q "^OK gate dry-run"'
 rm -rf "$bare" "$gr" "$other"
+# Pane delivery helpers against a fake tmux on PATH: it records every call, answers display-message with $FAKE_MODE,
+# counts the Enters it receives, and its capture-pane shows a real multi-line box until $FAKE_NEEDS Enters have
+# arrived, then the dim "Press up to edit queued messages" hint (the shapes are copied from real captures).
+fk=$(mktemp -d); cat > "$fk/tmux" <<'FAKE'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_LOG"
+case "$1" in
+  display-message) echo "${FAKE_MODE:-0}";;
+  send-keys) case "$*" in *" Enter") n=$(cat "$FAKE_ENTERS" 2>/dev/null || echo 0); echo $((n+1)) > "$FAKE_ENTERS";; esac;;
+  capture-pane) n=$(cat "$FAKE_ENTERS" 2>/dev/null || echo 0)
+    if [ "$n" -ge "${FAKE_NEEDS:-1}" ]; then printf '\033[38;5;241m\xe2\x9d\xaf \033[2m\033[39mPress up to edit queued messages\033[0m\n'
+    else printf '\033[38;5;241m\xe2\x9d\xaf \033[39m[a brief line]\n  line 2 of the brief\n'; fi;;
+esac
+FAKE
+chmod +x "$fk/tmux"
+fake() { local mode="$1" needs="$2"; shift 2; rm -f "$fk/calls" "$fk/enters"; FAKE_LOG="$fk/calls" FAKE_ENTERS="$fk/enters" FAKE_MODE="$mode" FAKE_NEEDS="$needs" PATH="$fk:$PATH" bash -c ". '$HERE/lib.sh'; $*"; }
+check "press_enter: not in copy mode → one real Enter, no cancel" 'fake 0 1 "ctl_press_enter gisik:7" >/dev/null; [ "$(grep -c send-keys "$fk/calls")" -eq 1 ] && grep -qx "send-keys -t gisik:7 Enter" "$fk/calls"'
+check "press_enter: in copy mode → cancel first, then Enter" 'fake 1 1 "ctl_press_enter gisik:7" >/dev/null; [ "$(grep send-keys "$fk/calls" | tr "\n" " ")" = "send-keys -t gisik:7 -X cancel send-keys -t gisik:7 Enter " ]'
+check "box_text: real text is read" '[ "$(fake 0 1 "ctl_box_text gisik:7")" = "[a brief line]" ]'
+check "box_text: the dim queued hint is not input" '[ -z "$(fake 0 0 "ctl_box_text gisik:7")" ] && fake 0 0 "ctl_box_queued gisik:7"'
+check "submit: a single-line box empties on the first Enter → 1" '[ "$(fake 0 1 "ctl_submit gisik:7")" = 1 ]'
+check "submit: a multi-line box absorbs the first Enter → 2" '[ "$(fake 0 2 "ctl_submit gisik:7")" = 2 ]'
+check "submit: a box that never empties → exit 1 after 3 Enters" '! fake 0 99 "ctl_submit gisik:7" >/dev/null && [ "$(cat "$fk/enters")" -eq 3 ]'
+check "submit: never pastes a CR" 'fake 0 2 "ctl_submit gisik:7" >/dev/null; ! grep -q paste-buffer "$fk/calls"'
+rm -rf "$fk"
 rm -rf "$tmp" "$wt"
 [ "$fails" -eq 0 ] && echo "lib.test.sh: ok" || { echo "lib.test.sh: $fails FAILED"; exit 1; }
