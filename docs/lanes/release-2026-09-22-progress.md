@@ -13,3 +13,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-37 | done | c84572a4 | app-nav.test.tsx |
 | T-E5-4 | done | bc039a53 | ticket-sheet.test.tsx + filters-sheet.test.tsx |
 | T-E5-19 | done | fd260632 | account-page.test.tsx |
+| T-V2 | done | 7e99e073 | members-page.test.tsx |
