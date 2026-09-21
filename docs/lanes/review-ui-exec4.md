@@ -433,7 +433,9 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 **WHY IT IS WRONG.** A primary action 8 px under the product's standalone floor, drawn in a border-and-6px idiom the borders→fills campaign removed everywhere else, on a route no sweep visits (`/settings/ticket-types/<id>` is not in the stack list; only the list route is).
 
-**WHAT WOULD HAVE BEEN BETTER.** `<Button variant="primary">`, which is one import and deletes the rule.
+**THE SAME SHAPE ONCE MORE, measured the same way.** The builder's *Publish* (`button.publish-controls__publish`, **84×36** at 390) is the identical rule — `background: var(--gn-accent); border: 1px solid var(--gn-accent); border-radius: 6px; padding: 0.35rem 0.9rem`, no `min-height` (`ui.css:2297-2306`) — beside the shared `<Button>` the same screen uses for *Add state*. **The roster, enumerated rather than sampled:** after comment-stripping, the two stylesheets hold **18** selectors with a `1–2px solid` border; **13** classes carry a `[data-style="neo"]` override; **14** bordered families have none, of which four are controls — these two 36-px buttons, `.gn-mcp-authorize__input` and `.gn-notfound__link` (both a deliberate `--gn-border-strong`, not filed) — and the rest are separators, banners, the popover panel and the canvas node.
+
+**WHAT WOULD HAVE BEEN BETTER.** `<Button variant="primary">` on both, which is one import each and deletes two rules.
 
 ---
 
