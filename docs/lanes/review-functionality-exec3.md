@@ -4410,7 +4410,7 @@ in the code that readers open first.
 other lanes: **0** (fourteen attacks and three examinations, all recorded with their measurement in
 `review-refutations-exec3.md`).
 
-## 72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a `ticket.assigned` … for a ticket that does not exist"* and cites a test that *"ingests two … against tickets that were never created, and they are committed"*; the test it cites was rewritten the same day because the gate now refuses exactly that, and its own comment says so (15:41 IST)
+## 72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a `ticket.assigned` … for a ticket that does not exist"* and cites a test that *"ingests two … against tickets that were never created, and they are committed"*; the test it cites had been rewritten 21 minutes earlier because the gate refuses exactly that, and its own comment says so (15:41 IST)
 
 **WHAT.** `apps/server/src/projections/tickets.ts:480-499` (docblock of the assignment fold's skip):
 *"the server commits them today: `test/permissions/check-role-permission.test.ts` ingests two `ticket.assigned` events
@@ -4434,9 +4434,10 @@ landed.**
   false for a ticket with no `proj_visibility` row exactly as it does for an invisible one. **The cases below used to
   file `ticket.assigned` against a bare `newUlid()`, which the visibility check now refuses**"* — the two ingests the
   docblock names as committed were rewritten to create a visible ticket first (`visibleTicket()`, `:955`).
-- Dates: the docblock landed in `6cb631d0` (2026-09-01, #59); the gate and the test's rewrite landed in `dd7bfcfd`
-  (2026-09-01, #57) — the same day. `projections/tickets.ts` has been committed 4 times after that day, last
-  `18d7e391` (2026-09-20), with the paragraph intact.
+- Dates: the gate and the test's rewrite landed in `dd7bfcfd` (2026-09-01 **18:51** IST, #57); the docblock landed in
+  `6cb631d0` (2026-09-01 **19:12** IST, #59) — **21 minutes after** the refusal it says does not exist, so the sentence
+  and its cited evidence were false when they reached `main`. `projections/tickets.ts` has been committed 4 times
+  after that day, last `18d7e391` (2026-09-20), with the paragraph intact.
 
 **What remains true, stated so the finding is not wider than the measurement:** the *engine* still has no existence
 check for these three types (`evaluateEvent` has no case for them — the docblock's first sentence, and exec 6's E6-17
