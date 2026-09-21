@@ -58,8 +58,14 @@ check "check-pr: merge commit is on the branch" '[ "$(cd "$cr" && /usr/bin/git l
 check "check-pr: one task commit + the merge of origin/main passes" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 0 bookkeeping commits, 1 files, 0 failures"'
 ( cd "$cr" && printf '| B05 | claimed | - | 1 task |\n' >> docs/lanes/release-2026-09-22-progress.md && /usr/bin/git commit -q -am "B05 claim: T-X1 (1 task)" && mkdir -p docs/lanes/pr-bodies && echo body > docs/lanes/pr-bodies/b05.md && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05: the §4 PR body, with log paths" && echo more >> docs/lanes/pr-bodies/b05.md && /usr/bin/git commit -q -am "| B05 | claimed — PR body amended" )
 check "check-pr: batch-id bookkeeping (progress file, pr-bodies/) passes and is not a task" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 3 bookkeeping commits, 3 files, 0 failures"'
-( cd "$cr" && echo three > docs/x.md && /usr/bin/git commit -q -am "B05: cite each new case id (touches a task file)" )
-check "check-pr: a batch-id subject whose diff leaves the bookkeeping paths fails, naming the files" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "batch-id subject but the diff touches files outside.*docs/x.md"'
+( cd "$cr" && echo three > docs/x.md && /usr/bin/git commit -q -am "B05: cite each new case id (touches a catalogue file)" )
+check "check-pr: a batch-id subject that stays in catalogue paths (docs/, test-cases/, Features.md) is bookkeeping" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 4 bookkeeping commits, 3 files, 0 failures"'
+( cd "$cr" && mkdir -p test-cases && echo case > test-cases/09-x.md && /usr/bin/git add -A && /usr/bin/git commit -q -m "Progress: T-X1 done (row + catalogue)" )
+check "check-pr: a Progress: subject in bookkeeping paths is bookkeeping, not a task" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 5 bookkeeping commits, 4 files, 0 failures"'
+( cd "$cr" && mkdir -p apps/web/test && echo spec > apps/web/test/x.test.ts && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05: close a ratchet violation (touches a test file)" )
+check "check-pr: a batch-id subject touching apps/ is a batch-labelled FIX-UP — counted and listed, rc 0" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "~ fix-up: [0-9a-f]\{8\} B05: close a ratchet violation (touches a test file) -> apps/web/test/x.test.ts" && printf "%s" "$out" | grep -q "1 task commits, 5 bookkeeping commits, 1 batch-labelled fix-ups ([0-9a-f]\{8\}), 5 files, 0 failures"'
+( cd "$cr" && echo spec2 > apps/web/test/x.test.ts && /usr/bin/git commit -q -am "Progress: T-X1 done — squashed with its test" )
+check "check-pr: a Progress: subject touching apps/ is a fix-up too (2 listed)" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "2 batch-labelled fix-ups"'
 ( cd "$cr" && echo four > docs/x.md && /usr/bin/git commit -q -am "oops: not a ruling id" )
 check "check-pr: a non-merge, non-bookkeeping commit without a ruling id still fails" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "commit subject does not start with a ruling id in the plan: .oops"'
 check "check-pr: a B-prefixed word that is not a batch id is not bookkeeping" '( cd "$cr" && /usr/bin/git commit -q --allow-empty -m "Bugfix: not a batch id" ); out=$(checkpr); printf "%s" "$out" | grep -q "ruling id in the plan: .Bugfix"'
@@ -72,6 +78,12 @@ printf ' Test Files  1 failed (1)\n      Tests  1 failed | 18 passed (19)\n   Du
 printf ' Tasks:    7 successful, 7 total\nCached:    0 cached, 7 total\n  Time:    9s\n' > "$lg/build.log"
 printf 'the anchor at byte 14060 precedes the first <nav\nmeasured in Chrome, no suite summary here\n' > "$lg/reading.log"
 cp "$lg/a-green.log" "$lg/pair-g.log"; cp "$lg/a-red.log" "$lg/pair-t.log"
+# rtk-proxied captures: `PASS (n) FAIL (m)` on line 1, a stack trace as the tail (the real shape of /tmp/exec2-e5-13-red.log, 434 lines)
+{ printf 'PASS (17) FAIL (1)\n\n'; for i in $(seq 1 40); do printf '       at runTest (file:///x/node_modules/@vitest/runner/dist/index.js:%d:11)\n' $i; done; printf '[full output: ~/Library/Application Support/rtk/tee/1_vitest_run.log]\n'; } > "$lg/rtk-red.log"
+{ printf 'PASS (87) FAIL (0)\n\n'; for i in $(seq 1 40); do printf '  ✓ case %d\n' $i; done; } > "$lg/rtk-green.log"
+printf 'Scope: 2 of 12 workspace projects\npackages/app-core typecheck$ tsc -p tsconfig.typecheck.json\npackages/app-core typecheck: Done\nEXIT=0\n' > "$lg/e5-4-tc2.log"
+printf 'packages/app-core typecheck$ tsc -p tsconfig.typecheck.json\nsrc/x.ts(3,1): error TS2322: no\nEXIT=2\n' > "$lg/e5-4-tc3.log"
+cp "$lg/a-red.log" "$lg/E5-40-red2.log"; cp "$lg/a-green.log" "$lg/E5-40-green2.log"
 logbody() { printf '%s\n' "$@" > "$cr-logs.md"; ( cd "$cr" && python3 "$HERE/verbs/check-pr.py" "$cr" plan.md docs/lanes/release-2026-09-22-progress.md "$cr-logs.md" 2>&1 ); }
 check "check-pr logs: a green log cited as green passes" '! logbody "| T-X1 | case — \`$lg/a-red.log\` (\`1 failed | 18 passed (19)\`) | \`$lg/a-green.log\` · \`19 passed (19)\` |" | grep -q "cited as green is not green"'
 check "check-pr logs: the red half of a TDD pair, cited as red, passes" '! logbody "| T-X1 | case — \`$lg/a-red.log\` (\`1 failed | 18 passed (19)\`) | \`$lg/a-green.log\` · \`19 passed (19)\` |" | grep -q "cited as red is not red"'
@@ -80,6 +92,13 @@ check "check-pr logs: a red log cited as green FAILS, naming the path and the ma
 check "check-pr logs: a green log cited as RED FAILS" 'cp "$lg/a-green.log" "$lg/probe.log"; logbody "witnessed by mutation, \`$lg/probe.log\`" | grep -q "log cited as red is not red (vitest: Test Files 1 passed): $lg/probe.log"'
 check "check-pr logs: a turbo build log cited as green passes" '! logbody "- \`pnpm turbo run build\` — exit 0 (\`$lg/build.log\`)" | grep -q "cited as"'
 check "check-pr logs: a measurement log with no summary, cited without a claim, passes" '! logbody "MEASURED — \`$lg/reading.log\`: the anchor precedes the first nav" | grep -q "$lg/reading.log"'
+check "check-pr logs: an rtk-proxied red (FAIL (1) on line 1, stack-trace tail) cited RED passes" '! logbody "| T-X1 | red first: \`$lg/rtk-red.log\` |" | grep -q "cited as red is not red"'
+check "check-pr logs: an rtk-proxied green (PASS (87) FAIL (0)) cited GREEN passes" '! logbody "- suite green: \`$lg/rtk-green.log\` · PASS (87) FAIL (0)" | grep -q "cited as green is not green"'
+check "check-pr logs: an rtk-proxied red cited as GREEN FAILS, naming the rtk marker (path name neutral, so the row decides)" 'cp "$lg/rtk-red.log" "$lg/rtk-suite.log"; logbody "- suite green: \`$lg/rtk-suite.log\` · all passed" | grep -q "log cited as green is not green (rtk: FAIL (1)): $lg/rtk-suite.log"'
+check "check-pr logs: a ONE-LINE rtk file (the whole capture is the summary) cited green passes" 'printf "PASS (1763) FAIL (0)" > "$lg/final-app-core.log"; ! logbody "- app-core: \`$lg/final-app-core.log\` PASS (1763) FAIL (0)" | grep -q "cited as"'
+check "check-pr logs: a typecheck log (tsc … Done, EXIT=0, no error TS) cited green passes" '! logbody "- typecheck (2 packages, fresh dist): EXIT=0 — \`$lg/e5-4-tc2.log\`" | grep -q "cited as green is not green"'
+check "check-pr logs: a typecheck log with error TS cited green FAILS" 'logbody "- typecheck: EXIT=0 — \`$lg/e5-4-tc3.log\`" | grep -q "log cited as green is not green (typecheck: error TS): $lg/e5-4-tc3.log"'
+check "check-pr logs: the path name WINS over the row — …-red2.log on a row that also says passed is RED, and passes" '! logbody "| T-E5-40 | the hidden backlog says so — \`$lg/E5-40-red2.log\` (1 failed) → \`$lg/E5-40-green2.log\` 19 passed (19) |" | grep -q "cited as"'
 check "check-pr logs: a cited log that does not exist still fails" 'logbody "see \`$lg/nope.log\`" | grep -q "names a log that does not exist: $lg/nope.log"'
 rm -rf "$lg" "$cr-logs.md"
 rm -rf "$cb" "$cr" "$cr-body.md" "$co"
