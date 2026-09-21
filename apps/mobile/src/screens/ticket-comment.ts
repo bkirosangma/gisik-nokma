@@ -31,3 +31,20 @@ export function buildCommentEvent(input: {
     origin: 'mobile',
   });
 }
+
+/**
+ * E5-44: `UNATTRIBUTED_ACTOR_ID` is never a valid ULID, so
+ * `packages/domain`'s own `actorId: ulidString` check refuses EVERY comment
+ * built with it — `malformed-envelope`, terminal, no retry
+ * (`packages/sync-client/src/outbox/outbox.ts:406-412`), and the ticket
+ * screen never re-reads the outbox to surface that failure. Before E2-42's
+ * fix some comments (the ones on a ticket assigned to the device's bound
+ * identity) could commit; after it, none can — there is no longer a
+ * per-ticket condition to gate on, so the control is withheld outright
+ * rather than accepting into a queue doomed to fail silently. Remove this
+ * gate once Plan 6's session handling binds a real actorId.
+ */
+export const COMMENTING_AVAILABLE = false;
+
+export const COMMENTING_WITHHELD_MESSAGE =
+  "Commenting from the phone isn't available yet — sign-in for the phone is still interim. Comment from the website instead.";

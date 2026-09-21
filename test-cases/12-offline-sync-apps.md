@@ -2838,6 +2838,24 @@ to guess from.*
   the workspace/entity/type/payload/origin pass through unchanged. —
   (`apps/mobile/src/screens/ticket-comment.test.ts`)
 
+## Ruling E5-44 — the Comment control is withheld, not just mis-attributed (2026-09-21, B14)
+
+*Since E2-42 (12.401) made `UNATTRIBUTED_ACTOR_ID` never a valid ULID, no phone comment can ever
+commit — `packages/domain`'s envelope validation refuses every one as `malformed-envelope`, terminal,
+no retry (`outbox.ts:406-412`), and the ticket screen never re-reads that outbox failure. There is no
+per-ticket condition left to gate on (the pre-fix code's "assigned to the commenter" case no longer
+exists), so `ticket-screen.tsx` withholds the editor and Comment button outright, replacing them with
+`COMMENTING_WITHHELD_MESSAGE`. `docs/manual.md`'s claim that "the phone app has a Comment button on a
+job and the website does not" is corrected to match, and the generated help module
+(`packages/app-core/src/help/content.generated.ts`) regenerated (`pnpm help:generate`; `pnpm
+check:help` green after).*
+
+- 12.408 ✅ `COMMENTING_AVAILABLE` is `false` and `COMMENTING_WITHHELD_MESSAGE` names the website as
+  the alternative — RED confirmed against a pre-fix state where the control stayed available with no
+  message; GREEN after. Also asserts `UNATTRIBUTED_ACTOR_ID` is never a valid ULID via the domain
+  package's own `isUlid`, the fact this ruling's withholding rests on. —
+  (`apps/mobile/src/screens/ticket-comment.test.ts`)
+
 ## Ruling E2-43 — the desktop shell's own init catches its rejection now (2026-09-21, B14)
 
 *`App`'s init IIFE built the whole replica stack inside `void (async () => {...})()` with no `catch`,

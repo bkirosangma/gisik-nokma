@@ -362,8 +362,9 @@ This is the honest list. Each one is an absence, not a hidden button.
 - **You cannot leave a comment on a job.** The writing box takes a description and not a comment, and
   nothing on the web shows a comment thread. **The one comment the website does take is a Move's** — a
   move carrying the "require a comment" rule puts a box on the Move dialog (§7), and what you type is
-  recorded on the move rather than shown back as a thread. **The phone app has a Comment button on a
-  job and the website does not.**
+  recorded on the move rather than shown back as a thread. **The phone app cannot leave one either, for
+  now** — commenting from the phone needs a signed-in identity the phone shell does not have yet, so
+  the control is withheld there too rather than shipped in a shape that always fails silently.
 - **You cannot attach a file to a job.** There is no attachment list on the web job sheet, and a file
   dropped into the description box is refused rather than quietly lost. **The one upload the website
   does take is a Move's** — a move carrying the "require evidence" rule puts a file box on the Move

@@ -1894,7 +1894,11 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
-                      "text": "The phone app has a Comment button on a job and the website does not."
+                      "text": "The phone app cannot leave one either, for now"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — commenting from the phone needs a signed-in identity the phone shell does not have yet, so the control is withheld there too rather than shipped in a shape that always fails silently."
                     }
                   ],
                   [

@@ -11,7 +11,7 @@ import { IST_CLOCK_NOTE, newSubmittedEvent, plainTextToDoc, renderContestedClaim
 import { EDITOR_HTML } from '../editor/editor-html.generated.js';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
 import { loadTicket } from './ticket-read.js';
-import { buildCommentEvent } from './ticket-comment.js';
+import { buildCommentEvent, COMMENTING_AVAILABLE, COMMENTING_WITHHELD_MESSAGE } from './ticket-comment.js';
 import { queryWorkspaceMembers } from './mention-query.js';
 
 type EditorDoc = Exclude<EditorWebViewProps['initialDoc'], null>;
@@ -129,17 +129,25 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
           <Button title="Discard" onPress={() => onDiscard(c)} />
         </View>
       ))}
-      <EditorWebView
-        initialDoc={draft}
-        onChange={setDraft}
-        html={EDITOR_HTML}
-        onMentionQuery={(query) => queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })}
-      />
-      {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
-      <Text accessibilityRole="text">
-        Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.
-      </Text>
-      <Button title="Comment" onPress={onComment} />
+      {COMMENTING_AVAILABLE ? (
+        <>
+          <EditorWebView
+            initialDoc={draft}
+            onChange={setDraft}
+            html={EDITOR_HTML}
+            onMentionQuery={(query) =>
+              queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })
+            }
+          />
+          {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
+          <Text accessibilityRole="text">
+            Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.
+          </Text>
+          <Button title="Comment" onPress={onComment} />
+        </>
+      ) : (
+        <Text accessibilityRole="text">{COMMENTING_WITHHELD_MESSAGE}</Text>
+      )}
     </ScrollView>
   );
 }
