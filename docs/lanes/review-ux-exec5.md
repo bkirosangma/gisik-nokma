@@ -1065,24 +1065,15 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 
 ### 6.4a Two mechanical sweeps, with their universes
 
-- **Help absolutes.** 0 → **61** candidate lines; the same over
-   → **37**. Every line was read; the ones not already in  (a–h), , or the manual's
-  own honest gaps (due dates, channels, project ids) were checked against code: **E5-1** (, ), **E5-21**
-  (), **E5-24** (, , , , ). The rest I opened were still
-  true ( no cross-project move,  no sort control,  the 200 cap,  the strip's absence,
-  / no email,  no saved-filters menu —  has no mount).
-- **Write catches.** packages/app-core/src/views/bulk-close-dialog.tsx:233:      setTransportError(`We could not reach the server for this close — ${message}`);
-packages/app-core/src/views/board.tsx:1430:        setTransportError(`We could not reach the server for this move — ${message}`);
-packages/app-core/src/views/board.tsx:1468:   * server did not answer this close." and "We could not reach the server
-packages/app-core/src/views/board.tsx:1532:        setTransportError(`We could not reach the server for this close — ${message}`);
-packages/app-core/src/views/board.tsx:1736:        setTransportError(`We could not reach the server for this move — ${message}`);
-packages/app-core/src/views/ticket-sheet.tsx:1074:      setTransportError(`We could not reach the server for this change — ${message}`);
-apps/web/e2e-stack/helpers/stack.ts:68:        `500 means the web container could not reach the server; anything HTML-shaped means Next ` +
-apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:848:        setDeleteNotice({ message: `We could not reach the server to restore it — ${message}`, undoFor: null });
-apps/web/src/backlog-rank-controls.tsx:186:    return { status: 'unreachable', message: `We could not reach the server for this move — ${message}` };
-apps/web/src/backlog-start-button.tsx:113:        setTransportError(`We could not reach the server for this start — ${message}`);
-apps/web/src/workspace-settings-form.tsx:298:        setTransportError(`We could not reach the server for this save — ${message}`); → **9 sites, 7 files**,
-  all listed in E5-25; each opened; all nine paint an  401 as transport.
+- **Help absolutes.** `grep -ciE '<absolute-claim pattern>' docs/manual.md` → **61** candidate lines; the same over
+  `docs/faq.md` → **37**. Every line was read; the ones not already in `exec2-F1` (a–h), `exec2-F5`, or the manual's
+  own honest gaps (due dates, channels, project ids) were checked against code: **E5-1** (`:664`, `faq:307`), **E5-21**
+  (`:365-366`), **E5-24** (`:299-300`, `:371`, `:372-373`, `:989-993`, `faq:143-147`). The rest I opened were still
+  true (`:225` no cross-project move, `:708` no sort control, `:418` the 200 cap, `:873` the strip's absence,
+  `:932`/`faq:634` no email, `faq:519-525` no saved-filters menu — `SavedFiltersMenu` has no mount).
+- **Write catches.** `grep -rn 'could not reach the server' packages/app-core/src apps/web/app apps/web/src` →
+  **9 product sites in 7 files** (plus one e2e helper string, not a product sentence), all listed in E5-25; each
+  opened; all nine paint an `HttpError` 401 as transport.
 
 ### 6.4b Hypotheses opened and KILLED by reading — recorded so the judge can see the method, not just the hits
 
