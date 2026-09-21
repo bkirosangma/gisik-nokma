@@ -1720,6 +1720,12 @@ chosen" while the wire carries a type, and because the swap is on the ordinary p
 `reopen-dialog.tsx:55-64` and `:102`; `visibility-editor.tsx:237-238`, `:330`, `:379-414`.
 `useEffect` counts per file are the grep above.
 
+**And the app has the pattern, which is what makes this an omission rather than a house style.**
+`apps/web/src/workspace-settings-form.tsx:177-190` — a form seeded from a `settings` prop in exactly the
+same way — **carries the re-seed effect** (`useEffect` at `:177`, re-deriving `draft` at `:186` and
+`autoCloseOff` at `:188` from the prop). Read at `a7b6292b`, in the same app, one directory over. So the
+fix for (a)–(c) is not novel machinery; it is the pattern already in use for the nearest comparable form.
+
 ⚠ **Reachability, stated per site.** (a) is reachable on every ticket creation where the type read has not
 answered by first paint — I have **not** driven it in a browser, so I claim the mechanism, not a
 reproduction. (b) needs a second prompt mounted while one is live, which `E2-34` shows is possible; I did
@@ -2300,17 +2306,77 @@ recording that rather than filing something to look busy:**
 - Both render their empty state through the model's `emptyCopy` with `role="note"`
   (`calendar-view.tsx:311-313`, `timeline-view.tsx:274-276`) rather than a component-owned default.
 
-**Why I stopped here.** Over the last several sweeps — the case catalogue, all 59 `catch` sites, every
-`disabled=` expression, the two shells, the phone's help screen, and now the two date views — I have been
+**Why I stopped the systematic sweeps.** Over the last several — the case catalogue, all 59 `catch` sites,
+every `disabled=` expression, the two shells, the phone's help screen, and the two date views — I have been
 finding surfaces *clean* far more often than not, which is the signal that the defects in this concern are
-where my report already says they are. Filing a 25th finding for the sake of it is how a report acquires
-the one that costs three times its claim. **I would rather hand the judge 24 measured findings and an
-honest statement that the remaining ground looked sound than 26 and a liability.**
+where my report already says they are. Filing a finding for the sake of it is how a report acquires the one
+that costs three times its claim.
 
-**What phase 1 leaves, stated as the boundary:** 24 new findings on the landed 19, one withdrawal, one
+**⚠ AND THE NEXT TWO SCREENS I OPENED WERE NOT CLEAN, which is why `E2-44` is below rather than absent.**
+I had two behaviour-heavy files left unread — `apps/web/src/workspace-settings-form.tsx` (450 lines) and
+`apps/web/src/mcp-tokens-screen.tsx` (362) — and closing the hunt without them would have been a boundary
+drawn for tidiness rather than for coverage. The settings form is well built (a `submitting` latch, both
+refusal slots with `role="alert"`, a `dirty`/`invalid` gate at `:435`, and — worth noting — a **re-seed
+effect** at `:177-190`, which is precisely the pattern `E2-33` finds missing from three dialogs). The token
+screen was not: `E2-44` is the finding. **The lesson I would keep: "I am finding things clean now" is a
+reading about the files already opened, not about the files not yet opened** — and I nearly used it to skip
+two.
+
+**What phase 1 leaves, stated as the boundary:** 25 new findings on the landed 19, one withdrawal, one
 standing-up against a ruling, five candidates examined and rejected with their measurements, one omission
 recorded as mine, and no refutations — because I read all three concurrent reports and could not falsify
 one.
+
+---
+
+### E2-44 (r2) — IMPORTANT · A failed read of your connected assistants is drawn as "No assistants are connected"
+
+**WHAT.** `apps/web/src/mcp-tokens-screen.tsx:120-128`:
+```
+const load = useCallback((): void => {
+  void http.get('/v1/me/mcp-tokens').then(
+    (body) => setTokens((body as { tokens: TokenRow[] }).tokens),
+    () => setTokens([]),          // :123 — any failure becomes an EMPTY LIST
+  );
+}, []);
+```
+and the render draws the empty state for exactly that value — `:236-240`:
+> *"**No assistants are connected.** One appears here after you approve it on the connect page."*
+
+**WHY it is wrong — what this particular list controls.** Everywhere else this class costs a person an
+explanation; here it costs them the truth about **access**. The screen's own lead sentence states the
+stakes immediately above the list (`:228-232`): *"Each of these can see and change whatever you can, and
+every claim it records carries your name. Revoking one takes effect at that assistant's next request."* So
+this is the one surface where a person can see and revoke credentials that **act as them** — and a
+dropped connection makes it say there are none. The failure direction is the dangerous one: a person with
+three live connections reads that they have none, and therefore does not revoke the one they meant to
+revoke. It is the same defect as `E2-23` (the passkeys list) and `E2-39` (the builder's roster), and the
+three connect: all three are surfaces that report **an absence of access grants** out of a read that never
+answered.
+
+**The file knows how to speak, which is what makes this an omission rather than a style.** The **revoke**
+path ten lines below handles failure with real care (`:142-157`): a 404 gets its own truthful sentence
+(*"That connection is already gone. The list below is up to date."*) and anything else gets a fallback
+that says the server did not say why. So the author wrote the handler for the write and, for the read,
+wrote a handler that deletes the distinction between "you have none" and "I could not find out".
+
+**WHAT WOULD HAVE BEEN BETTER.** A third arm: keep `tokens` as `null` on a rejection and render a failure
+sentence in place of the list — the shape `:234-235` already has for loading, one branch over. The screen
+already imports `refusalText` and already distinguishes `HttpError` bodies in two other places, so the
+vocabulary is present.
+
+**MEASUREMENT.** Opened: `apps/web/src/mcp-tokens-screen.tsx:118-132` (the loader and its two-argument
+`.then`), `:134-159` (the revoke handler that does it properly), `:228-240` (the lead sentence, the loading
+arm, the asserting empty arm); `packages/app-core/src/preferences/…` not involved.
+
+**Severity: Important.** ⚠ **Not verified:** whether a session-scoped `GET /v1/me/mcp-tokens` can fail in
+practice for a signed-in person — a 401 after expiry is handled upstream by `:131`'s signed-in gate, so
+the reachable cases are a 5xx or a dropped connection. I claim the code path and what it renders, not a
+reproduction.
+
+---
+
+*Running total of round-2 new findings: `E2-20`–`E2-44` (25) — 15 Important, 10 Minor.*
 
 ---
 
