@@ -4186,3 +4186,72 @@ same depth, holds (as §27 recorded).
 **SEVERITY: Minor (claimed), scored at half.** A conditional the owner decided against, left standing in two
 places; softer than `E3-30` because the case's mechanism sentence is still true and nothing reports false coverage —
 it reports an impossibility as open.
+
+## 67. DEFENCES — written pre-emptively, because this lane's phase 2 closes at 17:05:23 IST and the opponent's at 18:41:50
+
+Executor 6's phase-2 file reserves its refutations for after this lane can answer (*"if a turn comes in phase 2,
+the 'Refutations' section is finalised then"*), so the defences below answer the attacks its published reconnaissance
+names and the one attack every documentary finding invites. Each is dated and cites a line opened this session.
+
+### 67.1 `E3-14` — see the *DEFENCE* paragraph under §14.7.1 (15:14 IST)
+
+The recorded exclusions engaged; the warrant of one measured false at `check-permission.ts:641-643`; the
+Critical's basis (`/v1/me/invitations/:inviteId/{accept,decline}`, unrecorded, no-preflight, appending membership
+events) unmoved; the frozen text's failure to cite `http-origin.ts:128-146` recorded as a correction.
+
+### 67.2 The documentary class — `E3-1`, `E3-9`–`E3-13`, `E3-16`, `E3-17`, `E3-20`–`E3-31` (15:25 IST)
+
+**The attack:** *"a stale sentence in a docblock, a catalogue line or `Features.md` is not a product defect."*
+**The answer, in the order a judge can verify it:**
+
+1. **The scope was set by the owner, not by this lane.** Common brief §5: *"A case that asserts a property the product
+   has quietly stopped having is worse than no case, because it reports coverage that does not exist."* Role brief,
+   last line: *"If a claim in the docs does not survive your measurement, that is a finding, and the docs are where it
+   should go."* The workspace rule this repository is checked into (`/Users/kiro/my_projects/CLAUDE.md`, §Feature &
+   Test Tracking): *"No silent drift. Any PR that touches source files and leaves `Features.md` untouched is
+   incomplete"* and *"flip the status marker in the same commit as the test that covers it."*
+2. **The class has already been priced by the judge.** `docs/lanes/review-compiled-controller.md:548` —
+   `exec3-F1 · IMPORTANT · ACCEPTED`, with the controller's own re-measurement (*"`attachments.ts` `deleted` → 5
+   (claim: ZERO)"*) and its generalisation: *"a 'known gap' paragraph should be greppable by the number it is built
+   on."* Every member of this class is that sentence applied to a different line.
+3. **The opponent files the same class and reproduced three members of mine.** Executor 6's `E6-7`, `E6-12`, `E6-14`
+   and `E6-25` are documentary findings of the same shape (a record declaring a closed thing open, a reason that
+   stopped being true, a case that admits what the product refuses); its refutations file independently re-measured
+   `E3-25` (*"count reproduced by an independent instrument"*), `E3-26` and `E3-27` (*"holds"*) and `E3-20`/`E3-21`
+   (*"valid as filed"*). A lane that files the class cannot refute the class without refuting itself.
+4. **Each member carries a command, not an opinion.** `E3-9` `grep -c` over the schema's keys; `E3-11` the fixture
+   count; `E3-13` the cited line opened; `E3-22` `hierarchy.ts:237`/`:257`; `E3-23` the closer naming the case;
+   `E3-27` the export in `seed/templates.ts:41`; `E3-29` the registry's eighteen names; `E3-30` the test's own
+   `it(...)` string; `E3-31` `hierarchy.ts:274`. The judge's cheapest verification of any of them is under a minute.
+5. **The counts sub-class (`E3-9`, `E3-10`, `E3-11`, `E3-12`, `E3-17`, `E3-29`) is not "a wrong number".** Each number
+   is the argument of a claim: `E3-10`'s is a stated correctness invariant whose both terms are stale; `E3-29`'s
+   "eleven registered types" omits exactly the soft-delete and closure pair — the five the product added last, which
+   is to say the omission is the change history nobody wrote down. This report's own §64 is the same discipline
+   applied to itself: a count that matched (twenty) hid two lines never classified.
+
+### 67.3 `E3-18` — the bound is the defence (15:25 IST)
+
+§34 already revised it to **Minor** and stated the trigger is corrupt data. Executor 6's row concurs (*"valid … a
+doubtful remedy is not a false finding"*) and adds the sharper reading, which I adopt rather than resist: on a
+guest's replica a parent that exists but was never delivered is indistinguishable from one that never existed, so
+`reconcile`'s `restricted` is *right* for the first and an existence claim for the second — the divergence from the
+online read's `null` (`routes/tickets.ts:400-404`, opened this session in exec 6's citation) stands as measured.
+Nothing in the finding depends on the remedy sentence.
+
+### 67.4 `E3-8` — filed Low, and the exposure is stated (15:25 IST)
+
+§13.1 says it is *"the one I would least defend"* and why: CI may have no database to point `check:db-tz` at.
+Its measurement reproduces (`grep -c "check-db-timezone\|check:db-tz" .github/workflows/ci.yml` → 0), its claim is
+only that one of nine checkers is unwired, and it was filed at the lowest severity. It is not withdrawn; if the judge
+finds a recorded reason for the omission that this lane's search missed, the finding says so itself.
+
+### 67.5 The claims exec 6 flagged in its §9 that are NOT findings — answered so the record is straight (15:25 IST)
+
+- *"§7.3, 54 registrations, 49 guarded, 5 public by design, at `e4baa425`"* — a positive-findings section, not a
+  scored finding; re-counting it at the current base is on this lane's list below and the result will be appended
+  here if reached. Executor 6's own §9 notes `mcp-device.ts` gained a session-gated `deny` since; that changes the
+  registration count, not any finding.
+- *"§2, every finding transfers to current `main` unchanged"* — §13.1 re-ran every round-1 measurement at `a7b6292b`
+  rather than reasoning from the diff; the sentence is about the eight findings, each of which is listed with its
+  re-run command.
+- *"§7.5, the mappers refuse to default"* — executor 6 confirmed it (*"likely a defence, not a refutation"*).
