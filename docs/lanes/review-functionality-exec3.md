@@ -3491,3 +3491,48 @@ and 376 — that a reader would have taken for a result. **Coverage this closes:
 named gap; it is now walked at check-1 and check-4 depth. **What remains unasked:** `test-cases/README.md`'s own
 legend and the 🟡/🧪/🚫 rows (27 rows total) were counted but not read, and the ❌ set remains enumerated in my
 concern's file only.
+
+## 53. r2 finding E3-29 — `Features.md` §5 says "eleven registered types"; the registry carries eighteen, and the five it omits are the soft-delete and closure pair
+
+**§5 was one of the seven `Features.md` sections §51 recorded as never opened.** This is the first claim checked
+there, and it is the eighth instance of the same class (`E3-11`, `E3-12`, `E3-27`, `E3-28` and now `E3-29`): **a
+count and an enumeration in a bullet that mirrors a set which does not exist in code.**
+
+**WHAT.** `Features.md:397` opens — *"**Ticket event vocabulary** — eleven registered types, all v1, each bound to
+the entity kind it is about:"* — and enumerates exactly eleven. The registry in `packages/domain/src/vocabulary.ts`
+carries **34 registered types, eighteen of them filed against `entityKind: 'ticket'`.** Five `ticket.*` types in
+the registry are absent from the enumeration: **`ticket.closed`, `ticket.reopened`, `ticket.ranked`,
+`ticket.deleted`, `ticket.restored`.**
+
+**WHY it matters, and it is not only a wrong number.** The five omissions are not peripheral to this round — they
+are the closure pair and the **soft-delete pair**, and soft-delete-as-a-read-rule is a finding class in this very
+report. Worse, the bullet is **contradicted by the section it lives in**: `Features.md:407`, twelve bullets later
+in the same §5, describes `proj_tickets`'s two columns as *"both NULL until a `ticket.closed` fills them … both
+cleared back to NULL by `ticket.reopened`"* — naming two types the vocabulary bullet says do not exist. A reader
+auditing "which ticket event types are there" from :397 gets a closed set of eleven and will not find the pair the
+rest of §5 depends on. §5's own text is the refutation; I did not have to leave the section to find it.
+
+**WHAT WOULD HAVE BEEN BETTER.** The bullet should state the vocabulary the registry holds, or scope itself
+explicitly — *"the eleven types Plan 3 registered"* — so the count is a claim about a moment rather than about the
+set. The five later additions (`ticket.ranked` in §3:25's own bullet, the closed pair under the backlog/closed
+spec, the soft-delete pair) each have a bullet somewhere; the defect is that **this** bullet's count and closure
+were never moved when they landed, which is precisely the *"any PR that touches source files and leaves
+`Features.md` untouched is incomplete"* rule in the workspace conventions.
+
+**THE MEASUREMENT.** Parsed every `domainRegistry.register({...})` across `packages/domain/src/**/*.ts` and read
+the `type` and `entityKind` fields: **34 registered types, 18 with `entityKind: 'ticket'`** (the 34 list every
+registration in the package, not only the ticket file). Diffed the 11 names in the bullet against the 18:
+**bullets names missing from the registry: none** (so nothing in the list is fictional); **registry types absent
+from the list: the five `ticket.*` above**, plus `claim.contested`, `claim.contested_resolved` and
+`visibility.set`, which are filed against a ticket but belong to §3's contest vocabulary and §6's visibility
+surface rather than to §5, and which I do not count against this bullet. **Positive control in the same pass:**
+`ticket.closed` and `ticket.reopened` were confirmed present as literal `type:` strings at `vocabulary.ts:168` and
+`:175` before the registry walk, so the parser was known to see them.
+
+**SEVERITY: Minor.** Stated plainly, with why I did not claim more: **no runtime behaviour depends on this
+number**, every omitted type is documented in its own bullet elsewhere, and the five are therefore *discoverable*
+rather than hidden. I claim Minor rather than Important because the material consequence is a reader's, not the
+product's — but I do not withdraw it, because §5:407's dependence on two of the five makes this an internal
+contradiction inside one section rather than a stale citation to a far-off file. **Not measured, and named rather
+than implied:** I checked §5's counts only; the other six never-opened sections (§1, §2, §3, §7, §8, §10) still
+have no claims checked, and §3's 118 candidate countable bullets are the largest remaining surface.
