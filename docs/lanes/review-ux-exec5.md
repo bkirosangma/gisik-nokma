@@ -993,6 +993,28 @@ that makes the product yours".
 
 ---
 
+### E5-29 — MINOR · The state-mapping dialog says "Publishing cannot see which tickets sit in which state" directly above rows that say "3 tickets sit here today" `[SOURCE]`
+
+**WHAT.** `workflow-builder/ui/state-mapping-dialog.tsx:52-54` body: *"Version N+1 removes states that version N has.
+**Publishing cannot see which tickets sit in which state**, so every removed state needs a destination — occupied
+or not."* Each row beneath (`:58-62`) prints `countLine(...)` → *"3 tickets sit here today"* / *"1 ticket sits here
+today"* (`:10-15`), from `getStateOccupancy`.
+
+**WHY.** The docblock (`:17-33`) is precise: the RULE does not consult occupancy (client replicas are
+visibility-scoped, so the two engines would disagree), and the count is *"a courtesy"*. The sentence a person reads
+says the product cannot see the thing it prints on the next line. What is true — *"the counts do not decide; every
+removed state needs a destination whether or not anything sits in it"* — is what the docblock says and the copy
+does not.
+
+**WHAT WOULD HAVE BEEN BETTER.** *"The counts below are for your information only — the rule needs a destination
+for every removed state, occupied or not."*
+
+**MEASUREMENT.** `[SOURCE]` lines above opened.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1054,16 +1076,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**28 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 28). By claimed severity, read from the
-heading text: **Critical 1 · Important 20 · Minor 7** (1 + 20 + 7 = 28).
+**29 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 29). By claimed severity, read from the
+heading text: **Critical 1 · Important 20 · Minor 8** (1 + 20 + 8 = 29).
 
 - **Critical (1):** E5-13
 - **Important (20):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28
-- **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
+- **Minor (8):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 28. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 29. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1130,7 +1152,7 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
    `screens/ticket-screen.tsx:30-130` (E5-21) and `board-screen.tsx:40-60` (the status wording). The storage layers,
    the help screens, the editor web view and every offline arm are unread.
 2. **The workflow builder as a person meets it** (canvas, inspector, history screen) — read its load arms as
-   positive controls for E5-15 and `publish-controls.tsx` in full (E5-28). `state-mapping-dialog.tsx`,
+   positive controls for E5-15 and `publish-controls.tsx` and `state-mapping-dialog.tsx` in full (E5-28, E5-29).
    `workflow-rebind-dialog.tsx`, the inspectors and the canvas remain unread.
 3. **The comment thread, attachments door, subtask chain, close/reopen and delete/undo as END-TO-END FLOWS** — each
    needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
@@ -1207,5 +1229,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 28 findings — Critical 1 · Important 20 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 29 findings — Critical 1 · Important 20 · Minor 8 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
