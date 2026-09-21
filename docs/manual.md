@@ -24,10 +24,10 @@ Read these five. They are the ones that catch everybody.
    The website's job panel has an "Assignee" picker. The phone and desktop apps have no Assignee row
    at all, so there you can neither see who a job is on nor set it. Due dates have no control on any
    screen. (§5)
-4. **You cannot leave a comment on a job on the website.** The job screen shows the description and
-   lets you write one; there is no free-standing box for a comment. The one comment the website does
-   take is a **Move's**: a move carrying a "require a comment" rule puts a box on the Move dialog, and
-   what you type is recorded on the move. (§5)
+4. **You can leave a comment on a job now, on the website and on the phone.** The job screen shows the
+   description, lets you write one, and carries a comment thread with its own box at the end of it. A
+   move carrying a "require a comment" rule still puts a box on the Move dialog, and what you type
+   there is recorded on the move. (§5)
 5. **Every date in the product is on Indian time**, wherever you are. "Today" changes over at midnight
    in India — which is early evening in the UK and late morning on the American west coast. (§14)
 
@@ -109,36 +109,44 @@ that is what happened. Sign in the same way as before.
 The same is true if you click a link (an invitation, or a link to a job) while signed out: it
 remembers where you were headed and sends you there afterwards.
 
-To sign out, use the **Sign out** button on the right of the bar at the top of the screen. Signing out
-really does end it — the next thing you try on that device is refused immediately, not "at some point
-later". That matters if you have signed in on somebody else's laptop.
+To sign out, open the **account menu** at the right-hand end of the bar — the round button carrying your
+initial — and choose **Sign out**. Signing out really does end it — the next thing you try on that
+device is refused immediately, not "at some point later". That matters if you have signed in on somebody
+else's laptop.
 
 ---
 
 ## §2 — Finding your way around
 
-There is a small bar across the top of nearly every screen. It has three things and no more:
+There is a small bar across the top of nearly every screen. Inside a workspace it carries:
 
 - **Workspaces** — the list of every workspace you are in.
-- **My Work** — the jobs assigned to you. This only appears once you are inside a workspace.
-- **Inbox** — with a small number badge on it when you have unread messages.
+- **My Work** — the jobs assigned to you.
+- **Members** — the people in this workspace, and what they are.
+- **Settings** — this workspace's own screens: its ticket types, its workflows, and the workspace
+  itself (§11 and §12).
+- The **workspace's name**, linking to its home page, with the project you were last in beside it —
+  that one opens a menu of the workspace's other projects.
+- **Inbox** — a small icon at the right-hand end, with a dot on it when you have unread messages.
+- **Your avatar** — the round button with your initial on it, opening a menu with **Help**, **Account**
+  and **Sign out**.
 
-Plus your name and a **Sign out** button on the right.
-
-**That is the entire menu.** There is no settings link, no search box, and no help link. The settings
-screens do exist (§11 and §12) and nothing anywhere links to them.
+**My Work, Members and Settings appear only once a workspace is open**, and the workspace's name and its
+last project appear only once that name has arrived. With no workspace open the bar says so — *"No
+workspace selected — pick one to reach its board, members and settings."* **Signed out there is no
+avatar**, so **Help** and **Account** stay in the bar as plain links rather than moving into the menu.
 
 ### Light or dark
 
-There is a small toggle button that cycles through three settings each time you press it:
+On your **Account** page there is a **Theme** control with the three choices side by side — not a button
+you press to cycle:
 
-1. **System** — follow whatever your computer or phone is set to.
+1. **System** — follow whatever your computer or phone is set to. This is the default.
 2. **Light**
 3. **Dark**
-4. …and back to System.
 
-If you pick Light or Dark, the product remembers your choice for next time. If you cycle back around
-to System, it forgets your choice and follows your device again.
+If you pick Light or Dark, the product remembers your choice for next time. Pick **System** again and it
+forgets your choice and follows your device, including its automatic day/night switch.
 
 ---
 
@@ -178,12 +186,14 @@ to put a project there for you. Once a project exists, everything in the rest of
 
 ### What the Workspaces page shows you
 
-Your name at the top, then a card for each workspace you belong to, with that workspace's projects
-listed underneath as links.
+Your name at the top, then a card for each workspace you belong to, carrying that workspace's project
+count and — once it has any projects — a line naming them.
 
-- **Click a project name** to open its board.
-- **Clicking the workspace name does nothing.** It is a heading, not a link. Only the project links go
-  anywhere. This catches people out.
+- **Click anywhere on a card to open that workspace.** The whole card is one link, the workspace's name
+  and its projects line included. This catches people out the other way round now: the name looks like a
+  heading and is in fact the door.
+- The projects on the card are a **line of text, not links**. There is nothing per-project to click
+  there; the project list is one click further in, on the workspace's own page.
 
 If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
 — or create your own."* Both of those are real options.
@@ -296,12 +306,14 @@ withdraw it and send a fresh one.
 
 ### Seeing and changing what people are
 
-**You can see, and you cannot change.** The People page lists the people you can see in this workspace,
-and names each person's role. That role is read-only: there is no "remove", and no "change role".
+**You can see, and an admin can change a role — but nobody can be removed.** The People page lists the
+people you can see in this workspace, and names each person's role. An admin gets a **Role** picker on
+every row except an owner's; changing it submits there and then. **There is still no "remove".**
 
-Combined with the re-invitation problem above, this means a workspace's people list can drift out of
-step with reality and give you no way on screen to fix it. If somebody's role has to change, or
-somebody has to be removed, it has to be done another way.
+This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable finds
+the correction where they last saw it. Combined with the re-invitation problem above, a workspace's
+people list can still drift out of step with reality: a role can be fixed on screen now, but somebody
+still has to be removed another way.
 
 If somebody *is* removed by some other route, it takes effect immediately — on their very next action.
 If they are only taken off one project, they lose that project and keep everything else. Their saved
@@ -359,18 +371,29 @@ This is the honest list. Each one is an absence, not a hidden button.
   Type into the description on the job panel and save it; the panel reads back who set it and when.
   The same box handles formatting and mentions; dropping a file into it is refused rather than
   quietly lost.
-- **You cannot leave a comment on a job.** The writing box takes a description and not a comment, and
-  nothing on the web shows a comment thread. **The one comment the website does take is a Move's** — a
-  move carrying the "require a comment" rule puts a box on the Move dialog (§7), and what you type is
-  recorded on the move rather than shown back as a thread. **The phone app has a Comment button on a
-  job and the website does not.**
-- **You cannot attach a file to a job.** There is no attachment list on the web job sheet, and a file
-  dropped into the description box is refused rather than quietly lost. **The one upload the website
-  does take is a Move's** — a move carrying the "require evidence" rule puts a file box on the Move
-  dialog and stays blocked until the server has stored the file (§7).
-- **You cannot rename a job.**
-- **You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it
-  there is the nearest thing available.
+- **You can leave a comment on a job now.** It is kept here, rather than deleted, so a reader who
+  remembers it as an absence finds the correction where they last saw it. The job sheet carries a
+  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. A move
+  carrying the "require a comment" rule still puts its own box on the Move dialog (§7) and records what
+  you type on the move.
+- **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
+  remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's
+  files, and the comment box takes one too. The **description** box is still the exception: a file
+  dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
+  puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
+- **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
+  absence finds the correction where they last saw it. Open the job and type into the title at the top
+  of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
+- **You can delete a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
+  absence finds the correction where they last saw it. Open the job and press **Delete** in the sheet's
+  footer. The job stops appearing in every view — boards, lists, search, My Work — and **its history is
+  kept**, because other events cite it. **Only a project admin may delete**, and the button is not hidden
+  from anybody: press it without the right and the server refuses, saying so. A **"… deleted · its
+  history is retained"** message follows with an **Undo** for about fifteen seconds, and that Undo is the
+  product's only route back — once it goes, no control anywhere restores the job.
+
+  If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
+  alternative.
 - **You cannot move a job to a different project.**
 
 > **The one place the product will take a field value from you — and what it will not take.**
@@ -661,11 +684,12 @@ was an epic, *"Nothing in the backlog — epics appear in the List."*
 
 ### Board
 
-Columns, one per stage, with cards in them. You do not drag cards — you open one and press Move (§7).
+Columns, one per stage, with cards in them. There are three ways to move a job on: drag its card to a
+column, press the **‹** or **›** arrow on the card, or open it and press **Move…** (§7).
 
-A card shows the title, who it is on, whether it is blocked, its progress, and a small "who · when"
-button. Press that button and it tells you who moved it and when: *"marked Doing by Anselma Marak on
-19 Aug 2026"*.
+A card shows the title, who it is on, whether it is blocked, its progress, the **‹** and **›** arrows
+that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
+tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
 
 Columns are grouped by which set of stages they belong to, so if two job types use different
 arrangements you get two clearly separated groups rather than one confusing mess.
@@ -918,9 +942,11 @@ is only ever one on screen. And a single press carries at most **100** notificat
 whole press is refused and tells you so, rather than marking some of them and leaving you to work out
 which ones went.
 
-**The unread badge** on the Inbox link refreshes about once a minute. If a refresh fails it keeps the
-last number rather than resetting to nothing, and it shows nothing at all before the first answer
-comes back — an absence, not a zero.
+**The unread dot** on the Inbox link refreshes about once a minute. It says only *that* you have unread
+messages, never how many — the count is in the link's name, which is what a screen reader reads out and
+which keeps the signal from being carried by colour alone. If a refresh fails it keeps showing the dot
+rather than clearing it, and it shows nothing at all before the first answer comes back — an absence,
+not a zero.
 
 **If your Inbox is empty** it says so properly, and the sentence doubles as an explanation of what the
 Inbox is for: *"Nothing in your inbox. You will be told here when someone assigns you a ticket,
@@ -994,13 +1020,16 @@ That is the right choice — silently adding you would file a claim in your name
 but it means you have to actually read the warning. You cannot apply an empty list; the button stays
 off.
 
-### The gap: you cannot read the setting back
+### Reading the setting back
 
-**You can set who sees a job. You cannot see what it is currently set to.** On the one screen whose
-entire subject is who can see what, the current audience is shown as unavailable rather than guessed.
+**You can set who sees a job, and the screen reads it back to you.** This section is kept, rather than
+deleted, so a reader who remembers it as a gap finds the correction where they last saw it. On the
+screen whose entire subject is who can see what, the current audience is shown as a sentence — the
+mode, or the names when it is set to particular people — rather than as a guess.
 
-Guessing would be much worse. It is still a real hole in a feature about sharing. **Keep your own note
-of what you set**, at least until this is fixed, because the screen will not remind you.
+Guessing would be much worse, and there is one thing the screen still will not do: when it is set to
+particular people and their names have not arrived, it says so rather than filling the space with a
+partial answer wearing the shape of a complete one.
 
 ### What hidden looks like from the other side
 
@@ -1040,11 +1069,13 @@ before anything else.
 
 ### Getting to the screen
 
-**Nothing in the app links to it.** There is no settings entry in the top bar. The stage builder and
-the job-type editor can only be reached by typing their address into the browser bar.
+**The app links to it.** There is a **Settings** link in the top bar; it appears once a workspace is
+open, and it opens that workspace's settings, where the stage builder and the job-type editor live.
 
-That is the honest answer, and it is a real problem — these are the screens that make the product
-yours, and they are invisible. Ask whoever set your workspace up for the addresses and bookmark them.
+Nothing to bookmark. One wrinkle worth knowing: the bare address `/settings` with no workspace on it
+offers nothing usable, because the shell remembers no "current workspace" outside a route or a query
+parameter. It still resolves, and what it says then is accurate — pick a workspace and it points you at
+the list. Reaching it through the link never has this problem.
 
 ### Who can use it
 

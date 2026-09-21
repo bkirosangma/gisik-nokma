@@ -20,6 +20,11 @@ vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
   useParams: () => ({}),
   useSearchParams: () => new URLSearchParams(),
+  // E5-17 mounted `AppNav` on this route, and `AppNav` reads `usePathname` for
+  // the current-page marker. The mock is extended rather than the mount dropped:
+  // the page needed a way out, and a mock that omits a hook its own tree uses is
+  // a harness gap, not a product constraint.
+  usePathname: () => '/mcp/tokens',
 }));
 
 let session: { data?: { user?: { id: string; name: string } }; isPending: boolean } = {
@@ -68,6 +73,20 @@ function mount(): void {
 beforeEach(() => {
   calls = [];
   session = { isPending: false, data: { user: { id: '01J9USER000000000000000000', name: 'Kiro' } } };
+});
+
+describe('E5-17 the route is not a chrome-less orphan', () => {
+  it('mounts the app nav, so a person sent back here has a way out', async () => {
+    session = { isPending: false };
+    fetchStub(() => ({ status: 200, body: { tokens: [] } }));
+    mount();
+    // Nothing in `apps/web/app` or `apps/web/src` links to `/mcp/tokens`, and
+    // `mcp-tokens-screen.tsx`'s `returnTo` sends a signed-out person BACK here
+    // after sign-in — so before this mount the only route a reader could reach by
+    // typing was also the only one with no bar on it.
+    expect(document.querySelector('nav.gn-nav')).not.toBeNull();
+    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+  });
 });
 
 describe('14.96 signed out', () => {

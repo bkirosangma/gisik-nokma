@@ -15,7 +15,7 @@ export default function TicketTypesPage() {
   const wiring = useBuilderWiring(workspaceId);
   const base = `/w/${workspaceId}/settings/ticket-types`;
   return (
-    <main className="gn-shell">
+    <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">Ticket types</h1>
       {wiring.kind !== 'ready' ? (

@@ -97,7 +97,7 @@ describe('3.124 the founding form is reachable when the workspace list REFUSES',
 });
 
 describe('3.126 founding — the happy path', () => {
-  it('posts the name and routes the founder into their new workspace', async () => {
+  it('posts the name and routes the founder to the workspace HOME, not My Work', async () => {
     const names: string[] = [];
     mount({
       foundWorkspace: async (name) => {
@@ -108,7 +108,12 @@ describe('3.126 founding — the happy path', () => {
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Name'), 'Convenience Corner');
     await user.click(screen.getByRole('button', { name: 'Create workspace' }));
-    await waitFor(() => expect(push).toHaveBeenCalledWith('/w/01J9WORKSPACE0000000000000/my-work'));
+    // E5/F5 — the workspace HOME, not `/my-work`. Seconds after founding, every
+    // one of My Work's four sections is empty, so the founder landed on four
+    // negatives; the home carries the owner's New project form (`manual.md:174`
+    // — "an owner or admin gets a New project form INSIDE the workspace"), which
+    // is the control that makes the new workspace usable.
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/w/01J9WORKSPACE0000000000000'));
     expect(names).toEqual(['Convenience Corner']);
   });
 

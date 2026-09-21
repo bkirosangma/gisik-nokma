@@ -18,6 +18,17 @@
  * to a reader — but shipping it without this marker, to whoever next opens this
  * file, would be worse still.
  *
+ * ⚠ NARROWED BY E5-38 (round-2 ruling, 2026-09-21), and the difference matters.
+ * The paragraph above is about THIS marker and still holds: the words
+ * `BOILERPLATE`, `NOT REVIEWED BY A LAWYER` and `NOT LEGAL ADVICE` are asserted
+ * absent from the render by case 13.252, and that assertion is unchanged. What
+ * the ruling added is a SEPARATE, reader-facing line — *"Draft notice. The
+ * bracketed details below are not yet filled in."* — because the sign-in page
+ * binds a person's agreement to this document (below, and `sign-in/page.tsx`),
+ * and a page that asks for agreement while printing `[ENTITY NAME]` and
+ * `[JURISDICTION]` at ten sites owes the reader that much. It names the
+ * placeholder state; it does not editorialise about legal review.
+ *
  * The factual claims about product behaviour below were taken from the shipped
  * configuration (`deploy/do/app.yaml`), not invented: region `blr`, object
  * storage `blr1`, and the app's Asia/Kolkata clock are all set there.
@@ -25,6 +36,16 @@
 import Link from 'next/link';
 import { LegalTabs, LegalToc, sectionId, type LegalSection } from '../../src/legal-chrome.js';
 import { LegalNav } from '../../src/legal-nav.js';
+import { documentTitleFor } from '../../src/page-title.js';
+
+/**
+ * exec1 P12 — the route's title, and this page can use Next's own `metadata`
+ * because it is a SERVER component. A `'use client'` route cannot: an exported
+ * `metadata` there is ignored without a word, which is why the rest of the app
+ * uses `<DocumentTitle>`. Both read the format from `documentTitleFor`, so the
+ * two mechanisms cannot disagree about what a title looks like.
+ */
+export const metadata = { title: documentTitleFor('Privacy') };
 
 /**
  * The page's sections, declared ONCE.
@@ -173,13 +194,17 @@ const SECTIONS: readonly LegalSection[] = [
 
 export default function PrivacyPolicy() {
   return (
-    <main className="gn-shell gn-legal">
+    <main id="gn-main" className="gn-shell gn-legal">
       <LegalNav />
       <div className="gn-legal__column">
         <div className="gn-legal__head">
           <h1 className="gn-legal__title">Privacy Policy</h1>
           <LegalTabs active="privacy" />
         </div>
+        <p className="gn-legal__draft">
+          <span className="gn-legal__flag-label">Draft notice.</span> The bracketed details below are
+          not yet filled in.
+        </p>
         <p className="gn-legal__meta">
           Last updated <strong>[DATE]</strong> · Operated by <strong>[ENTITY NAME]</strong> ·
           Governed by the laws of <strong>[JURISDICTION]</strong>

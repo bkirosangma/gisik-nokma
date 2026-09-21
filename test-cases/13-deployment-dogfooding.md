@@ -1,5 +1,7 @@
 # 13. Deployment & dogfooding — test cases
 
+> **§13 blocks for the 2026-09-22 release batches** (`13.1057`–`13.1206`, per batch, cycle 46) are allocated in [`13-hig-per-screen.md`](./13-hig-per-screen.md) — *THE BLOCKS — take from yours, never from the tip*.
+
 Mirrors `Features.md` §13. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` manual · `🚫` out of scope (with reason).
 
 ## This file is the INDEX — the catalogue is split into part-files (2026-09-19)

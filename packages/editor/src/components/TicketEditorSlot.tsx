@@ -87,6 +87,13 @@ export type EditorSlotProps = {
   ticketId: string;
   placeholder?: string;
   autoFocus?: boolean;
+  /**
+   * The `id` of a visible element whose words name this composer. Transcribed
+   * from app-core's half — see that declaration for the reasoning; the two move
+   * together or neither does, and `test/ticket-editor-slot.test.tsx` compares
+   * the three field-name sets for equality so a one-sided addition fails.
+   */
+  labelledBy?: string;
   // Editor capabilities. Optional in the shared declaration because Plan 6's
   // read-only PlainTextEditorSlot supplies none of them. This component STATES
   // the gap rather than pretending: without `submit` the submit button is
@@ -200,6 +207,17 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
       <TicketEditor
         initialDoc={initialDoc}
         editable={!props.readOnly}
+        // The accessible name, off the one prop that already knows which
+        // writing surface this is. Deriving it here rather than taking it from
+        // the contract is deliberate: `mode` is already the shared declaration's
+        // discriminator, so a host cannot mount a description composer that
+        // calls itself a comment, and no new field has to travel through
+        // app-core to say what `mode` has said all along.
+        label={props.mode === 'comment' ? 'Comment' : 'Description'}
+        // Passed straight through. When the host points at a visible caption,
+        // that wins in `TicketEditor` and the `label` above is not rendered at
+        // all — so a mount that supplies both gets one name, from the caption.
+        {...(props.labelledBy === undefined ? {} : { labelledBy: props.labelledBy })}
         placeholder={props.placeholder ?? (props.mode === 'comment' ? 'Write a comment…' : 'Describe this ticket…')}
         queryUsers={props.queryUsers ?? NO_MENTIONS}
         uploadAttachment={uploadOrRefuse}

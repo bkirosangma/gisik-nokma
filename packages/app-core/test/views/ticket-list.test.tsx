@@ -1335,7 +1335,12 @@ describe('13.662 the group header band names its group and counts its own rows',
     // reasoned: the first version of these two lines said four each and the run
     // answered `assignee · 3 tickets` then `type · 3 tickets`.
     const expected: [Grouping, string, string, string][] = [
-      ['epic', 'No epic', 'epic · 2 tickets', 'Registrations'],
+      // F7 — the EPIC axis says ROWS, not TICKETS. This model counts the epic row
+      // too while the prototype counts children only, so the same words named two
+      // different numbers depending on which build you read; naming the unit
+      // settles which membership is being counted. The other three axes agree with
+      // the prototype and keep their word.
+      ['epic', 'No epic', 'epic · 2 rows', 'Registrations'],
       ['status', 'To do', 'state · 2 tickets', 'Doing'],
       ['assignee', 'Unassigned', 'assignee · 3 tickets', 'Kiro'],
       ['type', 'task', 'type · 3 tickets', 'epic'],
@@ -1393,7 +1398,7 @@ describe('13.662 the group header band names its group and counts its own rows',
     const region = screen.getByRole('region', { name: 'Registrations' });
     const band = region.querySelector('.gn-list__section-title');
     if (band === null) throw new Error('no band over Registrations');
-    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 tickets');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 rows');
 
     await user.click(within(region).getByRole('button', { name: 'Collapse DLT registration' }));
 
@@ -1402,7 +1407,7 @@ describe('13.662 the group header band names its group and counts its own rows',
     // about which number the band reads.
     expect(within(region).queryByTestId('ticket-card-t3')).toBeNull();
     expect(within(region).getByTestId('ticket-card-t2')).not.toBeNull();
-    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 tickets');
+    expect(band.querySelector('.gn-list__section-meta')).toHaveTextContent('epic · 2 rows');
     // The band answers for its section the way the summary answers for the
     // project: a count that shrank when a row was collapsed would be a count of
     // the user's scroll position. And the row's own state agrees with the table:
