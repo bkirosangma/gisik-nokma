@@ -143,6 +143,15 @@ the controller for another rather than borrowing a neighbour's.**
 was the maximum in use in section 13 when it was cut, recounted at `origin/main`, and **a bare "next free
 N" is a reading that expires — which is why a lane takes a BLOCK.**
 
+**`13.1100`–`13.1103` is ALLOCATED to release-plan lane B01 (exec6, 2026-09-21), T-E6-15's
+cross-site-WebSocket-hijacking cases, minted into `13-plan11-seams-and-scheduler.md`'s HTTP-Origin
+section — see that file's own note at the mint site.** Not derived from `13.1049` (`origin/main`'s tip
+at mint time): `13.101`–`13.240` is Lane E/Lane C's older block, still holding live, unminted headroom
+this lane had no authority to enter, so `13.1100` was picked clear of every range mentioned anywhere in
+either file, confirmed by grep. **Next free after this block: `13.1104`** — recount against every remote
+branch before trusting that number, not `origin/main` alone; the release plan runs several lanes on this
+same section at once, and `origin/main` is the SLOWEST of the readings, not the true one.
+
 Nothing in the Task 14/15 section below is proven by an automated test in the usual `vitest` sense —
 there is no test runner for GitHub Actions YAML. `🧪` there means: reproduced by hand against the actual
 tools involved (actionlint, a real vitest run), not inferred from reading the YAML. The Tasks 7–10 sections
