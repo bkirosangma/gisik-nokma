@@ -594,6 +594,88 @@ Important on my scale — but it is a whole settings surface with no error arm.
 
 ---
 
+### E5-16 — IMPORTANT · "New ticket" pre-selects **Epic** — the top of the hierarchy — and a mis-filed type cannot be changed afterwards; the export pre-selects the everyday type `[BROWSER]` `[SOURCE]` — category 3
+
+**WHAT.** Press `New ticket` on the board: the `Type` combobox opens with `value="Epic"` (`[BROWSER]`, the input's
+painted value), `Parent` = `None (project root)`, `Create` disabled until a title. A person who types a title and
+presses Create files an **Epic**. `new-ticket-dialog.tsx:97` `useState(typeOptions[0]?.id ?? '')`; `typeOptions` is
+the workspace's types in rank order (`page.tsx:1482-1485`), so the default is always rank 1 = Epic. The export's form
+defaults to `type: "Defect"` (`EXPORT:2216`), the SECOND type in its ladder (`:2274-2282`), not the first.
+
+**WHY.** In the dev project the type distribution is Epic 3 · Errand 24 · Story/Task/Sub-task 0 (`/settings` →
+Ticket types counts, `[BROWSER]`) — the default is the least likely choice 8 times in 9. And the mistake is
+one-way on the web: the sheet's `Type` row is read-only (`ticket-sheet.tsx:1235-1243`, matching the export's
+`<span>{{ sheetType }}</span>`), so an accidental Epic must be deleted and re-filed. An Epic is also structurally
+different — it heads a hierarchy and appears in the Backlog as a group band (the brief's "visible as a name and
+absent as a ticket" shape). **Search for a ruling:** `grep -rn 'typeOptions\[0\]\|default type\|first type'
+new-ticket-dialog.tsx create-ticket-flow.tsx page.tsx test-cases/13-*.md test-cases/05-*.md` → only the line itself;
+the dialog's docblock (`:1-84`) rules the Parent picker and the title, not the type default.
+
+**WHAT WOULD HAVE BEEN BETTER.** Default to the deepest-legal or most-used type (the subtask form already defaults to
+the deepest legal type — `exec1-P5`'s ruling records that choice), or to no selection with `Create` disabled until one
+is made — the pattern the Move dialog already uses (`Choose a state`).
+
+**MEASUREMENT.** `[BROWSER]` dialog inputs: `{label: "Type", role: "combobox", value: "Epic"}`; `[SOURCE]` lines
+above; `EXPORT:2216`, `:2274-2282`.
+
+**SEVERITY: Important** (claimed). A default that is usually wrong, on the product's most-used form, with no undo.
+
+**Observation, not scored:** the export's new-ticket form also carries `Description`, `Column`, `Assignee` and `Due
+date` (`EXPORT` overlay labels); the product's carries `Title`, `Type`, `Parent`. Assignee and description are
+settable on the sheet afterwards; due date is not (E5-6). The `Title` input has no accessible name (`<input
+value="">`, no `aria-label`, no `id`/`for`) — noted for the UI lane.
+
+---
+
+### E5-17 — MINOR · `/mcp/tokens` is a chrome-less orphan: no app nav, nothing links to it, and its own docblock says it is a Settings tab it left two rounds ago `[BROWSER]` `[SOURCE]`
+
+**WHAT.** `/mcp/tokens` paints `Connected assistants` with **no `AppNav`** — no Workspaces/My Work/Members/Settings,
+no account menu (`[BROWSER]` control list: only `Name`/`Revoke` buttons). `grep -rn "/mcp/tokens" apps/web/app
+apps/web/src` → no `href` anywhere; the only non-comment hit is `mcp-tokens-screen.tsx:212` (`returnTo`), which sends
+a signed-out person BACK to this chrome-less page after sign-in. `app/mcp/tokens/page.tsx:16-24` says `/settings`
+*"can mount the SAME component as its 'MCP tokens' tab"*; `app/settings/page.tsx:118-125` says *"MCP tokens LEFT this
+shell (Round 21) … moved it to `/account`"*. The painted `/settings` has three tabs: Ticket types · Workflows ·
+Workspace.
+
+**WHY.** A person who reaches it (bookmark, or the `returnTo`) has no way onward but the browser bar, on a page whose
+sibling (`/account`) carries the full shell. The owner's ruling was *"should not be opening up a separate route"*;
+the route was kept because "nobody asked for a URL to stop working" — fair — but it was kept without a nav.
+
+**WHAT WOULD HAVE BEEN BETTER.** Redirect `/mcp/tokens` → `/account#connected-assistants`, or mount `AppNav`.
+
+**MEASUREMENT.** `[BROWSER]` painted text and controls; `[SOURCE]` `app/mcp/tokens/page.tsx:1-33`,
+`app/settings/page.tsx:118-130`, `mcp-tokens-screen.tsx:212`.
+
+**SEVERITY: Minor** (claimed).
+
+**Observation, not scored:** three of the four connections paint byte-identical rows (`Approved 7 Sept 2026 · Last
+used 7 Sept 2026 · Name · Revoke`) with identical accessible names (`Name the connection approved 7 Sept 2026` ×3) —
+the person cannot tell which assistant a `Revoke` cuts until they name them. Data-dependent (unnamed seeds), so noted
+only.
+
+---
+
+### E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all three `[SOURCE]` — category 3, wire-limited
+
+**WHAT.** `/invite/[token]` (`page.tsx:87-126`): *"You are invited to join **<ws>** as <role>."* + `Join <ws>`. The
+export (`EXPORT:1761-1786`): inviter name, workspace, role, member count, *"Invitation expires · In 4 days"*, a
+*"What a member can do"* tray, and a Decline/Accept pair. `Decline` exists in the product only on `/workspaces`
+(`workspaces/page.tsx:448-466`, `:553`) for invitations matched to the signed-in email.
+
+**WHY.** A person holding a link they do not want has no answer on the page the link opens. `InviteSummary`
+(`online/invites.ts:3-7`) is `{workspaceId, workspaceName, role}` — the wire carries no inviter and no expiry, so two
+of the export's rows are a wire gap; Decline is not (the decline door exists, `myInvitations.decline`).
+`docs/design/prototype-delta-2026-09-18.md`'s invite entry records the absences and issues no ruling.
+
+**WHAT WOULD HAVE BEEN BETTER.** A Decline beside Join (the door exists), and expiry on the wire (the server holds
+`expires_at`, `routes/invites.ts:514`).
+
+**MEASUREMENT.** `[SOURCE]` lines above; `EXPORT:1761-1786`. Not driven — I hold no live invitation token.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 (filled in)
