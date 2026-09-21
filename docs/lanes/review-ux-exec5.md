@@ -1746,8 +1746,12 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   `docs/faq.md` → **37**. Every line was read; the ones not already in `exec2-F1` (a–h), `exec2-F5`, or the manual's
   own honest gaps (due dates, channels, project ids) were checked against code: **E5-1** (`:664`, `faq:307`), **E5-21**
   (`:365-366`), **E5-24** (`:299-300`, `:371`, `:372-373`, `:989-993`, `faq:143-147`). The rest I opened were still
-  true (`:225` no cross-project move, `:708` no sort control, `:418` the 200 cap, `:873` the strip's absence,
-  `:932`/`faq:634` no email, `faq:519-525` no saved-filters menu — `SavedFiltersMenu` has no mount).
+  true (`:225` no cross-project move, `:708` no sort control, `:873` the strip's absence, `:932`/`faq:634` no email,
+  `faq:519-525` no saved-filters menu — `SavedFiltersMenu` has no mount) — **except one I passed as true and had not
+  checked to the end of its sentence:** `:418` *"It stops at 200 entries, saying so at the top"*. The cap is real; the
+  placement is not — `ticket-sheet.tsx:2727-2731` renders `<HistoryList/>` and THEN the *"Showing the first 200
+  entries…"* notice, i.e. at the bottom. exec 2's `E2-55` (15:03) found it; I record my miss here rather than file a
+  duplicate.
 - **Write catches.** `grep -rn 'could not reach the server' packages/app-core/src apps/web/app apps/web/src` →
   **9 product sites in 7 files** (plus one e2e helper string, not a product sentence), all listed in E5-25; each
   opened; all nine paint an `HttpError` 401 as transport.
