@@ -185,7 +185,21 @@ the one checker `F8` found has no automated invocation anywhere, so nothing woul
 | `I2` (exec 1, IMPORTANT) | that a committed artefact records a defect that was fixed later, with nothing saying which run produced it | The artefact: `e2e-stack/non-text-contrast-roster.json` records `"belowCount": 1` with `button.ticket-type-list__move` at **1.41** on `/settings/ticket-types`. The fix: that class now has **three selector blocks** — `ui.css:5836` (the rule), `:5851` (`:focus-visible`), `:5855` (`:disabled`) — against a comment at `:5677` recording that it *"had NO RULE OF ITS OWN — 0 hits for the class"* | **holds** — the artefact has not been regenerated |
 | `P15` (exec 1, MINOR) | that the repo's generated prototype copy is **one line offset** from the owner's export | **Measured at a shared landmark.** Repo copy `design-system/interactive/desktop.dc.html`: **4051 lines**, `const navDef` at **2437**. Owner's export `Gisik Nokma - Desktop.dc.html`: **4050 lines**, `const navDef` at **2436**. **Exactly one line, at the same construct** | **holds** |
 
-**Thirty-nine checks across all five lanes. Thirty-nine held. My refutation count is zero.**
+
+| `I4` (exec 1, MINOR) | that a citation **resolves** and still misleads | `tap-targets.ts:43-45` quotes *"Dense in-list controls get 24, standalone controls get 44 — the same call `/help`'s table-of-contents links got"* and cites **`ui.css:1606-1616`**. Those sixteen lines are a **`border-left` marker ruling** — `"WHAT LEFT, AND WHY IT IS NOT A REVERSAL"` — and say nothing about 24 or 44. The sentence actually lives at **`ui.css:1662`** | **holds** |
+| `P17` (exec 1, MINOR) | that `/my-work`'s heading outline skips level 2 | `my-work/page.tsx:51` renders `<h1 className="gn-page-title">My Work</h1>` and `my-work.tsx` renders its four section headings (`:75`, `:86`, `:97`, `:116`) as `<h3 className="gn-my-work__heading">` — **h1 straight to h3** | **holds** |
+
+**Forty-one checks across all five lanes. Forty-one held. My refutation count is zero.**
+
+> **`I4` is the finding I would most have wanted to write myself, and it is one I did not.** Its class is
+> *"a citation that resolves is not a citation that is right"* — a rule this repository has recorded, and one
+> my own report files against other documents three times. exec 1 found an instance in a **docblock that
+> justifies the product's own tap-target rule**: the range it cites is real, non-empty, and about something
+> else entirely. **It is the cheapest possible defect to miss and the most expensive to act on**, because a
+> reader who follows the citation lands on a passage that appears to be about rulings and concludes the
+> threshold was ruled there. My own sweep for exactly that shape — the citation sweep over my round-2 half —
+> checks that paths exist and line numbers are in range, and **would not have caught this**, because both are
+> true here. That is a real limit in my instrument and I am recording it rather than leaving it implied.
 
 > **`P15` is worth a note for the shape of its own history, not only its measurement.** exec 1 filed it at
 > **IMPORTANT**, then read `design-system/interactive/support.js` and found that `sc-camel-*` is that runtime's
