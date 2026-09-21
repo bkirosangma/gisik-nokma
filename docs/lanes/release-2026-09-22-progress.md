@@ -5,3 +5,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | id | status | when / sha | note |
 |---|---|---|---|
 | B01 | claimed | 2026-09-21 19:45 | /Users/kiro/my_projects/gisik-nokma-exec6 |
+| T-E3-14 | done | a7796c41 | security-middleware.test.ts PROTECTED table (13.116 + it.each) |
