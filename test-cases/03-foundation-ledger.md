@@ -324,3 +324,19 @@ section follow the controller's rule, so the next free id after B16 is one past 
   `priority`, because the engine refuses to clear a priority (`field.priority-required`), so a
   `Cleared priority` assertion would pin a state the product forbids. —
   `packages/app-core/test/views/history-copy.test.ts`
+- **3.974** ✅ Nothing shadows the SegmentedControl's own `.gn-segmented` rule. `rule(selector)` in
+  `packages/ui/test/components.test.tsx` resolves a rule with `UI_CSS.match(...)` — **`.match()` takes the
+  FIRST occurrence in FILE ORDER** — so any rule whose selector TEXT contains that class and sits ABOVE
+  the real rule becomes the body `rule('.gn-segmented')` returns. **MEASURED 2026-09-22, and it was not
+  hypothetical:** the ticket sheet shipped a caller-side descendant selector at `:2163` while the real
+  rule sat at `:5125`, and `rule('.gn-segmented')` answered `" display: inline-flex; "` — the OVERRIDE,
+  not the track — while all 426 cases in that package stayed GREEN, because every one of them queries
+  `.gn-segmented__item` and that `__item` suffix blocks the prefix match. It would have fired only for
+  whoever next wrote the BARE class. Fixed by giving the caller its own class
+  (`SegmentedControlProps.className`); this case is what keeps it fixed, because a comment alone is a
+  claim with no instrument — and the first draft of the FIX'S OWN COMMENT reproduced the pattern and
+  reintroduced the match until the re-measurement caught it. Comments are stripped before the probe, with
+  a PLANTED-INPUT control proving the probe discriminates in both directions (an ancestor above the rule
+  is reported BY NAME; the same ancestor below it is not). Mutation-witnessed: re-inserting a shadowing
+  selector above the track reddens this case alone, `expected '.gn-mutation-probe' to be ''`. —
+  `packages/ui/test/components.test.tsx`
