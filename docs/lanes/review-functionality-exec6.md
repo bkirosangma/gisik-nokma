@@ -443,6 +443,46 @@ recognise `.runIf(` (the same guard, inverted), or the sibling should refuse tha
 **SEVERITY: Minor.** The instrument's blind spot is real and demonstrated, but nothing in the tree currently
 falls into it and the CI wire it sits on is dead for an unrelated reason.
 
+### E6-7 — MINOR — Migration prefixes are hand-rounded and future-dated with no recorded convention, so the plans' own `node-pg-migrate create` produces a prefix below an already-applied migration for ~a day after each merge
+
+**WHAT.** The last 13 migrations carry prefixes rounded to `…00000000` and spaced `1e11` ms (≈27.8 h) apart —
+`1788600000000` … `1790000000000` — and each was **committed before the instant its prefix names**: e.g.
+`1790000000000_proj-ticket-comments.sql` (prefix = `2026-09-21T14:13:20Z`) was committed `2026-09-20T22:20:51+05:30`
+= `16:50Z`, 21 h early; `1789800000000_proj-tickets-deleted.sql` (prefix `09-19T06:40Z`) was committed `09-20T13:17
+IST`, so its prefix was already in the past — the spacing is a counter, not a clock. The only recorded way to
+create a migration is the plans' `pnpm --filter @gisik-nokma/server exec node-pg-migrate create <name>`
+(`docs/superpowers/plans/2026-08-20-01-foundation-ledger.md:1902`, `:3116`; `…-07-editor-attachments.md:1918`),
+which stamps the wall clock. Measured at review time:
+
+```
+node -e 'console.log(Date.now() < 1790000000000)'   → true   (now = 2026-09-21T04:5xZ; the window closes 14:13:20Z = 19:43 IST)
+dev DB (54330, read-only): pgmigrations rows 32; last = 1790000000000_proj-ticket-comments @ 2026-09-21T02:50:18Z
+```
+
+So until 19:43 IST today a migration created the documented way is numbered **below one already applied on the dev
+database** — the exact shape `check-migration-order.mjs:1-45` was written after (*"could never run on any
+database that had the higher one — and NOTHING failed"*).
+
+**WHY it is wrong.** The checker mitigates but does not remove it: it refuses the new file against the base ref's
+maximum — correctly — but only when it runs, and CI has run nothing since 2026-09-06; the other guard is the hot
+stack's entrypoint aborting on `checkOrder`. Neither tells a developer *why* the tool's own output is refused, and
+nothing in `apps/server/`, `docs/` or the migrations directory says "hand-number above the last prefix" — `grep
+-rnEi 'round|prefix|migrate create' apps/server/README.md docs/*.md scripts/check-migration-order.mjs` → the
+checker's own docblock only. Every merge of a rounded prefix opens a fresh window (the spacing exceeds a day), so
+this recurs rather than resolves.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either use the clock (the tool's default) and let `check:migrations` do its
+job, or record the convention in one place the plans point at (*"prefix = previous + 1e11; never below
+`Date.now()`"*) — and make the checker say which of the two the file violated. Cheapest of all: refuse a prefix
+in the future in `check-migration-order.mjs`, which turns the convention into a rule.
+
+**MEASUREMENT.** `ls apps/server/migrations`; `git log --diff-filter=A --format=%cI -- <file>` per file; the
+`Date.now()` comparison above (time-bound — it reads `false` after 14:13:20Z on 2026-09-21); the dev-DB read in
+Appendix E. Lines opened: `check-migration-order.mjs:1-45`; `apps/server/package.json:11`; the three plan lines.
+
+**SEVERITY: Minor.** Loud when it fails (refusal or boot abort), but a recurring, undocumented trap on the path
+the plans themselves document.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
