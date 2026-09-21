@@ -967,7 +967,7 @@ its own category. Rulings 27/33 split *refusal* from *transport*; a session that
 `expired-session.tsx` docblock (`:9-18`) records that leaving it on the wrong side produced *"a panel telling a person
 their work 'cannot be read', when the true and actionable sentence is sign in again"* — for reads. The writes were
 never brought under the same rule. The person's typed comment / title draft is also stranded behind a sentence that
-suggests retrying, when retrying cannot succeed.
+reads as a network problem, when no retry on this session can succeed.
 
 **WHAT WOULD HAVE BEEN BETTER.** One predicate on the catch — `error instanceof HttpError && error.status === 401` (the
 transport HAS the status, `http.ts:50`) — routing to the same `/sign-in?next=` redirect reads use, with a sentence
