@@ -269,3 +269,7 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P30 | done | 41869c7d | generate-editor-html.test.ts (12.413, 12.414, 12.415) |
 | T-P6 | done | 1d06ea64 | prose-only, no case (rule 5) |
 | T-P7 | done | 21c868b6 | prose-only, no case (rule 5) |
+| T-E4-5 | done | fa9448d2 | OWNER 2026-09-22 00:2x: "the shape stands" — the 2026-09-19 shape ruling holds; aria-labelledby closes the defect; needs-owner resolved |
+| T-E5-39 | blocked | - | OWNER 2026-09-22 00:2x: "defer to post-release as its own task" — publishedAt/publishedBy on the workflow read, ~4 h sonnet; not a release item |
+| T-I1 | needs-owner | - | OWNER 2026-09-22 00:2x: CI minutes reset in ~10 days; the browser suites run LOCALLY against the rebuilt :3001 stack (cycle 47 §2); auto-merge clause reads "local forced gate" until then |
+| T-E6-26 | needs-owner | - | OWNER 2026-09-22 00:2x: "drop it" — post-release task: delete proj_rollups, its recompute calls, the verifier row, the Features.md note |
