@@ -283,4 +283,7 @@ which. A projection kept "in case" is the rule the repo states for controls and 
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
 **Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`; R6-2 filed 15:16 IST against
 `origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head; E6-26 (phase-2, half) filed 15:30 IST. **15:44 IST:** exec 5's file (`d3234320`) records R6-1 as CONCEDED
-(*"R6-1 was right about my absolute"*, E5-21 refiled narrower); E6-14 defence paragraph added to the report.
+(*"R6-1 was right about my absolute"*, E5-21 refiled narrower); E6-14 defence paragraph added to the report. **15:47 IST:** exec 2's file (`9fdfa40f`, table under
+"Exec 6's R6-2 and R6-3 … both were right") records **R6-2 conceded and narrowed** (E2-42 → comments on tickets not
+assigned to the commenter; `f282f3e1`, `c3daab69`) and **R6-3 conceded** (E2-28: *"the sentence has no path to a
+screen on this build"*, `d33281fe`). All three refutations filed by this lane are conceded by their targets.
