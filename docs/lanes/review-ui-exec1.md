@@ -976,7 +976,17 @@ Chasing P26 I read the delta document's baseline — `desktop.dc.html@6d7b67c0a5
 
 **And the positive half belongs here too:** the delta document cites its baseline by **git blob sha**, which is strictly *more* checkable than the sha256 the round-2 brief asks lanes to use — `git rev-parse` resolves it, and a sha256 of a working-tree file resolves to nothing. **The document is better cited than the instruction reviewing it.**
 
-**The honest summary of this section: SIX instruments I wrote produced confident wrong answers, and every one was caught by a control rather than by reading the result harder.** They failed in **three different directions**, which is why "check the result" is not a remedy:
+### A seventh, and this one is a SAMPLE mistaken for a UNIVERSE — the most transferable mistake in the section
+
+**P21's measurement said no library sets a `role` attribute on the editor.** I grepped `prosemirror-view`'s `dist` and `@tiptap/react`'s `dist`, found no `textbox` in either, and reported the absence. **Both greps were accurate; the conclusion was false**, because the package that sets it is neither of them: **`@tiptap/core@3.30.5`, `dist/index.js:6453`, `attributes: { role: "textbox", ...editorProps?.attributes }`.**
+
+**I searched the packages I knew about rather than the dependency chain.** One grep over the right directory finds it — `node_modules/.pnpm/@tiptap+core@3.30.5*/dist` — and I never ran it, because I had already decided which packages could hold the answer. **The repository already said so too**, at `packages/editor/src/extensions/mention-popup.ts:61`: *"PROSEMIRROR ALREADY SETS `role=\"textbox\"` on the editor element — observed, not assumed"* — **in a file I had opened earlier in the same round and read past.**
+
+**And this one is the worst kind, because it hid behind a correction.** My first wording said *"no role"*; I corrected it to *"no role ATTRIBUTE, the role is implicit"*, which **sounded like diligence and was a differently wrong claim.** A correction that replaces one wrong statement with another is worse than the original, because it now carries the appearance of having been checked.
+
+**The transferable rule, since this is the seventh of seven: an absence claim needs its UNIVERSE enumerated, not its sample.** The six before this one were instruments that produced well-formed wrong answers; this one was a *search space* I chose and did not state. **Every absence claim in this report should be read with its search boundary beside it — and the ones that name a directory, a file set or a command in the same sentence are the ones I would trust.**
+
+**The honest summary of this section: SEVEN instruments I wrote produced confident wrong answers, and every one was caught by a control or by opening the artefact rather than by reading the result harder.** They failed in **three different directions**, which is why "check the result" is not a remedy:
 
 | instrument | what it would have produced | direction |
 |---|---|---|
@@ -985,6 +995,7 @@ Chasing P26 I read the delta document's baseline — `desktop.dc.html@6d7b67c0a5
 | `<Link>` blindness | one unstyled control **missed entirely**, and the report's count wrong | manufactured a **clean bill** |
 | `.next` build artefacts counted as source | P12 apparently falsified — a **true finding deleted** | manufactured **the opposite of itself** |
 | shell-mangled `grep -E` pattern (P26's `.workflow-list`) | 0 rules for a family that has 19 — a **false open row** | manufactured a **finding** |
+| a dependency chain searched as a sample (P21) | *"no library sets a `role`"* — a **false measurement inside an Important finding** | manufactured **the opposite of itself** |
 | a **git blob sha** read as a sha256 (the delta doc's baseline) | *"unverifiable, and not the authority"* — a **false finding against a document that is better cited than the brief reviewing it** | manufactured a **finding** |
 
-**A control is not a formality you run at the end — in this lane it was the only thing standing between six confident reports and the truth.** And note which controls worked: not one of them was a re-reading. Three were a **second instrument on the same path**, and one was asking whether the file I had measured was **in the repository at all**.
+**A control is not a formality you run at the end — in this lane it was the only thing standing between seven confident reports and the truth.** And note which controls worked: not one of them was a re-reading. Three were a **second instrument on the same path**, and one was asking whether the file I had measured was **in the repository at all**.
