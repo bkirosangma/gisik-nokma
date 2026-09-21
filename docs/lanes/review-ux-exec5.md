@@ -1330,6 +1330,12 @@ and counts the attribute, not its content, so `"Sign out "` passes it.
 **WHAT WOULD HAVE BEEN BETTER.** `name → email → id` at the hook — the `memberLabel` order the members page already
 uses — so every consumer moves together; or at least `user.name?.trim() || user.email || user.id`.
 
+**Corroborated at paint by another lane, after this was pushed (mine 12:29, theirs 14:08 IST):** exec 4's `E4-33`,
+signed in on its own stack as the seeded guest `accountant@e2e.gisik-nokma.local` (`name = ''`), measured
+`h1.gn-page-title.textContent === "Workspaces — "`, `aria-label === "Account menu for "`, and the `?` glyph with
+`title=""` — the three sites named above, independently. Attribution: that painting is theirs; the hook mechanism
+(`??` on `''`, both hooks) and the consent page's own record of it are what this finding adds.
+
 **MEASUREMENT.** `[SOURCE]` `providers.tsx:170-179`, `:206`; `mcp/authorize/page.tsx:44-66`; `members/page.tsx:635-638`;
 `workspaces/page.tsx:51`; `account-menu.tsx:142`, `:145`, `:150`, `:188`. Not painted: the owner's account carries a
 name (`[BROWSER]` earlier: `Workspaces — Kiro`, `Account menu for Kiro`), and I hold no email-sign-up session; the
@@ -1749,6 +1755,10 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   `archived` — and E5-34 is what the bar does on that page), `E2-39` (`workflow-builder-screen.tsx:72`
   `listMembers().catch(() => [])`), `E2-40` (`rule-engine/src/rules/require-field.ts:9` reads `input.ticket.fields[rule.field]`, never the payload — opened). **No
   falsifying measurement found in any of them.**
+- **Attacks on my findings recorded in other lanes' reports (14:15 IST):** exec 3 §41 *"A TENTH ATTACK, ACROSS
+  CONCERNS — `E5-6` (the UX lane) holds"*; exec 3's earlier attempt on `E5-3`, *"premise holds — not refutable"*.
+  exec 4's `E4-33` paints E5-37's population (their guest session) and describes the same three sites; exec 4 notes
+  E5-3/E5-4/E5-8 overlap with E4-1/E4-18/E4-19 and that *"their pushes came first"*. Nothing withdrawn.
 - **The two refutation files already pushed (read 12:42 IST):** `exec2/review-ux-r2:docs/lanes/review-refutations-exec2.md`
   — *"THIS FILE CONTAINS NO REFUTATION"*; it opened E5-1, 2, 3, 4, 6, 7, 12, 13, 17, 21 against the lines and records each
   as holding (E5-21 *"CORRECTED MY OWN E2-42"*). `exec6/review-functionality:docs/lanes/review-refutations-exec6.md` —
