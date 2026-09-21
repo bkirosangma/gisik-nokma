@@ -42,4 +42,25 @@ describe('NotificationsSection', () => {
     // the caller is what would flip it, by passing new props.
     expect(mentionRow).toBeChecked();
   });
+
+  /**
+   * 11.216 — RULING E5-13's component half. The page-level wiring (a failed
+   * read must never fabricate `{ mutedKinds: [] }`) is case 11.215 in
+   * `apps/web/test/account-page.test.tsx`; this is the component's own
+   * contract — every row disabled and the refusal stated — independent of
+   * the caller.
+   */
+  it('11.216 an error disables every row and states the refusal, rather than rendering a togglable guess', () => {
+    render(
+      <NotificationsSection
+        mutedKinds={[]}
+        onToggle={vi.fn()}
+        error="Your preferences could not be loaded"
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Your preferences could not be loaded');
+    for (const box of screen.getAllByRole('checkbox')) {
+      expect(box).toBeDisabled();
+    }
+  });
 });

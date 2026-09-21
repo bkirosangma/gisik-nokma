@@ -33,6 +33,7 @@ export default function AccountPage() {
   const { dataSource, notificationPreferences } = useAppServices();
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
@@ -68,17 +69,18 @@ export default function AccountPage() {
   }, [dataSource]);
 
   useEffect(() => {
-    // Same silent-omission treatment the Workspaces effect above gives a
-    // failed read, and the SAME reason: this is a convenience control, not
-    // `/account`'s primary content, so a refusal here should not block the
-    // rest of the page. `{ mutedKinds: [] }` here is NOT
-    // `EMPTY_NOTIFICATION_PREFERENCES` reused — that constant's own docblock
-    // (`packages/domain/src/notification-preferences.ts`) defines it as what
-    // a person who has NEVER SAVED a preference reads, which is a claim about
-    // their history. A failed read has no idea whether they ever saved one;
-    // the literal below merely renders every kind as on for this visit,
-    // without asserting that fact about the account.
-    notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }));
+    // RULING E5-13: unlike the Workspaces effect above, a failed read here
+    // does NOT collapse to a guessed document. `toggleKind` below PUTs the
+    // whole preferences document built from `prefs` — so a guessed
+    // `{ mutedKinds: [] }` standing in for "loaded" would let one toggle
+    // silently overwrite whatever the person actually had muted with a
+    // document built from a guess. `prefs` stays `null` (never loaded) and
+    // `prefsError` carries the refusal instead; `toggleKind`'s own
+    // `if (prefs === null) return;` guard then refuses to save on this path
+    // for free.
+    notificationPreferences
+      .load()
+      .then(setPrefs, () => setPrefsError('Your preferences could not be loaded'));
   }, [notificationPreferences]);
 
   useEffect(() => {
@@ -263,8 +265,12 @@ export default function AccountPage() {
           <ProfileSection name={user.name} email={user.email} onSave={saveName} />
         ) : null}
         <AppearanceSection />
-        {prefs !== null ? (
-          <NotificationsSection mutedKinds={prefs.mutedKinds} onToggle={toggleKind} />
+        {prefs !== null || prefsError !== null ? (
+          <NotificationsSection
+            mutedKinds={prefs?.mutedKinds ?? []}
+            onToggle={toggleKind}
+            error={prefsError}
+          />
         ) : null}
         {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
         {sessions !== null ? (

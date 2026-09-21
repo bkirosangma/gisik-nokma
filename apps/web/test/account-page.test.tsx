@@ -104,7 +104,17 @@ beforeEach(() => {
 
 function mount() {
   render(
-    <Providers services={stubServices({ getMyWorkspaces: async () => [] }, {})}>
+    <Providers
+      services={stubServices(
+        { getMyWorkspaces: async () => [] },
+        // A benign default, matching `listUserPasskeys`'s own precedent above:
+        // without it, every pre-E5-13 case in this file would drive the
+        // notification-preferences read against the unstubbed rejection and
+        // render the new `prefsError` alert (ruling E5-13) alongside whatever
+        // alert that case is itself asserting on.
+        { notificationPreferences: { load: async () => ({ mutedKinds: [] }) } },
+      )}
+    >
       <AccountPage />
     </Providers>,
   );
@@ -265,6 +275,46 @@ describe('AccountPage — Notifications', () => {
     await waitFor(() => expect(loadCalls).toBe(2));
     // Drawn from the reloaded answer: the optimistic mute did not stick.
     await waitFor(() => expect(screen.getByLabelText(/mentioned/i)).toBeChecked());
+  });
+
+  /**
+   * 11.215 — RULING E5-13, CRITICAL. Before this ruling, a failed read
+   * collapsed to `setPrefs({ mutedKinds: [] })` — every row rendered ON, and
+   * `toggleKind` would happily PUT that guessed document, silently
+   * overwriting whatever the person actually had muted. The corrected
+   * behaviour: the section renders disabled with a stated refusal, and no
+   * row is togglable, so nothing can be saved from a state nobody confirmed.
+   */
+  it('11.215 a failed preferences read disables every row and refuses to save, rather than guessing all-on', async () => {
+    const save = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load: async () => {
+                throw new Error('network error');
+              },
+              save,
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your preferences could not be loaded',
+    );
+    const mentionRow = screen.getByLabelText(/mentioned/i);
+    expect(mentionRow).toBeDisabled();
+    // Attempting a click on a disabled control is a no-op in the real DOM —
+    // asserted rather than assumed, so a regression that dropped `disabled`
+    // would show up as `save` having been called.
+    await user.click(mentionRow);
+    expect(save).not.toHaveBeenCalled();
   });
 });
 

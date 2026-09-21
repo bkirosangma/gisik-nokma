@@ -169,13 +169,12 @@ The invitation banner's restyle (flat `--gn-tint-warning` wash, no shadow, no ac
   list, not an enable list, so "everything on" needs no second constant kept in sync with the five
   kinds as they grow. A toggle click is optimistic — the row flips immediately, then reverts to the
   freshly-reloaded true state if the `save()` rejects — the same distrust `/inbox`'s own `markRead`
-  catch has for its optimistic flip. **A second named absence, alongside Your workspaces' above:** a
-  failed `load()` also collapses to a value indistinguishable from an honest empty answer
-  (`{ mutedKinds: [] }`, everything rendered on), for the same reason — a convenience control, not this
-  page's primary content — but it is deliberately NOT `EMPTY_NOTIFICATION_PREFERENCES`: that constant's
-  own docblock defines it as what a person who has *never saved a preference* reads, a claim about
-  their history a failed read has no standing to make; the literal is unlabelled precisely so it makes
-  no such claim. **Sign-in and devices, Sessions half (Task 7):** every active session
+  catch has for its optimistic flip. **RULING E5-13 (CRITICAL, closed):** a failed `load()` used to
+  collapse to a guessed `{ mutedKinds: [] }` — every row rendered ON — and `toggleKind` would PUT that
+  guessed document as the whole record, silently un-muting whatever the person had actually stored. It
+  no longer does: `prefs` stays unset on a failed read, the section renders every row **disabled** with
+  a stated refusal ("Your preferences could not be loaded"), and `toggleKind`'s own guard (it already
+  refused to act while `prefs` is unset) now means a click on this path cannot save. **Sign-in and devices, Sessions half (Task 7):** every active session
   `authClient.listSessions()` answers (better-auth's core session route, no plugin needed — confirmed
   against the installed `better-auth@1.7.2` client's generated types, which differ from the plan's own
   guess: `createdAt`/`updatedAt` come back as `Date` instances, not strings, because the client revives

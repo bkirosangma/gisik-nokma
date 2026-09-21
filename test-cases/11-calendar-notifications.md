@@ -312,9 +312,11 @@ matching `notifications.test.ts`'s own argument against a hand-written `HttpClie
 - **11.205** ✅ `NotificationsSection` renders one checked-by-default row per real kind, five rows — no invented "email" column, no "weekly digest" row, since neither exists server-side — (`packages/app-core/test/account/notifications-section.test.tsx`)
 - **11.206** ✅ A muted kind renders unchecked, and only that one — (`packages/app-core/test/account/notifications-section.test.tsx`)
 - **11.207** ✅ Clicking a row calls `onToggle` with that kind and does not flip local state itself — the component is controlled, owning no state of its own — (`packages/app-core/test/account/notifications-section.test.tsx`)
-- **11.208** ✅ The wiring witness: `/account` reads real preferences through `useAppServices().notificationPreferences` and renders the muted row unchecked — proof the seam carries a real answer through, which the page's own un-stubbed-rejects-to-all-on fallback (every other case in this file) cannot show — (`apps/web/test/account-page.test.tsx`)
+- **11.208** ✅ The wiring witness: `/account` reads real preferences through `useAppServices().notificationPreferences` and renders the muted row unchecked — proof the seam carries a real answer through, which the page's own un-stubbed-rejects-to-disabled fallback (every other case in this file, since ruling E5-13, `mount()`'s own default resolves it instead) cannot show — (`apps/web/test/account-page.test.tsx`)
 - **11.209** ✅ Toggling an unmuted row on `/account` flips it and calls `notificationPreferences.save()` with the expected next `mutedKinds` — the ONLY state update on the success path, so the flip standing is `toggleKind`'s own optimistic `setPrefs`, not an accident of the mock (coordinator review, 2026-09-15: `toggleKind`'s optimistic-flip-then-revert had zero coverage before this and 11.210) — (`apps/web/test/account-page.test.tsx`)
 - **11.210** ✅ A refused save reverts the optimistic flip once the reload settles — `load()` is called a second time (the `.catch()`'s reload firing, not the DOM settling on its own) and the row is drawn from that reloaded answer, so the optimistic mute does not stick — the same mechanism `/inbox`'s own `markRead` catch uses (case 11.147) — (`apps/web/test/account-page.test.tsx`)
+- **11.215** ✅ RULING E5-13, CRITICAL — a failed preferences read on `/account` disables every Notifications row and states the refusal, and a click while disabled never reaches `notificationPreferences.save()` — before this ruling the failed read guessed `{ mutedKinds: [] }` and one toggle would PUT it as the whole document, silently overwriting whatever was actually stored — (`apps/web/test/account-page.test.tsx`)
+- **11.216** ✅ `NotificationsSection`'s own half of E5-13: an `error` prop renders a `role="alert"` refusal and disables every checkbox, independent of the caller — (`packages/app-core/test/account/notifications-section.test.tsx`)
 
 ## Permanently unused id ranges
 
@@ -343,7 +345,8 @@ to backfill — see `test-cases/README.md`'s §9 precedent (Plan 7, 9.1–9.34) 
 
 - **11.196** ✅ The reporting scope guard's ONE exclusion, compensated: the in-app help content may say "burndown"/"velocity" — because the FAQ entry that raises them answers *"There are none, and that is a deliberate decision"* — and the case asserts the exclusion is not vacuous, that every hit is prose rather than code, and that the denial is still there — (`packages/app-core/test/reporting-scope-guard.test.ts`)
 
-**New cases continue from 11.215.**  
+**New cases continue from 11.217.** (11.215–11.216 minted 2026-09-21/22, ruling E5-13 — the
+notification-preferences failed-read fix, at the page and component levels respectively.)  
 *(11.210 was IN USE, at the Notification preferences section above (account/help-screens plan, Task 5's
 server half 11.197–11.200, Task 6's client half 11.201–11.210 — the last two, 11.209–11.210, added on
 2026-09-15 coordinator review to close a coverage gap in `toggleKind`'s optimistic-flip-then-revert
