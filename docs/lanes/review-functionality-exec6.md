@@ -493,9 +493,33 @@ job, or record the convention in one place the plans point at (*"prefix = previo
 `Date.now()`"*) — and make the checker say which of the two the file violated. Cheapest of all: refuse a prefix
 in the future in `check-migration-order.mjs`, which turns the convention into a rule.
 
-**MEASUREMENT.** `ls apps/server/migrations`; `git log --diff-filter=A --format=%cI -- <file>` per file; the
-`Date.now()` comparison above (time-bound — it reads `false` after 14:13:20Z on 2026-09-21); the dev-DB read in
-Appendix E. Lines opened: `check-migration-order.mjs:1-45`; `apps/server/package.json:11`; the three plan lines.
+**MEASUREMENT — primary, permanent.** For each rounded-prefix file, prefix instant vs first commit instant
+(`node -e 'console.log(new Date(<prefix>).toISOString())'` and `git log --diff-filter=A --format=%cI -- <file>`):
+
+| file | prefix names | first committed | prefix was |
+|---|---|---|---|
+| `1788600000000_mcp-device-auth` | 2026-09-05T09:20Z | 2026-09-08T01:44+05:30 | past |
+| `1788700000000_proj-projects-archived` | 09-06T13:06Z | 09-09T12:11+05:30 | past |
+| `1788800000000_proj-invites-declined` | 09-07T16:53Z | 09-09T13:21+05:30 | past |
+| `1788900000000_user-notification-preferences` | 09-08T20:40Z | 09-15T07:24+05:30 | past |
+| `1789100000000_proj-tickets-closed` | 09-11T04:13Z | 09-17T11:25+05:30 | past |
+| `1789200000000_proj-tickets-rank` | 09-12T08:00Z | 09-18T09:58+05:30 | past |
+| `1789400000000_workspace-settings-auto-close` | 09-14T15:33Z | 09-18T13:12+05:30 | past |
+| `1789500000000_proj-tickets-reopened-at` | 09-15T19:20Z | 09-18T14:31+05:30 | past |
+| `1789600000000_proj-projects-description` | 09-16T23:06Z | 09-19T17:17+05:30 | past |
+| `1789700000000_mcp-tokens-name` | 09-18T02:53Z | 09-19T18:40+05:30 | past |
+| `1789800000000_proj-tickets-deleted` | 09-19T06:40Z | 09-20T13:17+05:30 | past |
+| `1789900000000_proj-projects-prefix` | 09-20T10:26Z | (added under another name; `--diff-filter=A` empty) | — |
+| **`1790000000000_proj-ticket-comments`** | **09-21T14:13:20Z** | **09-20T22:20:51+05:30 = 16:50Z** | **21 h in the future** |
+
+So the prefixes are a counter stepping `1e11` per migration, not a clock — most are in the past by commit time
+and the latest is in the future by nearly a day. Whether the *next* one is above `Date.now()` at the moment a
+developer runs `node-pg-migrate create` depends only on how fast migrations land.
+
+**Measurement — dated illustration (expires 14:13:20Z on 2026-09-21):** `node -e 'console.log(Date.now() <
+1790000000000)'` → `true` at 04:46:45Z; the dev DB (Appendix E) had `1790000000000` applied at 02:50:18Z. Between
+those instants a clock-stamped migration is numbered below one already applied. Lines opened:
+`check-migration-order.mjs:1-45`; `apps/server/package.json:11`; the three plan lines.
 
 **SEVERITY: Minor.** Loud when it fails (refusal or boot abort), but a recurring, undocumented trap on the path
 the plans themselves document.
