@@ -1603,7 +1603,7 @@ than `replica.ts`'s — so the unfiltered statements the probe exercised are the
 `replica-data-source.ts:780-809`, `:983-996`, `:1027-1029`, `:1323-1366`; `replica.ts:1132-1152`,
 `:1186-1207`; `board-screen.tsx:15-40`, `:56-59`; `apps/desktop/src/app.tsx:140-153`; `git show 18d7e391 --
 packages/app-core/src/replica/replica-data-source.ts` (the whole diff: two hunks, both filters, nothing else);
-`executor-state-history.md:671-696`; `review-functionality-exec3.md:316-335` (F5).
+`executor-state-history.md:671-696`; `review-functionality-exec3.md:315-339` (F5).
 
 **SEVERITY: Important.** A feature's one promise ("stops appearing in views") broken on two of the three
 client shells, one line from fixed, with the commit's own message as the specification. Not Critical: the web
