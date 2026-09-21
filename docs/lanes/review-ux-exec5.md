@@ -557,7 +557,9 @@ control, it is theirs, and it shows the limit of a drawing-match: **the export c
 
 **WHAT.** `/workspaces` card for Convenience Corner: `1 project` + chip `1 archived` (`[BROWSER]`).
 `/account` → Your workspaces: `Convenience Corner · owner · 2 projects` (`[BROWSER]`). Wire: `GET /v1/me/workspaces`
-→ two projects, one `archived: true` (`[BROWSER]`).
+→ two projects, one `archived: true` (`[BROWSER]`). **The cause is two units under one word:** `/workspaces` counts
+live projects only and says "archived" separately; `/account` counts the whole array, archived included — and
+neither screen names its unit.
 
 **WHY.** `workspaces/page.tsx:259-264` counts `live = projects.filter(p => !p.archived)` and renders
 `projectCountLine(live.length)`; `apps/web/src/account/workspaces-section.tsx:76-77` renders
