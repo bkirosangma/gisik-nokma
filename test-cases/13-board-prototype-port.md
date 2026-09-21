@@ -1723,3 +1723,42 @@ person reaches for rather than as a hard failure.
 
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance, so
 there is no feature bullet to edit — recorded here rather than left as a silent omission.
+
+## Every board card's `who · when` disclosure meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1056`
+
+**The finding, round 2 `E4-3`, IMPORTANT, scored PARTIAL.** `button.gn-board-card__provenance`
+toggles the state-provenance line on each card. Measured on the board at 1512×900 against the product's
+own selector list (`tap-targets.ts:268-280`) and visibility filter: **24 instances** — one per card,
+`document.querySelectorAll('button.gn-board-card__provenance').length` → 24 and `.gn-board-card` → 24 —
+each **66×21**, `display: inline-block`. It is not the card's open control (`.gn-board__card-slot` is),
+so nothing larger performs its function and WCAG 2.5.8's *Equivalent* exception does not apply. The
+judge corrected the finding's "only sweep" absolute — `e2e-viewport/responsive.spec.ts:678` is a second
+`measureTapTargets` call — and the core held.
+
+### The case
+
+- ✅ **13.1056 — the rule declares the 24-px in-list floor, and `DENSE_IN_LIST` classifies it as
+  in-list.** `apps/web/test/tap-target-density.test.ts`. **Both halves are asserted together and for
+  the reason the table exists at all:** a floor in the CSS with no classification is judged at 44 the
+  day a sweep reaches the board, and a classification with no floor absolves a control that does not
+  meet 24. The extractor is `ruleHeads` — the same comment-stripped one the liveness check uses, not a
+  second copy — because `ui.css` is mostly prose and a selector merely discussed in a comment would
+  answer for a rule that had been deleted. `min-height` alone is the fix: the element is UA
+  `inline-block` (its rule sets no `display`), so a min size applies to it, unlike the `padding: 0` bare
+  buttons elsewhere in the file whose height is their line box. `ui.css` and `e2e-viewport/tap-targets.ts`
+  were each reverted to `HEAD` for the RED run and restored from sha256-compared backups.
+
+### ⚠ Clause (b) of the membership rule is UNMET, recorded rather than implied
+
+`tap-targets.ts`'s own membership rule requires **(a)** a CSS rule that makes the 24-px call in its own
+words **AND (b) a sweep that actually visits the route it renders on.** The board route **is** in the
+stack suite's accessible-name and type-scale loop, but **not** in its tap-target pass, which measures
+`/my-work` alone — round-2 finding **E4-12**. So this `DENSE_IN_LIST` entry is **declared but not yet
+exercised**, the same position `.gn-my-work__title` is already recorded in, and it is written in both
+the entry's own `why` and the CSS rule rather than left to read as covered. Closing it needs a second
+`measureTapTargets` call on the board route plus its baseline key, and the suite refuses to invent a
+baseline — it needs a live stack on `:3001`, which another lane owns. **Owner: whoever widens that pass
+(E4-12).** The conservative direction is guarded either way: an undeclared dense control is judged at
+44, which reddens loudly.
+
+**No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.

@@ -996,6 +996,30 @@ button.gn-ticket-sheet__crumb--link {
   cursor: pointer;
   padding: 0.2rem 0 0;
   text-align: left;
+  /* 24px, the WCAG 2.5.8 in-list floor, and NOT 44 (E4-3). This is the same
+     call `.gn-attention__title` above makes and for the same reason: it is a
+     bare text disclosure sitting on the card's meta line beside the progress
+     count and the assignee, and 44 would turn every card's meta row into a
+     slab. It is NOT the card's open control — `.gn-board__card-slot` is, and
+     it keeps `cursor: pointer` — so nothing larger performs this control's
+     function and the *Equivalent* exception does not apply.
+
+     Measured before this: 66x21 on all 24 cards of the board, with no
+     `min-width`/`min-height` anywhere in this rule (grep -> 0), i.e. the
+     glyph row was the target. `min-height` is the whole fix because the
+     element is UA `inline-block` (this rule sets no `display`), so a min size
+     applies to it — unlike the `padding: 0` bare buttons above, whose height
+     is their line box and which therefore need an `inline-flex` box too.
+
+     ⚠ THE SWEEP HALF IS DEFERRED, recorded rather than implied: the board
+     route is in `apps/web/e2e-stack/viewport.spec.ts`'s accessible-name and
+     type-scale loop but NOT in its tap-target pass, which measures
+     `/my-work` alone (round-2 finding E4-12). So the `DENSE_IN_LIST` entry
+     below is declared but not yet EXERCISED — the same position
+     `.gn-my-work__title` is recorded in. Closing it means a second
+     `measureTapTargets` call on the board route plus its baseline key, which
+     needs a live stack on :3001 that this lane does not own. */
+  min-height: 1.5rem;
 }
 /* Board prototype port Task 13 (2026-09-16), spec Board `:354-399`, "Move
    button" row: `min-height:32px; min-width:36px; ctlBg + ctlShadow; accent;
