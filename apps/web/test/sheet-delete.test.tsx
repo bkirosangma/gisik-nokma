@@ -205,11 +205,34 @@ afterEach(() => {
   vi.restoreAllMocks();
 });
 
+/**
+ * ⚠ ADDED BY RULING E2-35 (2026-09-21) — the delete is now TWO presses.
+ *
+ * The sheet's footer `Delete` performs the delete on one press when this file
+ * was written; it opens a confirmation now (`Dialog`, `BulkCloseDialog`'s shape,
+ * case `13.1183`). Every arm here clicks through it, and the helper is one place
+ * so the change of shape is stated once.
+ *
+ * **This file was MISSED when E2-35 landed, and the batch verification is what
+ * caught it** — the sheet's own suite was re-run and this call-site suite was
+ * not, so eight cases (the four `16.84` arms and the four `13.1180` ones) went
+ * red with `expected [] to have a length of 1`. A change to a component's
+ * interaction is a change to every suite that drives it, not only the one that
+ * owns the component.
+ *
+ * The confirm is queried by its own name: the SHEET is a `role="dialog"` too,
+ * so an unnamed query finds two.
+ */
+async function pressDelete(): Promise<void> {
+  await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+  await userEvent.click(screen.getByRole('button', { name: 'Delete ticket' }));
+}
+
 describe('the sheet footer’s Delete — the narration and the Undo, at the call site', () => {
   it('16.84 pressing Delete posts ticket.deleted and names the ticket in the toast', async () => {
     await openTheSheet();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
 
     await waitFor(() => expect(ingested).toHaveLength(1));
     expect(ingested[0]![0]!.type).toBe('ticket.deleted');
@@ -238,7 +261,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
   it('16.84 the Undo posts ticket.restored FOR THE ID IT WAS OFFERED', async () => {
     await openTheSheet();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
 
     await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
@@ -262,7 +285,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
   it('16.84 DISMISSING the toast does not restore — the Undo is the only way back', async () => {
     await openTheSheet();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
 
     await userEvent.click(screen.getByRole('button', { name: 'Dismiss' }));
@@ -293,7 +316,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     await waitFor(() => expect(listCalls).toBeGreaterThan(0));
     const before = listCalls;
 
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
 
     await waitFor(() => expect(ingested).toHaveLength(1));
     await waitFor(() => expect(listCalls).toBeGreaterThan(before));
@@ -323,7 +346,7 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
 
   it('13.1180 the delete puts a strip on the page naming the ticket', async () => {
     await openTheSheet();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
 
     const found = strip();
@@ -345,7 +368,7 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
     // deliberately does not touch.
     vi.useFakeTimers({ shouldAdvanceTime: true });
     await openTheSheet();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
     expect(strip()).not.toBeNull();
 
@@ -372,7 +395,7 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
     // The dismiss is not a second undo. Without this, a strip whose × was wired
     // to the restore would pass every case above.
     await openTheSheet();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
 
     await userEvent.click(
@@ -390,7 +413,7 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
     // states. This is the arm that proves the clear is keyed on the COMMIT and
     // not on the click: the harness's `ingest` answers committed.
     await openTheSheet();
-    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
 
     await userEvent.click(screen.getByTestId('deleted-undo-button'));
