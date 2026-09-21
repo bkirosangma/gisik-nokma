@@ -329,7 +329,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 | E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
 | E6-24 | Important | Phone board / desktop list / phone search keep a soft-deleted ticket; the replica filter sits on the two reads the shells never call | App. AF |
-| E6-25 | Minor | `deploy/do/{app.yaml,README.md}` say the forged-XFF bypass is "open on main" and `DATABASE_CA_CERT` "has no effect" until a fix lands; both landed the same morning | five calls + git in the finding |
+| E6-25 | Minor | `deploy/do/{app.yaml,README.md}`: four "until it lands" sentences (forged-XFF bypass "open on main", `DATABASE_CA_CERT` "no effect"/"not in the schema", seeds "once Task 11 lands") — all landed the day they were written | five calls + git in the finding |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1625,7 +1625,7 @@ floor; the defect and its one-line fix stand either way.
 
 ---
 
-### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)") and that `DATABASE_CA_CERT` "has no effect" until a fix lands; both fixes landed in one PR the same morning the sentences were written, and both files were edited since without the sentences moving
+### E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"), that `DATABASE_CA_CERT` "has no effect" and is "not yet in config.ts's zod schema", and that the seed scripts are still to land; all four landed the day the sentences were written, and both files were edited since without the sentences moving
 
 **WHAT.** `deploy/do/app.yaml:95-101`, the comment above `TRUST_PROXY: "true"`, verbatim: *"…lets a caller pick
 its own rate-limit bucket via a forged leftmost X-Forwarded-For entry — Plan 11 T2 (not yet on main) fixes
@@ -1658,7 +1658,14 @@ the function is at `apps/server/src/db.ts:50` and the pool is built from it at `
 (07:50) by blame, and the file was edited again at 19:41 that day (`003dfdc8`) with the sentence intact. An
 operator reading the deploy directory today is told that the CA they set does nothing and that the rate limiter
 can be forged around — two "until it lands" sentences whose "it" landed within seven hours of their being
-written. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
+written. **Two more in the same two files, same author-commit `56cd0913`:** `app.yaml:59-62` says `DATABASE_CA_CERT`
+is *"not yet in config.ts's zod schema … inert until [Task 1 lands]"* — it is at `apps/server/src/config.ts:212`,
+added by the same `935f5d66`; and `README.md:71` says to run the seed scripts *"once Task 11 lands them"* — the
+seed CLIs landed at 08:27 that morning (`de882483`, #154, `apps/server/src/seed/cli-seed-convenience-corner.ts`)
+and `docs/runbook.md:214` already gives the command. Four forward-looking sentences in a two-file deploy directory,
+all four resolved by 14:02 on the day they were written, none re-read by the two later edits. (The fifth
+forward-looking sentence, `app.yaml:112-117` on `OPTIONS` not being mounted on the auth catch-all, is still
+true: `auth/routes.ts` registers `method: ['GET', 'POST']` only.) (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
 Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
 a roster or a sweep (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`,
 `13-second-wave-roles-and-navigation.md:609`), `scripts/check-skipif-coverage.mjs:14` (verified still TRUE: `.github/workflows/ci.yml:454-492`'s `other-tests`
