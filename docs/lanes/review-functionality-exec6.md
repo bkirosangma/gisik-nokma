@@ -961,8 +961,10 @@ workflow, then reports the correct live row as drift.
 `docs/plan-3-chain-b-handoff.md:213-222` (*"Open question 11. Owner: UNASSIGNED, deliberately … the class that
 has bitten three projections in this series"*). The record dates from 2026-09-02 (`ac187e88`); the trigger became
 a shipped, ordinary admin act the next day — `ticket-type-editor-screen.tsx` and `workflow-rebind-dialog.tsx`
-were added in `9b70ab99` (2026-09-03) and the editor's Workflow `<Select>` (`:354-361`) submits exactly this
-event. Nothing has re-examined the question since.
+were added in `9b70ab99` (2026-09-03); the editor's Workflow `<Select>` (`:354-361`) feeds `onSave`
+(`:286-300`), which submits exactly this `ticket-type.defined` with no migration attached, and the screen's own
+heading for the result is *"Existing tickets stay where they are"* (`:476`) — the state the verifier then reports
+as drift is the state the editor names as the normal outcome. Nothing has re-examined the question since.
 
 **WHY it matters now.** The verifier is not a curiosity; it is the restore drill's pass condition.
 `docs/runbook.md:149-150`: *"`pnpm … run verify:projections` — the drill passes only on the clean line and exit
@@ -985,7 +987,7 @@ afternoon; leaving it UNASSIGNED with the trigger shipped is the choice this fin
 `../src/projections/index.js` relatively). Lines opened: `verify-projections.ts:34-68` (projection-outer
 rebuild, `EXCEPT` both ways); `ledger/event-store.ts:146-156` (replay order, documented); `projections/tickets.ts:37-53`;
 `docs/plan-3-chain-b-handoff.md:213-222`; `docs/runbook.md:149-150`, `:174-175`; `seed-cc.test.ts:429-432`;
-`ticket-type-editor-screen.tsx:354-361`; `git log --diff-filter=A` for the two editor files → `9b70ab99`.
+`ticket-type-editor-screen.tsx:286-300`, `:354-361`, `:476`; `git log --diff-filter=A` for the two editor files → `9b70ab99`.
 
 **SEVERITY: Important.** A release-facing instrument that reports a failure on a correct database after an
 ordinary admin act, recorded without an owner while its trigger shipped.
