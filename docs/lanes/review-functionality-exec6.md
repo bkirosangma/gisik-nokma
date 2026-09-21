@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical.** Twelve findings, nine Important, every one measured through a door the product ships. The recurring
+**No Critical.** Thirteen findings, ten Important, every one measured through a door the product ships. The recurring
 shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
 (E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
 republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
@@ -30,7 +30,7 @@ part-way while the client is told nothing moved (E6-10), an offline edit turned 
 user's own ticket (E6-5), and an invite form whose channels the door refuses (E6-9). The second shape is **a record
 that describes a world the product has left**: the in-app help denying `Delete` (E6-1), three ❌ cases declaring
 guest admissions closed weeks ago (E6-12), and a "named, not decided" residual whose own commit decided it
-(E6-11). The round-1 lane's coverage boundary was the map: all nine Important findings are in the packages or the
+(E6-11), and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an unassigned open question since before its trigger shipped (E6-13). The round-1 lane's coverage boundary was the map: all ten Important findings are in the packages or the
 paths it said it did not reach.
 
 ---
@@ -882,6 +882,57 @@ read the ticket they are refused on). Lines opened: `06-auth-visibility.md:93`, 
 **SEVERITY: Important.** By the precedent the judge set for exec3-F1: a closed security-relevant gap still
 declared open with a named owner. Filed as one finding for three lines because the mechanism is one.
 
+### E6-13 — IMPORTANT — `verify:projections` reports DRIFT on a correct database after an ordinary type re-bind, so the restore drill it gates fails for a false reason and a real drift becomes indistinguishable from the known one
+
+**WHAT.** Through the door, with the verifier run in-process (Appendix L; 1 file / 1 test passed):
+
+```
+before re-bind: verify-projections: clean — every projection matches its rebuild from the ledger
+re-bind custom type "feature" from WF1 to WF2 (ticket-type.defined through POST /v1/events; touches no ticket)
+live proj_tickets.workflow_id for T after re-bind: WF1 (unchanged — "a re-binding affects new tickets only")
+after re-bind: verify-projections: DRIFT DETECTED
+  proj_tickets: 1 row(s) missing from live, 1 extra in live
+  missing from live: {"ticket_id":<T>, … "type_id":"feature", "workflow_id":<WF2>, …}     ← the rebuild's answer
+```
+
+The live table is right by the owner's rule (`projections/tickets.ts:45-47`: *"the owner's own 'a re-binding
+affects new tickets only' (2026-08-26)"*); the verifier's shadow rebuild resolves the ticket's type **as of now**
+(`getTicketTypeLadderFromDb` takes no sequence number; `tickets.ts:37-40`) and so puts the old ticket on the new
+workflow, then reports the correct live row as drift.
+
+**This is recorded — as an unassigned open question, not a ruling.** `projections/tickets.ts:37-53` and
+`docs/plan-3-chain-b-handoff.md:213-222` (*"Open question 11. Owner: UNASSIGNED, deliberately … the class that
+has bitten three projections in this series"*). The record dates from 2026-09-02 (`ac187e88`); the trigger became
+a shipped, ordinary admin act the next day — `ticket-type-editor-screen.tsx` and `workflow-rebind-dialog.tsx`
+were added in `9b70ab99` (2026-09-03) and the editor's Workflow `<Select>` (`:354-361`) submits exactly this
+event. Nothing has re-examined the question since.
+
+**WHY it matters now.** The verifier is not a curiosity; it is the restore drill's pass condition.
+`docs/runbook.md:149-150`: *"`pnpm … run verify:projections` — the drill passes only on the clean line and exit
+0."* After the first type re-bind in a workspace, **every** backup fails the drill with `DRIFT DETECTED` on
+`proj_tickets`, and the operator has two choices: stop trusting the drill, or learn to read past a known false
+row — at which point a real drift on the same table (the class the docblock says has "bitten three projections")
+hides behind it. Case 13.87 (`seed-cc.test.ts:429-432`, *"verifyProjections is clean over the whole seeded
+world"*) stays green because the seed never re-binds a type, and 3.23 🧪 (*"verify clean … per release"*) is
+manual. So the instrument's one release-facing job is the input it cannot judge.
+
+**WHAT WOULD HAVE BEEN BETTER.** The handoff already names the fix and its cost (a history-bearing
+`proj_ticket_types`, i.e. an as-of lookup like the workflow one). Short of that, two honest options: (a) have the
+verifier **know** this class — when a ticket's live `workflow_id` disagrees with the rebuild only because the
+type's binding changed after the ticket was created (the ledger says which), report it as *"binding drift,
+expected"* rather than `DRIFT DETECTED`, so the clean line means what the runbook says; or (b) record in
+`runbook.md` that the drill is not clean after a re-bind and what the expected row looks like. Either is one
+afternoon; leaving it UNASSIGNED with the trigger shipped is the choice this finding argues against.
+
+**MEASUREMENT.** Appendix L, run from `apps/server` (imports `../src/tools/verify-projections.js` and
+`../src/projections/index.js` relatively). Lines opened: `verify-projections.ts:19-56` (projection-outer
+rebuild, `EXCEPT` both ways); `ledger/event-store.ts:135-156` (replay order, documented); `projections/tickets.ts:37-53`;
+`docs/plan-3-chain-b-handoff.md:213-222`; `docs/runbook.md:149-150`, `:174-175`; `seed-cc.test.ts:429-432`;
+`ticket-type-editor-screen.tsx:354-361`; `git log --diff-filter=A` for the two editor files → `9b70ab99`.
+
+**SEVERITY: Important.** A release-facing instrument that reports a failure on a correct database after an
+ordinary admin act, recorded without an owner while its trigger shipped.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -983,9 +1034,9 @@ the table.
 | severity | count | members |
 |---|---|---|
 | Critical | **0** | — |
-| Important | **9** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12 |
+| Important | **10** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13 |
 | Minor | **3** | E6-6, E6-7, E6-11 |
-| **total** | **12** | E6-1 … E6-12, no gaps in the numbering |
+| **total** | **13** | E6-1 … E6-13, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -2359,6 +2410,148 @@ describe('exec6 probe: the guest admissions cases 6.51 / 6.77 assert', () => {
     say('guest: ticket.created', await post(WS, { kind: 'ticket', id: newUlid() }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'by guest' }, peerId, peerToken));
     say('guest: comment.added on the shared ticket', await post(WS, { kind: 'ticket', id: T }, 'comment.added', { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'hi' }] }] } }, peerId, peerToken));
     say('guest: visibility.set on the shared ticket -> workspace', await post(WS, { kind: 'ticket', id: T }, 'visibility.set', { ticketId: T, mode: 'workspace' }, peerId, peerToken));
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix L — probe for E6-13 — the verifier after a type re-bind
+
+File path in the tree: `apps/server/test/zz-exec6-probe-verify.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-verify.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A. (The first two runs of this file were refused `malformed-envelope … entity.id:
+must be a ULID` because I had addressed the `ticket-type.defined` event to the slug; the builder mints a fresh ULID
+per submission — `workflow-builder/events.ts:59-64` — and so does this file now.)
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does verify-projections report DRIFT on a correct live table after a custom type is re-bound to another workflow through the door?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+import { buildProjectionRegistry } from '../src/projections/index.js';
+import { verifyProjections, formatReport } from '../src/tools/verify-projections.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: verify-projections after a type re-bind', () => {
+  it('records the verifier verdict before and after', async () => {
+    const out: string[] = [];
+    const projections = buildProjectionRegistry();
+    const wf = await db.pool.query<{ workflow_id: string }>("SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = 'task'", [WS]);
+    const WF1 = wf.rows[0]!.workflow_id;
+    const WF2 = newUlid();
+    const def = { id: WF2, version: 1, name: 'Second', initialStateId: 'todo',
+      states: [{ id: 'todo', name: 'To do', category: 'open' }, { id: 'done', name: 'Done', category: 'terminal' }],
+      transitions: [{ from: '*', to: 'todo', rules: [] }, { from: '*', to: 'done', rules: [] }] };
+    expect((await post(WS, { kind: 'workflow', id: WF2 }, 'workflow.defined', def, ownerId, ownerToken)).status).toBe('committed');
+    // A custom type bound to WF1, one ticket of it.
+    const FEAT = { id: 'feature', name: 'Feature', icon: 'flag', rank: 2, workflowId: WF1, fields: [] };
+    const r0 = await post(WS, { kind: 'ticket-type', id: newUlid() }, 'ticket-type.defined', FEAT, ownerId, ownerToken);
+    expect(r0.status, JSON.stringify(r0)).toBe('committed');
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'feature', projectId: PRJ, parentId: null, title: 'born on WF1' }, ownerId, ownerToken)).status).toBe('committed');
+    const before = await verifyProjections({ pool: db.pool, projections });
+    out.push(`before re-bind: ${formatReport(before).split('\n')[0]}`);
+    // Re-bind the type to WF2 through the door (what the type editor's Workflow select submits), touching no ticket.
+    expect((await post(WS, { kind: 'ticket-type', id: newUlid() }, 'ticket-type.defined', { ...FEAT, workflowId: WF2 }, ownerId, ownerToken)).status).toBe('committed');
+    const live = await db.pool.query<{ workflow_id: string }>('SELECT workflow_id FROM proj_tickets WHERE ticket_id = $1', [T]);
+    out.push(`live proj_tickets.workflow_id for T after re-bind: ${live.rows[0]!.workflow_id === WF1 ? 'WF1 (unchanged — "a re-binding affects new tickets only")' : 'WF2'}`);
+    const after = await verifyProjections({ pool: db.pool, projections });
+    out.push(`after re-bind: ${formatReport(after).replace(/\n/g, ' | ').slice(0, 700)}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
