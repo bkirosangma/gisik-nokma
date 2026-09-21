@@ -3956,3 +3956,44 @@ the cross-document consistency this report keeps finding absent elsewhere. **Ver
 **§3 has produced no finding.** Fifty-six of its 68 candidate countable bullets remain unchecked, and the
 running count of wrong numbers I have produced inside §3 stands at **nine against twelve clean claims** — a ratio
 I am reporting rather than hiding, because it is the reason every count in this report names a control.
+
+## 62. Round 2 — §3 reaches fourteen checks, one more wrong number of mine, and a candidate I declined on the code's own words
+
+### 62.1 `Features.md:349` — *"`SyncStorage` (`run`, `all`, `transaction`, `close`)"*. **Four exactly — and my parse said three.**
+
+`packages/sync-client/src/storage/storage.ts` declares the interface with **four** members: `run`, `all`,
+**`transaction<T>(fn: (tx: SyncStorage) => Promise<T>): Promise<T>`**, and `close`. **My first count said 3 and I
+had the mismatch written down**; the missing member is the **generic** one, and my member pattern required a name
+followed immediately by `?`, `:` or `(`, so `transaction<T>(` never matched. **The tenth wrong number I have
+produced this round, and the third from the same root: a pattern that reads one spelling of an identifier and
+reports a set.** `transaction` is implemented in `better-sqlite3.ts:27` and covered by the conformance suite
+(`conformance.ts:31` commits atomically and rolls back on throw; `:47` serialises concurrent transactions).
+**Verified clean.**
+
+### 62.2 `Features.md:119` — *"over the four routes Plan 4 Task 14 shipped"*. **Four exactly, and the withdraw I went looking for is deliberately not a route.**
+
+`apps/server/src/routes/invites.ts` registers **four** routes — `POST /v1/workspaces/:workspaceId/invites`,
+`GET /v1/invites/:token`, `POST /v1/invites/:token/accept`, `GET /v1/workspaces/:workspaceId/invites`. **Two of my
+instruments missed them first:** a `\.(get|post|…)\s*\(` pattern finds nothing because every registration is
+written `app.post<{ Params: … }>(…)` — **the same generic-signature blindness that produced §62.1 in the same
+command, one file apart.**
+
+**And then I nearly filed a finding on the four capability words.** The bullet names *"minting, holding, accepting,
+withdrawing"* — and there is **no withdraw route**. It is not a defect, and the code says so in its own words:
+`packages/app-core/src/online/invites-admin.ts:79` — *"**Withdrawing an invitation is `invite.revoked`, an
+ordinary registered domain event**"* — and `online/index.ts:26` names it *"a withdraw that is **deliberately NOT
+there**"*. Withdrawal ships over the ordinary `/v1/events` door, by decision, with the reasoning recorded. **A
+bullet pairing four capabilities with four routes and delivering one of them over a different door is a sentence
+I could have read ungenerously; the code states the intent, so it does not survive as a finding.** Verified clean.
+
+### 62.3 §3 at fourteen, and the instrument record
+
+**Fourteen countable claims checked in §3, all fourteen exact** (§54.1–54.3, §55, §59.1–59.2, §60.1–60.2,
+§61.1–61.2, §62.1–62.2). **No finding in §3.** Fifty-four of its 68 candidate countable bullets remain unchecked.
+
+**And the round's running count of wrong numbers I have produced is TEN, against fourteen clean §3 claims.** Three
+of the ten came from one root — **a pattern that reads a single spelling and reports a set** — appearing as a
+badge spelling in a `Features.md` count (§54.1), a JS-shaped test pattern over a Python file (§56.2), a grammar
+without type arguments (§62.1), and a prose mention of a DDL keyword counted as DDL (§54.3). **That root is the
+same one every finding in `§16` names, and finding it in my own instruments ten times is the strongest evidence
+this report offers that the defect class is real and not a stylistic complaint.**
