@@ -4235,7 +4235,9 @@ events) unmoved; the frozen text's failure to cite `http-origin.ts:128-146` reco
 doubtful remedy is not a false finding"*) and adds the sharper reading, which I adopt rather than resist: on a
 guest's replica a parent that exists but was never delivered is indistinguishable from one that never existed, so
 `reconcile`'s `restricted` is *right* for the first and an existence claim for the second — the divergence from the
-online read's `null` (`routes/tickets.ts:400-404`, opened this session in exec 6's citation) stands as measured.
+online read's `null` stands as measured — both opened this session: `routes/tickets.ts:399-404` (*"claiming a
+restricted parent would invent one"* → `parent = null`) and `replica-data-source.ts:1164-1175` (*"the conservative
+arm is the one that claims LESS"* → `{ kind: 'restricted' }`).
 Nothing in the finding depends on the remedy sentence.
 
 ### 67.4 `E3-8` — filed Low, and the exposure is stated (15:25 IST)
