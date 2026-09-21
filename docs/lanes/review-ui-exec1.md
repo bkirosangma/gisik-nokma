@@ -371,6 +371,35 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **WHAT WOULD HAVE BEEN BETTER.** One of: regenerate the repo copy from the export byte-for-byte and record the sha in `interactive/PROVENANCE.md` (which is that directory's own stated job — *"the owner export each file was unpacked from, its sha256, and the one command that reproduces it"*); or, if the camelCased copy exists for a reason, say so where it is cited and stop treating it as the prototype. Either way the fix is at the artefact, not in the 71 files.
 
+### P16 — **IMPORTANT** ⚠ **r2 NEW** — One styling case asserts the ABSENCE of a declaration through a scanner that truncates multi-line rules, so it cannot fail when the thing it guards returns
+
+**WHAT.** `apps/web/test/neo-card-radius.test.ts` guards that no page-specific literal radius competes with `.gn-card`'s token. Its third case asserts `expect(rule?.includes('border-radius')).toBe(false)`. The `rule` it tests comes from a **single-line** scanner, so a declaration written on its own line is invisible to the assertion and the case stays **green with the literal radius present**.
+
+**MEASUREMENT — the scanner reproduced exactly, then run on a rule that sets the very thing the case forbids:**
+
+```
+const ruleFor = (css, re) => css.split('\n').find((l) => re.test(l) && l.includes('{'));
+ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)   //  => ".gn-sign-in {"
+```
+`"…{".includes('border-radius')` is `false`, so `expect(…).toBe(false)` **passes while `border-radius: 3px` is in the rule.** The case cannot fail under that precondition. The scanner is `apps/web/test/neo-card-radius.test.ts:35`; the assertion is `:53-56`.
+
+**AND IT IS THE ODD ONE OUT IN ITS OWN FAMILY, which is what makes it a finding rather than a style note.** I checked every content assertion in the four files still using the single-line scanner:
+
+| file | its content assertion | on a multi-line rule |
+|---|---|---|
+| `workspace-list-role-pin.test.ts:53` | `expect(rule).toMatch(/font-size:\s*0\.8rem/)` | **RED** — loud, safe |
+| `workspace-restricted-spacing.test.ts:54,60` | `expect(rule).toMatch(/margin…/)` | **RED** — loud, safe |
+| `ui/test/tokens.test.ts:188` | `expect(rule).toContain('font-family: …')` | **RED** — loud, safe |
+| **`neo-card-radius.test.ts:55`** | **`expect(rule?.includes('border-radius')).toBe(false)`** | **GREEN — silent** |
+
+**The three siblings fail loudly because they assert a declaration is PRESENT; this one fails silently because it asserts one is ABSENT.** A truncating scanner is safe for a positive assertion (it goes red) and unsafe for a negative one (it goes green) — and that asymmetry is the whole finding.
+
+**AND THE FIX IS ALREADY IN THE REPO.** Five sibling files moved to a multi-line scanner that returns the whole rule body: `members-styling.test.ts:61-70` (`findIndex` on the selector, then to the matching `}`), and the same shape in `attention-styling.test.ts`, `settings-shell-tokens.test.ts`, `workspaces-invitation-banner.test.tsx` and `sign-in-neo-restyle.test.ts`. `members-styling.test.ts`'s own docblock gives the reason and names this file: *"`neo-card-radius.test.ts`'s single-line version truncates every rule in the members family, whose declaration each sit on their own line."* **So the migration happened, this file was named in the migration's rationale, and it was not migrated.**
+
+**⚠ AND THE PRECONDITION, STATED SO THE CLAIM IS NOT INFLATED.** `.gn-sign-in`'s rule is **single-line today** (`globals.css:2081`), so the case currently passes **for the right reason** — I verified the rule body contains no `border-radius`. This is a latent hole, not a live false green: it needs the rule to be reformatted first. I file it Important rather than Critical on that basis, and record that the three siblings' equivalent holes are loud.
+
+**WHAT WOULD HAVE BEEN BETTER.** Use the multi-line scanner the five siblings share — or, better, put it in `test/helpers/` so there is one scanner rather than nine. `members-styling.test.ts:56-58` already records that no shared CSS-scan helper exists and that the shape is duplicated *"rather than imported"*, which is the condition that produced this asymmetry.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -420,7 +449,7 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 8**
+**IMPORTANT — 9**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` seven interactive controls styled by no rule at all (raw UA chrome)
@@ -439,10 +468,11 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 - `P7` desktop's task list has no rules
 - `P8` `Dialog`/`Sheet` declare `aria-modal="true"`; the missing containment is recorded as a named follow-on whose remedy exists in-repo (counted here, not under IMPORTANT — see the note)
 - `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
+- `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P10` the accessible-name ratchet's unit is an attribute; its message claims a property of assistive tech
 - `P13` no skip link; a keyboard-only user Tabs the nav on every navigation (WCAG 2.4.1)
 
-**Total 19.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 20.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
