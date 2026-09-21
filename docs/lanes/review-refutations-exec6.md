@@ -52,6 +52,24 @@ E6-8, E6-9, E6-11: all "hold") read; E3-25, E3-26, E3-27 re-measured below.
   measures three sibling reads — the ones `apps/mobile` and `apps/desktop` actually call — with no rule at all
   (Appendix AF, five reads before/after, positive control). A case that says the rule is applied is not a record
   that it is missing, and the commit that wrote the two gates says "a filter at every view-serving read".
+- **E6-10** — "per-event transactions are the design; a partial batch is what 7.45 promises." Answer: the finding is
+  not that the batch is per-event; it is that the CLIENT is told "refused" while k tickets moved (Appendix I prints
+  both the server's per-ticket rows and the client's single sentence), and that the docblock's "pre-flight
+  refusals append nothing" is true of the pre-flight and false of the gate that runs after it.
+- **E6-17** — "the assignee is checked against the roster somewhere." Answer: Appendix O commits `ticket.assigned`
+  with a fresh ULID and with the string `nobody-here` through `POST /v1/events` (controls: a member commits; the
+  board renders the string). If a refuter names the line that checks the roster, it must also explain the commit.
+- **E6-19** — "`IST_DAY_REGEX` is documented as shape-only." Answer: agreed and cited (`ist-day.ts:27`); the finding
+  is what the product then DOES with an impossible day — Appendix W commits `2026-02-30`, `2026-13-45`,
+  `0000-00-00` and the attention read prints "Needed by 0000-00-00". A documented parse bound is not a ruling that an
+  impossible day is a valid claim.
+- **E6-20** — "P15 was scoped to `displayName`." Answer: P15's sentence is general ("a name of only spaces names
+  nothing"), the finding lists which schemas got the refinement and which did not (`min(1)` only), and Appendix X
+  commits a state named `" "` that becomes a board column. Filed Minor for exactly the scoping objection.
+- **E6-21** — "leaving a workspace was never a product feature." Answer: the export's privacy copy promises it,
+  `http-origin.ts:180-181`'s exclusion reasoning ("a workspace they can leave") assumes it, and Appendix Y measures
+  that a member's and a guest's self-revocation are refused while an admin's revocation of them commits (the
+  control). With E3-14's forced join, the absence is what makes that join permanent — which is why it is Important.
 - **E6-25** — "comments in a deploy file are not the product." Answer: filed Minor for exactly that reason; the
   class (a record declaring a closed gap open) is the one the judge priced in round 1 (E3-1) and exec 3 re-files
   six times this round (E3-22 … E3-27); two of the six sentences are security claims an operator acts on, and every
