@@ -30,3 +30,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B10-ids | allocated | 2026-09-21 22:0x | controller (Fable): section-13 case ids are per RELEASE BATCH; B10 owns 13.1137-13.1156. The earlier self-declared reservation 13.1054-13.1073 is SUPERSEDED. |
 | B10-ids | renumbered | dbd2d08a528d93bcc5c7abe73d50f2b80b4d49c9 | all 14 section-13 ids this batch had minted, into the allocated block; count unchanged at 2625 |
 | T-E4-10 | done | 3d5896e75cbffee1512a7496edb3e415c3b5b5b5 | authoring-routes.test.tsx (13.1150) 9/9; web 643; first green was a FALSE RED from a stale app-core dist |
+| T-E4-26 | done | 07d10ccabfd8eb35bd9caa8a9876b3d2bef644ec | ticket-list-css-binding.test.tsx (13.1151) 14/14; ui 420, app-core 1725, web 643; spacer bound + declarationsFor fixed; DENSE_IN_LIST half deferred |
