@@ -1417,7 +1417,8 @@ describe('E4-11 — the workspace links sit behind one disclosure', () => {
     );
     expect(screen.queryByRole('button', { name: 'Menu' })).not.toBeInTheDocument();
     // The bar is still the bar: the always-items render, so this is the gate
-    // answering "no" rather than the component failing to mount.
-    expect(screen.getByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    // answering "no" rather than the component failing to mount. Signed out,
+    // the always-item is the bar's own `Sign in` (E5-31, B11), not `Workspaces`.
+    expect(document.querySelector('nav.gn-nav a.gn-nav__signin')).toHaveTextContent('Sign in');
   });
 });

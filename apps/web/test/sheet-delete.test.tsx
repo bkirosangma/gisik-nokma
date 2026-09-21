@@ -269,6 +269,9 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     await openTheSheet('GH-1183');
 
     await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    // E2-35 (B13): Delete asks first; the key arm is about the toast AFTER the
+    // confirmed delete, so press through the confirm the way the helper does.
+    await userEvent.click(await screen.findByRole('button', { name: 'Delete ticket' }));
 
     await waitFor(() => expect(ingested).toHaveLength(1));
     await waitFor(() =>
