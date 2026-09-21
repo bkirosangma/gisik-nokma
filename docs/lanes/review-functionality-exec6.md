@@ -254,7 +254,7 @@ the toast, after which the Delete PR's own list says *"there is no UI that emits
 becomes permanent in practice"*, `executor-state-history.md:687-691` — a sentence a user needs more than any other
 on this page), rewrite
 `faq.md:220-222` to answer *yes* and point at the undo, and drop the `faq.md:982` "unknown" bullet. The
-prototype's own `faq-delete` entry (export `Gisik Nokma - Desktop.dc.html`, sha `3d142d46`) is the model:
+prototype's own `faq-delete` entry (export `Gisik Nokma - Desktop.dc.html`, sha `3d142d46`, `:2082`, under *"What happens when I delete something"*) is the model:
 *"The ticket stops appearing in views. Its history is retained, because other events cite it."*
 
 **MEASUREMENT.**
