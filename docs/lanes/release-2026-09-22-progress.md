@@ -12,3 +12,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P9 | done | 303720e458759f5361298022f392db5ccebbf298 | components.test.tsx P9 x4 |
 | T-P8 | done | cf7ee59ab84197edd42fe884ef168ae5126348de | components.test.tsx P8 x4 |
 | B12 | claimed | 2026-09-21 21:17 | /Users/kiro/my_projects/gisik-nokma-exec2 |
+| T-E3-19 | done | 0970a58c98b4ed93d7417a8f6b7afbab39454f06 | parent-terminal-symmetric.test.ts (8) + precheck.test.ts gate 5 (5) |
