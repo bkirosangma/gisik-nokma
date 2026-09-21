@@ -1107,7 +1107,7 @@ on the ticket (`check-permission.ts:1048`); nothing asks whether the **named** u
 — the roster is one `resolveEffectiveRole` away and the gate already holds `ctx.db`. The read side then serves
 the string: `mappers.ts:546` `name: roster.get(id) ?? id` renders `nobody-here` as an assignee name, the list's
 `assigneeId` filter matches it, and `groupBy=assignee` will make a group for it. The MCP `assign_ticket` tool
-forwards any `assigneeId: z.string().min(1)` (`write-tools.ts:172`), so an agent typo becomes a permanent,
+forwards any `assigneeId: z.string().min(1)` (`write-tools.ts:173`), so an agent typo becomes a permanent,
 attributed claim naming nobody. The nearest recorded case, 7.27, is about a *member* who cannot see the ticket
 (read-side withholding); there is no case for a name that is not a person (`grep -rniE 'non-?member|not a
 member|any string' test-cases/{05,06,07,14,16}-*.md` → none about assignment).
