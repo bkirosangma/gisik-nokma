@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.070`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.071`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -299,3 +299,22 @@ absence-assertions that used it now name their own page's copy.
 
 The `401` arm is untouched: `expired-session.tsx` routes it to the sign-in notice, deliberately, and the
 panel never renders it.
+
+## The single row's failure speaks in the ROW's vocabulary — case `17.071` (E2-26, 2026-09-21)
+
+**Why this case is in §17 and not beside E5-10's in §13.** E2-26 and E5-10 name the same lines
+(`apps/web/app/inbox/page.tsx:278`, `:269-279`) and were judged to score independently. The FIX landed
+with E5-10; §13's B09 block (`13.1110`–`13.1119`) is spent, so this case is minted from this batch's §17
+allocation. It records the property the fix turns on that E5-10's case does not assert.
+
+**⚠ THE FINDING'S OWN REMEDY WAS "REUSE THE SAME TWO SENTENCES THE BULK PATH ALREADY HAS — one fact, one
+vocabulary, no new copy", AND THIS CASE ASSERTS THE OPPOSITE ON PURPOSE.** The bulk pair says *"Those
+notifications were not marked read"* — a plural, about a set. Said about ONE row it is a second false
+statement laid on top of the missing one: the reader clicked one row and is told about several. So the row
+has its own pair (`ROW_REFUSED_COPY`/`ROW_UNREACHED_COPY`), and the deviation is stated at the constant,
+in the case, and in the commit rather than made silently. **The disagreement is with a reviewer's
+suggestion, not with the finding's substance** — the substance, that the failure was silent, is closed.
+
+- **17.071** ✅ The row renders its OWN sentence and the bulk path's is absent — both halves asserted,
+  because a page rendering the bulk sentence would satisfy a check that only looked for "a sentence".
+  — (`apps/web/test/inbox-bulk.test.tsx`)

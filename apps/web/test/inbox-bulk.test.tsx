@@ -323,3 +323,35 @@ describe('13.1118/13.1119 the single-row reads and the Undo, which spoke to nobo
     expect(await screen.findByText(UNDO_FAILED_COPY)).toBeInTheDocument();
   });
 });
+
+describe('17.071 the single row’s failure speaks in the ROW’s vocabulary (E2-26)', () => {
+  /**
+   * 17.071 — E2-26, filed independently of E5-10 against the same lines
+   * (`inbox/page.tsx:278`, `:269-279`) and judged to score alongside it. The fix
+   * landed with E5-10; what this case adds is the property that fix turns on and
+   * that E5-10's case does NOT assert.
+   *
+   * **The finding's own remedy was "reuse the same two sentences the bulk path
+   * already has — one fact, one vocabulary, no new copy", and this case asserts
+   * the opposite on purpose, so the deviation is visible rather than silent.**
+   * The bulk pair says *"Those notifications were not marked read"* — a plural,
+   * about a set. Said about ONE row it is a second false statement laid on top of
+   * the missing one: the reader clicked one row and is told about several. So the
+   * row has its own pair, and this case pins BOTH halves of that choice — the
+   * row's sentence present, the bulk's absent.
+   */
+  it('17.071 the row says “That notification”, never the bulk path’s “Those notifications”', async () => {
+    renderInbox(THREE_UNREAD, async (ids) => [...ids], async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    const rows = await screen.findAllByRole('button', { name: /Renew the DLT registration/ });
+    await userEvent.click(rows[0]!);
+
+    expect(await screen.findByText(ROW_UNREACHED_COPY)).toBeInTheDocument();
+    // THE HALF THAT MAKES THIS A DIFFERENT CASE FROM E5-10's: the bulk sentence
+    // is the one the finding asked for, and it must NOT be the one rendered.
+    expect(screen.queryByText(BULK_UNREACHED_COPY)).toBeNull();
+    expect(screen.queryByText(BULK_REFUSED_COPY)).toBeNull();
+  });
+});
