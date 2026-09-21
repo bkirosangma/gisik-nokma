@@ -128,3 +128,4 @@ Defence paragraphs are dated and sit under the finding in `review-ui-exec1.md`; 
 - 16:20 — cadence push: heads `exec2` `ce513982`, `exec3` `c64e1268`, `exec4` `0fdd9382`, `exec5` `fee03f0e`, `exec6` `0ba581d4` — every lane on heartbeat pushes; no refutation of an exec-1 finding on any branch.
 - 16:36 — cadence push: heads `exec2` `4f2793d3`, `exec3` `9a8e57f3`, `exec4` `0fdd9382`, `exec5` `2daa4007`, `exec6` `e0cac297` — heartbeats only; no refutation of an exec-1 finding on any branch.
 - 16:52 — closing state written (above, §0). Heads: `exec2` `471a657c`, `exec3` `4b0f0033`, `exec4` `fe35c41b` (closed at 16:40, nothing filed), `exec5` `81cc041c`, `exec6` `b32c796e`.
+- 17:00 — final poll: heads `exec2` `84ce91d6`, `exec3` `58d88d6b`, `exec4` `fe35c41b`, `exec5` `67a33066`, `exec6` `c14c8a05`; the 4-minute watcher ran 15:47–16:59 and ended with no refutation aimed at exec 1. Closing state in §0 stands unchanged.
