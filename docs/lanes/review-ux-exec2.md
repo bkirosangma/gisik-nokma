@@ -1437,6 +1437,57 @@ coverage list as instructed. **Severity: Important.**
 
 ---
 *Batch 9 filed. Running total of round-2 new findings: `E2-20`–`E2-46` (27) — 17 Important, 10 Minor.*
+# R2.20 — NEW FINDING, BATCH 10
+
+### E2-47 (r2) — MINOR · The ticket sheet's own symbol sweep names three unwired exports and misses a fourth, whose docblock hands its correctness gap to a caller that does not exist
+
+**WHAT.** `packages/app-core/src/views/ticket-sheet.tsx:891-899` records a measured sweep:
+
+> *"The claim is COMPOSED elsewhere already: `packages/editor/src/drive/attachment-claims.ts` exports
+> `composeUploadAttachmentAdded` and `composeDriveReferenceAdded`, both tested. **Neither has a production
+> caller** — the symbol sweep returns their tests, their export and one docblock citation, and nothing else —
+> **and neither does `EvidencePicker`**, the other path that would emit one. Mobile has no wiring for the
+> event at all. So the code to make a claim existed and was never reachable from a screen."*
+
+**A fourth export in that family is not named: `transitionRequiresEvidence`.**
+`packages/editor/src/attachments/require-evidence.ts:61`, exported from the package barrel
+(`packages/editor/src/index.ts:66`). A walk of every `.ts`/`.tsx` under `apps/` and `packages/` outside `dist/`
+and tests returns **zero production callers** — its only non-test mentions are its own declaration, the barrel
+export and the compiled copies in `dist/`. ⚠ **The one apparent hit, `ticket-sheet.tsx:897`, is the docblock
+text above** — I checked it because a grep hit that is prose reads exactly like a call site.
+
+**WHY it is wrong, and why the fourth one matters more than the three that are named.** Its docblock is
+explicit that it does **not** reproduce the engine's state resolution — it matches the `fromStateId` the
+caller hands it verbatim, where the engine folds the ticket's state through every published `stateMapping`
+first (`transition.ts:60`, `:92`) — and it prices both failure directions: a false `true` prompts for evidence
+a live edge does not require, and a false `false` **"skips the prompt a live edge does require, which the
+server then refuses on submission for lack of `evidenceAttachmentId`"**. It then hands that gap onward:
+*"closing it means folding the state id here too, which is **this function's caller's business** (whoever
+wires it to a ticket's live state)"*. **That caller does not exist.** So a documented correctness gap is
+assigned to an owner who is not in the building, in a file whose three siblings were swept and named and this
+one was not — which is the shape where a gap reads as *tracked* precisely because a sweep was run nearby.
+
+**WHAT WOULD HAVE BEEN BETTER.** Two answers, both one line: **export it or delete it.** If the client is not
+going to decide the evidence prompt from the workflow definition — and the sheet's own docblock says the
+engine is the authority — then the function should not be public, because a public symbol with a documented
+unclosed gap invites a future caller to take it up without the folding its docblock requires. If it *is* to be
+used, the folding belongs inside it, since the docblock already establishes that no caller can be expected to
+know. **Either way the sweep in the sheet should name four, not three**, so the next reader does not have to
+re-run it to learn that this one exists.
+
+**MEASUREMENT.** Opened: `packages/editor/src/attachments/require-evidence.ts:1-67` (in full — the mirror, the
+two facts it derives by reading the engine, and the state-resolution gap it declines to close);
+`packages/editor/src/index.ts:66` (the barrel export); `packages/app-core/src/views/ticket-sheet.tsx:891-899`
+(the recorded sweep that names three); and a walk of every `.ts`/`.tsx` under `apps/` + `packages/` excluding
+`dist/` for the symbol, which returns **6 non-test mentions: 4 in `dist/`, its declaration, and the barrel**
+— zero callers. Also checked, and it holds: `EscapeSuggestion` **is** the last entry
+`buildEditorExtensions` returns (`schema/extensions.ts:195`), which the escape mechanic's command override
+depends on.
+
+**Source:** `packages/editor` beyond the four files I had read — reached by working my own coverage list as
+the controller directed. **Severity: Minor** — nothing is broken by an unused export; what is wrong is a
+public symbol with an unclosed gap whose owner is named as a caller that does not exist, inside a sweep that
+counted its neighbours and not it.
 
 ---
 
