@@ -226,7 +226,7 @@ two clickable crumbs, `data-testid="sheet-crumb-epic"` and `data-testid="sheet-c
 starts at `parentId`"* (`view-types.ts:509-534`). So when the direct parent IS the epic, `epic.id === parent.id`, and
 the sheet draws both (`ticket-sheet.tsx:1777`, `:1785`). The sheet's own comment ten lines above says why that is
 wrong: *"a breadcrumb that skips a level states a hierarchy the product does not have. A crumb list is a PATH or it is
-nothing"* (`:1750-1757`). A crumb that REPEATS a level states one too. The docblock at `view-types.ts:524-529` guards
+nothing"* (`:1751-1758`). A crumb that REPEATS a level states one too. The docblock at `view-types.ts:524-529` guards
 only the ticket-IS-epic case (*"a ticket that IS an epic must not appear as its own grandparent"*); the parent-is-epic
 case — the ordinary shape of a two-layer hierarchy — is unguarded. Case `16.70` pins the two-hop walk (*"task → story →
 epic"*); nothing pins one hop. In the export the two are different fields (`epicId`, `parentId`, `EXPORT:1959-1961`)
@@ -261,7 +261,7 @@ sheet, and the sheet's own rule calls that "not a path".
 
 **WHY.** This is not a corner: `members/page.tsx:635-638` records that *"better-auth's magic-link plugin creates a user
 with `name: name || ""` and our sign-in page sends no name … so **an email sign-up has `name === ''`**"* — the
-product's primary sign-in path. That page fixed its three sites with `memberLabel` (`:672-677`, name → email → id)
+product's primary sign-in path. That page fixed its three sites with `memberLabel` (`:671-676`, name → email → id)
 and named the defect exactly: *"an accessible name that identifies nobody."* The sheet's picker sits 40 lines from
 `nameOf` (`:654-655`), which already routes through `actorLabel` and its *"Honesty contract 1: … attributed, never
 blank"* (`provenance.ts:4-7`) — so the same person is their id on the claim line and a blank in the picker beside it.
