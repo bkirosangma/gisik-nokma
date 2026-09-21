@@ -80,13 +80,20 @@ import { fileURLToPath } from 'node:url';
  * here — recorded rather than left to be rediscovered:
  *
  *   * **`.gn-my-work__title`** (`ui.css`, byte-similar to `.gn-attention__title`
- *     and on `/my-work`, which the stack suite does sweep). It genuinely belongs
- *     by clause (a) and is the closest thing to an error in this table. It is
- *     left out on the CONSERVATIVE side — a control wrongly judged at 44 is
- *     judged too strictly, which is loud and safe — because `/my-work`'s
- *     baseline can only be measured against the live stack on `:3001`, which is
- *     another lane's worktree. **Owner: whoever next runs `test:e2e:stack`
- *     against its own stack.**
+ *     and on `/my-work`, **which the stack suite does sweep** —
+ *     `e2e-stack/viewport.spec.ts` navigates there and calls
+ *     `measureTapTargets` on the result). It belongs by clause (a) and **also by
+ *     clause (b)**, and it is the closest thing to an error in this table.
+ *     ⚠ **The reason recorded here used to be clause (b) failing, which is the
+ *     one reason that does not apply.** What actually keeps it out is a
+ *     MEASUREMENT WINDOW: `/my-work`'s baseline can only be taken against the
+ *     live stack on `:3001`, which is another lane's worktree, and no lane has
+ *     had that window. So it stays on the CONSERVATIVE side — a control wrongly
+ *     judged at 44 is judged too strictly, which is loud and safe — with the
+ *     real reason named rather than a clause borrowed from the two entries
+ *     below, for which (b) genuinely does fail. **Owner: whoever next runs
+ *     `test:e2e:stack` against its own stack, and the fix is to ADD the entry
+ *     and re-baseline in the same commit rather than to leave it out again.**
  *   * **`.gn-infotip__trigger`** — its own rule says "a dense control beside a
  *     field label", so (a) holds; no sweep's roster covers the routes it renders
  *     on, so (b) does not.
