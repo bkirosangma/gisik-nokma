@@ -658,10 +658,10 @@ it, with a refusal message that cannot be acted on, for nineteen days.
 **WHAT.** `POST /v1/workspaces/:ws/ticket-types/:typeId/migrate` (`routes/builder-reads.ts:851-1049`) is
 `admins-only` (`:856`). Its pre-flight (`:870-955`) asks every *migration* question — unknown target state,
 unmapped occupied state, same workflow, closed → non-terminal, `backlog` as a key — and then submits one
-`ticket.workflow_rebound` per ticket through `ingestClientBatch` (`:1038`), which commits **one transaction per
+`ticket.workflow_rebound` per ticket through `ingestClientBatch` (`:1040`), which commits **one transaction per
 event**. The pre-flight never asks the question the permission gate asks per ticket: `checkVisibilityPermission`
 → `canSee` (`check-permission.ts:1048`), and `canSeeResolved` (`can-see.ts:105-112`) answers **false for an
-`admin` on a project-mode ticket whose project they are not on** — a designed state (`check-permission.ts:938`,
+`admin` on a project-mode ticket whose project they are not on** — a designed state (`check-permission.ts:975`,
 *"There is deliberately NO admin shortcut: an admin who wants to create work in a project joins it first"*).
 Measured through the real doors (Appendix I; 1 file / 1 test passed):
 
@@ -676,10 +676,10 @@ control: POST migrate as owner -> HTTP 200 {"status":"migrated","count":2}
 
 **WHY it is wrong.** Three sentences in the record say this cannot happen, and one measurement says it does:
 
-- `builder-reads.ts:843-847`: *"if ingest refuses or fails PART WAY through a batch it accepted the pre-flight of,
+- `builder-reads.ts:842-846`: *"if ingest refuses or fails PART WAY through a batch it accepted the pre-flight of,
   earlier tickets stay moved. **Nothing this route can construct reaches that window — the pre-flight covers every
   refusal `checkTicketWorkflowRebound` can produce**"*. True of the engine's refusals; false of the gate's, which
-  runs first (`ingest-service.ts:235-252`) and which the pre-flight never consults.
+  runs first (`ingest-service.ts:235-252`, the gate call at `:235-245` and its refusal at `:246-252`) and which the pre-flight never consults.
 - Case 7.45 (`07-api-realtime-search.md:68`): *"The bulk rebind refuses up front and appends nothing"* — with a
   ledger-row-count control. The case's three refusals are the pre-flight's; the gate's refusal appends `n − k`
   rows and then says `refused`.
@@ -696,8 +696,8 @@ are not visible to you; ask an owner, or join their projects"* — so 7.45's sen
 too. Alternatively, an owner-only door for migration; or the batch-scoped ingest transaction the docblock already
 names as the real fix. And 7.45 should carry a fourth arm: an admin not on one project, asserting zero appends.
 
-**MEASUREMENT.** Appendix I, run from `apps/server`. Lines opened: `builder-reads.ts:843-847`, `:856`,
-`:938` (`ORDER BY ticket_id`), `:1038`, `:1041`; `check-permission.ts:938`, `:1048`; `can-see.ts:105-112`;
+**MEASUREMENT.** Appendix I, run from `apps/server`. Lines opened: `builder-reads.ts:842-846`, `:856`,
+`:938` (`ORDER BY ticket_id`), `:1040`, `:1041`; `check-permission.ts:975`, `:1048`; `can-see.ts:105-112`;
 `ingest-service.ts:235-252`; `07-api-realtime-search.md:68`.
 
 **SEVERITY: Important.** A documented "cannot happen" that happens for an ordinary admin, producing a
