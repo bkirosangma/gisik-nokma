@@ -186,6 +186,64 @@ describe('16.69 the detail route composes the ticket KEY from three ledger facts
   });
 });
 
+describe('P3 the PARENT ref carries the parent’s own key', () => {
+  /**
+   * P3 — the prototype labels its parent crumb `p.id + " " + p.title`
+   * (`Gisik Nokma - Desktop.dc.html:3417`) and the product had no key on the
+   * wire for an ancestor, so its crumb read the title alone and a ticket whose
+   * epic and parent share a title drew two identical crumbs. The parent ref now
+   * carries the key, composed by the SAME three facts the ticket's own uses.
+   *
+   * ⚠ THE NUMBER IS THE PARENT'S POSITION, NOT THE CHILD'S, and that is the one
+   * thing this case can get wrong while looking right: both tickets are seeded
+   * in one project, so a route that composed the parent's key from the CHILD's
+   * number would answer `CCSO-2` for a parent whose own position is 1 — and a
+   * single-ticket fixture could not tell the two apart.
+   */
+  it('the parent’s key is the parent’s own — its own POSITION, not the child’s', async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const { userId, headers } = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: prj }]);
+    await seedFounding(ws, 'CC');
+    await seedProject(db.pool, ws, prj, 'Shop operations', undefined, 'SO');
+
+    const parentId = newUlid();
+    const childId = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: parentId });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: childId, parentId });
+
+    const childRead = await get(`/v1/workspaces/${ws}/tickets/${childId}`, headers);
+    expect(childRead.statusCode).toBe(200);
+    // The CHILD's own key is its own position — 2.
+    expect(childRead.json().key).toBe('CCSO-2');
+    // And the PARENT's key is the parent's position — 1. Different numbers, so
+    // one composed from the other cannot pass.
+    expect(childRead.json().parent).toMatchObject({ kind: 'ticket', id: parentId, key: 'CCSO-1' });
+    expect(childRead.json().parent.key).not.toBe(childRead.json().key);
+
+    // ⚠ THE GRANDPARENT CARRIES NO KEY, and that is the prototype's asymmetry
+    // rather than an omission — its epic crumb is `e.title` alone, so serving
+    // one would put a field on the wire for a crumb that does not read it. It is
+    // a STRUCTURAL fact here (`AncestorRef` has no such field, and the type is
+    // the witness), and the runtime arm is in 16.70, whose fixture has an epic
+    // at all: this chain has none, so `epic` is null for that reason and an
+    // assertion here would be about the absence of an ancestor, not a key.
+    //
+    // ⚠ AND THE `key: null` ARM IS NOT HERE, DELIBERATELY. It is the
+    // ticket-number ruling's own absence — a number outside the snapshot the
+    // number is derived from — and **this suite cannot produce a snapshot-bounded
+    // read**: `seedTicket` always appends its `ticket.created`, so every ticket a
+    // route test can build HAS a creation position. A case claiming to drive it
+    // would need a mechanism invented for the test. The null arm is witnessed at
+    // the CLIENT (a fixture with `key: null` renders the title alone) and by
+    // 16.69's own no-founding-claim case, which drives the same three-way check
+    // for the ticket's key; the parent's uses the identical expression.
+    expect(childRead.json().parent.key).toBe('CCSO-1');
+  });
+
+});
+
 describe('16.70 the grandparent is the nearest PROPER ancestor of EPIC rank', () => {
   it('resolves through an intermediate parent, and is null for the epic itself', async () => {
     const ws = newUlid();

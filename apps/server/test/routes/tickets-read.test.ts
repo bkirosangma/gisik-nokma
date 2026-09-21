@@ -401,10 +401,17 @@ describe('the restricted-parent placeholder — existence, and nothing else', ()
     // chooses between the two arms — `canSee` on the parent. `toEqual` is exact
     // both ways: a title missing here reddens, and the sibling case above pins
     // that the restricted arm carries none.
+    // P3 — `key` joined this arm last, and `null` is the correct value HERE
+    // rather than a placeholder: this fixture seeds no founding claim, so
+    // `workspaceIdentityFromLedger` answers a null PREFIX and the composition
+    // refuses to assemble a key from a hole (`read/ticket-numbers.ts`: a key is
+    // not worth refusing a read over). The string arm is asserted in
+    // `ticket-crumbs.test.ts`'s P3 case, which seeds the founding claim.
     expect(res.json().parent).toEqual({
       kind: 'ticket',
       id: parentId,
       title: `Ticket ${parentId}`,
+      key: null,
       ticket: parentDirect.json().ticket,
     });
     // Same title, same run, from the parent's own read — so "the parent's title"

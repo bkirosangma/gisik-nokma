@@ -3077,6 +3077,76 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
    * dropped; this case is its one-hop companion, and it asserts BOTH halves:
    * named once, and the surviving crumb is the parent's.
    */
+  /**
+   * P3 — THE PARENT CRUMB READS THE PARENT'S KEY; THE EPIC CRUMB NEVER DOES.
+   *
+   * The prototype labels its parent crumb `p.id + " " + p.title`
+   * (`Gisik Nokma - Desktop.dc.html:3417`) and its epic crumb `e.title` alone
+   * (`:3410-3413`). The product matched the epic and not the parent, because the
+   * wire carried no key for an ancestor. **The cost was not cosmetic: the key is
+   * what disambiguates**, so a ticket whose epic and parent share a title drew
+   * two identical crumbs.
+   *
+   * ⚠ THREE ARMS, because `ParentRef.key` has three states and the render treats
+   * exactly one of them differently — see that type's docblock. A case that only
+   * asserted the happy path would leave `null` and `undefined` indistinguishable
+   * from a bug that drops the key.
+   */
+  it('P3: a parent crumb shows the parent’s KEY, and the epic crumb stays title-only', async () => {
+    const read = ticketRead({
+      parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: 'CCSO-9' },
+      epic: { kind: 'ticket', id: EPIC, title: 'Open Questions', key: 'CCSO-7' },
+    });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      // The epic carries a key on this fixture and does NOT render it — the
+      // prototype's `e.title`, and the reason a key on the epic ref is
+      // meaningless rather than merely unused.
+      'Open Questions',
+      'CCSO-9 Registrations',
+      'CCSO-1183',
+    ]);
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('CCSO-9 Registrations');
+    expect(screen.getByTestId('sheet-crumb-epic').textContent).toBe('Open Questions');
+  });
+
+  it('P3: a parent key that could NOT be composed falls back to the title alone — never a half label', async () => {
+    // `null` is the ticket-number ruling's own absence: the number is derived
+    // from the ledger's order, so a snapshot-bounded read composes no key, and a
+    // key is not worth refusing the read over.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: null } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
+    // And the separator-space trap: a naive `${key} ${title}` with a null key
+    // prints " Registrations" — a leading space nobody sees in a browser and
+    // every assertion above would still pass.
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).not.toMatch(/^\s/);
+  });
+
+  it('P3: a parent ref that carries NO key field at all renders the title alone', async () => {
+    // The third state: absent. A producer that does not carry a key for this ref
+    // (the grandparent's ref is the one the product has) must read exactly like
+    // `null` on screen, and neither may read as an empty crumb.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
+  });
+
   it('E5-3: two restricted refs to the SAME ticket draw one crumb, not two', async () => {
     const read = ticketRead({
       parent: { kind: 'restricted', id: PARENT },

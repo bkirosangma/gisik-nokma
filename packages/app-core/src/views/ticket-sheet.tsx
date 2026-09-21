@@ -1583,6 +1583,47 @@ export function TicketSheet({
    * drawn. One hop per crumb, exactly as the `Subtask of` chip does it, and no
    * traversal lives here to loop.
    */
+  /**
+   * P3 — THE PARENT CRUMB READS `KEY Title`, AND THE EPIC CRUMB DOES NOT.
+   *
+   * That asymmetry is the prototype's, not an invention here: its parent crumb
+   * is `p.id + " " + p.title` (`Gisik Nokma - Desktop.dc.html:3417`) and its
+   * epic crumb is `e.title` alone (`:3410-3413`). The product matched the epic
+   * and not the parent, because
+   * the wire carried no key for an ancestor — and the cost was not cosmetic:
+   * **the key is what disambiguates**, so a ticket whose epic and parent share a
+   * title drew two IDENTICAL crumbs and a reader could not tell one ancestor
+   * from two of them.
+   *
+   * `key` is `string | null | undefined` on `ParentRef` and the three states are
+   * three facts — see that type's docblock. Only ONE of them renders a key: a
+   * string. `null` (this read could not compose one) and absent (this ref
+   * carries none — every epic) both fall back to the title alone, which is the
+   * only behaviour they share.
+   */
+  // ⚠ WHICH CRUMB IT IS — THE `noun` — DECIDES, NOT WHETHER A KEY IS PRESENT.
+  // The first version of this helper showed the key whenever the ref had one,
+  // and it drew `CCSO-7 Open Questions` for the EPIC as readily as for the
+  // parent: the asymmetry lives in the PROTOTYPE'S TWO CRUMBS, so a renderer
+  // that keys off the data cannot express it. Deriving it from `noun` is sound
+  // and deriving it from `testId` would not be — the same distinction the
+  // parameter above already records: the noun is which crumb this is, the test
+  // selector is how a test finds it.
+  //
+  // The parameter is the TICKET arm alone, and that is the narrowing rather than
+  // a convenience: `ancestorCrumb` answers the restricted case before it reaches
+  // either call site, so a restricted ref can never be labelled here — and a
+  // signature that admitted one would invite a `Restricted …` string built in
+  // two places instead of the one that already exists.
+  const crumbLabel = (
+    ancestor: Extract<NonNullable<ParentRef>, { kind: 'ticket' }>,
+    noun: 'epic' | 'parent',
+  ): string => {
+    const key = ancestor.key;
+    const withKey = noun === 'parent' && typeof key === 'string' && key !== '';
+    return withKey ? `${key} ${ancestor.title}` : ancestor.title;
+  };
+
   const epicCrumb = ticketRead.epic;
   /**
    * E4-1 / E5-3 — THE EPIC CRUMB IS OMITTED WHEN IT IS THE PARENT, because a
@@ -1638,7 +1679,7 @@ export function TicketSheet({
       </span>
     ) : onOpen === undefined ? (
       <span className="gn-ticket-sheet__crumb" data-testid={testId}>
-        {ancestor.title}
+        {crumbLabel(ancestor, noun)}
       </span>
     ) : (
       <button
@@ -1647,7 +1688,7 @@ export function TicketSheet({
         data-testid={testId}
         onClick={() => onOpen(ancestor.id)}
       >
-        {ancestor.title}
+        {crumbLabel(ancestor, noun)}
       </button>
     );
 
