@@ -3,10 +3,13 @@ import {
   BUILTIN_FIELD_IDS,
   BUILTIN_TICKET_TYPE_SEEDS,
   DEEPEST_RANK,
+  DEFAULT_PRIORITY,
+  PRIORITIES,
   SUB_TASK_TYPE_ID,
   builtinTicketTypeDefs,
   customFieldDefSchema,
   dueDateValueSchema,
+  prioritySchema,
   ticketTypeDefSchema,
 } from '../src/ticket-types.js';
 import * as ticketTypesModule from '../src/ticket-types.js';
@@ -140,6 +143,21 @@ describe('ticketTypeDefSchema', () => {
       ticketTypeDefSchema.parse({ ...base, fields: [{ id: 'dueDate', name: 'Due', type: 'date' }] }),
     ).toThrow();
   });
+
+  it('3.962 refuses a custom field with id "priority" — priority is a built-in now', () => {
+    expect(() =>
+      ticketTypeDefSchema.parse({ ...base, fields: [{ id: 'priority', name: 'Priority', type: 'select', options: ['P1'] }] }),
+    ).toThrow(/shadows a built-in field/);
+  });
+
+  it('3.963 the priority vocabulary has ONE origin: three values, P2 in the middle is the default', () => {
+    expect(PRIORITIES).toEqual(['P1', 'P2', 'P3']);
+    expect(DEFAULT_PRIORITY).toBe('P2');
+    for (const value of PRIORITIES) expect(prioritySchema.parse(value)).toBe(value);
+    expect(() => prioritySchema.parse('P0')).toThrow();
+    expect(() => prioritySchema.parse('p1')).toThrow();
+    expect(() => prioritySchema.parse(null)).toThrow();
+  });
 });
 
 /**
@@ -159,7 +177,7 @@ describe('built-in seeds', () => {
     // future seed goes deeper, this assertion is the thing that says so.
     expect(DEEPEST_RANK).toBe(Math.max(...BUILTIN_TICKET_TYPE_SEEDS.map((t) => t.rank)));
     expect(DEEPEST_RANK).toBe(4);
-    expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate']);
+    expect(BUILTIN_FIELD_IDS).toEqual(['title', 'description', 'dueDate', 'startDate', 'priority']);
   });
 
   it('materialises full defs bound to a workspace default workflow', () => {

@@ -1,8 +1,9 @@
 import { z } from 'zod';
 import { IST_DAY_REGEX } from './ist-day.js';
+import { prioritySchema } from './ticket-types.js';
 import { stateCategorySchema } from './workflow.js';
 
-export const GROUPINGS = ['epic', 'status', 'assignee', 'type', 'flat'] as const;
+export const GROUPINGS = ['epic', 'status', 'assignee', 'type', 'priority', 'flat'] as const;
 export const groupingSchema = z.enum(GROUPINGS);
 export type Grouping = z.infer<typeof groupingSchema>;
 
@@ -123,6 +124,8 @@ export const filterSpecSchema = z
     typeId: noNul(z.string().min(1).max(200)).optional(),
     stateId: noNul(z.string().min(1).max(200)).optional(),
     stateCategory: stateCategorySchema.optional(),
+    /** One level (spec 2026-09-22). Singular like `stateId`, so `toServerFilterSpec` maps it the same way. */
+    priority: prioritySchema.optional(),
     blocked: z.boolean().optional(),
     /**
      * The closed flag (backlog/closed spec §3.2, 2026-09-17): `true` = closed

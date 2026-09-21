@@ -163,11 +163,19 @@ describe('filterSpecSchema', () => {
 });
 
 describe('groupingSchema', () => {
-  it('accepts exactly the five groupings', () => {
-    for (const g of ['epic', 'status', 'assignee', 'type', 'flat']) {
+  it('accepts exactly the six groupings', () => {
+    for (const g of ['epic', 'status', 'assignee', 'type', 'priority', 'flat']) {
       expect(groupingSchema.parse(g)).toBe(g);
     }
-    expect(() => groupingSchema.parse('priority')).toThrow();
-    expect(GROUPINGS).toEqual(['epic', 'status', 'assignee', 'type', 'flat']);
+    expect(() => groupingSchema.parse('workflow')).toThrow();
+    expect(GROUPINGS).toEqual(['epic', 'status', 'assignee', 'type', 'priority', 'flat']);
+  });
+});
+
+describe('7.267 filterSpecSchema.priority', () => {
+  it('accepts one of the three levels and refuses anything else', () => {
+    expect(filterSpecSchema.parse({ priority: 'P1' })).toEqual({ priority: 'P1' });
+    expect(() => filterSpecSchema.parse({ priority: 'P9' })).toThrow();
+    expect(() => filterSpecSchema.parse({ priority: ['P1'] })).toThrow();
   });
 });

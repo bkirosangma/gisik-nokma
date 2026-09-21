@@ -264,3 +264,21 @@ section follow the controller's rule, so the next free id after B16 is one past 
   `0100-01-01`, `9999-12-31`, all 365 days of 2026) the other places. The wrong shape answers `false`
   without throwing. Next free after `3.960` by the controller's 22:0x rule. —
   `packages/domain/test/ist-day.test.ts`
+
+### Priority is a built-in (spec 2026-09-22)
+
+- **3.962** ✅ `ticketTypeDefSchema` refuses a custom field with id `priority` — priority is a built-in now,
+  the same shadow refusal `dueDate`/`startDate` already draw. — `packages/domain/test/ticket-types.test.ts`
+- **3.963** ✅ The priority vocabulary has ONE origin: `PRIORITIES` is `['P1', 'P2', 'P3']`, `DEFAULT_PRIORITY`
+  is `'P2'`, `prioritySchema` accepts exactly the three and refuses `'P0'`, the lowercase `'p1'` and `null`.
+  — `packages/domain/test/ticket-types.test.ts`
+- **3.964** ✅ `ticketCreatedPayload` accepts an explicit `priority` of `P1`/`P2`/`P3`, leaves it `undefined`
+  when absent (the default is a REDUCER decision, never written into the stored payload), and refuses
+  `'P4'` and `null`. — `packages/domain/test/ticket-events.test.ts`
+- **3.965** ✅ `ticket.created` writes the priority claim on every ticket from birth: an event with no
+  `priority` (a v1 event) replays to P2 attributed to the CREATOR and the creation clocks; an explicit
+  priority on the event is the claim with the same attribution; the title claim is unchanged by the new
+  member (CONTROL: `state.fields` holds exactly `{priority, title}`). —
+  `packages/domain/test/ticket-state.test.ts`
+- **3.966** ✅ A later `ticket.field_set` on `priority` replaces the birth claim and keeps the new actor and
+  both new clocks. — `packages/domain/test/ticket-state.test.ts`
