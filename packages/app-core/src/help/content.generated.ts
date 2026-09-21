@@ -1805,7 +1805,7 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "A small window opens with three things: - "
+                      "text": "A small window opens with four things: - "
                     },
                     {
                       "kind": "bold",
@@ -1822,6 +1822,14 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — what kind of job this is, from your workspace's list. - "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5). - "
                     },
                     {
                       "kind": "bold",
@@ -1922,7 +1930,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "three things"
+                    "text": "five things"
                   },
                   {
                     "kind": "text",
@@ -1979,6 +1987,42 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " row's date box. Clearing the box takes the claim off rather than claiming a blank date. (§5)"
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set its priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " control, P1 / P2 / P3. Every job has one; new jobs start at P2. A job cannot be left without one, so there is nothing to clear. (§5)"
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set or clear its start date"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Start"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row's date box, like Due. (§5)"
+                    }
                   ]
                 ]
               },
@@ -1987,7 +2031,23 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Everything else on that panel is there to read rather than to change: the current stage, the type, the priority and the other field rows all show who claimed the value and when. Four rows are real controls — the title box at the top, the \"Assignee\" picker, the description box, and the "
+                    "text": "Everything else on that panel is there to read rather than to change: the current stage, the type and the other field rows all show who claimed the value and when. Six rows are real controls — the title box at the top, the \"Assignee\" picker, the description box, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Priority"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " control, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
                   },
                   {
                     "kind": "bold",
@@ -1995,7 +2055,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " date box."
+                    "text": " date boxes."
                   }
                 ]
               }
@@ -2055,11 +2115,27 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot set a start date."
+                      "text": "You can set a start date now."
                     },
                     {
                       "kind": "text",
-                      "text": " (See the box below for the one thing that comes close, and why it is not a substitute.) "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job panel's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Start"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row is a date box beside "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and behaves the same way: type a day or clear the box to take the claim off. "
                     },
                     {
                       "kind": "bold",
@@ -3668,7 +3744,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — by epic, status, assignee, type, or flat (no grouping)."
+                      "text": " — by epic, status, assignee, type, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or flat (no grouping)."
                     }
                   ],
                   [
@@ -3678,7 +3762,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — from status, assignee, due date, type, progress."
+                      "text": " — from status, assignee, due date, type, progress, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ]
                 ]

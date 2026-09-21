@@ -351,16 +351,20 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You
 get a panel with two tabs: **Details** and **History**.
 
-On the Details tab you can do **three things**:
+On the Details tab you can do **five things**:
 
 1. **Move it to another stage** — the **Move…** button. (§7)
 2. **Change who can see it** — the "Who can see this" section. (§10)
 3. **Set or clear its due date** — the **Due** row's date box. Clearing the box takes the claim off
    rather than claiming a blank date. (§5)
+4. **Set its priority** — the **Priority** control, P1 / P2 / P3. Every job has one; new jobs start at
+   P2. A job cannot be left without one, so there is nothing to clear. (§5)
+5. **Set or clear its start date** — the **Start** row's date box, like Due. (§5)
 
-Everything else on that panel is there to read rather than to change: the current stage, the type, the
-priority and the other field rows all show who claimed the value and when. Four rows are real controls —
-the title box at the top, the "Assignee" picker, the description box, and the **Due** date box.
+Everything else on that panel is there to read rather than to change: the current stage, the type and
+the other field rows all show who claimed the value and when. Six rows are real controls — the title box
+at the top, the "Assignee" picker, the description box, the **Priority** control, and the **Start** and
+**Due** date boxes.
 
 ### The things you cannot do to a job
 
@@ -373,10 +377,11 @@ This is the honest list. Each one is an absence, not a hidden button.
   It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not
   loaded, or the job is on a person outside the roster you can see. **On the phone and desktop apps
   there is no "Assignee" row at all**, so there a job's assignee can be neither read nor set.
-- **You cannot set a start date.** (See the box below for the one thing that comes close, and why it
-  is not a substitute.) **A due date is no longer on this list** — see the row above for the
-  precedent — because the website can now set one: the job panel's **Due** row is a date box, and
-  clearing it takes the claim off.
+- **You can set a start date now.** It is kept here, rather than deleted, so a reader who remembers it
+  as an absence finds the correction where they last saw it. The job panel's **Start** row is a date box
+  beside **Due**, and behaves the same way: type a day or clear the box to take the claim off.
+  **A due date is no longer on this list** — see the row above for the precedent — because the website
+  can now set one: the job panel's **Due** row is a date box, and clearing it takes the claim off.
 - **The description is no longer on this list — you can write it now.** It is kept here, rather than
   deleted, so a reader who remembers it as an absence finds the correction where they last saw it.
   Type into the description on the job panel and save it; the panel reads back who set it and when.
