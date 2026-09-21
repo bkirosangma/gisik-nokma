@@ -360,6 +360,8 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **WHAT WOULD HAVE BEEN BETTER.** One line in `EXEC-*` or the handoff: *"the selector is not built — the deepest-legal-type default satisfies the owner's first clause; this is the stop-and-report the override asked for if it is not small."* That converts an unrecorded drop into a ruling the controller can make.
 
+
+**Painted (phase 2, 2026-09-21 15:46 IST), by me — the form as it ships.** Instrument as P1's third defence paragraph; sheet open on `CCSO-6` (an errand with no children). The one `<form>` in the sheet is `form.gn-ticket-sheet__subtask-add` and its controls are exactly **one `<input>`** (inside the label *New subtask title*) **and one `<button type="submit">` *Add subtask*** — no `<select>`, no `[role=combobox]`, nothing that chooses a type; the section's whole text is *"Subtasks · No subtasks. A subtask is a ticket of its own — it gets a state, an assignee, a date and a history. · New subtask title · Add subtask"*. Nothing was submitted.
 ---
 
 ### P6 — **MINOR** — Mobile: two of three screens have no styling of any kind
