@@ -50,7 +50,7 @@ table**, a closed loop, and passes green beside the gap.
 
 **Eight Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
-command is printed beside it. **§23, §36 and §38 record seven attacks on other lanes' findings — all seven failed**, and one of them (`E6-6`) showed a claim in this report to be wrong,
+command is printed beside it. **§23, §36, §38 and §39 record eight attacks on other lanes' findings — all eight failed**, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
 the subject. **Two of this report's own citations were wrong and are
 corrected in §17** — the same defect `E3-13` files against another lane, shipped by the lane that filed it.
@@ -2811,3 +2811,46 @@ competing reports because a successful refutation is worth more to me than any s
 **One of those seven, `E6-6`, showed a claim in MY OWN report to be wrong**, which is the useful half: the
 attacks were not wasted, they just did not pay the way I was hoping. **A report that only ever confirms
 itself is not a review, and the fact that this one is 7-for-7 against its peers is a fact about its peers.**
+
+---
+
+## 39. AN EIGHTH ATTACK — `E6-11` holds, and it names a site my own round-1 sweep was structurally unable to find
+
+`E6-11` (executor 6, Minor) is that `GET /v1/projects/:id/tickets?groupBy=epic` labels groups with a
+**soft-deleted epic's title** while the detail door withholds that same title as *"the deleted ticket's
+content"*. Verified independently:
+
+```
+grep -c "deleted_at" apps/server/src/routes/list.ts        -> 0        <-- no predicate in the file at all
+routes/list.ts:384-452 (epicAncestors)                     -> filters `${visible}` on both arms, nothing else
+routes/list.ts:402-411                                     -> the code RECORDS it: "NO soft-delete predicate on
+                                                              either arm of the walk below … a deleted epic's
+                                                              TITLE still travels on its live children's cards."
+```
+
+**It holds.** The only `deleted_at` in the entire file is absent; the walk is visibility-filtered and nothing
+else; and the source says so itself. Nothing to refute.
+
+**AND IT EXPOSES A BOUND ON MY OWN ROUND-1 CLAIM, which is the part worth recording.** §7.1 of this report
+says *"at `e4baa425` every one of the 18 sites is constrained"*, and I stand behind it: I mutated the constant
+and each of the four longhand sites and every one was killed. **But my universe was "sites that CARRY the
+predicate", and the epic walk is a site that does not carry it at all** — so no mutation of mine could have
+reached it, and a lane's decision not to filter is invisible to a sweep looking for filters. **`list.ts` has
+two ticket-reading queries and only one of them is in my list**; the other was found by someone asking a
+different question.
+
+**The shape is the report's own, one more time:** `E3-6` and §20.1 are about a sweep's universe being too
+narrow, and this is the same failure with a different edge — **not a pattern that missed a member, but a
+universe defined by a property (`carries LIVE_TICKET_WHERE`) that the missed site does not have.** *A sweep
+for "who applies this rule" cannot find "who should and does not"*, and that is a different sweep with a
+different method — which is exactly what the competing lane ran.
+
+**What it changes in my report: nothing, and I am not withdrawing §7.1.** The 18 sites are constrained; this
+was never one of them. **What it changes is what a reader should take from §7.1's "every site is
+constrained" — the phrase means every site THAT FILTERS, and a lane reading it as "the deleted-epic question
+is settled" would be reading more than I measured.** Recorded here so that reading is not available.
+
+**TALLY: EIGHT ATTACKS, EIGHT FAILURES.** `E6-5`, `E6-1` (twice), `E6-2`, `E6-4`/`E4-1`/`E5-3`, `E6-6`,
+`E6-8`, `E6-9`, and now `E6-11` — **and two of the eight changed something in this report**: `E6-6` showed a
+claim of mine to be false (corrected, §14.4), and this one bounds §7.1's scope. **That ratio is the honest
+argument for attacking peers rather than re-reading oneself.**
