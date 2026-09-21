@@ -14,3 +14,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B11 | claimed | 2026-09-21 21:46 | /Users/kiro/my_projects/gisik-nokma-ds5 |
 | T-E2-45 | done | 856eddc9 | app-nav.test.tsx 17.141–17.143 (E2-45) |
 | T-E5-25 | done | 3f359c75 | 13.1157 session-expired write (sheet/board/bulk) + adapter; 13.1158 guard (mutation-witnessed) |
+| T-E5-31 | done | a3234e8c | 13.1159 app-nav signed-out arm (RED 2 / GREEN 33) |
