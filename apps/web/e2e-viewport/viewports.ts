@@ -163,10 +163,15 @@ export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as readonly ViewportName[];
  *
  * 13.352 (Task 15, neo restyle) — `/privacy` and `/terms` are both swept by
  * every check this file drives (accessible-names, tap-target, type-scale),
- * and neither `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx`
- * nor `apps/web/src/back-button.tsx` was touched by that task, so the Back
- * control's presence and accessible name on both routes is unaffected by
- * construction as well as by this suite staying green.
+ * and neither `apps/web/app/privacy/page.tsx` nor `apps/web/app/terms/page.tsx`
+ * was touched by that task. ⚠ **This used to add that
+ * `apps/web/src/back-button.tsx` was untouched too, "so the Back control's
+ * presence and accessible name on both routes is unaffected" — and that file
+ * does not exist.** It was removed in Step 2c-2 (`17c8345c`, "the dead component
+ * the port orphaned"), so the two routes carry no Back control to be affected
+ * and the premise holds by construction rather than by that file's absence from
+ * a diff. The pages are reached from the sign-in card's legal line, which is why
+ * the legal bar's `Sign in` link points at the same route a Back control did.
  */
 export const UNAUTHED_ROUTES = [
   { path: '/help', label: 'help' },
