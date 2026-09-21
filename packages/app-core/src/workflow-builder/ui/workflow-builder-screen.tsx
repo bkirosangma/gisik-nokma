@@ -19,6 +19,18 @@ import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
 import { WorkflowCanvas } from './workflow-canvas.js';
 
+/**
+ * RULING E5-41 (CRITICAL). Keyed on the WORKSPACE and the draft's own def id
+ * (stable across a re-mount of the edit route, `[workflowId]/page.tsx`,
+ * which re-fetches the same published id every time) rather than on nothing
+ * — two workflows in the same workspace, or the same workflow across two
+ * workspaces (a session token this product does not have), must not share a
+ * slot.
+ */
+function draftStorageKey(workspaceId: string, workflowId: string): string {
+  return `gn-workflow-draft:${workspaceId}:${workflowId}`;
+}
+
 function WorkflowNameField() {
   const store = useBuilderStore();
   const { canAuthor } = useBuilderEnv();
@@ -58,9 +70,45 @@ export function WorkflowBuilderScreen(props: {
   initialDraft: WorkflowDraft;
   onPublished?: (payload: PublishedWorkflowDef) => void;
 }) {
-  const [store] = useState(() => createDraftStore(props.initialDraft));
+  const storageKey = draftStorageKey(props.workspaceId, props.initialDraft.def.id);
+  const [store] = useState(() => {
+    // RULING E5-41 (CRITICAL): recover an in-progress draft this SAME tab
+    // left in `sessionStorage` rather than always starting from the
+    // server's last-published version — the manual already promises "for
+    // this session only" persistence for box positions, so this is the
+    // same promise kept for the rest of the draft too. Every unsaved
+    // state/arrow/rule used to die on any navigation (the nav bar, the
+    // breadcrumb, the browser's back button) with no marker and no
+    // recovery; this closes that for every case that keeps the TAB alive,
+    // which is everything the finding measured. A corrupt or inaccessible
+    // entry (private browsing, quota, a shape from an older build) falls
+    // back to the server's draft rather than crashing the screen.
+    try {
+      const saved = window.sessionStorage.getItem(storageKey);
+      if (saved !== null) return createDraftStore(JSON.parse(saved) as WorkflowDraft);
+    } catch {
+      // fall through to the server's draft
+    }
+    return createDraftStore(props.initialDraft);
+  });
   const [data, setData] = useState<{ members: WorkspaceMember[]; ticketTypes: TicketTypeDef[] } | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    // Written on every change, not only on unmount — a tab CLOSE fires no
+    // React cleanup at all, so an unmount-only write would still lose the
+    // draft to the one case the manual does not promise to survive anyway,
+    // while ALSO losing it to a crash or a forced reload, which it does.
+    return store.subscribe(() => {
+      try {
+        window.sessionStorage.setItem(storageKey, JSON.stringify(store.getState()));
+      } catch {
+        // sessionStorage unavailable (private mode, quota) — the draft
+        // still lives in `store`; only the recovery-on-remount promise
+        // above is what silently goes back to being unmet.
+      }
+    });
+  }, [store, storageKey]);
 
   useEffect(() => {
     let cancelled = false;
@@ -119,7 +167,20 @@ export function WorkflowBuilderScreen(props: {
             <WorkflowNameField />
             <div className="workflow-builder-screen__actions">
               <AddStateButton />
-              <PublishControls onPublished={props.onPublished} />
+              <PublishControls
+                onPublished={(payload) => {
+                  // The recovered draft is now the server's own truth — clearing
+                  // it here (rather than leaving it to expire on its own) is what
+                  // stops a stale pre-publish version from resurfacing if this
+                  // same id is ever opened again in this tab.
+                  try {
+                    window.sessionStorage.removeItem(storageKey);
+                  } catch {
+                    // already inaccessible; nothing more to clear
+                  }
+                  props.onPublished?.(payload);
+                }}
+              />
             </div>
           </div>
         </header>

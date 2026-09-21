@@ -1495,6 +1495,88 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     expect(within(row).getByText(/roster could not be loaded/i)).toBeInTheDocument();
   });
 
+  /**
+   * RULING E4-18 — `...people.map((member) => ({ value: member.id, label:
+   * member.name }))` rendered a BLANK 13px option for a member with no
+   * display name (a real, seeded member: `accountant@e2e.gisik-nokma.local`,
+   * `name: ''`). `provenance.ts`'s own honesty contract ("a missing display
+   * name falls back to the raw actor id — attributed, never blank") already
+   * governs the sibling `visibility-editor.tsx` picker via `actorLabel`; this
+   * is the same contract applied here.
+   */
+  it('a member with no display name renders by id, never a blank option', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
+        { id: 'user_nameless', name: '', role: 'guest' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source);
+    await settled();
+    const listbox = await openAssigneeList();
+    const options = within(listbox).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Unassigned',
+      'Kiro',
+      'Anselma Marak',
+      'user_nameless',
+    ]);
+    // The blank-string failure mode this ruling closes: no option's visible
+    // text is empty, which a `.toEqual` on the full array above could in
+    // principle still satisfy by accident if the array itself were wrong —
+    // this is the assertion that addresses the failure mode directly.
+    for (const option of options) {
+      expect(option.textContent).not.toBe('');
+    }
+  });
+
+  /**
+   * RULING E5-4 — the @mention list's own half of the same defect class
+   * E4-18 closed on the Assignee picker: `queryUsers` filtered on
+   * `member.name.toLowerCase().includes(needle)` and mapped `name:
+   * member.name` verbatim, so a nameless member was both invisible (a
+   * blank row, if listed at all) AND unreachable (typing anything could
+   * never match an empty string). `queryUsers` is captured off a fake
+   * `EditorSlotComponent`, the same dependency-injection seam 13.989's own
+   * describe block uses, since it is a closure private to `TicketSheet`
+   * and not otherwise reachable from a test.
+   */
+  it('the @mention list resolves a nameless member by id, and finds them by typing it', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_nameless', name: '', role: 'guest' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    let captured: ((query: string) => Promise<Array<{ userId: string; name: string }>>) | undefined;
+    const fakeSlot: EditorSlotComponent = (props) => {
+      captured = props.queryUsers;
+      return null;
+    };
+    renderSheet(read, source, { editorSlot: fakeSlot });
+    await settled();
+    expect(captured).toBeDefined();
+
+    const all = await captured!('');
+    expect(all).toContainEqual({ userId: 'user_nameless', name: 'user_nameless' });
+
+    // Reachable by typing the id — the raw empty name could never have
+    // matched anything, so this is the assertion that would fail if the
+    // resolved label were used only for DISPLAY and the OLD raw name were
+    // still what `.includes(needle)` matched against.
+    const found = await captured!('user_nameless');
+    expect(found.map((person) => person.userId)).toContain('user_nameless');
+  });
+
   it('names who assigned the ticket, in the sibling rows’ own shape', async () => {
     renderSheet(
       ticketRead({

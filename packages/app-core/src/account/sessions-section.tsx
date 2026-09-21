@@ -5,6 +5,13 @@ import type { SessionSummary } from './sessions-client.js';
 export type SessionsSectionProps = {
   sessions: SessionSummary[];
   onRevoke: (token: string) => void;
+  /**
+   * Set when the caller's own `onRevoke` refuses. Ruling E2-24(b): a "Sign
+   * out" refusal used to be read and discarded entirely — the list simply
+   * failed to shrink, with nothing on screen to say why. Same one-prop
+   * shape `PasskeysSection`'s add/remove `error` already carries.
+   */
+  error?: string | null;
 };
 
 /**
@@ -48,10 +55,15 @@ export type SessionsSectionProps = {
  * rather than a bare `<button>`, matching `ProfileSection`'s own use of
  * `Button` on this page.
  */
-export function SessionsSection({ sessions, onRevoke }: SessionsSectionProps) {
+export function SessionsSection({ sessions, onRevoke, error = null }: SessionsSectionProps) {
   return (
     <section className="gn-account__section gn-account__sessions">
       <h2 className="gn-account__section-title">Sign-in and devices</h2>
+      {error !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {error}
+        </p>
+      ) : null}
       {sessions.length === 0 ? (
         // THE WORDING HEDGES ON PURPOSE. `/account`'s own effect collapses a
         // FAILED read to `[]` (its docblock discloses this), so an empty list

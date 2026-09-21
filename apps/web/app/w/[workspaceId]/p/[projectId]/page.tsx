@@ -18,6 +18,7 @@ import {
   EPIC_RANK,
   TicketSheet,
   TimelineView,
+  actorLabel,
   isBuiltinEpicType,
   makeSubmittedFactory,
   matchesBoardCard,
@@ -3308,29 +3309,36 @@ function FiltersSheet({
         <p className="gn-filters__pending">No members to choose from.</p>
       ) : (
         <div className="gn-filters__person-list">
-          {members.map((member) => (
-            <TriStateChoice
-              key={member.id}
-              className="gn-filters__choice--row"
-              label={member.name}
-              mode={choiceMode(filter, key, member.id)}
-              onCycle={() => setFilter((current) => withCycledId(current, key, member.id))}
-            >
-              {/*
-                `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
-                its span (`components/avatar.tsx`), so left unhidden it
-                doubles this checkbox's accessible name to "Uma One Uma
-                One" — the label's accname concatenates every descendant's
-                text/label, and the plain `<span>` right after already
-                carries the real one. Decorative here, not a second source
-                of truth.
-              */}
-              <span aria-hidden="true">
-                <Avatar name={member.name} size="small" />
-              </span>
-              <span>{member.name}</span>
-            </TriStateChoice>
-          ))}
+          {members.map((member) => {
+            // RULING E5-4: `member.name` verbatim is blank for the
+            // magic-link population (`name: ''`), painting a row with no
+            // visible text and no accessible name — closed the same way
+            // E4-18 closed it on the ticket sheet's own pickers.
+            const label = actorLabel(member.id, member.name);
+            return (
+              <TriStateChoice
+                key={member.id}
+                className="gn-filters__choice--row"
+                label={label}
+                mode={choiceMode(filter, key, member.id)}
+                onCycle={() => setFilter((current) => withCycledId(current, key, member.id))}
+              >
+                {/*
+                  `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
+                  its span (`components/avatar.tsx`), so left unhidden it
+                  doubles this checkbox's accessible name to "Uma One Uma
+                  One" — the label's accname concatenates every descendant's
+                  text/label, and the plain `<span>` right after already
+                  carries the real one. Decorative here, not a second source
+                  of truth.
+                */}
+                <span aria-hidden="true">
+                  <Avatar name={label} size="small" />
+                </span>
+                <span>{label}</span>
+              </TriStateChoice>
+            );
+          })}
         </div>
       )}
     </fieldset>

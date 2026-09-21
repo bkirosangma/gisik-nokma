@@ -197,6 +197,18 @@ export default function MembersPage() {
   const [adminGate, setAdminGate] = useState<
     { kind: 'asking' } | { kind: 'admin' } | { kind: 'member'; why: string } | { kind: 'failed'; why: string }
   >({ kind: 'asking' });
+  /**
+   * RULING V2 (CRITICAL). Was `MintForm`'s own local state. A mint success
+   * called `onMinted` — `loadPending`, a network re-read — and if THAT read
+   * failed, `loadPending` flipped `adminGate` away from `'admin'`, which is
+   * the only state that mounts `MintForm` at all: the form unmounted and
+   * the one-time URL it was holding (`COPY_IT_NOW` had just said "it is not
+   * stored and cannot be shown again") died with it. Hoisted here so the
+   * credential outlives whatever the gate does next — `MintForm` is
+   * presentational; showing a minted link it no longer owns is not its
+   * business to lose.
+   */
+  const [minted, setMinted] = useState<MintedInvite | null>(null);
 
   /** The roster read, and it is a callback rather than a bare effect because a
    *  committed role change re-runs it: the cell renders the role the SERVER
@@ -554,6 +566,28 @@ export default function MembersPage() {
         </p>
       ) : null}
 
+      {/* RULING V2: rendered OUTSIDE the `adminGate` chain below on purpose —
+          the one-time credential must survive a re-read that flips the gate
+          away from 'admin' (a refused or dropped `loadPending` after a
+          successful mint), which is exactly the case that used to unmount
+          `MintForm` and take this card with it. */}
+      {minted !== null ? (
+        <Card className="gn-invite-mint__result">
+          <p className="gn-invite-mint__once">{COPY_IT_NOW}</p>
+          <code className="gn-invite-mint__url">{minted.url}</code>
+          {/*
+            Through `formatDateTime`, never raw. `expiresAt` is a UTC ISO instant
+            off the wire, and printing it verbatim puts a second clock in front of
+            an IST reader — the thing `src/ist-today.ts` and the ticket sheet's
+            provenance lines both exist to prevent. One clock, named: '8 Sep
+            2026, 15:30 IST'.
+          */}
+          <p className="gn-invite-mint__expiry">
+            It stops working after {formatDateTime(minted.expiresAt)}.
+          </p>
+        </Card>
+      ) : null}
+
       {adminGate.kind === 'asking' ? (
         <p>Checking whether you can invite people…</p>
       ) : adminGate.kind === 'failed' ? (
@@ -565,7 +599,13 @@ export default function MembersPage() {
         <p className="gn-members__not-admin">{adminGate.why}</p>
       ) : (
         <>
-          <MintForm workspaceId={workspaceId} onMinted={loadPending} />
+          <MintForm
+            workspaceId={workspaceId}
+            onMinted={(result) => {
+              setMinted(result);
+              loadPending();
+            }}
+          />
           <PendingList rows={pending ?? []} onRevoke={revoke} />
           {revokeRefusal !== null ? (
             <p role="alert" className="gn-refusal gn-refusal--server">
@@ -752,13 +792,21 @@ function memberSummary(members: readonly RosterMember[], workspaceName: string |
  * Everything else the door refuses reaches the screen in the door's own words,
  * unparaphrased, out of the 422's `IngestResult`.
  */
-function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: () => void }) {
+function MintForm({
+  workspaceId,
+  onMinted,
+}: {
+  workspaceId: string;
+  // RULING V2: hands the result UP rather than holding it — the caller owns
+  // the credential's lifetime now, this component only owns the ceremony of
+  // minting one.
+  onMinted: (result: MintedInvite) => void;
+}) {
   const { invitesAdmin } = useAppServices();
   const [address, setAddress] = useState('');
   const [channel, setChannel] = useState('email');
   const [role, setRole] = useState('member');
   const [projectIds, setProjectIds] = useState('');
-  const [minted, setMinted] = useState<MintedInvite | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const submit = (event: FormEvent): void => {
@@ -777,11 +825,9 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
       })
       .then(
         (result) => {
-          setMinted(result);
-          onMinted();
+          onMinted(result);
         },
         (cause: unknown) => {
-          setMinted(null);
           setRefusal(
             cause instanceof InviteAdminError && cause.serverMessage !== null
               ? cause.serverMessage
@@ -900,22 +946,9 @@ function MintForm({ workspaceId, onMinted }: { workspaceId: string; onMinted: ()
         Send invitation
       </Button>
 
-      {minted !== null ? (
-        <Card className="gn-invite-mint__result">
-          <p className="gn-invite-mint__once">{COPY_IT_NOW}</p>
-          <code className="gn-invite-mint__url">{minted.url}</code>
-          {/*
-            Through `formatDateTime`, never raw. `expiresAt` is a UTC ISO instant
-            off the wire, and printing it verbatim puts a second clock in front of
-            an IST reader — the thing `src/ist-today.ts` and the ticket sheet's
-            provenance lines both exist to prevent. One clock, named: '8 Sep
-            2026, 15:30 IST'.
-          */}
-          <p className="gn-invite-mint__expiry">
-            It stops working after {formatDateTime(minted.expiresAt)}.
-          </p>
-        </Card>
-      ) : null}
+      {/* RULING V2: the minted-URL card moved to the PAGE (`MembersPage`,
+          above `MintForm`'s own mount) — see that component's docblock.
+          `MintForm` no longer holds the credential once it has one. */}
 
       {refusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">

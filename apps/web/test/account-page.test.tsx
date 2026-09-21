@@ -104,7 +104,17 @@ beforeEach(() => {
 
 function mount() {
   render(
-    <Providers services={stubServices({ getMyWorkspaces: async () => [] }, {})}>
+    <Providers
+      services={stubServices(
+        { getMyWorkspaces: async () => [] },
+        // A benign default, matching `listUserPasskeys`'s own precedent above:
+        // without it, every pre-E5-13 case in this file would drive the
+        // notification-preferences read against the unstubbed rejection and
+        // render the new `prefsError` alert (ruling E5-13) alongside whatever
+        // alert that case is itself asserting on.
+        { notificationPreferences: { load: async () => ({ mutedKinds: [] }) } },
+      )}
+    >
       <AccountPage />
     </Providers>,
   );
@@ -174,6 +184,46 @@ describe('AccountPage — Profile', () => {
     mount();
     await user.click(await screen.findByRole('button', { name: 'Save name' }));
     expect(await screen.findByRole('alert')).toHaveTextContent('Name cannot be empty');
+  });
+
+  /**
+   * RULING E5-19 — "Save name" had no success arm at all: a save, a
+   * message-less refusal, and (in principle) a save that never sent all
+   * painted identically, the button simply stopping "Saving…". This case
+   * is the success half.
+   */
+  it('E5-19 a successful save states "Name saved", not silence', async () => {
+    updateUser.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Save name' }));
+    expect(await screen.findByRole('status')).toHaveTextContent('Name saved');
+  });
+
+  it('E5-19 a refusal with NO message states a fallback, rather than reading as success', async () => {
+    // better-auth's client types `error.message` as optional — this is the
+    // account-page half of the same shape `passkeys` already covers for
+    // add/remove. `error?.message ?? null` upstream would have collapsed
+    // THIS to the same `null` a real success returns.
+    updateUser.mockResolvedValue({ data: null, error: { status: 400, statusText: 'BAD_REQUEST' } });
+    const user = userEvent.setup();
+    mount();
+    await user.click(await screen.findByRole('button', { name: 'Save name' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'The server refused this change and did not say why.',
+    );
+    expect(screen.queryByRole('status')).toBeNull();
+  });
+
+  it('E5-19 editing the name again clears a stale "Name saved"', async () => {
+    updateUser.mockResolvedValue({ data: {}, error: null });
+    const user = userEvent.setup();
+    mount();
+    const nameInput = await screen.findByLabelText('Name');
+    await user.click(screen.getByRole('button', { name: 'Save name' }));
+    await screen.findByRole('status');
+    await user.type(nameInput, '.');
+    expect(screen.queryByRole('status')).toBeNull();
   });
 });
 
@@ -265,6 +315,120 @@ describe('AccountPage — Notifications', () => {
     await waitFor(() => expect(loadCalls).toBe(2));
     // Drawn from the reloaded answer: the optimistic mute did not stick.
     await waitFor(() => expect(screen.getByLabelText(/mentioned/i)).toBeChecked());
+  });
+
+  /**
+   * 11.215 — RULING E5-13, CRITICAL. Before this ruling, a failed read
+   * collapsed to `setPrefs({ mutedKinds: [] })` — every row rendered ON, and
+   * `toggleKind` would happily PUT that guessed document, silently
+   * overwriting whatever the person actually had muted. The corrected
+   * behaviour: the section renders disabled with a stated refusal, and no
+   * row is togglable, so nothing can be saved from a state nobody confirmed.
+   */
+  it('11.215 a failed preferences read disables every row and refuses to save, rather than guessing all-on', async () => {
+    const save = vi.fn();
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load: async () => {
+                throw new Error('network error');
+              },
+              save,
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your preferences could not be loaded',
+    );
+    const mentionRow = screen.getByLabelText(/mentioned/i);
+    expect(mentionRow).toBeDisabled();
+    // Attempting a click on a disabled control is a no-op in the real DOM —
+    // asserted rather than assumed, so a regression that dropped `disabled`
+    // would show up as `save` having been called.
+    await user.click(mentionRow);
+    expect(save).not.toHaveBeenCalled();
+  });
+
+  /**
+   * 11.218 — RULING E2-24(a). Before this ruling a refused save reverted the
+   * optimistic flip with NO rendered outcome at all (case 11.210 above only
+   * ever asserted the revert itself, never that anything on screen said the
+   * save had been refused). This is the message half of the same fix.
+   */
+  it('11.218 a refused save states the outcome, not just the silent revert', async () => {
+    const user = userEvent.setup();
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load: async () => ({ mutedKinds: [] }),
+              save: async () => {
+                throw new Error('save refused');
+              },
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    const mentionRow = await screen.findByLabelText(/mentioned/i);
+    await user.click(mentionRow);
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your change could not be saved. It has been reverted.',
+    );
+  });
+
+  /**
+   * 11.219 — the compounding-failure half of the same ruling: a refused
+   * save whose REVERT read also fails. Before this ruling the revert's
+   * `.load()` had no rejection handler at all, so this case left the
+   * optimistic (wrong) flip standing with no trace whatsoever — worse than
+   * 11.218's case, where at least the revert itself succeeds.
+   */
+  it('11.219 a refused save whose revert-read also fails falls back to the disabled refusal state, rather than leaving a silent wrong flip standing', async () => {
+    const user = userEvent.setup();
+    let loadCalls = 0;
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [] },
+          {
+            notificationPreferences: {
+              load: async () => {
+                loadCalls += 1;
+                if (loadCalls === 1) return { mutedKinds: [] };
+                throw new Error('revert read also failed');
+              },
+              save: async () => {
+                throw new Error('save refused');
+              },
+            },
+          },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+    const mentionRow = await screen.findByLabelText(/mentioned/i);
+    await user.click(mentionRow);
+    // The stronger refusal wins: the component cannot tell what the true
+    // state is any more, so it earns the same disabled treatment 11.215
+    // gives a failed INITIAL read, not merely the softer save-refusal note.
+    await waitFor(() =>
+      expect(screen.getByRole('alert')).toHaveTextContent('Your preferences could not be loaded'),
+    );
+    expect(screen.getByLabelText(/mentioned/i)).toBeDisabled();
   });
 });
 
@@ -373,6 +537,36 @@ describe('AccountPage — Sessions', () => {
     expect(screen.getByText('Unknown device')).toBeInTheDocument();
     await user.click(screen.getByRole('button', { name: 'Sign out' }));
     expect(revokeSession).toHaveBeenCalledWith({ token: 'other-token' });
+  });
+
+  /**
+   * RULING E2-24(b) — before this ruling `revokeSession`'s `{ error }` was
+   * read and discarded (`await sessionsClient.revoke(token);`): a refusal
+   * left the list simply failing to shrink, with nothing on screen to say
+   * why. The re-read count is compared as a DELTA around the click, not an
+   * absolute total — `listSessions`, unlike `listUserPasskeys`, is not
+   * reset between cases in this file, so an absolute count would silently
+   * include every earlier case's calls. `revokeSession`'s own `if
+   * (result.error === null) sessionsClient.list()…` must not fire on a
+   * refusal, or the session would appear to remain purely by coincidence of
+   * a re-list rather than because the refusal was actually honoured.
+   */
+  it('a revoke refusal renders verbatim and the list is NOT re-read', async () => {
+    listSessions.mockResolvedValue({
+      data: [
+        { token: 'current-token', createdAt: new Date('2026-09-01T00:00:00Z'), updatedAt: new Date('2026-09-14T00:00:00Z'), userAgent: null },
+        { token: 'other-token', createdAt: new Date('2026-09-05T00:00:00Z'), updatedAt: new Date('2026-09-10T00:00:00Z'), userAgent: null },
+      ],
+      error: null,
+    });
+    revokeSession.mockResolvedValue({ error: { message: 'Session not found' } });
+    const user = userEvent.setup();
+    mount();
+    await screen.findByRole('button', { name: 'Sign out' });
+    const callsBeforeRevoke = listSessions.mock.calls.length;
+    await user.click(screen.getByRole('button', { name: 'Sign out' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('Session not found');
+    expect(listSessions.mock.calls.length).toBe(callsBeforeRevoke);
   });
 
   it('renders "Last active" through the FULL pipeline — mocked Date, adapter\'s toISOString, then formatDateTime', async () => {
@@ -530,5 +724,20 @@ describe('AccountPage — Passkeys', () => {
     expect(listUserPasskeys).not.toHaveBeenCalled();
     expect(screen.queryByLabelText('Passkey name')).toBeNull();
     expect(screen.queryByText('You have no passkeys yet.')).toBeNull();
+  });
+
+  /**
+   * RULING E2-23 — a failed LIST read used to collapse to `setPasskeys([])`,
+   * and `PasskeysSection` then asserted "You have no passkeys yet." over a
+   * read that never actually confirmed that. The section now states the
+   * read failure instead, distinct from an add/remove `error`.
+   */
+  it('E2-23 a failed passkey list read states the refusal, not the named empty state', async () => {
+    listUserPasskeys.mockRejectedValue(new Error('network error'));
+    mount();
+    expect(await screen.findByRole('alert')).toHaveTextContent(
+      'Your passkeys could not be loaded.',
+    );
+    expect(screen.queryByText('You have no passkeys yet.')).not.toBeInTheDocument();
   });
 });

@@ -1001,9 +1001,16 @@ export function TicketSheet({
   const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> => {
     const people = members.data ?? [];
     const needle = query.trim().toLowerCase();
+    // RULING E5-4: `member.name` verbatim is blank for the magic-link
+    // population (`name: ''`) — the same defect E4-18 closed on the
+    // Assignee picker, here on the @mention list. Resolved through
+    // `actorLabel` BEFORE matching, not after: a nameless member is
+    // otherwise never reachable by typing (their raw name never matches
+    // anything) and, once resolved, is found the same way any other
+    // person is — by what this list actually shows for them.
     return people
-      .filter((member) => needle === '' || member.name.toLowerCase().includes(needle))
-      .map((member) => ({ userId: member.id, name: member.name }));
+      .map((member) => ({ userId: member.id, name: actorLabel(member.id, member.name) }))
+      .filter((person) => needle === '' || person.name.toLowerCase().includes(needle));
   };
 
   /**
@@ -1706,7 +1713,15 @@ export function TicketSheet({
             // `ticket.assigned` with `null` is a legal state the control must be
             // able to express, and a picker with no way back to it cannot.
             { value: UNASSIGNED, label: 'Unassigned' },
-            ...people.map((member) => ({ value: member.id, label: member.name })),
+            // RULING E4-18: `member.name` verbatim rendered a BLANK option
+            // for a member with no display name, breaking the honesty
+            // contract `provenance.ts` states ("a missing display name
+            // falls back to the raw actor id — attributed, never blank")
+            // and `visibility-editor.tsx:410`'s own picker already keeps.
+            ...people.map((member) => ({
+              value: member.id,
+              label: actorLabel(member.id, member.name),
+            })),
           ]}
           value={state.assigneeId ?? UNASSIGNED}
           onChange={(next) => {

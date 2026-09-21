@@ -42,4 +42,48 @@ describe('NotificationsSection', () => {
     // the caller is what would flip it, by passing new props.
     expect(mentionRow).toBeChecked();
   });
+
+  /**
+   * 11.216 — RULING E5-13's component half. The page-level wiring (a failed
+   * read must never fabricate `{ mutedKinds: [] }`) is case 11.215 in
+   * `apps/web/test/account-page.test.tsx`; this is the component's own
+   * contract — every row disabled and the refusal stated — independent of
+   * the caller.
+   */
+  it('11.216 an error disables every row and states the refusal, rather than rendering a togglable guess', () => {
+    render(
+      <NotificationsSection
+        mutedKinds={[]}
+        onToggle={vi.fn()}
+        error="Your preferences could not be loaded"
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent('Your preferences could not be loaded');
+    for (const box of screen.getAllByRole('checkbox')) {
+      expect(box).toBeDisabled();
+    }
+  });
+
+  /**
+   * 11.217 — RULING E2-24(a)'s component half. Distinct from `error`
+   * (11.216, a READ failure that disables every row): a refused SAVE is
+   * stated as its own refusal WITHOUT disabling anything, because the data
+   * is still current once the optimistic flip has reverted — only the last
+   * attempted change did not stick.
+   */
+  it('11.217 a save refusal states the outcome without disabling the rows, unlike a read failure', () => {
+    render(
+      <NotificationsSection
+        mutedKinds={[]}
+        onToggle={vi.fn()}
+        saveError="Your change could not be saved. It has been reverted."
+      />,
+    );
+    expect(screen.getByRole('alert')).toHaveTextContent(
+      'Your change could not be saved. It has been reverted.',
+    );
+    for (const box of screen.getAllByRole('checkbox')) {
+      expect(box).not.toBeDisabled();
+    }
+  });
 });

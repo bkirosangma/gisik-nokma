@@ -61,3 +61,13 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F7-ux | done | a7d5fd85 | epic band says rows; ticket-list 71 tests green |
 | T-E5-39 | blocked | - | remedy needs publishedAt/publishedBy ON THE READ: not reachable client-side (gateway has no workflow-events read; getWorkflow returns PublishedWorkflowDef = WorkflowDefinedPayload, which carries no instant/actor). Envelope has them and proj_workflows.published_workspace_seq makes the join possible, but serving them means a new read shape across apps/server/src/read/workflow-defs.ts + the route + the client mapper + the screen, on a type the whole workflow-builder shares. Plan allotted 0.3 h at haiku; this is not that. NOT done as a copy fix either: a sentence saying "no date recorded" would put a claim about the WIRE into the UI. |
 | T-E4-6 | done | abc431e2 | picker labels name||email||id; app-core views 550 tests green |
+| B02 | claimed | 2026-09-21 19:58 IST | /Users/kiro/my_projects/gisik-nokma-exec2 |
+| T-E5-13 | done | c44d8275 | 11.215 apps/web/test/account-page.test.tsx |
+| T-E5-41 | done | bedeb62c | 10.90 screens.test.tsx |
+| T-E2-23 | done | 1e2c8d95 | passkeys-section.test.tsx + account-page.test.tsx |
+| T-E2-24 | done | 5159b037 | notifications-section/sessions-section/account-page tests |
+| T-E4-18 | done | e2043c47 | ticket-sheet.test.tsx |
+| T-E5-37 | done | c84572a4 | app-nav.test.tsx |
+| T-E5-4 | done | bc039a53 | ticket-sheet.test.tsx + filters-sheet.test.tsx |
+| T-E5-19 | done | fd260632 | account-page.test.tsx |
+| T-V2 | done | 7e99e073 | members-page.test.tsx |
