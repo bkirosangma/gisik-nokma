@@ -401,6 +401,8 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **WHAT WOULD HAVE BEEN BETTER.** A `title` per route — `Settings · Gisik Nokma`, `Shop operations · Gisik Nokma` — set through Next's own `metadata`/`generateMetadata` on the route modules that already exist. The client-rendered routes (`'use client'`) would need `generateMetadata` in a small server wrapper or a `document.title` effect; either is a handful of lines per route, and the workspace/project ones already resolve their names via `use-workspace-name`/`use-project-name`.
 
+
+**Corroboration (phase 2, 2026-09-21 15:23 IST) — one route painted by me.** `http://localhost:3041/privacy` (see P31's defence for the instrument): `document.title` → **"Gisik Nokma"**; the a11y tree's root is `RootWebArea "Gisik Nokma"` over `heading "Privacy Policy" level=1`. One route, the source sweep is the finding; recorded because it is a paint I made rather than cited.
 ---
 
 ### P13 — **MINOR** ⚠ **r2 REVISION — the WCAG 2.4.1 CLAIM IS WITHDRAWN** — no skip link; a keyboard-only user Tabs the nav on every navigation
@@ -827,6 +829,8 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **Corroboration (phase 2, 2026-09-21 15:18 IST).** Exec 4 (`674decb2`, §1) opened the account menu on `:3041`: `[role=menu]` attributes are exactly `id`, `role`, `class` — no `aria-label`, no `aria-labelledby`. Attributed.
 
 **Corroboration (phase 2, 2026-09-21 15:18 IST) — the paint this finding said it did not have.** Exec 4 (`ccd60196`, §1) set `data-style` client-side on `/settings/ticket-types/new` and measured `.ticket-type-editor__issues li`: `rgb(215,0,21)` on `rgb(228,216,204)` at 12.8 px → **3.84:1** in `hig` and `minimal`; `neo` → 6.28:1. The computed number and the painted number agree to the second decimal. Attributed.
+
+**Corroboration (phase 2, 2026-09-21 15:23 IST) — one route painted by me.** `/privacy` on `:3041` (instrument in P31's defence): the a11y tree's first focusable after the root is `link "Sign in"` inside the unnamed `navigation`; no link precedes the bar and no `gn-skip`/skip element exists in the tree. One signed-out route; the source sweep is the finding.
 ---
 
 ### P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at least seven routes
@@ -858,6 +862,8 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **SEVERITY: IMPORTANT (claimed).** Systemic rather than local — both chrome bars, seven routes — it violates a rule this repository wrote down itself, and its harm lands on the population with no alternative bypass. **A refuter can argue Minor**, on the ground that the landmark still resolves and the links stay reachable; severity is the judge's either way, and I would not contest that ruling.
 
+
+**Defence (phase 2, 2026-09-21 15:23 IST) — the legal pair PAINTED, by me, in this phase.** Bullet 3 above names an accessibility-tree reading without naming its instrument, and a refuter could call it an asserted measurement; so here is one with the instrument named. `http://localhost:3041/privacy` (exec 4's `next dev` of the byte-identical product tree, opened in a fresh isolated browser context via the Chrome DevTools MCP, signed out, 1200 px): `document.querySelectorAll('nav')` → **2**; the first is `nav.gn-nav` with `aria-label` **null** and `aria-labelledby` **null** (1200×70), the second is `nav.gn-legal__toc` with `aria-label` **"On this page"** (726×148). The a11y-tree snapshot (`take_snapshot`) lists, in order: `navigation` (no name) → `heading "Privacy Policy" level=1` → … → `navigation "On this page"`. That is the finding's WHAT for the `LegalNav` half, painted. The `AppNav` half (`/settings`, `/w/<id>`, `/help`, the board) is signed-in and I did not paint it in this phase; its source lines (`app-nav.tsx:232`, `settings/page.tsx:180`) were re-opened and read as cited. Same paint, an aside for the judge: on this route the unnamed bar sits INSIDE the `main` landmark (tree: `main` → `navigation`), so a landmark list offers `main` and then two `navigation`s, one nameless.
 ---
 
 ### P32 — **MINOR** ⚠ **r2 NEW** — Why a control is disabled is put in `title` ON the disabled button, where it cannot be reached
