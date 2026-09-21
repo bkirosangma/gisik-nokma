@@ -39,7 +39,7 @@ ruled is not the prototype and are off by one against the one that is (F3). The 
 **confirmations of gaps the project already records and owns** (F4, F5) — reported because I reproduced
 them independently, not because they are news.
 
-### Round 2 — seventeen new findings, and the one that matters
+### Round 2 — eighteen new findings, and the one that matters
 
 **`E3-14` (Critical, claimed) is a hole in this product's CSRF control, measured against a real
 authenticated session (§24).** `HTTP_ORIGIN_PROTECTED_ROUTES` holds 11 patterns and **five
@@ -48,7 +48,7 @@ cookie-authenticated mutating routes are not in it**, including `POST /v1/me/inv
 survived: the guard written to catch exactly this compares the protected set against **the suite's own
 table**, a closed loop, and passes green beside the gap.
 
-**Eight Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
+**Nine Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
 command is printed beside it. **§23, §36, §38, §39, §40 and §41 record ten attacks on other lanes' findings — all ten failed**, one of them across concerns, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
