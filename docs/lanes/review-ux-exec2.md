@@ -2657,9 +2657,15 @@ version of this paragraph named `/settings` at screen level, and that is no long
 route renders), which is what produced the F1 addendum above. **What remains, with no pretence that it is
 small:**
 
-1. **The bulk of the 13.x catalogue — 2600 of its 2606 ids.** Reached in three bounded bites
-   (`17-open-work.md`'s `17.005`, this file's `13-second-wave-roles-and-navigation.md` log, and the
-   `12-offline-sync-apps.md` edge-class entry). **0.2 % of the catalogue**, and I am not claiming more.
+1. **The catalogue — two halves, reached differently, and the difference matters.**
+   **Mechanically, ACROSS ALL 26 FILES (R2.17e):** 474 source citations extracted and checked — **0 dead
+   paths, 0 genuinely rotted line numbers.** That is a complete mechanical sweep of the catalogue's
+   references. **By reading, four bounded bites:** `17-open-work.md`'s `17.005` re-run and holding;
+   `13-second-wave-roles-and-navigation.md`'s log, which produced `E2-50`; `12-offline-sync-apps.md`'s
+   edge-class entry; and the `06-auth-visibility.md` / `07-api-realtime-search.md` recorded-not-fixed
+   entries sampled. **⚠ What is NOT reached is the HALF THAT NEEDS JUDGEMENT: whether each of the 474 cited
+   lines still says what its case claims, and whether the 2606 ✅/❌/🟡 markers still describe the product.**
+   That is 2606 judgements and I am not claiming any of them.
 2. ⚠ **CORRECTED — `packages/editor` is now COMPLETE, and the line above was wrong twice.** It named
    `src/index.ts`, `attachments/attachment-claims.ts` and *"the two `webview` files beyond `bridge.ts`,
    `entry.tsx` and `create-editor-bridge.ts`"* as unread. **The webview directory has exactly three files**
