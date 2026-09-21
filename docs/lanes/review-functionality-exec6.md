@@ -1353,7 +1353,7 @@ DELETE /v1/me/workspaces/:ws -> 404     DELETE /v1/workspaces/:ws/members/:me ->
 
 `check-permission.ts:641-643` asks only `isWorkspaceAdmin` for `membership.revoked`; there is no self arm.
 `grep -rln 'Leave workspace|leaveWorkspace'` over `apps/web/app`, `packages/app-core/src`, `apps/mobile/src` →
-nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults only; no case in
+nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults only; `grep -ci leave Features.md` → 0; no case in
 `06-auth-visibility.md`, `13-second-wave-roles-and-navigation.md` or `16-remaining-doors.md` mentions leaving.
 
 **WHY it is wrong.**
@@ -1372,9 +1372,10 @@ nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults onl
    makes that one's consequence permanent from the victim's side (only an admin of the attacker's workspace
    can remove them).
 3. **Membership is a claim the person did not necessarily make.** An invitation acceptance is theirs; a
-   `membership.granted` filed by an admin (the roster's "Add" path, or the founding sequence's seeds) is not,
-   and the ledger's model is that a person may undo their own standing — a guest's explicit lists, an
-   assignee's assignment — everywhere except here.
+   `membership.granted` filed by an admin through `POST /v1/events` (the door E6-12's probe used) is not. And
+   the product lets a person undo comparable standing elsewhere: an assignee may unassign themselves
+   (`ticket.assigned` with `assigneeId: null` is gated by `canSee` alone, `check-permission.ts:1048`) — but a
+   member may not un-member themselves.
 
 **WHAT WOULD HAVE BEEN BETTER.** One arm in `checkRolePermission`: `membership.revoked` with
 `payload.userId === sessionUserId` is allowed for any role **unless** the actor is the sole owner (the
