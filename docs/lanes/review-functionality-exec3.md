@@ -3713,3 +3713,67 @@ about **§4 and §6 specifically**, tested there and not generalised here.
 **What remains genuinely unasked, named rather than implied:** `Features.md` §7 (895 lines, 93 candidate
 countable bullets) is opened but its claims are unchecked; **63 of §3's 68 countable bullets are unchecked**; and
 the ✅ set's 🟡/🧪/🚫 rows and `test-cases/README.md`'s legend were counted but not read.
+
+## 57. Round 2 — correction 7: §52's check-row set was ONE THIRD of the real one, and the extended check comes back clean on all 2,407
+
+**This is the correction that matters most in this report, because §52 claimed coverage and its universe was wrong in the same way the whole section was about.**
+
+### 57.1 What I got wrong
+
+§52 opened with *"the `test-cases/` ✅ set — 2,601 ids I had asked nothing"* and then reported its results over **1,077 check-rows**. **The real check-row set is 2,407.** My row pattern required the **bold** spelling
+(`- **6.5** ✅ …`), and the catalogue writes case lines in **three** styles. The repo's own guard,
+`scripts/check-case-ids.mjs`, counts them by name and prints its own breakdown — run at this sha
+(`node scripts/check-case-ids.mjs`, EXIT=0):
+
+```
+check-case-ids: real sweep -- bare 1136, bold 1182, marker-first 288, sum 2606, union 2606, 25 files scanned
+check-case-ids: ok (2606 unique ids, highest 17.006)
+```
+
+I recounted the ✅ set across all three styles myself: **bold 1,077 · bare 1,073 · marker-first 257 = 2,407.**
+So **§52 walked 44.7% of its own subject and reported it as the whole.** The blind-spelling defect this report
+has now caught in a case-id guard, in a citation sweep, in `Features.md` and in my own instruments **was in my
+own coverage claim**, and it was the eighth wrong number of the round.
+
+**Two honest notes on the numbers, rather than tidying them to match.** My own total-id count over the three
+styles is **2,559**, against the guard's **2,606** — a 47-id difference from how each anchors a line head (the
+guard instead reports a self-test against `scripts/fixtures/check-case-ids-fixture.md`, which is the stronger
+control and is why its 2,606 is the number I trust for the *union*; my 2,407 is my own count of the ✅ subset and
+I state it as mine). And the guard's neighbour, `scripts/check-case-citations.mjs`, records in its own docblock
+**"1525 checked ids, 815 uncited"** — a *different* reading, taken at an earlier sha and held as a ratchet
+baseline. **Three numbers for overlapping sets — 1,077 / 2,407 / 1,525 — is itself the finding's shape**, and
+none of the three is wrong: each answers a different question about the same catalogue. Mine answered the
+narrowest, and I labelled it as the whole.
+
+### 57.2 The extended check, run over all 2,407
+
+Same instrument as §52.1, same control in the pipeline (`proj-memberships.test.ts` → 1 match; `zzz-e3-nope.test.ts`
+→ 0), now over all three spellings:
+
+- **2,407 check-rows scanned** (bold 1,077 · bare 1,073 · marker-first 257).
+- **4 rows cite a path that does not resolve by full path or basename. Two of the four were my own instrument**
+  (`./engine.js`, `./evaluate.js`, `./refusal-rules.js`, `./contests.js` on 7.245 are **built artifacts inside
+  `dist/`**, which my tree index excludes; and `.d.ts` on 7.196 is a regex fragment, not a path).
+- **The two genuine cases are both documented and are NOT defects:**
+  **`7.243`** cites `apps/web/test/notifications-gateway.test.ts`, a file that does not exist — inside a **quoted
+  historical entry the case itself refutes**: *"The original entry read: … The caveat below was structural, and it
+  was WRONG."* The case names the claim in order to withdraw it.
+  **`13.24`** cites `error-alerter-shim.ts`, also absent — and the case is **🚫, title-cased RETIRED WITH ITS
+  SUBJECT**, with its own text stating the shim is deleted, why it existed, and that the case is deliberately not
+  renumbered. **Both are the catalogue doing exactly what it should with a citation to something gone.**
+
+**So the corrected result is stronger than the original, not weaker: all 2,407 check-rows in the catalogue cite an
+artifact that resolves — or cite one that does not, while saying so.** The check-1 result of §52.1 holds at
+2.2× the sample it was measured on.
+
+### 57.3 What §52 could NOT say, and what now stands
+
+§52's check-4 (the id separates ✅ 99.8% from ❌ 37.5%) was also run over the bold third only. **I did not re-run
+it across all three spellings**, and I am not going to claim its separation generalises: the bare and marker-first
+lines are the later-minted ids, and a monotone separation measured on one style is a reading about that style.
+**Recorded as §52's remaining limit rather than left implied.**
+
+**Standing after correction 7:** §52's separation result holds *for the bold-styled subset, n=1,077*; the
+**check-1 result holds for all 2,407**; and the sentence *"the check-row set was walked for the first time"* is
+true of the check-1 dimension and **one-third true of the check-4 dimension**. **Seven corrections to this
+report's own claims** (§17.1, §17.2, §14.4, §34, §52.5, §56.1, §57).
