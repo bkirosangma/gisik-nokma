@@ -2223,5 +2223,11 @@ than repeated: the finding's *"`.gn-help__nav-link` first appears 2026-09-15"* m
   manufactured by stripping the key from an otherwise real, ledger-created ticket, and `rebuildProjection`
   replays the whole ledger into the live table inside one transaction, putting the claim back attributed to
   the creator. — `apps/server/test/tools/rebuild-projection.test.ts`
+- **13.1228** ✅ The dev seed spreads the three levels: every seeded `ticket.created` carries an explicit
+  `priority` cycling P1 → P2 → P3 off the ticket's position in the series, so a fresh database shows the
+  whole ladder instead of only the reducer's birth default. Read back from `proj_tickets` rather than from
+  the built events, so the claim is proved to survive ingest and projection and not merely to be spelled in
+  a payload. Deterministic off position, never random — the seed is a fixture and a re-run must rebuild
+  byte-identical payloads. — `apps/server/test/seed/seed-dev.test.ts`
 
 **No `Features.md` bullet.** This corrects an existing sentence's announcement; it adds no affordance.

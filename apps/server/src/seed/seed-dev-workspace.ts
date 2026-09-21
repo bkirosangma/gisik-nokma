@@ -1,4 +1,4 @@
-import type { SubmittedEvent } from '@gisik-nokma/domain';
+import { PRIORITIES, type Priority, type SubmittedEvent } from '@gisik-nokma/domain';
 import { seedDescriptionDoc } from './doc-text.js';
 import { readPlanSeries, type PlanDoc } from './plan-series.js';
 import type { CcSeedDeps, SeedReport } from './seed-convenience-corner.js';
@@ -72,6 +72,26 @@ export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientT
     projectAdmin: true,
   });
 
+  /**
+   * The next level for the next `ticket.created`, cycling P1 → P2 → P3
+   * (spec 2026-09-22). A fresh database must SHOW the whole ladder, not only
+   * its middle: without this every seeded ticket would take the reducer's birth
+   * default and the dev stack would read as a product with one priority.
+   *
+   * ONE counter across epics AND tasks, not one index per plan or per epic. Off
+   * the plan number (`doc.planNumber % 3`, the shape the plan text sketches) a
+   * two-plan corpus — which is exactly `seed-dev.test.ts`'s fixture, chosen
+   * there for measured reasons and not for this — reaches only P2 and P3 and the
+   * case would be asserting something the fixture cannot produce. Counting every
+   * created ticket makes "all three levels are present" true of any corpus of
+   * three or more, which is the property the spec actually asks for.
+   *
+   * Deterministic off the position in the series, never random: the seed is a
+   * fixture, and a re-run must rebuild byte-identical payloads.
+   */
+  let priorityCursor = 0;
+  const nextPriority = (): Priority => PRIORITIES[priorityCursor++ % PRIORITIES.length]!;
+
   for (const doc of docs) {
     const epicId = seedUlid('ticket', `dev#plan-${doc.planNumber}`);
     push(`dev#plan-${doc.planNumber}#created`, { kind: 'ticket', id: epicId }, 'ticket.created', {
@@ -81,6 +101,7 @@ export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientT
       projectId,
       parentId: null,
       title: doc.title,
+      priority: nextPriority(),
     });
     if (doc.goal) {
       push(`dev#plan-${doc.planNumber}#description`, { kind: 'ticket', id: epicId }, 'ticket.field_set', {
@@ -109,6 +130,7 @@ export function buildDevSeedEvents(docs: PlanDoc[], ownerUserId: string, clientT
           projectId,
           parentId: epicId,
           title: `Task ${task.number}: ${task.title}`,
+          priority: nextPriority(),
         },
       );
       push(

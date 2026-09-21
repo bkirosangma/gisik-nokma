@@ -9,6 +9,7 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import { readPlanSeries } from '../../src/seed/plan-series.js';
 import { existingSeedEventIds } from '../../src/seed/seed-convenience-corner.js';
 import { buildDevSeedEvents, seedDevWorkspace } from '../../src/seed/seed-dev-workspace.js';
+import { seedUlid } from '../../src/seed/seed-ulid.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
@@ -286,5 +287,22 @@ describe('seedDevWorkspace', () => {
     });
     expect(second.committed).toBe(0);
     expect(second.skippedExisting).toBe(first.committed);
+  });
+
+  /**
+   * 13.1228 — the seed spreads all three levels (spec 2026-09-22): a fresh
+   * database must SHOW the whole ladder, not only its middle. Read back from
+   * `proj_tickets` rather than from the built events, so the claim is proved to
+   * survive ingest and projection rather than merely to be spelled in a payload.
+   *
+   * Depends on the case above having seeded — the describe's tests run in
+   * declaration order and this one reads what that one committed.
+   */
+  it('13.1228 the dev seed spreads the three priorities so a fresh database shows every level', async () => {
+    const rows = await db.pool.query<{ p: string }>(
+      `SELECT DISTINCT fields -> 'priority' ->> 'value' AS p FROM proj_tickets WHERE project_id = $1 ORDER BY p`,
+      [seedUlid('project', 'dev#build')],
+    );
+    expect(rows.rows.map((row) => row.p)).toEqual(['P1', 'P2', 'P3']);
   });
 });
