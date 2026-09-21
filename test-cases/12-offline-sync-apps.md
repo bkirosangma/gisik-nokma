@@ -2854,3 +2854,19 @@ factories, returning `{ok:false, error}` instead of letting the rejection escape
   (bootstrap replay) — same RED→GREEN discipline as 12.402, the second of the four awaits. —
   (`apps/desktop/src/init-replica.test.ts`)
 
+## Ruling E2-48 — the phone shell's own init catches its rejection too (2026-09-21, B14)
+
+*The sibling of E2-43 on desktop: `App`'s init IIFE ran the same architecture
+(`createReplica → createOutbox → createSyncEngine → createReplicaDataSource`, then `setDs`, differing
+only in the storage adapter — `createOpSqliteStorage` here) with no `catch`, so a rejection left the
+board silently empty. Fixed the same way: `init-replica.ts`'s `initReplica`, returning
+`{ok:false, error}`; `BoardScreen` gained an `initError` prop rendered as
+`<Text accessibilityRole="alert">`.*
+
+- 12.404 ✅ `initReplica` (mobile) reports the failure instead of rejecting when storage fails to open
+  — RED confirmed against the pre-fix function (an unhandled rejection), GREEN after. —
+  (`apps/mobile/src/init-replica.test.ts`)
+- 12.405 ✅ `initReplica` (mobile) reports the failure instead of rejecting when the replica fails to
+  build — same RED→GREEN discipline as 12.404. —
+  (`apps/mobile/src/init-replica.test.ts`)
+

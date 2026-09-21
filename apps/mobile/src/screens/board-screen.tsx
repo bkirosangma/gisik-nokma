@@ -12,6 +12,7 @@ export function BoardScreen(props: {
   status: string;
   queued: number;
   failed: number;
+  initError?: string | null;
 }) {
   const navigation = useNavigation<Nav>();
   const [tickets, setTickets] = useState<TicketSummary[]>([]);
@@ -48,6 +49,7 @@ export function BoardScreen(props: {
       */}
       <Text accessibilityRole="text">{syncStatusLabel(props.status, props.queued)}</Text>
       {props.failed > 0 ? <Text accessibilityRole="text">{props.failed} needs attention</Text> : null}
+      {props.initError != null ? <Text accessibilityRole="alert">{props.initError}</Text> : null}
       <TextInput placeholder="Search" value={query} onChangeText={setQuery} />
       {offlineCopy && query !== '' ? <Text>searching offline copy</Text> : null}
       {readError !== null ? <Text accessibilityRole="alert">{readError}</Text> : null}
