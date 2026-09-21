@@ -768,6 +768,24 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **AND IT IS THE SAME CLASS AS P4 AND P25:** a sentence in the artefact making a claim about the artefact that is *nearly* true. `apps/web/e2e` is a UI suite in this lane's universe and it is where I would look for the mocked-contract failure the coordination doc records by name; **the discipline is genuinely there — this is a hole in it, not an absence of it.**
 
+### P30 — **IMPORTANT** ⚠ **r2 NEW** — The mobile editor webview is TWO GENERATED LINKS BEHIND, and both links are unguarded
+
+**WHAT.** `apps/mobile` renders the ticket's description editor inside a WebView built from a **baked HTML string**. That string is generated from a **built bundle**, which is built from `packages/editor`'s source — **a three-step chain, unguarded at both generated links, and measured to be two steps stale.**
+
+**MEASUREMENT — each link, in order, with what proves the drift.**
+1. **The generated constant is from 2026-09-06.** `git log -1 --format='%ad' -- apps/mobile/src/editor/editor-html.generated.ts` → **`dca435d2`, 2026-09-06 02:24**.
+2. **The editor's source has changed FIVE times since.** `git rev-list --count --since=2026-09-03 HEAD -- packages/editor/src` → **5**, and they are not cosmetic: `1cbc6a02` (*"The description is editable, and the row it lives in did not exist"*), **`af4d31b7` (*"The rich-text toolbar the prototype draws had no counterpart"*)**, `95e6938e` (a reviewer's five Important findings), `188abb63` (a type-scale change), and **`afdb5af6`, 2026-09-20 23:25** (*"markdownLinks reversed: the typed link is on"*).
+3. **And the drift is visible in the artefact, with a control.** `grep -c 'ticket-editor__toolbar' apps/mobile/src/editor/editor-html.generated.ts` → **0** — the class `af4d31b7` introduced is absent. **Control: `ProseMirror`, `tiptap` and `contenteditable` each appear once**, so the string is a real editor bundle and the greps traverse it.
+4. **⚠ AND THE SECOND LINK IS STALE TOO, WHICH IS THE PART THAT MATTERS.** `packages/editor/dist-webview/index.html` is dated **Sep 3** and is **gitignored** (`.gitignore:7`). It contains `ProseMirror` **23 times** and `ticket-editor__toolbar` **0 times**. **So re-running the generator today — the remedy the file's own header instructs — would bake the September 3rd bundle, not current source.** The chain has to be rebuilt from its first link, and nothing says so.
+5. **And nothing checks any of it.** Grepping every `.json`, `.ts`, `.mjs`, `.yml` and the CI workflow for `editor-html.generated` or `generate-editor-html` finds **the generator, the generated file, and a `package.json` script** — **no `--check` mode, no test, no CI step.** `apps/mobile/src/editor/editor-web-view.test.ts` does not reference `EDITOR_HTML` or the word *generated* at all.
+
+**WHY IT IS WRONG — AND THE HONEST SPLIT, BECAUSE THE MECHANISM IS ALREADY RECORDED.** `Features.md` names the *risk* in as many words: *"it goes stale the moment `packages/editor`'s webview content changes, **and nothing in the gate checks its freshness** — regeneration is a manual, documented step."*
+**So the unguarded mechanism is a recorded gap, and I am not filing that.** **What is NOT recorded is that it HAS gone stale, by how much, and that the documented remedy would not fix it**: the record describes a hazard; this is the measured instance, and it includes a second stale link that the record's remedy does not reach. **That distinction is the whole finding** — and it is the difference between the P8 I re-filed downward and this one.
+
+**Consequence, stated narrowly.** The mobile composer is a WebView whose content predates the toolbar the owner ruled on (*"the rich-text toolbar — all 3 yes"*), the editable description, and the markdown-link reversal. **The shell is marked `⚙️` — *"no simulator or physical device has ever shown this UI to a person"* — so nobody has seen the drift**, which is why it lasted fifteen days. **A wrong editor on a surface nobody renders is a small harm; a two-link generated chain with no guard and a documented remedy that would not work is a machinery defect**, and that is what this is filed as.
+
+**WHAT WOULD HAVE BEEN BETTER.** `generate-editor-html.mjs` gaining a `--check` mode that regenerates into a temp file and diffs, wired as one step in the mobile package's `test` — the same shape `check:help` already uses for the in-app manual (*"the in-app manual and FAQ must match the documents they are generated from"*), which is this repository's own precedent for exactly this problem. **And the header should say the bundle must be rebuilt first**, since its current instruction would produce a second stale artefact and look like a fix.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -828,7 +846,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 15**
+**IMPORTANT — 16**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -844,6 +862,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
 - `P26` ⚠ r2 — the prototype-delta document is stale in BOTH halves: **every numbered queue row is closed** and **two of five per-screen gap claims no longer describe the product**
+- `P30` ⚠ r2 — the mobile editor webview is two generated links behind and both links are unguarded
 
 **MINOR — 17**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
@@ -864,7 +883,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P28` ⚠ r2 — the mobile board's row is the one pressable of six with no accessibility role; its sibling sets one **(observation credited to the opposing lane; the census is the addition)**
 - `P29` ⚠ r2 — the mock suite says every stub carries its server `file:line`; two of ten carry the file only, and they are the two whose contracts drifted
 
-**Total 33.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 34.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
