@@ -1682,7 +1682,7 @@ contradiction is the finding.
 **Source:** carried candidate (round-1 §2d). **Severity: Minor.** The true half of the sentence is present,
 so the person is not left without information — they are left with a contradiction.
 
-> **DEFENCE — phase 2, 2026-09-21 15:26 IST, after exec 6's `R6-3 → E2-28` (their file at `23d4ab8d`, filed 15:20).**
+> **DEFENCE — phase 2, 2026-09-21 15:23 IST, after exec 6's `R6-3 → E2-28` (their file at `23d4ab8d`, filed 15:20).**
 > **R6-3 is correct, and I re-ran its five measurements before writing this.** `<BulkCloseDialog` is mounted by two
 > files, `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx` and `packages/app-core/src/views/board.tsx`, and by
 > nothing under `apps/mobile` or `apps/desktop` (0 hits). The web constructs its data source at
