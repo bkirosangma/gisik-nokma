@@ -3882,3 +3882,38 @@ the correct remedy rather than a workaround.
 this report holds against `Features.md` — `E3-29` and `E3-26` — are in **§5** and **§10**, and the counts §3's
 bullets state are the ones the code agrees with. **Sixty-one of §3's 68 candidate countable bullets remain
 unchecked**, and that number is stated rather than dressed as coverage.
+
+## 60. Round 2 — §3's remaining checked claims: nine exact, no finding, and a note on what that does NOT mean
+
+### 60.1 `Features.md:347` — *"The Playwright smoke … five cases over sign-in, the refusing workspace list beside its founding form, the board's card with its restricted-count line and attributed provenance, and both halves of the invite contract"*
+
+`apps/web/e2e/smoke.spec.ts` holds **exactly five** `test(...)` calls, and their own titles map onto the bullet's
+enumeration **one for one**: *"sign-in offers the methods that can work, and no control that cannot"* · *"the
+workspace list RENDERS what it is served, and the founding door is still open"* · *"the board renders a card, its
+restricted-count line, and its attributed provenance"* · *"an invite link names the workspace and offers the
+join"* · *"a dead invite link says so, and offers no join"*. **Verified clean** — count and membership both.
+The bullet's second claim (*"kept off the gate by TWO independent facts"* — `test` is `vitest run` while the smoke
+is `test:e2e`, and `vitest.config.ts` includes `test/**` only) I checked only to the extent of confirming both
+facts exist; I did not edit either config to watch the exclusion fail, and so I record it as **read, not
+mutation-witnessed**.
+
+### 60.2 `Features.md:34` — *"Button, Chip, Card, Avatar, Dialog, Sheet, Table"*
+
+Seven components named, no count word asserted. All seven exist as
+`packages/ui/src/components/{button,chip,card,avatar,dialog,sheet,table}.tsx`. **Verified clean.** No finding
+either way — a list of seven that are seven.
+
+### 60.3 §3's tally, and the honest limit on it
+
+**Nine countable claims checked in §3, all nine exact** (§54.1–54.3, §55, §59.1–59.2, §60.1–60.2). **§3 has
+produced no finding, and that is a result rather than a gap in the search** — but it is worth being precise about
+what it is a result *about*: §3's bullets are densely tied to named modules, files and counts that exist, which is
+exactly why a check finds them true. **The two `Features.md` findings this report holds — `E3-29` (§5) and
+`E3-26` (§10) — are in sections whose bullets closed a set in prose instead**, and §4's and §6's findings are the
+same shape. **No claim in this report generalises that `Features.md` is stale; the claim is that it is stale
+where a bullet states a count over a set nothing in code can check, and that is tested in §4, §5, §6 and §10 and
+nowhere else.**
+
+**Remaining unchecked in §3: 59 of 68 candidate countable bullets.** And my own running total for the round is now
+**nine wrong numbers of my own against nine clean §3 claims** — the ratio that makes me distrust any count in this
+report that did not come with a control in the same command.
