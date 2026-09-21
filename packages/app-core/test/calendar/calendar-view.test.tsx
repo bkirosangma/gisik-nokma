@@ -694,7 +694,7 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
 });
 
 /**
- * E4-28 (batch B15, case block `11.216`-`11.217`) — the grid's date
+ * E4-28 (batch B15, case block `11.221`-`11.222`) — the grid's date
  * relationships stop living by position alone. `docs/lanes/review-ui-exec4.md:446`:
  * day cells carry only `data-day`/`data-today`/`data-outside`/`aria-current`
  * (no `aria-label`, no `<time>`), and a bar's rendered text is its ticket
@@ -705,7 +705,7 @@ describe('11.72 what the mounting shell hands in is what the grid uses', () => {
  * `itemClassName`'s sibling docblock: "the accessible name is the claim and
  * nothing else"), so this fix does not touch markers.
  */
-describe('11.216 every day cell names its own full date', () => {
+describe('11.221 every day cell names its own full date', () => {
   it('carries the full date as an aria-label, not just a bare day-of-month number', () => {
     renderCalendar([]);
     // `[data-day]` rather than a text query: August AND the outside-July row
@@ -726,7 +726,7 @@ describe('11.216 every day cell names its own full date', () => {
   });
 });
 
-describe("11.217 a bar's date span is a linked DESCRIPTION, not folded into its accessible name", () => {
+describe("11.222 a bar's date span is a linked DESCRIPTION, not folded into its accessible name", () => {
   it('keeps the accessible NAME exactly the ticket title, and links the dates as aria-describedby', () => {
     renderCalendar([
       ticket({
@@ -764,7 +764,7 @@ describe("11.217 a bar's date span is a linked DESCRIPTION, not folded into its 
 });
 
 /**
- * P20 (batch B15, case `11.219`) — the APG calendar-grid pattern's four
+ * P20 (batch B15, case `11.224`) — the APG calendar-grid pattern's four
  * roles, added to the structure that already exists: `grid` on the
  * container, `row` on the weekday head and on each week, `columnheader` (with
  * `aria-label` on the full weekday name) and `gridcell`. Without them the
@@ -772,7 +772,7 @@ describe("11.217 a bar's date span is a linked DESCRIPTION, not folded into its 
  * reader had no way to associate a day cell with the weekday column it sits
  * under. `docs/lanes/review-ui-exec1.md:567`.
  */
-describe('11.219 the month grid carries the APG calendar-grid roles, not position alone', () => {
+describe('11.224 the month grid carries the APG calendar-grid roles, not position alone', () => {
   it('grid on the container, row on the weekday head, columnheader with the full weekday name on each label', () => {
     renderCalendar([]);
     const grid = document.querySelector('.gn-calendar__grid');

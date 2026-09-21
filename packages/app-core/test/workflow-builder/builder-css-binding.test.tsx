@@ -715,7 +715,7 @@ describe('13.770 the workflow name is the title and stays a control', () => {
  * every style and theme — reusing a declared pair rather than adding a new,
  * unchecked one.
  */
-describe('E4-16 the React Flow attribution link is overridden to a declared contrast pair', () => {
+describe('13.1207 E4-16 the React Flow attribution link is overridden to a declared contrast pair', () => {
   const css = readFileSync(CSS_PATH, 'utf8');
 
   it('is floored at 12px and coloured with a role this file already declares', () => {
