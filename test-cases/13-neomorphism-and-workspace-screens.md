@@ -1392,7 +1392,13 @@ Task 4, Task 7 ×3, Task 8). Block `13.403`–`13.410`, minted per the corrected
   (`· +1 more`); and when `countsWithheld` is true the suffix drops the number (`· and more`) rather than
   leaking one to a guest — 13.380's own property ("no number anywhere") applied to a second surface. Six
   cases total (`projectLine`), plus three for the sibling `projectCountLine` (singular, plural, and
-  renders nothing at zero, the same withholding rule `restrictedLine` keeps). —
+  **says "No projects yet" at zero** — E5-36, 2026-09-21). That third one used to be "renders nothing at
+  zero, the same withholding rule `restrictedLine` keeps", borrowed from a rule whose reason does not
+  reach it: `restrictedLine`'s zero rule is about a person with nothing withheld being told about
+  withholding, and `projectCountLine` carries no withholding. What `null` bought was a founder's fresh
+  card — avatar, name, chips, "You're an owner here." — with no mention of projects and no pointer to the
+  New-project form that `docs/manual.md:174` sends an owner to. A withheld viewer is unaffected because
+  the caller gates the line on `!viewer.countsWithheld`, so the rule now lives where it was doing work. —
   (`apps/web/test/workspace-viewer.test.ts`)
 - **13.406** ✅ **The `/workspaces` page-head summary is gated on `workspaces !== null &&
   workspaces.length > 0`, both halves independently proven** — a REFUSED read is `null` exactly like an
