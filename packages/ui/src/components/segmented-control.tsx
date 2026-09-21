@@ -9,6 +9,26 @@ export type SegmentedControlProps<T extends string> = {
   onChange: (value: T) => void;
   /** Names the choice for assistive tech. Required, so it cannot be forgotten. */
   'aria-label': string;
+  /**
+   * Extra classes for the ROOT track, appended AFTER `gn-segmented`.
+   *
+   * **This exists so a CALLER never has to write a descendant selector naming
+   * `.gn-segmented`, and that is a correctness constraint rather than a
+   * convenience.** `packages/ui/test/components.test.tsx`'s `rule(selector)`
+   * helper finds a rule with `UI_CSS.match(new RegExp(escapedSelector +
+   * '\\s*\\{([^}]*)\\}'))` — **`.match()`, so the FIRST occurrence in file order
+   * wins.** A caller-side `.gn-somewhere .gn-segmented { … }` placed ABOVE the
+   * real `.gn-segmented` rule therefore becomes the body `rule('.gn-segmented')`
+   * returns, and a case asserting the track's own declaration reads the caller's
+   * override instead. Measured, 2026-09-22: with such a selector at `ui.css:2163`
+   * and the real rule at `:5125`, `rule('.gn-segmented')` answered
+   * `" display: inline-flex; "` — the override — while every existing case stayed
+   * green, because they all query `.gn-segmented__item` and the `__item` suffix
+   * blocks the prefix match. **The hazard is invisible until someone writes the
+   * bare selector, which is the most natural thing to write.** A class passed
+   * here has no `.gn-segmented` in its own selector, so it cannot shadow one.
+   */
+  className?: string;
 };
 
 /**
@@ -53,6 +73,7 @@ export function SegmentedControl<T extends string>({
   value,
   onChange,
   'aria-label': ariaLabel,
+  className,
 }: SegmentedControlProps<T>) {
   const tabRefs = useRef<Array<HTMLButtonElement | null>>([]);
   const selectedIndex = options.findIndex((option) => option.value === value);
@@ -93,7 +114,14 @@ export function SegmentedControl<T extends string>({
   };
 
   return (
-    <div role="tablist" aria-label={ariaLabel} className="gn-segmented">
+    // `className` is appended, never substituted, so a caller's class ADDS to
+    // the track rather than replacing it — and `undefined` leaves the attribute
+    // byte-identical to what every existing call site already renders.
+    <div
+      role="tablist"
+      aria-label={ariaLabel}
+      className={className === undefined ? 'gn-segmented' : `gn-segmented ${className}`}
+    >
       {options.map((option, index) => {
         const on = option.value === value;
         return (

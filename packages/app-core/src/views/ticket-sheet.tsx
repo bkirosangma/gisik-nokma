@@ -3077,6 +3077,13 @@ export function TicketSheet({
                     if (!prioritySaving && next !== priorityValue) void submitPriority(next);
                   }}
                   aria-label="Priority"
+                  // Its own class rather than a descendant selector from the row:
+                  // `.gn-ticket-sheet__field .gn-segmented { … }` would contain
+                  // the bare `.gn-segmented` substring and, sitting above the
+                  // real rule, would become the body `rule('.gn-segmented')`
+                  // returns in `packages/ui/test/components.test.tsx` — measured,
+                  // 2026-09-22. See `SegmentedControlProps.className`.
+                  className="gn-ticket-sheet__priority"
                 />
                 {priorityClaim === undefined ? (
                   <span className="gn-ticket-sheet__refusal">

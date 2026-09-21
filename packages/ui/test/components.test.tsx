@@ -1819,3 +1819,73 @@ describe('13.1153 the segmented item carries the prototype\'s horizontal padding
     expect(rule('.gn-segmented__item')).toMatch(/flex:\s*1/);
   });
 });
+
+/**
+ * 3.974 — NOTHING SHADOWS THE SEGMENTED TRACK'S OWN RULE, and the guard exists
+ * because the hazard is invisible to every other case in this file.
+ *
+ * `rule(selector)` (above) resolves a rule with `UI_CSS.match(new RegExp(...))`,
+ * and **`.match()` takes the FIRST occurrence in FILE ORDER.** So any rule whose
+ * selector TEXT contains this class and which sits ABOVE the real `.gn-segmented`
+ * rule becomes the body `rule('.gn-segmented')` returns — a caller's override
+ * answering for the component's own track.
+ *
+ * **MEASURED 2026-09-22, and it was not hypothetical.** The ticket sheet shipped
+ * `.gn-ticket-sheet__field .gn-segmented { display: inline-flex; }` at `:2163`
+ * with the real rule at `:5125`. `rule('.gn-segmented')` answered
+ * `" display: inline-flex; "` — the OVERRIDE — while all 426 cases in this
+ * package stayed GREEN, because every one of them queries `.gn-segmented__item`
+ * and that `__item` suffix blocks the prefix match. The landmine would have
+ * fired only for whoever next wrote the BARE class, which is the most natural
+ * thing to write when testing this component. It was fixed by giving the caller
+ * its own class (`SegmentedControlProps.className`), and this case is what keeps
+ * it fixed — a comment alone is a claim with no instrument.
+ *
+ * Comments are stripped first, for this file's own measured reason: `ui.css` is
+ * largely prose and quotes its selectors constantly, so a class merely DISCUSSED
+ * in a docblock would otherwise answer here — **which is exactly what the first
+ * draft of the fix's own comment did**, reintroducing the match it warned about
+ * until the re-measurement caught it.
+ */
+describe('3.974 the segmented track is not shadowed by another selector', () => {
+  /** The same strip `bare-control-coverage.test.ts` and `colour-scan.ts` apply. */
+  const stripComments = (css: string): string => css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  /**
+   * The rule's own SELECTOR TEXT: everything between the previous rule's closing
+   * brace and this rule's opening one. For a bare rule that is WHITESPACE ONLY,
+   * measured (`"\n\n\n"`, trim length 0); for a descendant form it leaves the
+   * ancestor class standing there.
+   */
+  const selectorTextOfFirst = (css: string, className: string): string => {
+    const match = stripComments(css).match(new RegExp(`\\.${className}\\s*\\{`));
+    if (match === null) throw new Error(`no rule for .${className}`);
+    const [before] = [stripComments(css).slice(0, match.index)];
+    return (before.split('}').pop() ?? '').trim();
+  };
+
+  it('3.974 the first `.gn-segmented` rule is the bare selector, with no ancestor ahead of it', () => {
+    expect(selectorTextOfFirst(UI_CSS, 'gn-segmented')).toBe('');
+    // CONTROL — a PLANTED INPUT, not a second real class, because the property
+    // under test is that this probe DISCRIMINATES. A reader that returned `''`
+    // for everything would satisfy the line above while catching nothing, so it
+    // is handed the exact shape it exists to reject and must name the ancestor
+    // standing there. Two arms, so a reader that returned a NON-empty string for
+    // everything fails too.
+    // It reports the text BEFORE the class — the ANCESTOR — and that is the
+    // useful thing to name: a failure says which selector is standing in front
+    // of the track. (This expectation was `.gn-somewhere .gn-segmented` on the
+    // first writing, and the probe was right: it matches AT the class, so the
+    // class itself is not in the window.)
+    expect(
+      selectorTextOfFirst('.a { x: 1; }\n.gn-somewhere .gn-segmented { y: 2; }', 'gn-segmented'),
+    ).toBe('.gn-somewhere');
+    // And the same planted input with the ancestor AFTER the rule: the probe
+    // reads the FIRST match in file order, so a shadow placed below the real
+    // rule is harmless and must NOT be reported. This is the half that stops the
+    // case demanding a stronger property than the hazard actually has.
+    expect(
+      selectorTextOfFirst('.gn-segmented { x: 1; }\n.gn-somewhere .gn-segmented { y: 2; }', 'gn-segmented'),
+    ).toBe('');
+  });
+});
