@@ -4,6 +4,7 @@ import { registerPushToken } from './register-push.js';
 /**
  * 12.39 — registerPushToken registers on a 200, reports transport-unavailable on a 404 (missing transport), and reports no-token when getToken throws (denied permission) — the three clauses this row names, each its own it().
  * 12.227 — registerPushToken registers the Expo token on a 200, reports transport-unavailable on the real 404 apps/server answers (no /v1/push/registrations route registered — asserted by the response status the fake fetchImpl returns, matching the route's real absence), reports no-token on a denied OS permission, and reports http-<status> for any other non-404 error.
+ * 12.411 — E2-49: a transport failure (fetch rejects — offline, a dropped socket) resolves {registered:false, reason:'unreachable'} instead of rejecting, and 'unreachable' is a THIRD value, never coerced into 'transport-unavailable' (the 404 arm, a server-given answer) or into any http-<status> value.
  */
 describe('registerPushToken', () => {
   const getToken = vi.fn(async () => ({ data: 'ExponentPushToken[abc]' }));
@@ -39,5 +40,14 @@ describe('registerPushToken', () => {
     const fetchImpl = vi.fn(async () => new Response('server error', { status: 500 }));
     const result = await registerPushToken({ baseUrl: 'http://api', token: 't', getToken, fetchImpl });
     expect(result).toEqual({ registered: false, reason: 'http-500' });
+  });
+
+  it('12.411 — reports a transport failure as a third value, not the 404 one, without throwing', async () => {
+    const fetchImpl = vi.fn(async () => {
+      throw new TypeError('Network request failed');
+    });
+    const result = await registerPushToken({ baseUrl: 'http://api', token: 't', getToken, fetchImpl });
+    expect(result).toEqual({ registered: false, reason: 'unreachable' });
+    expect(result.reason).not.toBe('transport-unavailable');
   });
 });

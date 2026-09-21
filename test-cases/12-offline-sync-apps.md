@@ -2927,3 +2927,18 @@ protocol widened, out of this task's package).*
   member) and the refused-door case (`[]`, not a throw). —
   (`apps/mobile/src/screens/mention-query.test.ts`)
 
+## Ruling E2-49 — push registration's transport failure is a third value (2026-09-21, B14)
+
+*`register-push.ts`'s `fetch` at the registration POST was not inside any `try`/`catch` — the only
+one of the function's four return arms not wrapped — so a transport failure (offline, a dropped
+socket) rejected instead of returning `{registered:false, reason:…}` like every other arm. Fixed by
+wrapping the `fetch` and returning `reason:'unreachable'` on its catch, kept distinct from
+`'transport-unavailable'` (the 404 arm, an answer the server actually gave) per this product's
+standing rule that a refusal and a dropped connection are never the same word.*
+
+- 12.411 ✅ `registerPushToken` reports a transport failure as `{registered:false,
+  reason:'unreachable'}` instead of rejecting, and `'unreachable'` is asserted distinct from
+  `'transport-unavailable'` — RED confirmed against the pre-fix function (the fetch rejection
+  propagated unhandled), GREEN after. —
+  (`apps/mobile/src/push/register-push.test.ts`)
+
