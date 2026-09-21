@@ -5,6 +5,7 @@ import '@gisik-nokma/editor/editor.css';
 import './globals.css';
 import { Providers } from '../src/providers.js';
 import { SkipLink } from '../src/skip-link.js';
+import { RouteAnnouncer } from '../src/route-announcer.js';
 
 export const metadata = { title: 'Gisik Nokma' };
 
@@ -51,6 +52,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
             swept in `test/skip-link.test.tsx`, so a route added without one
             reddens instead of shipping a dead anchor. */}
         <SkipLink />
+        {/*
+          P18 — outside `Providers` deliberately. It reads the route and the
+          document, and nothing from the app's service seam; mounting it here
+          means a route change is announced on every page in the product,
+          including the pages that render no shell.
+        */}
+        <RouteAnnouncer />
         <Providers>{children}</Providers>
       </body>
     </html>

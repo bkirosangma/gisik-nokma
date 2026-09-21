@@ -1,10 +1,11 @@
-import { act, render, screen, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // `"type": "module"`, so NodeNext resolves its types as CJS and a default
 // import lands on the module namespace (no `.setup`) under this repo's
 // verbatimModuleSyntax / no-esModuleInterop base config.
 import { userEvent } from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
+import { useState } from 'react';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
@@ -14,6 +15,7 @@ import { Chip } from '../src/components/chip.js';
 import { Dialog } from '../src/components/dialog.js';
 import { InfoTip } from '../src/components/info-tip.js';
 import { SegmentedControl } from '../src/components/segmented-control.js';
+import { Select, type SelectOption } from '../src/select/select.js';
 import { Sheet } from '../src/components/sheet.js';
 import { Switch } from '../src/components/switch.js';
 import { Table, type TableColumn } from '../src/components/table.js';
@@ -164,6 +166,147 @@ describe('Sheet', () => {
   });
 });
 
+/**
+ * P8 (case 13.1052) — `Dialog` and `Sheet` both declare `aria-modal="true"`, which tells
+ * assistive tech that everything outside them is inert. Neither moved focus into
+ * itself, trapped it, or restored it on close, so the claim was asserted and not
+ * kept. The gap is not inert in the product either: `board.tsx:385-393` refuses a
+ * column action *because* it judges the interaction to have arrived "behind a
+ * modal — a keyboard-focus escape", so a workaround exists specifically for the
+ * leak.
+ *
+ * The standard already exists in this repo, tested, on a less-used surface: the
+ * project page's filters sheet moves focus in on open and returns it to the exact
+ * opening control on close, asserted by 13.445/13.446. These cases bring the two
+ * shared primitives up to it — focus in on open, Tab contained, focus returned to
+ * the opener on a keyboard close.
+ *
+ * Every case opens through a real button and asserts the control that focus
+ * demonstrably LEFT before asserting where it arrived, because "focus is inside
+ * the dialog" is vacuously true when the opener was never focused in the first
+ * place.
+ */
+describe('P8 — Dialog and Sheet contain focus while they claim aria-modal', () => {
+  function Opener({ kind }: { kind: 'dialog' | 'sheet' }) {
+    const [open, setOpen] = useState(false);
+    return (
+      <div>
+        <button type="button" onClick={() => setOpen(true)}>
+          Open panel
+        </button>
+        {kind === 'dialog' ? (
+          <Dialog open={open} title="Reopen parent?" onClose={() => setOpen(false)}>
+            <button type="button">Inner action</button>
+          </Dialog>
+        ) : (
+          <Sheet open={open} title="GST registration" onClose={() => setOpen(false)}>
+            <button type="button">Inner action</button>
+          </Sheet>
+        )}
+      </div>
+    );
+  }
+
+  for (const kind of ['dialog', 'sheet'] as const) {
+    it(`P8: ${kind} moves focus in on open and returns it to the opener on Escape`, async () => {
+      const user = userEvent.setup();
+      render(<Opener kind={kind} />);
+      const trigger = screen.getByRole('button', { name: 'Open panel' });
+      trigger.focus();
+      expect(trigger).toHaveFocus();
+
+      await user.click(trigger);
+      const panel = screen.getByRole('dialog', { name: kind === 'dialog' ? 'Reopen parent?' : 'GST registration' });
+      // Control: focus really LEFT the opener — without this, "focus is inside
+      // the panel" would be satisfied by a component that moved nothing.
+      expect(document.activeElement).not.toBe(trigger);
+      expect(panel.contains(document.activeElement)).toBe(true);
+
+      await user.keyboard('{Escape}');
+      expect(screen.queryByRole('dialog')).not.toBeInTheDocument();
+      // Restored to the exact control that opened it, not to the body.
+      await waitFor(() => expect(trigger).toHaveFocus());
+    });
+
+    it(`P8: ${kind} contains Tab WITHOUT swallowing a portalled popover's own focus`, async () => {
+      /**
+       * The interaction this batch introduced and nothing else covered.
+       *
+       * `contain` holds focus inside the panel, and a `Select` panel is
+       * portalled to `document.body` — outside the panel in the DOM. Left alone,
+       * containment reads that as an escape and drags focus back off the option
+       * row.
+       *
+       * **Measured, not reasoned.** Removing E4-17's `FocusScope` from
+       * `SelectPanel` and re-running this shape leaves focus on
+       * `button.gn-select__trigger` with the option row never focused at all —
+       * the picker degrades silently inside every dialog in the product. With it,
+       * focus lands on `li.gn-select__option`. The mechanism is React Aria's
+       * scope TREE rather than the DOM: the panel's `FocusScope` is a child of
+       * the dialog's through React context, which crosses the portal, so
+       * `isElementInChildScope` answers true and `contain` leaves it be.
+       *
+       * So the two rulings in this batch hold each other up, and that is exactly
+       * the kind of coupling that breaks quietly when one half is later tidied
+       * away as a redundant wrapper. This case is the wire between them.
+       */
+      const user = userEvent.setup();
+      const onChange = vi.fn();
+      const options = [
+        { value: 'apple', label: 'Apple' },
+        { value: 'banana', label: 'Banana' },
+      ];
+      const inner = (
+        <>
+          <button type="button">First action</button>
+          <Select options={options} value={null} onChange={onChange} aria-label="Type" />
+        </>
+      );
+      function WithPicker() {
+        return kind === 'dialog' ? (
+          <Dialog open title="New ticket" onClose={vi.fn()}>
+            {inner}
+          </Dialog>
+        ) : (
+          <Sheet open title="New ticket" onClose={vi.fn()}>
+            {inner}
+          </Sheet>
+        );
+      }
+      render(<WithPicker />);
+      const trigger = screen.getByRole('button', { name: /Type/ });
+      trigger.focus();
+      await user.keyboard('{Enter}');
+      const listbox = await screen.findByRole('listbox');
+      // Give any containment pull-back a chance to happen before reading.
+      await waitFor(() => expect(listbox.contains(document.activeElement)).toBe(true));
+
+      await user.keyboard('{ArrowDown}{Enter}');
+      expect(onChange).toHaveBeenCalledWith('banana');
+      expect(screen.queryByRole('listbox')).not.toBeInTheDocument();
+    });
+
+    it(`P8: ${kind} keeps Tab inside itself`, async () => {
+      const user = userEvent.setup();
+      render(<Opener kind={kind} />);
+      const trigger = screen.getByRole('button', { name: 'Open panel' });
+      await user.click(trigger);
+      const panel = screen.getByRole('dialog', { name: kind === 'dialog' ? 'Reopen parent?' : 'GST registration' });
+
+      // The opener is the only tabbable thing outside the panel, so without
+      // containment enough Tabs reach it — which is exactly the escape the
+      // board refuses the interaction for.
+      for (let i = 0; i < 8; i += 1) {
+        await user.tab();
+        expect(
+          panel.contains(document.activeElement),
+          `after ${i + 1} Tab(s) focus left the ${kind} for ${document.activeElement?.tagName ?? 'nothing'}`,
+        ).toBe(true);
+      }
+    });
+  }
+});
+
 describe('Table', () => {
   type Row = { id: string; title: string };
   const columns: TableColumn<Row>[] = [
@@ -280,6 +423,106 @@ describe('SegmentedControl (13.288)', () => {
     expect(phoneTab).not.toHaveClass('gn-segmented__item--on');
     await userEvent.click(phoneTab);
     expect(onChange).toHaveBeenCalledWith('phone');
+  });
+});
+
+/**
+ * P9 (case 13.1051) — `SegmentedControl` declared full ARIA tab semantics (`role="tablist"`,
+ * `role="tab"`, `aria-selected`) and implemented none of the tab keyboard model:
+ * `grep -n "onKeyDown\|Arrow\|tabIndex\|aria-controls\|tabpanel"` on
+ * `segmented-control.tsx` returned nothing, so a screen reader announced "tab, 1
+ * of 3" and then no arrow key did anything. The reviewer's painted measurement
+ * confirmed it with real key events: ArrowRight left `activeElement` on the same
+ * tab, and every tab was its own Tab stop, which is the opposite of the pattern.
+ *
+ * The remedy here is the keyboard half: a roving `tabindex` (one stop for the
+ * whole tablist, arrows within it) and Left/Right/Home/End. The `aria-controls` /
+ * `tabpanel` half is NOT added, and that is a deliberate limit rather than an
+ * oversight — `SegmentedControl` is a generic component with no idea what, if
+ * anything, it is switching between, and the two alternatives the finding offers
+ * are both wrong for part of its seven render sites: `aria-pressed` on a group of
+ * buttons would misdescribe the sheet's *Details* / *History* and the help
+ * browser's sections, which really do switch a panel in place. What CAN be fixed
+ * without a caller's cooperation is the contract that makes the announced roles
+ * usable, and that is what these cases assert.
+ */
+describe('P9 — SegmentedControl implements the tab keyboard model it declares', () => {
+  const OPTIONS = [
+    { value: 'phone', label: 'Phone' },
+    { value: 'email', label: 'Email link' },
+    { value: 'passkey', label: 'Passkey' },
+  ];
+
+  /** A genuinely controlled harness: the roving tabindex follows the selection, so
+   *  a `vi.fn()` that never rounds the value back would freeze the whole model. */
+  function Harness({ initial }: { initial: string }) {
+    const [value, setValue] = useState(initial);
+    return (
+      <SegmentedControl
+        aria-label="Sign-in method"
+        value={value}
+        onChange={setValue}
+        options={OPTIONS}
+      />
+    );
+  }
+
+  const tabsOf = () => within(screen.getByRole('tablist', { name: 'Sign-in method' })).getAllByRole('tab');
+
+  it('P9: the tablist is ONE tab stop, on the selected tab', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="email" />);
+    const tabs = tabsOf();
+    expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
+
+    // And that is what Tab actually lands on — the roving index is a claim about
+    // the keyboard, so it is read off the keyboard.
+    await user.tab();
+    expect(tabs[1]).toHaveFocus();
+  });
+
+  it('P9: ArrowRight moves focus to the next tab and selects it', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="phone" />);
+    const tabs = tabsOf();
+    await user.tab();
+    // Control, first: focus is demonstrably on the first tab, so the assertion
+    // below reads a move rather than a component that never had focus.
+    expect(tabs[0]).toHaveFocus();
+
+    await user.keyboard('{ArrowRight}');
+    expect(tabs[1]).toHaveFocus();
+    expect(tabs[1]).toHaveAttribute('aria-selected', 'true');
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'false');
+    expect(tabs.map((tab) => tab.getAttribute('tabindex'))).toEqual(['-1', '0', '-1']);
+  });
+
+  it('P9: ArrowLeft from the first tab wraps to the last', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="phone" />);
+    const tabs = tabsOf();
+    await user.tab();
+    expect(tabs[0]).toHaveFocus();
+
+    await user.keyboard('{ArrowLeft}');
+    expect(tabs[2]).toHaveFocus();
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
+  });
+
+  it('P9: Home and End jump to the first and last tab', async () => {
+    const user = userEvent.setup();
+    render(<Harness initial="email" />);
+    const tabs = tabsOf();
+    await user.tab();
+    expect(tabs[1]).toHaveFocus();
+
+    await user.keyboard('{End}');
+    expect(tabs[2]).toHaveFocus();
+    expect(tabs[2]).toHaveAttribute('aria-selected', 'true');
+
+    await user.keyboard('{Home}');
+    expect(tabs[0]).toHaveFocus();
+    expect(tabs[0]).toHaveAttribute('aria-selected', 'true');
   });
 });
 
@@ -693,6 +936,86 @@ describe('Select panel/option styling', () => {
 
   it('the option row background is the shared surface token, not a bespoke color', () => {
     expect(rule('.gn-select__panel')).toMatch(/background:\s*var\(--gn-surface(-raised)?\)/);
+  });
+});
+
+/**
+ * E4-21 (case 10.91) — independently the same defect as P23 (rules §3: the two found it
+ * separately and both score in full), so the two cases are written against the
+ * same corrected behaviour from different angles rather than duplicated: this
+ * one owns the STYLESHEET half — that a ring exists at all, and that it carries
+ * `.gn-field__input`'s own offset so the searchable and non-searchable branches
+ * look identical — and P23's owns the keyboard half in `select.test.tsx`.
+ *
+ * The defect: `.gn-select__trigger--searchable input:focus { outline: none; }`
+ * (`ui.css:2474`) is the product REMOVING the focus indicator from the one
+ * control whose whole job is to be typed into. WCAG 2.2 §2.4.7 *Focus Visible*
+ * is Level AA, and because the removal is the product's own declaration no
+ * user-agent default can survive it. The searchable trigger is a WRAPPER `<div>`
+ * around that input — the div has no `tabIndex` of its own, so the input is what
+ * receives focus, which is exactly why the replacement has to be keyed on the
+ * wrapper's `:focus-within` rather than on the input.
+ */
+describe('E4-21 — the searchable Select paints a focus ring', () => {
+  const FRUIT: SelectOption[] = [
+    { value: 'apple', label: 'Apple' },
+    { value: 'banana', label: 'Banana' },
+  ];
+
+  it('E4-21: the trigger declares a :focus-within ring with .gn-field__input\'s own offset', () => {
+    // `rule()` throws "no rule for …" when the selector is absent, so this is the
+    // assertion that reddens while the removal has no replacement — the state the
+    // finding measured. The offset is asserted, not just the outline: `.gn-field__input`'s
+    // own rule carries `outline-offset: 1px` and the point of putting the ring here
+    // is that the two branches of this control look the same when focused.
+    const body = rule('.gn-select__trigger--searchable:focus-within');
+    expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(
+      /outline:\s*2px solid var\(--gn-focus-ring\)/,
+    );
+    expect(body, `.gn-select__trigger--searchable:focus-within body: ${body}`).toMatch(/outline-offset:\s*1px/);
+  });
+
+  it('E4-21: the suppression is still there and still scoped to the input alone', () => {
+    // The replacement must not be bought by deleting the suppression: `:focus` on
+    // the input would paint a ring on a click into a typeable field, and the
+    // wrapper's ring is what should carry focus indication here.
+    expect(rule('.gn-select__trigger--searchable input:focus')).toMatch(/outline:\s*none/);
+  });
+
+  it('E4-21: the class the ring is keyed on is an ancestor of the input that takes focus', () => {
+    // The stylesheet half above proves the rule EXISTS; this proves it can MATCH
+    // something, which a text scan cannot see — a ring keyed on a class nothing
+    // wraps the focused input in is a rule that paints nowhere. `:focus-within`
+    // matches only a descendant relationship, so `contains` is the precondition.
+    render(<Select options={FRUIT} value={null} onChange={vi.fn()} searchable aria-label="Fruit" />);
+    const input = screen.getByRole('combobox', { name: 'Fruit' });
+    input.focus();
+    expect(input).toHaveFocus();
+    const trigger = input.closest('.gn-select__trigger--searchable');
+    expect(
+      trigger,
+      'the focused combobox input is not inside a `.gn-select__trigger--searchable` wrapper, so the :focus-within ring can never match',
+    ).not.toBeNull();
+    expect(trigger?.contains(document.activeElement)).toBe(true);
+  });
+
+  it('E4-21: no later stylesheet re-declares the trigger and forks the ring away', () => {
+    // `apps/web/app/layout.tsx` imports `ui.css` and then `globals.css`, so a rule
+    // appended there WINS at equal specificity — the same gap this file already
+    // closes for `.ticket-type-list__move`, and the reason a scan of `ui.css` alone
+    // is a check that cannot fail. Both files, same invocation.
+    //
+    // The positive control is on the file that MUST match, and it runs first: if the
+    // scan were silently reading an empty string, `globals.css`'s absence would be
+    // indistinguishable from a working check that found nothing.
+    expect(
+      UI_CSS.includes('.gn-select__trigger--searchable'),
+      'the scan cannot see .gn-select__trigger--searchable in ui.css, where it is declared — it is reading nothing',
+    ).toBe(true);
+    expect(
+      GLOBALS_CSS.includes('.gn-select__trigger--searchable'),
+      'globals.css re-declares .gn-select__trigger--searchable, which wins over ui.css by source order',
+    ).toBe(false);
   });
 });
 

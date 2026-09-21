@@ -4,6 +4,7 @@ import { createPortal } from 'react-dom';
 import { useButton } from '@react-aria/button';
 import { useComboBox } from '@react-aria/combobox';
 import { useListBox, useOption } from '@react-aria/listbox';
+import { FocusScope } from '@react-aria/focus';
 import { DismissButton, useOverlay, useOverlayPosition } from '@react-aria/overlays';
 import { HiddenSelect, useSelect } from '@react-aria/select';
 import { useComboBoxState } from '@react-stately/combobox';
@@ -526,13 +527,41 @@ function SelectPanel(props: {
   const { listBoxProps: resolvedListBoxProps } = useListBox({ ...listBoxProps, autoFocus }, state, listBoxRef);
   return (
     <div {...overlayProps} ref={overlayRef} className="gn-select__panel" data-placement={placement}>
-      <DismissButton onDismiss={onDismiss} />
-      <ul {...resolvedListBoxProps} ref={listBoxRef} className="gn-select__list">
-        {[...state.collection].map((item) => (
-          <SelectOptionRow key={item.key} item={item} state={state} />
-        ))}
-      </ul>
-      <DismissButton onDismiss={onDismiss} />
+      {/*
+        E4-17 — the panel is portalled to `document.body`, and `useListBox`'s
+        `autoFocus` DOM-focuses an option row inside it. When the panel unmounts,
+        that focused node is removed with the portal, so the browser drops focus to
+        `<body>`: Escape after Enter-opening, and Enter to pick, both threw a
+        keyboard user out of the surrounding sheet to the top of the document.
+
+        `FocusScope restoreFocus` is the React Aria primitive for exactly this. It
+        saves the active element during render — before the `autoFocus` child
+        mounts, which is why the capture is a render-time ref rather than a layout
+        effect — and on unmount restores it, but only once it can see that focus
+        was lost to `<body>` rather than deliberately moved elsewhere (see
+        `useRestoreFocus`'s `requestAnimationFrame` guard). So the restore is what
+        makes both keyboard paths land back on the trigger, while a blur-away close
+        still leaves focus where the user put it.
+
+        `restoreFocus` only, not the `autoFocus` the finding also suggests:
+        `useListBox` already focuses the list on open, and a second auto-focus
+        scope would contend with it for the same mount. Focus *placement* was never
+        the defect — both measurements show the row receiving focus — only
+        restoration was.
+
+        `FocusScope` renders no wrapper element (two `hidden` sentinel spans), so
+        the panel's own children stay direct children of `.gn-select__panel` and
+        nothing here changes layout.
+      */}
+      <FocusScope restoreFocus>
+        <DismissButton onDismiss={onDismiss} />
+        <ul {...resolvedListBoxProps} ref={listBoxRef} className="gn-select__list">
+          {[...state.collection].map((item) => (
+            <SelectOptionRow key={item.key} item={item} state={state} />
+          ))}
+        </ul>
+        <DismissButton onDismiss={onDismiss} />
+      </FocusScope>
     </div>
   );
 }
