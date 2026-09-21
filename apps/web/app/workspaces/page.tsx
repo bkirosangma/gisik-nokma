@@ -611,7 +611,20 @@ function FoundingForm() {
     setSending(true);
     setRefusal(null);
     void founding.foundWorkspace(name, prefix === '' ? undefined : prefix).then(
-      ({ workspaceId }) => router.push(`/w/${workspaceId}/my-work`),
+      /*
+        THE WORKSPACE HOME, NOT MY WORK (F5). This pushed `/my-work`, and seconds
+        after founding every one of My Work's four sections is empty — the
+        founder met "Nothing assigned to you. / No claims in transit. / No
+        contested claims. / Nothing has been shared with you." and nothing that
+        said what to do next. The home carries the owner's **New project** form
+        (`w/[workspaceId]/page.tsx`) and the project grid, which is where the
+        manual already sends an owner for it (`docs/manual.md:174` — "an owner or
+        admin gets a New project form inside the workspace, and that is the only
+        control that creates one"). The prototype's own landing is the list with
+        a confirmation; this is the cheaper of the two remedies the finding
+        offers and the one that puts a working control in front of the person.
+      */
+      ({ workspaceId }) => router.push(`/w/${workspaceId}`),
       (cause: unknown) => {
         setSending(false);
         setRefusal(
