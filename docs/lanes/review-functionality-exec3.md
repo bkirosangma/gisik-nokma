@@ -461,11 +461,23 @@ failure it was written to fix.**
 **AND I TRIED TO FALSIFY THE OTHER EIGHT AND COULD NOT — recorded so the next lane does not spend here.**
 Four carry an **internal self-test** — a planted-defect fixture the script itself runs before its real
 sweep: `check-case-citations.mjs:288` (consumed at `:361`), `check-case-ids.mjs:195` (consumed at `:221`),
-`check-migration-order.mjs:396` (reported at `:428`), `check-runbook-commands.mjs:202`. The other four
-**refuse an empty universe by design**, with the reasoning in the failure text —
+`check-migration-order.mjs:396` (reported at `:428`), `check-runbook-commands.mjs:202`. **Three** refuse an
+empty universe by design, with the reasoning in the failure text —
 `check-env-example.mjs:180-188` (*"A gate that finds nothing cannot fail, and a check that cannot fail is
-not evidence"*), `check-task-ledger.mjs:290-293`, `check-skipif-coverage.mjs:28-31`,
-`check-no-silent-skips.mjs:55-60`.
+not evidence"*), `check-task-ledger.mjs:290-293`, `check-skipif-coverage.mjs:28-31`.
+
+> **⚠ CORRECTED AT PHASE-1 CLOSE — this sentence read "The other FOUR refuse an empty universe", and named
+> `check-no-silent-skips.mjs:55-60` as the fourth. IT DOES NOT.** Measured: `echo '{}' >
+> /tmp/e.json && node scripts/check-no-silent-skips.mjs /tmp/e.json` prints
+> `check-no-silent-skips: ok (0 skipIf-guarded file(s) checked, none fully skipped)` with **EXIT=0**, and
+> `{"testResults":[]}` does the same. The guard I cited at `:60` is `if (ran.length === 0)` — it lives
+> **inside the per-file loop** (`:28` iterates `report.testResults ?? []`), so a report naming no files
+> never reaches it and `skipIfFilesChecked` stays 0 into the `:77` success line. **I read the guard's
+> text and not its position, and reported it as a property of the script rather than of the loop.**
+> **Executor 6's `E6-6` is CORRECT and this sentence was wrong**; it is corrected here rather than left
+> for the judge, and the credit for finding it is theirs — I reproduced their exact command before
+> changing this line. **That is the fourth time this lane mistook a guard for a universe**, and the first
+> where the mistake was in the report rather than in my own scratch work.
 
 ⚠ **Two of those four cites were docblocks on my first pass** (`check-case-citations.mjs:279` and
 `check-migration-order.mjs:58` are comments *about* the self-test, not the self-test). I repointed them at
