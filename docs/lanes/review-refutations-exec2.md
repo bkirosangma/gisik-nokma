@@ -133,6 +133,42 @@ does not rest on reading a line.
 
 | `I1` (exec 1, **CRITICAL**) | that no browser-based UI instrument has executed anywhere since 2026-09-06 | `gh api …/actions/runs?per_page=15` → **15 of the 15 most recent runs are `failure`**, every `main` run among them. And the job breakdown of the latest `main` run (`35560484912`) is the sharper fact: **`scope` fails first, so `build`, `typecheck`, `server-tests`, `e2e` and `viewport` are all `skipped`** — the instruments do not fail, they never start | **holds, with a mechanism worth adding** |
 
+
+### What the red gate actually means — measured, and it cuts both ways
+
+`I1`'s mechanism led somewhere more useful than the check itself. The latest `main` run has `scope` failing
+first and five jobs **skipped**, and **four `check-*` jobs failing independently**. So I ran every one of the
+seven checkers **locally, on this tree**:
+
+| checker | CI | **on this tree** |
+|---|---|---|
+| `check:help` | **failure** | **PASS** |
+| `check:runbook` | **failure** | **PASS** |
+| `check:citations` | **failure** | **PASS** |
+| `check:migrations` | **failure** | **PASS** |
+| `check:tasks` | skipped | **PASS** |
+| `check:env` | skipped | **PASS** |
+| `check:db-tz` | not in CI at all (`F8`) | FAIL — `DATABASE_URL is required`, i.e. an unset variable |
+
+**Six of six runnable checks pass on the tree this exercise reviewed.** So the red gate is **not a content
+failure**: whatever is failing in CI is failing for a reason that does not reproduce here — which is exactly
+the shape this repository has recorded before, where a gate result is not evidence unless it names its
+environment.
+
+**And the correction cuts both ways, which is why it is worth the judge's attention:**
+
+- **Reading "all CI red since 2026-09-06" as *"the product is broken"* is wrong.** Six checks that run and
+  fail in CI pass here, on the reviewed tree.
+- **Reading the green local runs as *"the gate passes"* is equally wrong.** `scope`'s failure **skips**
+  `build`, `typecheck`, `server-tests`, `e2e` and `viewport` — so the suites that would exercise the browser
+  have not run in two weeks, whatever the checkers say. `I1` is right and its consequence is worse than "a
+  test fails": **a green local run and a red CI run can both be true of the same tree, and neither of them
+  has exercised the product in a browser.**
+
+⚠ **Boundary:** I ran the checkers here and read the job conclusions; I did **not** establish *why* CI fails,
+and I do not speculate. `check:db-tz`'s local failure is an unset variable rather than a defect — and it is
+the one checker `F8` found has no automated invocation anywhere, so nothing would have caught it either way.
+
 **Thirty-five checks across all five lanes. Thirty-five held. My refutation count is zero.**
 
 > **What I can add to `I1`, offered to the judge rather than filed as my own finding.** Its claim is that
