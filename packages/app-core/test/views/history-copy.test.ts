@@ -72,7 +72,18 @@ const VALID_PAYLOAD: Record<string, unknown> = {
   'ticket.assigned': { assigneeId: 'user_anselma' },
   'ticket.collaborator_added': { userId: 'user_anselma' },
   'ticket.collaborator_removed': { userId: 'user_anselma' },
-  'ticket.field_set': { fieldId: 'priority', value: 'high' },
+  // ⚠ `P1`, not the `'high'` this fixture carried until 2026-09-22, and the
+  // value is corrected rather than the field id because of what this fixture IS:
+  // its own contract, one paragraph up, is "a payload shaped as the domain
+  // declares it". `priority` is a BUILT-IN since spec 2026-09-22 and its value
+  // set is closed, so `{ fieldId: 'priority', value: 'high' }` is a payload the
+  // engine REFUSES (`field.type-mismatch` — "Priority needs one of P1, P2 or
+  // P3"); a census whose sample of a type is an event that cannot be written is
+  // measuring a world the product no longer has. The custom-field case this
+  // value used to stand for is not lost — `fields`-axis coverage lives in
+  // `test/filter/list-filter.test.ts`, which reads `severity` for exactly this
+  // reason.
+  'ticket.field_set': { fieldId: 'priority', value: 'P1' },
   'ticket.reparented': { newParentId: null },
   'ticket.workflow_rebound': { toWorkflowId: 'wf-1', toStateId: 'doing' },
   'ticket.closed': {},
@@ -202,5 +213,48 @@ describe('3.184 history copy — the attachment and resolution sentences', () =>
     expect(
       describeEvent(withPayload('claim.contested_resolved', { resolution: 'escalated-to-owner' })),
     ).toBe('Conflicting claim resolved — escalated-to-owner');
+  });
+});
+
+/**
+ * 3.973 — the `ticket.field_set` sentence, including the priority change that
+ * the priority built-in (spec 2026-09-22) made an ordinary one.
+ *
+ * ⚠ **THIS BRANCH HAD NO TEXT ASSERTION UNTIL THIS CASE, and that is why it
+ * exists.** `3.183`'s census asserts only `describeEvent(...) !== event.type`,
+ * so it proves a sentence EXISTS for every registered type and says nothing
+ * about what any of them SAY — and the plan that made priority a built-in
+ * recorded, in its own self-review, that this line *"needs no task:
+ * `describeEvent` already prints `Set priority to P1` for a string value
+ * (`history-copy.ts:139`, verified)"*. Verified by READING, not by a test:
+ * **nothing in this repo would have gone red had that sentence been wrong.**
+ * A claim about the artifact that no instrument reads is the shape this file's
+ * own case ids exist to replace with a measurement.
+ */
+describe('3.973 history copy — the field_set sentence', () => {
+  /**
+   * Local rather than the `withPayload` one describe up: that helper is scoped
+   * to `3.184`, and hoisting it would rearrange a landed block for this one's
+   * convenience. `eventOf` is module-scoped, so the one-liner is all this needs.
+   */
+  const fieldSet = (payload: unknown): TicketHistoryEvent => ({
+    ...eventOf('ticket.field_set'),
+    payload,
+  });
+
+  it('3.973 names the field and the value it was set to — priority included, with no new copy', () => {
+    expect(describeEvent(fieldSet({ fieldId: 'priority', value: 'P1' }))).toBe('Set priority to P1');
+    // The sentence is GENERIC over the field id, which is exactly why the new
+    // built-in needed no copy of its own: a custom field reads the same way.
+    // Both halves are here so the case cannot pass on a branch hard-coded for
+    // the field this task happened to care about.
+    expect(describeEvent(fieldSet({ fieldId: 'severity', value: 'high' }))).toBe('Set severity to high');
+    // The CLEARING claim is the other arm — the SAME event carrying `null`,
+    // never a second type — asserted on a field that can actually be cleared.
+    // `priority` cannot be (the engine refuses `field.priority-required`), so
+    // a `Cleared priority` assertion would pin a state the product forbids.
+    // The id is RAW here rather than resolved to "Due date": that is the
+    // shipped sentence, recorded rather than endorsed.
+    expect(describeEvent(fieldSet({ fieldId: 'dueDate', value: null }))).toBe('Cleared dueDate');
   });
 });

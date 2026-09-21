@@ -312,3 +312,15 @@ section follow the controller's rule, so the next free id after B16 is one past 
   `priority` back into `BUILTIN_FIELD_CHOICES` reddens this case alone
   (`Tests 1 failed | 8 passed`, `expected [] to deeply equal [ 'priority' ]`), which is what stops a
   well-meaning "fix" shipping. — `packages/app-core/test/workflow-builder/summaries.test.ts`
+- **3.973** ✅ The `ticket.field_set` History sentence names the field AND the value — `Set priority to P1`
+  for the built-in, `Set severity to high` for a custom field (the branch is generic over the field id,
+  which is why the new built-in needed no copy of its own), and the CLEARING arm reads `Cleared dueDate`
+  off the same event carrying `null`. **This branch had no text assertion before this case**, and the
+  plan's self-review asserted the priority sentence works by READING `history-copy.ts:139` rather than by
+  a test: **`3.183`'s census asserts only `describeEvent(...) !== event.type`, so it proves a sentence
+  EXISTS and says nothing about what any of them say.** Mutation-witnessed, and the witness is the
+  measurement of that gap: renaming the template to `` `Field ${fieldId} = ${value}` `` reddens 3.973
+  ALONE while ALL FOUR of 3.183's cases stay green. The cleared arm is asserted on `dueDate` and not on
+  `priority`, because the engine refuses to clear a priority (`field.priority-required`), so a
+  `Cleared priority` assertion would pin a state the product forbids. —
+  `packages/app-core/test/views/history-copy.test.ts`
