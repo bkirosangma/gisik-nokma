@@ -836,6 +836,26 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 ---
 
+### P32 — **MINOR** ⚠ **r2 NEW** — Why a control is disabled is put in `title` ON the disabled button, where it cannot be reached
+
+**WHAT.** Three components explain a disabled control through the `title` attribute **on the disabled `<button>` itself**. A `disabled` button is removed from the focus order, so a keyboard user cannot land on it, and assistive technology does not reach `title` on an element the user cannot focus. **The explanation therefore reaches only a mouse user who hovers** — and it reaches them only if their browser shows tooltips on disabled controls, which several do not.
+
+**MEASUREMENT.**
+1. **`packages/editor/src/components/TicketEditorSlot.tsx` — `disabledReason` occurs four times in the file and NOWHERE ELSE**, by exhaustive grep: declared at **`:146-150`**, consumed by `canSubmit` at **`:151`**, and used at **`:219`** (`disabled={submitting || !canSubmit}`) and **`:220`** (`title={disabledReason}`). **There is no visible render of it.** Its two values are whole-surface explanations, not button hints: *"Read-only: this document cannot be edited here."* and *"This editor was mounted without a submit handler, so there is nowhere to send the words."*
+2. **`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:365` and `:377`** — `title={moveBlocker(index, ±1) ?? …}` with `disabled={moveBlocker(index, ±1) !== null}` **on the next line**, so the tooltip is the blocker and the control is disabled by that same blocker.
+3. **`packages/app-core/src/workflow-builder/ui/publish-controls.tsx:112`** — `title={issues.length > 0 ? 'Fix the issues below first.' : undefined}`, beside `disabled={issues.length > 0 || …}` at `:111`. **The weakest of the three and probably correct**, since "below" points at content the same surface renders. **It is cited as the contrast that shows the product knows the pattern**, and it is also the shape the other two should have taken.
+4. **And the control is otherwise built correctly, which is what makes this narrow.** `TicketEditorSlot.tsx:216-224` carries `type="button"` and visible text (`'Comment'` / `'Save description'`), so **its accessible name is right** — `title` is not doing naming work here. **The name is fine; the EXPLANATION is what is unreachable.**
+
+**WHY IT IS WRONG.** `disabled` removes an element from the sequential focus order, and `title` is reached by the accessible-description computation only on an element assistive tech exposes and the user can land on. **So the reason exists for the one input method that does not need it, and not for the two that do** — and in case 2 it is the *state* explanation, so a user who cannot move a ticket is told why only if they can hover the control that will not move.
+
+**⚠ WHAT I DID NOT MEASURE, stated so the claim is not read wider than it is.** I did **not** render any of the three and confirm that a browser suppresses the tooltip on a disabled element; that behaviour varies by browser and I have no painted measurement of it. **The certain part is the focus one** — a disabled button takes no keyboard focus — and that alone is sufficient for the finding. **The tooltip-suppression half is stated as a possibility, not as a measurement**, which is the line §3 draws between a finding and an assertion.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either keep the control enabled and explain on activation, or move the reason into `aria-describedby` pointing at a visible or visually-hidden node — `Sheet`'s and `Dialog`'s own dismiss controls already show the house can attach a distinct accessible string to a control — or render the reason beside it, which is the pattern `publish-controls.tsx:112` already assumes when it says *"below"*.
+
+**SEVERITY: MINOR.** Real, bounded, and with three remedies already in the repository's idiom — but it costs a user one unexplained refusal, not a task.
+
+---
+
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
 
 | comparison | class | evidence |
@@ -927,7 +947,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P30` ⚠ r2 — the mobile editor webview is two generated links behind and both links are unguarded
 - `P31` ⚠ r2 — the top bar is an UNNAMED `navigation` landmark beside a named one on at least seven routes
 
-**MINOR — 17**
+**MINOR — 18**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -945,10 +965,10 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P27` ⚠ r2 — the viewport suite's narrowest width is 390px; WCAG 1.4.10 names 320px and nothing tests it
 - `P28` ⚠ r2 — the mobile board's row is the one pressable of six with no accessibility role; its sibling sets one **(observation credited to the opposing lane; the census is the addition)**
 - `P29` ⚠ r2 — the mock suite says every stub carries its server `file:line`; two of ten carry the file only, and they are the two whose contracts drifted
+- `P32` ⚠ r2 — why a control is disabled is put in `title` ON the disabled button, where a keyboard or screen-reader user cannot reach it
 
-**Total 35.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 36.** `raised` and `sum by severity` agree by enumeration above.
 
----
 
 ## 9. THE CLAIM I AM LEAST SURE OF
 
