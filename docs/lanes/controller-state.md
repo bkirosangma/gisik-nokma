@@ -93,6 +93,18 @@ Cycle 34 §1 held for the whole landing: **a reviewer restarted mid-read loses e
 
 ⚠ **PASTE DELIVERY, for whoever talks to a lane next:** `tmux load-buffer` takes a **path argument** — `tmux load-buffer -b x /tmp/file.txt`. A shell redirect (`< file`) is not accepted, it errors, and the `&&` **silently short-circuits the paste**, so nothing arrives and the pane looks untouched. The first attempt at these HOLDs failed exactly that way. Verify delivery by **reading the transcript**, not the input box — a submitted turn renders with the same `❯` glyph as an unsubmitted one.
 
+### 9. 📌 2026-09-21 — **THE CONTROLLER IS BACK ON THE CLAUDE API.** Owner: *"lets move the controller back to claude api."*
+**The seat's backend changed from `deepseek` to `anthropic` (`--model opus`).** This retires the owner's 2026-09-18 move (*"claude weekly limits are almost over. switch to deepseek for the controller as well"*).
+
+**THREE FILES CARRY IT — change all three, or the switch silently reverts:**
+1. **`gisik-nokma-lanes/ctl-start.sh`** — now `export GISIK_EXECUTOR_BACKEND=anthropic`. ⚠ It also previously cat'd **only the 2026-09-18 override**, so a controller launched through it received **no dispatch brief at all**; its prompt assembly is now aligned with `ctl-self-restart.sh`.
+2. **`gisik-nokma-lanes/ctl-self-restart.sh`** — the **inline** launch value is `anthropic`. ⚠ **The `tmux set-environment … GISIK_EXECUTOR_BACKEND deepseek` two lines above it STAYS `deepseek`** — that one is the EXECUTORS'. The two are **deliberately different**: harmonising them either flips the controller back to DeepSeek or moves all three lanes to Anthropic.
+3. **`gisik-nokma-lanes/.ctl-prompt-restart-2026-09-19.md`** — its *"You run on DeepSeek… YOU ARE THE WEAKER MODEL… ITS SEVEN TRIGGERS APPLY TO YOU VERBATIM"* block is **WITHDRAWN**, replaced by a 2026-09-21 override. ⛔ **Without this the switch is worse than useless**: the incoming controller would believe it is the weak model and hand every ruling back to the owner — the exact behaviour the owner moved it off DeepSeek to end. **The brief's model/effort tiers are live again; the rulings are the controller's.** The 09-19 rules that were never about the model survive (never `AskUserQuestion` in a nudged topology; the dev-stack rule; the four lying instruments; the merge bar).
+
+**What did NOT move: the three executor lanes stay on `deepseek-flash[1m]`, and the session env `GISIK_EXECUTOR_BACKEND` deliberately still reads `deepseek`.** The controller's backend is set **per-launcher**, which is the only thing that lets the two differ.
+
+⚠ **HOW TO VERIFY A RELAUNCH, because a mistake here is silent.** `exec-claude.sh` resolves the backend from the session env **unless the caller exports its own**, so a launcher that forgets the export puts the controller straight back on DeepSeek **with no error**. The `anthropic` branch is silent (it only adds `--model`); the `deepseek` branch prints `exec-claude.sh: backend deepseek — ANTHROPIC_MODEL=…` to stderr. **A deepseek line on launch means the export was lost; its absence means anthropic.** Also confirm the pane's status line: it reads `deepseek-flash[1m]` on the old backend and shows the Opus model on the new one.
+
 ---
 
 ## 🔄 TUESDAY 2026-09-22 ~00:1x IST — **CYCLE 34: THE QUEUE IS EMPTY, ALL EIGHT ITEMS ARE MERGED, AND THE THREE-REVIEWER EXERCISE IS RUNNING. THIS ENTRY IS FOR A CONTROLLER THAT WAKES UP MID-EXERCISE.** `main` is **`e4baa425`**; **zero open PRs**; ledger **307 done / 1 todo**.
