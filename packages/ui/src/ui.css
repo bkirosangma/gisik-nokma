@@ -4999,6 +4999,58 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   padding: 0.5rem 0.75rem;
 }
 .gn-project__count { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+/* Ruling E2-30 (2026-09-21) — the durable way back from a soft delete. Reuses
+   `.gn-project__narrowing`'s own metrics verbatim (the flex row, the wrap, the
+   gap, the quaternary fill, the control radius, the padding) because it is the
+   same kind of thing in the same column: an inline strip stating a fact about
+   the whole project. Declared as its OWN rule rather than composed into that
+   selector list so the two can move apart — this one carries a dismissal
+   control and a danger-adjacent action, and the narrowing strip does not. */
+.gn-project__deleted {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.5rem 0.75rem;
+}
+.gn-project__deleted-text {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
+/* The Undo, at the 44px tap-target floor this repo measures rather than at the
+   strip's own text height — a control that only *looks* like part of a banner
+   still has to be usable. `min-height` only; the width follows the word. */
+.gn-project__deleted-undo {
+  font: inherit;
+  font-size: 0.875rem;
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-accent);
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-project__deleted-undo:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+.gn-project__deleted-dismiss {
+  font: inherit;
+  font-size: 1.1rem;
+  line-height: 1;
+  margin-left: auto;
+  min-height: 2.75rem;
+  min-width: 2.75rem;
+  border: none;
+  background: none;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
 .gn-project__scope-note { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__search {
   min-height: 2.75rem;

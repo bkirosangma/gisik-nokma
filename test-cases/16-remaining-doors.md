@@ -572,6 +572,36 @@ plus a partial index → a filter at every view-serving SELECT.
   `colorOf` reproduces `tokens.test.ts`'s pinned primitives, and the same computation reproduces the
   recorded 4.4013 — and the pair is ENFORCED rather than written into a comment, which is the criticism
   16.83 earned.
+  - ⚠ **AMENDED BY RULING E2-30 (2026-09-21) — THE TOAST'S SENTENCE, and the way back it did not name.**
+  The sentence read `${title} deleted · its history is retained`. That is TRUE of the ledger and
+  MISLEADING about what the person can do, because the retained history had no screen — no deleted view,
+  no filter axis, no search arm — and the ONE producer of `ticket.restored` in the whole client was the
+  Undo inside a toast that caps itself at the ruled 15 s. It now reads `${title} deleted · you can also
+  undo this on the page`, naming the durable route the ruling added. The three assertions that pinned
+  the old spelling were amended in the same change set, quoting what they used to assert.
+
+- **13.1180** ✅ **The DURABLE way back from a delete (ruling E2-30, 2026-09-21).** A delete now also puts
+  a strip on the page — one slot, the last ticket deleted from this page — naming the ticket and offering
+  its own Undo. **`role="status"` and a direct child of `.gn-project`, so it is on EVERY tab**: a delete
+  removes the ticket from the Board, the List, the Calendar and the Timeline at once, so the route back
+  belongs to the page rather than to whichever tab happened to be open. It does not expire, it is
+  dismissible, a second delete REPLACES it (one slot, the same rule the toast keeps — and said plainly on
+  the strip's own sentence, so nobody is told a ticket is reachable when it has been superseded), and a
+  **COMMITTED** restore clears it — not the click, because a failed restore is exactly when the route
+  proved useful. **The case that carries the ruling is the one the four `16.84` call-site cases cannot
+  make:** they all act INSIDE the toast's window, so every one of them would pass against a product whose
+  only route still lapses at 15 s. `13.1180` crosses the ruled window with fake timers, asserts the TOAST
+  is gone (positively first, so it cannot pass by the timer simply not being wired), and then asserts the
+  strip is still there **and still live** — the restore posts from the strip alone, carrying the id it was
+  built for. Two controls: dismissing the STRIP posts nothing (without which a × wired to the restore
+  would pass every case above), and a committed restore clears it. **Mutation-witnessed with two distinct
+  signatures:** binding the strip to the toast — `setDurableUndo(null)` in the toast's own `onDismiss`,
+  i.e. re-creating the defect — reddens the durability case alone (`Tests 1 failed | 7 passed`), and
+  dropping the clear from the committed branch reddens the clearing control alone (`Tests 1 failed | 7
+  passed`). The strip's Undo carries a **distinct accessible name** (`Undo the deletion of <title>`)
+  because the toast's control is called "Undo" too; the visible word is unchanged and the accessible name
+  contains it, so WCAG 2.5.3 holds, and a page-wide `getByRole('button', {name: 'Undo'})` stays
+  unambiguous. — (`apps/web/test/sheet-delete.test.tsx`)
 
 ### The sheet's three missing surfaces — the toolbar, the editable title, the breadcrumb
 
