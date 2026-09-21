@@ -2629,9 +2629,21 @@ consistently where it matters — a latch, a state carried by shape as well as c
 as omissions against a live house style, which is the argument I made for each of them and can now make with
 two more measured examples.
 
-**Still unreached, and it is a short list:** `/settings` at screen level (its components are read), the bulk
-of the 13.x catalogue, and `packages/editor/src/index.ts`, `attachment-claims.ts` and the two remaining
-`webview` files.
+**STILL UNREACHED — the list, corrected at the end of phase 1 rather than left to drift.** ⚠ **The earlier
+version of this paragraph named `/settings` at screen level, and that is no longer true:** I read
+`app/settings/page.tsx:100-155` (the three-query-param design, the MCP-tokens departure, and what the bare
+route renders), which is what produced the F1 addendum above. **What remains, with no pretence that it is
+small:**
+
+1. **The bulk of the 13.x catalogue — 2600 of its 2606 ids.** Reached in three bounded bites
+   (`17-open-work.md`'s `17.005`, this file's `13-second-wave-roles-and-navigation.md` log, and the
+   `12-offline-sync-apps.md` edge-class entry). **0.2 % of the catalogue**, and I am not claiming more.
+2. **Three `packages/editor` files** — `src/index.ts` (86 lines, the barrel), `attachments/attachment-claims.ts`
+   (47), and the two `webview` files beyond `bridge.ts`, `entry.tsx` and `create-editor-bridge.ts`.
+3. **`/members` and `/account` at screen level** — reached at component level and through their pages'
+   loaders, but not walked as screens.
+4. **The painted half of the peer corpus.** Roughly thirty peer findings rest on `[BROWSER]` evidence I can
+   read and not reproduce; that boundary is stated in §6 and in the refutations file.
 ## R2.18 — THE LAST UNREAD SCREENS, AND WHY I STOPPED HUNTING
 
 Two surfaces I had never opened — the **Calendar** (`calendar-view.tsx`, 514 lines) and the **Timeline**
