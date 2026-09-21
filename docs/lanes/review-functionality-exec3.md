@@ -3168,3 +3168,42 @@ errand-with-waits.ts:5` (the present-tense reference). **Control on the sweep:**
 returns **three** hits — the two above and `test-cases/13-deployment-dogfooding.md:104`, which is a *struck*
 sentence about id renumbering and is **not** the same claim, so the phrase is not a shared idiom I am
 misreading.
+
+---
+
+## 46. REACHING THE THIRD NAMED NOT-REACHED SURFACE — `Features.md` §6, the server core
+
+§16.1's first item is *"`Features.md` outside §4. It has 14 sections and I audited one."* §6 (auth,
+membership and visibility) is the section that is most mine, and it is 60 bullets of this lane's core.
+**Reached, with the method and the boundary:**
+
+**Method.** Read all 60 bullets; selected the ones making a **checkable factual claim** rather than a
+descriptive one; opened the code or artifact each names. **Four checked at the line:**
+
+| bullet | claim | measured |
+|---|---|---|
+| `:452` | the errand oracle *"will be pinned by … `checkErrandTemplate` (**not yet landed on this branch**)"* | **FALSE — filed as `E3-27`.** It is `seed/templates.ts:41`, it is CALLED by the seeder as a throwing guard (`seed-convenience-corner.ts:133`), and it has 11 cases |
+| `:471` | every minted token carries *"a real `expires_at` (14 days, one constant"* | **holds**: `INVITE_TOKEN_TTL_MS = 14 * 24 * 60 * 60 * 1000` at `routes/invites.ts:75`, one constant, consumed by the conditional DELETE at `:209` and by `acceptance.ts:103` ✓ |
+| `:457` | the key's display sites, as a status list — `-` built, `·` not | **holds**: the three `-` items are as described, and the `·` items (a ticket URL, a search result, a mention, an MCP argument, a toast) are still unbuilt — `grep` over `routes/search.ts`, `routes/list.ts` and `mcp-server/tools/read-tools.ts` finds no key on any of them ✓ |
+| `:475` | *"`engines` is declared in the root manifest alone"*, so pnpm's warning proves nothing | **holds**: `grep -rn '"engines"' --include=package.json` returns **one** file, the root; and `apps/server/test/node-version.test.ts` is in the gate. **This is the brief's own rule — a gate result is not evidence unless it names its Node — and the project has a test for it** ✓ |
+
+**AND §6 IS THE BEST-MAINTAINED SECTION I HAVE AUDITED, WHICH IS WORTH RECORDING AS A RESULT.** Three of
+four checks hold, and the section self-corrects in place where it has drifted: `:456` carries its own
+`⚠ … kept as the state this change set started from, not as the state it ends in`, and `:457` carries
+`⚠ THIS SITE NOW EXISTS TO WIRE, corrected at the merge of 2026-09-20: it said "this site does not exist to
+wire: Delete is HELD" and that stopped being true when the sheet footer merged (e9c1a04f) while this branch
+ran`. **Both are the class this report files findings about — a sentence made false by a merge — corrected by
+the author with the correction kept.** `E3-27` sits in the same section, and it is the one nobody corrected.
+
+**BOUNDARY, stated rather than implied.** I read all 60 bullets and **checked four at the line**. A checkable
+claim is not the same as a correct one, and a bullet I read and did not check is not a bullet I have
+verified — **so this section's coverage is "the four claims above", not "§6".** The remaining bullets are
+mostly descriptive (which projection holds what, which gate is pure) and I judged them lower-yield than the
+factual ones; that judgement is mine and a lane with more time should test it.
+
+**STILL NOT REACHED, and this is the honest end of my list:** `Features.md` §9 (editor/documents/
+attachments), §11 (calendar/notifications), §12 (offline sync, ~660 lines), §13 (deployment, ~525 lines) and
+§14 (MCP) — five of fourteen sections, of which I have audited §4 fully and §6 as above. **And the `test-cases/`
+✅ set: I enumerated every ❌ line in my concern's file (§30.1) but have not asked whether the ✅ lines still
+describe the product**, which is `E6-12`'s finding in the other direction and is the largest remaining gap in
+this report.
