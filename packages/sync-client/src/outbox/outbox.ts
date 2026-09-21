@@ -28,16 +28,29 @@ import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } f
  *   bullet said 2, and was re-signed at 2 by the change set that repriced the
  *   fixture below** — the exact defect the next bullet congratulates itself for
  *   catching, committed inside the paragraph that celebrates it. Re-run the
- *   stated command before trusting either number.
+ *   stated command before trusting either number. TWO of the three are code
+ *   uses — `sync-service.ts` and `rig.ts`; `sync-routes.ts`'s single mention is
+ *   a docblock line quoting the response shape, so a move would reword it rather
+ *   than break it.
  * - **`packages/sync-client`: 6 files** — this one, `engine/sync-engine.ts`,
  *   `net/http-transport.ts`, `index.ts`, `test/sync-engine.test.ts`, and
  *   `replica/sync-item.ts`. **This bullet said 5 and enumerated 5, and the
  *   enumeration was what made it checkable**: the stated command returns six,
  *   because `sync-item.ts` gained a docblock line naming this very record in
  *   the same commit that wrote the count. FIVE of the six are code uses; the
- *   sixth is prose. So the move's cost by the stated measure is **8 files**,
- *   not the seven the closing line used to claim — and five-plus-two if only
- *   code is counted.
+ *   sixth is prose.
+ *
+ * **The total is deliberately NOT restated, because the total is the number that
+ * drifted.** This paragraph used to close by adding the two bullets into one
+ * cost, and the sum was wrong: it said **eight** where its own three and six
+ * come to **nine** by the stated command. That is the whole argument for
+ * leaving it out — each package count above is checkable against the command,
+ * and a reader who wants a sum adds two numbers; a sum written here is a reading
+ * that expires the next time any file mentions either name. The paragraph's
+ * other derived claim, *"five-plus-two if only code is counted"*, measured TRUE
+ * (five of the six sync-client files and two of the three server ones carry a
+ * code use) and is left out for the same reason: the split is stated per bullet
+ * above, where the command settles it.
  * - **`packages/domain`: nothing missing.** `IngestErrorCode` — the base of
  *   `SyncInvalidCode` — is already there (`ingest-result.ts:3`), and
  *   `ingest-result.ts` already declares an `{status:'invalid'; eventId: string
@@ -323,6 +336,32 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
     },
 
     async nextBatch(limit = 50, now = () => new Date()) {
+      // INVARIANT (E6-5): a queued claim is offered only when every queued
+      // claim enqueued before it is due too — the batch is the longest DUE
+      // PREFIX of the queue in position order, never the set of due rows.
+      //
+      // The filter used to be `WHERE … AND next_attempt_at <= ?`, which reads
+      // as "only rows that are due" and is: after `recordFailure` pushed a
+      // batch out by `backoffMs`, a claim enqueued AFTER the failure carried
+      // the schema's epoch default and was due at once, so the next flush —
+      // and the product flushes on every enqueue — offered it ALONE, ahead of
+      // the older claims on the same ticket it depends on. Measured
+      // 2026-09-21: batch1 = [CREATE, RENAME-1] fails transiently; RENAME-2 is
+      // enqueued; 500 ms later nextBatch = [RENAME-2]. The sync door then
+      // refused the rename as a claim on a ticket it had never seen, filed a
+      // `claim.contested` against the user's own ticket two seconds before it
+      // existed, and the outbox recorded that contest and dropped the edit. A
+      // queue that preserves order across a backoff boundary is what 12.144's
+      // sentence ("a batch that lost the order would send a `field_set` for a
+      // ticket the server has not been told about") already claimed.
+      //
+      // Liveness is unchanged: nothing retries a backing-off head on a timer —
+      // `flush()` runs on enqueue and on catch-up — so the head was already
+      // waiting for the next trigger, and now its tail waits with it. Rows in
+      // `failed` (refused/invalid, terminal) are not in the queue and block
+      // nothing, as before; a claim behind a terminally refused one is a
+      // different question and is not decided here.
+      //
       // `next_attempt_at` compares as TEXT, which IS instant comparison because
       // every value in the column is a Z-normalised ISO string — `toISOString()`
       // here, the schema's epoch default otherwise. A device-offset render on
@@ -330,10 +369,16 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
       // on every non-UTC machine; `schema.ts` stakes the same property on the
       // ledger's two clock columns.
       const rows = await storage.all(
-        "SELECT * FROM outbox WHERE status = 'queued' AND next_attempt_at <= ? ORDER BY position LIMIT ?",
-        [now().toISOString(), limit],
+        "SELECT * FROM outbox WHERE status = 'queued' ORDER BY position LIMIT ?",
+        [limit],
       );
-      return rows.map(rowToItem);
+      const nowIso = now().toISOString();
+      const duePrefix: typeof rows = [];
+      for (const row of rows) {
+        if ((row.next_attempt_at as string) > nowIso) break;
+        duePrefix.push(row);
+      }
+      return duePrefix.map(rowToItem);
     },
 
     async applyResult(eventId, result) {

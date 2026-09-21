@@ -58,6 +58,30 @@ export interface ResolvedVisibility {
  * not implicitly appended. Locking yourself out is a legal (attributed) claim,
  * and the client warns before it is made.
  *
+ * **A non-member on an explicit list is a naming that confers nothing, and the
+ * product has no "ticket-only access" tier for outsiders — the GUEST role is
+ * that tier.** Recorded here (E6-22, 2026-09-21) because the owner's
+ * interactive prototype says otherwise: its visibility sheet reads *"Naming
+ * someone outside this workspace gives them ticket-only access — this ticket,
+ * nothing else"* and suffixes such a candidate *"— outside this workspace"*
+ * (`design-system/interactive/desktop.dc.html`, unpacked from the export and
+ * never hand-edited). The product's decision is the first row of the table
+ * above, and it is deliberate: every tier sits ON TOP of membership, a guest
+ * "reaches work through `visibility.set` explicit lists" (the invite schema's
+ * sentence, quoted by `apps/web/app/w/[workspaceId]/members/page.tsx`), and a
+ * person with no workspace role has no bootstrap, no
+ * stream and no `/v1/me/workspaces` entry to reach the ticket by. So the
+ * product's picker offers the roster only
+ * (`packages/app-core/src/views/visibility-editor.tsx`, the `members` prop),
+ * and the sheet's outsider copy is a KNOWN DIVERGENCE, not a feature owed.
+ * What the door does with such a naming is the remaining half, stated rather
+ * than implied: `visibility.set` submitted through the API or MCP with a
+ * non-member id is COMMITTED today and the id lands in
+ * `proj_visibility.resolved_user_ids` — measured 2026-09-21 — where this
+ * function ignores it. Nothing leaks by it; the naming is inert. Refusing it
+ * at the door (*"invite them as a guest first"*) is a permission-gate change
+ * with a route test, not a sentence, and it has no ruling yet.
+ *
  * ## Both unions are exhaustive, and the unenumerated direction is DENY
  *
  * The role and the mode are each walked by a BARE `switch` — no `default`, no

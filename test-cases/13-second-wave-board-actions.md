@@ -51,11 +51,36 @@ were never in scope for a client whose route cannot serve them.
   column out" must not quietly become "we left the table out". The role is asserted as `owner` /
   `member`, NOT as a prettified label, because that is what the row carries — `role` is a plain
   `string` on `RosterMember` (never a second `WorkspaceRole` list to drift from), and a case expecting
-  "Owner" would assert a mapping nobody wrote. The case also pins the ABSENCE of a per-row control:
-  no `combobox`, no `button` inside the table, because the prototype's role cell is a `<select>` under
-  `canEditRole` (`:679-685`) and no route accepts a role change on this branch — a picker here would be
-  a control that cannot be honoured. (`apps/web/app/w/[workspaceId]/members/page.tsx:253`, `:256`,
-  `:259`, `:294`, `apps/web/test/members-page.test.tsx:446`)
+  "Owner" would assert a mapping never written — `role` is a plain `string` on `RosterMember`, never a
+  second `WorkspaceRole` list to drift from, so a case expecting "Owner" would assert a mapping nobody
+  wrote.
+  **⚠ RE-POINTED 2026-09-21 (ruling E2-51), because the sentence that stood here asserted an absence the
+  product had REVERSED.** It read: *"The case also pins the ABSENCE of a per-row control: no `combobox`,
+  no `button` inside the table, because the prototype's role cell is a `<select>` under `canEditRole`
+  (`:679-685`) and **no route accepts a role change on this branch** — a picker here would be a control
+  that cannot be honoured."* The reason was already false when written (the role-change door ships, and
+  the guard — not the door — was what had been missing), and the test had ALREADY been re-pointed in the
+  same change that made it false, so only this prose still carried it.
+  **What the case asserts now, which is the property rather than its proxy:** each row shows the wire's
+  own token; a row the viewer may edit carries a control named for its person, and a row they may not
+  chips the token instead. Both arms are asserted on one render: the owner's row (whose role the control
+  cannot state) carries NO button, and the member's row carries one whose accessible name is
+  `Role for Anselma Marak` and whose text is `member` — so a prettified label anywhere in either arm
+  fails it. `isEditableRole` (`apps/web/app/w/[workspaceId]/members/page.tsx:601`) is the predicate that
+  decides which arm a row takes.
+  **⚠ AND THE CITATION MOVED, to `apps/web/test/members-page.test.tsx:754-783`.** This line cited
+  `:446`, which resolves to an unrelated line inside the `3.138` docblock — the finding measured that.
+  The re-pointed test is in the `13.761` describe, and **it is not at the finding's own `:602` either**:
+  this batch's task 5 (ruling E5-11) added ~180 lines to that file earlier in the same session, so a
+  line number read before it does not resolve after it. `.754-783` is where the describe and its two
+  assertions are TODAY, measured against the tree.
+  **⚠ AND THE SOURCE CITATIONS ARE RE-POINTED TOO, for the same reason the sentence was:**
+  `page.tsx:253`, `:256`, `:259` and `:294` were the OLD absence claim's citations (the invite/revoke
+  ingest and the role-guard comment) and none of them supports the sentence that now stands. The three
+  that do are verified against the tree: **`:511`** and **`:519`** are the two arms of one ternary (the
+  `Select` named `Role for <label>`, and the chip carrying `member.role` verbatim), and **`:601`** is
+  `isEditableRole`, the predicate that decides between them.
+  — (`apps/web/app/w/[workspaceId]/members/page.tsx:511`, `:519`, `:601`)
 
 - ✅ **13.762 — the monogram draws one capital and does not repeat it to a screen reader.** The
   prototype's disc repeats the person's first letter BESIDE their name (`:674-675`), so read aloud the
@@ -2077,3 +2102,32 @@ to prevent. `useLiveQuery` gained `settled` for this — the alternative reading
 `answered` sentinel on every `T` would grow a case in every adapter, and using `error` for a
 null-means-404 convention would put a transport detail inside a hook that deliberately knows no status
 codes.
+## The workflow canvas's vendor attribution link is readable (E4-16, batch B15, 2026-09-21) — block `13.1207`–`13.1216`
+
+Id minted from the B15 self-allocated block recorded in `13-hig-per-screen.md`'s block table (this
+batch is absent from the controller's 22:0x allocation, so its driver added the row rather than
+borrowing a neighbour's — the rule the block table itself states). Recounted before minting: the
+highest `13.120*` id anywhere in `test-cases/` + `docs/` at this tip was none — `git grep -nE
+'13\.120[7-9]|13\.121[0-6]'` returns zero hits, a genuinely free block.
+
+- ✅ **13.1207 — React Flow's own attribution link is overridden to a declared, checked contrast
+  pair, not left at its 1.10:1 vendor default.** `@xyflow/react`'s stylesheet paints
+  `.react-flow__attribution` at 10px in a fixed grey it does not theme, measured (painted, builder
+  route) at **1.10:1** against the canvas's dark-mode backdrop and **2.61:1** in light — both under the
+  4.5 body text owes (finding E4-16, `docs/lanes/review-ui-exec4.md:295`). Not re-painted here (no
+  browser in this suite); the fix is a repo override in `packages/ui/src/ui.css` —
+  `.react-flow__attribution { background: var(--gn-surface-raised); font-size: 0.75rem; }` and
+  `.react-flow__attribution a { color: var(--gn-text-muted); }` — composed from a pair this file
+  already declares and every style/theme already passes: `{ fg: 'textMuted', bg: 'surfaceRaised',
+  minimum: 4.5 }` in `CONTRAST_PAIRS` (`packages/ui/src/tokens.ts`), asserted live by
+  `packages/ui/test/tokens.test.ts`'s own loop on every commit. The case itself reads the CSS rule
+  rather than re-deriving the contrast number: `declarationsFor` on `.react-flow__attribution` and
+  `.react-flow__attribution a` must contain the three declarations above, plus a direct assertion that
+  `CONTRAST_PAIRS` still declares the row this override leans on — so a future edit that drops either
+  the override or the underlying guarantee reddens here, not silently. RED confirmed by removing the
+  override (`.react-flow__attribution lost its override`, 1 failed / 17 passed); GREEN with it restored
+  (18 passed). `packages/ui/src/ui.css`,
+  `packages/app-core/test/workflow-builder/builder-css-binding.test.tsx`
+
+**Recount, at this tip.** One id is minted here (`13.1207`), inside the self-allocated block
+`13.1207`–`13.1216`; the next free id inside this block is `13.1208`.

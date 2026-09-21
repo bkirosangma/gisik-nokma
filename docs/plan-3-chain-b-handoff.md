@@ -237,6 +237,22 @@ beside the two live-path cases in `apps/server/test/proj-tickets.test.ts`. **It 
 test**: the only rebuild case in that file is also the only one that may write to `events` (a second
 writer would replay through the first, and that case's own length assertion is what guards it).
 
+> **2026-09-21, E6-13 (release batch B16): the CONSEQUENCE is closed; the key question is not.** Review
+> round 2 measured what the paragraph above predicts, and one shape it does not: after a type re-bind,
+> `verify:projections` reported `DRIFT DETECTED` on a correct database when the new workflow had been
+> published before the ticket, and **threw** `applyTicketEvent: workflow "…" is not defined` from inside
+> the reducer when it had been published after the ticket (the type editor's ordinary act) — so the
+> restore drill failed either way. The fix takes a road this entry did not price: `proj_ticket_types`
+> keeps one row per type and its key, and `getTicketTypeLadderFromDb` now takes the event's
+> `workspace_seq` and answers from the LEDGER — the newest `ticket-type.defined` at or before that
+> position — for exactly the types whose table row post-dates the event. That condition can hold only in
+> a replay (ingest serialises `workspace_seq` per workspace under `pg_advisory_xact_lock` and applies
+> projections inside the event's transaction), so the live path is untouched and the ledger read is a
+> replay-only cost. `getTicketTypeFromDb` and its engine-context readers are untouched. Asserted in
+> `apps/server/test/verify-projections.test.ts` (case 3.960): both orders verify clean and
+> `rebuildProjection('proj_tickets')` reproduces the live row. What stays open is only what this entry
+> was literally about — a history-bearing `proj_ticket_types` — and nothing now depends on it.
+
 ### 2. Nothing refuses an assignment of nothing to somebody. Owner: **the controller to assign.**
 
 `evaluateEvent` has no case for `ticket.assigned`, `ticket.collaborator_added`,

@@ -641,6 +641,24 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   Aug`): it crosses midnight under `+05:30` to `21 Aug`, one day past its own UTC date, so the assertion
   can tell `formatDate`/`formatIstInstant` apart from a same-day UTC slice that would print the wrong date
   identically to the right one on a non-discriminating instant — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.1182** ✅ **`disabled` is the whole double-submit guard, and the inert `if (submitting) return` is
+  gone (ruling E2-31, 2026-09-21).** `submitTicketEvent` carried that line at its top, documented as
+  guarding *"a second click landing on the same render pass as the first, before React has re-rendered
+  the `disabled` attribute onto the DOM"* — which it **cannot** do, because `submitting` is RENDER STATE:
+  two calls in one render pass both close over the same pre-commit `false`. The line is removed rather
+  than kept as belt-and-braces, because a guard whose stated purpose is unreachable is indistinguishable
+  from a working one to every future reader. **This case pins what actually holds:** with the first Close's
+  ingest HELD PENDING, a second click posts nothing, and the control is `disabled` after the first —
+  **deleting `disabled={submitting}` reddens it** (`Tests 1 failed | 115 skipped`). **And the inertness is
+  MEASURED rather than argued, which is the point of the second mutation:** re-adding the removed line
+  with `disabled` still gone leaves this case red **identically** (`Tests 1 failed | 115 skipped`) — the
+  render-state guard demonstrably cannot do the job it claimed, so the finding's other remedy (a
+  `submittingRef` mirroring `submitTitle`) was declined: the precedent it cites
+  (`TicketEditorSlot.tsx`, *"two `comment.added` events for one comment"*) reached its handler from TWO
+  sources — a Save button and a blur/Enter commit, where the `disabled` landing on the field is what fired
+  the second — and Close/Reopen has one source and no blur-commit, so that fix here would install a second
+  guard that also cannot fire. The id is from **B13's allocated §13 block (13.1177–13.1186)**. —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 - **13.587** ✅ A non-terminal ticket shows neither **Close** nor **Reopen** — the two buttons' gates
   (`stateCategory === 'terminal' && closed === null`, and `closed !== null`) both read false for an active
   or open ticket, so this sheet offers no closing affordance at all outside a terminal state

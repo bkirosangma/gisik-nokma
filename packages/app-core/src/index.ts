@@ -6,6 +6,12 @@ export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from '.
 export { createClientStateCache, type ClientStateCache } from './cache.js';
 export { withCacheFeed } from './cache-feed.js';
 export {
+  SESSION_EXPIRED_COPY,
+  SessionExpiredError,
+  writeFailureCopy,
+  writeFailureRefusalClass,
+} from './session-expired.js';
+export {
   PARENT_TERMINAL_RULE,
   completeForPrecheck,
   contextFromCache,
@@ -26,6 +32,7 @@ export {
   // `apps/web` case to need it; `packages/app-core/test/views/board.test.tsx`
   // already imports it directly, being in the same package.
   EMPTY_COLUMN_COPY,
+  EMPTY_BOARD_UNWIRED_COPY,
   // The epic-rule twins, re-exported for exactly the same reason (owner ruling,
   // 2026-09-20): the shell's page spec asserts the SAME string the component
   // renders, so that a future copy change fails the assertion rather than

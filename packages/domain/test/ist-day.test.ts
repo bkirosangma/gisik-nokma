@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { IST_OFFSET_MINUTES, IST_TIME_ZONE, istDayBounds, istDayOf } from '../src/ist-day.js';
+import { IST_OFFSET_MINUTES, IST_TIME_ZONE, isRealIstDay, istDayBounds, istDayOf } from '../src/ist-day.js';
 
 /**
  * 3.27 — cited on the block: the IST day boundary — `18:29:59Z` and `18:30:00Z` fall on different IST days, the one millisecond between them changes the day, and a day’s bounds are the half-open `[startUtc, endUtc)`. Note the block also reads the INSTANT rather than the label, so the same moment stated as `+05:30` and as `Z` lands on one day.
@@ -132,5 +132,38 @@ describe('istDayBounds', () => {
     expect(() => istDayBounds('2026-02-30')).toThrowError('not a real calendar day: 2026-02-30');
     expect(() => istDayBounds('2026-13-01')).toThrowError(RangeError);
     expect(() => istDayBounds('2026-13-01')).toThrowError('not a real calendar day: 2026-13-01');
+  });
+});
+
+/**
+ * 3.961 — E6-19: `isRealIstDay` is the one definition of a day the calendar
+ * has, and it agrees with `istDayBounds` on every input: what one refuses the
+ * other throws on, what one accepts the other places. The three days the
+ * finding committed as due dates (`2026-02-30`, `2026-13-45`, `0000-00-00`)
+ * are refused; the boundary days a naive bound would get wrong are accepted.
+ */
+describe('isRealIstDay', () => {
+  it('refuses the days no calendar has, and the wrong shape, without throwing', () => {
+    for (const day of ['2026-02-30', '2026-13-45', '0000-00-00', '2026-00-10', '2026-04-31', '2027-02-29', '0099-01-01']) {
+      expect(isRealIstDay(day), day).toBe(false);
+      expect(() => istDayBounds(day), day).toThrowError(RangeError);
+    }
+    for (const notADay of ['2026-8-20', '20/08/2026', '2026-08-20T00:00:00.000Z', '', 'nonsense']) {
+      expect(isRealIstDay(notADay), notADay).toBe(false);
+    }
+  });
+
+  it('accepts the boundary days a bound written one off would lose, and every day of a year', () => {
+    for (const day of ['2028-02-29', '2026-02-28', '2026-12-31', '2026-01-01', '2026-04-30', '0100-01-01', '9999-12-31']) {
+      expect(isRealIstDay(day), day).toBe(true);
+      expect(istDayBounds(day).startUtc, day).toMatch(/Z$/);
+    }
+    let checked = 0;
+    for (let ms = Date.UTC(2026, 0, 1); ms < Date.UTC(2027, 0, 1); ms += 86_400_000) {
+      const day = new Date(ms).toISOString().slice(0, 10);
+      expect(isRealIstDay(day), day).toBe(true);
+      checked += 1;
+    }
+    expect(checked).toBe(365);
   });
 });

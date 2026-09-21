@@ -1,4 +1,4 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeAll, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -44,9 +44,15 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
+/**
+ * E5-34: the route's project id is a VARIABLE now, because the case below is
+ * about standing ON an archived project's own page — every case before it was
+ * about a global route with no project segment, which is why `({})` was enough.
+ */
+let currentParams: { projectId?: string } = {};
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
-  useParams: () => ({}),
+  useParams: () => currentParams,
   usePathname: () => '/inbox',
   useSearchParams: () => new URLSearchParams(),
 }));
@@ -61,6 +67,7 @@ import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 
 beforeEach(() => {
   window.localStorage.clear();
+  currentParams = {};
   clearLastProjectCache();
   clearWorkspaceProjectsCache();
   mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
@@ -359,5 +366,54 @@ describe('LastProjectNav — the dropdown', () => {
       workspaceId: 'ws_1',
       projectId: 'p_beta',
     });
+  });
+});
+
+/**
+ * E5-34 (round-2 ruling, MINOR, 2026-09-21) — on an archived project's OWN page,
+ * the item named and linked a DIFFERENT project.
+ *
+ * `live` filters archived rows out, so on `/w/…/p/<archived id>` the remembered
+ * lookup missed and the fallback answered with the FIRST LIVE project: the item
+ * showed that project's name, that project's href, and no `aria-current` (the
+ * pathname is not that href). The component's own docblock calls the item "a
+ * function of the ROUTE" — true only of live routes.
+ *
+ * The route's project is resolved first now, archived or not, and it is BADGED
+ * so the one route where the bar names an archived project says so. The dropdown
+ * stays live-only: it offers somewhere to go, and an archived project is not
+ * somewhere the workspaces page will show you.
+ */
+describe('E5-34 the item names the project you are actually on', () => {
+  it('13.1166 on an archived project’s route, names THAT project — badged — not the first live one', async () => {
+    currentParams = { projectId: 'p_arch' };
+    renderNav(servicesFor([WS_1]));
+
+    // The name carries the state, exactly as `/workspaces`' card does it.
+    const trigger = await screen.findByRole('link', { name: 'Archived One, archived' });
+    expect(trigger).toHaveAttribute('href', '/w/ws_1/p/p_arch');
+    // The visible half of the same fact.
+    expect(trigger).toHaveTextContent('Archived One');
+    expect(trigger).toHaveTextContent('Archived');
+    // And NOT the substitution this case exists for: `p_beta` is the first live
+    // project in served order and was what the item named.
+    expect(screen.queryByRole('link', { name: 'Beta' })).toBeNull();
+
+    // The dropdown is still live-only — the archived project is not offered as
+    // somewhere to go.
+    await userEvent.hover(trigger);
+    const menu = await screen.findByRole('menu', { name: 'Projects' });
+    expect(within(menu).queryByRole('menuitem', { name: /Archived One/ })).toBeNull();
+    expect(within(menu).getByRole('menuitem', { name: 'Beta' })).toBeInTheDocument();
+  });
+
+  it('13.1166 CONTROL — a LIVE project’s own route still names that project, unbadged', async () => {
+    currentParams = { projectId: 'p_gamma' };
+    renderNav(servicesFor([WS_1]));
+
+    const trigger = await screen.findByRole('link', { name: 'Gamma' });
+    expect(trigger).toHaveAttribute('href', '/w/ws_1/p/p_gamma');
+    // No chip and no ", archived" — the badge is the state, not decoration.
+    expect(trigger).not.toHaveTextContent('Archived');
   });
 });

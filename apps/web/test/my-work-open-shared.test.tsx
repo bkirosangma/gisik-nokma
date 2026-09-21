@@ -127,3 +127,101 @@ describe('3.162 My Work opens a ticket from the Shared with me section', () => {
     );
   });
 });
+
+/**
+ * V5 (round-2 ruling, IMPORTANT, 2026-09-21) — the CONTESTED section's click.
+ *
+ * The page's resolver searched `assigned`, `inTransit` and `shared` under a
+ * comment reading *"Every section this component renders a title button for must
+ * be resolvable here, and that is now all four."* **Three arms.** `contested` is
+ * the fourth, its rows carry no `projectId` at all (`ContestedClaim` has a
+ * `ticketId` and no project), so the lookup could never place one and the title
+ * button — the one affordance on a contested row that looks like every other
+ * section's — did nothing: no navigation, no error, indistinguishable from a
+ * slow page.
+ *
+ * The fix has two halves and both are asserted here: the contested id is placed
+ * by asking the server (`ticketLocation.locate`, the same one-shot gateway the
+ * inbox uses), and a ticket the server will NOT place says so instead of
+ * clicking into silence.
+ */
+describe('V5 My Work opens a contested claim, or says why it cannot', () => {
+  const contestedView = (): MyWorkView => ({
+    assigned: [],
+    inTransit: [],
+    shared: [],
+    contested: [
+      {
+        ticketId: '01J9TICKETCONTESTED0000000',
+        title: 'Renew the shop licence',
+        rule: 'state.terminal',
+        reason: 'the ticket is already closed',
+        claim: {
+          actorId: '01J9USER000000000000000000',
+          clientTime: '2026-08-19T09:58:12.000Z',
+          contestedAt: '2026-08-19T10:00:00.000Z',
+        },
+      },
+    ],
+  });
+
+  it('13.1163 routes to the contested ticket’s own project, asked of the locator', async () => {
+    const locate = vi.fn(async () => ({
+      workspaceId: '01J9WORKSPACE0000000000000',
+      projectId: '01J9PROJECTCONTESTED000000',
+    }));
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWork: async () => contestedView(), getAttention: async () => [] },
+          { ticketLocation: { locate } },
+        )}
+      >
+        <MyWorkPage />
+      </Providers>,
+    );
+
+    const region = await screen.findByRole('region', { name: 'My contested claims' });
+    await userEvent.click(
+      await within(region).findByRole('button', { name: 'Renew the shop licence' }),
+    );
+
+    await waitFor(() =>
+      expect(push).toHaveBeenCalledWith(
+        '/w/01J9WORKSPACE0000000000000/p/01J9PROJECTCONTESTED000000?ticket=01J9TICKETCONTESTED0000000',
+      ),
+    );
+    // The id really was ASKED FOR — a resolver that guessed a project would
+    // otherwise pass the assertion above on a coincidence of fixture ids.
+    expect(locate).toHaveBeenCalledWith(
+      '01J9WORKSPACE0000000000000',
+      '01J9TICKETCONTESTED0000000',
+    );
+  });
+
+  it('13.1163 says so, and navigates nowhere, when the server will not place the ticket', async () => {
+    // `null` is the locator's answer for BOTH "no such ticket" and "not yours" —
+    // the route refuses to distinguish them — so the sentence may not guess.
+    const locate = vi.fn(async () => null);
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWork: async () => contestedView(), getAttention: async () => [] },
+          { ticketLocation: { locate } },
+        )}
+      >
+        <MyWorkPage />
+      </Providers>,
+    );
+
+    const region = await screen.findByRole('region', { name: 'My contested claims' });
+    await userEvent.click(
+      await within(region).findByRole('button', { name: 'Renew the shop licence' }),
+    );
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('cannot be opened from here');
+    expect(alert).not.toHaveTextContent('no longer exists');
+    expect(push).not.toHaveBeenCalled();
+  });
+});

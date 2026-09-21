@@ -458,7 +458,8 @@ describe('3.111 the standing audience — served where it is served, absent wher
    * 3.172 — an `explicit` audience whose ROSTER is not served.
    *
    * The roster is cut from the wire by a standing disclosure ruling
-   * (`routes/tickets.ts:115-118`), so this is the production shape for every
+   * (`routes/tickets.ts`, *"an explicit audience ROSTER, a disclosure no plan
+   * authorized"*), so this is the production shape for every
    * explicit ticket. The mode is named and the names are not, and the section
    * has to SAY so: "Only: the people this ticket names" without the clause
    * beside it is a partial answer wearing the shape of a complete one — a
@@ -529,7 +530,7 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
    * THAT PROVES IT.
    *
    * `userIds: null` is not an edge case here: the roster is CUT at the wire
-   * (`apps/server/src/routes/tickets.ts:115-118` — *"an explicit audience
+   * (`apps/server/src/routes/tickets.ts` — *"an explicit audience
    * ROSTER, a disclosure no plan authorized"*), so a restricted ticket served
    * by the shipped server has `resolvedMode: 'explicit'` and NO names. A dot
    * keyed on the ROSTER — the natural mistake, since the two arrive together in

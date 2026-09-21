@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { ruleFor } from './helpers/css-rule-scan.js';
 
 /**
  * Cases 13.887 and 13.888 — the members roster's styling, measured.
@@ -51,23 +52,20 @@ const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
 
 /**
- * Full rule body, selector line through its matching closing brace — the
- * multi-line shape `workspaces-invitation-banner.test.ts:346` established and
- * `sign-in-neo-restyle.test.ts` shares (duplicated rather than imported: no
- * shared CSS-scan helper exists in `test/helpers/` yet, which is that file's own
- * note). `neo-card-radius.test.ts`'s single-line version truncates every rule in
- * the members family, whose declarations each sit on their own line.
+ * The scanner is now IMPORTED, not copied — P16, 2026-09-21.
+ *
+ * This note used to read *"duplicated rather than imported: no shared CSS-scan
+ * helper exists in `test/helpers/` yet"*, and it was right for as long as it
+ * stood: six files under this directory each carried their own `ruleFor`, three
+ * of them the single-line form that returns the selector line rather than the
+ * rule — which is the shape that truncates every rule in the members family,
+ * whose declarations each sit on their own line. That helper now exists
+ * (`./helpers/css-rule-scan.js`) and all six import it.
+ *
+ * The sentence this replaces is kept in essence because it was the only written
+ * record of the duplication, and a migration that erases its own reason is how
+ * the next copy gets made.
  */
-function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
-  const lines = css.split('\n');
-  const startIndex = lines.findIndex((line) => selectorPattern.test(line));
-  if (startIndex === -1) return undefined;
-  const openIndex = lines.findIndex((line, i) => i >= startIndex && line.includes('{'));
-  if (openIndex === -1) return undefined;
-  const closeIndex = lines.findIndex((line, i) => i >= openIndex && line.includes('}'));
-  if (closeIndex === -1) return undefined;
-  return lines.slice(startIndex, closeIndex + 1).join('\n');
-}
 
 const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
 const uiCss = readFileSync(UI_CSS_PATH, 'utf8');

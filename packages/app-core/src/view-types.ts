@@ -209,6 +209,43 @@ export type BoardCard = {
   stateProvenance: ClaimProvenance;
   cause: TransitionCause | null;
   rollup: RollupToViewer | null;
+  /**
+   * The ticket's due date, in `ListRow.dueDate`'s OWN nested shape and read by
+   * the SAME `mapDueDate` — so the two views cannot drift into two ideas of
+   * what a claimed date is, and a card carries the claim with the date for the
+   * reason that column's docblock gives: a date is a claim, and the claim's
+   * actor travels with it.
+   *
+   * ⚠ **THE WIRE ALREADY CARRIED THIS AND THE BOARD DID NOT READ IT** (ruling
+   * E5-2, 2026-09-21). `TicketCard.dueDate` (`packages/domain/src/read-models.ts`)
+   * is the three-state union — `claimed` / `cleared` / `never-claimed` — and
+   * `mapBoardCard` simply never read the field, so `BoardCard` had no due date
+   * while `ListRow.dueDate` (`:353` below) had one off the same wire.
+   * `cleared` and `never-claimed` both fold
+   * to `null` here, exactly as they do on the list: "nobody is claiming a date
+   * now" is one fact about this card, and which of the two ways it came to be
+   * is the clearing claim's own business.
+   *
+   * **REQUIRED, NOT OPTIONAL** — and this is the finding's own point rather
+   * than a style choice. The board is the DEFAULT project tab, and the defect
+   * E5-2 records is precisely that an overdue ticket is indistinguishable there
+   * from an undated one. An optional field would let any future constructor
+   * answer "this card has nothing to say about a due date" by staying silent,
+   * which is the same screen the ruling calls wrong. Both producers are this
+   * repo's own code (`online/mappers.ts`, `replica/replica-data-source.ts`), so
+   * there is no legacy literal to spare and the compiler names every one that
+   * must decide.
+   *
+   * ⚠ **THE KEY IS NOT HERE, AND THAT HALF IS A REAL WIRE GAP.** The export's
+   * meta line opens with `bits = [t.id]` — the `CCSO-3` form. That key is
+   * composed on the SINGLE-TICKET read (`apps/server/src/routes/tickets.ts`,
+   * `ticketKey(identity.prefix, projectPrefix, number)`), which is the sheet's
+   * crumb and not this card's route: `TicketCard` carries no workspace prefix,
+   * no project prefix and no per-project number, so a `BoardCard` has nothing
+   * to compose one from. Drawing a key here would mean inventing it, so the
+   * due label was built and the key left as a recorded gap.
+   */
+  dueDate: { date: string; claim: ClaimProvenance } | null;
   /** True only between submit and the server's answer (web is online-only). */
   pending: boolean;
 };
@@ -421,7 +458,7 @@ export type ResolvedVisibilityMode = Exclude<VisibilityMode, 'inherit'>;
  *
  * `proj_visibility` holds five columns of interest and this shape carries two.
  * `own_user_ids` / `resolved_user_ids` are CUT from the route by a standing
- * disclosure ruling — `routes/tickets.ts:111-114`: an explicit audience ROSTER
+ * disclosure ruling — `routes/tickets.ts`: an explicit audience ROSTER
  * is *"a disclosure no plan authorized"* — and the row carries no provenance at
  * all: who set the mode, and when, is on the LEDGER, not in this projection. So
  * the two members below are the two the wire actually has.

@@ -6,6 +6,7 @@ import { Board, MoveRefusalNotice, refusalCopy, type BoardMoveCapability } from 
 import { moveOutcome } from '../../src/views/board-moves.js';
 import type { BoardGroup, BoardView } from '../../src/view-types.js';
 import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
+import { SESSION_EXPIRED_COPY, SessionExpiredError } from '../../src/session-expired.js';
 import { WS, boardCardSeed, WF_ERRAND } from '../helpers/seed.js';
 
 /**
@@ -635,4 +636,41 @@ describe('Board move arrows — several declared targets one way open a picker (
     dialog = await screen.findByRole('dialog', { name: 'Move ticket' });
     expect(within(dialog).getByRole('button', { name: /Move to/ })).toHaveTextContent('Choose a state');
   });
+
+  /**
+   * E5-25 (round-2 ruling, IMPORTANT) — a move whose session ENDED is not a move
+   * the server could not be reached for.
+   *
+   * The shipped catch painted every thrown cause as *"We could not reach the
+   * server for this move — HTTP 401 for /v1/events"*: the server was reached and
+   * answered the one thing this product treats as its own category, and the
+   * person was given neither the true sentence nor the way back in. The cause
+   * arrives here as `SessionExpiredError` — a view may not import `HttpError`
+   * at all (`test/no-http-in-views.test.ts`, case 3.35) — so the adapter that
+   * has the status is where the classification is made, and
+   * `test/online/online-data-source.test.ts` is where a real 401 is proven to
+   * become it.
+   */
+  it('13.1157 E5-25 a move whose session ended says so, and is not painted as a transport failure', async () => {
+    const user = userEvent.setup();
+    const { moves } = movesFor({}, WF_ERRAND, async () => {
+      throw new SessionExpiredError('/v1/events');
+    });
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} moves={moves} />);
+    await settled();
+
+    await user.click(screen.getByRole('button', { name: 'Move to Doing' }));
+
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent(SESSION_EXPIRED_COPY);
+    expect(alert).not.toHaveTextContent('could not reach the server');
+    // The register says the same thing the sentence does — see
+    // `writeFailureRefusalClass`'s own docblock.
+    expect(alert).toHaveClass('gn-refusal--session');
+    expect(alert).not.toHaveClass('gn-refusal--transport');
+    // The control that keeps this from passing on a component that simply
+    // stopped working: the arrow is usable again afterwards.
+    expect(screen.getByRole('button', { name: 'Move to Doing' })).not.toBeDisabled();
+  });
+
 });

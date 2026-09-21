@@ -4,6 +4,8 @@ import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { Button, Card, InfoTip, Switch } from '@gisik-nokma/ui';
 import {
   makeSubmittedFactory,
+  writeFailureCopy,
+  writeFailureRefusalClass,
   type DataSource,
   type WorkspaceSettings,
 } from '@gisik-nokma/app-core';
@@ -293,9 +295,12 @@ export function WorkspaceSettingsForm({
         );
       }
     } catch (cause) {
+      // E5-25: a 401 is a session that ended, not an unreachable server — and
+      // it is decided in one place, not here.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this save — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this save — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -423,7 +428,7 @@ export function WorkspaceSettingsForm({
           </p>
         ) : null}
         {transportError !== null ? (
-          <p role="alert" className="gn-refusal gn-refusal--transport">
+          <p role="alert" className={writeFailureRefusalClass(transportError)}>
             {transportError}
           </p>
         ) : null}

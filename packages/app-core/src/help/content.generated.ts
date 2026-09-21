@@ -90,11 +90,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You can put a job on a person only on the website — and you cannot set a due date anywhere."
+                  "text": "You can put a job on a person only on the website."
                 },
                 {
                   "kind": "text",
-                  "text": " The website's job panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. Due dates have no control on any screen. (§5)"
+                  "text": " The website's job panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. (§5)"
                 }
               ],
               [
@@ -1321,23 +1321,77 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "about-the-projects-box",
-            "title": "About the \"Projects\" box",
+            "id": "about-the-project-access-box",
+            "title": "About the \"Project access\" box",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "It asks for a comma-separated list of identifiers — long strings of letters and numbers that you would have to go and find from somewhere. "
+                    "text": "It is a dropdown, and it offers "
                   },
                   {
                     "kind": "bold",
-                    "text": "In practice this box is not usable by a person."
+                    "text": "All projects in this workspace"
                   },
                   {
                     "kind": "text",
-                    "text": " Leave it empty."
+                    "text": " plus one *"
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "Only "
+                  },
+                  {
+                    "kind": "text",
+                    "text": "<project name>*** entry for each project you can see. Pick a name; the product works out the identifier behind it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Until 2026-09-21 the box was labelled "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Projects (comma-separated ids, optional)\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and wanted long strings of letters and numbers that you would have to go and find from somewhere — the manual's own verdict was "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"In practice this box is not usable by a person.\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It is kept here, rather than deleted, so a reader who remembers it as an unusable box finds the correction where they last saw it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Leave it on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "All projects in this workspace"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " unless the invitation really is for one project only."
                   }
                 ]
               },
@@ -1868,7 +1922,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "two things"
+                    "text": "three things"
                   },
                   {
                     "kind": "text",
@@ -1907,6 +1961,24 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " — the \"Who can see this\" section. (§10)"
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set or clear its due date"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row's date box. Clearing the box takes the claim off rather than claiming a blank date. (§5)"
+                    }
                   ]
                 ]
               },
@@ -1915,7 +1987,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Everything else on that panel is there to read, not to change. You will see the title, the current stage, the assignee, any fields, and the description — all of them showing who claimed the value and when, and none of them editable."
+                    "text": "Everything else on that panel is there to read rather than to change: the current stage, the type, the priority and the other field rows all show who claimed the value and when. Four rows are real controls — the title box at the top, the \"Assignee\" picker, the description box, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " date box."
                   }
                 ]
               }
@@ -1975,11 +2055,27 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot set a due date or a start date."
+                      "text": "You cannot set a start date."
                     },
                     {
                       "kind": "text",
-                      "text": " (See the box below for the one thing that comes close, and why it is not a substitute.)"
+                      "text": " (See the box below for the one thing that comes close, and why it is not a substitute.) "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "A due date is no longer on this list"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — see the row above for the precedent — because the website can now set one: the job panel's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row is a date box, and clearing it takes the claim off."
                     }
                   ],
                   [
@@ -6868,6 +6964,19 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A page you left open catches up when you come back to it."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " If you leave the Calendar or the Timeline sitting in a tab over India's midnight, their \"today\" ring moves to the new day the moment you return to that tab or bring the window forward — you do not have to reload the page. Until you look at it again it still shows the day it was drawn on, which you were not there to see."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "There is a footnote naming the time zone at the bottom of a job's history. That is the only place in the product that acknowledges it."
                   }
@@ -7618,15 +7727,40 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
-            "id": "what-do-i-put-in-the-projects-box-on-the-invite-form",
-            "title": "What do I put in the \"Projects\" box on the invite form?",
+            "id": "what-do-i-put-in-the-project-access-box-on-the-invite-form",
+            "title": "What do I put in the \"Project access\" box on the invite form?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "All projects in this workspace"
+                  },
+                  {
                     "kind": "text",
-                    "text": "Nothing. It asks for a comma-separated list of identifiers — long strings of letters and numbers you would have to go and find. It is not usable by a person as it stands. Leave it empty."
+                    "text": ", unless the invitation is genuinely for one project only — in which case pick the project by NAME from the same dropdown. It is a list of names; you never type an identifier."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "⚠ It used to ask you to type identifiers, and this answer said to leave it empty."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Until 2026-09-21 the box was labelled "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Projects (comma-separated ids, optional)\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and wanted long strings of letters and numbers you would have to go and find. The old answer is kept here so a reader who remembers it finds the correction where they last saw it."
                   }
                 ]
               }
@@ -7901,11 +8035,27 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "No control does it."
+                    "text": "Yes — on the website's job panel."
                   },
                   {
                     "kind": "text",
-                    "text": " The calendar and timeline are built entirely around claimed dates and the \"due soon\" list depends on them, and nothing offers to claim one."
+                    "text": " Open a job and its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " row is a date box: pick a day and it is claimed under your name, with the row reading back who set it and when. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Clear the box to take the claim off"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — that is recorded as a clearing rather than as a blank date. The calendar, the timeline, the list's due column and the \"due soon\" notice all read the same claim, so the date you set here is the date those screens show."
                   }
                 ]
               },
@@ -7914,7 +8064,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is one place that accepts a typed field value, and it will not give you a due date. If an admin puts a "
+                    "text": "There is also a place that accepts a TYPED field value, and it works differently. If an admin puts a "
                   },
                   {
                     "kind": "bold",
@@ -7922,7 +8072,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rule on one of your moves, the Move dialog puts a plain typing box on screen for that field and will not let the move through until you fill it in. That is the only place in the product that takes a field value from a person."
+                    "text": " rule on one of your moves, the Move dialog puts a plain typing box on screen for that field and will not let the move through until you fill it in."
                   }
                 ]
               },
@@ -7977,7 +8127,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Worth knowing about. Not a substitute for a due date."
+                    "text": "Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how you set the built-in due date."
                   }
                 ]
               }

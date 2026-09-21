@@ -162,30 +162,115 @@ export async function getTicketTypeFromDb(
  *
  * Workspace-scoped for the reason its singular sibling is — a type key is an
  * actor-chosen slug, so `invoice` exists in many workspaces at once.
+ *
+ * ## AS OF `asOfWorkspaceSeq`, and where the history comes from when this
+ * table has none (E6-13, 2026-09-21)
+ *
+ * This table is last-definition-wins with one row per type, so on its own it
+ * can only answer "what does the type say NOW". The row's
+ * `defined_workspace_seq` is the stream position of the definition it holds,
+ * and that number is what makes an as-of answer possible without giving the
+ * table history: a row whose `defined_workspace_seq` is GREATER than the
+ * event being applied is a definition that landed AFTER that event, so what
+ * the table holds is provably not what the live path saw when it applied the
+ * event. For exactly those types — and only those — the definition in force
+ * at `asOfWorkspaceSeq` is read back from the ledger itself: the newest
+ * `ticket-type.defined` for that key at or before that position, parsed by
+ * the same schema this projection applied it with. A type the ledger has NO
+ * definition for at that position is DROPPED from the ladder rather than left
+ * at its final state, so a `ticket.created` of a type that did not yet exist
+ * meets the reducer's `unknown ticket type` throw (a broken ledger, reported
+ * loudly) and not a silently newer binding.
+ *
+ * **On the live path the ledger branch cannot run.** Ingest assigns
+ * `workspace_seq` under `pg_advisory_xact_lock` per workspace and applies
+ * every projection inside the event's own transaction
+ * (`ledger/event-store.ts`, `lockWorkspace` and `nextWorkspaceSeq`), and this
+ * projection is registered BEFORE `proj_tickets`, so when a ticket event at
+ * position N is applied every row here was written by an event at a position
+ * below N. The branch is reachable only by a REPLAY of an event that a later
+ * redefinition post-dates — `tools/verify-projections.ts`' shadow rebuild and
+ * `rebuildProjection` — which is where the answer was wrong before: the
+ * rebuild resolved the NEW binding for a ticket the live path bound to the old
+ * one (`DRIFT DETECTED` on a correct database) and, when the new workflow was
+ * published after the ticket, threw `workflow "…" is not defined` from inside
+ * the reducer, because a workflow not yet in force at the ticket's position
+ * was being asked for. Both are measured in `test/verify-projections.test.ts`.
+ * The verifier's `search_path` trick is what lets `events` be named
+ * unqualified here: that table has no shadow copy, so it resolves to
+ * `public.events` under a shadow rebuild exactly as it does live.
+ *
+ * Cost, stated rather than claimed away: in a replay, every ticket event that
+ * precedes some later redefinition pays one extra query over the workspace's
+ * ticket-type events — bounded by `events_workspace_seq_unique` (a range scan
+ * of the workspace's stream up to the event's position) and by the count of
+ * `ticket-type` rows, whichever the planner picks. A workspace that has never
+ * redefined a type after creating a ticket pays nothing on either path.
+ *
+ * What this does NOT change: `proj_ticket_types` still keeps no history, its
+ * primary key is untouched, and `getTicketTypeFromDb` (the engine context's
+ * point lookup, whose readers are the reason the handoff priced a key change
+ * as out of scope) is untouched. The plan's Open question 11 asked for a
+ * history-bearing table; the ledger IS the history, and reading it only when
+ * the table's row post-dates the event is what keeps this a replay-only cost.
  */
 export type TicketTypeLookup = {
   get(typeId: string): TicketTypeDef | undefined;
 };
 
+type TicketTypeRow = {
+  type_id: string;
+  name: string;
+  icon: string;
+  rank: number;
+  workflow_id: string;
+  fields: unknown;
+};
+
 export async function getTicketTypeLadderFromDb(
   db: Queryable,
   workspaceId: string,
+  asOfWorkspaceSeq: number,
 ): Promise<TicketTypeLookup> {
-  const { rows } = await db.query<{
-    type_id: string;
-    name: string;
-    icon: string;
-    rank: number;
-    workflow_id: string;
-    fields: unknown;
-  }>(
-    `SELECT type_id, name, icon, rank, workflow_id, fields
+  const { rows } = await db.query<TicketTypeRow & { defined_workspace_seq: number }>(
+    `SELECT type_id, name, icon, rank, workflow_id, fields, defined_workspace_seq
        FROM proj_ticket_types
       WHERE workspace_id = $1`,
     [workspaceId],
   );
-  const raw = new Map(rows.map((row) => [row.type_id, row]));
+  const raw = new Map<string, TicketTypeRow>();
   const parsed = new Map<string, TicketTypeDef>();
+  const redefinedAfter: string[] = [];
+  for (const row of rows) {
+    if (row.defined_workspace_seq > asOfWorkspaceSeq) {
+      redefinedAfter.push(row.type_id);
+    } else {
+      raw.set(row.type_id, row);
+    }
+  }
+  if (redefinedAfter.length > 0) {
+    // The definition in force at the event's position, straight from the
+    // ledger, for the types whose table row post-dates the event (see the
+    // docblock). Parsed EAGERLY: this branch runs only in a replay of a
+    // ticket event that a later redefinition post-dates, and a payload that
+    // fails the schema here is a ledger row this projection could never have
+    // applied — the loud answer is the right one.
+    const asOf = await db.query<{ payload: unknown }>(
+      `SELECT DISTINCT ON (payload->>'id') payload
+         FROM events
+        WHERE workspace_id = $1
+          AND entity_kind = 'ticket-type'
+          AND type = 'ticket-type.defined'
+          AND workspace_seq <= $2
+          AND payload->>'id' = ANY($3::text[])
+        ORDER BY payload->>'id', workspace_seq DESC`,
+      [workspaceId, asOfWorkspaceSeq, redefinedAfter],
+    );
+    for (const row of asOf.rows) {
+      const def = ticketTypeDefSchema.parse(row.payload);
+      parsed.set(def.id, def);
+    }
+  }
   return {
     get(typeId) {
       const already = parsed.get(typeId);

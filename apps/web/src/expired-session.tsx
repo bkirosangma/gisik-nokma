@@ -1,7 +1,12 @@
 'use client';
 
 import { useEffect } from 'react';
-import { useRouter } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import {
+  SESSION_EXPIRED_COPY,
+  SessionExpiredError,
+  type DataSource,
+} from '@gisik-nokma/app-core';
 
 /**
  * The ONE author of "a 401 is not a refusal, it is a session that ended".
@@ -67,10 +72,28 @@ export function isExpiredSession(message: string | null): boolean {
  */
 export function useSignInOnExpiredSession(messages: ReadonlyArray<string | null>): boolean {
   const router = useRouter();
+  const pathname = usePathname();
   const expired = messages.some(isExpiredSession);
   useEffect(() => {
-    if (expired) router.push('/sign-in');
-  }, [expired, router]);
+    if (!expired) return;
+    // E5-32: the destination is CARRIED, not dropped. This hook was the ONE
+    // author of the 401 redirect and pushed a bare `/sign-in`, while
+    // `docs/manual.md` promises the opposite in two places — *"it puts you back
+    // on the page you were trying to reach"* and *"The same is true if you
+    // click a link (an invitation, or a link to a job) while signed out: it
+    // remembers where you were headed and sends you there afterwards."* The
+    // invitation/consent/settings arms already kept theirs; now every one of the
+    // hook's five callers does.
+    //
+    // The PATH comes from `usePathname` (which strips any query) and the QUERY
+    // is read off `window` inside the effect rather than taken from
+    // `useSearchParams`, deliberately: a hook that calls the latter puts every
+    // caller behind a `Suspense` boundary, and this runs only in the browser, at
+    // the moment the redirect is decided — exactly when the current URL is what
+    // is wanted. `sign-in/page.tsx` constrains `next` to a path on this site, so
+    // nothing here can widen it.
+    router.push(signInWithNext(pathname + window.location.search));
+  }, [expired, pathname, router]);
   return expired;
 }
 
@@ -86,8 +109,13 @@ export function useSignInOnExpiredSession(messages: ReadonlyArray<string | null>
  *
  * `role="status"` so it joins the same list the refusal panels are asserted as,
  * printed rather than counted.
+ *
+ * **The string itself moved to `@gisik-nokma/app-core` (E5-25)** and this is a
+ * re-export, not a second definition: the WRITE path paints the same sentence
+ * from the package views, and two declarations of one sentence is a sentence
+ * that drifts. Every reader of this module keeps the name it already imported.
  */
-export const EXPIRED_SESSION_COPY = 'Your session has ended. Taking you to sign in…';
+export const EXPIRED_SESSION_COPY = SESSION_EXPIRED_COPY;
 
 export function ExpiredSessionNotice() {
   return (
@@ -95,4 +123,53 @@ export function ExpiredSessionNotice() {
       {EXPIRED_SESSION_COPY}
     </p>
   );
+}
+
+/**
+ * A `DataSource` that tells the shell when a WRITE found the session gone
+ * (E5-25, round-2 ruling).
+ *
+ * ## Why the redirect is here rather than in each write's catch
+ *
+ * Nine write sites painted a 401 as *"We could not reach the server"*, and five
+ * of them are `packages/app-core` views — which may not import `HttpError` at
+ * all (`packages/app-core/test/no-http-in-views.test.ts`, case 3.35). Those views
+ * now paint the right sentence, because the adapter that HAS the status
+ * re-throws it as `SessionExpiredError`; but none of them has a router, and the
+ * sentence says *"Taking you to sign in…"*.
+ *
+ * This is the other half: the shell wraps the ONE `DataSource` it hands to every
+ * page, so any write that ends in a 401 — a board move, a close, a bulk close, a
+ * sheet change, a settings save, a delete's Undo, a backlog start or re-rank —
+ * pushes `/sign-in` once. It is deliberately not per-site: a tenth write site
+ * added tomorrow would otherwise need a tenth copy of this, and the site that
+ * forgot would be silent in the direction nobody audits.
+ *
+ * The failure is RE-THROWN unchanged. This wrapper's only job is the redirect;
+ * the sentence is the view's, and swallowing the throw here would leave a view
+ * rendering a success it never had.
+ */
+/**
+ * The `/sign-in` URL that remembers where the person was (E5-32).
+ *
+ * One builder for the read hook and the write guard, so the two cannot drift
+ * about what a remembered destination looks like — and `sign-in/page.tsx`'s
+ * guard is the only thing that has to accept it.
+ */
+export function signInWithNext(pathAndSearch: string): string {
+  return `/sign-in?next=${encodeURIComponent(pathAndSearch)}`;
+}
+
+export function withSignInOnExpiredWrite(source: DataSource, onExpired: () => void): DataSource {
+  return {
+    ...source,
+    async ingest(events) {
+      try {
+        return await source.ingest(events);
+      } catch (cause) {
+        if (cause instanceof SessionExpiredError) onExpired();
+        throw cause;
+      }
+    },
+  };
 }

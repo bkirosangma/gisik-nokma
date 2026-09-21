@@ -2142,7 +2142,9 @@ describe('12.309-12.310 the refold hazard, and the narrowness of the swallow (cl
    * ## rather than an omission
    *
    * `applyInstruction`'s three arms are `purgeEntity`, `revokeScope` and the
-   * `reach-granted` recorder, and every statement in the first two is a DELETE:
+   * `reach-granted` recorder — the three instruction arms of `SyncItem`'s four,
+   * and the reason `isSyncInstruction` narrows to all three (case 6.96) — and
+   * every statement in the first two is a DELETE:
    * nothing in this fixture can make one throw without stubbing the replica,
    * and a stubbed replica would be measuring the stub. `isSyncInstruction(item)
    * → false` therefore stands on the type and on reading, unmeasured. Written

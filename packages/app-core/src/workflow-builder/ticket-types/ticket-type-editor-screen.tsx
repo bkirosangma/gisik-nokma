@@ -6,7 +6,7 @@ import {
   type PublishedWorkflowDef,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Card, Select } from '@gisik-nokma/ui';
+import { Button, Card, Select } from '@gisik-nokma/ui';
 import { buildTicketTypeDefinedEvent } from '../events.js';
 import type { WorkflowAuthoringGateway } from '../gateway.js';
 import { canAuthorRole, type BuilderSession } from '../ui/builder-context.js';
@@ -187,15 +187,18 @@ function EditorHeader(props: {
             flight, and it does not exist at all for a non-author. Moving it must
             not turn it into a button that reports success about a def the server
             will reject. */}
+        {/* E4-27 — the shared `Button`, not a page-local control. The class
+            stays for `align-self: flex-start` (the one thing the shared
+            component does not supply); the paint is `gn-button--primary`'s. */}
         {props.canAuthor ? (
-          <button
-            type="button"
+          <Button
+            variant="primary"
             className="ticket-type-editor__save"
             disabled={props.saveDisabled}
             onClick={props.onSave}
           >
             Save ticket type
-          </button>
+          </Button>
         ) : null}
       </div>
     </div>
@@ -287,6 +290,17 @@ export function TicketTypeEditorScreen(props: {
   }, [diverged, outgoingWorkflowId, defId, gateway, workspaceId]);
 
   const isBuiltin = BUILTIN_TICKET_TYPE_SEEDS.some((seed) => seed.id === def.id);
+  // E6-3 (2026-09-21): the rank has moved off its SAVED value on an existing
+  // custom type. The engine accepts the re-rank whatever sits where — the rank
+  // invariants are write-time invariants and occupancy is never an engine
+  // input (`checks/ticket-type.ts`, owner 2026-08-26) — so the tickets already
+  // placed keep their parents, and the placements the new rank forbids are
+  // refused only when someone next tries to make them. Said HERE, at the
+  // moment of the change, so the admin decides with that in front of them;
+  // it is the rank counterpart of the workflow divergence notice below, and
+  // like it, it carries no count it has not measured. A new type has nothing
+  // placed yet; a built-in cannot re-rank at all.
+  const rankDiverged = props.initialDef !== null && !isBuiltin && def.rank !== props.initialDef.rank;
   const parsed = ticketTypeDefSchema.safeParse(def);
   const schemaMessages = parsed.success
     ? []
@@ -459,6 +473,13 @@ export function TicketTypeEditorScreen(props: {
             </label>
             {isBuiltin ? (
               <p className="ticket-type-editor__builtin-note">Built-in type — its place in the hierarchy is fixed.</p>
+            ) : null}
+            {rankDiverged ? (
+              <p className="ticket-type-editor__builtin-note" data-testid="rank-divergence">
+                Tickets already placed keep their place — re-ranking does not move or re-check them. The new rank
+                applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank
+                no longer allows cannot be put back there.
+              </p>
             ) : null}
           </Card>
           <Card className="ticket-type-editor__card">

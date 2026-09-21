@@ -286,14 +286,26 @@ handlers, and Due as an `<input type="date">` **with a note line**; only Type is
 **this is the read half** and the editors are named as an unbuilt door. `16.29` asserts the read-only
 half, the same way `16.22` ASSERTED F's chip absence.
 
+**✅ THE DUE HALF OF THAT DOOR IS NOW BUILT — ruling E5-6 (release 2026-09-22, batch B13).** The record
+above is kept rather than deleted because it is what the ruling overrode: every surface in this product
+READS a due date — My Work's overdue count, the List's due column, the Calendar, the Timeline, the
+due-soon notification — and until E5-6 none could SET one, so the fact was visible in four places and
+claimable in none. The job panel's **Due** row is now a date box mirroring the export's own
+(`desktop.dc.html:3599`: `{ due: v || null }` — an emptied control CLEARS the claim, which is
+`value: null` on `ticket.field_set`). **PRIORITY IS STILL THE UNBUILT DOOR** and is still the read half
+only; `16.29` was amended to pin that SPLIT rather than the uniform absence it used to pin, which is
+the outcome its own suite docblock asked for (*"16.29 asserts the READ-ONLY half so that making them
+editable later is a decision rather than a drift"*). The editor's write behaviour is **`13.1178`**.
+
 - **16.23** ✅ All three rows are drawn **ALWAYS**, even on a ticket claiming none of them — the state this task exists to end. Each absence carries its own sentence.
-- **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps.
+- **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps. **AMENDED BY E5-6:** the day half used to be `getByText('30 Aug 2026')` over a read-only span; the export's row draws a date input and no such span, so it is now asserted as that control's VALUE (`toHaveValue('2026-08-30')`). The "both halves" substance is unchanged.
 - **16.25** ✅ Type renders the **NAME from the workspace ladder**, not the raw id.
 - **16.26** ✅ Type **falls back to the id** when the ladder does not hold it — the control for 16.25, without which a hard-coded name would pass.
 - **16.27** ✅ Priority renders the claim when the ticket carries one: it is a CONVENTION, so the claimed case arrives by the ticket carrying the field, exactly as a custom field would.
-- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice.
-- **16.29** ✅ The three rows are **READ-ONLY**: no `input`, `select` or `button` inside any of them.
+- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text.
+- **16.29** ✅ The rows are **READ-ONLY except the one E5-6 made an editor**: Priority and Type carry no `input`, `select` or `button`, and Due's own editor is asserted POSITIVELY so the case cannot pass by the control silently disappearing.
 - **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index.
+- **13.1178** ✅ **The Due row's WRITE (ruling E5-6, 2026-09-21)** — the door this record's Due half was. Committing a changed day submits exactly one `ticket.field_set` carrying `{ fieldId: 'dueDate', value: { date } }`; **clearing the box submits `value: null`** — the clearing claim, which is the export's own reading of an emptied control (`desktop.dc.html:3599`, `{ due: v || null }`), never `{ date: '' }`; and Enter commits the draft exactly as the title field's own Enter does. The id is from **B13's allocated §13 block (13.1177–13.1186)**, not from this file's 16.x series, because §13 ids became per-release-batch — the case still lives here, beside the Door G record it belongs to. **Two controls, because the write path has two ways to be wrong and one of them was, measured:** an **UNCHANGED** day sends nothing at all (this event is append-only, so a commit of the value the ticket already has would put a history line in the ticket claiming a date nobody touched), and a ticket claiming **NO** date can still be given its **first** one — the arm the defect was loudest in, since a ticket born without a due date could never acquire one before this ruling. **⚠ THE UNCHANGED CONTROL WAS VACUOUS ON ITS FIRST WRITING AND THE MUTATION WITNESS FOUND IT:** it made ONE `change` to the value the input already held, which fires no React `onChange` at all, so the draft stayed `null`, `onBlur`'s `dueDraft !== null` gate short-circuited, `submitDueDate` was never called, and the case **passed against a `submitDueDate` with its no-op guard deleted**. It now makes TWO real changes — out to a different day and back — and a THIRD case exists purely as its precondition, proving the same two-change dance reaches the write when the final value differs. **Mutation-witnessed with two distinct signatures:** dropping the clearing arm reddens the clearing case alone (`Tests 1 failed | 113 passed`), and deleting the no-op guard reddens the unchanged case alone (`Tests 1 failed | 114 passed`). — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 
 **Mutation witnesses, run and recorded rather than predicted.** Dropping `dueDate` from the generic
 loop's exclusion reddens **16.28 alone** (a second row for one claim). Removing the Type row's `??
@@ -312,7 +324,7 @@ sentence is about the DATE and the claim line is about the ACTOR.
 
 ### What is NOT covered
 
-- **The two editors are NOT built.** Priority and Due are read-only rows here; making them editable — Priority as a segmented control, Due as a date input with its note line — is a separate door, named and not taken. `16.29` asserts the absence rather than describing it.
+- **The DUE editor was not built HERE, and is built now (ruling E5-6).** This bullet used to read *"the two editors are NOT built. Priority and Due are read-only rows here"*. **Due is no longer read-only** — the job panel's Due row is a date box, mirroring the export's own (`desktop.dc.html:1199-1203`, and `:3599` for the clearing semantics), asserted by `13.1178`; `16.24`, `16.28` and `16.29` were amended in that change set rather than left pinning a rendering the door replaces. **Priority is STILL not built** and remains a read-only row — Priority as a segmented control is a separate door, named and not taken, and `16.29` still asserts that absence rather than describing it.
 - **The CSS is not measured.** jsdom loads no stylesheet.
 - **`pendingFieldIds` is empty.** `ClientStateCache` exposes no pending surface (measured), so the Due row does not badge an in-flight claim. The sheet's other field rows do not badge one either — this is stated because an empty list is a value, not a placeholder.
 ## Door — `/v1/search`: `matchedIn` becomes derivable (executor 1, 2026-09-19) — cases `16.32`–`16.37`
@@ -552,9 +564,12 @@ plus a partial index → a filter at every view-serving SELECT.
   `exec/ticket-key` (`CCSO-1183`: a workspace prefix, a project prefix, and a per-project number), so
   **the toast's sentence is now reachable as the prototype wrote it** — the remaining work is one
   interpolation in the host, which reads the key off the same read that already carries the title.
-  Until then the sentence carries the ticket's TITLE, and that is a live departure rather than a
-  standing one. The parity list's note that the breadcrumb needs a ticket key is satisfied by the same
-  change.
+  **The interpolation LANDED 2026-09-21 (T-E6-14):** the sheet hands the host `key ?? title` — the same
+  expression its own breadcrumb crumb already uses — so the toast reads the KEY wherever the workspace
+  has a prefix and the title where it does not. `apps/web/test/sheet-delete.test.tsx` pins BOTH arms,
+  the key-named sentence and the no-key fallback beside it, so a host interpolating `${title}`
+  unconditionally reddens. **The departure is closed rather than live.** The parity list's note that
+  the breadcrumb needs a ticket key is satisfied by the same change.
   - **The stylesheet half, and the ground the control really has.** It has a rule of its own: `packages/ui/test/components.test.tsx` pins the rule's existence, its roles, its 44px floor and
   its `justify-content: space-between`; `packages/ui/test/tokens.test.ts` pins the CONTRAST PAIR.
   **`--gn-danger` as TEXT measures 4.4013 on `surface` in hig/minimal light — below AA, a shortfall this
@@ -564,6 +579,55 @@ plus a partial index → a filter at every view-serving SELECT.
   `colorOf` reproduces `tokens.test.ts`'s pinned primitives, and the same computation reproduces the
   recorded 4.4013 — and the pair is ENFORCED rather than written into a comment, which is the criticism
   16.83 earned.
+  - ⚠ **AMENDED BY RULING E2-30 (2026-09-21) — THE TOAST'S SENTENCE, and the way back it did not name.**
+  The sentence read `${title} deleted · its history is retained`. That is TRUE of the ledger and
+  MISLEADING about what the person can do, because the retained history had no screen — no deleted view,
+  no filter axis, no search arm — and the ONE producer of `ticket.restored` in the whole client was the
+  Undo inside a toast that caps itself at the ruled 15 s. It now reads `${title} deleted · you can also
+  undo this on the page`, naming the durable route the ruling added. The three assertions that pinned
+  the old spelling were amended in the same change set, quoting what they used to assert.
+
+- **13.1180** ✅ **The DURABLE way back from a delete (ruling E2-30, 2026-09-21).** A delete now also puts
+  a strip on the page — one slot, the last ticket deleted from this page — naming the ticket and offering
+  its own Undo. **`role="status"` and a direct child of `.gn-project`, so it is on EVERY tab**: a delete
+  removes the ticket from the Board, the List, the Calendar and the Timeline at once, so the route back
+  belongs to the page rather than to whichever tab happened to be open. It does not expire, it is
+  dismissible, a second delete REPLACES it (one slot, the same rule the toast keeps — and said plainly on
+  the strip's own sentence, so nobody is told a ticket is reachable when it has been superseded), and a
+  **COMMITTED** restore clears it — not the click, because a failed restore is exactly when the route
+  proved useful. **The case that carries the ruling is the one the four `16.84` call-site cases cannot
+  make:** they all act INSIDE the toast's window, so every one of them would pass against a product whose
+  only route still lapses at 15 s. `13.1180` crosses the ruled window with fake timers, asserts the TOAST
+  is gone (positively first, so it cannot pass by the timer simply not being wired), and then asserts the
+  strip is still there **and still live** — the restore posts from the strip alone, carrying the id it was
+  built for. Two controls: dismissing the STRIP posts nothing (without which a × wired to the restore
+  would pass every case above), and a committed restore clears it. **Mutation-witnessed with two distinct
+  signatures:** binding the strip to the toast — `setDurableUndo(null)` in the toast's own `onDismiss`,
+  i.e. re-creating the defect — reddens the durability case alone (`Tests 1 failed | 7 passed`), and
+  dropping the clear from the committed branch reddens the clearing control alone (`Tests 1 failed | 7
+  passed`). The strip's Undo carries a **distinct accessible name** (`Undo the deletion of <title>`)
+  because the toast's control is called "Undo" too; the visible word is unchanged and the accessible name
+  contains it, so WCAG 2.5.3 holds, and a page-wide `getByRole('button', {name: 'Undo'})` stays
+  unambiguous. — (`apps/web/test/sheet-delete.test.tsx`)
+
+- **13.1183** ✅ **`Delete` ASKS FIRST (ruling E2-35, 2026-09-21).** The footer's control performed the
+  delete on ONE press, while the product reaches **the same soft delete** on many tickets through a whole
+  confirmation surface (`bulk-close-dialog.tsx`). It is now a `Dialog` in that shape: the ticket's title,
+  the consequence (it leaves the Board, the List, the Calendar and the Timeline; nothing is erased), and
+  **both** ways back — the toast's ruled 15 seconds and the page strip `13.1180` added. Three cases: the
+  press opens the ask and posts **nothing** (the ask is not the act); a CONTROL that Cancel closes it and
+  still posts nothing, with the sheet still standing (a Cancel wired to the delete would pass the first
+  arm otherwise); and the confirm posts exactly one `ticket.deleted` for this ticket with `{}`.
+  **Mutation-witnessed with two distinct signatures:** making the footer delete on the press again
+  reddens all three (`Tests 3 failed | 116 skipped`), and wiring Cancel to the delete reddens the Cancel
+  control ALONE (`Tests 1 failed | 2 passed | 116 skipped`). **The confirm is named `Delete ticket`, never
+  a second bare "Delete"** — the case asserts exactly one button called "Delete" exists, which is the
+  same collision `13.1180`'s Undo hit. **Two omissions are deliberate and stated in the code:** the
+  control is NOT hidden, and the accept is NOT gated on a local `precheck` — the deletion door's own
+  docblock (`packages/rule-engine/src/checks/deletion.ts`) says authority "is not a pure function of the
+  envelope — this engine's context carries no membership at all", so a local gate would answer every
+  question about this delete except the one that makes it consequential. The id is from **B13's allocated
+  §13 block (13.1177–13.1186)**. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 
 ### The sheet's three missing surfaces — the toolbar, the editable title, the breadcrumb
 

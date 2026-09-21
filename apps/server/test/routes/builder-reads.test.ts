@@ -21,6 +21,7 @@ import { INVALID_VERSION_BODY } from '../../src/routes/builder-reads.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * Plan 5 Task 9b — the BUILDER read surface, and the bulk rebind beside it.
@@ -1878,5 +1879,144 @@ describe('POST …/migrate — a closed ticket may only migrate to a terminal st
     expect(moved[0]?.workflow_id).toBe(targetWorkflowId);
     expect(moved[0]?.state_id).toBe('done2');
     expect(moved[0]?.closed_at).not.toBeNull();
+  });
+});
+
+/**
+ * 7.266 — E6-10 (release 2026-09-22, B12). The migrate pre-flight asked every
+ * MIGRATION question over the whole ticket set and then submitted one
+ * `ticket.workflow_rebound` per ticket through `ingestClientBatch`, which
+ * commits one transaction per event — but it never asked the question the
+ * PERMISSION GATE asks per event: `canSee`. `canSeeResolved` answers false for
+ * an `admin` on a project-mode ticket whose project they are not on (there is
+ * deliberately no admin read bypass), so an admin's migration of a type with
+ * one ticket they could see and one they could not moved the first, was
+ * refused on the second, and answered `refused` — a type split across two
+ * workflows under a docblock that called the window unreachable, and a client
+ * told nothing moved.
+ *
+ * A WORKSPACE OF ITS OWN, seeded here rather than in the shared world: the
+ * shared `admin` sits on no project by design (`RoleAxis`), the landing case
+ * above counts the shared workspace's rebound events exactly, and a fixture
+ * that changed what an existing case measures would make the suite pass by
+ * declaration order (`SiblingProject`'s rule). Two people signed in over the
+ * wire (`read.otp`), two projects, one type, two tickets.
+ */
+describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s question (E6-10)', () => {
+  const FROM = 'e610-from';
+  const TO = 'e610-to';
+  const TYPE = 'audit';
+  let workspaceId = '';
+  let ownerAuth: { authorization: string };
+  let adminAuth: { authorization: string };
+  /** In the project the admin IS on — created first, so it sorts first under `ORDER BY ticket_id`. */
+  let visibleId = '';
+  /** In the project the admin is NOT on. */
+  let hiddenId = '';
+
+  const flow = (id: string, name: string) => ({
+    id,
+    version: 1,
+    name,
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' as const },
+      { id: 'done', name: 'Done', category: 'terminal' as const },
+    ],
+    transitions: [
+      { from: '*', to: 'todo', rules: [] },
+      { from: '*', to: 'done', rules: [] },
+    ],
+  });
+
+  beforeAll(async () => {
+    const owner = await signInWithPhone(read.app, read.otp, '+911111111191');
+    const admin = await signInWithPhone(read.app, read.otp, '+911111111192');
+    ownerAuth = { authorization: `Bearer ${owner.token}` };
+    adminAuth = { authorization: `Bearer ${admin.token}` };
+    workspaceId = newUlid();
+    const onProject = newUlid();
+    const offProject = newUlid();
+    // Two ULIDs minted in the same millisecond are not ordered — the tail is
+    // random — so the pair is SORTED and the smaller one is the visible
+    // ticket's: `ORDER BY ticket_id` must reach the ticket the admin can see
+    // first for the defect to have been a PARTIAL migration (measured: the
+    // unsorted form failed 1 run in 4).
+    const minted = [newUlid(), newUlid()] as const;
+    visibleId = minted[0] < minted[1] ? minted[0] : minted[1];
+    hiddenId = minted[0] < minted[1] ? minted[1] : minted[0];
+    const ws = { workspaceId, actorId: owner.userId };
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.created', payload: { name: 'Split audit' } }),
+      makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(workspaceId, owner.userId) }, type: 'membership.granted', payload: { userId: owner.userId, role: 'owner' } }),
+      makeCommitted({ ...ws, entity: { kind: 'membership', id: membershipId(workspaceId, admin.userId) }, type: 'membership.granted', payload: { userId: admin.userId, role: 'admin' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: onProject }, type: 'project.created', payload: { name: 'On' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: onProject }, type: 'project.member_added', payload: { userId: owner.userId, projectAdmin: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: onProject }, type: 'project.member_added', payload: { userId: admin.userId, projectAdmin: false } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: offProject }, type: 'project.created', payload: { name: 'Off' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: offProject }, type: 'project.member_added', payload: { userId: owner.userId, projectAdmin: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'workflow', id: FROM }, type: 'workflow.defined', payload: flow(FROM, 'Audit flow') }),
+      makeCommitted({ ...ws, entity: { kind: 'workflow', id: TO }, type: 'workflow.defined', payload: flow(TO, 'Audit flow, revised') }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: TYPE }, type: 'ticket-type.defined', payload: { id: TYPE, name: 'Audit', icon: 'check', rank: 3, workflowId: FROM, fields: [] } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: visibleId }, type: 'ticket.created', payload: { typeId: TYPE, projectId: onProject, parentId: null, title: 'Audit the admin can see' } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: hiddenId }, type: 'ticket.created', payload: { typeId: TYPE, projectId: offProject, parentId: null, title: 'Audit the admin cannot see' } }),
+    ]);
+  }, 60_000);
+
+  const migrateAs = (auth: { authorization: string }) =>
+    read.app.inject({
+      method: 'POST',
+      url: `/v1/workspaces/${workspaceId}/ticket-types/${TYPE}/migrate`,
+      headers: auth,
+      payload: { fromWorkflowId: FROM, toWorkflowId: TO, stateMap: { todo: 'todo' } },
+    });
+
+  async function population(workflowId: string): Promise<number> {
+    const response = await read.app.inject({
+      method: 'GET',
+      url: `/v1/workspaces/${workspaceId}/ticket-types/${TYPE}/population?workflowId=${workflowId}`,
+      headers: ownerAuth,
+    });
+    expect(response.statusCode).toBe(200);
+    return (response.json() as TypePopulationResponse).count;
+  }
+
+  it('an admin not on one of the projects is refused UP FRONT with the count, and nothing is appended', async () => {
+    // The gate's own answer, ticket by ticket, through the ticket door: this
+    // is the fact the pre-flight has to ask about, asserted rather than
+    // assumed of the seed.
+    const seen = await read.app.inject({ method: 'GET', url: `/v1/workspaces/${workspaceId}/tickets/${visibleId}`, headers: adminAuth });
+    const unseen = await read.app.inject({ method: 'GET', url: `/v1/workspaces/${workspaceId}/tickets/${hiddenId}`, headers: adminAuth });
+    expect([seen.statusCode, unseen.statusCode]).toEqual([200, 404]);
+    // And the visible one is processed FIRST — `ORDER BY ticket_id`, ULIDs
+    // minted in this order — which is what made the defect a PARTIAL
+    // migration rather than a clean refusal on the first row.
+    expect(visibleId < hiddenId).toBe(true);
+    expect([await population(FROM), await population(TO)]).toEqual([2, 0]);
+
+    const before = await ledgerRows();
+    const response = await migrateAs(adminAuth);
+    expect(response.statusCode).toBe(422);
+    // Nothing appended, nothing moved: the type is NOT split across two
+    // workflows. Asserted BEFORE the body, so the RED reads as what the
+    // defect did — one ticket on each workflow ([1, 1]) under a `refused` —
+    // rather than as a rule-name mismatch.
+    expect([await population(FROM), await population(TO)]).toEqual([2, 0]);
+    expect(await ledgerRows()).toBe(before);
+    expect(response.json()).toEqual({
+      status: 'refused',
+      rule: 'migration.not-visible',
+      reason:
+        '1 of the 2 tickets of this type is not visible to you; a migration moves every ticket of the type, so ask an owner to run it, or join the projects those tickets are in.',
+    });
+
+    // POSITIVE CONTROL, same body, the owner (who reads the whole workspace):
+    // the migration lands whole, so the refusal above was the caller and not
+    // the request.
+    const accepted = await migrateAs(ownerAuth);
+    expect(accepted.statusCode).toBe(200);
+    expect(accepted.json()).toEqual({ status: 'migrated', count: 2 });
+    expect(await ledgerRows()).toBe(before + 2);
+    expect([await population(FROM), await population(TO)]).toEqual([0, 2]);
   });
 });

@@ -26,10 +26,18 @@ import type { Projection } from './registry.js';
  *
  * §8 pins `proj_entity_heads, proj_workflows, proj_ticket_types, proj_projects,
  * proj_tickets, proj_rollups, proj_memberships, proj_visibility, proj_contested`.
- * `proj_ticket_types` does not exist yet, so this one's §8 position today is
- * immediately after `proj_workflows` — an INSERT, not an append. See
- * `./index.ts` and `test/projection-order.test.ts`, both of which must move in
- * the same commit.
+ * **This position is 4, and it was an INSERT rather than an append.** This
+ * paragraph used to read *"`proj_ticket_types` does not exist yet, so this
+ * one's §8 position today is immediately after `proj_workflows`"* — true for
+ * the 21 minutes between `dd7bfcfd` (18:51:28 IST, 2026-09-01) and `6cb631d0`
+ * (19:12:54 IST, the commit that registered `proj_ticket_types`) and false ever
+ * since, because
+ * `proj_ticket_types` landed at position 3 and pushed this one down. `./index.ts`
+ * carries the corrected account in its own comment on that registration
+ * (*"It INSERTS above proj_projects, which had been immediately after
+ * proj_workflows only because this position was empty"*); `test/projection-order.test.ts`
+ * is the assertion, and it and `./index.ts` move in the same commit as any
+ * position change.
  *
  * ## Determinism
  *

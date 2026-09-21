@@ -947,7 +947,24 @@ function WorkspaceHome({
         // True of THIS CALLER'S list, and said as such. A member outside every
         // project has an empty live list in a workspace full of them, and
         // "there are no projects" would be a claim about the workspace.
-        <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
+        //
+        // ⚠ **AND IT WAS NOT TRUE OF EVERY CALLER (E5-23, round-2 ruling,
+        // 2026-09-21).** The sentence presupposes projects the reader cannot
+        // open — *"no projects YOU can open"* — which is exactly right for the
+        // excluded member and exactly wrong for the person who founded this
+        // workspace seconds ago and is looking at the New-project form below,
+        // having created nothing yet. Two different facts reach this one arm and
+        // `shown.length === 0` cannot tell them apart on its own; `isAdmin`
+        // together with the SERVED count can. The founder's sentence names the
+        // form below rather than an absence, because the form is the way out and
+        // it is already on screen.
+        isAdmin && workspace.projects.length === 0 ? (
+          <p className="gn-workspace-home__empty">
+            No projects yet — create the first one below.
+          </p>
+        ) : (
+          <p className="gn-workspace-home__empty">No projects you can open are active here.</p>
+        )
       ) : (
         // ONE grid, not a live list plus a disclosed second one (Round 20) —
         // but the archived cards sort to its END (Round 21, owner ruling), dimmed

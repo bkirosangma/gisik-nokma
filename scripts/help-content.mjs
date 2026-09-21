@@ -43,12 +43,13 @@
  * every one of them behaves. A gate whose own instrument is unverified is the
  * shape this repository keeps getting caught by.
  */
-import { readFileSync, writeFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readFileSync, readdirSync, writeFileSync } from 'node:fs';
+import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
 const REPO_ROOT = resolve(dirname(fileURLToPath(import.meta.url)), '..');
 const OUT = 'packages/app-core/src/help/content.generated.ts';
+const BASELINE = 'scripts/help-quoted-strings-absent.json';
 
 const SOURCES = [
   { id: 'manual', source: 'docs/manual.md' },
@@ -326,6 +327,135 @@ export const HELP_CONTENT: HelpContent = ${JSON.stringify(content, null, 2)} as 
 `;
 }
 
+// ── THE SECOND PROPERTY: is any of this TRUE OF THE PRODUCT? ─────────────────
+//
+// WHAT THIS IS FOR. `--check` above verifies that the generated module matches
+// its sources. It cannot fail on whether either document is true of the build,
+// so the corpus can drift arbitrarily far from the product and the gate stays
+// green by construction. F2 (2026-09-21) is the finding; F1 is eight rows of the
+// drift it permits, all of which passed this gate.
+//
+// WHAT IT CAN CHECK, MEASURED BEFORE WRITING IT. Not the general claim — no
+// instrument can decide whether prose describes the product — but the part that
+// is a literal: a string the help puts in front of a person. **Population
+// measured at 2026-09-21: 130 quoted strings in `docs/manual.md`, 96 in
+// `docs/faq.md`, 226 in all, and ZERO absent from `apps/` + `packages/`.** So it
+// ships green and ratchets from there.
+//
+// WHY QUOTES AND NOT BACKTICKS — measured, not assumed, and it corrects the
+// remedy's own wording. The review says "every back-ticked control name".
+// `docs/manual.md` contains EIGHT backticks in total and three distinct tokens
+// (`2026-08-30`, `Mark N read`, `/settings`); a rule built on them would have a
+// population of three. The manual names its controls and product strings in
+// DOUBLE QUOTES, and that is what is swept below.
+//
+// WHAT IT DOES NOT CATCH — named, not implied, and this one was MEASURED
+// against the very rows the remedy names. It would not have caught F1. Run
+// against the pre-F1 manual (at `e33b7b8a^`) with today's product: 127 spans,
+// zero absent — because F1's drift was BOLD names and prose describing where a
+// control sits ("use the **Sign out** button on the right of the bar"), and
+// `Sign out` still exists in the product, one menu deeper. **A string can be
+// present and the sentence about it still false.** That gap is real and stays
+// open; this closes the half that is a literal.
+
+/**
+ * Every string a help document puts in double quotes, deduped.
+ *
+ * A span whose CONTENT carries `*` is dropped: those are artefacts of emphasis
+ * beside a quotation mark, not product strings, and two of them are in the
+ * manual today. A span that is italic-WRAPPED (`*"…"*`) is NOT dropped — the
+ * asterisks sit outside the quotes, and the sentence inside is a real string.
+ */
+export function quotedSpans(text) {
+  return [
+    ...new Set(
+      (text.match(/"[^"\n]+"/g) ?? [])
+        .map((s) => s.slice(1, -1))
+        .filter((s) => !s.includes('*') && !s.includes('`')),
+    ),
+  ];
+}
+
+const PRODUCT_DIRS = ['apps', 'packages'];
+const PRODUCT_EXT = /\.(ts|tsx|js|jsx|mjs|css|json|md)$/;
+const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.turbo']);
+
+/**
+ * The haystack, and the ONE FILE THAT MUST NOT BE IN IT.
+ *
+ * `packages/app-core/src/help/content.generated.ts` is a COPY OF THE CORPUS —
+ * it is what this script writes from the two documents. Left in, every string
+ * the manual quotes is "found in the product" inside the manual's own generated
+ * copy, and the check cannot fail for any string the corpus currently contains.
+ *
+ * **That is not a hypothesis: it is the first version of this check, and it was
+ * caught only by running the mutation below.** A quoted string that no product
+ * file contains was appended to `manual.md`, the generated copy was regenerated
+ * so the freshness half was satisfied, and the gate printed `EXIT=0`. A check
+ * whose haystack contains the thing it is checking is the defect class this
+ * whole batch exists for, so the exclusion is stated here by name.
+ */
+const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
+
+/** Every product file's text, joined — the haystack a quoted string is looked for in. */
+export function productText(root) {
+  const parts = [];
+  const walk = (dir) => {
+    for (const entry of readdirSync(dir, { withFileTypes: true })) {
+      if (PRODUCT_SKIP.has(entry.name)) continue;
+      const p = join(dir, entry.name);
+      if (entry.isDirectory()) walk(p);
+      else if (PRODUCT_EXT.test(entry.name) && !p.endsWith(GENERATED_COPY)) {
+        parts.push(readFileSync(p, 'utf8'));
+      }
+    }
+  };
+  for (const dir of PRODUCT_DIRS) walk(join(root, dir));
+  return parts.join('\n');
+}
+
+/**
+ * THE RULE, AND WHY IT IS A RATCHET RATHER THAN THE OBVIOUS ASSERTION.
+ *
+ * The obvious rule — every quoted string must exist in the product — was
+ * measured before it was written, and it is FALSE of this corpus: of 226 quoted
+ * strings, 74 are legitimately absent. They are the manual's worked examples
+ * (`"Marak Design"`, `"Fix Mrs. Patel's leaking pipe."`), its illustrative
+ * labels (`"3 of 5 done"`), and its paraphrases of what a screen says
+ * (`"you don't have permission"`). Asserting the obvious rule would have put 74
+ * false failures on the gate, which is how a check earns the right to be
+ * ignored.
+ *
+ * So the baseline IS THE MEASUREMENT: the 74 strings that were absent when this
+ * landed, recorded in `<baseline>` as absent rather than as "not a product
+ * string" — a reviewer can challenge any one of them, and the file says so. The
+ * check then fails in BOTH directions, like the case-citation ratchet:
+ *
+ *   * a quoted string absent from the product and NOT in the baseline — the
+ *     corpus now says something the product does not, which is the drift F2 is
+ *     about;
+ *   * a baselined string the product NOW contains — the baseline has rotted and
+ *     the entry must be deleted, so it cannot quietly become a blanket
+ *     permission.
+ *
+ * @returns {{checked: number, undeclared: {source: string, span: string}[], resolved: string[]}}
+ */
+export function compareAbsent({ documents, product, baseline }) {
+  const undeclared = [];
+  const absentNow = new Set();
+  let checked = 0;
+  for (const doc of documents) {
+    for (const span of quotedSpans(doc.text)) {
+      checked += 1;
+      if (product.includes(span)) continue;
+      absentNow.add(span);
+      if (!baseline.absent.includes(span)) undeclared.push({ source: doc.source, span });
+    }
+  }
+  const resolved = baseline.absent.filter((s) => !absentNow.has(s)).sort();
+  return { checked, undeclared, resolved };
+}
+
 // ── The self-test, run before any --check certifies anything ─────────────────
 
 const CASES = [
@@ -437,6 +567,53 @@ const CASES = [
     },
   },
   {
+    name: 'a quoted string absent from the product is reported ONLY when it is undeclared',
+    run: () => {
+      const documents = [
+        { id: 'd', source: 'docs/d.md', text: 'Press "Sign out", or "No such thing".' },
+      ];
+      const { undeclared, checked, resolved } = compareAbsent({
+        documents,
+        product: 'Sign out',
+        baseline: { absent: ['No such thing'] },
+      });
+      // Declared absent -> silent. The same call with an EMPTY baseline must
+      // report it, or this case would pass under a rule that never fires.
+      const bare = compareAbsent({ documents, product: 'Sign out', baseline: { absent: [] } });
+      return (
+        checked === 2 &&
+        undeclared.length === 0 &&
+        resolved.length === 0 &&
+        bare.undeclared.length === 1 &&
+        bare.undeclared[0].span === 'No such thing'
+      );
+    },
+  },
+  {
+    name: 'PLANTED: a baselined absence the product NOW contains is a STALE entry, and reported',
+    run: () => {
+      // The ratchet's other direction, and the one that stops the baseline
+      // becoming a blanket permission: an entry that no longer describes
+      // anything must be deleted, not left for the next absence to hide behind.
+      const documents = [{ id: 'd', source: 'docs/d.md', text: 'Press "Sign out".' }];
+      const { undeclared, resolved } = compareAbsent({
+        documents,
+        product: 'Sign out',
+        baseline: { absent: ['Sign out', 'a string nobody quotes any more'] },
+      });
+      return undeclared.length === 0 && resolved.length === 2;
+    },
+  },
+  {
+    name: 'PLANTED: an emphasis ARTEFACT beside a quote is not read as a product string',
+    run: () => {
+      // The content carries `*`, so it is a fragment of emphasis and not a
+      // string anyone put in the product. Two of these are live in the manual,
+      // and treating them as claims would redden the gate on prose.
+      return quotedSpans('a " — an epic * is real work" b').length === 0;
+    },
+  },
+  {
     name: 'PLANTED: prose before the first ## reaches the document intro, not the floor',
     run: () => {
       const doc = parseDocument(
@@ -520,6 +697,48 @@ function main() {
     process.exit(1);
   }
   console.log(`help-content: ok (${content.length} documents, ${sections} sections, ${entries} entries, generated copy matches source)`);
+
+  // ── AND IS ANY OF IT TRUE OF THE PRODUCT? See the block above the extractor.
+  const baselinePath = resolve(REPO_ROOT, BASELINE);
+  const baseline = JSON.parse(readFileSync(baselinePath, 'utf8'));
+  const { checked, undeclared, resolved } = compareAbsent({
+    documents: SOURCES.map((s) => ({
+      ...s,
+      text: readFileSync(resolve(REPO_ROOT, s.source), 'utf8'),
+    })),
+    product: productText(REPO_ROOT),
+    baseline,
+  });
+
+  if (undeclared.length > 0) {
+    console.error(
+      `help-content: ${undeclared.length} quoted string(s) in the help do NOT appear anywhere in ` +
+        '`apps/` or `packages/`, and are not declared as known-absent in ' +
+        `${BASELINE}. The document names something the product does not say, which is how a reader ` +
+        'ends up following an instruction that stopped being true:',
+    );
+    for (const u of undeclared) console.error(`  ${u.source}: "${u.span}"`);
+    console.error(
+      '  Either the product lost the string (fix the document) or the document invented it (check the ' +
+        'claim). If the absence is intended — a worked example, a paraphrase of a screen — declare it in ' +
+        `${BASELINE} with that reason beside it.`,
+    );
+    process.exit(1);
+  }
+  if (resolved.length > 0) {
+    console.error(
+      `help-content: ${resolved.length} string(s) declared known-absent in ${BASELINE} are in the ` +
+        'product NOW. The baseline has rotted: an entry that no longer describes anything is a permission ' +
+        'nobody re-reads, and the next absence would hide behind it. Delete these:',
+    );
+    for (const s of resolved) console.error(`  "${s}"`);
+    process.exit(1);
+  }
+  console.log(
+    `help-content: ${checked} quoted string(s) checked against the product; ${
+      baseline.absent.length
+    } declared known-absent and still absent`,
+  );
 }
 
 if (import.meta.url === `file://${process.argv[1]}`) main();

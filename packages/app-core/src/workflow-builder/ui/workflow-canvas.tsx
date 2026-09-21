@@ -55,6 +55,14 @@ function CanvasInner() {
         nodesDraggable
         elementsSelectable
         fitView
+        // E4-20: `fitView` alone shrinks BELOW 1:1 whenever the graph is
+        // wider than the canvas — measured 0.745 at 1512px, 0.52 at 390px —
+        // which paints every control on a state node (the 44px Blocked
+        // checkbox included) smaller than it is declared. `minZoom: 1` floors
+        // the fit at 1:1: a graph that overflows the canvas is panned and
+        // scrolled into, never shrunk to fit, so on-screen controls are never
+        // smaller than their own CSS says.
+        fitViewOptions={{ minZoom: 1 }}
         defaultEdgeOptions={{ type: 'transition', markerEnd: { type: MarkerType.ArrowClosed } }}
       >
         <Background />

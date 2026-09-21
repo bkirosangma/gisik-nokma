@@ -88,8 +88,25 @@ function renderedClasses(root: ParentNode): string[] {
  */
 function declarationsFor(css: string, selector: string): string | null {
   const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
-  const rule = new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm').exec(stripComments(css));
-  return rule?.[1] ?? null;
+  const stripped = stripComments(css);
+  const head = new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'gm');
+  for (const match of stripped.matchAll(head)) {
+    // ⚠ A SELECTOR LIST IS NOT "EXACTLY" EITHER OF ITS MEMBERS, and the
+    // line-start anchor above does NOT capture that on its own. It happens to
+    // work for `.gn-list__collapse`, whose shared-rule line ends in a comma
+    // (`.gn-list__collapse,`) and so cannot match `^\.gn-list__collapse\s*\{` —
+    // **and it silently fails for `.gn-list__open`, whose shared-rule line IS
+    // `^\.gn-list__open {`**, returning the two-head rule's body instead of the
+    // specific one's. Nothing read `.gn-list__open` through this function until
+    // case 13.1151 did, which is exactly why it went unnoticed: the limitation
+    // was written in this docblock as if it were handled, and it was handled for
+    // one of the two names. A candidate whose preceding text ends in a comma is
+    // a later head of a list, so it is skipped rather than answered with.
+    const before = stripped.slice(0, match.index).trimEnd();
+    if (before.endsWith(',')) continue;
+    return match[1] ?? null;
+  }
+  return null;
 }
 
 const CSS = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
@@ -384,18 +401,25 @@ describe('13.671 the tray is closed by CSS the component can rely on, and the ca
     // `.gn-list__caret-spacer` reserves the caret's column for a row that has no
     // caret, which is the only thing making a leaf start at the same x as its
     // parent. It is a RELATIVE fact (two lengths agreeing), so it is asserted
-    // relative-first and then anchored absolutely: the prototype's own number is
-    // 22px (`desktop.dc.html:446` caret, `:449` spacer), and 1.375rem is this
-    // file's spacing idiom for it. A relative assertion with no absolute beside
-    // it passes when BOTH values drift together, which is precisely the change
-    // the alignment would not survive.
+    // relative-first and then anchored absolutely on BOTH sides: the
+    // prototype's own number is 22px (`desktop.dc.html:446` caret, `:449`
+    // spacer) and it is no longer this file's number — **E4-26 raised the caret
+    // to WCAG 2.5.8's 24px in-list floor and the spacer followed**, because a
+    // 24px caret beside a 22px spacer shears every leaf off its parent's left
+    // edge by 2px. A relative assertion with no absolute beside it passes when
+    // BOTH values drift together, which is precisely the change the alignment
+    // would not survive; the two absolutes are what caught this one.
     const spacer = declarationsFor(CSS, '.gn-list__caret-spacer');
     const caret = declarationsFor(CSS, '.gn-list__collapse');
     const spacerWidth = spacer === null ? null : /width:\s*([\d.]+rem)/.exec(spacer)?.[1];
     const caretMinWidth =
       caret === null ? null : /min-width:\s*([\d.]+rem)/.exec(caret)?.[1];
-    expect(spacerWidth).toBe('1.375rem');
-    expect(caretMinWidth).toBe('1.375rem');
+    // BOTH absolutes moved 1.375rem -> 1.5rem together in E4-26, and they had
+    // to: the prototype's spacer is 22px to match its 22px caret, and the caret
+    // was raised to WCAG 2.5.8's 24px in-list floor. Two absolutes plus the
+    // relative assertion is what makes a co-drift impossible here.
+    expect(spacerWidth).toBe('1.5rem');
+    expect(caretMinWidth).toBe('1.5rem');
     expect(spacerWidth).toBe(caretMinWidth);
   });
 });
@@ -490,5 +514,85 @@ describe('13.671 the attributes the gn-list selectors key on are attributes the 
       container.querySelector('.gn-list__columns-toggle')?.getAttribute('aria-expanded'),
     ).toBe('true');
     expect(container.querySelector('.gn-list__columns-tray')?.hasAttribute('hidden')).toBe(false);
+  });
+});
+
+/**
+ * Case `13.1151` — E4-26 — the List view's two per-row controls meet the 24-px
+ * in-list floor, and the whole row still has no larger door.
+ *
+ * Measured on the List at 1512: `button.gn-list__collapse` **22×22** and
+ * `button.gn-list__open` **125×22** (×26 rows, 17px/22px) — both under WCAG
+ * 2.5.8's 24px floor, which is the same floor `.gn-my-work__title` and
+ * `.gn-attention__title` were moved to on 2026-09-08. `grep -n onClick
+ * packages/app-core/src/views/ticket-list.tsx` finds **three handlers** — the
+ * Columns toggle, the caret and the title — and **no `<tr>`/row handler**, so
+ * unlike the board card (`13.523`) there is no larger equivalent target and
+ * 2.5.8's *Equivalent* exception does not apply. The prototype draws 22; the
+ * floor wins, as it did for `.gn-attention__title`.
+ *
+ * **The title button is raised through its LINE BOX, not a `min-height`, and
+ * that is worth asserting rather than assuming:** `.gn-list__open` declares
+ * `font-size`/`line-height` only, so its height IS its line box and a
+ * `min-height` added there would be a second, competing mechanism.
+ */
+describe('13.1151 the List row controls meet the 24px in-list floor', () => {
+  const REM = 16;
+
+  function px(value: string | undefined): number | null {
+    if (value === undefined) return null;
+    const m = /([\d.]+)rem/.exec(value);
+    return m?.[1] === undefined ? null : Number(m[1]) * REM;
+  }
+
+  /** Both halves, read the way the assertions below read them. */
+  function floorsOf(css: string): { caretMin: number | null; caretHeight: number | null; openLineBox: number | null } {
+    const caret = declarationsFor(css, '.gn-list__collapse');
+    const open = declarationsFor(css, '.gn-list__open');
+    return {
+      caretMin: px(caret === null ? undefined : /min-width:\s*([\d.]+rem)/.exec(caret)?.[1]),
+      caretHeight: px(caret === null ? undefined : /min-height:\s*([\d.]+rem)/.exec(caret)?.[1]),
+      openLineBox: px(open === null ? undefined : /line-height:\s*([\d.]+rem)/.exec(open)?.[1]),
+    };
+  }
+
+  it('13.1151 the caret is 24×24 and the title’s line box is 24px', () => {
+    const f = floorsOf(CSS);
+    expect(f, `read from ui.css: ${JSON.stringify(f)}`).toEqual({
+      caretMin: 24,
+      caretHeight: 24,
+      openLineBox: 24,
+    });
+  });
+
+  it('13.1151 the floor is asserted as a FLOOR, not as a width', () => {
+    // `>= 24` rather than `=== 24` on the two min sizes: a later edit that gave
+    // the caret a larger in-list target is an improvement, not a regression,
+    // and an equality would redden on it. The exact values are still pinned
+    // above; this is the half that says what the number is FOR.
+    const f = floorsOf(CSS);
+    expect(f.caretMin).toBeGreaterThanOrEqual(24);
+    expect(f.caretHeight).toBeGreaterThanOrEqual(24);
+    expect(f.openLineBox).toBeGreaterThanOrEqual(24);
+  });
+
+  it('13.1151 a planted 22px caret reddens the same reader, in the same path', () => {
+    // MUTATION WITNESS: the pre-fix value planted by REPLACING the real rule —
+    // not appended. `declarationsFor` answers with the FIRST head that matches,
+    // so a rule appended at the end of the file would leave the real one being
+    // read and the plant would be inert: a control that does not traverse the
+    // measurement's path is not a control. This is the same lesson
+    // `settings-shell-tokens.test.ts`'s `withRule` records, arrived at twice.
+    const real = CSS.slice(CSS.indexOf('.gn-list__collapse {'));
+    const planted = CSS.replace(
+      real.slice(0, real.indexOf('{') + 1) ,
+      '.gn-list__collapse {\n  min-width: 1.375rem;\n  min-height: 1.375rem;\n',
+    );
+    expect(planted, 'the plant matched nothing — the witness is inert').not.toBe(CSS);
+    expect(declarationsFor(planted, '.gn-list__collapse')).toContain('min-width: 1.375rem');
+    expect(floorsOf(planted).caretMin, 'the planted 22px read back as the floor').toBe(22);
+    // And the real stylesheet still reads as the fixed one, in the same
+    // function, so the plant above cannot have replaced anything.
+    expect(floorsOf(CSS).caretMin).toBe(24);
   });
 });

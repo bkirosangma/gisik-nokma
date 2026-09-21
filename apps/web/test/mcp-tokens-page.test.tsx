@@ -85,7 +85,11 @@ describe('E5-17 the route is not a chrome-less orphan', () => {
     // after sign-in — so before this mount the only route a reader could reach by
     // typing was also the only one with no bar on it.
     expect(document.querySelector('nav.gn-nav')).not.toBeNull();
-    expect(await screen.findByRole('link', { name: 'Workspaces' })).toBeInTheDocument();
+    // E5-31 (B11): signed out, the bar no longer offers `Workspaces` (a link that
+    // could only 401-bounce); the way out it offers is its own `Sign in`, which
+    // carries `next=` back here. Two `Sign in` links are on this page — the
+    // bar's and the screen's — so the assertion names the bar's by class.
+    expect(document.querySelector('nav.gn-nav a.gn-nav__signin')).toHaveTextContent('Sign in');
   });
 });
 
@@ -95,8 +99,14 @@ describe('14.96 signed out', () => {
     fetchStub(() => ({ status: 200, body: { tokens: [] } }));
     mount();
 
-    const link = screen.getByRole('link', { name: 'Sign in' });
-    expect(link).toHaveAttribute('href', `/sign-in?next=${encodeURIComponent('/mcp/tokens')}`);
+    // E5-31 (B11) added the bar's own `Sign in` beside the screen's; both carry
+    // `next=` back here, and this case is about the SCREEN's — every `Sign in`
+    // link on the page must land back here.
+    const links = screen.getAllByRole('link', { name: 'Sign in' });
+    expect(links).toHaveLength(2);
+    for (const link of links) {
+      expect(link).toHaveAttribute('href', `/sign-in?next=${encodeURIComponent('/mcp/tokens')}`);
+    }
     // Not merely "no list rendered": a signed-out page that still fired the
     // request would 401 and look identical on screen.
     await waitFor(() => expect(calls).toEqual([]));

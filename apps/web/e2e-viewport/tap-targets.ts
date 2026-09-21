@@ -40,9 +40,14 @@ import { fileURLToPath } from 'node:url';
  *   | `.gn-help__pager-link`   | "sits in running text rather than on its own, so the 24px in-list floor is the applicable one" |
  *
  * So this is a change to make the CHECKER agree with a rule the product had
- * already written down — not a new threshold. `ui.css:1606-1616` states the
- * whole rule in one sentence: *"Dense in-list controls get 24, standalone
- * controls get 44 — the same call `/help`'s table-of-contents links got."*
+ * already written down — not a new threshold. `ui.css` states the whole rule in
+ * one sentence, in the docblock above `.gn-attention__title`: *"Dense in-list
+ * controls get 24, standalone controls get 44 — the same call `/help`'s
+ * table-of-contents links got."* ⚠ **This cited `ui.css:1606-1616`, a range that
+ * RESOLVES and misleads** — it holds this file's own paragraph about a removed
+ * `border-left` marker, and it looks substantive enough that a reader checking
+ * the citation would have believed it. The sentence is cited by its words now,
+ * because a grep for those words finds it and a range does not keep it.
  *
  * ## WHY MEMBERSHIP IS DECLARED AND NOT DERIVED
  *
@@ -80,13 +85,20 @@ import { fileURLToPath } from 'node:url';
  * here — recorded rather than left to be rediscovered:
  *
  *   * **`.gn-my-work__title`** (`ui.css`, byte-similar to `.gn-attention__title`
- *     and on `/my-work`, which the stack suite does sweep). It genuinely belongs
- *     by clause (a) and is the closest thing to an error in this table. It is
- *     left out on the CONSERVATIVE side — a control wrongly judged at 44 is
- *     judged too strictly, which is loud and safe — because `/my-work`'s
- *     baseline can only be measured against the live stack on `:3001`, which is
- *     another lane's worktree. **Owner: whoever next runs `test:e2e:stack`
- *     against its own stack.**
+ *     and on `/my-work`, **which the stack suite does sweep** —
+ *     `e2e-stack/viewport.spec.ts` navigates there and calls
+ *     `measureTapTargets` on the result). It belongs by clause (a) and **also by
+ *     clause (b)**, and it is the closest thing to an error in this table.
+ *     ⚠ **The reason recorded here used to be clause (b) failing, which is the
+ *     one reason that does not apply.** What actually keeps it out is a
+ *     MEASUREMENT WINDOW: `/my-work`'s baseline can only be taken against the
+ *     live stack on `:3001`, which is another lane's worktree, and no lane has
+ *     had that window. So it stays on the CONSERVATIVE side — a control wrongly
+ *     judged at 44 is judged too strictly, which is loud and safe — with the
+ *     real reason named rather than a clause borrowed from the two entries
+ *     below, for which (b) genuinely does fail. **Owner: whoever next runs
+ *     `test:e2e:stack` against its own stack, and the fix is to ADD the entry
+ *     and re-baseline in the same commit rather than to leave it out again.**
  *   * **`.gn-infotip__trigger`** — its own rule says "a dense control beside a
  *     field label", so (a) holds; no sweep's roster covers the routes it renders
  *     on, so (b) does not.
@@ -181,6 +193,21 @@ export const DENSE_IN_LIST: readonly DenseInList[] = [
       'sits inline after a `Next` label in running text, and its rule says so — "the 24px in-list ' +
       'floor is the applicable one."',
   },
+  {
+    control: '.gn-board-card__provenance',
+    container: '.gn-board__cards',
+    witness: '.gn-board__card-slot',
+    declaredAt: '.gn-board-card__provenance',
+    why:
+      'The `who · when` disclosure on every board card, 66x21 with no min size before E4-3 gave it ' +
+      'the floor. A bare text control on the card’s meta line beside the progress count, so its rule ' +
+      'reaches the same call `.gn-attention__title` does — 44 would turn each meta row into a slab. ' +
+      'It is NOT the card’s open control (`.gn-board__card-slot` is), so it has no larger equivalent. ' +
+      '⚠ Clause (b) of the membership rule is UNMET for this entry today: the board is not in the ' +
+      'stack suite’s tap-target pass, which measures /my-work alone (round-2 finding E4-12). The ' +
+      'classification is declared here so it cannot be forgotten when that pass widens; the entry ' +
+      'is not yet exercised, and that is recorded rather than left to read as covered.',
+  },
 ];
 
 /** WCAG 2.5.8, "Target Size (Minimum)" — the floor for a dense in-list control. */
@@ -258,26 +285,54 @@ export type TapTargets = {
  * `.gn-attention__title` (`inline-flex`) and `.gn-help__pager-link`
  * (`inline-flex`) are NOT reached by it and had to be classified explicitly.
  */
+/**
+ * THE ARMS OF THE POPULATION — every selector that can make an element a tap
+ * target. Exported since P11 (2026-09-21) so the ARMS THEMSELVES are testable on
+ * the gate: this list is the definition of "what counts", and a browser suite is
+ * the only other thing that could notice an arm going missing.
+ *
+ * THE LISTBOX PATTERN WAS MISSING FOR BOTH ROLES, and that made the `Select`
+ * panel — the product's most-migrated shared control — invisible to every
+ * rendered-property sweep. Its option rows are `<li role="option">` inside a
+ * `<ul role="listbox">`, `Select` portals the panel to `document.body`, and
+ * neither role appeared in any of the four sweep modules. The rows are real
+ * controls: `ui.css` styles `.gn-select__option` and `.gn-select__panel`.
+ *
+ * ⚠ ONE OF THOSE ROWS WAS ALREADY REACHED, and the arm is not what fixed it —
+ * measured by the reviewer, and repeated here because it narrows the claim
+ * rather than widening it. React Aria's `useOption` gives the FOCUSED option a
+ * roving `tabindex="0"`, so the focused row already matched through the
+ * `[tabindex]:not([tabindex="-1"])` arm above, and a sweep that opened a panel
+ * would have judged exactly ONE option per listbox — at 44px, out of context.
+ * The other rows matched no arm. `[role="listbox"]` is added for the panel
+ * itself: it is a container of controls, and it is the thing that is on screen
+ * while the rows are.
+ */
+export const TAP_TARGET_ARMS: readonly string[] = [
+  'a[href]',
+  'button',
+  'input:not([type="hidden"])',
+  'select',
+  'textarea',
+  'summary',
+  '[role="button"]',
+  '[role="link"]',
+  '[role="tab"]',
+  '[role="checkbox"]',
+  '[role="switch"]',
+  '[role="combobox"]',
+  '[role="option"]',
+  '[role="listbox"]',
+  '[tabindex]:not([tabindex="-1"])',
+];
+
 export async function measureTapTargets(
   page: Page,
   dense: readonly DenseInList[] = DENSE_IN_LIST,
 ): Promise<TapTargets> {
   return page.evaluate(
-    ({ table, denseFloor, standaloneFloor }) => {
-      const SELECTOR = [
-        'a[href]',
-        'button',
-        'input:not([type="hidden"])',
-        'select',
-        'textarea',
-        'summary',
-        '[role="button"]',
-        '[role="link"]',
-        '[role="tab"]',
-        '[role="checkbox"]',
-        '[role="switch"]',
-        '[tabindex]:not([tabindex="-1"])',
-      ].join(', ');
+    ({ table, denseFloor, standaloneFloor, selector }) => {
+      const SELECTOR = selector;
 
       const describe = (el: Element): string => {
         const id = el.id !== '' ? `#${el.id}` : '';
@@ -411,7 +466,12 @@ export async function measureTapTargets(
         brokenEntries,
       };
     },
-    { table: dense as DenseInList[], denseFloor: DENSE_FLOOR_PX, standaloneFloor: STANDALONE_FLOOR_PX },
+    {
+      table: dense as DenseInList[],
+      denseFloor: DENSE_FLOOR_PX,
+      standaloneFloor: STANDALONE_FLOOR_PX,
+      selector: TAP_TARGET_ARMS.join(', '),
+    },
   );
 }
 

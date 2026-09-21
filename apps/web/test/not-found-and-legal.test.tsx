@@ -232,8 +232,9 @@ describe('the legal pages', () => {
  * the part worth keeping.
  *
  * **What survives, and what does not, stated so the trade is on the record.**
- * `BackButton`'s fallback for a reader with no history was `/sign-in` (see
- * `back-button.tsx`'s docblock: these pages are reached from the sign-in card).
+ * `BackButton`'s fallback for a reader with no history was `/sign-in` — these
+ * pages are reached from the sign-in card, so the route the reader came from is
+ * the route back. (The component itself is gone, Step 2c-2 `17c8345c`.)
  * The bar's `Sign in` link points at the same route, so a reader who landed
  * with no history still has a real destination. What is genuinely LOST is the
  * one-press return for a reader who does have history — the export leaves them

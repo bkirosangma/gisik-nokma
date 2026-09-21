@@ -2,6 +2,7 @@
 
 import Link from "next/link";
 import { usePathname } from "next/navigation";
+import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { useCurrentUser } from "./providers.js";
@@ -228,6 +229,23 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
   const current = (target: string): "page" | undefined =>
     pathname === target ? "page" : undefined;
 
+  /**
+   * **The phone-width disclosure (E4-11).** At 390 px this bar measured 390×310
+   * — five wrapped 44-px rows, 37 % of an 844-px viewport, with the board's
+   * first card 1105 px below the fold. `flex-wrap: wrap` is what stops a long
+   * signed-in name overflowing the row by 10 px (Item 7 of
+   * `docs/pre-launch-checklist.md`); it was never a ruling that the bar may
+   * take five rows.
+   *
+   * So below 40rem the workspace-scoped links move behind one disclosure while
+   * `Workspaces`, the toggle and the corner stay on a single line. This is
+   * STATE, but not CONDITIONAL RENDERING: the links are always in the document
+   * and `data-open` only decides whether the stylesheet paints them. A closed
+   * bar is a visual state, not a missing link — and it keeps every route to
+   * My Work / Members / Settings in the accessibility tree at every width.
+   */
+  const [moreOpen, setMoreOpen] = useState(false);
+
   return (
     <nav
       className="gn-nav"
@@ -250,9 +268,35 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           docblock in globals.css for why it is pinned instead of sharing
           this group's wrap. */}
       <div className="gn-nav__links">
-        <Link href="/workspaces" aria-current={current("/workspaces")}>
-          Workspaces
-        </Link>
+        {/* E5-31: gated on the session, because signed out there is nothing
+            behind it. The bar used to offer Workspaces, an inbox icon, an
+            account menu and a scope note to a visitor who could use none of
+            them — pressing Workspaces landed on `/sign-in` by a 401 bounce,
+            with no `next=` and no Sign in control anywhere on the page. The
+            house rule this restores is the one Rounds 22–23 set for the Board
+            item: the bar does not offer a link that cannot resolve. */}
+        {user !== null ? (
+          <Link href="/workspaces" aria-current={current("/workspaces")}>
+            Workspaces
+          </Link>
+        ) : null}
+        {/* PHONE-ONLY (E4-11). `display: none` above 40rem, where the links it
+            opens are painted directly by `.gn-nav__more`'s `display: contents`.
+            It renders only when the disclosure it controls has content in it:
+            every child of `.gn-nav__more` is gated on `!noWorkspace`, so that
+            flag is the exact condition, not a proxy for it. */}
+        {!noWorkspace ? (
+          <button
+            type="button"
+            className="gn-nav__more-toggle"
+            aria-expanded={moreOpen}
+            aria-controls="gn-nav-more"
+            onClick={() => setMoreOpen((open) => !open)}
+          >
+            Menu
+          </button>
+        ) : null}
+        <div className="gn-nav__more" id="gn-nav-more" data-open={moreOpen ? "true" : "false"}>
         {/* The workspace's own served name — ONE source, `getMyWorkspaces`, never
             a second derivation. Omitted (not id, not a placeholder) until the
             name arrives or if the read fails; see `useWorkspaceName` above. */}
@@ -312,6 +356,7 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             Settings
           </Link>
         ) : null}
+        </div>
         {/* Inbox LEFT this group in Round 24 — it now renders in
             `.gn-nav__corner` below, immediately left of the avatar. It is still
             unconditional on `workspaceId` for the reason it always was: the
@@ -345,8 +390,18 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             <Link href="/help" aria-current={current("/help")}>
               Help
             </Link>
-            <Link href="/account" aria-current={current("/account")}>
-              Account
+            {/* E5-31: the arm `legal-nav.tsx:96-99` already had and this bar
+                did not. `/account` is withheld with `Workspaces` above — it is
+                the signed-in person's own page and answers a 401 bounce for
+                anyone else — and the one destination a visitor with no session
+                needs is the door IN, carrying where they were headed so
+                signing in returns them to it (the same `next=` shape the
+                invite, consent and settings shells use). */}
+            <Link
+              className="gn-nav__signin"
+              href={`/sign-in?next=${encodeURIComponent(pathname)}`}
+            >
+              Sign in
             </Link>
           </>
         ) : null}
@@ -387,7 +442,13 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
             on a TRANSIENT read failure — destroying state on a network blip, to
             recover a hint. The note is a hint; `Workspaces` is still one click
             away and is the real route out. */}
-        {showScopeNote ? (
+        {/* E5-31: also withheld signed out, and the sentence is why — "pick
+            one to reach its board, members and settings" tells a person to do
+            something the bar is no longer offering them, and none of the three
+            nouns is reachable without a session. `showScopeNote` already
+            requires storage to have been read and to hold nothing; this adds
+            the positive session that the sentence presupposes. */}
+        {showScopeNote && user !== null ? (
           <span className="gn-nav__scope">
             No workspace selected — pick one to reach its board, members and settings.
           </span>
@@ -397,10 +458,16 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
       {/* The inbox icon sits immediately LEFT of the avatar (Round 24, owner),
           both outside `.gn-nav__links` so they stay pinned as a pair at the
           bar's end rather than wrapping into the destination group. */}
-      <div className="gn-nav__corner">
-        <InboxNavLink active={pathname === "/inbox"} />
-        <AccountMenu />
-      </div>
+      {/* E5-31: the whole corner is signed-in only. `AccountMenu` already
+          rendered nothing without a session, but `InboxNavLink` did — an
+          unlabelled icon pointing at a session-gated route, which is the
+          third of the dead controls this ruling names. */}
+      {user !== null ? (
+        <div className="gn-nav__corner">
+          <InboxNavLink active={pathname === "/inbox"} />
+          <AccountMenu />
+        </div>
+      ) : null}
       </div>
     </nav>
   );

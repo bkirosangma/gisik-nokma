@@ -4,6 +4,7 @@ import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult } from '@gisik-nokma/domain';
 import { BulkCloseDialog } from '../../src/views/bulk-close-dialog.js';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
+import { SESSION_EXPIRED_COPY, SessionExpiredError } from '../../src/session-expired.js';
 import { WS } from '../helpers/seed.js';
 
 /**
@@ -210,6 +211,31 @@ describe('BulkCloseDialog — one dialog, N ticket.closed in one batch (spec §8
     expect(onClosed).not.toHaveBeenCalled();
     await waitFor(() => expect(confirm()).toBeEnabled());
     // Nothing is lost: all three are still listed and still pending.
+    expect(screen.getAllByRole('listitem')).toHaveLength(3);
+  });
+
+  /**
+   * E5-25 — the same rejection, one cause over: the session ENDED.
+   *
+   * `bulk-close-dialog.tsx:233` is one of the nine sites the ruling counts, and
+   * it is the worst of them to get wrong: a batch of closes the person believes
+   * landed, on a session that is gone.
+   */
+  it('13.1157 E5-25 a bulk close whose session ended says so, and reports nothing closed', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, () => {
+      throw new SessionExpiredError('/v1/events');
+    });
+    const { onClosed } = renderDialog(source);
+
+    await user.click(confirm());
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent(SESSION_EXPIRED_COPY);
+    expect(notice).toHaveClass('gn-refusal', 'gn-refusal--session');
+    expect(notice).not.toHaveClass('gn-refusal--transport');
+
+    expect(onClosed).not.toHaveBeenCalled();
+    await waitFor(() => expect(confirm()).toBeEnabled());
     expect(screen.getAllByRole('listitem')).toHaveLength(3);
   });
 

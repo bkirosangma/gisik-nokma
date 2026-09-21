@@ -223,6 +223,84 @@ describe('12.147–12.149 the two kinds of failure, and the echo that arrives fi
     await storage.close();
   });
 
+  /**
+   * 12.960 — E6-5: a claim enqueued AFTER a transient failure cannot overtake
+   * the backing-off claims it depends on. The batch is the longest DUE PREFIX
+   * of the queue, so while the head is backing off the flush is offered
+   * nothing, and when the head comes due the whole queue is offered in order.
+   *
+   * RED before the fix (the reviewer's Appendix D, reproduced here): batch1 =
+   * [CREATE, RENAME-1] fails transiently, RENAME-2 is enqueued, and 500 ms
+   * later `nextBatch` offered `[RENAME-2]` alone — a `field_set` for a ticket
+   * the server had never been told about, which the sync door turned into a
+   * false, unresolved `claim.contested` on the user's own ticket.
+   */
+  it('E6-5 / 12.960 a claim enqueued after a transient failure waits for the backing-off head', async () => {
+    const { storage, outbox } = await fixture();
+    const create = createTicket();
+    const rename = (value: string): SubmittedEvent =>
+      newSubmittedEvent({
+        workspaceId: WS,
+        entity: create.entity,
+        type: 'ticket.field_set',
+        payload: { fieldId: 'title', value },
+        actorId: USER_A,
+        origin: 'mobile',
+      });
+    const rename1 = rename('first rename');
+    expect(await outbox.enqueue(create)).toEqual({ queued: true, eventId: create.id });
+    expect(await outbox.enqueue(rename1)).toEqual({ queued: true, eventId: rename1.id });
+
+    const t0 = new Date('2026-09-21T10:00:00.000Z');
+    const batch1 = (await outbox.nextBatch(50, () => t0)).map((item) => item.eventId);
+    expect(batch1).toEqual([create.id, rename1.id]);
+    // The transport threw: both back off by backoffMs(1).
+    await outbox.recordFailure(batch1, 'network', () => t0);
+    // The user keeps working on the ticket they can see.
+    const rename2 = rename('second rename');
+    expect(await outbox.enqueue(rename2)).toEqual({ queued: true, eventId: rename2.id });
+
+    // Before the head is due: NOTHING, not [rename2].
+    const t1 = new Date(t0.getTime() + 500);
+    expect(await outbox.nextBatch(50, () => t1)).toEqual([]);
+    // Once the head is due: everything, in enqueue order.
+    const t2 = new Date(t0.getTime() + backoffMs(1) + 1);
+    expect((await outbox.nextBatch(50, () => t2)).map((item) => item.eventId)).toEqual([
+      create.id,
+      rename1.id,
+      rename2.id,
+    ]);
+    // And the limit still cuts a PREFIX, never a due subset.
+    expect((await outbox.nextBatch(2, () => t2)).map((item) => item.eventId)).toEqual([create.id, rename1.id]);
+    await storage.close();
+  });
+
+  /**
+   * 12.961 — the control for 12.960, on the shape 12.960 cannot see: a
+   * not-due row in the MIDDLE of the queue (a state a device may already hold
+   * from before this rule, or that a partial failure can leave). A due head
+   * followed by a backing-off row followed by a due row offers the head ALONE
+   * — the prefix stops at the first row not yet due — rather than skipping the
+   * middle. Without this case, "empty while the head is not due" passes
+   * equally well against the old due-subset filter plus a head check.
+   */
+  it('12.961 the batch stops at the first row not yet due, even when later rows are due', async () => {
+    const { storage, outbox } = await fixture();
+    const a = createTicket(newUlid(), 'A');
+    const b = createTicket(newUlid(), 'B');
+    const c = createTicket(newUlid(), 'C');
+    for (const event of [a, b, c]) {
+      expect(await outbox.enqueue(event)).toEqual({ queued: true, eventId: event.id });
+    }
+    const t0 = new Date('2026-09-21T10:00:00.000Z');
+    await outbox.recordFailure([b.id], 'network', () => t0);
+
+    expect((await outbox.nextBatch(50, () => t0)).map((item) => item.eventId)).toEqual([a.id]);
+    const later = new Date(t0.getTime() + backoffMs(1) + 1);
+    expect((await outbox.nextBatch(50, () => later)).map((item) => item.eventId)).toEqual([a.id, b.id, c.id]);
+    await storage.close();
+  });
+
   it('12.148 recordFailure is TRANSIENT: it backs off, holds the batch, and leaves the row queued', async () => {
     const { storage, outbox } = await fixture();
     const create = createTicket();

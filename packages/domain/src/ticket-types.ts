@@ -1,5 +1,6 @@
 import { z } from 'zod';
-import { IST_DAY_REGEX } from './ist-day.js';
+import { displayName } from './display-name.js';
+import { IST_DAY_REGEX, isRealIstDay } from './ist-day.js';
 
 export const CUSTOM_FIELD_KINDS = ['text', 'number', 'date', 'select', 'person'] as const;
 export type CustomFieldKind = (typeof CUSTOM_FIELD_KINDS)[number];
@@ -75,9 +76,12 @@ export type BuiltinFieldId = (typeof BUILTIN_FIELD_IDS)[number];
 export const customFieldDefSchema = z
   .object({
     id: z.string().min(1),
-    name: z.string().min(1),
+    // The field's name and each select option are labels someone reads: P15's
+    // refinement, from the one module (E6-20). A `" "` option is a choice
+    // with no label.
+    name: displayName,
     type: z.enum(CUSTOM_FIELD_KINDS),
-    options: z.array(z.string().min(1)).min(1).optional(),
+    options: z.array(displayName).min(1).optional(),
     required: z.boolean().optional(),
   })
   .superRefine((field, ctx) => {
@@ -93,7 +97,7 @@ export type CustomFieldDef = z.infer<typeof customFieldDefSchema>;
 export const ticketTypeDefSchema = z
   .object({
     id: z.string().min(1),
-    name: z.string().min(1),
+    name: displayName,
     icon: z.string().min(1),
     rank: z.number().int().min(1),
     workflowId: z.string().min(1),
@@ -177,7 +181,12 @@ export function builtinTicketTypeDefs(defaultWorkflowId: string): TicketTypeDef[
  * claim looks like.
  */
 export const dueDateValueSchema = z.object({
-  date: z.string().regex(IST_DAY_REGEX, 'a due date is a day in YYYY-MM-DD form'),
+  // Shape from the one origin, then existence from the one definition of a
+  // real day (E6-19): `2026-02-30` is the right shape and no day at all.
+  date: z
+    .string()
+    .regex(IST_DAY_REGEX, 'a due date is a day in YYYY-MM-DD form')
+    .refine(isRealIstDay, 'a due date is a day the calendar has'),
   note: z.string().optional(),
 });
 export type DueDateValue = z.infer<typeof dueDateValueSchema>;

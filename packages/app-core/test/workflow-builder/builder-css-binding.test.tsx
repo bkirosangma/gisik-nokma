@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
+import { CONTRAST_PAIRS } from '@gisik-nokma/ui';
 import { createDraftStore, type DraftStore } from '../../src/workflow-builder/draft-store.js';
 import { createFakeGateway } from '../../src/workflow-builder/fake-gateway.js';
 import { draftFromTemplate, WORKFLOW_TEMPLATES } from '../../src/workflow-builder/templates.js';
@@ -700,5 +701,37 @@ describe('13.770 the workflow name is the title and stays a control', () => {
       ALL_ROLES_IN_UI_CSS,
     )?.[1];
     expect(neo).toContain('box-shadow: var(--gn-shadow-sunken)');
+  });
+});
+
+/**
+ * E4-16 — React Flow's own vendor stylesheet paints its required attribution
+ * link at 10px with a fixed grey, measured (painted, builder route) at
+ * 1.10:1 contrast against this canvas's dark-mode backdrop and 2.61:1 in
+ * light — both below the 4.5 body text needs. Not re-painted here (no
+ * browser in this suite); instead the repo override this fixes with is
+ * checked at the CSS-rule level, and its colour pair is proven by the same
+ * `CONTRAST_PAIRS` loop `packages/ui/test/tokens.test.ts` already runs on
+ * every style and theme — reusing a declared pair rather than adding a new,
+ * unchecked one.
+ */
+describe('13.1207 E4-16 the React Flow attribution link is overridden to a declared contrast pair', () => {
+  const css = readFileSync(CSS_PATH, 'utf8');
+
+  it('is floored at 12px and coloured with a role this file already declares', () => {
+    const block = declarationsFor(stripComments(css), '.react-flow__attribution');
+    expect(block, '.react-flow__attribution lost its override').toContain('font-size: 0.75rem');
+    expect(block).toContain('background: var(--gn-surface-raised)');
+    const link = declarationsFor(stripComments(css), '.react-flow__attribution a');
+    expect(link, '.react-flow__attribution a lost its override').toContain(
+      'color: var(--gn-text-muted)',
+    );
+  });
+
+  it('the textMuted/surfaceRaised pair this override relies on is a declared, checked minimum', () => {
+    // Not a new guarantee: this pair is already in CONTRAST_PAIRS and already
+    // measured passing in every style/theme by tokens.test.ts's own loop — the
+    // override above composes onto a contrast promise that test already keeps.
+    expect(CONTRAST_PAIRS).toContainEqual({ fg: 'textMuted', bg: 'surfaceRaised', minimum: 4.5 });
   });
 });

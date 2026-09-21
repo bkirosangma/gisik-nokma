@@ -56,10 +56,11 @@ services:
       - key: DATABASE_URL
         value: ${db.DATABASE_URL}
         scope: RUN_TIME
-      # Documented ahead of its reader in .env.example (Plan 11); not yet in
-      # config.ts's zod schema on the sha this file was written against.
-      # Forward-referenced the same way .env.example itself does -- becomes
-      # load-bearing the moment Task 1 lands, inert until then.
+      # Honoured, and it has been since Plan 11 Task 1: config.ts's zod schema
+      # takes an optional PEM under this name, and db.ts applies it to the
+      # pool -- failing loudly rather than silently when the CA cannot be
+      # applied to the URL's connection form. So this key is LOAD-BEARING; it
+      # read "not yet in config.ts's zod schema ... inert until then".
       - key: DATABASE_CA_CERT
         value: ${db.CA_CERT}
         scope: RUN_TIME
@@ -72,8 +73,9 @@ services:
       - key: TZ
         value: Asia/Kolkata
       # DEPLOY_SHA (apps/server/src/config.ts, `z.string().min(1)
-      # .default('dev')`, forthcoming on Lane E's branch -- confirmed against
-      # their working tree, uncommitted as of this file's writing) is
+      # .default('dev')` -- it has LANDED; this parenthetical read
+      # "forthcoming on Lane E's branch, uncommitted as of this file's
+      # writing") is
       # DELIBERATELY NOT set here. /healthz serves it verbatim on BOTH its
       # 200 and 503 branches so an operator can tell which commit answered
       # during an incident -- that is the whole reason Ruling P33 exists.
@@ -91,14 +93,13 @@ services:
       # itself be a live-deploy action, which is explicitly out of scope
       # for both tasks (owner instruction, 2026-09-06).
       # Required behind App Platform's router (every client would otherwise
-      # share one rate-limit bucket). With Fastify's naive trustProxy, this
-      # setting alone lets a caller pick its own rate-limit bucket via a
-      # forged leftmost X-Forwarded-For entry -- Plan 11 T2 (not yet on
-      # main) fixes this by keying the limiter on the RIGHTMOST XFF entry
-      # (the nearest trusted proxy's own observation, which a caller cannot
-      # write) instead. Until T2 lands, TRUST_PROXY=true is still required
-      # here -- without it every client in the world shares one bucket --
-      # but the forged-header gap above is open on whatever is on main.
+      # share one rate-limit bucket). The limiter keys on the RIGHTMOST
+      # X-Forwarded-For entry -- the nearest trusted proxy's own observation,
+      # which a caller cannot write (`http/rate-limit.ts`'s `rateLimitKeyFor`,
+      # and the last-occurrence rule beside it) -- so a forged leftmost entry
+      # buys nothing. That is Plan 11 Task 2 and it IS on main; this comment
+      # used to say the fix was "not yet on main" and that "the forged-header
+      # gap above is open on whatever is on main". Both are superseded.
       - key: TRUST_PROXY
         value: "true"
       # These two are DIFFERENT ORIGINS, and that is the condition that broke

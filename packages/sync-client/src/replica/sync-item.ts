@@ -95,7 +95,12 @@ export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: stri
 
 export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
-/** The two members that carry a top-level `kind`. */
+/**
+ * The three members that carry a top-level `kind` — purge, scope-revoked and
+ * reach-granted. (This read "the two members" while `reach-granted` was the
+ * newest arm and the sentence had not followed it; case 6.96 records the same
+ * count drift one union up.)
+ */
 export type SyncInstruction = PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
 /**

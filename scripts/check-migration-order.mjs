@@ -24,6 +24,30 @@
  * WHAT IT PROVES. That every migration present now and absent from the base ref
  * carries a numeric prefix strictly above the highest prefix on the base ref.
  *
+ * THE PREFIX CONVENTION, RECORDED HERE BECAUSE NOTHING ELSE SAID IT (E6-7,
+ * 2026-09-21). Measured over the last 13 migrations, `1788600000000` …
+ * `1790000000000`: every one is a multiple of `1e8` ms, and of the 12 gaps
+ * between neighbours 10 are `1e8` and 2 are `2e8`. The sequence is therefore a
+ * COUNTER — hand-written, stepped by a unit of its own — and not the wall
+ * clock: `1790000000000` was committed 21 h before the instant its own prefix
+ * names, while `1789800000000` was committed 25 h after its own. It runs both
+ * ways, which is what makes it a window rather than a lag.
+ *
+ * THE WINDOW, AND WHY THE REFUSAL HAS TO EXPLAIN ITSELF. The plans record two
+ * creation shapes, and which one a developer meets depends on the plan they
+ * read: a `node-pg-migrate create` step, which stamps the clock
+ * (`docs/superpowers/plans/2026-08-20-01-foundation-ledger.md:1902`), and plan
+ * files that name the migration with an explicit prefix
+ * (`docs/superpowers/plans/2026-08-20-03-tickets-hierarchy.md:3348` — that one
+ * `1755672000000`). While the counter's head sits ahead of the wall clock, a
+ * clock stamp is numbered BELOW a migration already applied and arrives at this
+ * check refused — correctly, and with no way for the developer to know from the
+ * message alone that the shape the tool produces is not the shape this repo
+ * commits. So the below-max refusal states the convention and the remedy. What
+ * it does NOT do is decide the convention: dropping the counter for the
+ * generator's stamp is a process choice, and this file records the one the repo
+ * practises rather than making that choice on the repo's behalf.
+ *
  * WHAT IT DOES NOT PROVE — named, not implied:
  *   - It does not prove a migration is CORRECT, idempotent, or reversible.
  *     This is an ordering property only.
@@ -102,6 +126,20 @@ const DEFAULT_BASE_REF = 'origin/main';
  * still an instrument that lies about the runner.
  */
 const SEPARATOR = '_';
+
+/**
+ * The sentence the below-max refusal MUST carry. Held as a constant so the
+ * message and the self-test's required-name list cannot drift apart, and pinned
+ * by that list so the record is load-bearing rather than decoration: deleting
+ * the sentence from the refusal reddens the self-test.
+ *
+ * WHY THE RECORD IS IN A REFUSAL at all. The convention below is unrecorded
+ * anywhere else a developer creating a migration would look, so the moment they
+ * meet it is the tool's own `node-pg-migrate create` stamp arriving here
+ * refused. The message has to say what to do instead of the stamp.
+ */
+export const CONVENTION_SENTENCE = 'This repo hand-numbers its migrations';
+
 export function numericPrefix(fileName) {
   const raw = fileName.split(SEPARATOR)[0];
   if (raw && /^\d+$/.test(raw)) {
@@ -223,7 +261,11 @@ export function checkMigrationOrder({ baseDir, currentDir }) {
       problems.push(
         `new migration ${f} has prefix ${p}, which is NOT strictly above ${baseMax} — the highest prefix already present on the base ref. ` +
           `A migration numbered below one that has been applied can never run: node-pg-migrate's checkOrder refuses it as "preceding already run migration", ` +
-          `while a fresh test database applies both cleanly, so no test and no gate can see it. Renumber it above ${baseMax}.`,
+          `while a fresh test database applies both cleanly, so no test and no gate can see it. ` +
+          `${CONVENTION_SENTENCE}: the sequence is a counter, by a rounded step of its own, and it can ` +
+          `sit ahead of the wall clock — so a stamp fresh from \`node-pg-migrate create\` lands below ` +
+          `the head while it does, and this refusal is what that stamp meets. ` +
+          `Renumber it above ${baseMax}, keeping the rounded shape the neighbours share.`,
       );
     }
   }
@@ -250,7 +292,7 @@ export const PLANTED = [
     base: BASE,
     current: [...BASE, '1789550000000_x.sql'],
     expect: 1,
-    names: ['1789550000000_x.sql'],
+    names: ['1789550000000_x.sql', CONVENTION_SENTENCE],
   },
   {
     name: 'a new migration numbered EQUAL to the highest already present (not strictly above)',

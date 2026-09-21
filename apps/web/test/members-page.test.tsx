@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { membershipId, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
-import type { DataSourceQuery, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import { InviteAdminError, type PendingInvite } from '@gisik-nokma/app-core/online';
 import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js';
 import { Providers } from '../src/providers.js';
@@ -56,10 +56,41 @@ const ROSTER: RosterMember[] = [
   { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
 ];
 
-/** A `WorkspaceRef` for the name lookup only — the summary line is its one caller here. */
-function workspaceRef(name: string): WorkspaceRef {
-  return { id: WS, name, prefix: 'CC', role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects: [] };
+/**
+ * A `WorkspaceRef`. `projects` defaults to EMPTY, which is the shape the summary
+ * line's one caller needs; the invite form's select (ruling E5-11) is the
+ * second caller and passes real rows.
+ */
+function workspaceRef(name: string, projects: ProjectRef[] = []): WorkspaceRef {
+  return { id: WS, name, prefix: 'CC', role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects };
 }
+
+/**
+ * The two projects the invite form's select offers, in SERVED order.
+ *
+ * Every field `ProjectRef` requires is here, including the four this form never
+ * reads: the type is the WHOLE served row, and a fixture that filled only the
+ * two the select labels would be a body the server cannot send — the same rule
+ * the roster fixture above states for `role`.
+ */
+const PROJECTS: ProjectRef[] = [
+  {
+    id: '01J9PROJECT000000000000000',
+    name: 'Errand tracking',
+    archived: false,
+    prefix: 'ET',
+    ticketCount: 3,
+    blockedCount: 0,
+  },
+  {
+    id: '01J9PROJECT000000000000001',
+    name: 'Shop operations',
+    archived: false,
+    prefix: 'SO',
+    ticketCount: 0,
+    blockedCount: 0,
+  },
+];
 
 const PENDING: PendingInvite = {
   inviteId: '01J9INVITE00000000000000AB',
@@ -220,18 +251,32 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
    */
   it('3.133 hides the projects field on guest, and omits the KEY from the body', async () => {
     const bodies: unknown[] = [];
-    mount({
-      listPending: async () => [],
-      mintInvite: async (_workspaceId, request) => {
-        bodies.push(request);
-        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+    mount(
+      {
+        listPending: async () => [],
+        mintInvite: async (_workspaceId, request) => {
+          bodies.push(request);
+          return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+        },
       },
-    });
+      undefined,
+      undefined,
+      // ⚠ ADDED BY RULING E5-11 (2026-09-21): the field was a text box that
+      // accepted any string, so this case never needed a project to EXIST. It is
+      // a select of served names now, so the choice this case makes before
+      // switching to guest has to be a real one.
+      { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
+    );
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
-    // Type a project id FIRST, then switch to guest — the state survives the
+    // Choose a project FIRST, then switch to guest — the state survives the
     // switch, so this is the shape that would leak the key.
-    await user.type(screen.getByLabelText(/^Projects/), '01J9PROJECT000000000000000');
+    await user.click(screen.getByRole('button', { name: /Project access/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', {
+        name: 'Only Errand tracking',
+      }),
+    );
     // Scoped for the same reason as the case above: the roster's own role
     // control also matches `/Role/` since 2026-09-18, and this case is about the
     // mint form's picker.
@@ -239,7 +284,7 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
     expect(form).not.toBeNull();
     await user.click(within(form!).getByRole('button', { name: /Role/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'guest' }));
-    expect(screen.queryByLabelText(/^Projects/)).toBeNull();
+    expect(screen.queryByRole('button', { name: /Project access/ })).toBeNull();
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(Object.keys(bodies[0] as object).sort()).toEqual(['address', 'channel', 'role']);
@@ -247,16 +292,30 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
 
   it('3.133 sends projectIds for a MEMBER who named some', async () => {
     const bodies: unknown[] = [];
-    mount({
-      listPending: async () => [],
-      mintInvite: async (_workspaceId, request) => {
-        bodies.push(request);
-        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+    mount(
+      {
+        listPending: async () => [],
+        mintInvite: async (_workspaceId, request) => {
+          bodies.push(request);
+          return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+        },
       },
-    });
+      undefined,
+      undefined,
+      // ⚠ AMENDED BY RULING E5-11 (2026-09-21): this case used to TYPE a ULID
+      // into a text box. It now picks the same project by NAME from the served
+      // list — which is the whole of the ruling, and the assertion below is
+      // unchanged: the door still receives the ID.
+      { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
+    );
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
-    await user.type(screen.getByLabelText(/^Projects/), '01J9PROJECT000000000000000');
+    await user.click(screen.getByRole('button', { name: /Project access/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', {
+        name: 'Only Errand tracking',
+      }),
+    );
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect(bodies[0]).toEqual({
@@ -264,6 +323,99 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
       channel: 'email',
       role: 'member',
       projectIds: ['01J9PROJECT000000000000000'],
+    });
+  });
+
+  /**
+   * 13.1181 — ruling E5-11: THE PROJECT FIELD OFFERS NAMES, not identifiers.
+   *
+   * It was a text box labelled *"Projects (comma-separated ids, optional)"*, so
+   * a person had to transcribe project ULIDs from somewhere else — and the
+   * manual's own verdict was *"In practice this box is not usable by a person."*
+   * The names were one read away the whole time (`GET /v1/me/workspaces` serves
+   * `projects[]{id,name}`, the same read the workspace name beside it already
+   * makes), and the export draws a `<select>` of them.
+   *
+   * The queries below are REGEXES, which is not a style choice: an exact
+   * `{ name: 'Project access' }` matches ZERO buttons on the trigger this
+   * `Select` renders while `/Project access/` matches one — measured, and the
+   * reason the file's own `Role` queries are already regexes.
+   */
+  describe('13.1181 the project field offers project NAMES', () => {
+    /** The opened panel — `listbox`, with the `option`s hanging directly off it. */
+    const openProjects = async (user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> => {
+      await user.click(screen.getByRole('button', { name: /Project access/ }));
+      return screen.findByRole('listbox');
+    };
+
+    it('13.1181 offers the export’s options — All projects first, then one Only <name> per project, in served order', async () => {
+      mount(
+        { listPending: async () => [], mintInvite: async () => ({ inviteId: 'i', url: 'u', expiresAt: 'e' }) },
+        undefined,
+        undefined,
+        { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
+      );
+      const user = userEvent.setup();
+      await screen.findByLabelText('Address');
+
+      const options = within(await openProjects(user)).getAllByRole('option');
+      expect(options.map((option) => option.textContent)).toEqual([
+        'All projects in this workspace',
+        'Only Errand tracking',
+        'Only Shop operations',
+      ]);
+      // The ID is the option's VALUE, never its label — the whole of the ruling
+      // is that a person chooses a name and the wire still carries the id.
+      expect(options[1]?.getAttribute('data-key')).toBe(PROJECTS[0]!.id);
+    });
+
+    it('13.1181 CONTROL — an UNANSWERED projects read offers no projects, rather than inventing any', async () => {
+      // `useWorkspaceProjects` holds `null` for a read that is pending or
+      // refused, and `null` is NOT `[]` — the hook's own docblock: `[]` would be
+      // the claim "this workspace has no projects". The select renders the one
+      // option that is true either way, so the absence is an OMISSION and never
+      // a raw id or a stale name. Without this arm, a select that fell back to
+      // the id would pass the case above.
+      mount(
+        { listPending: async () => [], mintInvite: async () => ({ inviteId: 'i', url: 'u', expiresAt: 'e' }) },
+        undefined,
+        undefined,
+        {
+          getMyWorkspaces: async () => {
+            throw new Error('the read is down');
+          },
+        },
+      );
+      const user = userEvent.setup();
+      await screen.findByLabelText('Address');
+
+      const options = within(await openProjects(user)).getAllByRole('option');
+      expect(options.map((option) => option.textContent)).toEqual(['All projects in this workspace']);
+    });
+
+    it('13.1181 CONTROL — the default choice sends NO projectIds key at all', async () => {
+      // The door refuses `projectIds: []` exactly as it refuses a guest's, and
+      // "All projects" is not a narrowing — so the key is OMITTED rather than
+      // sent empty. The 3.133 case above covers the named arm.
+      const bodies: unknown[] = [];
+      mount(
+        {
+          listPending: async () => [],
+          mintInvite: async (_workspaceId, request) => {
+            bodies.push(request);
+            return { inviteId: 'i', url: 'u', expiresAt: 'e' };
+          },
+        },
+        undefined,
+        undefined,
+        { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
+      );
+      const user = userEvent.setup();
+      await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+      await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+
+      await waitFor(() => expect(bodies).toHaveLength(1));
+      expect(Object.keys(bodies[0] as object).sort()).toEqual(['address', 'channel', 'role']);
     });
   });
 
@@ -1253,15 +1405,19 @@ describe('13.886 the invite form’s fields wear the shared .gn-field pattern', 
     expect(addressWrap?.className).toContain('gn-field');
     expect(addressWrap?.querySelector('.gn-field__label')?.textContent).toBe('Address');
 
-    const projects = screen.getByLabelText(/^Projects/);
+    // ⚠ AMENDED BY RULING E5-11 (2026-09-21): this field is the shared `Select`
+    // now, not a native input — so it wears the pattern the way `Channel` and
+    // `Role` do, which is the fact this case's own docblock settled
+    // (`select.tsx:254` puts `gn-field__input` on the component's OWN trigger).
+    // The assertions are the same three about the same three things; what
+    // changed is the label's text and the tag underneath it.
+    const projects = screen.getByRole('button', { name: /Project access/ });
     expect(projects.className).toContain('gn-field__input');
     const projectsWrap = projects.closest('label');
     expect(projectsWrap?.className).toContain('gn-field');
-    expect(projectsWrap?.querySelector('.gn-field__label')?.textContent).toBe(
-      'Projects (comma-separated ids, optional)',
-    );
+    expect(projectsWrap?.querySelector('.gn-field__label')?.textContent).toBe('Project access');
 
-    // And the wrapper moves no behaviour: what was typed still reaches the door.
+    // And the wrapper moves no behaviour: what was entered still reaches the door.
     await user.type(address, 'anselma@example.test');
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() => expect(bodies).toHaveLength(1));

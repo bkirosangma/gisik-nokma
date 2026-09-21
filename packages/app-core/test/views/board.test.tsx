@@ -11,8 +11,15 @@ import { act } from 'react';
 import { describe, expect, it, vi } from 'vitest';
 import { isUlid, type IngestResult } from '@gisik-nokma/domain';
 import type { BoardCard, BoardGroup, BoardView } from '../../src/view-types.js';
-import { Board, EMPTY_BOARD_COPY, EMPTY_COLUMN_COPY, useBoard } from '../../src/views/board.js';
+import {
+  Board,
+  EMPTY_BOARD_COPY,
+  EMPTY_BOARD_UNWIRED_COPY,
+  EMPTY_COLUMN_COPY,
+  useBoard,
+} from '../../src/views/board.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { formatDate } from '../../src/provenance.js';
 import { TICKET, WS, boardCardSeed, claim } from '../helpers/seed.js';
 
 /**
@@ -801,7 +808,10 @@ describe('3.112 an empty board says words, not nothing', () => {
    * use, so a re-export of a different string cannot satisfy the render
    * assertion; `queryAllByRole('region')` empty keeps it off scaffolding. */
   it('renders the pinned copy where it used to render an empty div', () => {
-    render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
+    // WIRED (V1, 2026-09-21): the pinned copy INSTRUCTS — "create one" — and
+    // since the ruling it renders only where a create handler exists, so this
+    // case hands one down. The unwired arm has its own case below (3.113).
+    render(<Board board={emptyBoard} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
     expect(EMPTY_BOARD_COPY).toBe('No tickets here yet — create one.');
     // No scaffolding: not one column region is drawn for a board with no groups.
@@ -823,9 +833,14 @@ describe('3.112 an empty board says words, not nothing', () => {
     expect(clicks).toEqual([1]);
   });
 
-  it('3.113 says the words and offers NO button when the shell handed none', () => {
+  it('3.113 says the situation and offers NO button when the shell handed none', () => {
     render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
-    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    // V1 (2026-09-21): the UNWIRED copy states the fact and instructs nothing.
+    // The pinned sentence above tells the reader to create a ticket, and a mount
+    // with no handler made that impossible from where it was read; the ruling's
+    // remedy is that the words follow the control.
+    expect(screen.getByText(EMPTY_BOARD_UNWIRED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
     // A no-op button here would look like a way out of an empty project and
     // would not be one.
     expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
@@ -869,11 +884,13 @@ describe('3.112 an empty board says words, not nothing', () => {
         },
       ],
     };
-    render(<Board board={noCards} onOpenTicket={() => {}} />);
+    render(<Board board={noCards} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     // The columns ARE the workflow's states and rendering them is the
     // promise this file's first describe makes — unchanged by R6.
     expect(screen.getByRole('region', { name: 'To do' })).toBeInTheDocument();
     // R6: zero cards in total, even with a group present, says the sentence.
+    // (Wired, since V1: this fixture's own subject is R6's gate, not the
+    // handler's presence, which 3.113 owns.)
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 });
@@ -1008,12 +1025,23 @@ describe('Board — Ruling 19: isNarrowed suppresses the pinned sentence when ca
   });
 
   it('13.467 the IDENTICAL board, not narrowed, still says the R6 sentence — proving the flag is what discriminates', () => {
-    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} isNarrowed={false} />);
+    // Wired (V1, 2026-09-21): this case is about `isNarrowed`, and the sentence
+    // it discriminates on is `EMPTY_BOARD_COPY` — which since the ruling renders
+    // only where a create handler was handed down. The unwired arm's own copy is
+    // asserted by 3.113, so wiring here changes nothing this case is measuring.
+    render(
+      <Board
+        board={narrowedAwayBoard}
+        onOpenTicket={() => {}}
+        onCreateTicket={() => {}}
+        isNarrowed={false}
+      />,
+    );
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 
   it('13.467 CONTROL — omitting isNarrowed entirely behaves exactly like isNarrowed={false} (the default is "not narrowed")', () => {
-    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} />);
+    render(<Board board={narrowedAwayBoard} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
     expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
   });
 });
@@ -1043,5 +1071,135 @@ describe('Board — entity-keyed data-testid hooks (Plan 11 T13)', () => {
     expect(gstCard).not.toBe(licenceCard);
     expect(within(gstCard).getByText('File the GST return')).toBeInTheDocument();
     expect(within(licenceCard).getByText('Renew the trade licence')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 13.1177 — ruling E5-2 (`review-ux-exec5`). The Board drew NO due date at all:
+ * `BoardCard` carried none while `TicketCard.dueDate` was already on every
+ * card the board is projected from and `ListRow` read it, so a ticket a week
+ * overdue was indistinguishable from an undated one on the project's DEFAULT
+ * tab. The export draws the label in the card's meta line and colours it
+ * `di.late ? "var(--danger)" : "var(--label2)"`. Both halves are asserted
+ * here — plus the FOUR control arms the late tone needs, because a tone that
+ * is always on and a tone that is never on both satisfy a one-armed
+ * assertion:
+ *
+ *   - a FUTURE date draws the label in the ordinary tone;
+ *   - a date due TODAY is not late (the comparison is `<`, not `<=`);
+ *   - with NO `today` the label draws in the ordinary tone — the prop's own
+ *     absence path, and the reason the tone is injected rather than read from
+ *     a device clock;
+ *   - a card claiming NO date draws no label at all, which is what stops the
+ *     first case passing on a span that is simply always rendered.
+ *
+ * `formatDate` is the expectation rather than a literal because the label's
+ * contract IS the product's one date formatter (`provenance.ts`) — the same
+ * one the List's due cell renders through. A hard-coded `'14 Sep 2026'` would
+ * pin the spelling and miss a formatter that changed under both views at once.
+ */
+describe('13.1177 the board card draws the due label, and the late tone (ruling E5-2)', () => {
+  const TODAY = '2026-09-21';
+  const DUE = '2026-09-14';
+
+  const cardDue = (date: string) => boardCardSeed({ dueDate: { date, claim: claim() } });
+
+  it('13.1177 draws a claimed due date in the card', () => {
+    render(<Board board={errandBoard([cardDue(DUE)])} onOpenTicket={() => {}} today={TODAY} />);
+    expect(screen.getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
+  });
+
+  it('13.1177 a date that has passed carries the late tone', () => {
+    render(<Board board={errandBoard([cardDue(DUE)])} onOpenTicket={() => {}} today={TODAY} />);
+    expect(screen.getByText(formatDate(DUE)).className).toContain('gn-board-card__due--late');
+  });
+
+  it('13.1177 CONTROL — the same label for a FUTURE date is drawn without the late tone', () => {
+    const future = '2026-09-30';
+    render(<Board board={errandBoard([cardDue(future)])} onOpenTicket={() => {}} today={TODAY} />);
+    const label = screen.getByText(formatDate(future));
+    expect(label.className).toContain('gn-board-card__due');
+    expect(label.className).not.toContain('--late');
+  });
+
+  it('13.1177 CONTROL — a ticket due TODAY is not late', () => {
+    render(<Board board={errandBoard([cardDue(TODAY)])} onOpenTicket={() => {}} today={TODAY} />);
+    const label = screen.getByText(formatDate(TODAY));
+    expect(label.className).toContain('gn-board-card__due');
+    expect(label.className).not.toContain('--late');
+  });
+
+  it('13.1177 CONTROL — with no today the label still draws, in the ordinary tone', () => {
+    render(<Board board={errandBoard([cardDue(DUE)])} onOpenTicket={() => {}} />);
+    const label = screen.getByText(formatDate(DUE));
+    expect(label.className).toContain('gn-board-card__due');
+    expect(label.className).not.toContain('--late');
+  });
+
+  it('13.1177 CONTROL — a card claiming no date draws no due label', () => {
+    render(<Board board={errandBoard([boardCardSeed()])} onOpenTicket={() => {}} today={TODAY} />);
+    const card = screen.getByTestId(`ticket-card-${TICKET}`);
+    expect(card.querySelector('.gn-board-card__due')).toBeNull();
+  });
+});
+
+/**
+ * V1 (round-2 ruling, IMPORTANT, 2026-09-21) — the empty state's instruction and
+ * its control are ONE decision.
+ *
+ * `EMPTY_BOARD_COPY` says *"No tickets here yet — create one."* and the button
+ * beneath it renders only when `onCreateTicket` is passed. **Every mount in the
+ * product passed nothing** — measured at the ruling: `grep -rn 'onCreateTicket='
+ * apps/web/app apps/web/src` answered 0 across 63 files while the string appears
+ * 18 times in `board.tsx` — so the sentence told the reader to do something the
+ * mount made impossible, and the column's `+` glyph painted with nothing behind
+ * it.
+ *
+ * The fix has two halves and this case pins both: the WORDS follow the control
+ * (an unwired board states the situation instead of instructing), and the `+`
+ * glyph is never drawn unaccompanied. The shell's own half — the project page
+ * lifting `CreateTicketFlow`'s open state and passing a real handler — is
+ * asserted where that mount lives (`apps/web/test/project-create-gate.test.tsx`).
+ */
+describe('V1 the empty board never instructs an action it cannot offer', () => {
+  const emptyBoard: BoardView = { projectId: 'prj_1', groups: [] };
+
+  it('13.1162 unwired: states the situation, offers no button, draws no + glyph', () => {
+    render(<Board board={emptyBoard} onOpenTicket={() => {}} />);
+    expect(screen.getByText(EMPTY_BOARD_UNWIRED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(EMPTY_BOARD_COPY)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Create a ticket' })).toBeNull();
+    // The glyph is the one part of an empty column that reads as a control.
+    expect(document.querySelector('.gn-board__column-empty-icon')).toBeNull();
+  });
+
+  it('13.1162 wired: instructs, and the instruction has a control — on the board and in every empty column', () => {
+    const clicks: number[] = [];
+    const oneEmptyColumn: BoardView = {
+      projectId: 'prj_1',
+      groups: [
+        {
+          workflowId: 'wf-errand',
+          workflowVersion: 1,
+          workflowName: 'Errand',
+          columns: [
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+          ],
+        },
+      ],
+    };
+    render(
+      <Board
+        board={oneEmptyColumn}
+        onOpenTicket={() => {}}
+        onCreateTicket={() => clicks.push(1)}
+      />,
+    );
+    expect(screen.getByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    // Both affordances: the banner's, and the empty COLUMN's own "Add a ticket".
+    expect(screen.getByRole('button', { name: 'Create a ticket' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+    // And the glyph accompanies the control rather than replacing one.
+    expect(document.querySelector('.gn-board__column-empty-icon')).not.toBeNull();
   });
 });

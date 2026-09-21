@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { ruleFor } from './helpers/css-rule-scan.js';
 
 /**
  * Cases 13.907–13.909 — `isSettingsShell`'s two token nits, and the one
@@ -49,16 +50,6 @@ const UI_CSS_PATH = resolve(TEST_DIR, '../../../packages/ui/src/ui.css');
  * `neo-card-radius.test.ts` truncates every rule in this family, whose
  * declarations each sit on their own line.
  */
-function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
-  const lines = css.split('\n');
-  const startIndex = lines.findIndex((line) => selectorPattern.test(line));
-  if (startIndex === -1) return undefined;
-  const openIndex = lines.findIndex((line, i) => i >= startIndex && line.includes('{'));
-  if (openIndex === -1) return undefined;
-  const closeIndex = lines.findIndex((line, i) => i >= openIndex && line.includes('}'));
-  if (closeIndex === -1) return undefined;
-  return lines.slice(startIndex, closeIndex + 1).join('\n');
-}
 
 /**
  * `property → value` for one rule body, comments dropped by CONTEXT rather than
@@ -335,5 +326,75 @@ describe('13.910 — exactly ONE rule carries the current item, across both styl
     // tokens is not counted, so the count above is not simply "number of rules".
     const unrelated = `${css}\n.gn-elsewhere a[aria-current='page'] { background: var(--gn-fill-tertiary); }\n`;
     expect(matches(unrelated)).toHaveLength(1);
+  });
+});
+
+/**
+ * Case `13.1149` — E4-25 — the settings sidebar's section links take the four
+ * metrics `:3145` carries, which this file used to list as deliberately NOT
+ * ported.
+ *
+ * `globals.css`'s own docblock recorded the deferral in those words —
+ * *"`min-height:44px`, `padding:0 14px`, `font-size:15px`, `font-weight:500`
+ * … outside this task's named scope"* — on the ground that they were
+ * *"tap-target and type-scale questions rather than token ones"*. **That
+ * position did not survive being measured:** the three section links rendered
+ * **232×39**, `padding: 8px 11.2px`, `min-height: auto`. 44 here is a POINTER
+ * floor (WCAG 2.5.5), not a keyboard one, and these three links are the
+ * sidebar's only controls for changing section. A scope argument can defer a
+ * metric; it cannot make 39 equal 44.
+ *
+ * **`padding: 0 14px` is asserted TOGETHER WITH `min-height`, and that pairing
+ * is the point:** the prototype's item carries no vertical padding at all and
+ * takes its height from `min-height`, so porting either alone leaves the row
+ * able to drift off 44 again the moment the font does.
+ */
+describe('13.1149 the settings sidebar item ports the prototype\'s four metrics', () => {
+  const measuredFour = (source: string): Record<string, boolean> => {
+    const rule = ruleFor(source, SIDEBAR_ITEM);
+    return {
+      minHeight: /min-height:\s*2\.75rem/.test(rule ?? ''),
+      padding: /padding:\s*0 0\.875rem/.test(rule ?? ''),
+      fontSize: /font-size:\s*0\.9375rem/.test(rule ?? ''),
+      fontWeight: /font-weight:\s*500/.test(rule ?? ''),
+    };
+  };
+
+  it('13.1149 all four are declared', () => {
+    const found = measuredFour(css);
+    expect(
+      Object.entries(found)
+        .filter(([, ok]) => !ok)
+        .map(([name]) => name),
+      `missing at .gn-settings__sidebar a: ${JSON.stringify(found)}`,
+    ).toEqual([]);
+  });
+
+  it('13.1149 the two halves that hold the row at 44 arrive together', () => {
+    // `min-height` without `padding: 0` leaves 8px of vertical padding under a
+    // 44px floor, and `padding: 0 0.875rem` without the floor is the 39 the
+    // finding measured. Neither alone is the port.
+    const rule = ruleFor(css, SIDEBAR_ITEM) ?? '';
+    expect(rule).toMatch(/min-height:\s*2\.75rem/);
+    expect(rule).toMatch(/padding:\s*0 0\.875rem/);
+    expect(rule, 'the pre-fix two-axis padding came back').not.toMatch(/padding:\s*0\.5rem 0\.7rem/);
+  });
+
+  it('13.1149 a planted rule missing any one of the four is caught, in the same path', () => {
+    // MUTATION WITNESS. `withRule` replaces the FIRST match through the same
+    // `ruleFor` the case above reads, so each plant traverses the measurement's
+    // path rather than being appended past it. Each plant drops exactly one
+    // declaration, so a plant that reddened nothing would mean that declaration
+    // is not what the case is reading.
+    const plant = (body: string) =>
+      withRule(css, SIDEBAR_ITEM, `.gn-settings__sidebar a,\n${body}`);
+    for (const [name, body] of [
+      ['minHeight', '  border-radius: 8px;\n  padding: 0 0.875rem;\n  font-size: 0.9375rem;\n  font-weight: 500;'],
+      ['padding', '  min-height: 2.75rem;\n  padding: 0.5rem 0.7rem;\n  font-size: 0.9375rem;\n  font-weight: 500;'],
+      ['fontSize', '  min-height: 2.75rem;\n  padding: 0 0.875rem;\n  font-weight: 500;'],
+      ['fontWeight', '  min-height: 2.75rem;\n  padding: 0 0.875rem;\n  font-size: 0.9375rem;'],
+    ] as const) {
+      expect(measuredFour(plant(body))[name], `planted a rule missing ${name}`).toBe(false);
+    }
   });
 });

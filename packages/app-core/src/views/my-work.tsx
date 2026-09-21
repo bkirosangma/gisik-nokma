@@ -72,7 +72,7 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
   return (
     <div className="gn-my-work">
       <section role="region" aria-label="Assigned to me" className="gn-my-work__section">
-        <h3 className="gn-my-work__heading">Assigned to me</h3>
+        <h2 className="gn-my-work__heading">Assigned to me</h2>
         {view.assigned.length === 0 ? (
           <p className="gn-my-work__empty">Nothing assigned to you.</p>
         ) : (
@@ -83,7 +83,7 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
       </section>
 
       <section role="region" aria-label="My claims in transit" className="gn-my-work__section">
-        <h3 className="gn-my-work__heading">My claims in transit</h3>
+        <h2 className="gn-my-work__heading">My claims in transit</h2>
         {view.inTransit.length === 0 ? (
           <p className="gn-my-work__empty">No claims in transit.</p>
         ) : (
@@ -94,7 +94,7 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
       </section>
 
       <section role="region" aria-label="My contested claims" className="gn-my-work__section">
-        <h3 className="gn-my-work__heading">My contested claims</h3>
+        <h2 className="gn-my-work__heading">My contested claims</h2>
         {view.contested.length === 0 ? (
           <p className="gn-my-work__empty">No contested claims.</p>
         ) : (
@@ -113,7 +113,7 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
         disappearing section is indistinguishable from one that failed to load.
       */}
       <section role="region" aria-label="Shared with me" className="gn-my-work__section">
-        <h3 className="gn-my-work__heading">Shared with me</h3>
+        <h2 className="gn-my-work__heading">Shared with me</h2>
         {view.shared.length === 0 ? (
           <p className="gn-my-work__empty">Nothing has been shared with you.</p>
         ) : (

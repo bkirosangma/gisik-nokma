@@ -341,7 +341,27 @@ moves. Both cases are about that clause, so the pair is a specific kill rather t
   the seam the real window sits on. The wrapper commits a real transition and then hands the batch to the
   REAL service, so the refusal is the engine's own `close-requires-terminal`; the case then asserts
   `refused: 1` AND `closed_at IS NULL` AND **zero** `ticket.closed` events — the second and third
-  together being what a direct writer cannot fake.
+  together being what a direct writer cannot fake. *(Since E6-8 the engine's close check also reads the
+  parent's children, and the SELECT mirrors that predicate too — 13.1167 — so "any ticket the SELECT
+  returns is one the engine would accept" still holds, over three questions now rather than two.)*
+- ✅ **13.1167 — a parent promoted into terminal by a republish is not swept while a child is open** (E6-8,
+  release batch B12, from B12's §13 block `13.1167`–`13.1176`; `apps/server/test/auto-close/sweep.test.ts`).
+  A workflow republish that promotes a kept state to `terminal` puts a parent there over an open child
+  without a transition, and `workflow-defined.ts` accepts it on purpose (publish legality never reads
+  occupancy). The engine's `ticket.closed` asked only `stateCategory`, so the sweep — selecting on
+  `state_category = 'terminal'` and nothing about children — CLOSED the parent unattended over its open
+  work (RED: `candidates: 1, closed: 1`). Two halves now hold the line, and the case is the SQL half:
+  `checks/close.ts` refuses `parent-terminal-with-open-children` (4.55 pins it), and the sweep's SELECT
+  carries a `NOT EXISTS` over non-terminal children so the parent is not a CANDIDATE at all — asserted as
+  `candidates: 0, closed: 0, refused: 0` with `closed_at IS NULL` and zero `ticket.closed` rows, off a
+  world built the way production builds it (child created under the still-active parent, then the
+  republish; the terminal-parent/open-child precondition read off `proj_tickets`, not assumed). Positive
+  control in the same world: the child finishes (inside the window, so it is not itself a candidate) and
+  the next sweep closes the parent through the door under the system actor. Mutation, recorded: with the
+  `NOT EXISTS` removed the case reddens as `candidates: 1, refused: 1, closed: 0` — the engine alone
+  holds the ledger, and the SQL mirror is what keeps the nightly log free of refusals for a world that
+  did not move. The child's `deleted_at` is deliberately not consulted, matching the engine's
+  `getChildrenStates`; E6-4 is where both move together.
 - ✅ **13.731 — the auto-close job's interval is validated by `requirePositiveIntervalMs`, on the same
   scheduler as the other four.** One case in `apps/server/test/ops/backup-daemon-main.test.ts`, which is
   a **recorded placement deviation**: the plan named `test/auto-close/sweep.test.ts` as this task's test
@@ -1314,6 +1334,34 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
   address input reddens this case ALONE (1 failed / 37), and un-wrapping the projects field back to the
   bare pair reddens it alone as well.
+  ⚠ **AMENDED BY RULING E5-11 (2026-09-21) — the projects half is no longer a NATIVE field.** It is the
+  shared `Select` now, so it wears the pattern the way `Channel`/`Role` do (inside a `.gn-field` with a
+  `.gn-field__label`, the component's own trigger carrying `gn-field__input`), and the case asserts the
+  same three things about the same three things. Its title's "two NATIVE fields" is now one native
+  (the address) and one `Select`; the title is kept because it is what the case was minted as, and the
+  live state is this note. **The queries are REGEXES** — `queryAllByRole('button', { name:
+  'Project access' })` returns 0 on this trigger while `/Project access/` returns 1, measured — which
+  is also why this file's own `Role` queries have always been regexes.
+
+- ✅ **13.1181 — the invite form's project field offers project NAMES, not identifiers (ruling E5-11,
+  2026-09-21).** `apps/web/test/members-page.test.tsx`. It was a text box labelled *"Projects
+  (comma-separated ids, optional)"*, so a person had to transcribe project ULIDs from somewhere else;
+  `docs/manual.md` said so in as many words — *"In practice this box is not usable by a person"* — and
+  the finding's judge measured a form whose own docblock already refused to "offer a choice the door
+  will reject" for two of its three choices while the third had no honest input at all. It is now the
+  export's `<select>` (`desktop.dc.html:768-772`), fed from `useWorkspaceProjects` — the SAME
+  `GET /v1/me/workspaces` read the workspace name beside it already makes. **Three cases:** the option
+  list is *All projects in this workspace* first, then one *Only `<name>`* per project in SERVED order,
+  with the ID as the option's VALUE and never its label (the whole ruling is that a person chooses a
+  name and the wire still carries the id); a CONTROL that an UNANSWERED projects read offers only *All
+  projects* — the hook holds `null` and not `[]`, and `[]` would be the claim "this workspace has no
+  projects", so without this arm a select falling back to the id would pass the case above; and a
+  CONTROL that the default choice sends NO `projectIds` key (the door refuses `[]` exactly as it refuses
+  a guest's). **Mutation-witnessed with two distinct signatures:** labelling the options with the ID
+  reddens the three cases that choose by name (`Tests 3 failed | 37 passed`), and dropping the
+  `all`-omits-the-key term reddens the omitted-key control alone (`Tests 1 failed | 39 passed`). The
+  id is from **B13's allocated §13 block (13.1177–13.1186)**, not this file's 13.88x series, because
+  §13 ids became per-release-batch; the case still lives here, beside its siblings. — (`apps/web/test/members-page.test.tsx`)
 
 - ✅ **13.887 — the roster's zebra, on the rows the prototype actually tints.**
   `apps/web/test/members-styling.test.ts:167`. FOUR claims, and each is there because a different defect
@@ -1600,3 +1648,72 @@ fallback this field exists to serve.
   unchanged in COUNT (the same controls, renamed only for the nameless population), so the ratchet's
   number should not move — but that is a prediction, not a measurement, and the owner of that sweep is
   whoever next runs it.
+
+## The shell's nav on a phone: five rows in, one row out (lane ds1, 2026-09-21, batch B10) — cases `13.1137`–`13.1138`
+
+**The finding, round 2 `E4-11`, IMPORTANT.** On the board at `emulate 390x844`, `.gn-nav` measured
+**390×310** — the destination links wrapped to five 44-px rows, 37 % of the viewport. Measured at scroll
+0, the first group title sat at y=755, the first column header at y=802 and the first card at **y=1105**
+on an 844-px-tall phone: **no ticket was on screen when the board opened.** The bar's own docblock had
+recorded the growth and called it an *"understatement"*; `docs/pre-launch-checklist.md` Item 7 explained
+where the wrap came from — a 10-px horizontal overflow caused by the signed-in name, fixed with
+`flex-wrap: wrap` **and a negative control**, not a width guess — and never ruled that the bar may take
+five rows. The prototype's only phone screen puts navigation in a bottom tab bar; the reviewer's remedy
+allowed either that or a single disclosure, and the disclosure is what this change takes.
+
+**Ids `13.1137`–`13.1138`, taken from the block B10 was ALLOCATED — and the route to them is worth
+recording rather than tidying, because it produced three wrong answers before the right one.** The
+first pass took this pair from `13.913`/`13.914`, chosen by asking THIS FILE for its next free number.
+That universe was the file in hand, not the catalogue: a later pair minted the same way collided with
+`13.966`/`13.967`, already in use in `test-cases/13-second-wave-board-actions.md`, and
+`node scripts/check-case-ids.mjs` refused the tree with the duplicate named at both lines. **The sweep a
+per-file recount is not a smaller version of is `test-cases/*.md`; it is a different question.** The
+second answer was a self-declared reservation of `13.1054`–`13.1073`, verified free across all 25 files
+— correct as far as it went, and **superseded within the hour by the third answer**: the controller
+allocated §13 ids per RELEASE BATCH (`Fable, 22:0x`), and **B10 owns the block `13.1137`–`13.1156`**.
+Every §13 id this batch had already minted was renumbered into it, in one pass, in the commit that says
+so. A lane's own reservation is a reading that expires; an allocation is not.
+
+### The mechanism, and the shape it was chosen for
+
+The wrapper is a `<div>`, **not a `<details>`**, and the reason is the wide-width arm: above 40rem
+`.gn-nav__more` is `display: contents`, so the links lay out as DIRECT flex children of `.gn-nav__links`
+exactly as they did before the wrapper existed — the desktop bar is unchanged rather than merely similar.
+A closed `<details>` hides its own content through internal slotting no stylesheet can undo, so the open
+state is a `data-open` attribute instead. **The consequence is the point: the links are never
+conditionally rendered.** They are always in the document, so a closed bar is a visual state and not a
+missing link — a `{moreOpen && …}` implementation would have satisfied every assertion about the OPEN
+state while silently deleting three routes from the phone's accessibility tree.
+
+**Not measured, said rather than implied: the phone bar's height after this change was NOT painted, and
+neither Features.md nor the stylesheet's docblock asserts a new number.** What is asserted is the
+mechanism the height depends on.
+
+### The cases
+
+- ✅ **13.1137 — the phone breakpoint hides the wrapper, and the wide arm does not.** This is a SOURCE
+  scan, not a rendered one, and deliberately: the gate has no browser (`apps/web/e2e-*` is Playwright,
+  not in `pnpm test`), and the property at issue is which declarations a rule carries, on which the
+  stylesheet *is* the authority. `apps/web/test/nav-phone-disclosure.test.ts`. **Two controls, and
+  neither is decoration.** *(a)* The extractor is run over a rule PLANTED INSIDE A COMMENT and must not
+  read it as a rule — because this stylesheet's docblocks quote the selectors they explain, and because
+  it writes brace characters inside comments, which unbalances a brace counter that has not stripped
+  them. **That failure was measured, not imagined:** the first version of this scan lost `.gn-nav__more`'s
+  own wide rule to exactly that and reported a missing rule as a finding. The control reads both ways —
+  the same extractor over the unstripped text DOES return the comment as a rule. *(b)* The mutation
+  witness reverts the phone arm to the wide arm's `display: contents` and requires the SAME function the
+  assertion uses to flip, asserting the planted text matched before it concludes anything, so a plant
+  that silently matched nothing cannot read as a survivor. `globals.css` holds FOUR
+  `@media (max-width: 40rem)` blocks, so "the 40rem block" is not a thing that exists — the block is
+  selected by containing `.gn-nav__more`, which is why asking for the first one answers about
+  `.gn-workspace-list`.
+- ✅ **13.1138 — the toggle is wired to the panel, and the links are in the document in BOTH states.**
+  `apps/web/test/app-nav.test.tsx`. jsdom evaluates no media query, so the stylesheet test above can
+  prove the breakpoint hides the wrapper but not that the button which unhides it is wired to it; this
+  case covers the half the scan cannot reach. The toggle starts `aria-expanded="false"` with
+  `aria-controls="gn-nav-more"`, flips both the attribute and the panel's `data-open` on click and back
+  (it is a toggle, not a one-way reveal), and `My Work` / `Members` / `Settings` are queried in the
+  CLOSED state as well as the open one. **The negative control is a signed-out global route with no
+  remembered workspace**, where every child of the wrapper is gated away and the toggle must not render —
+  it fails both if the toggle becomes unconditional and if the gate is tightened to
+  `workspaceName !== null` (the name is unresolved there, but the three id-only links are not).

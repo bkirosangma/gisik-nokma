@@ -2,7 +2,7 @@ import { fireEvent, render, screen, waitFor, within } from '@testing-library/rea
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { TicketTypeDef } from '@gisik-nokma/domain';
-import type { BoardView, TicketListView } from '@gisik-nokma/app-core';
+import { EMPTY_BOARD_COPY, type BoardView, type TicketListView } from '@gisik-nokma/app-core';
 import { HttpError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
 import { EMPTY_PREFERENCES, stubServices } from './helpers/stub-services.js';
@@ -110,6 +110,9 @@ const BOARD: BoardView = {
               typeId: 'task',
               assignee: null,
               stateProvenance: PROVENANCE,
+              // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this
+              // ticket claims no date", the same default `boardCardSeed` uses.
+              dueDate: null,
               cause: null,
               rollup: null,
               pending: false,
@@ -573,5 +576,50 @@ describe('13.591f the New-ticket dialog\'s "Start in focus" checkbox tracks a RE
 
     await pickParent(user, 'Actively worked, never closed');
     expect(screen.getByRole('checkbox', { name: 'Start in focus' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * V1 (round-2 ruling, IMPORTANT, 2026-09-21) — the empty board's instruction and
+ * its control, at the mount where the control had to be wired.
+ *
+ * `Board`'s empty state renders *"No tickets here yet — create one."* and a
+ * "Create a ticket" button gated on `onCreateTicket`. **No caller in this app
+ * passed it** — `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered 0
+ * across 63 files at the ruling — so the sentence instructed an action the page
+ * made impossible from where it was read, while the control itself sat three
+ * centimetres to the left in this header. The board's half of the fix is in
+ * `packages/app-core/test/views/board.test.tsx` (V1); this is the shell's half:
+ * the page lifts `CreateTicketFlow`'s open state and passes a real handler, so
+ * the banner's button opens the SAME dialog the header's "New ticket" does.
+ */
+describe('V1 an empty project’s board offers the control its sentence names', () => {
+  const emptyWorld = () =>
+    stubServices({
+      getBoard: async () => ({ projectId: PROJECT, groups: [] }),
+      getTickets: async () => LIST,
+      getTicketTypes: async () => WORKSPACE_TYPES,
+      getPreferences: async () => EMPTY_PREFERENCES,
+    });
+
+  it('13.1162 the sentence is the pinned one, and its button opens the New-ticket dialog', async () => {
+    session = { data: { user: { id: ANSELMA, name: 'Anselma Marak' } }, isPending: false };
+    render(
+      <Providers services={emptyWorld()}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    expect(await screen.findByText(EMPTY_BOARD_COPY)).toBeInTheDocument();
+    const create = screen.getByRole('button', { name: 'Create a ticket' });
+    // No dialog before the press — otherwise the assertion below would pass on a
+    // page that opened one on load.
+    expect(screen.queryByRole('combobox', { name: 'Parent' })).not.toBeInTheDocument();
+
+    await userEvent.setup().click(create);
+
+    // The SAME dialog the header's own trigger opens: its Parent picker is the
+    // control that exists only inside it.
+    expect(await screen.findByRole('combobox', { name: 'Parent' })).toBeInTheDocument();
   });
 });

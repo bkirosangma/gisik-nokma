@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from 'react';
+import { useEffect, useId, useRef, useState } from 'react';
 import type { Editor } from '@tiptap/core';
 import { emptyDoc, isDocJson, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
@@ -164,6 +164,13 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
       ? 'This editor was mounted without a submit handler, so there is nowhere to send the words.'
       : undefined;
   const canSubmit = disabledReason === undefined;
+  /**
+   * The id the disabled control is DESCRIBED BY. `useId` rather than a literal
+   * because this component can be mounted more than once on a page (the
+   * composer appears in the sheet and in the comment thread) and a shared id
+   * would point every instance at the first one's sentence.
+   */
+  const disabledReasonId = useId();
 
   const autoFocus = props.autoFocus ?? false;
   useEffect(() => {
@@ -259,10 +266,44 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         className="editor-slot__submit"
         disabled={submitting || !canSubmit}
         title={disabledReason}
+        /*
+          THE REASON, REACHABLE. A `disabled` button is removed from the focus
+          order, so a `title` on it is spoken to nobody: the explanation reached
+          a mouse user who happened to hover, and stopped there. The `title`
+          stays for that reader, and `aria-describedby` points at the hidden
+          span below so the same sentence is attached to the control wherever
+          the control is reached — a screen reader's element list, a form
+          summary — rather than only on hover.
+        */
+        aria-describedby={disabledReason === undefined ? undefined : disabledReasonId}
         onClick={() => void handleSubmit()}
       >
         {props.mode === 'comment' ? 'Comment' : 'Save description'}
       </button>
+      {disabledReason !== undefined && (
+        <span
+          id={disabledReasonId}
+          /*
+            Visually hidden, inline — the recipe `apps/web/src/route-announcer.tsx`
+            carries, reused rather than re-invented, because this product has no
+            `sr-only`-style utility to hand: the one it had was cut as YAGNI when
+            `aria-label` replaced the mechanism it was written for.
+          */
+          style={{
+            position: 'absolute',
+            width: 1,
+            height: 1,
+            margin: -1,
+            padding: 0,
+            border: 0,
+            overflow: 'hidden',
+            clipPath: 'inset(50%)',
+            whiteSpace: 'nowrap',
+          }}
+        >
+          {disabledReason}
+        </span>
+      )}
     </div>
   );
 }

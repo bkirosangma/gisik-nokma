@@ -44,7 +44,7 @@
 export const VIEWPORT_PORT = 3021;
 export const VIEWPORT_BASE_URL = `http://127.0.0.1:${VIEWPORT_PORT}`;
 
-export type ViewportName = 'phone-390' | 'tablet-768' | 'desktop-1512';
+export type ViewportName = 'phone-320' | 'phone-390' | 'tablet-768' | 'desktop-1512';
 
 export type ViewportSpec = {
   /** The CSS-pixel width Playwright is told to use AND the page must report. */
@@ -119,6 +119,42 @@ export type ViewportSpec = {
  * been run; it is a second instrument, not a substitute for this one.
  */
 export const VIEWPORTS: Readonly<Record<ViewportName, ViewportSpec>> = {
+  /**
+   * **320 — WCAG 2.2 §1.4.10 *Reflow*'s own number, added 2026-09-21 (P27).**
+   * Before this entry the narrowest width this product was
+   * ever measured at was **390px**, 70px above the criterion, and `320`
+   * appeared nowhere in either suite. The entry costs one object literal and
+   * puts the criterion's own number under every per-viewport sweep — tap
+   * targets, label text, accessible names, contrast — because
+   * `playwright.viewport.config.ts:184` builds its projects by MAPPING this
+   * record, so a fourth entry IS a fourth Playwright project.
+   *
+   * ⚠ **The three per-width BASELINES for this width do not exist yet, and
+   * that is stated here rather than discovered by the first person to run the
+   * suite.** `tap-target-baseline.json`, `accessible-names-baseline.json` and
+   * the type-scale baseline are keyed `<viewport>|<route>`, and all three
+   * REFUSE a missing key rather than seeding it (`responsive.spec.ts`'s own
+   * "the suite refuses to invent one"). So the first run of the viewport suite
+   * on this branch will report a missing baseline for each of the five routes
+   * at `phone-320` and stop — loudly, in the safe direction, with no invented
+   * number committed. **Owner: whoever next runs `test:e2e:viewport` against a
+   * live stack; record with `UPDATE_*_BASELINE=1` and commit the file.** This
+   * lane could not: the suite is Playwright, it needs its own `next dev`, and
+   * this lane runs in push-only mode with no stack of its own.
+   *
+   * `iPhone SE` and not `iPhone 5`: Playwright ships no `iPhone 5` descriptor
+   * (checked against `@playwright/test`'s own `devices`), and the descriptor
+   * only contributes the non-viewport mobile characteristics anyway — the
+   * config pins `viewport` AFTER the spread, so the 320×568 below is what is
+   * actually used.
+   */
+  'phone-320': {
+    width: 320,
+    height: 568,
+    device: 'iPhone SE',
+    narrow40rem: true,
+    narrow60rem: true,
+  },
   'phone-390': {
     width: 390,
     height: 844,
@@ -163,10 +199,15 @@ export const VIEWPORT_NAMES = Object.keys(VIEWPORTS) as readonly ViewportName[];
  *
  * 13.352 (Task 15, neo restyle) — `/privacy` and `/terms` are both swept by
  * every check this file drives (accessible-names, tap-target, type-scale),
- * and neither `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx`
- * nor `apps/web/src/back-button.tsx` was touched by that task, so the Back
- * control's presence and accessible name on both routes is unaffected by
- * construction as well as by this suite staying green.
+ * and neither `apps/web/app/privacy/page.tsx` nor `apps/web/app/terms/page.tsx`
+ * was touched by that task. ⚠ **This used to add that
+ * `apps/web/src/back-button.tsx` was untouched too, "so the Back control's
+ * presence and accessible name on both routes is unaffected" — and that file
+ * does not exist.** It was removed in Step 2c-2 (`17c8345c`, "the dead component
+ * the port orphaned"), so the two routes carry no Back control to be affected
+ * and the premise holds by construction rather than by that file's absence from
+ * a diff. The pages are reached from the sign-in card's legal line, which is why
+ * the legal bar's `Sign in` link points at the same route a Back control did.
  */
 export const UNAUTHED_ROUTES = [
   { path: '/help', label: 'help' },

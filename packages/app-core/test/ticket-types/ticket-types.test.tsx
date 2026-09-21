@@ -1,7 +1,7 @@
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no
 // default export that survives `verbatimModuleSyntax` — the same fix already
 // settled at test/views/board.test.tsx and test/workflow-builder/canvas.test.tsx.
@@ -420,7 +420,14 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
     await screen.findByText('Invoice');
 
     // Invoice's ↑ would swap it with the built-in directly above it.
-    expect(screen.getByRole('button', { name: 'Move Invoice up' })).toBeDisabled();
+    const up = screen.getByRole('button', { name: 'Move Invoice up' });
+    expect(up).toBeDisabled();
+    // And the reason is ATTACHED to it, not only hoverable: a disabled button is
+    // out of the focus order, so its `title` reaches a mouse user and nobody
+    // else. `aria-describedby` must resolve to a node carrying the sentence.
+    const describedBy = up.getAttribute('aria-describedby');
+    expect(describedBy).not.toBeNull();
+    expect(document.getElementById(describedBy!)?.textContent).toBe('Built-in types keep their rank.');
 
     // The same rule read from the other side: the bottom built-in's ↓ would
     // move it, so it is disabled — while its ↑, pointing at another built-in,
@@ -877,6 +884,48 @@ describe('TicketTypeEditorScreen — built-ins and refusals', () => {
     const rankField = await screen.findByRole('spinbutton', { name: 'Hierarchy rank' });
     expect(rankField).toBeDisabled();
     expect(screen.getByText('Built-in type — its place in the hierarchy is fixed.')).toBeInTheDocument();
+  });
+
+  /**
+   * 10.120 — E6-3 (release 2026-09-22, B12): re-ranking a custom type does
+   * not move or re-check the tickets already placed under the old rank — the
+   * rank invariants are write-time invariants and occupancy is never an
+   * engine input (owner, 2026-08-26), so the engine ACCEPTS the re-rank and
+   * the ledger then holds placements the write doors refuse to reproduce
+   * (`packages/rule-engine/test/ticket-type-rerank.test.ts`, 5.76). The
+   * editor says so at the moment the rank is changed, so the admin decides
+   * with the consequence in front of them; the note is absent while the rank
+   * still reads the saved value, and absent on a new type, which has nothing
+   * placed yet.
+   */
+  it('tells the admin that tickets already placed keep their place, the moment a custom type\'s rank is changed', async () => {
+    const invoice: TicketTypeDef = { id: newUlid(), name: 'Invoice', icon: 'receipt', rank: 3, workflowId: kanbanPublished.id, fields: [] };
+    renderEditor(invoice, { ticketTypes: [...builtins, invoice] });
+    const rankField = await screen.findByRole('spinbutton', { name: 'Hierarchy rank' });
+    expect(rankField).toHaveValue(3);
+    expect(screen.queryByTestId('rank-divergence')).not.toBeInTheDocument();
+
+    // `fireEvent.change` rather than `user.clear` + `user.type`: the field's
+    // onChange coerces an empty value to 1, so a cleared-then-typed "2" reads
+    // "12" — a keystroke sequence, not the rank an admin means.
+    fireEvent.change(rankField, { target: { value: '2' } });
+    expect(rankField).toHaveValue(2);
+    expect(screen.getByTestId('rank-divergence')).toHaveTextContent(
+      'Tickets already placed keep their place — re-ranking does not move or re-check them. The new rank applies to tickets created or moved from now on, so a ticket moved out of a placement the new rank no longer allows cannot be put back there.',
+    );
+
+    // Back to the saved rank: nothing diverges, so nothing is said.
+    fireEvent.change(rankField, { target: { value: '3' } });
+    expect(rankField).toHaveValue(3);
+    expect(screen.queryByTestId('rank-divergence')).not.toBeInTheDocument();
+  });
+
+  it('says nothing about placed tickets on a NEW type, whose rank has no saved value to diverge from', async () => {
+    renderEditor(null);
+    const rankField = await screen.findByRole('spinbutton', { name: 'Hierarchy rank' });
+    fireEvent.change(rankField, { target: { value: '2' } });
+    expect(rankField).toHaveValue(2);
+    expect(screen.queryByTestId('rank-divergence')).not.toBeInTheDocument();
   });
 
   /**

@@ -17,7 +17,8 @@ import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
-import { actorLabel, formatStateProvenance } from '../provenance.js';
+import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
+import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
   BoardCard as BoardCardData,
@@ -116,6 +117,31 @@ export type BoardProps = {
    * behind them.
    */
   moves?: BoardMoveCapability;
+  /**
+   * TODAY, as an IST day string (`YYYY-MM-DD`), for the one thing on this
+   * board that is a relation to the present rather than a claim about the
+   * ticket: whether a card's due date has PASSED (ruling E5-2, 2026-09-21).
+   *
+   * OPTIONAL, the SAME precedent `onCreateTicket`, `isNarrowed` and
+   * `epicsHidden` set above — and here the absence has a precise meaning
+   * rather than merely a conservative one: **no clock, no late tone.** A mount
+   * that passes nothing draws the due label in the ordinary tone, which is
+   * what the List already does and for the reason its own CSS records
+   * (`packages/ui/src/ui.css`, `.gn-list__due`): a danger tone with no clock
+   * behind it would paint every past date the same colour as every future one.
+   * Narrower than the truth, never wrong about it — the same direction the
+   * replica's missing `cause` argues for.
+   *
+   * **WHY A PROP AND NOT A `new Date()` HERE.** The neighbouring date views do
+   * not read a clock either: `calendar-view.tsx` and `timeline-view.tsx` are
+   * HANDED `today` by the shell, and the surfaces that decide which day a claim
+   * belongs to are held clock-free by `CLOCK_FREE_ROOTS`
+   * (`test/helpers/clock-scan.ts`). A card's lateness is that same question one
+   * surface over, so it joins the clock `apps/web`'s project page already owns
+   * — one `istToday()` per render — rather than growing a second one that could
+   * disagree with the Calendar and Timeline tabs about which day it is.
+   */
+  today?: string;
 };
 
 /**
@@ -182,6 +208,27 @@ export type BoardMoveCapability = {
  * spellings of one sentence is how a copy change passes a test it broke.
  */
 export const EMPTY_BOARD_COPY = 'No tickets here yet — create one.';
+
+/**
+ * The words an empty board says when NOBODY WIRED THE CREATE AFFORDANCE (E5… V1,
+ * round-2 ruling, 2026-09-21).
+ *
+ * `EMPTY_BOARD_COPY` instructs — *"create one"* — and the button that would let a
+ * person do it renders only when `onCreateTicket` is passed. **A call site that
+ * passed nothing therefore told the reader to do something the mount made
+ * impossible**, and at the time of the ruling that was every mount in the
+ * product: `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered 0
+ * across 63 files, while the string appeared 18 times in this module. The
+ * sentence is therefore chosen by whether the control exists, exactly as the
+ * epics arm below is chosen by whether the epic rule is the reason.
+ *
+ * The alternative the ruling also allowed — wiring the shell's create region
+ * through — is still the better end state and is NOT ruled out by this constant:
+ * a mount that wires the handler gets `EMPTY_BOARD_COPY` back, and this string
+ * then renders nowhere. What the constant prevents is a THIRD state, where the
+ * copy instructs and the control is missing.
+ */
+export const EMPTY_BOARD_UNWIRED_COPY = 'No tickets here yet.';
 
 /**
  * The words an empty board says when the ONLY reason it is empty is the epic rule
@@ -319,7 +366,7 @@ type MoveRegistry = Map<string, (toStateId: string) => void>;
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves }: BoardProps) {
+export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today }: BoardProps) {
   /**
    * The shared drop registry (`MoveRegistry`'s own docblock above) —
    * created HERE, unconditionally, before any early return, because React's
@@ -488,7 +535,11 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
           prop's own docblock). Absent ⇒ the original sentence, unchanged.
         */}
         <p className="gn-board__empty-copy">
-          {epicsHidden === true ? EMPTY_BOARD_EPICS_COPY : EMPTY_BOARD_COPY}
+          {epicsHidden === true
+            ? EMPTY_BOARD_EPICS_COPY
+            : onCreateTicket === undefined
+              ? EMPTY_BOARD_UNWIRED_COPY
+              : EMPTY_BOARD_COPY}
         </p>
         {onCreateTicket !== undefined ? (
           <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
@@ -549,6 +600,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             moves={moves}
             moveRegistry={moveRegistryRef}
             bulkCloseFor={openBulkClose}
+            today={today}
           />
         ) : (
           <BoardGroupSection
@@ -560,6 +612,7 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
             arrows={null}
             onDropCard={null}
             bulkCloseFor={null}
+            today={today}
           />
         );
       })}
@@ -607,6 +660,7 @@ function BoardGroupSection({
   arrows,
   onDropCard,
   bulkCloseFor,
+  today,
 }: {
   group: BoardGroup;
   groupCount: number;
@@ -636,10 +690,12 @@ function BoardGroupSection({
    * hands back an event and a `stateId`.
    */
   bulkCloseFor: ((column: BoardColumn) => void) | null;
+  /** `Board`'s own `today`, threaded through unchanged — see its prop docblock. */
+  today?: string;
 }) {
   return (
     <section className="gn-board__group">
-      {groupCount > 1 ? <h3 className="gn-board__workflow">{group.workflowName}</h3> : null}
+      {groupCount > 1 ? <h2 className="gn-board__workflow">{group.workflowName}</h2> : null}
       <div className="gn-board__rail">
         {group.columns.map((column) => (
           <section
@@ -709,6 +765,7 @@ function BoardGroupSection({
                   stateName={column.name}
                   onOpen={() => onOpenTicket(card.ticketId)}
                   arrows={arrows === null ? null : arrows(card, column.stateId)}
+                  today={today}
                 />
               ))}
             </ul>
@@ -743,7 +800,13 @@ function BoardGroupSection({
              */}
             {column.cards.length === 0 ? (
               <div className="gn-board__column-empty">
-                <span className="gn-board__column-empty-icon" aria-hidden="true">
+                {/* V1: the `+` is the one part of an empty column that reads as
+                    a CONTROL, and it must never render unaccompanied — a glyph
+                    that looks pressable with nothing behind it is the dead
+                    affordance this board refuses elsewhere. Gated on the same
+                    prop the button below is. */}
+                {onCreateTicket !== undefined ? (
+                  <span className="gn-board__column-empty-icon" aria-hidden="true">
                   <svg
                     width="18"
                     height="18"
@@ -755,7 +818,8 @@ function BoardGroupSection({
                   >
                     <path d="M12 5.5v13M5.5 12h13" />
                   </svg>
-                </span>
+                  </span>
+                ) : null}
                 <p className="gn-board__column-empty-copy">
                   {column.epicsHidden === true ? EMPTY_COLUMN_EPICS_COPY : EMPTY_COLUMN_COPY}
                 </p>
@@ -796,6 +860,7 @@ function BoardGroupWithMoves({
   moves,
   moveRegistry,
   bulkCloseFor,
+  today,
 }: {
   group: BoardGroup;
   groupCount: number;
@@ -804,8 +869,10 @@ function BoardGroupWithMoves({
   moves: BoardMoveCapability;
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock. Owned by `Board`, threaded through unchanged. */
   moveRegistry: MutableRefObject<MoveRegistry>;
-  /** Second wave Task 10 — `Board`'s own opener, threaded through unchanged; see `BoardGroupSection`'s prop. */
+  /** Second Wave Task 10 — `Board`'s own opener, threaded through unchanged; see `BoardGroupSection`'s prop. */
   bulkCloseFor: (column: BoardColumn) => void;
+  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
+  today?: string;
 }) {
   const workflowKey = `${group.workflowId}@${group.workflowVersion}`;
   const workflow = useLiveQuery(moves.dataSource, moves.workspaceId, workflowKey, () =>
@@ -879,6 +946,7 @@ function BoardGroupWithMoves({
       }
       onDropCard={handleDrop}
       bulkCloseFor={bulkCloseFor}
+      today={today}
     />
   );
 }
@@ -963,11 +1031,14 @@ function BoardCardSlot({
   stateName,
   onOpen,
   arrows,
+  today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
   arrows: ReactNode;
+  /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
+  today?: string;
 }) {
   const draggedRef = useRef(false);
   return (
@@ -994,7 +1065,7 @@ function BoardCardSlot({
         onOpen();
       }}
     >
-      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} />
+      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} today={today} />
     </li>
   );
 }
@@ -1024,13 +1095,40 @@ function BoardCardView({
   stateName,
   onOpen,
   arrows,
+  today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
   arrows: ReactNode;
+  today?: string;
 }) {
   const [unfolded, setUnfolded] = useState(false);
+  /**
+   * Ruling E5-2 — the DUE LABEL, which this card drew none of until 2026-09-21
+   * while the sheet, the List, `my-work`, the Calendar and the Timeline all
+   * carried the date, and the Board is the project's DEFAULT tab. The export
+   * draws it in the card's meta line and colours it
+   * `di.late ? "var(--danger)" : "var(--label2)"`; both halves are reproduced
+   * here rather than only the date, because a date nobody can see has passed is
+   * the fact the ruling is about.
+   *
+   * `late` is a plain STRING comparison of two IST day strings — the same
+   * comparison `filter/list-filter.ts` uses for its `dueBefore`/`dueAfter` axes,
+   * and the reason no clock or zone arithmetic appears here: `YYYY-MM-DD` sorts
+   * lexicographically in calendar order, so `due < today` needs neither a
+   * `Date` nor a timezone. A ticket due TODAY is not late, which is what `<`
+   * rather than `<=` says.
+   *
+   * With no `today` the label still draws, in the ordinary tone — see the
+   * `today` prop's docblock on `BoardProps` for why the absence is honest.
+   *
+   * The ATTRIBUTION is a `title`, not a second line: the export's meta line is
+   * one bit and a board card is the densest surface in the product, so the
+   * claimant rides along the way `Chip`'s own `title` does immediately above.
+   * The visible text is the date alone, exactly as the export draws it.
+   */
+  const late = card.dueDate !== null && today !== undefined && card.dueDate.date < today;
   return (
     <Card className={card.pending ? 'gn-board-card gn-board-card--pending' : 'gn-board-card'}>
       <button type="button" className="gn-board-card__title" onClick={onOpen}>
@@ -1048,6 +1146,14 @@ function BoardCardView({
         ) : null}
         {card.rollup !== null ? (
           <span className="gn-board-card__progress">{formatRollup(card.rollup)}</span>
+        ) : null}
+        {card.dueDate !== null ? (
+          <span
+            className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
+            title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
+          >
+            {formatDate(card.dueDate.date)}
+          </span>
         ) : null}
       </div>
       <button
@@ -1424,10 +1530,13 @@ function MoveArrows({
       }
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
-      // `transportError` channel, own sentence, never `serverRefusal`.
+      // `transportError` channel, own sentence, never `serverRefusal`. E5-25:
+      // a 401 is neither, and `writeFailureCopy` is the one place that is
+      // decided.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this move — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1526,10 +1635,11 @@ function MoveArrows({
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
       // `transportError` channel `submitDirect` uses, own sentence, never
-      // `serverRefusal`.
+      // `serverRefusal`. E5-25: the 401 arm joins it, one author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this close — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1731,9 +1841,11 @@ function MoveArrows({
       }
     } catch (cause) {
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
+      // E5-25: a 401 goes to the session sentence through the same author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this move — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        );
       }
     }
   };
@@ -1802,7 +1914,7 @@ function MoveArrows({
          * bug that would read as a query bug.
          */}
         {transportError !== null && dialog === null ? (
-          <p role="alert" className="gn-refusal gn-refusal--transport">
+          <p role="alert" className={writeFailureRefusalClass(transportError)}>
             {transportError}
           </p>
         ) : null}

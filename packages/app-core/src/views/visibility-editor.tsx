@@ -91,8 +91,8 @@ export function writeUnreachedCopy(cause: unknown): string {
  *
  * Both are `| null` rather than optional, and `null` is a CLAIM here rather than
  * a shrug: it says *"no read served this"*, which is the honest answer for the
- * roster (**cut from the wire entirely** — `routes/tickets.ts:115-118`: an
- * explicit audience ROSTER is *"a disclosure no plan authorized"*) and for the
+ * roster (**cut from the wire entirely** — `routes/tickets.ts`, *"an explicit
+ * audience ROSTER, a disclosure no plan authorized"*) and for the
  * provenance (which lives on the LEDGER, not in the projection the ticket read
  * is built from). An optional key would let a mapper that simply forgot the
  * field look the same as the cut applying — the rule `WorkItem.projectName`
@@ -214,7 +214,7 @@ type Submission = { kind: 'idle' } | { kind: 'sending' } | { kind: 'refused'; ru
  * What the old text was RIGHT about, and what still stands:
  *
  * - the ROSTER (`own_user_ids` / `resolved_user_ids`) is **cut**, by a standing
- *   disclosure ruling — `routes/tickets.ts:115-118`: *"an explicit audience
+ *   disclosure ruling — `routes/tickets.ts`: *"an explicit audience
  *   ROSTER, a disclosure no plan authorized"*. So an `explicit` audience renders
  *   its mode and says the list is not served, rather than drawing names;
  * - the PROVENANCE is **not in the row** — who set the audience, and when, is on

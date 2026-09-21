@@ -34,24 +34,32 @@ import { getWorkflowDefFromProjection, getWorkflowDefsInForce } from './workflow
  *    table that disagrees with the live one after any republish, and throws
  *    outright once a version has dropped a state a replayed transition names.
  *
- *    **The TICKET-TYPE lookup is NOT as-of, and "every definition" would be a
- *    false sentence here.** `getTicketTypeLadderFromDb` takes no sequence
- *    number and reads what proj_ticket_types holds NOW, because that table is
- *    last-definition-wins with no history to ask (`./ticket-types.ts`). So this
- *    table is a pure function of the ledger prefix for workflow versioning, and
- *    for type binding only until somebody re-points a ticket type at another
- *    workflow: after that, replaying the `ticket.created` resolves the NEW
- *    `workflowId` for a ticket the live path bound to the old one — the
- *    live-versus-rebuild drift class this series has already met three times,
- *    and it contradicts the owner's own "a re-binding affects new tickets only"
- *    (2026-08-26). It is the plan's **Open question 11**, scoped out
- *    deliberately rather than smuggled in: the fix is not symmetric with the
- *    workflow one, because giving proj_ticket_types history means changing its
- *    primary key, and `getTicketTypeFromDb` has readers in the engine context
- *    (Task 12) and in Plans 4–5. Recorded **UNASSIGNED** in
- *    `docs/plan-3-chain-b-handoff.md`: no plan in the series has an open task on
- *    that table's key, and parking it on one that has none would be a handoff
- *    nobody receives.
+ *    **The TICKET-TYPE lookup is as-of too, since E6-13 (2026-09-21), by a
+ *    different road.** `proj_ticket_types` is last-definition-wins with no
+ *    history to ask (`./ticket-types.ts`), so until that task this lookup read
+ *    what the table holds NOW, and this table was a pure function of the
+ *    ledger prefix for workflow versioning but for type binding only until
+ *    somebody re-pointed a ticket type at another workflow: after that,
+ *    replaying the `ticket.created` resolved the NEW `workflowId` for a ticket
+ *    the live path bound to the old one — the live-versus-rebuild drift class
+ *    this series has met three times, contradicting the owner's own "a
+ *    re-binding affects new tickets only" (2026-08-26) — and, when the new
+ *    workflow was published AFTER the ticket, threw from the reducer instead,
+ *    because a workflow not yet in force at the ticket's position was being
+ *    asked for. `getTicketTypeLadderFromDb` now takes the event's position and
+ *    answers as of it: a table row whose `defined_workspace_seq` post-dates the
+ *    event is replaced by the ledger's own definition at that position. That
+ *    row can post-date the event ONLY in a replay (its docblock cites the
+ *    ingest lock that makes this so), so the live path is untouched and the
+ *    ledger is read only for the tickets a later redefinition would otherwise
+ *    misplace. The plan's **Open question 11** priced the fix as a
+ *    primary-key change to `proj_ticket_types` with readers of
+ *    `getTicketTypeFromDb` in the engine context (Task 12) and Plans 4–5 to
+ *    move; none of that is touched — the table keeps one row per type and the
+ *    ledger supplies the history. The consequence the question was recorded
+ *    for (a rebuild that disagrees with live after a re-bind) is closed and
+ *    measured in `test/verify-projections.test.ts`; the question's own text in
+ *    `docs/plan-3-chain-b-handoff.md` carries a dated note saying so.
  * 2. It consumes `workflow.defined` and folds every row on that workflow
  *    forward (refresh on publish). A stored `state_category` that a new version
  *    has redefined is a lie that rollups, board columns and the overdue sweep
@@ -371,17 +379,18 @@ async function upsertTicket(db: PoolClient, next: TicketState): Promise<void> {
  * would be the reducer's own `is not defined` throw, which names the ledger for
  * a loader's omission.
  *
- * `asOfWorkspaceSeq` is this event's own position in the workspace stream, and
- * it reaches ONE of the two lookups. The WORKFLOW set is the one that was in
- * force when the event happened, never the newest. The TICKET-TYPE ladder is
- * whatever proj_ticket_types holds NOW: that table is last-definition-wins with
- * no history, so there is no as-of question it can answer (`./ticket-types.ts`).
- * Do not read this loader as "every definition as of the event" — the second
- * half of point 1 in this file's header names the drift that costs, why it is
- * not fixed here, and where it is recorded.
+ * `event.workspaceSeq` is this event's own position in the workspace stream,
+ * and it reaches BOTH lookups. The WORKFLOW set is the one that was in force
+ * when the event happened, never the newest. The TICKET-TYPE ladder is what
+ * proj_ticket_types holds, except for a type whose row post-dates this event
+ * — possible only in a replay — which is answered from the ledger's own
+ * definition at this position instead (`./ticket-types.ts`, E6-13). So this
+ * loader IS "every definition as of the event"; the second half of point 1 in
+ * this file's header records the drift and the throw that stood here before,
+ * and the road taken around the primary-key change the plan priced.
  */
 async function loadDeps(db: PoolClient, event: LedgerEvent): Promise<TicketStateDeps> {
-  const types = await getTicketTypeLadderFromDb(db, event.workspaceId);
+  const types = await getTicketTypeLadderFromDb(db, event.workspaceId, event.workspaceSeq);
   const workflows = await getWorkflowDefsInForce(db, event.workspaceId, event.workspaceSeq);
   return {
     getTicketType: (typeId) => types.get(typeId),
@@ -478,14 +487,20 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
  * — and the throw stays for all four.
  *
  * It does NOT for these three. `evaluateEvent`'s switch has no case for them, so
- * they fall through to `{ refused: false }` with no existence check, and the
- * server commits them today: `test/permissions/check-role-permission.test.ts`
- * ingests two `ticket.assigned` events against tickets that were never created,
- * and they are committed, not refused. Folding one would throw INSIDE the ingest
- * transaction — turning a submission the product currently accepts into a 500 —
- * and would leave the table unrebuildable from a ledger the product itself
- * wrote. Registering this projection is what makes that reachable; it was
- * latent, and it becomes live in this commit.
+ * they fall through to `{ refused: false }` with no existence check OF THEIR OWN.
+ * **The door still refuses them, and this paragraph said it did not.** The
+ * permission gate runs before the engine: `checkPermission` asks `canSee` for the
+ * event's entity, and `canSee` answers `false` for a ticket with no
+ * `proj_visibility` row exactly as it does for an invisible one
+ * (`visibility/can-see.ts`), so a `ticket.assigned` naming a ticket that was
+ * never created is refused `TICKET_NOT_VISIBLE_REASON` at both client doors.
+ * The citation this paragraph used to carry is the proof of the opposite now:
+ * `test/permissions/check-role-permission.test.ts`'s `visibleTicket` helper
+ * exists precisely BECAUSE the gate started refusing a bare `newUlid()`, and its
+ * own docblock says so in as many words. Folding one would still throw INSIDE the
+ * ingest transaction — turning a submission into a 500 — and would leave the
+ * table unrebuildable from a ledger the product itself wrote, which is why the
+ * skip stays and why the set is keyed by name rather than by "unknown ticket".
  *
  * The skip is deliberately NOT "skip whenever the ticket is unknown". That is
  * the shape this series keeps catching — two cases that cannot be told apart,
@@ -493,12 +508,12 @@ async function refreshTicketsForWorkflow(db: PoolClient, event: LedgerEvent): Pr
  * against what the door actually covers. Nothing is invented either way: there is
  * no ticket to assign, so there is no row to write.
  *
- * THE UNDERLYING GAP IS NOT FIXED HERE and is not this task's: nothing refuses a
- * `ticket.assigned` (or either collaborator event) for a ticket that does not
- * exist, so the ledger can hold an assignment of nothing to somebody. That is a
- * refusal no plan document owns — recorded as a finding for the controller.
- * When it lands, this set becomes unreachable rather than wrong, and the two
- * lines below can go.
+ * **What remains true is narrower than "the gap is open":** the ENGINE has no
+ * existence check for these three, so a caller that reached `evaluateEvent`
+ * without the permission gate — an internal door — could still write an
+ * assignment of nothing to somebody. That is an absence rather than a reachable
+ * hole: at both client doors the gate above answers first. The set below is what
+ * keeps the projection from throwing on the outcome if it ever happens.
  *
  * `comment.added` and `attachment.added` are the same gap and are absent from
  * this set only because `apply` has already returned for them above, before the

@@ -40,6 +40,28 @@ describe('workflowDefSchema', () => {
   it('refuses a version below 1', () => {
     expect(workflowDefSchema.safeParse({ ...validDef, version: 0 }).success).toBe(false);
   });
+
+  /**
+   * 4.56 — E6-20, planted defect: a workflow named `" "` and a state named
+   * `" "` or `"\t"` are refused with ruling P15's sentence — the one
+   * `workspace.created`, `project.created` and the ticket title already read.
+   * Before the fix both were `z.string().min(1)`: through `POST /v1/events` a
+   * workflow named `" "` committed and `GET workflows` listed it, and a state
+   * named `" "` was a board column with no header. RED: `success: true` on all
+   * three. The padded control keeps this a refusal, not a trim: `"  Basic  "`
+   * is stored verbatim.
+   */
+  it('planted defect: a workflow or state name of only spaces names nothing', () => {
+    const blankWorkflow = { ...validDef, name: ' ' };
+    const blankState = { ...validDef, states: [{ id: 'todo', name: ' ', category: 'open' }] };
+    const tabState = { ...validDef, states: [{ id: 'todo', name: '\t', category: 'open' }] };
+    for (const [label, bad] of [['workflow', blankWorkflow], ['state', blankState], ['tab state', tabState]] as const) {
+      const result = workflowDefSchema.safeParse(bad);
+      expect(result.success, label).toBe(false);
+      expect(JSON.stringify(result.error?.issues), label).toContain('a name of only spaces names nothing');
+    }
+    expect(workflowDefSchema.safeParse({ ...validDef, name: '  Basic  ' }).success).toBe(true);
+  });
 });
 
 describe('workflowStateSchema — amendment 9', () => {

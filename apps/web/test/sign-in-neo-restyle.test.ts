@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { ruleFor } from './helpers/css-rule-scan.js';
 
 /**
  * Round 2d (2026-09-09) — `/sign-in` neo alignment, the CSS-source half.
@@ -26,18 +27,6 @@ const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
  * mixes both styles). A rule opened with a multi-selector list (`a,\nb {`)
  * is matched from whichever of its selector lines `selectorPattern` hits.
  */
-function ruleFor(css: string, selectorPattern: RegExp): string | undefined {
-  const lines = css.split('\n');
-  const startIndex = lines.findIndex((line) => selectorPattern.test(line));
-  if (startIndex === -1) return undefined;
-  // Walk forward from the first line the OPENING brace appears on (which may
-  // be a later line than the selector match, for a multi-selector rule).
-  const openIndex = lines.findIndex((line, i) => i >= startIndex && line.includes('{'));
-  if (openIndex === -1) return undefined;
-  const closeIndex = lines.findIndex((line, i) => i >= openIndex && line.includes('}'));
-  if (closeIndex === -1) return undefined;
-  return lines.slice(startIndex, closeIndex + 1).join('\n');
-}
 
 describe('13.360/13.361 — globals.css wires the retired accent hex through --gn-text-accent, not --gn-accent', () => {
   const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');

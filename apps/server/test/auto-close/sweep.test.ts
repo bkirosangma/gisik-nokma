@@ -714,3 +714,122 @@ describe('13.730 a refused close is counted and leaves the ticket open', () => {
     expect(report).toEqual({ workspacesOn: 1, candidates: 1, closed: 0, refused: 1 });
   });
 });
+
+/**
+ * 13.1167 — E6-8 (release 2026-09-22, B12): the sweep never builds a close
+ * over open children.
+ *
+ * Case 4.23 keeps a parent from ENTERING a terminal state over open children,
+ * but a workflow republish that promotes a kept state to `terminal` puts the
+ * parent there without a transition, and `workflow-defined.ts` accepts that
+ * on purpose (publish legality never depends on where tickets sit). Until
+ * this fix the engine's `ticket.closed` asked only `stateCategory`, so the
+ * sweep — which selects on `state_category = 'terminal'` and nothing about
+ * children — closed such a parent unattended, over its open work.
+ *
+ * Two halves, and they are different instruments: the ENGINE now refuses the
+ * close (`checks/close.ts`, `parent-terminal-with-open-children` — pinned in
+ * `packages/rule-engine/test/close-with-open-children.test.ts`), and the
+ * sweep's SELECT mirrors that predicate so the parent is not a CANDIDATE at
+ * all — no envelope built, no nightly "refused" for a world that did not
+ * move. This case is the second half: `candidates: 0`, which a sweep that
+ * relied on the engine's refusal alone would answer `candidates: 1,
+ * refused: 1`. The world is built the way it happens in production — the
+ * child created while the parent was still active, then the republish — not
+ * assembled by hand behind the projection's back.
+ */
+describe('13.1167 a parent promoted into terminal by a republish is not swept while a child is open', () => {
+  it('is not a candidate while the child is open, and closes on the sweep after the child finishes', async () => {
+    const ws = newUlid();
+    await seedWorkflowAndType(ws);
+    await seedAutoClose(ws, DAYS);
+    // The parent: `doing` (active), entered long ago — old enough to sweep the
+    // moment its state reads terminal.
+    const parent = await seedTicket({ workspaceId: ws, enteredAt: '2026-08-01T06:00:00.000Z', state: 'doing' });
+    // A child type one rank deeper, and a child created under the parent while
+    // the parent was still active — the only order the hierarchy check allows.
+    const childType = `${TYPE_ID}-child`;
+    const child = newUlid();
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'ticket-type', id: childType },
+        type: 'ticket-type.defined',
+        payload: { id: childType, name: 'Sweep sub-task', icon: 'check', rank: 2, workflowId: WF, fields: [] },
+      }),
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'ticket', id: child },
+        type: 'ticket.created',
+        payload: { typeId: childType, projectId: PROJECT, parentId: parent, title: 'Open child', start: 'focus' },
+        serverTime: '2026-08-01T06:01:00.000Z',
+      }),
+      // v2: `doing` KEPT and promoted active → terminal. The projection's
+      // refresh-on-publish folds the parent's category to terminal with no
+      // ticket event at all — so the sweep's "entered" clock still reads the
+      // old transition into `doing`.
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'workflow', id: WF },
+        type: 'workflow.defined',
+        payload: {
+          id: WF,
+          version: 2,
+          name: 'Auto-close flow',
+          initialStateId: 'todo',
+          states: [
+            { id: 'todo', name: 'To do', category: 'open' },
+            { id: 'doing', name: 'Doing', category: 'terminal' },
+            { id: 'done', name: 'Done', category: 'terminal' },
+          ],
+          transitions: [
+            { from: 'todo', to: 'doing', rules: [] },
+            { from: 'doing', to: 'done', rules: [] },
+            { from: 'done', to: 'doing', rules: [] },
+          ],
+        },
+        serverTime: '2026-08-02T00:00:00.000Z',
+      }),
+    ]);
+    // The world the defect needs, asserted off the projection rather than
+    // assumed of the seed: a TERMINAL parent with an OPEN child under it.
+    const { rows: before } = await db.pool.query<{ ticket_id: string; state_category: string; parent_id: string | null }>(
+      'SELECT ticket_id, state_category, parent_id FROM proj_tickets WHERE workspace_id = $1 ORDER BY parent_id NULLS FIRST',
+      [ws],
+    );
+    expect(before).toEqual([
+      { ticket_id: parent, state_category: 'terminal', parent_id: null },
+      { ticket_id: child, state_category: 'open', parent_id: parent },
+    ]);
+
+    const report = await sweep();
+    expect(report).toEqual({ workspacesOn: 1, candidates: 0, closed: 0, refused: 0 });
+    expect(await closedAt(parent)).toBeNull();
+    expect(await closedEvents(parent)).toHaveLength(0);
+
+    // POSITIVE CONTROL in the same world: the child finishes, and the very
+    // next sweep closes the parent through the door — so the zero above was
+    // the child, not a sweep that closes nothing.
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: ws,
+        actorId: HUMAN,
+        entity: { kind: 'ticket', id: child },
+        type: 'ticket.transitioned',
+        // `todo → doing` is a declared edge, and under v2 `doing` IS terminal:
+        // the child finishes by the one move the workflow actually offers it —
+        // INSIDE the window, so the child itself is not a candidate and the
+        // count below is the parent alone.
+        payload: { to: 'doing' },
+        serverTime: '2026-09-17T00:00:00.000Z',
+      }),
+    ]);
+    const after = await sweep();
+    expect(after).toEqual({ workspacesOn: 1, candidates: 1, closed: 1, refused: 0 });
+    expect(await closedAt(parent)).not.toBeNull();
+    expect(await closedEvents(parent)).toEqual([{ actor_id: SYSTEM_ACTOR_AUTO_CLOSE, origin: 'server' }]);
+  });
+});

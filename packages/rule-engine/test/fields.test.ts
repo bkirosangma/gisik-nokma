@@ -143,6 +143,33 @@ describe('checkTicketFieldSet', () => {
     });
   });
 
+  /**
+   * 5.78 — E6-19, planted defect at the ENGINE's two day arms: a custom
+   * `date` field and the `dueDate`/`startDate` built-ins each refuse
+   * `2026-02-30` with the SAME sentence they already gave the wrong shape —
+   * the door has one sentence for "not a day", not a second one for "a day
+   * that does not exist". RED: `{ refused: false }` on all three.
+   */
+  it('planted defect: a day no calendar has is refused like a wrong shape, on the custom and the built-in arms', async () => {
+    expect(await checkTicketFieldSet(fieldSet('filed-on', '2026-02-30'), ctx())).toEqual({
+      refused: true,
+      rule: 'field.type-mismatch',
+      reason: '"Filed on" needs a date in YYYY-MM-DD form.',
+    });
+    expect(await checkTicketFieldSet(fieldSet('dueDate', { date: '2026-13-45' }), ctx())).toEqual({
+      refused: true,
+      rule: 'field.type-mismatch',
+      reason: '"Due date" needs a day in YYYY-MM-DD form (a note is optional).',
+    });
+    expect(await checkTicketFieldSet(fieldSet('startDate', { date: '0000-00-00' }), ctx())).toEqual({
+      refused: true,
+      rule: 'field.type-mismatch',
+      reason: '"Start date" needs a day in YYYY-MM-DD form (a note is optional).',
+    });
+    // The leap day is a real day: the refinement is the calendar, not February.
+    expect(await checkTicketFieldSet(fieldSet('filed-on', '2028-02-29'), ctx())).toEqual({ refused: false });
+  });
+
   it('planted defect: clearing the title', async () => {
     expect(await checkTicketFieldSet(fieldSet('title', null), ctx())).toEqual({
       refused: true,

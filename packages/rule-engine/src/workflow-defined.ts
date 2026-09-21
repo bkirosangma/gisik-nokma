@@ -159,6 +159,18 @@ export async function evaluateWorkflowDefined(
   // the state was dropped and mis-mapped or kept and demoted, and every
   // consumer that already knows how to handle a `workflow-state-mapping`
   // refusal needs no new branch to handle this one too.
+  //
+  // The MIRROR — a kept state PROMOTED to terminal, or (in the loop above) a
+  // dropped open state mapped onto a terminal one — is deliberately NOT
+  // refused here, even when a parent with open children sits in that state
+  // (E6-8, 2026-09-21). Refusing it would make publish legality depend on
+  // occupancy, which the stranding block above rules out for good. The
+  // parent-terminal invariant is held at the doors that act on ONE ticket
+  // instead: `transition.ts` (a parent may not enter terminal over open
+  // children, a child may not leave terminal under a terminal parent) and
+  // `checks/close.ts` (a parent may not be CLOSED over open children), so a
+  // republish can put a parent in a terminal category over open work but
+  // nothing can close it there.
   for (const newState of payload.states) {
     const oldState = latest.states.find((state) => state.id === newState.id);
     if (oldState !== undefined && oldState.category === 'terminal' && newState.category !== 'terminal') {

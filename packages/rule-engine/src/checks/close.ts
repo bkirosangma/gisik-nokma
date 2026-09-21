@@ -12,6 +12,27 @@ import { ACCEPT, refuse } from './refusals.js';
  * is explicit: a closed ticket's transitions are refused in `transition.ts`
  * until `ticket.reopened` clears the flag.
  *
+ * And closing is only legal over finished children (E6-8, 2026-09-21): a
+ * parent may not be closed while any of its children is non-terminal — the
+ * parent-terminal invariant, held here at the LAST door. `transition.ts`
+ * refuses a parent ENTERING terminal over open children (case 4.23), but a
+ * workflow republish reaches the same relation without a transition — a kept
+ * state promoted to `terminal`, or a dropped open state mapped onto a
+ * terminal one — and `workflow-defined.ts` accepts both deliberately, because
+ * publish legality never depends on where tickets sit (owner, 2026-08-26:
+ * occupancy is a builder courtesy, never an engine input). So the parent can
+ * legitimately sit in a terminal category over open work, and this check is
+ * what keeps that from becoming a CLOSED parent over open work — by a person
+ * through the sheet, or unattended by the auto-close sweep
+ * (`apps/server/src/auto-close/sweep.ts`, whose SELECT mirrors this
+ * predicate so it never builds a close this door refuses). The same rule id
+ * as the transition-side refusal, `parent-terminal-with-open-children`: one
+ * invariant, one id, and every consumer that handles it needs no new branch.
+ * The open-child predicate is the transition guard's, line for line
+ * (`stateCategory !== 'terminal'` over `getChildrenStates`), and the two must
+ * move together — E6-4 (soft-deleted children) is the change that will move
+ * them.
+ *
  * Same shape as every other check's entity-kind guard (`transition.ts:41-47`,
  * `workflow-rebind.ts:44-50`, `fields.ts:90-96`): a misfiled kind is a
  * malformed claim and is REFUSED, naming the kind it actually points at — it
@@ -42,6 +63,16 @@ export async function checkTicketClosed(env: EventEnvelope, ctx: EngineContext):
       : (statesWithBacklog(def).find((state) => state.id === ticket.stateId)?.name ?? ticket.stateId);
     return refuse(REFUSAL_RULES.closeRequiresTerminal,
       `A ticket can only be closed from a terminal state; "${stateName}" is not one.`);
+  }
+  // After the terminal check, deliberately: "not terminal" is the more
+  // fundamental refusal, and a parent in an open state with open children
+  // should hear that first (the remedy is different, and the children may
+  // finish before it does).
+  const children = await ctx.getChildrenStates(ticket.id);
+  const openCount = children.filter((child) => child.stateCategory !== 'terminal').length;
+  if (openCount > 0) {
+    return refuse(REFUSAL_RULES.parentTerminal,
+      `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`);
   }
   return ACCEPT;
 }

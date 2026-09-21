@@ -96,6 +96,43 @@ describe('msUntilNextUtc', () => {
     }
     expect(msUntilNextUtc('21:00', new Date('2026-08-20T20:00:00.000Z'))).toBe(60 * 60 * 1000);
   });
+
+  /**
+   * 13.1200 — E6-23, planted defect: an HH:MM that LOOKS well-formed but names
+   * no time of day is refused and NAMED, with the same sentence the shape check
+   * uses — never silently rolled over. Before the fix the regex admitted these
+   * and `setUTCHours` rolled them: measured against the built module from a
+   * fixed `2026-09-21T07:30Z`, `25:00` scheduled the next run at
+   * `2026-09-22T01:00Z`, `23:60` at `2026-09-22T00:00Z`, `24:00` at
+   * `2026-09-22T00:00Z` and `99:99` at `2026-09-25T04:39Z` — four days out —
+   * while `9:00` (the wrong SHAPE) threw. A daemon that started cleanly on a
+   * mistyped `BACKUP_TIME_UTC` looked correctly configured and dumped at the
+   * wrong hour, which the restore drill cannot notice: the dump exists.
+   */
+  it('planted defect: an out-of-range hour or minute is refused and named, not rolled over', () => {
+    const from = new Date('2026-09-21T07:30:00.000Z');
+    for (const bad of ['25:00', '23:60', '24:00', '99:99']) {
+      expect(() => msUntilNextUtc(bad, from), bad).toThrowError(
+        new RegExp(`backup time must be HH:MM \\(UTC\\), got '${bad}'`),
+      );
+    }
+  });
+
+  /**
+   * 13.1201 — the control for 13.1200: the two BOUNDARY values inside the
+   * range still schedule, and land on the minute they name. Without this the
+   * case above passes equally well against a bound written as `> 23` for the
+   * minutes or `>= 23` for the hours.
+   */
+  it('the boundary values inside the range still pass: 00:00 and 23:59', () => {
+    const from = new Date('2026-09-21T07:30:00.000Z');
+    const midnight = new Date(from.getTime() + msUntilNextUtc('00:00', from));
+    expect([midnight.getUTCHours(), midnight.getUTCMinutes()]).toEqual([0, 0]);
+    expect(midnight.toISOString()).toBe('2026-09-22T00:00:00.000Z');
+    const lastMinute = new Date(from.getTime() + msUntilNextUtc('23:59', from));
+    expect([lastMinute.getUTCHours(), lastMinute.getUTCMinutes()]).toEqual([23, 59]);
+    expect(lastMinute.toISOString()).toBe('2026-09-21T23:59:00.000Z');
+  });
 });
 
 /**

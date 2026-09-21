@@ -35,9 +35,11 @@ import {
   type ListFilterSpec,
   type ListRow,
   type TicketDatesInput,
+  writeFailureCopy,
+  writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
-import { Avatar, SegmentedControl, Switch, Toast, type SegmentedOption } from '@gisik-nokma/ui';
+import { Avatar, Chip, SegmentedControl, Switch, Toast, type SegmentedOption } from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -70,6 +72,7 @@ import {
   type ProjectTab,
 } from '../../../../../src/use-last-project.js';
 import { useWorkspaceName } from '../../../../../src/use-workspace-name.js';
+import { useWorkspaceProjects } from '../../../../../src/use-workspace-projects.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -237,6 +240,25 @@ function ProjectBoard() {
    * pending or refused; see each hook's own docblock.
    */
   const workspaceName = useWorkspaceName(workspaceId);
+  /**
+   * E2-38 (round-2 ruling, MINOR) — the project's OWN state, on the project's own
+   * page.
+   *
+   * This page had **zero occurrences of `archived`** (case-insensitive, the whole
+   * file, measured) while the screen a person must pass through to reach it
+   * carries it prominently — the workspace home matches 58 times, with the
+   * archive/restore controls and the *"N archived · show"* toggle. So an archived
+   * project's own board was indistinguishable from a live one's, which matters
+   * because the two differ in what the product will let you do.
+   *
+   * **The read is the one the nav and the home already make** —
+   * `useWorkspaceProjects`, module-cached, no new request — rather than a second
+   * way of asking. `null` (pending or refused) and "not in the list" are both
+   * SILENT here: an absence of the chip claims nothing, where a chip painted on a
+   * failed read would assert the project is live.
+   */
+  const workspaceProjects = useWorkspaceProjects(workspaceId);
+  const projectArchived = workspaceProjects?.find((p) => p.id === projectId)?.archived === true;
   const projectName = useProjectName(workspaceId, projectId);
   // Task 10 (backlog/closed spec §5.4, 2026-09-17) adds `'backlog'` to this
   // union. The default stays `'board'` — Backlog is the FIRST tab in the
@@ -466,6 +488,47 @@ function ProjectBoard() {
     message: string;
     undoFor: string | null;
   } | null>(null);
+  /**
+   * RULING E2-30 (2026-09-21) — THE DURABLE HALF OF THE WAY BACK FROM A DELETE.
+   *
+   * ## What was wrong
+   *
+   * Every view excludes a soft-deleted ticket (`LIVE_TICKET_WHERE`, the single
+   * `deleted_at IS NULL` predicate in `apps/server/src/read/visible-where.ts`),
+   * and the inverse event has exactly ONE producer in the client: the Undo
+   * button inside `deleteNotice`'s toast. That toast caps itself at
+   * `TOAST_DEFAULT_DURATION_MS` (15 s, an OWNER RULING — so this does not touch
+   * it), which left a person who deleted by mistake at twenty seconds with **no
+   * recourse inside the product at all**, while the server was perfectly able to
+   * put the ticket back. `check-permission.ts` gates `ticket.deleted` on
+   * project-admin rights: the gate protected the DOING and not the UNDOING,
+   * which is backwards.
+   *
+   * ## What this is, and what it deliberately is not
+   *
+   * One slot — the last ticket deleted from this page — rendered as an inline
+   * strip that does not expire, beside the toast rather than instead of it. The
+   * toast stays exactly as it was, because a transient message at the foot of
+   * the screen IS the right shape for a quick reversal; this is the route for
+   * the person who looked away.
+   *
+   * **One slot, not a list, and that is the prototype's own shape**: the notice
+   * state above is one-slot for the same reason ("a second delete inside the
+   * first toast's window is a NEW toast"). A LIST would be a deletion history,
+   * which is the surface E2-30 measures as absent everywhere; claiming this is
+   * one would repeat the defect the sentence at `onDeleted` is being fixed for.
+   * A second delete therefore REPLACES this, and the replace is stated on the
+   * strip's own sentence so a person is never told a ticket is reachable when it
+   * has been superseded.
+   *
+   * **Client-only, which is the finding's own claim** — "neither needs anything
+   * the server does not already do": `restoreDeletedTicket` already submits the
+   * gated `ticket.restored` event and already reloads both reads. The other arm
+   * the finding offers, a "Deleted" section on the List, would need the server
+   * to serve rows every read path currently excludes by that one predicate, and
+   * that is a visibility door rather than a client affordance.
+   */
+  const [durableUndo, setDurableUndo] = useState<{ ticketId: string; title: string } | null>(null);
   const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
     setRankOverrides((current) => {
       const next = new Map(current);
@@ -512,6 +575,19 @@ function ProjectBoard() {
    * landed, but a keyboard exit always leaves focus somewhere real.
    */
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /**
+   * V1 (round-2 ruling, 2026-09-21) — the New-ticket flow's dialog, lifted so the
+   * BOARD'S empty state can open it.
+   *
+   * `Board`'s empty banner renders *"No tickets here yet — create one."* and a
+   * "Create a ticket" button that only appears when `onCreateTicket` is passed —
+   * and nothing in this app passed it, so the sentence instructed an action the
+   * page made impossible from where it was read. The control existed all along,
+   * three centimetres to the left in this header; what was missing was a way to
+   * open it from the banner, which is what `CreateTicketFlow`'s new
+   * `open`/`onOpenChange` props provide.
+   */
+  const [createOpen, setCreateOpen] = useState(false);
   const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeFilters = useCallback((returnFocus: boolean) => {
     setFiltersOpen(false);
@@ -886,15 +962,28 @@ function ProjectBoard() {
           return;
         }
         if (result.status === 'committed') {
+          // Ruling E2-30 — the durable strip goes ONLY on a committed restore.
+          // A failed one keeps it, because the route back is still there and
+          // the person may want to try again; clearing it here would take the
+          // affordance away at the exact moment it proved useful.
+          setDurableUndo(null);
           list.reload();
           board.reload();
           return;
         }
         const reason = result.status === 'refused' ? result.reason : result.message;
         setDeleteNotice({ message: `The ticket could not be restored — ${reason}`, undoFor: null });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setDeleteNotice({ message: `We could not reach the server to restore it — ${message}`, undoFor: null });
+      } catch (cause) {
+        // E5-25: a 401 here is a session that ended, not an unreachable server.
+        // `writeFailureCopy` is the ONE place that is decided, for all nine
+        // write sites; the redirect is the shell's data-source guard.
+        setDeleteNotice({
+          message: writeFailureCopy(
+            cause,
+            (message) => `We could not reach the server to restore it — ${message}`,
+          ),
+          undoFor: null,
+        });
       }
     },
     [board.reload, currentUserId, dataSource, list.reload, workspaceId],
@@ -1286,17 +1375,48 @@ function ProjectBoard() {
    * thing allowed to make this decision; an ISO slice would ring yesterday's
    * cell for five and a half hours every night.
    */
-  const today = istToday();
-  /*
-   * RECORDED, NOT FIXED: `today` is computed once per RENDER and never
-   * re-derived on its own, so a tab left open across IST midnight keeps
-   * yesterday's ring until something else re-renders this page. The day
-   * COMPUTATION is right — 11.164 pins it at the instant the UTC and IST
-   * spellings disagree — and this is only about when it is recomputed.
-   * Deliberately not fixed here: the fix is a timer, and a timer is a
-   * re-render mechanism that needs its own case, its own cleanup and its own
-   * argument about cadence. OWNER: whoever next opens this page's date wiring.
+  const [today, setToday] = useState(() => istToday());
+  /**
+   * RULING E5-43 (2026-09-21) — `today` is now RE-DERIVED, and this replaces the
+   * "RECORDED, NOT FIXED" note that stood here. That note was accurate about the
+   * defect it named: the day was computed once per RENDER and never on its own,
+   * so a tab left open across IST midnight kept yesterday's ring until something
+   * else re-rendered this page. The day COMPUTATION was always right — 11.164
+   * pins it at the instant the UTC and IST spellings disagree — and the note
+   * deferred only WHEN it is recomputed, to "whoever next opens this page's date
+   * wiring". This is that change.
+   *
+   * ## Why an EVENT and not a tick
+   *
+   * The finding allows either. This takes the event because it needs no cadence
+   * argument: a tick must answer "how often is often enough", and every answer
+   * is wrong in one direction — a minute is 1440 wake-ups a day to move one
+   * value, an hour leaves a ring stale for up to an hour after midnight. A
+   * visibility or focus event instead fires exactly when the page is ABOUT to be
+   * looked at again, which is the only moment the ring's staleness can be seen,
+   * and a background tab's ring is not being looked at. It is also what the
+   * finding names first.
+   *
+   * ## Why state rather than a `let`
+   *
+   * A re-derivation only reaches the two views through a render, so the day has
+   * to be state. Setting the SAME day is free — React bails out on an identical
+   * value — so a person switching tabs ten times across a quiet afternoon costs
+   * ten comparisons and no render.
+   *
+   * Both listeners are removed on cleanup; neither is registered on the server,
+   * because this file is a client component (`'use client'` at the top) and the
+   * effect never runs there.
    */
+  useEffect(() => {
+    const refresh = (): void => setToday(istToday());
+    document.addEventListener('visibilitychange', refresh);
+    window.addEventListener('focus', refresh);
+    return () => {
+      document.removeEventListener('visibilitychange', refresh);
+      window.removeEventListener('focus', refresh);
+    };
+  }, []);
 
   /**
    * The roster resolved into the two things the views need from it, and BOTH are
@@ -1832,6 +1952,8 @@ function ProjectBoard() {
     return (
       <>
         <CreateTicketFlow
+          open={createOpen}
+          onOpenChange={setCreateOpen}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}
@@ -1851,6 +1973,19 @@ function ProjectBoard() {
       </>
     );
   })();
+
+  /**
+   * V1 — whether the `Board`'s empty state may offer its create button.
+   *
+   * Derived from the SAME two facts `createRegion` branches on to decide whether
+   * the flow is offered at all (a signed-in person, and types that did not
+   * refuse), read once here rather than re-tested at the board. The transient
+   * arms above — the session still loading, the list still loading — are
+   * deliberately NOT mirrored: they end on their own, the flow's own dialog
+   * opens as soon as it mounts, and a button that disappears for a second and
+   * returns is worse than one that opens a dialog a moment later.
+   */
+  const canCreate = session.kind === 'signed-in' && ticketTypes.error === null;
 
   return (
     <main id="gn-main" className="gn-shell">
@@ -1903,6 +2038,16 @@ function ProjectBoard() {
               <p className="gn-project__breadcrumb">{workspaceName}</p>
             ) : null}
             {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+            {/* The SAME component and the SAME word the workspace home's card
+                uses for this state, so the two screens cannot describe one fact
+                two ways. A sentence is deliberately NOT added: everything else
+                worth saying about an archived project (who may restore it, where)
+                is admin-only and would be a second false claim for a member. */}
+            {projectArchived ? (
+              <p className="gn-project__archived">
+                <Chip tone="neutral">Archived</Chip>
+              </p>
+            ) : null}
 
             {/*
               `.gn-project__header` — Task 2 of the prototype port. Controls
@@ -2145,6 +2290,58 @@ function ProjectBoard() {
               value={view}
               onChange={setView}
             />
+
+            {/*
+              RULING E2-30 — THE DURABLE WAY BACK FROM A DELETE, rendered as a
+              direct child of `.gn-project` so it is on EVERY tab rather than
+              inside the one that happened to be open: deleting a ticket removes
+              it from the Board, the List, the Calendar and the Timeline at
+              once, so the route back belongs to the page and not to a tab.
+
+              `role="status"`, not `alert`: this is a state the page is in, and
+              it was entered by the reader's own action — the same choice the
+              toast makes, and the reason a screen reader announces it once
+              rather than interrupting.
+
+              `data-testid` on both the strip and its Undo, because the toast
+              renders an Undo too and a test that matched by role and name alone
+              would find two of them.
+            */}
+            {durableUndo !== null ? (
+              <div className="gn-project__deleted" role="status" data-testid="deleted-undo">
+                <span className="gn-project__deleted-text">
+                  {`${durableUndo.title} is deleted. Undo here until you delete another ticket or reload the page.`}
+                </span>
+                <button
+                  type="button"
+                  className="gn-project__deleted-undo"
+                  data-testid="deleted-undo-button"
+                  /*
+                    NAMED FOR THE TICKET, and not merely "Undo". The toast is on
+                    screen at the same moment and ITS control is called "Undo"
+                    too, so two identically-named buttons would be on one page —
+                    ambiguous to a screen-reader user and unaddressable by role
+                    and name. The visible word stays "Undo" and the accessible
+                    name CONTAINS it, so WCAG 2.5.3 (Label in Name) holds; the
+                    same containment question the bulk-close button's
+                    `Close all (2)` does NOT hold, which is recorded on that
+                    control rather than silently repeated here.
+                  */
+                  aria-label={`Undo the deletion of ${durableUndo.title}`}
+                  onClick={() => void restoreDeletedTicket(durableUndo.ticketId)}
+                >
+                  Undo
+                </button>
+                <button
+                  type="button"
+                  className="gn-project__deleted-dismiss"
+                  aria-label="Dismiss the deleted-ticket message"
+                  onClick={() => setDurableUndo(null)}
+                >
+                  ×
+                </button>
+              </div>
+            ) : null}
 
             {/*
               THE DISCLOSURE STRIP (Step 3/4, the shared mechanism Task 8's
@@ -2529,6 +2726,18 @@ function ProjectBoard() {
                 <Board
                   board={boardNarrowing.view}
                   onOpenTicket={openTicket}
+                  /*
+                    V1 (round-2 ruling, 2026-09-21) — the empty state's create
+                    affordance, wired to the SAME `CreateTicketFlow` the header
+                    renders. Gated on the same conditions that control whether
+                    that flow is OFFERED at all: the flow is not rendered when
+                    the types read refused or the session is not signed in, so
+                    the banner must not offer a button in those states either —
+                    and `emitting`/`session` are read here rather than
+                    re-derived, so the two doors cannot disagree about when
+                    creation is available.
+                  */
+                  {...(canCreate ? { onCreateTicket: () => setCreateOpen(true) } : {})}
                   isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
                   /*
                     WHICH OF THE TWO EMPTY SENTENCES (owner ruling, 2026-09-20). True
@@ -2539,6 +2748,15 @@ function ProjectBoard() {
                     passes `false` and keeps "No tickets here yet — create one."
                   */
                   epicsHidden={boardNarrowing.epicsDropped > 0}
+                  /*
+                    RULING E5-2 — the board's one relation to the present. The
+                    SAME `today` the Calendar and Timeline tabs are handed two
+                    blocks up: one `istToday()` per render, so the three views
+                    cannot disagree about which day it is. `Board` draws the
+                    late tone from it and draws nothing extra without it (its
+                    own `BoardProps.today` docblock).
+                  */
+                  today={today}
                   /*
                     THE MOVE ARROWS' CAPABILITY (board-prototype-port Task
                     13). Gated on `session.kind === 'signed-in'`, the SAME
@@ -2730,7 +2948,7 @@ function ProjectBoard() {
                       className={
                         rankNotice.channel === 'server'
                           ? 'gn-refusal gn-refusal--server'
-                          : 'gn-refusal gn-refusal--transport'
+                          : writeFailureRefusalClass(rankNotice.text)
                       }
                     >
                       {rankNotice.text}
@@ -2971,17 +3189,40 @@ function ProjectBoard() {
             THE SOFT DELETE'S NARRATION. The sheet emits `ticket.deleted`, closes
             itself, and calls this on `committed` only — so a refused or
             unanswered delete leaves the sheet up with its own notice and this is
-            never called. What it hands back is the ticket's TITLE, not an id:
-            the prototype's toast says `"GN-1183 deleted · …"`, and this product
-            has no ticket key (a ULID is not something a person reads back). See
-            `TicketSheetProps.onDeleted` for the full reasoning; reversing it is
-            the one interpolation below.
+            never called. What it hands back is the ticket's human name — its
+            `key` when the workspace has a prefix, its title when it does not —
+            which is the same expression the sheet's own breadcrumb uses, and
+            never an id. ⚠ **This comment read "the ticket's TITLE ... this
+            product has no ticket key (a ULID is not something a person reads
+            back)", and the KEY had shipped thirteen minutes before it:**
+            `ac18f2bc` landed ticket keys on 2026-09-20 at 13:04:40 IST, and
+            this comment's own commit `18d7e391` is at 13:17:51. The
+            prototype's own toast — `"GN-1183 deleted · …"` — is what the
+            sentence now reproduces wherever a key exists. The reading was what
+            was wrong, not the interpolation. See
+            `TicketSheetProps.onDeleted`.
           */
-          onDeleted={(ticketId, title) => {
+          onDeleted={(ticketId, name) => {
             setDeleteNotice({
-              message: `${title} deleted · its history is retained`,
+              /*
+                ⚠ THE SENTENCE NAMES THE DURABLE ROUTE (ruling E2-30, 2026-09-21).
+                It read `${title} deleted · its history is retained` — TRUE of
+                the ledger, and MISLEADING about what the person can do, because
+                the retained history had no screen: no deleted view, no filter
+                axis, no search arm. A sentence that promises a record nobody
+                can reach is worse than one that says nothing, and the fix the
+                finding asks for is exactly this: name where the way back is.
+                The route named is real from the same moment — the strip below
+                is rendered with this toast, not after it.
+              */
+              message: `${name} deleted · you can also undo this on the page`,
               undoFor: ticketId,
             });
+            // One slot: a second delete replaces the first ticket's strip, the
+            // same one-slot rule the toast above keeps. Said plainly on the
+            // strip's own sentence, so nobody is told a ticket is still
+            // reachable when it has been superseded.
+            setDurableUndo({ ticketId, title: name });
             /*
               ⚠ BOTH READS ARE RE-ASKED HERE, and the deletion's correction must
               not depend on the stream. **Found by independent review
@@ -3346,9 +3587,22 @@ function FiltersSheet({
    */
   const clearAll = () => setFilter(clearFilterAxes);
 
-  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds') => (
+  /**
+   * E5-5: `note` is the third argument, and it exists for exactly one caller.
+   *
+   * The Filters sheet renders a `Collaborators` fieldset whose tri-state rows
+   * work — the filter keeps what you set — but **no view narrows by it**, and
+   * the only place the product said so was a strip printed AFTER the press
+   * (`docs/manual.md:826-828`: *"Collaborators is the one thing no tab applies
+   * — the strip's own sentence is 'Not applied on the board: collaborator.'"*).
+   * A control that looks like the six around it and quietly does nothing is the
+   * dead-affordance shape this shell refuses elsewhere; the remedy is to say so
+   * BEFORE the press, in the section that carries it.
+   */
+  const personSection = (title: string, key: 'assigneeIds' | 'collaboratorIds', note?: string) => (
     <fieldset className="gn-filters__section">
       <legend className="gn-filters__section-label">{title}</legend>
+      {note !== undefined ? <p className="gn-filters__note">{note}</p> : null}
       {membersError !== null ? (
         <p className="gn-filters__pending">
           This workspace’s roster could not be loaded, so filtering by {title.toLowerCase()} is not
@@ -3413,7 +3667,14 @@ function FiltersSheet({
         </div>
         <div className="gn-filters__body">
           {personSection('Assignee', 'assigneeIds')}
-          {personSection('Collaborators', 'collaboratorIds')}
+          {/* The words are the manual's own; the strip's after-the-fact
+              sentence is not removed, because it still fires on the board for
+              anyone who sets this and forgets. */}
+          {personSection(
+            'Collaborators',
+            'collaboratorIds',
+            'No view narrows by this yet — you can set it and the filter keeps it, but nothing is filtered by it.',
+          )}
 
           <fieldset className="gn-filters__section">
             <legend className="gn-filters__section-label">Type</legend>

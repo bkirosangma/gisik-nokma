@@ -2,6 +2,7 @@ import { render, screen } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
+import { clearWorkspaceProjectsCache } from '../src/use-workspace-projects.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -58,6 +59,11 @@ import ProjectPage from '../app/w/[workspaceId]/p/[projectId]/page.js';
  */
 beforeEach(() => {
   clearWorkspaceNameCache();
+  // E2-38: the page now reads the project LIST too (it is where the project's
+  // own `archived` flag lives), and that hook keeps the same kind of
+  // module-scoped cache `useWorkspaceName` does — one shared per test file, so
+  // it is cleared between cases for the identical reason.
+  clearWorkspaceProjectsCache();
 });
 
 describe('the project page names itself from the same read AppNav already makes', () => {
@@ -129,5 +135,81 @@ describe('the project page names itself from the same read AppNav already makes'
     // for the name nobody could confirm.
     expect(screen.queryByText(WORKSPACE)).not.toBeInTheDocument();
     expect(screen.queryByText(PROJECT)).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * E2-38 (round-2 ruling, MINOR, 2026-09-21) — an archived project's OWN board
+ * says it is archived.
+ *
+ * This page contained **zero occurrences of `archived`** — case-insensitive,
+ * whole file, measured at the ruling — while the screen a person must pass
+ * through to reach it carries the fact prominently (the workspace home matches
+ * it 58 times, with the archive/restore controls and the "N archived · show"
+ * toggle). An archived project's board was therefore indistinguishable from a
+ * live one's, and the two differ in what the product will let you do.
+ *
+ * The flag comes from the SAME `getMyWorkspaces` read this page already makes
+ * for its own names — no new request — which is why the assertion is on the
+ * chip rather than on any new read being stubbed.
+ */
+describe('E2-38 the project page names the project’s own state', () => {
+  const world = (archived: boolean) =>
+    stubServices({
+      getMyWorkspaces: async () => [
+        {
+          id: WORKSPACE,
+          name: 'Garo Hills Logistics',
+          prefix: 'GH',
+          role: 'owner',
+          memberCount: 3,
+          nameRestrictedProjectCount: 0,
+          projects: [
+            {
+              id: PROJECT,
+              name: 'Errand tracking',
+              prefix: 'ET',
+              archived,
+              ticketCount: 4,
+              blockedCount: 0,
+            },
+          ],
+        },
+      ],
+    });
+
+  it('13.1164 says "Archived" on the archived project’s own page', async () => {
+    render(
+      <Providers services={world(true)}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    // Scoped to the PAGE'S OWN line, not `screen.findByText('Archived')`: since
+    // E5-34 the nav's own project item also badges an archived route (its job,
+    // one surface up), so an unscoped query matches two chips and throws on
+    // ambiguity rather than failing cleanly.
+    const chip = await screen.findByText('Archived', {
+      selector: '.gn-project__archived .gn-chip',
+    });
+    expect(chip).toBeInTheDocument();
+    // Inside the page's own state line rather than inside the heading: the
+    // heading is the project's NAME, and a state read as part of it would make
+    // a screen reader announce "Errand tracking Archived" as one string.
+    expect(chip.closest('.gn-project__archived')).not.toBeNull();
+    expect(screen.getByRole('heading', { level: 1 })).toHaveTextContent('Errand tracking');
+  });
+
+  it('13.1164 CONTROL — a live project’s page carries no such chip', async () => {
+    render(
+      <Providers services={world(false)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    // Settled on the title first, so this is an absence read off a mounted page
+    // rather than a snapshot taken before the read answered.
+    await screen.findByRole('heading', { name: 'Errand tracking', level: 1 });
+    expect(screen.queryByText('Archived')).toBeNull();
+    expect(document.querySelector('.gn-project__archived')).toBeNull();
   });
 });
