@@ -796,7 +796,16 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   async function listTicketSummaries(workspaceId: string): Promise<TicketSummary[]> {
     const out: TicketSummary[] = [];
     for (const ticket of await replica.listTickets(workspaceId)) {
-      if (ticket.confirmed !== null) out.push(await summarise(ticket.confirmed, ticket.contests));
+      if (ticket.confirmed === null) continue;
+      // The soft delete, the same READ predicate `getTickets` applies and for
+      // the same reason it is applied here rather than inside
+      // `replica.listTickets`: that enumeration also feeds `confirmedById` and
+      // the parent walk, where a deleted parent must still resolve. This is the
+      // list the phone's board screen and the desktop shell render, and
+      // `myWork` is a filter over it — so this one conjunct is what makes
+      // "the ticket stops appearing in views" true on both shells (E6-24).
+      if ((ticket.confirmed.deleted ?? null) !== null) continue;
+      out.push(await summarise(ticket.confirmed, ticket.contests));
     }
     // Offline-born tickets exist ONLY as queued claims. They are summarised
     // from the overlay and are ALWAYS badged — `pendingCreatedTickets` is the
@@ -1353,9 +1362,25 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * ticket in `overlay.confirmed`, and `searchLocal` reads the `tickets` table
      * — i.e. the confirmed ones — so a ticket in the second list is by
      * construction absent from the first.
+     *
+     * THE SOFT DELETE IS APPLIED HERE, on the same seam and for the same reason
+     * as the union above: `searchLocal` is a settled-only scan over the store,
+     * and the store keeps a deleted ticket (its parent walk and its undo need
+     * it), so the view predicate belongs to the door that serves the view —
+     * exactly where `getTickets` and `listTicketSummaries` carry theirs. One
+     * predicate over the hits covers BOTH of `searchLocal`'s arms, the title
+     * scan and the comment-owner lookup, which is what makes a comment on a
+     * deleted ticket unable to resurface that ticket's title (E6-24). The
+     * offline-born half needs no such check: a queued claim has no confirmed
+     * state and therefore no `deleted` flag to carry.
      */
     async searchOfflineCopy(workspaceId, text) {
-      const hits = await replica.searchLocal(workspaceId, text);
+      const hits: Array<{ ticketId: string; title: string }> = [];
+      for (const hit of await replica.searchLocal(workspaceId, text)) {
+        const owning = await replica.getTicket(hit.ticketId);
+        if ((owning?.confirmed?.deleted ?? null) !== null) continue;
+        hits.push(hit);
+      }
       const needle = text.toLowerCase();
       for (const born of await outbox.pendingCreatedTickets(workspaceId)) {
         const title = titleOf(born.pending);

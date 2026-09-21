@@ -31,7 +31,7 @@ never saw.
 | **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.067` and `17.069`–`17.072`** (`17.068` deliberately unused: a control arm folded into `17.067`'s case rather than given its own id) |
 | **release batch B01** (exec6, `rel/b01-server-doors-security-and-refusa`) | **`17.081`–`17.100`** — allocated 2026-09-21 21:0x (cycle 46) |
 | **release batch B02** (exec2, `rel/b02-account-page-workflow-builder-dr`) | **`17.101`–`17.120`** — allocated 2026-09-21 21:0x (cycle 46) |
-| **release batch B07** (exec4, `rel/b07-soft-delete-integrity-engine-rep`) | **`17.121`–`17.140`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B07** (exec4, `rel/b07-soft-delete-integrity-engine-rep`) | **`17.121`–`17.140`** — allocated 2026-09-21 21:0x (cycle 46) — **minted: `17.121`–`17.126`** (the batch's replica case is `12.399` in §12, which owns the replica) |
 
 **⚠ 2026-09-21 (cycle 46): blocks are now per RELEASE BATCH (the branch that lands), not per lane session** — a lane runs several batches in one worktree tonight, and a block that follows the session would be shared by two branches landing in either order. **A batch that empties its block asks the controller for the next twenty; a later batch in the same lane gets its own row.** The rule this file already states applies unchanged: mint only from your own row, never from the tip, never from a neighbour's. (ds5 measured the alternative tonight in §10/§13, where three batches minting from "next free N" collided: `10.90` and `13.1050`–`13.1056` were minted twice.)
 
@@ -374,3 +374,106 @@ arriving from that file's comments-thread section can find them.
 - **17.026** ✅ **E5-3 — THE ONE-HOP SHAPE IS THE SAME TICKET ON BOTH SIDES OF THE WIRE, and it is NAMED ONCE on screen.** §16 door: the ancestry walk and the breadcrumb it feeds (`ticket-crumbs.test.ts` case `16.70`; `ticket-sheet.test.tsx` cases `16.65`/`16.87`). E5-3 is the independent duplicate of E4-1, whose client fix landed as `17.024`; **what this id adds is the two arms that fix depends on and no case witnessed.** (i) **SERVER:** `16.70` walks TWO HOPS (task → story → epic) and never covers the shape the seeded project is made of — **23 of 26 tickets have an epic as their direct parent**, so `cursor = state.parentId` is epic-rank on the first iteration and the walk returns the same row the parent branch reports. The new route case asserts `epic.id === parent.id` for that shape, with a CONTROL one hop deeper proving the two are not always equal. **It pins a contract the client depends on, which is why it lives in the server's suite:** if a future change has the route NULL the epic when it equals the parent — the alternative remedy the finding offered — this case reddens and the client comparison has to be revisited in the same change rather than quietly becoming dead code that still looks load-bearing. (ii) **CLIENT:** the visible pair is `17.024`; the same shape with BOTH refs `restricted` — which a viewer may be sent, since the walk answers `{kind:'restricted', id}` on both branches — is asserted to draw `Restricted parent` ONCE. **An implementation that special-cased `kind` would pass the visible case and draw two restricted crumbs here**, and a restricted crumb carries no title, so the person least able to notice the duplication by eye is the one seeing it. The dossier's own authority gives no guidance for either arm: the prototype never draws this shape, its `parentId` and `epicId` fixtures coming from disjoint sets. (Planted defects: the route's alternative remedy — epic nulled when it equals the parent — `PASS (0) FAIL (1) skipped (4)`, *expected null to deeply equal { kind: 'ticket', …(2) }*, `/tmp/ds3-T-E5-3-red.log`; the client comparison special-casing `kind` — kills ONLY the restricted arm, the visible case surviving as designed, *expected <span data-testid="sheet-crumb-epic"> to be null*, `/tmp/ds3-T-E5-3-red2.log`.) — `apps/server/test/routes/ticket-crumbs.test.ts`, `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **17.027** ✅ **P3 — THE PARENT CRUMB CARRIES THE PARENT'S OWN KEY, AND THE WIRE NOW HAS ONE TO CARRY.** §16 door: the ticket sheet's location breadcrumb and the ancestry the route serves (`ticket-sheet.test.tsx` cases `16.63`/`16.87`; `ticket-crumbs.test.ts` case `16.69`). The prototype labels its PARENT crumb `p.id + " " + p.title` (`Gisik Nokma - Desktop.dc.html:3417`) and its EPIC crumb `e.title` alone (`:3410-3413`). The product matched the epic and not the parent, because **the wire carried no key for an ancestor** — `ParentRef` was `{kind:'ticket'; id; title}` and the route's visible arm sent exactly that. **The cost was not cosmetic: the key is what disambiguates**, so a ticket whose epic and parent shared a title drew two IDENTICAL crumbs and a reader could not tell one ancestor from two. The parent ref now carries `key: string | null`, composed by the SAME three facts the ticket's own key uses — the workspace prefix, the project prefix, the parent's OWN position by `workspace_seq` — with the two prefix reads HOISTED above the parent branch rather than duplicated (`projectPrefixesInWorkspace` answers the whole workspace in one call, so the parent's key costs ONE extra read). **`key` on `ParentRef` is `string | null | undefined` and the three states are three different facts, which is why the field is not simply required:** a STRING is a composed key; `null` is one that could not be composed (the ticket-number ruling's own absence — a key is not worth refusing a read over); ABSENT means this ref carries no key at all, which is the GRANDPARENT, and that is the prototype's asymmetry rather than an omission. `mapParentRef` keeps the absent arm absent rather than collapsing it to `null` — the same discipline the ticket's own `key` mapping records one ref over. **The render is decided by WHICH CRUMB IT IS, not by whether a key is present:** the first version showed a key whenever the ref had one and drew `CCSO-7 Open Questions` for the epic as readily as for the parent, so `crumbLabel` takes the same `noun` parameter the restricted arm already uses. (Planted defects, measured on each side: the client rendering the title alone — the pre-P3 product — reddens `PASS (113 skipped, 1 failed)` on *the crumb bar's ordered texts*; the route omitting the key reddens the server case *expected { kind: 'ticket', …(3) } to match object { kind: 'ticket', …(2) }* at `/tmp/ds3-T-P3-red-server.log`. ⚠ Two EXISTING cases asserted the parent ref's exact shape and were updated rather than excused: `tickets-read.test.ts` now pins `key: null` there — its fixture seeds NO founding claim, so the prefix is null and the composition refuses to assemble a key from a hole — and `real-door-round-trip.test.ts` asserts `expect.any(String)`, deliberately NOT a literal typed from reasoning about a `freezeClocks` pipeline, with the exact string pinned deterministically in the case that seeds the founding claim.) — `apps/server/src/routes/tickets.ts`, `packages/app-core/src/view-types.ts`, `packages/app-core/src/online/mappers.ts`, `packages/app-core/src/views/ticket-sheet.tsx`, `apps/server/test/routes/ticket-crumbs.test.ts`, `packages/app-core/test/views/ticket-sheet.test.tsx`
 - **17.028** ✅ **P4 — "THE SAME PLAIN SPAN" IS NOT THE SAME SPAN.** §16 door: the ticket sheet's location breadcrumb, the `onOpenTicket`-less arm (`ticket-sheet.test.tsx` case `16.64`; the rules are in `packages/ui/src/ui.css`). The arm's own docblock said the crumb *"degrades to the SAME plain span the restricted arm uses"*, and **that sentence was the only thing making the two arms look alike.** They share a SHAPE — a plain `<span>` carrying the base class — and not an INK: `.gn-ticket-sheet__crumb--restricted` carries `var(--gn-restricted)`, while the no-callback arm carries the bare class, has **no rule of its own at all**, and inherits `var(--gn-text-muted)` from `.gn-ticket-sheet__crumbs`. **The inks stay different on purpose, so the remedy is the SENTENCE and not the CSS:** *"you cannot open this here"* and *"you may not see this"* are different facts, and this surface keeps them apart everywhere else — the finding itself offers both remedies and says plainly *"one of the two; not a sentence claiming both"*. The identical sentence in `Features.md` said *"it degrades to the same plain span"* and is corrected in the same change. **A case is still owed for a prose fix**, because a corrected sentence with nothing behind it drifts back, and the cheapest way to make the two arms the same span is to give the bare class the restricted modifier — which is exactly what the case reddens on: it asserts the bare rule's ABSENCE (an absence being the only way to see it) and that the two arms' inks differ. (Planted defect: a `.gn-ticket-sheet__crumb { color: var(--gn-restricted); }` rule added — P4's other remedy, taken literally — kills 1, *expected … not to match /^\.gn-ticket-sheet__crumb\s*\{/m*; `/tmp/ds3-T-P4-red.log`.) — `packages/app-core/src/views/ticket-sheet.tsx`, `Features.md`, `packages/app-core/test/views/ticket-sheet-crumb-css-binding.test.tsx`
+## Release batch B07 — soft-delete integrity at the doors (2026-09-21, block `17.121`–`17.140`)
+*The release plan's B07 (`docs/lanes/release-2026-09-22-plan.md` §6): round-2 findings E6-2, E6-4, E6-11 and
+round-1 F2, F4, F5, all about one rule — a soft-deleted ticket "stops appearing in views" — reaching the
+WRITE doors and the reads the Delete commit missed. E6-24, the replica's three unfiltered reads, is `12.399`
+in §12 because that section owns the replica.*
+- **17.121** ✅ **The ingest door refuses every ordinary write against a soft-deleted ticket, and `ticket.assigned`
+  on one no longer manufactures an inbox notification pointing at a 404** (E6-2). One check ahead of
+  `evaluateEvent`'s dispatch — `checkTicketLive` in `checks/deletion.ts`, where the flag was already read —
+  refuses `deleted-ticket` ("This ticket is deleted; restore it first.") for an event filed against a ticket
+  that RESOLVES and is deleted; the exempt five are enumerated with a reason each (`ticket.deleted`,
+  `ticket.restored`, `ticket.created`, `claim.contested`, `claim.contested_resolved`), and a ticket that does
+  not resolve passes through UNCHANGED, because the server commits `ticket.assigned` for a never-created ticket
+  today and pins it (`DOOR_LEAVES_EXISTENCE_UNCHECKED`) — a second ruling this gate does not make. **Engine
+  half** (`packages/rule-engine/test/live-ticket.test.ts`, 23 cases): the gated thirteen and the exempt five
+  are asserted to be the WHOLE ticket-scoped vocabulary (read from `vocabulary.ts` as text, with the block
+  count as its control), each gated type is refused on the deleted twin and passes the gate on the live twin
+  in the same case, reachability through `evaluateEvent` for a type WITH a dispatch arm and one WITHOUT, a
+  restore re-opening the door, an unknown ticket passing, a stranger kind passing. Witnessed by mutation
+  (`if (false && …)` on the flag read → `Tests 14 failed | 9 passed (23)`, every kill at its own
+  `deleted-ticket` assertion). **Door half** (`apps/server/test/integration/soft-deleted-writes.test.ts`,
+  13 cases, through `POST /v1/events`): the finding's eight-event battery on the deleted twin refused
+  `deleted-ticket` and on the live twin committed — or, for `ticket.closed`/`ticket.ranked`, met the
+  workflow's own refusal, which pins that the gate is AHEAD of those rules rather than instead of them; the
+  deleted head untouched while the live twin's writes landed; the peer's inbox and the `notifications` table
+  holding an assignment for the live twin and none for the deleted one; a second delete still
+  `already-deleted`; and after `ticket.restored` the same `ticket.assigned` commits AND its notification is
+  delivered (the case waits for the fanout's row, which also drains it before the pool closes). RED before
+  the gate: `Tests 10 failed | 3 passed (13)`; GREEN: `Tests 13 passed (13)`. `fanout.ts`'s premise paragraph
+  now says what the door enforces; `notifications/sweep.ts` is named as a producer, not the inbox read. —
+  (`packages/rule-engine/test/live-ticket.test.ts`, `apps/server/test/integration/soft-deleted-writes.test.ts`)
+- **17.122** ✅ **A soft-deleted child is not open work: its parent closes over it, and a LIVE open sibling still
+  blocks with the ordinary sentence** (E6-4, transition half). `transition.ts`'s parent-terminal count now
+  carries `(child.deleted ?? null) === null` beside `stateCategory !== 'terminal'` — the live-only predicate
+  the projection's reader hands its callers and this caller never took, so the refusal named a count every
+  view reported as zero and, with no UI that emits `ticket.restored` past the undo toast, the parent could
+  never be finished from the product. Engine (`packages/rule-engine/test/deleted-hierarchy.test.ts`): P with
+  two open children, one deleted → refused "1 … is still open" (the live one, not the deleted one); both
+  deleted → accepted; none deleted → "2 … are still open" (so the accept is the flag being read, not the
+  invariant gone); deleted-then-restored counts again. Door
+  (`apps/server/test/integration/soft-deleted-hierarchy.test.ts`, `POST /v1/events`): the finding's own
+  sequence — create P/C, P → doing, delete C, `proj_tickets` counts 0 live open children, P → done COMMITS;
+  control P2 with a live open child refused "1 … is still open"; the same P2 closes once that child is done.
+  RED (engine): `Tests 4 failed | 2 passed (6)`, the count reading 2 for 1; RED (door): `Tests 3 failed | 1
+  passed (4)`, P → done refused. GREEN: `6 passed (6)` / `4 passed (4)`. —
+  (`packages/rule-engine/test/deleted-hierarchy.test.ts`, `apps/server/test/integration/soft-deleted-hierarchy.test.ts`)
+- **17.123** ✅ **A soft-deleted ticket is not a parent: `ticket.created` under one and `ticket.reparented`
+  onto one are refused `hierarchy.parent-deleted`, and the live twin takes the same child** (E6-4, hierarchy
+  half). Both parent-resolution sites in `checks/hierarchy.ts` refuse after tenancy (`unknown-parent` still
+  answers a foreign or absent id — there is no flag to read on nothing) and before anything about the
+  parent's shape; ahead of `cross-project` on purpose, because "pick a parent from the same project" would
+  send the actor after a ticket no view shows, and the ordering case pins it with the same foreign parent
+  live (→ `cross-project`) and deleted (→ `parent-deleted`). Reason: "The chosen parent ticket is deleted.
+  Restore it, or pick another parent." — not `unknown-parent`, whose sentence is false of a ticket that
+  exists. A restored parent takes children again. Engine and door halves in the same two files as 17.122;
+  the door half creates under / moves onto a deleted story (refused) and its live twin (committed), then
+  restores one and creates under it. —
+  (`packages/rule-engine/test/deleted-hierarchy.test.ts`, `apps/server/test/integration/soft-deleted-hierarchy.test.ts`)
+- **17.124** ✅ **A contested claim on a soft-deleted ticket keeps its row and loses its title; the live
+  contested sibling keeps both** (round-1 F4). `routes/my-work.ts` gates a contested claim's title on
+  `row.deleted_at === null && (await canSee(…))`; 7.217 constrained the `canSee` half and nothing
+  constrained the `deleted_at` half — the finding measured the full server suite byte-identical with it
+  removed, and 16.90(b) recorded the gap with the owner "whoever next picks up the contested-claim
+  surface". The fixture: two of the owner's own tickets, both contested, both titles read by VALUE before
+  the delete; one soft-deleted (the projection's `deleted_at` read back before the route is asked); after,
+  the deleted one's row is present with `title: null` and the live one is unchanged in the same answer —
+  so `null` is the conjunct answering, not a route that joins no title. GREEN on first run (the conjunct is
+  correct); RED by the finding's own mutation (`row.deleted_at === null &&` removed): `Tests 1 failed | 24
+  passed (25)` at `expected 'Contested, then deleted' to be null`, restored from a copy and verified. Placed
+  last in its file because a deleted ticket is absent from every group the cases above count. —
+  (`apps/server/test/routes/my-work.test.ts`, "F4: the deleted ticket keeps its row and loses its title; the
+  live sibling keeps both")
+- **17.125** ✅ **The replica's two soft-delete gates — `getTickets`' `if ((state.deleted ?? null) !== null)
+  continue;` and `getBoard`'s `(state.deleted ?? null) === null` conjunct — are witnessed by a deleted-ticket
+  fixture, and each mutation the finding ran now reddens exactly its own case** (round-1 F5). The same world
+  as `12.399` (two tasks in `doing`, assigned to the viewer, one then deleted, the fold proven before any
+  read), asked at the two reads the Delete commit did write. GREEN on first run (the gates are correct);
+  RED by mutation, one at a time, each restored from a copy: `if (false) continue;` → `Tests 1 failed | 5
+  passed (6)` at the `getTickets` case; the board conjunct → `true,` → `Tests 1 failed | 5 passed (6)` at the
+  `getBoard` case. The other publications of the survivor (the `soft-delete-background-paths.test.ts`
+  docblock's (c), Features.md's invariant row, 16.90(c)) are updated in the same change set: cited by
+  content, witnessed, owner line discharged; 16.90's marker flips 🟡 → ✅ with this case, its third part. —
+  (`packages/app-core/test/replica/replica-deleted-reads.test.ts`, "F5: getTickets drops a soft-deleted
+  ticket…", "F5: getBoard drops it…")
+- **17.126** ✅ **The list's epic grouping no longer serves a soft-deleted epic's title as a group header:
+  a deleted ancestor ends the walk exactly as an invisible one does, and its children fall to `no-epic`**
+  (E6-11). `epicAncestors`' recursive member now carries `AND ${LIVE_TICKET_WHERE}` after the visibility
+  hop — the seed term needs no copy, its rows are the page's own cards, already live-filtered — so the
+  title never leaves the query. The list was the one door of four still serving the content: the detail
+  door answers `restricted` for a deleted parent, the crumb withholds the title, search withholds it; and
+  it served it in the group HEADER (`titleOfEpic`), not on the card, which carries only `epicId` — the
+  residual note had that wrong too. The paragraph that called this "named, not decided" is retired: the
+  cascade question (what happens to EXISTING children when a parent is deleted) stays open, but the title
+  question was decided in the same commit at the neighbouring door. Through the real door with a LIVE
+  epic and its child in the same project as the control: before the delete both epics head their groups
+  by title; after, the live one is unchanged, the deleted one is no key and no label, the body carries the
+  child but not the title, `no-epic` holds exactly the child, and the child's card keeps `parentId` (the
+  boundary 7.80 pins) with `epicId: null`. RED: `Tests 1 failed | 36 passed (37)` at the body containing
+  the title; GREEN: `37 passed (37)`. ⚠ **NOT decided here, and the same open question the walk's own
+  docblock already files with the owner: whether a deleted (or invisible) ancestor should be a DISTINCT
+  `restricted-epic` bucket rather than `no-epic` — the finding's remedy asks for it; it is a response
+  shape Plan 5's contract pins.** —
+  (`apps/server/test/routes/list.test.ts`, "E6-11: a deleted epic ends the walk like an invisible one —
+  its children fall to `no-epic` and its title is nowhere in the body")

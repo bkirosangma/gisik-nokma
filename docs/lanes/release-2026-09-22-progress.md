@@ -121,3 +121,11 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E5-3 | done | a7f169f3 | 17.026 / E5-3 — one-hop contract (server) + restricted arm (client); server 1728, app-core 1758 |
 | T-P3 | done | 4f7209aa | 17.027 / P3 — parent crumb carries the parent key (wire + render); app-core 1761, server 1729, web 622 |
 | T-P4 | done | e14109b9 | 17.028 / P4 — the sentence corrected (SAME->same SHAPE); RED kills 1, app-core 1763, ui 378 |
+| B07 | claimed | 2026-09-21 20:50 | /Users/kiro/my_projects/gisik-nokma-exec4 |
+| T-E6-24 | done | 24997d03e767466c7f1b0460674e6e72b445dd03 | replica-deleted-reads.test.ts E6-24 x4 (case 12.399) |
+| T-E6-2 | done | f6231926363f3245f98cd5a154fa8b43dcfa2417 | live-ticket.test.ts E6-2 x23 (mutation-witnessed) + soft-deleted-writes.test.ts x13 through POST /v1/events (case 17.121) |
+| T-E6-4 | done | 35c414f1910b69843641df43764a283e54e3243b | deleted-hierarchy.test.ts E6-4 x6 + soft-deleted-hierarchy.test.ts x4 through POST /v1/events (cases 17.122-17.123) |
+| T-F2-fn | done | ccc22a4a93433fdd468621e4cb370f6fb81c5d1a | prose-only: false warrant withdrawn in soft-delete-background-paths.test.ts (c), Features.md, 16.90(c); citations re-pointed by content |
+| T-F4-fn | done | 39167c28d48b5a16e21e8d8d35c323e5e7e926f7 | my-work.test.ts F4 x1 (mutation-witnessed: 1 failed / 24 passed) (case 17.124) |
+| T-F5-fn | done | 066f2491d799929b0659175d8d8dd610d7755d03 | replica-deleted-reads.test.ts F5 x2 (mutation-witnessed, one kill each); 16.90 flipped to ✅ (case 17.125) |
+| T-E6-11 | done | 76f6b6994862b28045dc72a3964210e4ac0f79e7 | list.test.ts E6-11 x1 through GET /v1/projects/:id/tickets?groupBy=epic (case 17.126); the restricted-epic LABEL stays the owner's recorded question |

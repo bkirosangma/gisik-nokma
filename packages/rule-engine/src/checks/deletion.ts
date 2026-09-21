@@ -65,6 +65,80 @@ export async function checkTicketDeleted(env: EventEnvelope, ctx: EngineContext)
   return ACCEPT;
 }
 
+/**
+ * The types the live-ticket gate below lets THROUGH on a deleted ticket, each
+ * for a reason a reader can check rather than a category a reader has to
+ * trust. Everything else filed against `kind: 'ticket'` is gated.
+ *
+ * - `ticket.deleted` — its own check answers `already-deleted`, which is the
+ *   better sentence and the one that protects the first deleter's record.
+ * - `ticket.restored` — the undo; it REQUIRES the flag to be set.
+ * - `ticket.created` — an id that already resolves is `ticket.already-exists`'s
+ *   sentence to say (`checks/hierarchy.ts`), not this gate's.
+ * - `claim.contested` / `claim.contested_resolved` — bookkeeping ABOUT a
+ *   refusal, filed by the server (`contests.ts`). Refusing them here would make
+ *   THIS refusal unrecordable for an offline claimant whose queued edit meets
+ *   it, and a resolution settles a contest, not the ticket.
+ */
+const LIVE_GATE_EXEMPT: ReadonlySet<string> = new Set([
+  'ticket.deleted',
+  'ticket.restored',
+  'ticket.created',
+  'claim.contested',
+  'claim.contested_resolved',
+]);
+
+/**
+ * THE LIVE-TICKET GATE (round-2 finding E6-2).
+ *
+ * INVARIANT, in one sentence: an event filed against a ticket that resolves and
+ * whose `deleted` flag is set is refused `deleted-ticket`, unless it is one of
+ * the five kinds in `LIVE_GATE_EXEMPT` that are about the deletion itself or
+ * its record.
+ *
+ * Until this check, the product's every READ surface said a deleted ticket
+ * "stops appearing in views" while its WRITE doors accepted `ticket.assigned`,
+ * `comment.added`, `ticket.transitioned`, `ticket.field_set`,
+ * `ticket.collaborator_added` and `visibility.set` against one — byte-identical
+ * to the same battery on a live ticket — and the assignment fanout then served
+ * the assignee an inbox notification pointing at a 404. The engine read the
+ * flag in exactly one file, this one, and only for the pair above.
+ *
+ * It runs in `evaluateEvent` BEFORE the per-type dispatch, and that placement
+ * is the whole design: five of the six measured types have no dispatch arm at
+ * all (they fall through to `{ refused: false }`), so no guard inside any one
+ * check could have reached them, and a guard copied into every check is the
+ * shape this series keeps catching one copy short. The precedent is the
+ * attachments UPLOAD door, which already refuses a deleted ticket at the door
+ * (`routes/attachments.ts`, cases 16.97–16.99) — this is that decision reaching
+ * the ingest door for every write at once.
+ *
+ * NARROW, deliberately: a ticket that does NOT resolve passes through
+ * UNCHANGED. `ticket.assigned` and both collaborator events have no existence
+ * check today and the server commits them for a never-created ticket
+ * (`apps/server/src/projections/tickets.ts` records it under
+ * `DOOR_LEAVES_EXISTENCE_UNCHECKED`, and
+ * `test/permissions/check-role-permission.test.ts` pins it). Refusing an
+ * unknown ticket here would be a second ruling under the first's name; this
+ * gate makes one.
+ *
+ * AUTHORIZATION is not here either, for the reason the file header gives: this
+ * gate reads only the ticket's own head state, so the fixture suite and the
+ * offline replica — which enter at `evaluateEvent` — get the same answer the
+ * server does, and an offline device that still holds the ticket gets its
+ * refusal (and its contest) instead of a silently accepted edit.
+ */
+export async function checkTicketLive(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
+  if (env.entity.kind !== 'ticket') return ACCEPT;
+  if (LIVE_GATE_EXEMPT.has(env.type)) return ACCEPT;
+  const ticket = await getTicketState(ctx, env.entity.id);
+  if (ticket === null) return ACCEPT;
+  if ((ticket.deleted ?? null) !== null) {
+    return refuse(REFUSAL_RULES.deletedTicket, 'This ticket is deleted; restore it first.');
+  }
+  return ACCEPT;
+}
+
 export async function checkTicketRestored(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
   if (env.type !== 'ticket.restored') return ACCEPT;
   if (env.entity.kind !== 'ticket') {

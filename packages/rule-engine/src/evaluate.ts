@@ -8,7 +8,7 @@ import { checkTicketTypeDefined } from './checks/ticket-type.js';
 import { checkTicketWorkflowRebound } from './checks/workflow-rebind.js';
 import { checkTicketClosed, checkTicketReopened } from './checks/close.js';
 import { checkTicketRanked } from './checks/rank.js';
-import { checkTicketDeleted, checkTicketRestored } from './checks/deletion.js';
+import { checkTicketDeleted, checkTicketLive, checkTicketRestored } from './checks/deletion.js';
 import { checkMembershipGranted, checkMembershipRevoked } from './checks/membership.js';
 import type { Accept, EngineContext, Refusal } from './engine.js';
 
@@ -22,8 +22,17 @@ import type { Accept, EngineContext, Refusal } from './engine.js';
  * trusting this dispatch, the two-layer precedent `transition.ts:11-28` set:
  * the fixture suite and Plan 10's offline replica enter here and never pass
  * through ingest's door, so the door's answer is not available to them.
+ *
+ * ONE check runs before the dispatch, for every type at once: the live-ticket
+ * gate (`checks/deletion.ts`, E6-2). It is ahead of the switch rather than
+ * inside each arm because the types it exists for — `ticket.assigned`,
+ * `comment.added`, `visibility.set` and their kin — have no arm here at all,
+ * and "every other event type passes through" was the sentence that let a
+ * soft-deleted ticket keep taking writes.
  */
 export async function evaluateEvent(env: EventEnvelope, ctx: EngineContext): Promise<Accept | Refusal> {
+  const live = await checkTicketLive(env, ctx);
+  if (live.refused) return live;
   switch (env.type) {
     case 'workflow.defined':
       return evaluateWorkflowDefined(env, ctx);
