@@ -56,15 +56,16 @@ replacements, which do not interpret dollar-patterns. The diff is now exactly th
 **A final automated audit of both artifacts, re-run after every repair, and clean on every section.**
 Counts measured against the sections rather than remembered: **31 round-2 findings, 18 Important / 13
 Minor, 0 Critical, every one with a severity line, headings in ascending numeric order with no duplicates;
-43 refutation targets and 43 rows with no duplicates.** Both files' citations resolve — **90 distinct paths
+43 refutation targets and 43 rows with no duplicates.** Both files' citations resolve — **95 distinct paths
 in the report and 22 in the refutations file, none missing, every line number inside its file.**
 
 ⚠ **FIVE of my own instruments produced a false reading today, and every one is recorded rather than
 tidied** — a mount search that could not match end-of-line, a count pattern that excluded hyphens, a
 `String.replace` whose replacement expanded a dollar-pattern and **tripled this file**, a bulk-edit whose
-/g flag **overwrote six separate per-batch history lines with one identical sentence**, and finally an audit
-check too coarse to tell a *current-state* total from a *historical* snapshot, which reported FAIL against a
-line that was correct. **The pattern is the point: my verification tooling fails silently and in the
+/g flag **overwrote six separate per-batch history lines with one identical sentence**, and — twice — an
+audit check too coarse to tell a *current-state* total from a *historical* snapshot, which reported FAIL
+against lines that were correct. **That last one is now fixed in the instrument rather than noted**: the
+check excludes batch-history and snapshot lines by name, so it fails only on a total that is genuinely stale. **The pattern is the point: my verification tooling fails silently and in the
 confident direction, which is the same class this report files against the product six times.** Every
 section of the audit names what it measured rather than reporting a verdict, which is why each failure was
 findable at all.
