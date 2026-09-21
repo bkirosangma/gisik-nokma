@@ -2256,6 +2256,20 @@ so one sentence for both would be false of one of them. **Every case below there
   this view cannot disclose — and *"an epic is why this is empty"* would be a half-truth there.
   ⚠ **Minted on the controller's instruction** after this executor measured the site and asked rather than
   assuming §6's "delta ZERO" covered the whole set — `#602` minted nothing for it.
+- **13.1115** ✅ **THE BACKLOG SITE'S THIRD ARM, closed by E5-40 (2026-09-21).** `13.1044`'s two arms
+  answer "is an epic why this is empty?"; this one answers a question neither can, because the
+  **"Only tickets in progress"** switch writes `stateCategories: ['active']` into the **server** read and a
+  backlog ticket's category is `open` — so the toggle strips every backlog row before any screen-level fold
+  sees it, and both `shown` and `total` read 0. **A backlog emptied by the toggle and one that is genuinely
+  empty are the same state inside `backlogNarrowing`**, which is why the choice is made at the render site,
+  where `activeOnly` is known: *"The backlog is hidden while “Only tickets in progress” is on."* — true
+  whether or not anything sat behind the toggle. The page had carried this as `RECORDED, NOT FIXED`.
+  **Both arms are asserted**, and the stub APPLIES the filter rather than ignoring it — a `getTickets` that
+  returned every row would render the backlog correctly and the defect could not appear at all.
+  — (`apps/web/test/backlog-tab.test.tsx`)
+  **And the scope note now names the Backlog**, which it had left out of its list of narrowed surfaces
+  ("the list, calendar and timeline" over three tabs of five), together with `docs/manual.md`, which quotes
+  the note verbatim and gains the Backlog's own paragraph. — (`apps/web/test/page-refusals.test.tsx`)
 - **The shipped help moves too, and it is easy to miss.** `docs/faq.md` and `docs/manual.md` carry the
   calendar's cause-list **as prose**, and the manual additionally quotes the Board's and the Backlog's empty
   sentences. `scripts/help-content.mjs` generates both into `content.generated.ts`, which `check:help` gates.

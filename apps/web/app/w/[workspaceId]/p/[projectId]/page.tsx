@@ -139,18 +139,33 @@ export const BUILTIN_LADDER_NOTICE =
   'Showing the four built-in ticket types while this workspace’s own types load.';
 
 /**
- * THE BACKLOG'S TWO EMPTY SENTENCES (owner ruling, 2026-09-20), hoisted out of the JSX
- * so the page spec can assert the same strings the tab renders rather than re-typing
- * them — the discipline `EMPTY_BOARD_COPY`'s own docblock gives, and the reason
+ * THE BACKLOG'S THREE EMPTY SENTENCES (owner ruling, 2026-09-20; the third added
+ * for E5-40, 2026-09-21), hoisted out of the JSX so the page spec can assert the
+ * same strings the tab renders rather than re-typing them — the discipline
+ * `EMPTY_BOARD_COPY`'s own docblock gives, and the reason
  * `packages/app-core/src/index.ts` re-exports the board's pair.
  *
  * `BACKLOG_EMPTY_COPY` is the original and is UNCHANGED: it is true of a backlog with
  * nothing in it, and nothing about the epic ruling made it false there.
- * `BACKLOG_EMPTY_EPICS_COPY` is the new one and is reached ONLY when every row the
+ * `BACKLOG_EMPTY_EPICS_COPY` is the second and is reached ONLY when every row the
  * tab would have drawn was an epic — see `backlogNarrowing`'s `epicsOnly`.
+ *
+ * `BACKLOG_EMPTY_ACTIVE_ONLY_COPY` is the third, and it exists because the first
+ * was being said in a state it is not true of. "Only tickets in progress" writes
+ * `stateCategories: ['active']` into the SERVER read (`listFilter`, above
+ * `useTicketList`), and a backlog ticket's category is `open` — so the toggle
+ * strips every backlog row before any screen-level fold can see it, `shown` and
+ * `total` both read 0, and nothing inside `backlogNarrowing` can tell a backlog
+ * emptied BY THE TOGGLE from one that is genuinely empty. The toggle's state is
+ * known only at the render site, so the choice is made there — and the sentence
+ * chosen is true of BOTH: it says the backlog is hidden, which the toggle does
+ * whether or not anything was behind it. `TicketList` may draw a backlog that is
+ * empty for a reason, and this is that reason named.
  */
 export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.';
 export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog — epics appear in the List.';
+export const BACKLOG_EMPTY_ACTIVE_ONLY_COPY =
+  'The backlog is hidden while “Only tickets in progress” is on.';
 
 function ProjectBoard() {
   const router = useRouter();
@@ -936,16 +951,21 @@ function ProjectBoard() {
    * anything else keeps the original sentence, and case 13.1044 asserts both
    * arms** — one sentence for both would be false of one of them.
    *
-   * RECORDED, NOT FIXED: "Only tickets in progress" sets `stateCategories:
-   * ['active']` SERVER-SIDE (`listFilter`, above `useTicketList`) — a
-   * backlog ticket's category is `open`, so that toggle strips every backlog
-   * row out of `list.rows` before this memo ever sees them. With the toggle
-   * on, the Backlog tab reads "Nothing in the backlog — new tickets land
-   * here." over a project that may hold plenty; both `shown` and `total`
-   * read 0, so nothing here can tell the two apart from inside this memo,
-   * and nothing on the Backlog tab today says the toggle is why. Owner:
-   * whoever next revisits the toggle's own scope (its docblock already notes
-   * it predates this tab).
+   * ✅ **AND THE TOGGLE'S ARM IS CLOSED TOO (E5-40, 2026-09-21).** This memo
+   * used to carry a `RECORDED, NOT FIXED` for "Only tickets in progress": it
+   * sets `stateCategories: ['active']` SERVER-SIDE (`listFilter`, above
+   * `useTicketList`), and a backlog ticket's category is `open`, so the toggle
+   * strips every backlog row out of `list.rows` before this memo ever sees
+   * them — both `shown` and `total` read 0, so nothing HERE can tell a backlog
+   * emptied by the toggle from one that is genuinely empty. **The fix is not in
+   * this memo, and deliberately so:** the toggle's own state is known at the
+   * RENDER SITE, which picks `BACKLOG_EMPTY_ACTIVE_ONLY_COPY` on `activeOnly`
+   * instead of inferring the cause from a set that cannot carry it. The
+   * sentence it picks — *"The backlog is hidden while 'Only tickets in
+   * progress' is on."* — is true whether or not anything sat behind the
+   * toggle, which is what makes it the right one for a state this fold cannot
+   * resolve. The scope note beside the switch names the Backlog now too; it
+   * had named three tabs of five.
    */
   const backlogNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
@@ -2022,8 +2042,9 @@ function ProjectBoard() {
               */}
               {activeOnly ? (
                 <span className="gn-project__scope-note" data-testid="list-filter-note">
-                  the list, calendar and timeline are asking only for tickets in progress —
-                  not started and done are both excluded. The board is not narrowed.
+                  the list, calendar, timeline and backlog are asking only for tickets in
+                  progress — not started and done are both excluded, and the backlog is
+                  emptied. The board is not narrowed.
                 </span>
               ) : null}
             </div>
@@ -2556,16 +2577,28 @@ function ProjectBoard() {
                     onOpenTicket={openTicket}
                     emptyCopy={
                       /*
-                        THE SAME TWO CASES AS THE BOARD, one tab over (owner ruling,
-                        2026-09-20). `TicketList` is handed only the surviving rows, so
-                        it cannot tell a backlog that holds nothing from one whose only
-                        tickets are epics — the fold above answers it where both sets
-                        exist. A backlog emptied by anything else keeps the original
-                        sentence, which was written to be true of that.
+                        THREE CASES NOW, and the FIRST one is the toggle (E5-40,
+                        2026-09-21). `activeOnly` writes `stateCategories: ['active']`
+                        into the server read, so with it on the backlog is empty for a
+                        reason no fold in this file can see: `backlogNarrowing` is
+                        computed from the ALREADY-narrowed `list.rows`, where both
+                        `shown` and `total` read 0 and `epicsOnly` is false. The
+                        original sentence was therefore rendered over a backlog that
+                        may hold plenty. The toggle's own state is known HERE, so the
+                        choice is made here, and the sentence it picks is true whether
+                        or not anything sat behind the toggle.
+
+                        Below it, the same two cases as the Board, one tab over (owner
+                        ruling, 2026-09-20): `TicketList` is handed only the surviving
+                        rows, so it cannot tell a backlog that holds nothing from one
+                        whose only tickets are epics — the fold above answers that one
+                        where both sets exist.
                       */
-                      backlogNarrowing.epicsOnly
-                        ? BACKLOG_EMPTY_EPICS_COPY
-                        : BACKLOG_EMPTY_COPY
+                      activeOnly
+                        ? BACKLOG_EMPTY_ACTIVE_ONLY_COPY
+                        : backlogNarrowing.epicsOnly
+                          ? BACKLOG_EMPTY_EPICS_COPY
+                          : BACKLOG_EMPTY_COPY
                     }
                     /*
                       THE START CAPABILITY, gated on `session.kind ===

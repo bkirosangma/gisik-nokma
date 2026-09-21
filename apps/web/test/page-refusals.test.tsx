@@ -579,9 +579,15 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // exempting the board from a narrowing that had no visible effect there anyway.
     expect(await screen.findByText('Old sign taken down')).toBeInTheDocument();
     expect(screen.getByTestId('list-filter-note')).toHaveTextContent('The board is not narrowed');
+    // The tabs it NAMES moved with E5-40 (2026-09-21): the note said "the list,
+    // calendar and timeline" over three tabs of five, leaving the Backlog out —
+    // and the Backlog is the one the toggle empties rather than narrows. The
+    // assertion names all four now, because the note's whole job is to name the
+    // surfaces, and a surface it forgets is one this test would not catch.
     expect(screen.getByTestId('list-filter-note')).toHaveTextContent(
-      'the list, calendar and timeline are asking only for tickets in progress',
+      'the list, calendar, timeline and backlog are asking only for tickets in progress',
     );
+    expect(screen.getByTestId('list-filter-note')).toHaveTextContent('the backlog is emptied');
   });
 
   it('Project page: the board tab shows the board read’s own failure, not "Loading…"', async () => {
