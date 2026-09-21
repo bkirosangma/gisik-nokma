@@ -407,6 +407,42 @@ test/zz-exec6-probe-overtake.test.ts --no-file-parallelism`; imports `../src/*.j
 network error, on the headline offline path. Not filed as Critical because the claim is retained in
 `failedItems` with its error and can be redone by a user who notices.
 
+### E6-6 — MINOR — `check-no-silent-skips.mjs` prints `ok` on an empty report: an instrument with no positive control on its own universe
+
+**WHAT.** `scripts/check-no-silent-skips.mjs:28` iterates `report.testResults ?? []` and `:77` prints
+`ok (N skipIf-guarded file(s) checked, none fully skipped)` whatever `N` is. Measured:
+
+```
+echo '{}' > empty.json;               node scripts/check-no-silent-skips.mjs empty.json
+  → check-no-silent-skips: ok (0 skipIf-guarded file(s) checked, none fully skipped)   EXIT=0
+echo '{"testResults":[]}' > zero.json; node scripts/check-no-silent-skips.mjs zero.json
+  → check-no-silent-skips: ok (0 skipIf-guarded file(s) checked, none fully skipped)   EXIT=0
+```
+
+**WHY it is wrong.** The check exists so that *"a guard that eats an entire suite"* cannot go green. A report
+that names no files is the largest possible silent skip, and the checker greets it with `ok`. Its own sibling
+knows the shape: `check-skipif-coverage.mjs:29` refuses with *"git ls-files returned zero test files -- the
+detector is broken"* when its universe is empty. This one has no such control, so a shard whose filter matched
+nothing, or a JSON reporter whose output shape changed (`testResults` renamed), reads as a pass at
+`ci.yml:449`. The repo's own `check-case-ids.mjs` header says why this matters (*"A matcher that returns zero
+results on every real file looks IDENTICAL, from the outside, to a matcher that never fires at all"*), and this
+checker is the one of the nine that did not adopt it. **Latent, not live:** today the two `.skipIf(` files
+(`apps/server/test/ops/pg-dump.test.ts`, `restore-drill.test.ts`) are under the covered prefix and no other
+guard spelling (`.runIf(`, `describe.skip(`, `it.skip(`) is in use — measured with `git ls-files | xargs grep -lF`
+— and CI has not executed the step since 2026-09-06 (every job `steps: 0`, `runner_name: ""`, already recorded by
+the controller).
+
+**WHAT WOULD HAVE BEEN BETTER.** Two lines: count the tracked `.skipIf(` files under the covered prefix (the
+sibling already does this walk) and refuse when the report mentions fewer of them than exist — *"expected 2
+skipIf-guarded files in this report, saw 0"* — so an empty or mis-shaped report is loud. Also `:49` should
+recognise `.runIf(` (the same guard, inverted), or the sibling should refuse that spelling outright.
+
+**MEASUREMENT.** The two commands above, run at `a7b6292b` with node v22.22.2. Lines opened:
+`check-no-silent-skips.mjs:28`, `:49`, `:77`; `check-skipif-coverage.mjs:29`; `ci.yml:445-449`.
+
+**SEVERITY: Minor.** The instrument's blind spot is real and demonstrated, but nothing in the tree currently
+falls into it and the CI wire it sits on is dead for an unrelated reason.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
