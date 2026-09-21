@@ -343,6 +343,15 @@ the reviewed tree rather than of a neighbour. Nothing was created, changed or su
 is the strongest form the finding can take — a person reading §2 while looking at the bar can see the
 sentence is false. It also sharpens the remedy: this is not a subtle staleness, it is a contradiction
 visible in one viewport.
+**AND THE CORPUS IS NOT WEB-ONLY — its falsity ships on the phone too.** Reached by working my coverage
+list, `apps/mobile/src/screens/help-screen.tsx` (330 lines) renders **the same `HELP_CONTENT`** the web
+browser renders — `import { HELP_CONTENT, searchHelp, … } from '@gisik-nokma/app-core'` (`:13-19`), then its
+own React-Native renderers for spans, blocks, quotes, lists and tables. So every stale row of the table above
+— the nav bar *"with three things and no more"*, *"there is no help link"*, *"the settings screens … can only
+be reached by typing their address"*, *"you cannot leave a comment on a job"* — **is read by a person on the
+phone as well**, and the phone cannot click a link that would have shown them otherwise. **This is a wider
+true scope for the finding rather than a new one**, and it is recorded here because a reader deciding how
+urgent F1 is should know the blast radius is every surface that renders the manual, not one.
 **SEVERITY: Important.** I considered Critical and declined: nothing is destroyed, no wrong write is
 made, and the person can discover the truth by looking at the bar. What is wrong is that the product's
 own help misdescribes the product — repeatedly, and in the direction that makes it look less capable
@@ -2591,6 +2600,25 @@ searched for deliberately and not found in the primary citations.
 
 ---
 
+## R2.17b — THE COVERAGE LIST WORKED, SURFACE BY SURFACE (controller direction, 13:55)
+
+The controller directed the remaining phase-1 time at my own not-reached list, on the grounds that every
+surface reached is scored and coverage is the tiebreaker. Below is what has been reached since, with the
+verdict for each — because *"I looked at it"* is not a coverage claim a judge can check.
+
+| surface | verdict |
+|---|---|
+| `packages/ui` — `button.tsx`, `card.tsx`, `table.tsx`, `info-tip.tsx`, `avatar.tsx` | **read, no defect.** `table.tsx:113-124` puts `onClick` on a `<tr>` with no `tabIndex`/`role`/`onKeyDown`, which looked like a mouse-only row — **and it is not**: the title cell renders a real `<button className="gn-list__open">` (`ticket-list.tsx:923-930`), so the row click is a redundant convenience and the keyboard path exists. Killed on its last link. |
+| `packages/editor/src/extensions/escape-suggestion.ts` (377 lines) | **read; produced `E2-46`.** Its load-bearing claim — that the `undoInputRule` override depends on `EscapeSuggestion` being the LAST entry — was checked: `schema/extensions.ts:195`, closing bracket at `:196`. It holds. |
+| `packages/editor/src/schema/extensions.ts` (198 lines) | **read; produced `E2-46`.** |
+| `packages/app-core/src/inbox/inbox-view.tsx` (121 lines) | **read, no defect.** `:113` renders "Load more" whenever `onLoadMore` is truthy with no `hasMore` signal, which looked like a control that could be dead — **and it is not**: `inbox/page.tsx:462` passes `onLoadMore={page.nextCursor === null ? null : loadMore}`, so the callback's presence IS the signal, as its docblock at `:245` states. Killed on its last link. |
+| `apps/mobile/src/screens/help-screen.tsx` (330 lines) | **read; widened `E2-1`'s scope** — it renders the same stale corpus on the phone. |
+
+**Two candidates killed on their last link in this batch, which is now five for the round** (`M4`'s
+unreachable throw, the viewport coverage that lives in the other suite, the Calendar/Timeline axis no caller
+supplies, the clickable row, and the Load-more callback). **The last link is where the defects are not**,
+and checking it before filing is the only thing that has kept this report's error rate at zero claimed-and-
+wrong so far.
 ## R2.18 — THE LAST UNREAD SCREENS, AND WHY I STOPPED HUNTING
 
 Two surfaces I had never opened — the **Calendar** (`calendar-view.tsx`, 514 lines) and the **Timeline**
