@@ -9,6 +9,7 @@ import { Button, Chip, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
+import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
@@ -1065,13 +1066,15 @@ export function TicketSheet({
       setTransportError(null);
       if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
       else setServerRefusal({ rule: result.code, reason: result.message });
-    } catch (error) {
+    } catch (cause) {
       // Ruling 27/33: a transport failure is not a refusal either — same
       // `transportError` channel `board.tsx`'s `submitDirect` (`:1082-1088`)
-      // uses, own sentence, never `serverRefusal`.
+      // uses, own sentence, never `serverRefusal`. E5-25: a 401 is neither,
+      // and it decides through the same author as the other eight.
       setServerRefusal(null);
-      const message = error instanceof Error ? error.message : String(error);
-      setTransportError(`We could not reach the server for this change — ${message}`);
+      setTransportError(
+        writeFailureCopy(cause, (message) => `We could not reach the server for this change — ${message}`),
+      );
     } finally {
       setSubmitting(false);
     }
@@ -1973,7 +1976,7 @@ export function TicketSheet({
         is set.
       */}
       {transportError !== null && !moveOpen ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
+        <p role="alert" className={writeFailureRefusalClass(transportError)}>
           {transportError}
         </p>
       ) : null}

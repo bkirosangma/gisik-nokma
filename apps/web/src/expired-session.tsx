@@ -2,6 +2,11 @@
 
 import { useEffect } from 'react';
 import { useRouter } from 'next/navigation';
+import {
+  SESSION_EXPIRED_COPY,
+  SessionExpiredError,
+  type DataSource,
+} from '@gisik-nokma/app-core';
 
 /**
  * The ONE author of "a 401 is not a refusal, it is a session that ended".
@@ -86,8 +91,13 @@ export function useSignInOnExpiredSession(messages: ReadonlyArray<string | null>
  *
  * `role="status"` so it joins the same list the refusal panels are asserted as,
  * printed rather than counted.
+ *
+ * **The string itself moved to `@gisik-nokma/app-core` (E5-25)** and this is a
+ * re-export, not a second definition: the WRITE path paints the same sentence
+ * from the package views, and two declarations of one sentence is a sentence
+ * that drifts. Every reader of this module keeps the name it already imported.
  */
-export const EXPIRED_SESSION_COPY = 'Your session has ended. Taking you to sign in…';
+export const EXPIRED_SESSION_COPY = SESSION_EXPIRED_COPY;
 
 export function ExpiredSessionNotice() {
   return (
@@ -95,4 +105,42 @@ export function ExpiredSessionNotice() {
       {EXPIRED_SESSION_COPY}
     </p>
   );
+}
+
+/**
+ * A `DataSource` that tells the shell when a WRITE found the session gone
+ * (E5-25, round-2 ruling).
+ *
+ * ## Why the redirect is here rather than in each write's catch
+ *
+ * Nine write sites painted a 401 as *"We could not reach the server"*, and five
+ * of them are `packages/app-core` views — which may not import `HttpError` at
+ * all (`packages/app-core/test/no-http-in-views.test.ts`, case 3.35). Those views
+ * now paint the right sentence, because the adapter that HAS the status
+ * re-throws it as `SessionExpiredError`; but none of them has a router, and the
+ * sentence says *"Taking you to sign in…"*.
+ *
+ * This is the other half: the shell wraps the ONE `DataSource` it hands to every
+ * page, so any write that ends in a 401 — a board move, a close, a bulk close, a
+ * sheet change, a settings save, a delete's Undo, a backlog start or re-rank —
+ * pushes `/sign-in` once. It is deliberately not per-site: a tenth write site
+ * added tomorrow would otherwise need a tenth copy of this, and the site that
+ * forgot would be silent in the direction nobody audits.
+ *
+ * The failure is RE-THROWN unchanged. This wrapper's only job is the redirect;
+ * the sentence is the view's, and swallowing the throw here would leave a view
+ * rendering a success it never had.
+ */
+export function withSignInOnExpiredWrite(source: DataSource, onExpired: () => void): DataSource {
+  return {
+    ...source,
+    async ingest(events) {
+      try {
+        return await source.ingest(events);
+      } catch (cause) {
+        if (cause instanceof SessionExpiredError) onExpired();
+        throw cause;
+      }
+    },
+  };
 }

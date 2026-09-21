@@ -10,6 +10,7 @@ import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import type { ListRow, TicketHistoryEvent, TicketRead, TicketVisibility } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import { SESSION_EXPIRED_COPY, SessionExpiredError } from '../../src/session-expired.js';
 import {
   PARENT,
   TICKET,
@@ -1257,6 +1258,43 @@ describe('TicketSheet — Close, Reopen and the badge (backlog/closed spec §5.3
     expect(notice).toHaveTextContent('We could not reach the server for this change — socket hung up');
     expect(document.body.textContent).not.toContain('Refused by the server');
     await waitFor(() => expect(closeButton).toBeEnabled());
+  });
+
+  /**
+   * E5-25 (round-2 ruling, IMPORTANT) — the finding's own reproduction: a write
+   * after the session expired, at the sheet.
+   *
+   * The shipped sentence was *"We could not reach the server for this change —
+   * HTTP 401 for /v1/events"* and nothing sent the person to sign in. This is
+   * the site the ruling names first (`ticket-sheet.tsx:1074`), and the copy it
+   * must paint is the product's own — the same one the five read arms mount.
+   */
+  it('13.1157 E5-25 a change whose session ended says so, in the session register', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => {
+        throw new SessionExpiredError('/v1/events');
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(within(stateRow()).getByRole('button', { name: 'Close' })).toBeInTheDocument());
+
+    await user.click(within(stateRow()).getByRole('button', { name: 'Close' }));
+
+    const notice = await screen.findByRole('alert');
+    expect(notice).toHaveTextContent(SESSION_EXPIRED_COPY);
+    expect(notice.className).toBe('gn-refusal gn-refusal--session');
+    expect(document.body.textContent).not.toContain('could not reach the server');
+    expect(document.body.textContent).not.toContain('Refused by the server');
   });
 
   /**
@@ -3274,4 +3312,7 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     // already draws for the ticket read and the ledger tab is the model.
     expect(notice.textContent).not.toContain('Loading');
   });
+
+
+
 });

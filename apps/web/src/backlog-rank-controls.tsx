@@ -1,7 +1,15 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { makeSubmittedFactory, moveTarget, planRankMove, type DataSource, type ListRow } from '@gisik-nokma/app-core';
+import {
+  makeSubmittedFactory,
+  moveTarget,
+  planRankMove,
+  writeFailureCopy,
+  writeFailureRefusalClass,
+  type DataSource,
+  type ListRow,
+} from '@gisik-nokma/app-core';
 
 /**
  * Second wave Task 5 — the Backlog tab's Move up / Move down, and the ONE
@@ -181,9 +189,15 @@ export async function submitRank(
     // no failure and no success worth acting on.
     return { status: 'unreachable', message: 'The server did not answer this move.' };
   } catch (cause) {
-    // Ruling 27: a transport failure is not a refusal either.
-    const message = cause instanceof Error ? cause.message : String(cause);
-    return { status: 'unreachable', message: `We could not reach the server for this move — ${message}` };
+    // Ruling 27: a transport failure is not a refusal either. E5-25: a 401 is
+    // a session that ended, and the sentence is chosen in one place.
+    return {
+      status: 'unreachable',
+      message: writeFailureCopy(
+        cause,
+        (message) => `We could not reach the server for this move — ${message}`,
+      ),
+    };
   } finally {
     // The snap-back. Reached for BOTH failure shapes, for the partial case and
     // for the throw above — which is why it is a `finally` and not branches —
@@ -308,7 +322,7 @@ export function BacklogRankControls({
         </p>
       ) : null}
       {transportError !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
+        <p role="alert" className={writeFailureRefusalClass(transportError)}>
           {transportError}
         </p>
       ) : null}

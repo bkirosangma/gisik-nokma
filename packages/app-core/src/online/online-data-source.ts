@@ -1,5 +1,6 @@
 import type { DataSource, DataSourceQuery } from '../data-source.js';
 import type { FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
+import { SessionExpiredError } from '../session-expired.js';
 import { HttpError, createHttpClient, type FetchLike, type HttpClient } from './http.js';
 import {
   boardWorkspaceId,
@@ -484,7 +485,22 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
           `ingest batch of ${events.length} exceeds the contract maximum of ${MAX_INGEST_BATCH}`,
         );
       }
-      return mapIngestResults(await http.post('/v1/events', { events }), events.length);
+      const path = '/v1/events';
+      try {
+        return mapIngestResults(await http.post(path, { events }), events.length);
+      } catch (cause) {
+        // E5-25: a 401 on a WRITE is a session that ended, not an unreachable
+        // server. The events door answers its refusals inside a `200` body, so
+        // the only 401 this call can meet is the session guard's, produced
+        // before the handler. Re-thrown as the view-visible class because a view
+        // may not import `HttpError` (see `session-expired.ts`); everything else
+        // — a 500, a dropped connection, a refusal that arrived as a status —
+        // keeps travelling as it did.
+        if (cause instanceof HttpError && cause.status === 401) {
+          throw new SessionExpiredError(path, { cause });
+        }
+        throw cause;
+      }
     },
     query,
     subscribe: createStreamSubscriber({

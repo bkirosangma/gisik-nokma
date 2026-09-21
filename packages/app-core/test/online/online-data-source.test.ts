@@ -14,6 +14,12 @@ import {
   UnexpressibleFilterError,
 } from '../../src/online/mappers.js';
 import { HttpError } from '../../src/online/http.js';
+import {
+  SESSION_EXPIRED_COPY,
+  SessionExpiredError,
+  writeFailureCopy,
+  writeFailureRefusalClass,
+} from '../../src/session-expired.js';
 import { submittedTicketCreated } from '../helpers/seed.js';
 
 const WORKSPACE = '01J9GWS0000000000000000000';
@@ -1237,6 +1243,75 @@ describe('16.54-16.55 getTicketAttachments — the read behind the sheet’s att
     const badSource = createOnlineDataSource({ baseUrl: '', fetchImpl: badSha.fetchImpl });
     await expect(badSource.query.getTicketAttachments(WORKSPACE, TICKET)).rejects.toBeInstanceOf(
       MappingError,
+    );
+  });
+});
+
+/**
+ * E5-25 (round-2 ruling) — the ONE classification a view is allowed to make.
+ *
+ * `test/no-http-in-views.test.ts` (case 3.35) forbids a view from importing
+ * `HttpError`, so the status cannot be tested where the catch is: it is tested
+ * HERE, at the adapter that has it, and it crosses the seam as
+ * `SessionExpiredError` — which is the thing the nine write catches branch on.
+ *
+ * The transport's own message is asserted beside the class, because the two are
+ * what the old code conflated: *"We could not reach the server for this move —
+ * HTTP 401 for /v1/events"* is a 401 that WAS reached and answered.
+ */
+describe('E5-25 a write that ends in a 401 is a session that ended', () => {
+  /** A fetch that answers one status and body, for the 401 arms below. */
+  function statusFetch(status: number, body: unknown) {
+    const calls: string[] = [];
+    const fetchImpl = async (input: string) => {
+      calls.push(input);
+      return { ok: status >= 200 && status < 300, status, json: async () => body } as Response;
+    };
+    return { fetchImpl, calls };
+  }
+
+  it('E5-25 ingest re-throws a 401 as SessionExpiredError, naming the path', async () => {
+    const { fetchImpl, calls } = statusFetch(401, { error: 'unauthenticated' });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+
+    await expect(source.ingest([submittedTicketCreated()])).rejects.toBeInstanceOf(SessionExpiredError);
+    // The request really was spent, so this is a reached server and not a
+    // local refusal dressed as one.
+    expect(calls).toHaveLength(1);
+  });
+
+  it('E5-25 every other status keeps travelling as an HttpError, unchanged', async () => {
+    // The control: without it "wrap everything" would satisfy the case above.
+    // 500 is the neighbouring shape — the transport's own failure class — and
+    // 403 is the neighbouring SEMANTIC one (a session the server accepted and
+    // then refused), which must not be sent to a sign-in page.
+    for (const status of [403, 500]) {
+      const { fetchImpl } = statusFetch(status, { message: 'nope' });
+      const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+      const thrown = await source.ingest([submittedTicketCreated()]).then(
+        () => null,
+        (cause: unknown) => cause,
+      );
+      expect(thrown).toBeInstanceOf(HttpError);
+      expect(thrown).not.toBeInstanceOf(SessionExpiredError);
+      expect((thrown as HttpError).status).toBe(status);
+    }
+  });
+
+  it('13.1157 E5-25 the 401 sentence is the product\'s one session copy, and only for that cause', () => {
+    // The second half of the seam: what the view paints. `writeFailureCopy` is
+    // the single place that decides, so a tenth write site cannot invent an
+    // eleventh rule.
+    const transport = (message: string): string => `We could not reach the server for this move — ${message}`;
+    expect(writeFailureCopy(new SessionExpiredError('/v1/events'), transport)).toBe(SESSION_EXPIRED_COPY);
+    expect(writeFailureCopy(new Error('socket hung up'), transport)).toBe(
+      'We could not reach the server for this move — socket hung up',
+    );
+    // And the register follows the copy, so a session sentence is not painted
+    // in the transport class.
+    expect(writeFailureRefusalClass(SESSION_EXPIRED_COPY)).toBe('gn-refusal gn-refusal--session');
+    expect(writeFailureRefusalClass('We could not reach the server for this move — x')).toBe(
+      'gn-refusal gn-refusal--transport',
     );
   });
 });

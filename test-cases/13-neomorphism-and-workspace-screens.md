@@ -2284,3 +2284,45 @@ described") reddens **13.983 alone** (`expected function to throw an error, but 
 - **The 500-character bound is asserted at the schema, not at the input.** The form carries no
   `maxLength` (deliberately, matching the name field), so an over-long description is refused by the
   domain on submission rather than prevented while typing. No case drives that path from the browser.
+
+## A write after the session ended — cases `13.1157`–`13.1158` (E5-25, 2026-09-21)
+
+**Why these cases are in this file, and where the ids come from.** Their subject is the shell's failure
+states — the same family `13.1118`–`13.1119` (the inbox's silent single-row reads) were minted into, by the
+same lane, one batch earlier. **The ids are from release batch B11's §13 block
+`13.1157`–`13.1166`, allocated by the controller 2026-09-21 22:0x** (the allocation table lands in
+`test-cases/13-hig-per-screen.md` with B03's PR; this line records it here so a minting session that reads
+only this file still knows the block and its owner). `13.1157`–`13.1158` are minted; the rest of the block
+stays free for the batch's remaining tasks.
+
+**The defect, in the finding's own words.** The events door answers refusals inside a `200` body, so the only
+`401` a write can meet is the session guard's — produced before the handler. The client transport throws
+`HttpError` with `message = "HTTP 401 for /v1/events"`, and **every write catch in the product painted that
+as transport**: *"We could not reach the server for this change — HTTP 401 for /v1/events"*
+(`ticket-sheet.tsx:1074`), and the same sentence at `board.tsx:1430`, `:1532`, `:1736`,
+`bulk-close-dialog.tsx:233`, `backlog-rank-controls.tsx:186`, `backlog-start-button.tsx:113`,
+`workspace-settings-form.tsx:298` and the project page's delete-Undo — **nine sites, and not one of them
+sent the person to sign in**, though every READ did. The person's typed comment or title draft stayed
+stranded behind a sentence that reads as a network problem, when no retry on that session could succeed.
+
+**Where the classification can be made, and where it cannot.** The remedy as filed —
+`error instanceof HttpError && error.status === 401` — is not writable in five of the nine sites:
+`packages/app-core/test/no-http-in-views.test.ts` (case 3.35, coordination amendment 10) fails any file
+outside `src/online/` that imports the transport. So the adapter that HAS the status re-throws it as
+`SessionExpiredError` (`packages/app-core/src/session-expired.ts`), and that class is what the nine catches
+branch on. `writeFailureCopy` is the ONE place a write's sentence is chosen, so a tenth write site cannot
+invent an eleventh rule.
+
+- **13.1157** ✅ A write whose session ended paints the product's own session sentence — never "we could not
+  reach the server" — in its own `gn-refusal--session` register, at the sheet's change path, the board's
+  move path and the bulk close, with the arrow/button usable again afterwards. The 401 becomes
+  `SessionExpiredError` at the adapter (proven over the real transport), and the sentence is chosen in one
+  place. — (`packages/app-core/test/views/ticket-sheet.test.tsx`,
+  `packages/app-core/test/views/board-moves-ui.test.tsx`,
+  `packages/app-core/test/views/bulk-close-dialog.test.tsx`,
+  `packages/app-core/test/online/online-data-source.test.ts`)
+- **13.1158** ✅ **The control, and the other half of the fix:** a `500` and a `403` do NOT send anyone to
+  sign in and keep travelling as `HttpError` — so "wrap everything" cannot satisfy `13.1157` — while a
+  `401` on the shell's one `DataSource` pushes `/sign-in` exactly once and **re-throws** (a guard that
+  swallowed it would leave the calling view rendering a success it never had). —
+  (`apps/web/test/session-expired-writes.test.tsx`)

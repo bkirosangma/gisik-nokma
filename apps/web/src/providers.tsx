@@ -1,6 +1,7 @@
 'use client';
 
-import { createContext, useContext, useMemo, type ReactNode } from 'react';
+import { createContext, useContext, useMemo, useRef, type ReactNode } from 'react';
+import { useRouter } from 'next/navigation';
 import {
   createClientStateCache,
   withCacheFeed,
@@ -27,6 +28,7 @@ import {
 import { authClient } from './auth-client.js';
 import { createWebAuthoringGateway } from './authoring/data-source-gateway.js';
 import { createHttpTicketLocator, type TicketLocator } from './ticket-location.js';
+import { withSignInOnExpiredWrite } from './expired-session.js';
 
 /**
  * The shell's whole world, in one object.
@@ -94,6 +96,15 @@ export function Providers({
   children: ReactNode;
   services?: AppServices;
 }) {
+  // The router is read through a REF (E5-25): the write guard below needs a way
+  // to reach `/sign-in`, and putting `router` in the memo's dependency list
+  // would rebuild the whole service graph — cache, transport, gateways — on
+  // every navigation. `next/navigation`'s `push` is stable in practice, and the
+  // ref makes that not matter either way.
+  const router = useRouter();
+  const push = useRef(router.push);
+  push.current = router.push;
+
   const constructed = useMemo<AppServices | null>(() => {
     // Nothing is built when services were injected: a second, unused online
     // source would hold a second cache, and the pages would feed one and read
@@ -115,7 +126,12 @@ export function Providers({
       // belongs here is an ORIGIN, not a socket URL.
       streamBaseUrl: process.env.NEXT_PUBLIC_SERVER_URL ?? 'http://localhost:3000',
     });
-    const dataSource = withCacheFeed(online, cache);
+    // The ONE wrap that turns any write's expired session into the redirect
+    // (E5-25) — see `withSignInOnExpiredWrite`'s own docblock for why this is
+    // not repeated at each of the nine write sites.
+    const dataSource = withSignInOnExpiredWrite(withCacheFeed(online, cache), () =>
+      push.current('/sign-in'),
+    );
     return {
       dataSource,
       cache,

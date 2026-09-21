@@ -1,7 +1,13 @@
 'use client';
 
 import { useEffect, useRef, useState } from 'react';
-import { makeSubmittedFactory, type DataSource, type ListRow } from '@gisik-nokma/app-core';
+import {
+  makeSubmittedFactory,
+  writeFailureCopy,
+  writeFailureRefusalClass,
+  type DataSource,
+  type ListRow,
+} from '@gisik-nokma/app-core';
 
 export type BacklogStartButtonProps = {
   row: ListRow;
@@ -107,10 +113,12 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
         );
       }
     } catch (cause) {
-      // Ruling 27: a transport failure is not a refusal either — own channel, own sentence.
+      // Ruling 27: a transport failure is not a refusal either — own channel,
+      // own sentence. E5-25: the 401 arm joins it through the one author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this start — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this start — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -134,7 +142,7 @@ export function BacklogStartButton({ row, toStateId, dataSource, workspaceId, cu
         </p>
       ) : null}
       {transportError !== null ? (
-        <p role="alert" className="gn-refusal gn-refusal--transport">
+        <p role="alert" className={writeFailureRefusalClass(transportError)}>
           {transportError}
         </p>
       ) : null}

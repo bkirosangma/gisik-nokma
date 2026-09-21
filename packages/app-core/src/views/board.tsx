@@ -17,6 +17,7 @@ import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
+import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatStateProvenance } from '../provenance.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type {
@@ -1424,10 +1425,13 @@ function MoveArrows({
       }
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
-      // `transportError` channel, own sentence, never `serverRefusal`.
+      // `transportError` channel, own sentence, never `serverRefusal`. E5-25:
+      // a 401 is neither, and `writeFailureCopy` is the one place that is
+      // decided.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this move — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1526,10 +1530,11 @@ function MoveArrows({
     } catch (cause) {
       // Ruling 27: a transport failure is not a refusal either — same
       // `transportError` channel `submitDirect` uses, own sentence, never
-      // `serverRefusal`.
+      // `serverRefusal`. E5-25: the 401 arm joins it, one author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this close — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this close — ${message}`),
+        );
       }
     } finally {
       if (mountedRef.current) setSubmitting(false);
@@ -1731,9 +1736,11 @@ function MoveArrows({
       }
     } catch (cause) {
       // Ruling 27: `transportError`, never a hand-built `serverRefusal`.
+      // E5-25: a 401 goes to the session sentence through the same author.
       if (mountedRef.current) {
-        const message = cause instanceof Error ? cause.message : String(cause);
-        setTransportError(`We could not reach the server for this move — ${message}`);
+        setTransportError(
+          writeFailureCopy(cause, (message) => `We could not reach the server for this move — ${message}`),
+        );
       }
     }
   };
@@ -1802,7 +1809,7 @@ function MoveArrows({
          * bug that would read as a query bug.
          */}
         {transportError !== null && dialog === null ? (
-          <p role="alert" className="gn-refusal gn-refusal--transport">
+          <p role="alert" className={writeFailureRefusalClass(transportError)}>
             {transportError}
           </p>
         ) : null}

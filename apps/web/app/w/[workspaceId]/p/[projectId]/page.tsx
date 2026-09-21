@@ -34,6 +34,8 @@ import {
   type ListFilterSpec,
   type ListRow,
   type TicketDatesInput,
+  writeFailureCopy,
+  writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
 import { Avatar, Switch, Toast } from '@gisik-nokma/ui';
@@ -843,9 +845,17 @@ function ProjectBoard() {
         }
         const reason = result.status === 'refused' ? result.reason : result.message;
         setDeleteNotice({ message: `The ticket could not be restored — ${reason}`, undoFor: null });
-      } catch (error) {
-        const message = error instanceof Error ? error.message : String(error);
-        setDeleteNotice({ message: `We could not reach the server to restore it — ${message}`, undoFor: null });
+      } catch (cause) {
+        // E5-25: a 401 here is a session that ended, not an unreachable server.
+        // `writeFailureCopy` is the ONE place that is decided, for all nine
+        // write sites; the redirect is the shell's data-source guard.
+        setDeleteNotice({
+          message: writeFailureCopy(
+            cause,
+            (message) => `We could not reach the server to restore it — ${message}`,
+          ),
+          undoFor: null,
+        });
       }
     },
     [board.reload, currentUserId, dataSource, list.reload, workspaceId],
@@ -2639,7 +2649,7 @@ function ProjectBoard() {
                       className={
                         rankNotice.channel === 'server'
                           ? 'gn-refusal gn-refusal--server'
-                          : 'gn-refusal gn-refusal--transport'
+                          : writeFailureRefusalClass(rankNotice.text)
                       }
                     >
                       {rankNotice.text}

@@ -2140,6 +2140,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    `--transport`'s rule despite the identical tone. Reuses `--gn-warning`, so no
    new colour pairing is introduced for a contrast floor to have to carry. */
 .gn-refusal--editor { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
+/* E5-25 (2026-09-21): a session that ENDED, on a write. A fourth reason for the
+   same register and its own class for `--editor`'s own reason above: it is not a
+   transport failure (the server was reached and answered), and it is not the
+   server's verdict on the write either (no handler ran). Reuses `--gn-warning`
+   so no new colour pairing is introduced for a contrast floor to carry. */
+.gn-refusal--session { background: var(--gn-fill-secondary); box-shadow: inset 4px 0 0 var(--gn-warning); color: var(--gn-text); }
 
 .gn-attachments { list-style: none; margin: 0.8rem 0 0; padding: 0; display: flex; flex-direction: column; gap: 0.5rem; }
 .gn-attachment { display: flex; flex-direction: column; gap: 0.1rem; }

@@ -6,6 +6,12 @@ export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from '.
 export { createClientStateCache, type ClientStateCache } from './cache.js';
 export { withCacheFeed } from './cache-feed.js';
 export {
+  SESSION_EXPIRED_COPY,
+  SessionExpiredError,
+  writeFailureCopy,
+  writeFailureRefusalClass,
+} from './session-expired.js';
+export {
   PARENT_TERMINAL_RULE,
   completeForPrecheck,
   contextFromCache,
