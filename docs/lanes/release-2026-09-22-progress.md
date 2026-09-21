@@ -13,3 +13,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P21 | done | 0e0ce247 | 9.259 description composer named by its <dt> via labelledBy through the shared contract; contract mutation-witnessed |
 | T-P22 | done | 63519f7a | 13.1052 both menus named; new role="menu" source sweep + two runtime arms |
 | T-P31 | done | 1bcfbc94 | 13.1053 both nav landmarks named; product-wide <nav> sweep + two runtime arms; 13.685 moved with its reason written in |
+| T-E4-33 | done | 6fbe6ecc | 13.1054 the shell names a nameless person from the email; one displayLabel module for both labels |
