@@ -2438,7 +2438,7 @@ against a real workspace. I claim the code path and the attribution semantics, n
 > not argue it. What I argue is that the record shows the false half was found and named by this lane, in phase 1,
 > before any peer filed against it. Sibling: exec 5's `E5-21`, independently measured, same door.
 >
-> **DEFENCE, CORRECTED — 15:18 IST, after reading exec 6's `R6-2 → E2-42` (their file at `213a25ad`, filed 15:16).**
+> **DEFENCE, CORRECTED — 15:17 IST, after reading exec 6's `R6-2 → E2-42` (their file at `213a25ad`, filed 15:16).**
 > R6-2 is **right**, and the paragraph above repeats the error it found: I named `/v1/events`' gate
 > (`checkRolePermission`, `IDENTITY_SPOOF_REASON`) as the door the phone meets. **It is not.** The phone's transport
 > pushes to **`/v1/sync`** (`packages/sync-client/src/net/http-transport.ts:157`, opened), and that door answers
@@ -2988,7 +2988,7 @@ eighth**.
 
 **Severity: Important**, with the Critical reading stated above.
 
-> **DEFENCE — phase 2, 2026-09-21 15:26 IST, self-filed before any refutation.** Re-opening the cause list *"offline,
+> **DEFENCE — phase 2, 2026-09-21 15:25 IST, self-filed before any refutation.** Re-opening the cause list *"offline,
 > a 5xx, a dropped connection"* against the client library found **one member false**. `authClient` is
 > `createAuthClient` from `better-auth@1.7.2` with no `throw` or `catchAllError` option (`apps/web/src/auth-client.ts:32-40`,
 > opened; `better-auth/dist/client/config.mjs` sets neither for `/sign-out`, `:68`). Under `@better-fetch/fetch@1.3.1`
