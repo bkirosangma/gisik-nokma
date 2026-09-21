@@ -78,7 +78,7 @@ type SetReadFn = (ids: readonly string[], read: boolean) => Promise<string[]>;
 function renderInbox(
   notifications: Notification[],
   setRead: SetReadFn,
-  // Defaulted to the silent success every case before 13.1118 wants, and
+  // Defaulted to the silent success every case before 13.1108 wants, and
   // overridden by that case alone — which is the one that measures the
   // single-row failure.
   markRead: (id: string) => Promise<void> = async () => undefined,
@@ -255,9 +255,9 @@ describe('16.41 the inbox bulk action and its Undo', () => {
   });
 });
 
-describe('13.1118/13.1119 the single-row reads and the Undo, which spoke to nobody (E5-10)', () => {
+describe('13.1108/13.1109 the single-row reads and the Undo, which spoke to nobody (E5-10)', () => {
   /**
-   * 13.1118 — E5-10. `markRead(id)` flipped the row optimistically and then
+   * 13.1108 — E5-10. `markRead(id)` flipped the row optimistically and then
    * `void gateway.markRead(id).catch(() => loadFirstPage())` — a reload and NO
    * sentence. The bulk path sixty lines up classifies the failure and renders it,
    * and its own docblock records why: *"The first version of this catch reloaded
@@ -273,7 +273,7 @@ describe('13.1118/13.1119 the single-row reads and the Undo, which spoke to nobo
    * can exceed, and the single-row route's only status is the 404 both arms of
    * "not yours" and "does not exist" share.
    */
-  it('13.1118 a refused single-row mark-read SAYS SO rather than reloading in silence', async () => {
+  it('13.1108 a refused single-row mark-read SAYS SO rather than reloading in silence', async () => {
     renderInbox(THREE_UNREAD, async (ids) => [...ids], async () => {
       // The route's 404 for a row that is not yours and for one that does not
       // exist — one frozen body, and the gateway does not swallow it (11.138).
@@ -291,7 +291,7 @@ describe('13.1118/13.1119 the single-row reads and the Undo, which spoke to nobo
     expect(screen.queryByText(ROW_UNREACHED_COPY)).toBeNull();
   });
 
-  it('13.1118 a single-row mark-read that never reached a server says THAT instead, never a refusal', async () => {
+  it('13.1108 a single-row mark-read that never reached a server says THAT instead, never a refusal', async () => {
     renderInbox(THREE_UNREAD, async (ids) => [...ids], async () => {
       throw new TypeError('Failed to fetch');
     });
@@ -306,12 +306,12 @@ describe('13.1118/13.1119 the single-row reads and the Undo, which spoke to nobo
   });
 
   /**
-   * 13.1119 — the Undo. `undoMarkAllRead` had the SAME silent catch
+   * 13.1109 — the Undo. `undoMarkAllRead` had the SAME silent catch
    * (`void gateway.setRead(ids, false).catch(() => loadFirstPage())`), so a
    * failed undo flipped the rows back to read with nothing said — and the reader
    * had just been TOLD they were unread, by a toast that then disappeared.
    */
-  it('13.1119 a REFUSED undo says so, rather than silently leaving the rows read', async () => {
+  it('13.1109 a REFUSED undo says so, rather than silently leaving the rows read', async () => {
     renderInbox(THREE_UNREAD, async (ids, read) => {
       if (!read) throw new HttpError(404, '/v1/me/notifications/read', { error: 'not_found' });
       return [...ids];

@@ -2285,7 +2285,7 @@ described") reddens **13.983 alone** (`expected function to throw an error, but 
   `maxLength` (deliberately, matching the name field), so an over-long description is refused by the
   domain on submission rather than prevented while typing. No case drives that path from the browser.
 
-## The inbox's single-row read and its Undo, which failed in silence — cases `13.1118`–`13.1119` (E5-10, 2026-09-21)
+## The inbox's single-row read and its Undo, which failed in silence — cases `13.1108`–`13.1109` (E5-10, 2026-09-21)
 
 **The defect, in the file's own words, twice.** `markRead(id)` flipped the row optimistically and then
 `void gateway.markRead(id).catch(() => loadFirstPage())` — a reload and NO sentence. `undoMarkAllRead()`
@@ -2299,13 +2299,13 @@ The Undo's is the worse of the two: the reader has just been TOLD by the toast t
 are unread again, and a failed undo leaves the screen contradicting a sentence the page has already
 withdrawn.
 
-- **13.1118** ✅ A refused single-row mark-read SAYS SO, and a failure that never reached a server says
+- **13.1108** ✅ A refused single-row mark-read SAYS SO, and a failure that never reached a server says
   THAT instead — never a refusal. **The row splits by KIND where the bulk arm splits by STATUS**: the
   bulk route's 400 is its bound, a number only a bulk request can exceed, while the single-row route's
   only status is the 404 that both "not yours" and "does not exist" share — so an `HttpError` of any
   status is the server adjudicating and anything else never reached one. —
   (`apps/web/test/inbox-bulk.test.tsx`)
-- **13.1119** ✅ A refused Undo says so, beside the toast, rather than silently leaving the rows read.
+- **13.1109** ✅ A refused Undo says so, beside the toast, rather than silently leaving the rows read.
   Its own slot, not the bulk one: the two are said in different places, and this sentence has to outlive
   the toast the Undo just closed. — (`apps/web/test/inbox-bulk.test.tsx`)
 

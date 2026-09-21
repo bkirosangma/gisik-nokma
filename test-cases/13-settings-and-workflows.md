@@ -1426,7 +1426,7 @@ collision that actually happened.** These two were first minted as `13.1050`/`13
 same day** — same section, same tip, neither merged. §16's header says §13 is closed to new ids and its
 window sits in an exhausted block; the release plan tells every batch to mint the next free id in its file;
 six batches were doing that at once. **So this lane renumbered its two** (the repo's rule: an id which has
-not merged can still be renumbered) **and took `13.1110`–`13.1119`, clear of every live tip.** Measured
+not merged can still be renumbered) **and took `13.1107`–`13.1116`, clear of every live tip.** Measured
 across ALL remote branches rather than one — §13's occupied ordinals ran to **`13.1103`**, B01's
 server-door cases, so `13.1100`–`13.1103` were taken too. The allocation is recorded in the index
 (`13-deployment-dogfooding.md`). The cases sit in this part-file because the screens do.

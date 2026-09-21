@@ -311,7 +311,7 @@ panel never renders it.
 
 **Why this case is in §17 and not beside E5-10's in §13.** E2-26 and E5-10 name the same lines
 (`apps/web/app/inbox/page.tsx:278`, `:269-279`) and were judged to score independently. The FIX landed
-with E5-10; §13's B09 block (`13.1110`–`13.1119`) is spent, so this case is minted from this batch's §17
+with E5-10; §13's B09 block (`13.1107`–`13.1116`) is spent, so this case is minted from this batch's §17
 allocation. It records the property the fix turns on that E5-10's case does not assert.
 
 **⚠ THE FINDING'S OWN REMEDY WAS "REUSE THE SAME TWO SENTENCES THE BULK PATH ALREADY HAS — one fact, one

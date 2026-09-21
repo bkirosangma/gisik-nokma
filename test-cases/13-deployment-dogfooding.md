@@ -143,8 +143,8 @@ the controller for another rather than borrowing a neighbour's.**
 was the maximum in use in section 13 when it was cut, recounted at `origin/main`, and **a bare "next free
 N" is a reading that expires — which is why a lane takes a BLOCK.**
 
-**`13.1110`–`13.1119` is ALLOCATED to release batch B09 (lane ds5, 2026-09-21) — `13.1110` and `13.1111`
-minted, `13.1112`–`13.1119` reserved.** ⚠ **THIS BLOCK EXISTS BECAUSE THE RELEASE'S OWN RULE COLLIDED, AND
+**`13.1107`–`13.1116` is ALLOCATED to release batch B09 (lane ds5, 2026-09-21) — `13.1110` and `13.1111`
+minted, `13.1107`–`13.1109` and `13.1112`–`13.1116` reserved.** ⚠ **THIS BLOCK EXISTS BECAUSE THE RELEASE'S OWN RULE COLLIDED, AND
 THE COLLISION IS RECORDED HERE RATHER THAN ONLY IN THE BATCH'S PROGRESS FILE.** The release plan (`§0` rule
 5) instructs every batch to mint "the next free id in that file's section", and six batches were minting
 that way at once: **`13.1050`–`13.1051` were minted by B09 and `13.1050`–`13.1056` were minted

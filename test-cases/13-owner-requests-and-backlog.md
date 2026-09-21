@@ -2286,7 +2286,7 @@ through `./dist`, so the web suite was reading a stale artifact and the mutation
 greps the DIST — not the source — and a mutation that never ran is indistinguishable from a killed one
 from the outside.
 
-## A preferences failure is not a LIST failure — cases `13.1116`–`13.1117` (E5-42, 2026-09-21)
+## A preferences failure is not a LIST failure — cases `13.1116`–`13.1107` (E5-42, 2026-09-21)
 
 **The defect.** `useTicketList` returned `error: list.error ?? preferences.error`, folding the
 preferences hook's error — set on a failed `getPreferences` AND on a failed `putPreferences` — into the
@@ -2307,7 +2307,7 @@ the person who needs the sentence is standing.
   reaches `prefsError`. **Both halves are asserted in one case** — the control arm makes the ticket
   read fail and asserts it still reaches `error`, without which the case would pass on a hook that had
   simply stopped reporting errors at all. — (`packages/app-core/test/views/ticket-list.test.tsx`)
-- **13.1117** ✅ The sentence, where a person meets it: beside the column chooser, over rows that are
+- **13.1107** ✅ The sentence, where a person meets it: beside the column chooser, over rows that are
   still drawn, with the list's own summary still a claim about the project. Asserted on the PAIR,
   because a screen that replaced the list with the preference failure would pass an assertion on the
   sentence alone — which is the defect E5-42 reports. — (`packages/app-core/test/views/ticket-list.test.tsx`)

@@ -2030,7 +2030,7 @@ measures another.**
 ## A ticket the server answers 404 for says so, instead of loading for ever — cases `13.1112`–`13.1113` (E4-23, 2026-09-21)
 
 **Why this case is in §13 and not in §16, which is where the sheet's other cases live.** The id is from
-**B09's block `13.1110`–`13.1119`**, recorded in the §13 index header (`13-deployment-dogfooding.md`).
+**B09's block `13.1107`–`13.1116`**, recorded in the §13 index header (`13-deployment-dogfooding.md`).
 §16's own header states that both of its lane blocks are fully spent and that a lane whose block is empty
 does not mint from the tip — so §13's block is where this lane may mint, and the case sits in the §13
 part-file that already carries the sheet's screen-level work rather than in a section it cannot write to.

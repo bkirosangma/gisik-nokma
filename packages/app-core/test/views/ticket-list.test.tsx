@@ -93,7 +93,7 @@ function ControlledList({
   rows = ROWS,
   initial = DEFAULT_VIEW_PREFS,
   // Undefaulted, like its neighbours below: every existing case exercises
-  // `TicketList`'s absent-prop arm, and 13.1117 is the one that measures the
+  // `TicketList`'s absent-prop arm, and 13.1107 is the one that measures the
   // sentence this prop draws.
   prefsError,
   // Deliberately NOT defaulted here. Defaulting it in the harness means every
@@ -1885,7 +1885,7 @@ describe('13.705 the rowDrag slot: rows drag, the row reports itself as the befo
   });
 });
 
-describe('13.1116/13.1117 a preferences failure is not a LIST failure (E5-42)', () => {
+describe('13.1116/13.1107 a preferences failure is not a LIST failure (E5-42)', () => {
   /**
    * 13.1116 — E5-42. `useTicketList` returned
    * `error: list.error ?? preferences.error`, folding the preferences hook's
@@ -1936,7 +1936,7 @@ describe('13.1116/13.1117 a preferences failure is not a LIST failure (E5-42)', 
   });
 
   /**
-   * 13.1117 — the sentence, where a person meets it: beside the column chooser.
+   * 13.1107 — the sentence, where a person meets it: beside the column chooser.
    *
    * A `prefsError` the page could not render would be the same silent failure one
    * layer out, and this is the arm the finding's own remedy names. Asserted on the
@@ -1944,7 +1944,7 @@ describe('13.1116/13.1117 a preferences failure is not a LIST failure (E5-42)', 
    * replaced the list with the preference failure would pass an assertion on the
    * sentence alone, which is precisely the defect E5-42 reports.
    */
-  it('13.1117 the preference failure is said BESIDE the column chooser, over rows that are still drawn', async () => {
+  it('13.1107 the preference failure is said BESIDE the column chooser, over rows that are still drawn', async () => {
     render(<ControlledList prefsError="HTTP 500 for /v1/me/preferences" />);
     const notice = await screen.findByTestId('list-prefs-error');
     expect(notice).toHaveTextContent('Your column choice was not saved');
