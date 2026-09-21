@@ -75,8 +75,8 @@ other-assignee (actorId = assigneeId ≠ session user)  -> invalid: actor-mismat
 actorId='me'   (unassigned ticket)                     -> invalid: malformed-envelope "actorId: must be a ULID"
 ```
 
-So (1) **a person commenting on a ticket assigned to THEM commits** — the case the phone's own list surfaces
-first (`myWork.assigned`) — which falsifies "can never be committed" and "guaranteed by construction"; and (2)
+So (1) **a person commenting on a ticket assigned to THEM commits** — an ordinary case on a shell whose list is
+every ticket the person can see (`listTicketSummaries`), including the ones assigned to them — which falsifies "can never be committed" and "guaranteed by construction"; and (2)
 the refusal the finding names, `IDENTITY_SPOOF_REASON` (`check-permission.ts:71`, `:544`, the `/v1/events` gate),
 is not the one the phone meets: the sync door answers `invalid` with `actor-mismatch` (`sync-service.ts:325`) before
 any gate runs, and the `'me'` shape never reaches even that — it fails the envelope parse. An `invalid` result is
