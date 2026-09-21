@@ -68,8 +68,8 @@ E6-8, E6-9, E6-11: all "hold") read; E3-25, E3-26, E3-27 re-measured below.
   commits a state named `" "` that becomes a board column. Filed Minor for exactly the scoping objection.
 - **E6-21** — "leaving a workspace was never a product feature." Answer: the export's privacy copy promises it,
   `http-origin.ts:180-181`'s exclusion reasoning ("a workspace they can leave") assumes it, and Appendix Y measures
-  that a member's and a guest's self-revocation are refused while an admin's revocation of them commits (the
-  control). With E3-14's forced join, the absence is what makes that join permanent — which is why it is Important.
+  that a member's and a guest's self-revocation are refused while the owner's revocation of the member commits
+  (the control) and an admin's self-revocation commits (so "leaving" exists for admins only). With E3-14's forced join, the absence is what makes that join permanent — which is why it is Important.
 - **E6-25** — "comments in a deploy file are not the product." Answer: filed Minor for exactly that reason; the
   class (a record declaring a closed gap open) is the one the judge priced in round 1 (E3-1) and exec 3 re-files
   six times this round (E3-22 … E3-27); two of the six sentences are security claims an operator acts on, and every
