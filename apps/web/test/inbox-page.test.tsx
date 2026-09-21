@@ -236,7 +236,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     // in the sibling text beside it. A bare `findByRole('status')` cannot be
     // used here either: the loading arm carries that role too, so it resolves on
     // the first frame and the assertion reads "Loading…".
-    const refusal = (await screen.findByText(/Your inbox cannot be shown yet\./)).closest(
+    const refusal = (await screen.findByText(/Your inbox could not be loaded/)).closest(
       '[role="status"]',
     );
     expect(refusal?.textContent).toContain('the notifications table is not migrated');
@@ -265,7 +265,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
 
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
     await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
-    expect(screen.queryByText(/Your inbox cannot be shown yet\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your inbox could not be loaded/)).not.toBeInTheDocument();
   });
 
   it('11.151 says the ticket cannot be opened — and keeps the message — when the locator answers null', async () => {
@@ -352,7 +352,7 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(notice.textContent).toContain('the cursor has expired');
     // 3. NOT the arm that blanks the page. Asserted on the panel's own words:
     //    `findByRole('status')` is ambiguous here, as 11.149 records.
-    expect(screen.queryByText(/Your inbox cannot be shown yet\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/Your inbox could not be loaded/)).not.toBeInTheDocument();
     // 4. Still offered: the cursor did not move, so there is still a next page.
     const retry = screen.getByRole('button', { name: /more/i });
 

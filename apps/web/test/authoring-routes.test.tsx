@@ -190,8 +190,8 @@ describe('a role read that FAILS is a refusal on screen, never a quietly read-on
     // Awaited on the REFUSAL's own words, not on `role="status"`: the loading
     // arm is also a status, so `findByRole('status')` resolves on the spinner
     // and the case would assert against the wrong element.
-    const refusal = await screen.findByText(/cannot be shown yet/);
-    expect(refusal.closest('p')).toHaveTextContent('Your role in this workspace cannot be shown yet.');
+    const refusal = await screen.findByText(/could not be loaded/);
+    expect(refusal.closest('p')).toHaveTextContent('Your role in this workspace could not be loaded — reload to try again.');
     expect(refusal.closest('p')).toHaveTextContent('HTTP 500 for /v1/workspaces/x/members');
     // The pair: the screen that would otherwise stand in its place is absent.
     expect(screen.queryByRole('heading', { name: 'Workflows', level: 2 })).not.toBeInTheDocument();
@@ -220,7 +220,7 @@ describe('a role read that FAILS is a refusal on screen, never a quietly read-on
     );
 
     expect(await screen.findByText(READ_ONLY_COPY)).toBeInTheDocument();
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
     await waitFor(() => {
       expect(screen.queryByRole('button', { name: 'New workflow' })).not.toBeInTheDocument();
     });

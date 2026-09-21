@@ -272,7 +272,7 @@ describe('the project page mounts four views over one list read', () => {
     );
     await openTab('Calendar');
 
-    const refusal = (await screen.findByText(/The calendar cannot be shown yet\./)).closest(
+    const refusal = (await screen.findByText(/The calendar could not be loaded/)).closest(
       '[role="status"]',
     );
     // The CAUSE's own words, not a paraphrase — the shell reports what failed
@@ -300,10 +300,10 @@ describe('the project page mounts four views over one list read', () => {
     );
     await openTab('Timeline');
 
-    expect(await screen.findByText(/The timeline cannot be shown yet\./)).toBeInTheDocument();
+    expect(await screen.findByText(/The timeline could not be loaded/)).toBeInTheDocument();
     // Not the List tab's wording — a viewer on the Timeline tab is told which
     // view went missing, which is the whole job of `ShellRefusal`'s `what`.
-    expect(screen.queryByText(/The ticket list cannot be shown yet\./)).not.toBeInTheDocument();
+    expect(screen.queryByText(/The ticket list could not be loaded/)).not.toBeInTheDocument();
     expect(document.querySelector('.gn-timeline')).toBeNull();
   });
 
@@ -464,7 +464,7 @@ describe('the project page mounts four views over one list read', () => {
     // the way past. The board is SERVED here, so it renders; the list refuses.
     await waitFor(() => expect(document.querySelector('.gn-board')).not.toBeNull());
     await openTab('List');
-    const refusal = (await screen.findByText(/The ticket list cannot be shown yet\./)).closest(
+    const refusal = (await screen.findByText(/The ticket list could not be loaded/)).closest(
       '[role="status"]',
     );
     expect(refusal?.textContent).toContain('the ticket list read did not answer');
@@ -499,7 +499,7 @@ describe('the roster is a convenience, never a gate', () => {
     expect(
       await screen.findByRole('button', { name: "needed by 30 Aug — user_kiro's claim" }),
     ).toBeInTheDocument();
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
   /**
@@ -557,7 +557,7 @@ describe('the roster is a convenience, never a gate', () => {
     // And the claim about claims is not made.
     expect(screen.queryByText(/Undated work is absent, not estimated/)).not.toBeInTheDocument();
     // Nor is this mistaken for a refusal: nothing failed.
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
   it('11.187 the Timeline tab does the same — the guard is per-arm, so one witness cannot cover both', async () => {
@@ -578,7 +578,7 @@ describe('the roster is a convenience, never a gate', () => {
     expect(await screen.findByText('Loading\u2026')).toBeInTheDocument();
     expect(document.querySelector('.gn-timeline')).toBeNull();
     expect(screen.queryByText(/Undated work is absent, not estimated/)).not.toBeInTheDocument();
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
 });

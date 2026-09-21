@@ -430,7 +430,7 @@ describe('3.143 the type picker offers the WORKSPACE’s ticket types, not the b
     );
     expect(
       await screen.findByText(
-        /This workspace’s ticket types, so New ticket is not offered cannot be shown yet\./,
+        /This workspace’s ticket types, so New ticket is not offered could not be loaded/,
       ),
     ).toBeInTheDocument();
     expect(screen.getByText(/HTTP 404 for \/v1\/workspaces\/.*\/ticket-types/)).toBeInTheDocument();

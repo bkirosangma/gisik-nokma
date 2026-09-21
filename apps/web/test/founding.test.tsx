@@ -65,7 +65,7 @@ describe('3.124 the founding form is reachable when the workspace list REFUSES',
     mount({});
     // The refusal is on screen — the default stub refuses `getMyWorkspaces`
     // with the REAL serving-gap table.
-    expect(await screen.findByRole('status')).toHaveTextContent('cannot be shown yet');
+    expect(await screen.findByRole('status')).toHaveTextContent('could not be loaded');
     // …and so is the form.
     expect(screen.getByRole('heading', { name: 'New workspace' })).toBeInTheDocument();
     expect(screen.getByLabelText('Name')).toBeInTheDocument();

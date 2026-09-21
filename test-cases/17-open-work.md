@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.069`** |
+| **release batch B09** (lane ds5) | **`17.061`–`17.080`** (allocated by the controller 2026-09-21 21:0x, recorded in the cycle-46 anchor PR on `main`) — **minted: `17.061`–`17.070`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -268,3 +268,34 @@ a new door (decline-by-token), which is a route and a ruling rather than a contr
 answer what a decline means for a person who never signed in. **Owner: whoever next takes the invite
 surface.** The finding's own words — *"A Decline beside Join (the door exists)"* — are true of the
 PRODUCT and not of this page, and that distinction is the reason this part is recorded rather than built.
+
+## The shared refusal panel says what to DO — case `17.070` (E5-30, 2026-09-21)
+
+**The defect.** `ShellRefusal` — the one panel every refusing read in the shell renders — drew
+`"{what} cannot be shown yet."` with the transport's raw string spliced straight after it. `message` is
+the page's `error` string, the stringified cause, so a 500 read *"Your inbox cannot be shown yet. HTTP 500
+for /v1/me/notifications"*: a sentence that reports the failure and stops — it never says a RELOAD is the
+way out, which is the one thing a person looking at this panel can do — and then appends a status code to
+someone who cannot act on one.
+
+- **17.070** ✅ The panel names the action — *"{what} could not be loaded — reload to try again."* — the
+  same advice the sibling load-error sentences in `packages/app-core` already give, AND still carries the
+  transport's own words, now on their OWN LINE in their own element rather than spliced into a sentence
+  designed to be read. Asserted on the pair, and with the old wording asserted ABSENT, because a panel
+  rendering both would satisfy a presence-only check. — (`apps/web/test/page-refusals.test.tsx`)
+
+**⚠ THE JUDGE SCORED THIS "PARTIAL" ON SCOPE, AND THE CORRECTION IS RECORDED RATHER THAN REPEATED.** The
+finding said the panel is mounted on six sites across five routes; the verifier's own grep found
+**fourteen mounts on seven routes**. Nothing in this case asserts a count — the copy change reaches every
+mount either way, since it is one component.
+
+**⚠ AND THE COPY CHANGE'S BLAST RADIUS IS THE HONEST COST OF A SHARED COMPONENT, MEASURED RATHER THAN
+GLOSSED:** **29 assertions across 8 spec files** asserted the old wording and moved with it. Three of
+those are historical records and were deliberately EXCLUDED from the sweep (this file's own record above,
+`page-refusals`'s E5-30 docblock, and `ticket-list.test.tsx`'s E5-42 note). **The sweep also had to be
+narrowed twice after it ran:** a generic `/could not be loaded/` matcher reddens on `/workspaces`'s
+*"Your invitations could not be loaded:"*, which is a DIFFERENT component's sentence, so the two
+absence-assertions that used it now name their own page's copy.
+
+The `401` arm is untouched: `expired-session.tsx` routes it to the sign-in notice, deliberately, and the
+panel never renders it.

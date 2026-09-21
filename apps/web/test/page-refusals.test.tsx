@@ -174,8 +174,8 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // says which one went missing and what stood in its place.
     const texts = (await screen.findAllByRole('status')).map((node) => node.textContent ?? '');
     expect(texts).toEqual([
-      expect.stringContaining('What needs your attention cannot be shown yet.'),
-      expect.stringContaining('My Work cannot be shown yet.'),
+      expect.stringContaining('What needs your attention could not be loaded — reload to try again.'),
+      expect.stringContaining('My Work could not be loaded — reload to try again.'),
     ]);
     expect(texts[0]).toContain("AttentionItem kind 'contested' — its title");
     // `WorkItem.stateName`. It named `WorkItem.projectName` until P32/P38, then
@@ -198,7 +198,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       </Providers>,
     );
 
-    expect(await screen.findByText(/Your workspaces cannot be shown yet\./)).toBeInTheDocument();
+    expect(await screen.findByText(/Your workspaces could not be loaded/)).toBeInTheDocument();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
     expect(
       screen.queryByText('No workspaces yet. Ask an admin for an invite link.'),
@@ -222,7 +222,12 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       </Providers>,
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    // SPECIFIC to this page's own refusal panel, not the bare phrase (E5-30,
+    // 2026-09-21): the copy change made "could not be loaded" a phrase OTHER
+    // components also use — `/workspaces` renders "Your invitations could not be
+    // loaded:" for an unstubbed invitations read — so the generic matcher now
+    // reddens on a sentence this case is not about.
+    expect(screen.queryByText(/Your workspaces could not be loaded/)).not.toBeInTheDocument();
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
     // Not a spinner either. With the refusal suppressed the page falls through
     // to `workspaces === null`, which without the notice is `Loading…` over a
@@ -266,7 +271,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     );
 
     // CONTROL — the project page rendered, and rendered its board arm.
-    expect(await screen.findByText(/The board cannot be shown yet\./)).toBeInTheDocument();
+    expect(await screen.findByText(/The board could not be loaded/)).toBeInTheDocument();
 
     // The strip is absent...
     expect(screen.queryByRole('complementary', { name: 'Needs your attention' })).not.toBeInTheDocument();
@@ -382,7 +387,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       const statuses = screen.getAllByRole('status').map((node) => node.textContent ?? '');
       expect(
         statuses.some(
-          (text) => text.includes('The ticket list cannot be shown yet.') && text.includes(ownWords),
+          (text) => text.includes('The ticket list could not be loaded — reload to try again.') && text.includes(ownWords),
         ),
       ).toBe(true);
     });
@@ -601,7 +606,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
       </Providers>,
     );
 
-    expect(await screen.findByText(/The board cannot be shown yet\./)).toBeInTheDocument();
+    expect(await screen.findByText(/The board could not be loaded/)).toBeInTheDocument();
     expect(screen.getByText(/GET \/v1\/projects\/p1\/board failed: 404/)).toBeInTheDocument();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
@@ -614,7 +619,7 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
  * deliberately NOT a refusal … it redirects to `/sign-in`"*. Enumerated:
  * `app/workspaces/page.tsx:25` did it and the other two data-reading pages did
  * not, so an expired session on `/w/<id>/my-work` or `/w/<id>/p/<id>` rendered
- * *"My Work cannot be shown yet — HTTP 401 for /v1/me/work"* — a refusal panel
+ * *"My Work could not be loaded — HTTP 401 for /v1/me/work"* — a refusal panel
  * naming a serving gap that was not the cause, with nothing the viewer could act
  * on. It survived because the ONLY 401 case in this file was on the page that
  * already worked, so no mutation to the other two could go red.
@@ -640,8 +645,9 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     );
     await waitFor(() => expect(push).toHaveBeenCalledWith('/sign-in'));
     expect(await screen.findByText(EXPIRED_SESSION_COPY)).toBeInTheDocument();
-    // The half that makes it a test: the sentence this page used to show.
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    // The half that makes it a test: the sentence this page used to show —
+    // named specifically, per the same reasoning as the Workspaces case above.
+    expect(screen.queryByText(/My Work could not be loaded/)).not.toBeInTheDocument();
     expect(screen.queryByText('Loading…')).not.toBeInTheDocument();
   });
 
@@ -674,7 +680,7 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
     // ONE, printed as a list: three reads failed together and they are one event.
     const texts = (await screen.findAllByRole('status')).map((node) => node.textContent ?? '');
     expect(texts).toEqual([EXPIRED_SESSION_COPY]);
-    expect(screen.queryByText(/cannot be shown yet/)).not.toBeInTheDocument();
+    expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });
 
   it('the predicate is ANCHORED, so a refusal that merely mentions 401 does not redirect', async () => {
@@ -716,8 +722,55 @@ describe('3.141 an expired session sends the viewer to sign in — on ALL THREE 
         <MyWorkPage />
       </Providers>,
     );
-    expect(await screen.findByText(/My Work cannot be shown yet\./)).toBeInTheDocument();
+    expect(await screen.findByText(/My Work could not be loaded/)).toBeInTheDocument();
     expect(push).not.toHaveBeenCalled();
     expect(screen.queryByText(EXPIRED_SESSION_COPY)).not.toBeInTheDocument();
+  });
+});
+
+describe('17.070 the shared refusal panel says what to DO (E5-30)', () => {
+  /**
+   * 17.070 — E5-30. The panel on every refusing read rendered
+   * `"{what} could not be loaded — reload to try again."` followed by the transport's raw string —
+   * `LiveQueryResult.error`, which is the stringified cause. So a 500 read *"Your
+   * inbox cannot be shown yet. HTTP 500 for /v1/me/notifications"*: a sentence
+   * that says the read failed, never that a RELOAD is the way out, and which
+   * appends a status code to a person who cannot act on one.
+   *
+   * The two halves are one change and are asserted together: the sentence says
+   * what to do, and the wire string is still PRESENT — carried rather than
+   * dropped, because the panel exists to show the authority's own words and a
+   * paraphrase would be the shell making a claim about someone else's code.
+   */
+  it('17.070 names the action, and still carries the transport’s own words', async () => {
+    render(
+      <Providers
+        services={stubServices({
+          getMyWork: () => Promise.reject(new Error('HTTP 500 for /v1/me/work')),
+        })}
+      >
+        <MyWorkPage />
+      </Providers>,
+    );
+
+    // Scoped to the panel's own class rather than `role="status"`: the page
+    // carries other status roles (the attention strip's arm among them), so the
+    // role query is ambiguous and reddens for a reason that is not this case's.
+    await screen.findByText(/My Work could not be loaded/);
+    // The page carries TWO refusal panels (My Work's own and the attention
+    // strip's), so this picks the one this case is about rather than the first
+    // in document order — a bare `querySelector` found the strip's.
+    const panel = Array.from(document.querySelectorAll('.gn-shell__refusal')).find((node) =>
+      (node.textContent ?? '').includes('My Work could not be loaded'),
+    ) as HTMLElement;
+    expect(panel).not.toBeUndefined();
+    expect(panel).toHaveTextContent('My Work could not be loaded — reload to try again.');
+    // The wire string is kept, on its OWN line rather than spliced into the
+    // sentence — the two are different kinds of statement.
+    const wire = panel.querySelector('.gn-shell__refusal-wire');
+    expect(wire).not.toBeNull();
+    expect(wire?.textContent).toContain('HTTP 500 for /v1/me/work');
+    // And the old wording is gone rather than sitting beside the new one.
+    expect(panel.textContent ?? '').not.toContain('cannot be shown yet');
   });
 });
