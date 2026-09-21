@@ -1706,3 +1706,78 @@ describe('13.1062 the timeline nav declares a border, so no UA bevel survives', 
     expect(rule('.gn-timeline__open')).toMatch(/border:\s*none/);
   });
 });
+
+/**
+ * Case `13.1063` — E4-2 — the sheet's and the dialog's Close glyph is a
+ * 44-px target, not a 21-px glyph in a transparent box.
+ *
+ * `button.gn-sheet__close` measured **23.59×21.20** with `padding: 1px 6px`
+ * (the UA's), `min-width`/`min-height: auto`, `font-size: 19.2px` and
+ * `background: rgba(0,0,0,0)` — the visible pointer control for leaving the
+ * product's most-used overlay. The prototype draws a 32-px filled circle; this
+ * rule takes **44**, the same divergence `.gn-sheet__full` immediately above
+ * already records and for the same reason (WCAG 2.5.5 and `tap-targets.ts`
+ * measure every `button`), because two controls in one header cannot answer
+ * that question differently.
+ *
+ * **This is NOT a WCAG 2.5.8 failure in the strict sense, and the case says so
+ * rather than letting the assertion imply otherwise:** the scrim
+ * (`sheet.tsx:97-99`, `onClick={onClose}`) is a pointer *equivalent*, so the
+ * finding's first draft — *"no other pointer control closes the sheet"* — was
+ * withdrawn before the freeze. What remains is a 21-px control whose equivalent
+ * is an unmarked area a person has to know about.
+ *
+ * **The size is asserted as a PAIR with `.gn-sheet__full`** rather than as a
+ * literal, because the two sit in one header and the shared number is the
+ * decision; a later edit that gave the close the prototype's 32 would redden
+ * here instead of shipping two answers.
+ */
+describe('13.1063 the overlay dismiss control meets the 44px standalone floor', () => {
+  const CLOSE = '.gn-sheet__close';
+
+  it('13.1063 the rule declares the floor in both dimensions', () => {
+    const body = rule(CLOSE);
+    expect(body).toMatch(/min-width:\s*2\.75rem/);
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    // And a box that honours them — the same half `.gn-attention__title`'s own
+    // note makes: a UA inline-block would take a min size, but this control is
+    // centred glyph in a circle, which is what `inline-flex` is for here.
+    expect(body).toMatch(/display:\s*inline-flex/);
+    expect(body).toMatch(/align-items:\s*center/);
+    expect(body).toMatch(/justify-content:\s*center/);
+  });
+
+  it('13.1063 it takes the prototype\'s circle and fill', () => {
+    const body = rule(CLOSE);
+    expect(body).toMatch(/border-radius:\s*999px/);
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+  });
+
+  it('13.1063 the header\'s two controls answer the size question the same way', () => {
+    // The decision, asserted as a pair: both are standalone controls in the
+    // sheet header, so both take 44 and neither takes the prototype's 32.
+    for (const selector of [CLOSE, '.gn-sheet__full']) {
+      expect(rule(selector), `${selector} min-height`).toMatch(/min-height:\s*2\.75rem/);
+      expect(rule(selector), `${selector} must not take the prototype's 32px`).not.toMatch(
+        /min-height:\s*2rem\b/,
+      );
+    }
+  });
+
+  it('13.1063 the dialog\'s close shares the rule, so both overlays get it', () => {
+    // `.gn-dialog__close, .gn-sheet__close { … }` is ONE rule with two heads.
+    // Asserted rather than assumed, because the fix would silently cover only
+    // half the overlays if a later edit split them.
+    // `rule()` cannot be used on `.gn-dialog__close` — it looks for that
+    // selector immediately followed by `{`, and this head does not end a
+    // selector list. The combined head's own BODY is read instead, which is
+    // the same evidence: there is one body and it serves both heads.
+    const noComments = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const combined = noComments.match(/\.gn-dialog__close,\s*\.gn-sheet__close\s*\{([^}]*)\}/);
+    expect(combined, 'the two overlay dismiss controls no longer share a rule').not.toBeNull();
+    expect(combined?.[1]).toMatch(/min-height:\s*2\.75rem/);
+    // And the sheet head resolves through `rule()`, which is what every other
+    // case in this file uses — so the shared body is the one they all see.
+    expect(rule(CLOSE)).toBe(combined?.[1]);
+  });
+});

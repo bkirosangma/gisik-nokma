@@ -1896,3 +1896,44 @@ different questions. `P35`'s own corroboration: the family's other two members, 
   and restored from a sha256-compared backup. Package suites: ui 416, web 639.
 
 **No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance.
+
+## The overlay dismiss control is a 44-px circle, not a 21-px glyph (lane ds1, 2026-09-21, batch B10) — case `13.1063`
+
+**The finding, round 2 `E4-2`, MINOR.** `button.gn-sheet__close` — "×", `aria-label="Close sheet"` — the
+visible pointer control for leaving the product's most-used overlay, measured **23.59×21.20**
+(`getBoundingClientRect`) with `padding: 1px 6px` (the UA's), `min-width`/`min-height: auto`,
+`font-size: 19.2px` and `background: rgba(0,0,0,0)`: the glyph WAS the box. The only rule for it
+(`.gn-dialog__close, .gn-sheet__close`) sets `font`, `font-size`, `line-height`, `border`, `background`,
+`color` and `cursor` — and no size. The prototype draws a 32-px filled circle.
+
+### ⚠ The finding's opening claim was withdrawn before the freeze, and the fix records that
+
+The first draft said *"no other pointer control closes the sheet"*, on a `[class*="backdrop"]` query that
+returned null. **That query was the wrong needle** — the scrim is `div.gn-sheet__scrim` with
+`onClick={onClose}` (`sheet.tsx:97-99`; the dialog's is `dialog.tsx:17`), and clicking outside closes both.
+So this is **not a WCAG 2.5.8 failure in the strict sense**; it is a 21-px control whose pointer
+equivalent is an unmarked area a person has to know about. The severity is set accordingly and the rule
+says so rather than letting the assertion imply a stricter claim.
+
+### The case
+
+- ✅ **13.1063 — the dismiss control declares the 44-px floor in both dimensions, takes the prototype's
+  circle and fill, and answers the size question the same way the header's other control does.**
+  `packages/ui/test/components.test.tsx`. **44, not the prototype's 32:** this is the same divergence
+  `.gn-sheet__full` immediately above already records — *"this repo enforces the 44px tap-target floor on
+  every `button` (WCAG 2.5.5, and `tap-targets.ts` measures them), while the prototype draws 32px"* — and
+  two controls in one header cannot answer it differently, so the size is asserted as a **pair** with
+  `.gn-sheet__full` rather than as a literal. The circle and fill are the prototype's. A fourth assertion
+  pins that the two overlay dismiss controls still SHARE one rule: `rule()` cannot be used on
+  `.gn-dialog__close` because that head does not end a selector list, so the combined head's body is read
+  and compared to the sheet head's — the same evidence by a different route. **Not painted**: the
+  measurement above is the finding's own. `ui.css` was reverted to `HEAD` for the RED run and restored
+  from a sha256-compared backup. Package suites: ui 420, web 639.
+
+**No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
+
+**One half of the finding's remedy is NOT done, named rather than implied:** it also asked for *"one sweep
+that opens a sheet before measuring"*, because no current sweep enters a state where the sheet is open
+(`UNAUTHED_ROUTES` covers `/help`, `/privacy`, `/terms` and a 404 probe; the stack suite's tap pass
+measures `/my-work` alone). That is a Playwright change needing a live stack on `:3001`, out of this
+lane's reach; the owner is whoever widens that pass, and the same gap is recorded under `13.1056`.

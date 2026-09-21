@@ -760,13 +760,40 @@ button.gn-ticket-sheet__crumb--link {
   outline-offset: -1px;
 }
 
+/* E4-2 (2026-09-21). The glyph WAS the box: measured 23.59x21.20 with
+   `padding: 1px 6px` (the UA's), `min-width: auto`, `min-height: auto`,
+   `font-size: 19.2px`, `background: rgba(0,0,0,0)` — the visible pointer
+   control for leaving the product's most-used overlay, 21 px tall.
+
+   ⚠ THE PROTOTYPE DRAWS A 32-px FILLED CIRCLE AND THIS RULE TAKES **44**,
+   which is the same divergence, for the same reason, that `.gn-sheet__full`
+   immediately above already records: *"this repo enforces the 44px tap-target
+   floor on every `button` (WCAG 2.5.5, and `tap-targets.ts` measures them),
+   while the prototype draws 32px."* Two controls in one header cannot answer
+   that question differently, so the circle and its fill are the prototype's
+   and the size is the product's.
+
+   ⚠ THE FINDING'S OWN PREAMBLE IS NOT REPEATED HERE, because it was withdrawn
+   before the freeze and the record should not outlive the correction: the
+   first draft said *"no other pointer control closes the sheet"*, and the scrim
+   (`div.gn-sheet__scrim`, `onClick={onClose}`, `sheet.tsx:97-99`) refutes it —
+   clicking outside closes both. So this is **not** a WCAG 2.5.8 failure in the
+   strict sense; it is a 21-px control whose equivalent is an unmarked area a
+   person has to know about, which is why it is MINOR and why the floor is the
+   fix rather than a redesign. */
 .gn-dialog__close,
 .gn-sheet__close {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
   font: inherit;
   font-size: 1.2rem;
   line-height: 1;
   border: none;
-  background: none;
+  border-radius: 999px;
+  background: var(--gn-fill-tertiary);
   color: var(--gn-text-muted);
   cursor: pointer;
 }
