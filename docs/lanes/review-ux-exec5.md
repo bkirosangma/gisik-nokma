@@ -1376,7 +1376,7 @@ Privacy notice"* until then.
 **WHAT.** `workflow-builder/ui/workflow-history-screen.tsx:122-190`: each version renders `v${n}`, `Current`/
 `Superseded`, the name, the state chips and *"N states · M transitions · maps K states"* (`:175-181`). `grep -n
 'publishedAt\|serverTime\|actor' workflow-history-screen.tsx gateway.ts` → 0. `PublishedWorkflowDef`
-(`domain/workflow.ts`) carries `{id, version, name, initialStateId, states, transitions, stateMapping?}` — no
+(`domain/workflow.ts:116`, `= WorkflowDefinedPayload`) carries `{id, version, name, initialStateId, states, transitions, stateMapping?}` — no
 instant, no actor — while the event that made each version, `workflow.defined` (`domain/vocabulary.ts:75`),
 carries `serverTime` and `actorId` like every ledger event. The screen's arms are otherwise complete: load error
 (`:116`), loading (`:118`), empty (`:120`), and a *"N versions … did not answer and are not shown"* gap sentence
@@ -1562,8 +1562,9 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 6. **Backlog / List / Calendar / Timeline** — not driven; the List's due column was read in source only.
 7. **`test-cases/13-*.md`** — not verified id by id.
 8. **exec 2's remaining §2e candidates** (~30) beyond the three I verified — not opened.
-9. **`check:help` / `scripts/help-content.mjs`** — not run; E5-1's corpus rows are read from `docs/manual.md`/`faq.md`
-   directly, which is what the generator consumes.
+9. **`check:help` / `scripts/help-content.mjs`** — **run at 13:53**: `self-test passed (12 cases, 5 of them planted
+   defects)`, `ok (2 documents, 29 sections, 231 entries, generated copy matches source)`. Green — and it says nothing about
+   whether the 231 entries are TRUE (`exec2-F2`), which is where E5-1 and E5-24's rows live.
 10. **Offline / replica-degraded** — the web client is online-only (`BoardCard.pending` docblock); the edge class is
     mobile/desktop's and I did not reach them.
 11. **Concurrent / interleaved** — not attempted (needs two sessions writing).
