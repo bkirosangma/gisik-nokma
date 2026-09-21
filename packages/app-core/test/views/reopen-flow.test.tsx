@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default
 // export that survives `verbatimModuleSyntax`, settled at
 // packages/ui/test/components.test.tsx and repeated by board.test.tsx and
@@ -579,6 +579,43 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     expect(payload.start).toBe('focus');
     expect(Object.keys(payload)).toContain('start');
     expect(onCreated).toHaveBeenCalled();
+  });
+});
+
+/**
+ * 3.180 (V10) — THE LEDGER END OF THE SAME GUARD, which is the thing the
+ * finding is actually about. The dialog's own case pins "onCreate is called once"; this
+ * pins what that is FOR. `create-ticket-flow` mints
+ * `entity: { kind: 'ticket', id: newUlid() }` PER CALL, so two presses are two
+ * `ticket.created` events with two distinct ids — two tickets, in an append-only
+ * ledger. Asserted on the source's own recorded ingest and on the envelope ID,
+ * because "one call" and "one ticket" are different claims and only the second
+ * one is the product's.
+ */
+describe('V10 two presses on Create file ONE ticket, not two', () => {
+  it('PLANTED DEFECT: two clicks in one commit record ONE ticket.created', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
+    renderFlow(source, { parentCandidates: [] });
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+
+    // Both clicks land in ONE React batch, which is the case a committed
+    // `disabled` cannot guard — see the dialog's own case for the measurement
+    // that pins the discrimination.
+    const create = screen.getByRole('button', { name: 'Create' });
+    await act(async () => {
+      create.click();
+      create.click();
+    });
+
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const created = source.ingested.flat().filter((event) => event.type === 'ticket.created');
+    expect(created).toHaveLength(1);
+    // One event, one entity id — the id is minted per call, so a duplicate would
+    // be a second ULID and the ledger would hold two tickets nothing can merge.
+    expect(created[0]!.entity.id).toEqual(expect.any(String));
+    expect(source.ingested[0]).toHaveLength(1);
   });
 });
 

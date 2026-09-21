@@ -1,4 +1,4 @@
-import { fireEvent, render, screen, within } from '@testing-library/react';
+import { act, fireEvent, render, screen, within } from '@testing-library/react';
 // Named import, not the default: `@testing-library/user-event` ships no default export that
 // survives `verbatimModuleSyntax`, settled at packages/ui/test/components.test.tsx and repeated
 // by board.test.tsx, ticket-list.test.tsx and reopen-flow.test.tsx.
@@ -482,5 +482,95 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       parentId: 'parent_focus_2',
       start: 'focus',
     });
+  });
+});
+
+/**
+ * 3.180 (V10) — THE CREATE CONTROL HAD NO RE-ENTRANCY GUARD OF ANY KIND.
+ *
+ * `disabled` carried the title/type gates and nothing else, and the dialog held
+ * no in-flight latch, so a second press was not even a race. The call reaches
+ * `create-ticket-flow.tsx`, which mints `entity: { kind: 'ticket', id: newUlid() }`
+ * PER CALL: two presses are two distinct `ticket.created` events with two
+ * distinct ids — two tickets, in an append-only ledger.
+ *
+ * The repository had already measured this exact failure one package away. The
+ * composer's own docblock
+ * (`packages/editor/src/components/TicketEditorSlot.tsx:128-136`) records that
+ * render state is USELESS as a guard, because two clicks in one React batch both
+ * read the same pre-commit `false`; `submittingRef` is set SYNCHRONOUSLY inside
+ * the handler, before the first await, which is the only place a second click in
+ * the same tick can be seen. This is that shape, on the product's primary
+ * creation control.
+ */
+describe('V10 the Create control cannot file two tickets from two presses', () => {
+  const TYPES = [{ id: 'task', name: 'Task' }];
+
+  function slowDialog(): { onCreate: ReturnType<typeof vi.fn>; release: () => void } {
+    let release: () => void = () => undefined;
+    const onCreate = vi.fn(
+      () =>
+        new Promise<void>((resolve) => {
+          release = resolve;
+        }),
+    );
+    render(
+      <NewTicketDialog
+        open
+        typeOptions={TYPES}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'File the GST return' } });
+    return { onCreate, release: () => release() };
+  }
+
+  it('PLANTED DEFECT: two presses in one commit call onCreate ONCE, and the control states the state', async () => {
+    const { onCreate, release } = slowDialog();
+    // `HTMLButtonElement` explicitly: the discrimination pin below reads
+    // `.disabled` off the live DOM node, which `HTMLElement` does not carry —
+    // and vitest is green either way, so the typecheck is the check.
+    const create = screen.getByRole<HTMLButtonElement>('button', { name: 'Create' });
+    expect(create).toBeEnabled();
+
+    // Two clicks in ONE React batch — the case a committed `disabled` cannot
+    // guard, because the attribute is not re-read from the DOM between them.
+    let enabledAtSecondClick = false;
+    await act(async () => {
+      create.click();
+      enabledAtSecondClick = !create.disabled;
+      create.click();
+    });
+    // PINS THE DISCRIMINATION. If React ever committed `disabled` between these
+    // two statements, the second click would be swallowed by the ATTRIBUTE and
+    // this case would keep passing while no longer testing the ref at all.
+    expect(enabledAtSecondClick).toBe(true);
+    expect(onCreate).toHaveBeenCalledTimes(1);
+
+    // …and while the first one is still in flight the control says so, rather
+    // than looking pressable beside a request already on the wire.
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+    release();
+  });
+
+  it('the guard LIFTS when the create settles, so a refusal does not strand the dialog', async () => {
+    const { onCreate, release } = slowDialog();
+    await act(async () => {
+      screen.getByRole('button', { name: 'Create' }).click();
+    });
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+
+    // The flow leaves the dialog OPEN on a refusal — nothing landed, nothing is
+    // in flight, and the person must be able to press again.
+    await act(async () => {
+      release();
+    });
+    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    await act(async () => {
+      screen.getByRole('button', { name: 'Create' }).click();
+    });
+    expect(onCreate).toHaveBeenCalledTimes(2);
   });
 });

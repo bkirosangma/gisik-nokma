@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useRef, useState } from 'react';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 
 export type NewTicketDraft = {
@@ -65,7 +65,14 @@ export type NewTicketDialogProps = {
    * find the control that caused it.
    */
   parentCandidatesNarrowing?: string;
-  onCreate: (draft: NewTicketDraft) => void;
+  /**
+   * The claim, handed up. May be ASYNCHRONOUS, and the dialog waits on it: that
+   * returning promise is the only thing that can tell the Create control when
+   * the attempt has settled, and without that this dialog cannot state the
+   * in-flight state it must not double-file through (see the guard below).
+   * A caller that returns nothing is still fine — `Promise.resolve` covers it.
+   */
+  onCreate: (draft: NewTicketDraft) => void | Promise<void>;
   onClose: () => void;
 };
 
@@ -121,6 +128,66 @@ export function NewTicketDialog({
   // THIS dialog is in focus — never for no parent, a withheld picker, or a
   // backlog/closed one, which is exactly `chosenParent?.inFocus === true`.
   const startCheckboxVisible = chosenParent?.inFocus === true;
+
+  /**
+   * TWO flags, on purpose, because they answer different questions at different
+   * instants — the split `TicketEditorSlot` adopted after measuring this exact
+   * failure, and the reason its docblock is worth reading before touching this.
+   *
+   * `submitting` is render state and drives `disabled`. It is USELESS as a
+   * re-entrancy guard: the attribute is not re-read from the DOM between two
+   * clicks in one React batch, so both handlers run and both see the pre-commit
+   * `false`. (`disabled` carried only the title/type gates before this, so a
+   * second press was not even a race — the Create control had no guard of any
+   * kind.) `submittingRef` is set SYNCHRONOUSLY inside the handler, before the
+   * first await, which is the only place a second click in the same tick can be
+   * seen.
+   *
+   * THE COST IS NOT COSMETIC. `onCreate` reaches `create-ticket-flow.tsx`, which
+   * mints `entity: { kind: 'ticket', id: newUlid() }` PER CALL: two presses are
+   * two distinct `ticket.created` events with two distinct ids — two tickets, in
+   * an append-only ledger that cannot take either back.
+   */
+  const submittingRef = useRef(false);
+  const [submitting, setSubmitting] = useState(false);
+
+  const create = (): void => {
+    if (submittingRef.current) return;
+    submittingRef.current = true;
+    setSubmitting(true);
+    // The guard LIFTS on settle either way: a refusal leaves the dialog open
+    // with nothing in flight, and the person must be able to press again. The
+    // rejection is NOT swallowed — `.finally` passes it through exactly as the
+    // previous fire-and-forget call did, so a transport failure still surfaces
+    // where it surfaced before rather than becoming a silent no-op here.
+    void Promise.resolve(
+      onCreate({
+        title,
+        typeId,
+        // `parentCandidatesUnavailable` is checked HERE and not only where the
+        // picker is drawn, because hiding a control does not clear the state
+        // behind it. `parentId` survives from any earlier selection, and this
+        // prop can arrive AFTER one: the list answers, the user picks a parent,
+        // a later read fails, and the picker is replaced by a sentence saying
+        // the ticket will be created at project root. Emitting `parentId` then
+        // would submit the ticket under a parent the dialog had just told the
+        // user it would not have — the screen saying one thing and the payload
+        // doing another, which is the exact defect this component's docblock
+        // exists to refuse. Witnessed at 3.157, with a control proving the
+        // parent still travels when the picker IS shown.
+        parentId: noUsableParent ? null : parentId,
+        // Spec §5.4: 'backlog' unless the checkbox above is BOTH visible
+        // and checked. `startCheckboxVisible` already carries "a usable,
+        // in-focus parent is chosen" — re-testing `noUsableParent` here
+        // would be a second, driftable spelling of the same fact this
+        // component already computed once above.
+        start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
+      }),
+    ).finally(() => {
+      submittingRef.current = false;
+      setSubmitting(false);
+    });
+  };
 
   return (
     <Dialog open={open} title="New ticket" onClose={onClose}>
@@ -277,31 +344,13 @@ export function NewTicketDialog({
         <Button onClick={onClose}>Cancel</Button>
         <Button
           variant="primary"
-          disabled={title.trim() === '' || typeId === ''}
-          onClick={() =>
-            onCreate({
-              title,
-              typeId,
-              // `parentCandidatesUnavailable` is checked HERE and not only where the
-              // picker is drawn, because hiding a control does not clear the state
-              // behind it. `parentId` survives from any earlier selection, and this
-              // prop can arrive AFTER one: the list answers, the user picks a parent,
-              // a later read fails, and the picker is replaced by a sentence saying
-              // the ticket will be created at project root. Emitting `parentId` then
-              // would submit the ticket under a parent the dialog had just told the
-              // user it would not have — the screen saying one thing and the payload
-              // doing another, which is the exact defect this component's docblock
-              // exists to refuse. Witnessed at 3.157, with a control proving the
-              // parent still travels when the picker IS shown.
-              parentId: noUsableParent ? null : parentId,
-              // Spec §5.4: 'backlog' unless the checkbox above is BOTH visible
-              // and checked. `startCheckboxVisible` already carries "a usable,
-              // in-focus parent is chosen" — re-testing `noUsableParent` here
-              // would be a second, driftable spelling of the same fact this
-              // component already computed once above.
-              start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
-            })
-          }
+          // `submitting` is the third term and it is the RENDER half of the guard
+          // above: the ref is what actually stops a duplicate, and this is what
+          // tells the person a request is already on the wire. A control that
+          // looks pressable while it is not is the same lie in the other
+          // direction.
+          disabled={title.trim() === '' || typeId === '' || submitting}
+          onClick={create}
         >
           Create
         </Button>
