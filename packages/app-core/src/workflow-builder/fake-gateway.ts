@@ -35,6 +35,19 @@ export type FakeGatewaySeed = {
   submitResults?: IngestResult[];
   /** Drained in order; when empty, a migration moves the whole seeded population. */
   migrationResults?: MigrationOutcome[];
+  /**
+   * E5-28 — simulate the SUBMIT itself failing to reach the server, as opposed
+   * to answering with a refusal. The real `gateway.submit` is
+   * `dataSource.ingest` (`apps/web/src/authoring/data-source-gateway.ts:327`),
+   * which throws `HttpError` or the fetch `TypeError`; before this seed the
+   * fake could only RETURN a result, so no test through it could express the
+   * dropped connection the transport arm exists for.
+   *
+   * It throws a `TypeError` rather than a bespoke class because that is the
+   * shape a real dropped fetch arrives as — an `HttpError` would be the door
+   * answering, which is the case `submitResults` already covers.
+   */
+  submitError?: boolean;
   /** Simulate the occupancy read failing — the dialog's "ticket count unavailable" path. */
   occupancyError?: boolean;
   /** Simulate the population read failing — the divergence notice's "unavailable" path. */
@@ -136,6 +149,7 @@ export function createFakeGateway(
       return { status: 'migrated', count: seed.typePopulation?.[input.typeId]?.[input.fromWorkflowId] ?? 0 };
     },
     submit: async (events) => {
+      if (seed.submitError === true) throw new TypeError('Failed to fetch');
       return events.map((event): IngestResult => {
         const claimedId =
           typeof event === 'object' && event !== null && 'id' in event && typeof (event as { id: unknown }).id === 'string'

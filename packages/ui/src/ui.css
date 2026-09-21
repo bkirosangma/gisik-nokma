@@ -2326,6 +2326,14 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .publish-controls__banner--success { border-left-color: var(--gn-success); }
 .publish-controls__banner--refused { border-left-color: var(--gn-danger); }
 .publish-controls__banner--invalid { border-left-color: var(--gn-warning); }
+/* E5-28 — the dropped connection's own tone, and its own class so it can never
+   be read as the server refusing: `--refused` wears `--gn-danger`, this wears
+   `--gn-warning`, the same amber `gn-refusal--transport` uses on the sheet for
+   the identical fact. `--unknown` is a third thing again — the door answered,
+   in a vocabulary this build does not hold — so it takes the muted ink rather
+   than either verdict tone. */
+.publish-controls__banner--transport { border-left-color: var(--gn-warning); }
+.publish-controls__banner--unknown { border-left-color: var(--gn-text-muted); }
 .publish-controls__banner-title { margin: 0 0 0.3rem; font-weight: 600; }
 .publish-controls__banner-reason { margin: 0; }
 .publish-controls__banner-rule { margin: 0.3rem 0 0; font-size: 0.75rem; color: var(--gn-text-muted); }

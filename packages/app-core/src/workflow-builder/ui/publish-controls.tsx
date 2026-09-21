@@ -7,11 +7,53 @@ import { StateMappingDialog } from './state-mapping-dialog.js';
 
 type PublishPhase =
   | { phase: 'idle' }
-  | { phase: 'mapping'; occupancy: Record<string, number> | null; occupancyFailed: boolean }
+  /**
+   * E5-28 — the dialog's phase now carries TWO more facts, and both exist
+   * because of what the removed version threw away:
+   *
+   * - `mapping` — what the person has chosen so far. It lives HERE rather than
+   *   in the dialog's own state so a REFUSAL can hand it back: the dialog used
+   *   to hold its own `useState` and was unmounted the instant `submitting` was
+   *   set, so a refusal returned the person to an idle Publish button with the
+   *   work the dialog exists to collect gone, and pressing Publish again
+   *   reopened an EMPTY dialog. A refusal must not cost somebody their mapping.
+   * - `refusal` — the authority's answer, when this phase was re-entered FROM
+   *   one. `null` on the ordinary open.
+   *
+   * `occupancy`/`occupancyFailed` are carried back unchanged, never refetched
+   * and never reset to `null`: `null` with `occupancyFailed: false` is the
+   * "counting tickets…" state, so clearing them would tell the person the count
+   * was being read again when nobody re-read it.
+   */
+  | {
+      phase: 'mapping';
+      occupancy: Record<string, number> | null;
+      occupancyFailed: boolean;
+      mapping: Record<string, string>;
+      refusal: { rule: string; reason: string } | null;
+    }
   | { phase: 'submitting' }
   | { phase: 'published'; version: number }
   | { phase: 'refused'; rule: string; reason: string }
-  | { phase: 'invalid'; message: string };
+  | { phase: 'invalid'; message: string }
+  /**
+   * E5-28 — a dropped connection, or a door that answered nothing at all.
+   * Ruling 27/33's split, applied here for the first time: a transport failure
+   * is NOT an adjudication, so it gets its own phase, its own sentence and its
+   * own banner tone, never the `refused` banner's words. This is the arm whose
+   * absence left Publish disabled for ever with nothing on screen.
+   */
+  | { phase: 'transport'; message: string }
+  /**
+   * E5-28 — the door ANSWERED, with a status this client's vocabulary does not
+   * name. Its own phase rather than a silent fall-through: before this, a
+   * status outside the `switch` returned without setting any phase at all,
+   * which left `submitting` in place and Publish disabled for ever — the same
+   * stuck control as a dropped connection, reached by a completely different
+   * route. It is not a transport failure (the server did answer) and not a
+   * refusal (nobody refused), so it says exactly that and nothing more.
+   */
+  | { phase: 'unknown'; status: string };
 
 /**
  * Publish: the version bump from the PUBLISHED base, the mapping dialog when
@@ -62,6 +104,13 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
   const dropped = droppedStates(draft);
 
   async function submitPayload(stateMapping?: Record<string, string>): Promise<void> {
+    // Captured BEFORE the `submitting` set, because that set is what unmounted
+    // the dialog: whatever it was showing when the person confirmed is what a
+    // refusal must hand back. Read off the render closure, which is correct
+    // here — this function is called from the `mapping` phase's own onConfirm
+    // (or from `idle`, when nothing was dropped, in which case there is nothing
+    // to hand back and `priorMapping` is null).
+    const priorMapping = state.phase === 'mapping' ? state : null;
     setState({ phase: 'submitting' });
     const payload = buildPublishPayload(draft, stateMapping);
     const event = buildWorkflowDefinedEvent({
@@ -70,19 +119,53 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       origin: 'web',
       payload,
     });
-    const [result] = await env.gateway.submit([event]);
-    if (result === undefined) throw new Error('gateway.submit returned no result for the event');
-    switch (result.status) {
-      case 'committed':
+    try {
+      const [result] = await env.gateway.submit([event]);
+      if (result === undefined) {
+        // A SILENCE, not a refusal — the same distinction `ticket-sheet.tsx`'s
+        // `submitTicketEvent` draws for `results[0] === undefined`, and it goes
+        // to the same transport slot with its own sentence.
+        setState({ phase: 'transport', message: 'The server did not answer this publish.' });
+        return;
+      }
+      if (result.status === 'committed') {
         setState({ phase: 'published', version: payload.version });
         props.onPublished?.(payload);
         return;
-      case 'refused':
+      }
+      if (result.status === 'refused') {
+        // E5-28 — a refusal KEEPS the mapping and reopens the dialog on it,
+        // with the authority's words above it. `result.rule`/`result.reason`
+        // are carried VERBATIM, the same discipline the `refused` banner
+        // already keeps: this client meets rule names it has never heard of,
+        // and a paraphrase would be the board knowing something the user does
+        // not.
+        if (priorMapping !== null && stateMapping !== undefined) {
+          setState({
+            ...priorMapping,
+            mapping: stateMapping,
+            refusal: { rule: result.rule, reason: result.reason },
+          });
+          return;
+        }
         setState({ phase: 'refused', rule: result.rule, reason: result.reason });
         return;
-      case 'invalid':
+      }
+      if (result.status === 'invalid') {
         setState({ phase: 'invalid', message: result.message });
         return;
+      }
+      // No `default` used to exist and no path set a phase, so an unnamed
+      // status left `submitting` in place for ever — see the `unknown` phase's
+      // own docblock. Naming it is the point: the door answered, and this
+      // client will not pretend it understood what it said.
+      setState({ phase: 'unknown', status: String((result as { status: unknown }).status) });
+    } catch (cause) {
+      // Ruling 27/33 — a dropped connection is not an adjudication, and the
+      // sentence says whose failure it was. Same words the sheet uses for the
+      // same fact, for the same reason.
+      const message = cause instanceof Error ? cause.message : String(cause);
+      setState({ phase: 'transport', message: `We could not reach the server for this publish — ${message}` });
     }
   }
 
@@ -91,7 +174,7 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       await submitPayload();
       return;
     }
-    setState({ phase: 'mapping', occupancy: null, occupancyFailed: false });
+    setState({ phase: 'mapping', occupancy: null, occupancyFailed: false, mapping: {}, refusal: null });
     try {
       const occupancy = await env.gateway.getStateOccupancy(env.workspaceId, draft.def.id);
       setState((current) => (current.phase === 'mapping' ? { ...current, occupancy } : current));
@@ -114,6 +197,22 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
       >
         Publish
       </button>
+      {/*
+        E5-28 — the refusal, when this phase was re-entered FROM one, renders
+        ABOVE the dialog it belongs to rather than replacing it. The person
+        keeps their mapping and reads why it did not land, in the server's own
+        words, in the same banner the unreachable dialog would have used.
+      */}
+      {state.phase === 'mapping' && state.refusal !== null ? (
+        <div className="publish-controls__banner publish-controls__banner--refused" role="alert">
+          <p className="publish-controls__banner-title">The server refused this publish.</p>
+          <p className="publish-controls__banner-reason">{state.refusal.reason}</p>
+          <p className="publish-controls__banner-rule">{`rule: ${state.refusal.rule}`}</p>
+          <p className="publish-controls__banner-reason">
+            Your mapping is below, as you left it — change it and publish again, or cancel.
+          </p>
+        </div>
+      ) : null}
       {state.phase === 'mapping' ? (
         <StateMappingDialog
           dropped={dropped}
@@ -122,6 +221,7 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
           targetStates={draft.def.states.map((candidate) => ({ id: candidate.id, name: candidate.name }))}
           fromVersion={draft.base?.version ?? 0}
           toVersion={(draft.base?.version ?? 0) + 1}
+          initialMapping={state.mapping}
           onCancel={() => setState({ phase: 'idle' })}
           onConfirm={(mapping) => void submitPayload(mapping)}
         />
@@ -142,6 +242,30 @@ export function PublishControls(props: { onPublished?: (payload: PublishedWorkfl
         <div className="publish-controls__banner publish-controls__banner--invalid">
           <p className="publish-controls__banner-title">The server could not read this claim.</p>
           <p className="publish-controls__banner-reason">{state.message}</p>
+        </div>
+      ) : null}
+      {/*
+        E5-28 — the dropped connection's own slot, Ruling 27's split. Its own
+        banner class and its own words: this is not the server refusing, and it
+        must never read as the server refusing.
+
+        Publish is RE-ENABLED here by construction — the disabled predicate is
+        `issues.length > 0 || phase === 'submitting'`, and this is not
+        `submitting`. Before this arm existed the phase stayed `submitting` for
+        ever, so the button was greyed with nothing on screen saying why.
+      */}
+      {state.phase === 'transport' ? (
+        <div className="publish-controls__banner publish-controls__banner--transport" role="alert">
+          <p className="publish-controls__banner-title">This publish did not reach the server.</p>
+          <p className="publish-controls__banner-reason">{state.message}</p>
+        </div>
+      ) : null}
+      {state.phase === 'unknown' ? (
+        <div className="publish-controls__banner publish-controls__banner--unknown" role="alert">
+          <p className="publish-controls__banner-title">
+            The server answered this publish with a result this build does not recognise.
+          </p>
+          <p className="publish-controls__banner-reason">{`status: ${state.status}`}</p>
         </div>
       ) : null}
     </div>
