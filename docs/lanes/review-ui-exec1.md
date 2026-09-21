@@ -264,6 +264,8 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 
 **Painted (phase 2, 2026-09-21 15:27 IST), by me — the focus half.** Same instrument; the sheet opened from the URL (`?ticket=01EXF5XW3ZZZV7PD0P6B5HWGPX`), `[role=dialog]` present with `aria-label` *"HSN codes for the real catalogue"*, and `document.activeElement.tagName` → **BODY** 2.5 s after load: focus was not moved into the modal. Exec 4's `E4-2` records the same.
+
+**Painted, second paragraph (phase 2, 2026-09-21 15:43 IST), by me — the `Dialog` primitive, both halves.** Same instrument. Focused the board's *New ticket* button and clicked it: at 300 ms and at 1 800 ms `document.activeElement` is still that `button.gn-button--primary`, `closest('[role=dialog]')` → **null**, while `[role=dialog]` *New ticket* is open — focus is not moved in. Then a real `Escape`: the dialog closes and `document.activeElement` → **BODY** — focus is not returned to the button that opened it either. Both halves of the WHAT, on the second primitive.
 ---
 
 ### P9 — **IMPORTANT** — `SegmentedControl` carries full ARIA tab semantics and implements none of the tab keyboard model
@@ -847,6 +849,8 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **Painted (phase 2, 2026-09-21 15:41 IST), by me.** Instrument as P1's third defence paragraph; `/w/<id>/my-work` signed in: `h1,h2,h3,h4,h5,h6` in document order → **`H1 My Work` · `H3 Assigned to me` · `H3 My claims in transit` · `H3 My contested claims` · `H3 Shared with me`** — no `h2` anywhere on the route. Exec 4's `E4-24` paints the same outline and adds the board, the List and the builder.
 
 **Painted (phase 2, 2026-09-21 15:41 IST), by me.** Same instrument; project page, *Calendar* tab: `.gn-calendar [role]` → **0** elements; the first `.gn-calendar__day` is a `DIV` whose entire text is `31` with no `aria-label`; an item is a `<button>` whose only date text is `title="starts 18 Aug — Kiro's claim · needed by 5 Oct — Kiro's claim"` (no `aria-label`). Exec 4's `E4-28` paints the same and adds the Timeline.
+
+**Painted (phase 2, 2026-09-21 15:43 IST), by me, with a control in the same dialog.** Instrument as P1's third defence paragraph; board → *New ticket* (a dialog; nothing submitted). `input[role=combobox]` (*Type*) focused: `matches(':focus-visible')` → **true**, `outline-style: none`; its wrapper `.gn-select__trigger` → `outline-style: none`, `box-shadow` the resting neo inset (`rgba(176,152,132,0.6) 4px 4px 9px inset …`) — **no visible focus indicator on either element**. **Control:** the dialog's bare Title `<input>` focused → `:focus-visible` true, `outline-style: auto`, `outline-width: 1px` — the UA ring paints where nothing suppresses it. Two comboboxes in the dialog (*Type*, *Parent*). Exec 4's `E4-21` paints the same.
 ---
 
 ### P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at least seven routes
