@@ -189,6 +189,7 @@ handed me its copy constants by name (`BULK_REFUSED_COPY`, `BULK_UNREACHED_COPY`
 | E5-36 | Min | `/workspaces` card, zero projects | FIRST-RUN | source (owner's `workspaces-gap.md` item 12) | — |
 | E5-37 | Imp | the shell's own-identity sites (heading, menu, monogram, two accessible names) | EMPTY (the person's own name) | source (two docblocks, one "confirmed in the database") | sibling of E5-4 |
 | E5-38 | Min | `/privacy` at sign-in | copy (category 2, argued) | browser (2nd) + source | — |
+| E5-39 | Min | workflow version history | copy (no when, no who) | source | — |
 
 **Edge classes reached, by finding:** EMPTY (E5-4, 37) · ERROR (E5-10, 13, 15, 18, 19, 25, 27, 28, 30, 33) ·
 PERMISSION-REFUSED (E5-9, 31) · OFFLINE/REPLICA-DEGRADED (**not reached** — web is online-only; phone/desktop read at two
@@ -1370,6 +1371,33 @@ Privacy notice"* until then.
 
 ---
 
+### E5-39 — MINOR · "Version history" lists v1…vN with no date and no author — the ledger records both on every `workflow.defined`, the read serves neither `[SOURCE]` — wire-limited, unruled
+
+**WHAT.** `workflow-builder/ui/workflow-history-screen.tsx:122-190`: each version renders `v${n}`, `Current`/
+`Superseded`, the name, the state chips and *"N states · M transitions · maps K states"* (`:175-181`). `grep -n
+'publishedAt\|serverTime\|actor' workflow-history-screen.tsx gateway.ts` → 0. `PublishedWorkflowDef`
+(`domain/workflow.ts`) carries `{id, version, name, initialStateId, states, transitions, stateMapping?}` — no
+instant, no actor — while the event that made each version, `workflow.defined` (`domain/vocabulary.ts:75`),
+carries `serverTime` and `actorId` like every ledger event. The screen's arms are otherwise complete: load error
+(`:116`), loading (`:118`), empty (`:120`), and a *"N versions … did not answer and are not shown"* gap sentence
+(`:136-140`).
+
+**WHY.** The manual makes versions matter to a person — *"Your job stays on the version of the workflow it was
+pinned to when it was created"* (`docs/manual.md:637`), *"Publishing again makes version 2, and jobs created
+under version 1 stay on version 1"* (`:1141`) — so "when did v2 replace v1" and "who published it" are the two
+questions the history screen exists to answer, and it answers neither. Same shape as E5-35 (rows without a time)
+and E5-8 (history without a what). The export's workflows screen draws no date either (`prototype-delta`
+`:668-673`), so this is a product gap rather than a drawing divergence.
+
+**WHAT WOULD HAVE BEEN BETTER.** Carry `publishedAt`/`publishedBy` on the version read (they are on the event) and
+render *"published 16 Sep 2026 by Kiro"* per card through the one `formatDateTime`.
+
+**MEASUREMENT.** `[SOURCE]` lines above opened. Not driven — the builder needs a session.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1434,16 +1462,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**38 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 38). By claimed severity, read from the
-heading text: **Critical 1 · Important 23 · Minor 14** (1 + 23 + 14 = 38).
+**39 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 39). By claimed severity, read from the
+heading text: **Critical 1 · Important 23 · Minor 15** (1 + 23 + 15 = 39).
 
 - **Critical (1):** E5-13
 - **Important (23):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32, E5-37
-- **Minor (14):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38
+- **Minor (15):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30, E5-33, E5-34, E5-35, E5-36, E5-38, E5-39
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 38. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32, E5-33, E5-38 = 23 of 39. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30, E5-34, E5-35, E5-36, E5-37, E5-39.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1523,8 +1551,9 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
    `screens/ticket-screen.tsx:30-130` (E5-21) and `board-screen.tsx:40-60` (the status wording). The storage layers,
    the help screens, the editor web view and every offline arm are unread.
 2. **The workflow builder as a person meets it** (canvas, inspector, history screen) — read its load arms as
-   positive controls for E5-15 and `publish-controls.tsx` and `state-mapping-dialog.tsx` in full (E5-28, E5-29).
-   `workflow-rebind-dialog.tsx`, the inspectors and the canvas remain unread.
+   positive controls for E5-15 and `publish-controls.tsx`, `state-mapping-dialog.tsx`, `workflow-history-screen.tsx` and `workflow-rebind-dialog.tsx`
+   in full (E5-28, E5-29, E5-39); the six inspector/panel files for their sentences. The canvas (`workflow-canvas.tsx`,
+   `state-node.tsx`, `transition-edge.tsx`) remains unread.
 3. **The comment thread, attachments door, subtask chain, close/reopen and delete/undo as END-TO-END FLOWS** — each
    needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
@@ -1661,5 +1690,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 38 findings — Critical 1 · Important 23 · Minor 14 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 39 findings — Critical 1 · Important 23 · Minor 15 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
