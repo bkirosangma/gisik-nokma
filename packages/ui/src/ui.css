@@ -939,6 +939,73 @@ button.gn-ticket-sheet__crumb--link {
    at 600 weight and the 44px floor (`min-height: 2.75rem`) this metric asks
    for — the one thing it does not add is the shadow, unchanged from every
    other control in the product. */
+
+/* ── P2: THE WHOLE-BOARD EMPTY STATE (2026-09-21).
+
+   `board.tsx:528` renders `<div className="gn-board gn-board--empty">`,
+   `:490` renders `gn-board__empty-copy` and `:494` renders
+   `gn-board__empty-create`. **All three had ZERO selector blocks** — the only
+   two hits for the family in this file were COMMENTS (`:835`, and the
+   `/usr/bin/git log -S` trail shows `b1dda062` added a mention, not a rule) —
+   so the product's FIRST-RUN call to action on an empty board was a grey
+   outset `<button>` on a neumorphic page. This is the one board empty state
+   with no styling: its per-column sibling IS styled (`gn-board__column-empty`
+   above, `-icon`, `-copy`), and the contrast was measured the same way.
+
+   ⚠ **AND IT HAS NO PROTOTYPE COUNTERPART, which is why it is styled to the
+   sibling rather than to a drawing.** The prototype draws no whole-board
+   empty state; the two sentences this block serves are the product's own
+   (`board.tsx` records both, including why "no tickets" is true of a
+   restricted project as well as an empty one). **Recorded in `Features.md`
+   as a deliberate addition** so a later reader does not "correct" it back
+   toward a prototype that has no such screen — the same treatment
+   `.gn-board__empty-create`'s control constant gets below, and the reason the
+   container borrows the COLUMN empty state's shape instead of inventing a
+   third one: two empty states on one board should read as one family.
+
+   ⚠ STILL NOT PAINTED — the same standing caveat as P1. What is asserted is
+   what the rules declare (case 13.1059). */
+.gn-board--empty {
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-card);
+  padding: 2rem 1rem;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.75rem;
+  text-align: center;
+}
+.gn-board__empty-copy {
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+/* The shared control constant `981aa92b` established for
+   `.ticket-type-list__move` (`:5971`): fill-tertiary, text-accent, control
+   radius, no border. This rule and the P1 bare-control reset above BOTH match
+   this class and that is deliberate — P1 removed the UA chrome, this gives it
+   the product's own. They overlap on `border`, `background`, `padding` and
+   `color`; source order decides, and this one is later. */
+.gn-board__empty-create {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.75rem;
+  padding: 0 1.125rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-board__empty-create:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
 /* Spec row "Card": cardBg, radius 12px, 14px padding, cardShadow. Board.tsx:150
    already renders `<Card className="gn-board-card">`, composing to
    `gn-card gn-board-card` (`card.tsx:7`). This selector is bare — (0,1,0),

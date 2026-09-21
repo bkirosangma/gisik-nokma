@@ -1837,3 +1837,35 @@ keyword — and the shorthand resets every background property anyway.
   and restored from sha256-compared backups.
 
 **No `Features.md` bullet.** This corrects existing controls' paint; it adds no affordance.
+
+## The board's whole-board empty state gets a treatment, and a recorded rationale (lane ds1, 2026-09-21, batch B10) — case `13.1059`
+
+**The finding, round 2 `P2`, IMPORTANT.** `board.tsx:528` renders
+`<div className="gn-board gn-board--empty">`, `:490` renders `gn-board__empty-copy` and `:494` renders
+`gn-board__empty-create`. **All three had ZERO selector blocks** — the only two hits for the family in
+`ui.css` were *comments* (`:835`, `:4980`), and `/usr/bin/git log -S'gn-board__empty-create'` shows
+`b1dda062` added a mention, not a rule. So the product's first-run call to action on an empty board was a
+grey outset `<button>` on a neumorphic page. It is the one board empty state with no styling: its
+per-column sibling has three rules (`.gn-board__column-empty`, `-icon`, `-copy`).
+
+### The design decision, recorded rather than left implicit
+
+**The prototype draws no whole-board empty state at all.** So the container borrows the per-column empty
+state's own shape — `fill-quaternary`, `--gn-radius-card`, the centred column, the muted `0.9375rem` copy —
+rather than inventing a third treatment: two empty states on one board should read as one family. The
+action takes the shared control constant **`981aa92b`** established for `.ticket-type-list__move`:
+fill-tertiary, text-accent, control radius, no border, the 44 px standalone floor. **The absence is
+recorded in `Features.md` as a deliberate addition**, which is what stops a later reader "correcting" the
+screen back toward a prototype that never had it — the second half of the finding's own remedy.
+
+### The case
+
+- ✅ **13.1059 — the container carries the sibling's shape, the copy takes the sibling's type, the action
+  takes the shared constant, and the P1 reset still precedes this rule.** `packages/ui/test/components.test.tsx`.
+  The last case is the one worth naming: **P1's bare-control reset and this rule BOTH match
+  `.gn-board__empty-create`**, deliberately — P1 removed the UA chrome, this gives the product's own — and
+  they overlap on `border`, `background`, `padding` and `color`, so source order decides. If the two ever
+  swap, the action silently loses its fill while every other assertion here stays green, so the order is
+  pinned by index rather than assumed. **Not painted**: what is asserted is what the rules declare, and
+  `apps/web/e2e-*` is Playwright, which is not in `pnpm test`. `ui.css` was reverted to `HEAD` for the RED
+  run and restored from a sha256-compared backup.

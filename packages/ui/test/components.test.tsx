@@ -1588,3 +1588,69 @@ describe('13.1057 the ticket sheet collapses its label column at phone width', (
     expect(phone).toMatch(/\.gn-sheet__full\s*\{\s*display:\s*none;/);
   });
 });
+
+/**
+ * Case `13.1059` — P2 — the board's whole-board empty state is styled, and the
+ * three classes it renders stop matching nothing.
+ *
+ * `board.tsx` renders `gn-board gn-board--empty` (`:528`), `gn-board__empty-copy`
+ * (`:490`) and `gn-board__empty-create` (`:494`). **All three had ZERO selector
+ * blocks** — the only two hits for the family in this file were COMMENTS — so the
+ * product's first-run call to action on an empty board was a grey outset
+ * `<button>` on a neumorphic page. It is the one board empty state with no
+ * styling while its per-column sibling has three rules.
+ *
+ * **The container borrows the COLUMN empty state's shape, and that is the design
+ * decision rather than a shortcut:** the prototype draws no whole-board empty
+ * state at all, so there is no drawing to fit — and two empty states on one
+ * board should read as one family. That absence is recorded in `Features.md` as
+ * a deliberate addition, which is what stops a later reader "correcting" it back
+ * toward a prototype that has no such screen. The ACTION takes the shared
+ * control constant `981aa92b` established for `.ticket-type-list__move`:
+ * fill-tertiary, text-accent, control radius, no border.
+ *
+ * **Not painted** — what is asserted is what the rules declare.
+ */
+describe('13.1059 the board\'s whole-board empty state is styled', () => {
+  it('13.1059 the container carries the column sibling\'s shape', () => {
+    const body = rule('.gn-board--empty');
+    expect(body).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-card\)/);
+    // The sibling's own three, asserted as a family rather than one property:
+    // a container that centred differently would read as a different state.
+    expect(body).toMatch(/display:\s*flex/);
+    expect(body).toMatch(/align-items:\s*center/);
+    expect(body).toMatch(/text-align:\s*center/);
+  });
+
+  it('13.1059 the copy takes the sibling copy\'s type', () => {
+    // Same numbers as `.gn-board__column-empty-copy` deliberately: the two
+    // sentences are the same kind of sentence and one scale apart would show.
+    expect(rule('.gn-board__empty-copy')).toMatch(/font-size:\s*0\.9375rem/);
+    expect(rule('.gn-board__empty-copy')).toMatch(/color:\s*var\(--gn-text-muted\)/);
+  });
+
+  it('13.1059 the action takes the shared control constant', () => {
+    const body = rule('.gn-board__empty-create');
+    expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
+    expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
+    expect(body).toMatch(/border-radius:\s*var\(--gn-radius-control\)/);
+    expect(body).toMatch(/border:\s*none/);
+    // The 44px standalone floor, the same one `.ticket-type-list__move` carries.
+    expect(body).toMatch(/min-height:\s*2\.75rem/);
+    // And the NEGATIVE half: a control still carrying the UA's edge is exactly
+    // what this rule exists to remove, so its return is asserted against.
+    expect(body).not.toMatch(/outset|inset/);
+  });
+
+  it('13.1059 the P1 bare-control reset and this rule both match, and this one is later', () => {
+    // The overlap is deliberate and is pinned rather than left to be
+    // rediscovered: P1 removes the UA chrome, this gives the product's own.
+    // If the two rules ever swap order the action silently loses its fill.
+    const resetAt = UI_CSS.indexOf('.gn-board__empty-create,\n.add-rule-menu__trigger {');
+    const styledAt = UI_CSS.indexOf('.gn-board__empty-create {');
+    expect(resetAt, 'the P1 grouped reset vanished').toBeGreaterThan(-1);
+    expect(styledAt, 'this rule vanished').toBeGreaterThan(-1);
+    expect(styledAt).toBeGreaterThan(resetAt);
+  });
+});
