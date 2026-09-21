@@ -1663,8 +1663,8 @@ with the code-only needle first); `sed -n 95,106p deploy/do/app.yaml`; `git blam
 `git log --format='%h %ad %s' -- deploy/do/app.yaml` (four commits, timed with `--date=iso`); `git log -1 935f5d66`; lines opened:
 `rate-limit.ts:74-99`, `:112-123`; `test-cases/13-plan11-seams-and-scheduler.md:72-75` (13.121), `:90` (13.126 ❌,
 the unit-test gap, which is a different sentence and still true). Not previously filed: `grep -c "not yet on main\|forged-header\|TRUST_PROXY"` over the six lanes' review reports
-at their latest pushes (exec 1–5 and the compiled controller review) → 0 each; the same needle over this report → 8,
-as the control that the path can match.
+at their latest pushes (exec 1–5 and the compiled controller review) → 0 each; the same needle over this report → 10 lines,
+as the control that the path can match (measured after this sentence was written).
 
 **SEVERITY: Minor.** A stale comment in a deploy spec; nothing misbehaves. Filed rather than folded into E6-12
 because it is a security claim in the operator's own file, in the direction that invites a second fix.
