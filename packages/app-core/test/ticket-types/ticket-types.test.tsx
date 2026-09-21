@@ -319,7 +319,8 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
    * 13.928 — every row carries both controls, and each is a SIBLING of the row
    * door rather than a child of it.
    *
-   * The row is one `<button aria-label="Edit …">` (`:387-416`). A control
+   * The row is one `<button aria-label="Edit …">` (`:392-421` — and the verb BRANCHES
+ * since E4-34: a non-author's row reads `Open …`). A control
    * nested inside it would be a button inside a button — an invalid tree that
    * jsdom will happily render, which is exactly why this is asserted on the
    * DOM containment rather than on the fact that a control exists.
@@ -494,6 +495,32 @@ describe('TicketTypeListScreen — the ↑/↓ reorder (Tasks 6+7, lifted 2026-0
         onNew={() => {}}
       />);
     expect(await screen.findAllByRole('button', { name: 'Move Invoice down' })).not.toHaveLength(0);
+  });
+
+  it('E4-34 a non-author is offered a door that says Open, not Edit', async () => {
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'member' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    await screen.findByText('Invoice');
+    // The read-only banner sits directly above these rows and says "You can look,
+    // not touch". A row named "Edit Invoice" contradicts it in the same viewport,
+    // and it is the verb a screen reader hears.
+    expect(screen.queryByRole('button', { name: 'Edit Invoice' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Open Invoice' })).not.toBeNull();
+    // Control on the same instrument: the AUTHOR's row still says Edit, so the
+    // null above is the verb branch and not a misspelt name.
+    render(<TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={{ userId: newUlid(), role: 'owner' }}
+        gateway={createFakeGateway({ workflows: [kanbanPublished], ticketTypes: [...builtins, invoice, errand] })}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />);
+    expect(await screen.findAllByRole('button', { name: 'Edit Invoice' })).not.toHaveLength(0);
   });
 
   /**

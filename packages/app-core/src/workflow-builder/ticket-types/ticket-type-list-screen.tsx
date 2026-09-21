@@ -34,8 +34,13 @@ import { TypeIcon } from './icons.js';
  *   a **pre-existing** owner ruling, quoted at the rule itself (`packages/ui/src/
  *   ui.css:1811-1812`, owner 2026-09-10: *"remove [Edit] and open on just
  *   clicking the entire card/row"*). The whole row is one
- *   `<button aria-label={\`Edit ${type.name}\`}>` (`:387-416`), so an `Edit` button
- *   beside it would be a second door to the same place — not a port.
+ *   `<button aria-label={\`${canAuthor ? 'Edit' : 'Open'} ${type.name}\`}>` (`:392-421`),
+ *   so an `Edit` button beside it would be a second door to the same place — not a
+ *   port. **The verb BRANCHES (E4-34, 2026-09-21):** it read a bare `Edit ${type.name}`,
+ *   which told a guest — the reader the read-only banner directly above the list is
+ *   addressed to — that five rows were editable. `canAuthor` was already in scope
+ *   and already branches at `:344`, `:350` and `:360`; the row itself was the one
+ *   place it did not.
  * - **the `"Draft"` badge — RULED: NOT BUILT** (owner, 2026-09-18). A draft ticket
  *   type is not a state this product has, so `TicketTypeDef` gains no draft flag
  *   and no event carries one. The prototype's other badge value (`"Built-in"`) IS
@@ -387,7 +392,7 @@ export function TicketTypeListScreen(props: {
               <button
                 type="button"
                 className="ticket-type-list__row"
-                aria-label={`Edit ${type.name}`}
+                aria-label={`${canAuthor ? 'Edit' : 'Open'} ${type.name}`}
                 onClick={() => props.onOpen(type.id)}
               >
                 <span className="ticket-type-list__icon">
