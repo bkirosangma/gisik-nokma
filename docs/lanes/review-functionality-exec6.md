@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical.** Fourteen findings, ten Important, every one measured through a door the product ships. The recurring
+**No Critical claimed.** Fifteen findings, eleven Important, every one measured through a door the product ships. The recurring
 shape is **a door that accepts what every read surface says cannot be happening**: writes on a soft-deleted ticket
 (E6-2), a deleted open child blocking its parent while the board shows zero (E6-4), a type re-rank and a workflow
 republish that leave hierarchies the engine then refuses to reproduce (E6-3, E6-8), a bulk migration refused
@@ -30,7 +30,7 @@ part-way while the client is told nothing moved (E6-10), an offline edit turned 
 user's own ticket (E6-5), and an invite form whose channels the door refuses (E6-9). The second shape is **a record
 that describes a world the product has left**: the in-app help denying `Delete` (E6-1), three ❌ cases declaring
 guest admissions closed weeks ago (E6-12), and a "named, not decided" residual whose own commit decided it
-(E6-11), and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an unassigned open question since before its trigger shipped (E6-13). The round-1 lane's coverage boundary was the map: all ten Important findings are in the packages or the
+(E6-11), and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an unassigned open question since before its trigger shipped (E6-13). The third shape has one member and it is the one I would put first: **the cross-site defence covers writes and not the socket** — a cookie plus a foreign Origin is refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15). The round-1 lane's coverage boundary was the map: all eleven Important findings are in the packages or the
 paths it said it did not reach.
 
 ---
@@ -976,6 +976,64 @@ toast falls back to the title when it does not.
 **SEVERITY: Minor.** Copy and a stale docblock; the wrong sentence is the one that explains a prototype
 departure, which is the class the common brief asks this lane to read closely.
 
+### E6-15 — IMPORTANT — Cross-site WebSocket hijacking: a cookie-authenticated `/v1/stream` handshake from a foreign Origin is accepted and serves the victim's ledger, while the same cookie and Origin are refused on `POST /v1/events`
+
+**WHAT.** Measured at the assembled app **with the security surface on** (`security: { webOrigin:
+'http://localhost:3001', rateLimit: null }` — the same build `security-middleware.test.ts` uses), on this lane's
+port `:3061`, with a real web session obtained by replaying the OTP flow and keeping `set-cookie`
+(Appendix M; 1 file / 1 test passed):
+
+```
+set-cookie names: better-auth.session_token; using: better-auth.session_token=<redacted>
+control GET /v1/me/workspaces with cookie only        -> 200          ← the cookie alone is a live web session
+Origin=https://evil.artsourced.in -> handshake ACCEPTED; first frame type=event; frames=13; victim title present in stream: true
+Origin=https://evil.example       -> handshake ACCEPTED; … frames=13; victim title present in stream: true
+Origin=(absent)                   -> handshake ACCEPTED; … frames=13; victim title present in stream: true
+control POST /v1/events with cookie + foreign Origin  -> 403 {"error":"forbidden_origin"}   ← the HTTP-Origin hook fires
+```
+
+So the product's cross-site defence refuses a forged **write** and admits a forged **subscription** — and the
+subscription is the whole visible ledger of the victim (`visibleEventsFor`), title and all.
+
+**WHY it is wrong.** Three facts the code states and one it does not:
+
+1. `http/http-origin.ts:259` — `if (!MUTATING_METHODS.has(input.method)) return false;` — the Origin check is
+   for `POST/PUT/PATCH/DELETE` only; a WebSocket upgrade is a `GET`. The docblock explains why reads are absent
+   (*"CSRF is about causing a state change … this server's reads change none"*, `:146-149`) — true of `GET`
+   responses a browser cannot read cross-origin, **and not of a WebSocket**, which CORS does not govern at all:
+   the page that opened it reads every frame.
+2. `stream/routes.ts:267` — `{ websocket: true, preHandler: [requireSession, requireConnectionBudget] }` —
+   nothing inspects `Origin` on the upgrade; `@fastify/websocket` is registered with `maxPayload` only (`:262`).
+3. The product's own reasoning already rejects `SameSite=Lax` as the defence: `http-origin.ts:180-182` (the
+   mcp-tokens entry) — *"`SameSite=Lax` does not close it, because the product and the API are same-site siblings
+   of one registrable domain"* — and `deploy/do/app.yaml:5` deploys exactly that: `pm.artsourced.in` and
+   `pm-api.artsourced.in`. `auth.ts:271` ships `sameSite: 'lax'`. So the precondition the product itself
+   built the HTTP-Origin check for — an attacker page on any sibling of `artsourced.in` — is enough to open the
+   socket with the victim's cookie, subscribe to any workspace id the attacker knows (a fellow member knows them
+   all), and read what the *victim* can see: the visibility model's explicit lists, guest scopes and
+   project-mode fences are bypassed from the read side for as long as the socket stays open.
+
+**WHAT WOULD HAVE BEEN BETTER.** The same predicate, one more door: in `httpOriginRefused`, treat the stream
+route as protected regardless of method (a cookie-bearing upgrade whose `Origin` is not `WEB_ORIGIN` is refused
+before `requireSession`), or check `Origin` in the stream's own `preHandler`. And the durable half exec 3's
+E3-14 also asks for — a test that walks the assembled route table and injects a cookie + forged `Origin` at every
+route, **including the upgrade**, so the next door added is refused by the suite rather than by a reviewer.
+
+**Relation to exec 3's round-2 E3-14.** That finding is five *mutating* routes outside
+`HTTP_ORIGIN_PROTECTED_ROUTES` — the write side of the same defence, under the same same-site precondition. This
+is the **read** side, on a route the set could never hold (it is not a mutating method), found independently by
+asking what the set cannot cover by construction; the two are complements, not duplicates, and neither
+measurement is reused.
+
+**MEASUREMENT.** Appendix M, run from `apps/server` (`app.listen` on `127.0.0.1:3061` — this lane's port — for
+the real socket; `ws` via `test/helpers/stream.ts`'s `openStream`). Lines opened: `http-origin.ts:146-149`,
+`:180-182`, `:259`; `stream/routes.ts:262`, `:267`; `auth.ts:271`; `deploy/do/app.yaml:5`, `:119`; `app.ts`'s
+origin hook (`httpOriginRefused({ method: request.method, routeUrl: request.routeOptions.url, … })`).
+
+**SEVERITY: Important.** A measured bypass of the visibility model from the read side, gated on a precondition
+the product's own security notes treat as real. Filed at Important rather than Critical because a same-site
+attacker page is required and the socket reads only what the victim may read; the judge may weigh it with E3-14.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1082,9 +1140,9 @@ the table.
 | severity | count | members |
 |---|---|---|
 | Critical | **0** | — |
-| Important | **10** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13 |
+| Important | **11** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15 |
 | Minor | **4** | E6-6, E6-7, E6-11, E6-14 |
-| **total** | **14** | E6-1 … E6-14, no gaps in the numbering |
+| **total** | **15** | E6-1 … E6-15, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -2600,6 +2658,163 @@ describe('exec6 probe: verify-projections after a type re-bind', () => {
     out.push(`live proj_tickets.workflow_id for T after re-bind: ${live.rows[0]!.workflow_id === WF1 ? 'WF1 (unchanged — "a re-binding affects new tickets only")' : 'WF2'}`);
     const after = await verifyProjections({ pool: db.pool, projections });
     out.push(`after re-bind: ${formatReport(after).replace(/\n/g, ' | ').slice(0, 700)}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix M — probe for E6-15 — cross-site WebSocket hijacking on `/v1/stream`
+
+File path in the tree: `apps/server/test/zz-exec6-probe-cswsh.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-cswsh.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A, plus a free `127.0.0.1:3061`. The first run of this file was made with
+`buildTestApp(db)` — security hooks **off** — and its HTTP control answered `400` instead of `403`; that run is
+not the measurement. The line below builds with `security: { webOrigin, rateLimit: null }` and the control
+answers `403 forbidden_origin`.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does a COOKIE-authenticated WebSocket handshake with a foreign Origin get a subscribed stream? (cross-site WebSocket hijacking)
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+import { openStream } from './helpers/stream.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db, { security: { webOrigin: 'http://localhost:3001', rateLimit: null } });
+  app = built.app;
+  (globalThis as unknown as { __builtOtp: unknown }).__builtOtp = built.otp;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: cross-site WebSocket hijacking on /v1/stream', () => {
+  it('records whether a cookie + foreign Origin handshake is accepted and served', async () => {
+    const out: string[] = [];
+    // 1. A COOKIE session for the owner: replay the OTP flow and keep set-cookie.
+    const builtOtp = (globalThis as unknown as { __builtOtp: { sent: Array<{ code: string }> } }).__builtOtp;
+    const before = builtOtp.sent.length;
+    const send = await app.inject({ method: 'POST', url: '/api/auth/phone-number/send-otp', payload: { phoneNumber: '+919000000601' } });
+    expect(send.statusCode, send.body).toBeLessThan(300);
+    const code = builtOtp.sent[before]!.code;
+    const verify = await app.inject({ method: 'POST', url: '/api/auth/phone-number/verify', payload: { phoneNumber: '+919000000601', code } });
+    expect(verify.statusCode, verify.body).toBeLessThan(300);
+    const setCookie = ([] as string[]).concat(verify.headers['set-cookie'] as string | string[] | undefined ?? []);
+    const cookie = setCookie.map((c) => c.split(';')[0]!).filter((c) => c.includes('session_token')).join('; ');
+    out.push(`set-cookie names: ${setCookie.map((c) => c.split('=')[0]).join(', ')}; using: ${cookie.replace(/=.*/, '=<redacted>')}`);
+    // 2. Control: the cookie alone (no bearer) authenticates an ordinary GET — i.e. it is a real web session.
+    const me = await app.inject({ method: 'GET', url: '/v1/me/workspaces', headers: { cookie } });
+    out.push(`control GET /v1/me/workspaces with cookie only -> ${me.statusCode}`);
+    // 3. A ticket so the stream has something to say.
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'VICTIM SECRET TITLE' }, ownerId, ownerToken)).status).toBe('committed');
+    // 4. Listen on this lane's port and open the socket with the cookie and a FOREIGN Origin.
+    await app.listen({ port: 3061, host: '127.0.0.1' });
+    for (const origin of ['https://evil.artsourced.in', 'https://evil.example', undefined]) {
+      const headers: Record<string, string> = { cookie };
+      if (origin !== undefined) headers['origin'] = origin;
+      try {
+        const stream = await openStream(3061, headers);
+        stream.subscribe(WS, 0);
+        const frame = await stream.next((f) => JSON.stringify(f).includes(T) || (f as { type?: string }).type === 'caught-up', 5000);
+        const leaked = stream.raw.some((r) => r.includes('VICTIM SECRET TITLE'));
+        out.push(`Origin=${origin ?? '(absent)'} -> handshake ACCEPTED; first matching frame type=${(frame as { type?: string }).type}; frames=${stream.frames.length}; victim title present in stream: ${leaked}`);
+        await stream.close();
+      } catch (err) {
+        out.push(`Origin=${origin ?? '(absent)'} -> ${String((err as Error).message).slice(0, 160)}`);
+      }
+    }
+    // 5. Control for the HTTP-Origin hook: the same cookie + foreign Origin on POST /v1/events is refused.
+    const forged = await app.inject({ method: 'POST', url: '/v1/events', headers: { cookie, origin: 'https://evil.artsourced.in' }, payload: { events: [] } });
+    out.push(`control POST /v1/events with cookie + foreign Origin -> ${forged.statusCode} ${forged.body.slice(0, 80)}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
