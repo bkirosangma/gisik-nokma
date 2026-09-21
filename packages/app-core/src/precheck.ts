@@ -344,6 +344,22 @@ function precheckTicketClosed(submitted: SubmittedEvent, cache: ClientStateCache
       reason: `A ticket can only be closed from a terminal state; "${stateName}" is not one.`,
     };
   }
+  // E6-8 (2026-09-21): `checks/close.ts` refuses a close over open children
+  // — the parent-terminal invariant at its last door. Mirrored here with the
+  // same discipline gate 3 gives the transition path: `childrenOf` answers
+  // with the children this client has SEEN, so only a vouched-complete set
+  // may decide, and an unvouched one defers rather than announcing a close
+  // the server refuses. A refusal from a vouched open child reads only
+  // server-served `stateCategory`, which is this module's definition of one.
+  if (!cache.hasCompleteChildren(ticket.id)) return notEvaluated();
+  const openCount = cache.childrenOf(ticket.id).filter((child) => child.stateCategory !== 'terminal').length;
+  if (openCount > 0) {
+    return {
+      kind: 'refused',
+      rule: REFUSAL_RULES.parentTerminal,
+      reason: `This ticket cannot be closed while ${openCount} of its child tickets ${openCount === 1 ? 'is' : 'are'} still open.`,
+    };
+  }
   return { kind: 'passed' };
 }
 
