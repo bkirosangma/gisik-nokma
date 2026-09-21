@@ -703,12 +703,12 @@ names as the real fix. And 7.45 should carry a fourth arm: an admin not on one p
 **SEVERITY: Important.** A documented "cannot happen" that happens for an ordinary admin, producing a
 half-migrated type, a false refusal, and no way forward from the page.
 
-### E6-11 — IMPORTANT — The list serves a soft-deleted epic's title as a group header, while the detail, search and crumb doors withhold it — a view-serving statement with no delete predicate, outside the round-1 enumeration
+### E6-11 — MINOR — The list serves a soft-deleted epic's title as a group header; the detail door withholds the same title as "the deleted ticket's content" — both decisions landed in the same commit, one as a ruling and one as a deferral
 
 **WHAT.** `GET /v1/projects/:id/tickets?groupBy=epic` labels each group with the epic's title
-(`routes/list.ts:274-278`, `titleOfEpic`), resolved by `epicAncestors` (`:404-452`): a recursive walk up
+(`routes/list.ts:274-278`, `titleOfEpic`), resolved by `epicAncestors` (`:384-452`): a recursive walk up
 `proj_tickets` joined to `proj_visibility`, filtered by `${visible}` at every hop and by **nothing about
-`deleted_at`** (`:416-441`). Measured through the real doors (Appendix J; 1 file / 1 test passed):
+`deleted_at`**. Measured through the real doors (Appendix J; 1 file / 1 test passed):
 
 ```
 before delete: list groups = [{"label":"SECRET EPIC TITLE","cards":2}]
@@ -716,32 +716,42 @@ delete the epic                                            -> committed
 after delete: GET epic detail                              -> 404
 after delete: GET task detail -> 200; parent={"kind":"restricted",…}; epic={"kind":"restricted",…}
 after delete: list groups = [{"label":"SECRET EPIC TITLE","cards":1}]      ← the deleted epic's title, as a header
-after delete: list body contains the deleted epic's title: true
 after delete: search "SECRET"                              -> 200; contains title: false
 ```
 
-**WHY it is wrong.** The product has already decided what a deleted ticket's title is: `routes/tickets.ts:419-431`
-withholds a deleted *parent's* title from the child's crumb because *"the parent's TITLE is the deleted ticket's
-content, and the FAQ's 'stops appearing in views' is exactly a statement about content"*, answering `restricted`
-instead. The same request, one door over, prints that content at the top of the list — the product's primary
-view — for as long as the epic has a live child. Search and the detail door agree with the crumb; the list
-disagrees with all three. And this site is invisible to every sweep the repo records: `visible-where.ts:157-172`
-enumerates "13 constant uses + 4 longhand `deleted_at IS NULL` + 1 TypeScript" and exec 3 §7.1 mutated those 18;
-this statement carries **no** predicate to mutate, so *"a sweep is only as complete as its pattern"* applies in
-the direction the repo's own note warns about — the rule is absent, not unconstrained.
+**This is recorded, and the record is what the finding is about.** `list.ts:402-411` says, in the code: *"NO
+soft-delete predicate on either arm of the walk below, and this is the dispatch's own recorded open question
+rather than an oversight … Filtering the walk means a deleted epic's children silently lose their epic chip — a
+visible regression … against a title the reader could see before the delete. The scope decides it when the
+cascade question is ruled; the residual is named here … a deleted epic's TITLE still travels on its live
+children's cards."* — pointing at `executor-state-history.md:692-696`, item 7 *"Named, not decided."*
 
-**WHAT WOULD HAVE BEEN BETTER.** `AND ${LIVE_TICKET_WHERE}` on the recursive member of `epicAncestors` (alias
-`t` is already the `proj_tickets` join), so a deleted ancestor ends the walk exactly as an invisible one does —
-the group then lands under "No epic", or better under a `restricted`-style label the client already knows how to
-render. Plus a soft-delete case in `test/read/soft-delete*.test.ts` that deletes an epic with a live child and
-asserts the list header, so the 18-site enumeration gains its 19th member as a *witnessed* one.
+**WHY the deferral does not stand.** The question it defers — *is a deleted ancestor's title content the reader
+may still be shown?* — was **decided in the same commit at the neighbouring door**. `git log -S` puts both
+paragraphs in `18d7e391` (2026-09-20 13:17 IST, the Delete PR): `routes/tickets.ts:419-431` answers `restricted`
+for a deleted parent *because "the parent's TITLE is the deleted ticket's content, and the FAQ's 'stops appearing
+in views' is exactly a statement about content"*, explicitly rejecting the "reader could see it before" reasoning
+that `list.ts:407-408` relies on. Search (`proj_search`) withholds it too. So after `18d7e391` the product holds
+one answer at three doors and its opposite at the fourth, and the list's note describes itself as undecided when
+its own change set decided it. The residual is also mis-stated: it says the title travels on the children's
+*cards*; the card carries only `epicId` (`list-cards.ts:125`) — the title travels in the group **header**
+(`:277`), which is the more visible of the two.
 
-**MEASUREMENT.** Appendix J, run from `apps/server`. Lines opened: `list.ts:274-278`, `:282-289`, `:404-452`
-(`:416` `WITH RECURSIVE ancestry AS`, `:423` and `:433` the two `${visible}` hops, no `deleted_at`);
-`list-cards.ts:125`; `routes/tickets.ts:419-431`; `visible-where.ts:157-172`.
+**WHAT WOULD HAVE BEEN BETTER.** Apply the crumb's decision: `AND ${LIVE_TICKET_WHERE}` on the recursive member
+of `epicAncestors` (alias `t` is already the `proj_tickets` join) so a deleted ancestor ends the walk as an
+invisible one does, and label the group the way the crumb labels the parent (`restricted` / "An epic you cannot
+open") rather than "No epic" — which keeps the chip the note wanted to keep and drops the content the crumb
+already drops. Then retire the "named, not decided" paragraph, since it is decided.
 
-**SEVERITY: Important.** The one view the FAQ's promise is about, serving the one field the product has ruled is
-the deleted ticket's content, reached by the ordinary path of deleting an epic that has children.
+**MEASUREMENT.** Appendix J, run from `apps/server`. Lines opened: `list.ts:274-278`, `:384-452` (`:402-411`
+the residual note, `:416` `WITH RECURSIVE`, `:423`/`:433` the two `${visible}` hops); `list-cards.ts:125`;
+`routes/tickets.ts:419-431`; `executor-state-history.md:692-696`; `git log --format=%h -S"TITLE still travels"
+-- apps/server/src/routes/list.ts` and `-S"TITLE is the deleted ticket" -- apps/server/src/routes/tickets.ts`
+→ both `18d7e391`.
+
+**SEVERITY: Minor.** The gap is recorded at the line and the reader could see the title before the delete; the
+defect is that the record calls undecided what its own commit decided, and the list is now the one door out of
+four that shows the content.
 
 ---
 
