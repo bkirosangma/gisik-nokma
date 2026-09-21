@@ -4345,7 +4345,7 @@ true while its third is not).
 **SEVERITY: Important (claimed), scored at half.** A security gate's own enumeration of its doors is wrong about
 one of three, in the direction that sends a reader to build a closure that exists.
 
-## 69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist yet"* and that its own position is *"immediately after `proj_workflows`"*; both were false the day the sentence landed, and the file it says must move *"in the same commit"* did (15:35 IST)
+## 69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist yet"* and that its own position is *"immediately after `proj_workflows`"*; both became false 21 minutes after the sentence landed, and the file it says must move *"in the same commit"* did (15:35 IST)
 
 **WHAT.** `apps/server/src/projections/proj-projects.ts:26-32`: *"§8 pins `proj_entity_heads, proj_workflows,
 proj_ticket_types, proj_projects, …`. `proj_ticket_types` does not exist yet, so this one's §8 position today is
@@ -4357,9 +4357,10 @@ both of which must move in the same commit."*
 INSERTS above proj_projects, which had been immediately after proj_workflows only because this position was
 empty"*), then `projProjects` (*"§8 position 4"*). So `proj-projects` is not immediately after `proj_workflows`, the
 table it says is missing is registered above it, and the neighbour file carries the correction the docblock says
-must travel with it. Dates: the docblock landed in `dd7bfcfd` (2026-09-01, #57); the ticket-types projection landed in
-`6cb631d0` (2026-09-01, #59) — the same day; `proj-projects.ts` has been committed **4 times after** that day (5 in
-all), last `4d11d8f8` (2026-09-20), with the sentence intact.
+must travel with it. Dates: the docblock landed in `dd7bfcfd` (2026-09-01 18:51 IST, #57); the ticket-types projection and
+`index.ts`'s re-ordering landed in `6cb631d0` (2026-09-01 19:12 IST, #59) — **21 minutes later**, so the sentence
+was true for 21 minutes; `proj-projects.ts` has been committed **4 times after** that day (5 in all), last `4d11d8f8`
+(2026-09-20), with the sentence intact.
 
 **WHAT WOULD HAVE BEEN BETTER.** Delete the two sentences; `index.ts:66-72` already says what is true and why.
 
