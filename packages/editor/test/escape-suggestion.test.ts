@@ -54,7 +54,7 @@ const MARK_TRIGGERS: Trigger[] = [
   // "both", 2026-09-20) made an input-rule trigger. It belongs in this table
   // because the escape mechanic's coverage is defined as "every trigger that
   // fires an input rule", and this one does. ⚠ Its `typed` string carries NO
-  // TRAILING TEXT, and that is load-bearing rather than tidy — see 9.257, which
+  // TRAILING TEXT, and that is load-bearing rather than tidy — see 9.260, which
   // measures what happens when there is some. Every other row here is in the
   // same condition, which is what makes this table a uniform measurement.
   {
@@ -160,7 +160,7 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
   });
 
   /**
-   * 9.257 / E2-46 — THE TYPED LINK IS COVERED BY THE ESCAPE MECHANIC, and the
+   * 9.260 / E2-46 — THE TYPED LINK IS COVERED BY THE ESCAPE MECHANIC, and the
    * "asymmetry" the code and two catalogues recorded was the PROBE, not the
    * trigger.
    *
@@ -182,7 +182,7 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
    * special". Reverse the fix and this case fails on the link-at-end row, which
    * is the row the table above now carries.
    */
-  it('9.257 — the typed link is offered the escape suggestion, and continuing to type dismisses it exactly as it does for bold', () => {
+  it('9.260 — the typed link is offered the escape suggestion, and continuing to type dismisses it exactly as it does for bold', () => {
     const LINK = 'see [the doc](https://gst.gov.in)';
     const BOLD = 'x **b**';
     const read = (typed: string): ReturnType<typeof getEscapeSuggestion> => {
@@ -227,10 +227,10 @@ describe('non-triggers stay literal with no suggestion', () => {
    * a markdown link now CREATES the link, and the arm could only have been kept by
    * asserting the old behaviour as the current one. What replaced it is in
    * `schema.test.ts`, which pins what the typed link now does, **and in this file's
-   * own trigger table plus 9.257**, which pin that the typed link IS offered the
+   * own trigger table plus 9.260**, which pin that the typed link IS offered the
    * escape suggestion. (This sentence previously claimed the opposite — that the
    * suggestion is "measurably NOT offered". E2-46 measured it and that is false;
-   * 9.257 is the 2x2 that separates the trigger from the probe's conditions.)
+   * 9.260 is the 2x2 that separates the trigger from the probe's conditions.)
    */
   it.each([
     { typed: 'a | b | c', literal: 'a | b | c' },

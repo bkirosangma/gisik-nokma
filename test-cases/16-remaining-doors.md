@@ -1173,6 +1173,6 @@ using, and `docker compose` is forbidden in this topology. Owner: whoever next r
   bullet used to say the opposite.** The recorded measurement (`9.95`) compared two probes that were not run under the same
   conditions: the link probe typed `see [the doc](https://gst.gov.in) now` — text AFTER the trigger — while the bold probe
   typed `x **b**` with nothing after, and continuing to type dismisses the suggestion by design (case `9.92`). The link chip
-  was dismissed, not absent. Case `9.257` is the 2x2 that separates the trigger from the probe's conditions, and the typed
+  was dismissed, not absent. Case `9.260` is the 2x2 that separates the trigger from the probe's conditions, and the typed
   link is now a row in `9.88`'s trigger table. No production behaviour changed — the mechanism was always generic; the record
   was the defect. Recorded in `packages/editor/src/schema/extensions.ts` and `packages/editor/test/schema.test.ts` (`9.95`).
