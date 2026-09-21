@@ -139,7 +139,7 @@ git log --format='%h %ci' -S"submitTicketEvent('ticket.deleted'" -- packages/app
   → 18d7e391 2026-09-20 13:17:51 +0530
 grep -nE 'cannot delete a job|No delete button' docs/lanes/review-*.md test-cases/*.md → no matches (not previously found)
 ```
-**Related, Minor, folded in rather than filed separately:** `apps/server/src/permissions/check-permission.ts:1064-1065`
+**Related, Minor, folded in rather than filed separately:** `apps/server/src/permissions/check-permission.ts:1072-1073`
 attributes the sentence *"The ticket stops appearing in views"* to *"the FAQ's own sentence"*. `grep -rn 'stops
 appearing' docs/faq.md docs/manual.md` → **no match**; the sentence is the **prototype's** `faq-delete` entry (as
 `vocabulary.ts:203` correctly says). A docblock that cites "the FAQ" for a sentence the FAQ never carried is the
@@ -148,6 +148,101 @@ class the round-1 rulings named (*"cited a sentence from a file that never conta
 **SEVERITY: Important.** A shipped help surface contradicting a shipped control, on the one action whose
 consequences (disappearance from every board) a user most needs explained, and on a path where the undo is
 otherwise undiscoverable from the help.
+
+### E6-2 — IMPORTANT — The ingest door accepts every ordinary write against an already soft-deleted ticket, and `ticket.assigned` on one manufactures an inbox notification that points at a 404
+
+**WHAT.** Through the product's own door (`POST /v1/events`, session-authenticated, owner actor), against a ticket
+whose detail door already answers **404** and whose comments door answers **404**, the server **commits**
+`ticket.assigned`, `comment.added`, `ticket.transitioned`, `ticket.field_set` (title), `ticket.collaborator_added`
+and `visibility.set` — **byte-identical answers to the same eight-event battery run against a live ticket in the
+same run** (the two refusals, `ticket.closed` → `close-requires-terminal` and `ticket.ranked` →
+`rank-requires-backlog`, are state-of-workflow refusals and fire identically on the live control). Afterwards
+`proj_tickets` for the deleted ticket reads `{state_id: "doing", deleted_at: <set>, assignee_id: <peer>}`. And the
+`ticket.assigned` fanout inserted an `assignment` row for the peer, which `GET /v1/me/notifications` **serves** to
+the peer (200, `"ticketTitle":"to be deleted"`), while the peer's own `GET /v1/workspaces/:ws/tickets/:id` for that
+ticket answers **404**.
+
+**WHY it is wrong.** Three reasons, each measurable:
+
+1. **The product's own stated rule is broken.** `apps/server/src/notifications/sweep.ts:175-177`: *"A notification
+   is a VIEW — it appears in a person's list — so a soft-deleted ticket must not arrive there."* The due-soon sweep
+   honours it (`AND ${LIVE_TICKET_WHERE}` at `:187`, `:265`); the assignment fanout does not, and the inbox read
+   (`notifications/store.ts:128-130`, `SELECT … FROM notifications WHERE …`) joins nothing and filters nothing.
+2. **The fanout's docblock rests on a false premise.** `notifications/fanout.ts:101-107` says the fanout *"runs on
+   a claim that has just COMMITTED, about a ticket the actor could see at the time … A ticket deleted in the same
+   instant is a race … the soft-delete predicate belongs to the READS that render notifications
+   (`notifications/sweep.ts` filters at the source)"*. Measured: there is no race — the delete committed *before*
+   the assignment and the door still committed it; `canSee` is not "live" (the repo says so itself:
+   `visible-where.ts:135-136` *"A deleted ticket is still VISIBLE in the `canSee` sense"*); and `sweep.ts` is not
+   the read that renders notifications — it is the due-soon/stale *producer*; the read is `store.ts:128` and it
+   filters nothing.
+3. **The engine asks about `deleted` in exactly one file.** `grep -rn deleted packages/rule-engine/src` (code
+   lines only) → `checks/deletion.ts:64` (`already-deleted`) and `:85` (`not-deleted`); no other check reads the
+   flag. Of the 34 registered event types, **18 are not dispatched by `evaluateEvent` at all** (set difference of
+   `vocabulary.ts` registrations against `evaluate.ts` cases: `attachment.added comment.added invite.*
+   project.* ticket.assigned ticket.collaborator_* visibility.set workspace.*`), and for the ticket-scoped ones
+   the only gate is `checkVisibilityPermission`'s `canSee` (`check-permission.ts:1046`). So a state change on a
+   ticket that *"stops appearing in views"* is applied where nobody can review it, its comment lands in a thread
+   the comments door refuses to serve (case 16.72), and a `Restore` brings the ticket back in a state and with an
+   assignee nobody saw set.
+
+**This is not a ruled divergence.** I searched for a ruling: `visible-where.ts:173-178` explains why the *engine
+context* must serve deleted rows — *"an engine that cannot see a deleted ticket refuses its own undo
+(`ticket.restored`) with `unknown-ticket`"* — which is a reason for the context's reader, not a ruling that other
+writes are accepted. Case `16.90` records *"`canSee` does not mean 'not deleted'"* as the reason the attachment
+doors leaked, and the owner's ruling on that (*"attachments leak: do as you recommend"*, `16-remaining-doors.md:933`)
+closed the **upload** door with `ticketIsLive` (`routes/attachments.ts:388`, cases `16.97`–`16.99`). So the
+product's precedent is that a write door **refuses** a deleted ticket — and the six event types above are the
+doors that were not walked.
+
+**Doors this reaches in the product, not only in a probe.** (a) `packages/mcp-server/src/tools/write-tools.ts:144`,
+`:163`, `:185` — `transition_ticket`, `add_comment`, `assign_ticket` submit with no read-before-write, so an agent
+holding an id from an earlier `list` gets `committed` from the same product whose `get_ticket` answers not-found;
+(b) `POST /v1/sync` wraps the same ingest (`ingest-service.ts:221-223`), so an offline replica that still holds
+the ticket pushes its edits and gets no refusal and no contest; (c) any second user with the sheet open when the
+delete lands — `ticket-sheet.tsx` closes only for the actor who pressed `Delete`.
+
+**WHAT WOULD HAVE BEEN BETTER.** One rule, in the engine where the deleted flag is already read: a ticket-scoped
+event other than `ticket.restored` (and `ticket.deleted` itself, which already refuses) is refused with a
+`ticket.deleted`-family rule (*"This ticket is deleted; restore it first"*) — `checks/deletion.ts` already has the
+lookup and the refusal vocabulary (`REFUSAL_RULES.alreadyDeleted`). That closes all six types on all three doors
+at once, and it makes the fanout's premise true rather than asserted. The pass-through types (`comment.added`,
+`ticket.assigned`, `collaborator_*`, `visibility.set`, `attachment.added`) need a dispatch arm; today they have
+none. Then rewrite `fanout.ts:101-107` to say what is true.
+
+**MEASUREMENT.** Probe file (verbatim in Appendix A), run once, 1 file / 1 test passed, raw output through
+`rtk proxy` (rtk's filter had swallowed the console lines on the first run):
+```
+cd apps/server && pnpm exec vitest run test/zz-exec6-probe-deleted-writes.test.ts --no-file-parallelism
+PROBE detail(deleted)=404 detail(live)=200
+PROBE answers:                       (deleted ticket)      PROBE LIVE control answers:
+  ticket.assigned            -> committed                  committed
+  comment.added              -> committed                  committed
+  ticket.transitioned        -> committed                  committed
+  ticket.field_set           -> committed                  committed
+  ticket.collaborator_added  -> committed                  committed
+  ticket.closed              -> refused (close-requires-terminal …)   refused (same)
+  ticket.ranked              -> refused (rank-requires-backlog …)     refused (same)
+  visibility.set             -> committed                  committed
+PROBE second ticket.deleted -> refused (already-deleted)          ← the flag IS read, by one check
+PROBE comments read(deleted)=404
+PROBE notifications rows for peer: 2   (assignment "to be deleted", assignment "live")
+PROBE inbox(peer)=200 body={"notifications":[… "kind":"assignment","payload":{"ticketId":"<DELETED>","ticketTitle":"to be deleted" …
+PROBE peer detail(deleted)=404
+PROBE proj_tickets row after writes: {"state_id":"doing","deleted_at":"2026-09-21T04:29:34.673Z","assignee_id":"<peer>"}
+ Test Files  1 passed (1)   Tests  1 passed (1)
+```
+Lines opened: `evaluate.ts:26-69` (dispatch, `default: return { refused: false }`), `check-permission.ts:1046`
+(`canSee` gate), `can-see.ts:227-234` (reads `proj_visibility` only), `fanout.ts:101-107`, `:122`,
+`sweep.ts:175-177`, `store.ts:128-130`, `deletion.ts:64`/`:85`, `write-tools.ts:144`/`:163`/`:185`.
+Set difference: `grep -oE "^\s*type: '[^']+'" packages/domain/src/vocabulary.ts` (34) vs
+`grep -oE "case '[^']+'" packages/rule-engine/src/evaluate.ts` (16) → 18 pass-through.
+
+**SEVERITY: Important.** Not Critical: the actor could see the ticket, so nothing leaks and nothing is lost —
+the ledger keeps it all. But the server accepts writes the product's every read surface says cannot be happening,
+one of them produces a user-visible notification into a dead link, and the docblock guarding the path asserts a
+premise the door does not enforce. It is the *"client believes what the server declined"* shape run backwards:
+the server believes what its own reads decline.
 
 ---
 
