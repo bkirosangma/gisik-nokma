@@ -728,20 +728,41 @@ export function TicketSheet({
       type: 'ticket.transitioned',
       payload: transitionPayload,
     });
-    const results = await dataSource.ingest([...fieldEvents, transition]);
-    const failed = results.find((result) => result.status !== 'committed');
-    if (failed === undefined) {
+    try {
+      const results = await dataSource.ingest([...fieldEvents, transition]);
+      const failed = results.find((result) => result.status !== 'committed');
+      if (failed === undefined) {
+        setServerRefusal(null);
+        setTransportError(null);
+        setMoveOpen(false);
+        read.reload();
+        history.reload();
+        return;
+      }
+      // The authority's own words, carried without paraphrase. A refusal is a
+      // named rule and a reason the engine wrote; an `invalid` is the door's code
+      // and message. Both reach the user as they were said.
+      setTransportError(null);
+      if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
+      else setServerRefusal({ rule: failed.code, reason: failed.message });
+    } catch (cause) {
+      // E2-29 — a dropped connection during a Move, which used to produce
+      // nothing at all. The await above had no `catch` and the call site is
+      // `void submitTransition(submission)`, so a rejected `ingest` was an
+      // unhandled promise rejection: the sheet's own transport sentence renders
+      // only when `!moveOpen`, and the dialog replacing it was handed the
+      // literal `null`, so no surface could speak. Same channel and same
+      // sentence the sibling writes here use (`submitTicketEvent`), and the
+      // same one `board.tsx`'s `submitFromDialog` reaches for a dialog Move —
+      // Ruling 27's split: a silence is not an adjudication, so this is
+      // `transportError`/`gn-refusal--transport`, never a `{rule, reason}` pair
+      // standing in for one. The dialog stays open, and it is the dialog that
+      // carries the sentence: it is the surface in view, and the retry lives
+      // there.
+      const message = cause instanceof Error ? cause.message : String(cause);
       setServerRefusal(null);
-      setMoveOpen(false);
-      read.reload();
-      history.reload();
-      return;
+      setTransportError(`We could not reach the server for this move — ${message}`);
     }
-    // The authority's own words, carried without paraphrase. A refusal is a
-    // named rule and a reason the engine wrote; an `invalid` is the door's code
-    // and message. Both reach the user as they were said.
-    if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
-    else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
 
   /**
@@ -2634,14 +2655,16 @@ export function TicketSheet({
           onSubmit={(submission) => void submitTransition(submission)}
           precheck={precheck}
           serverRefusal={serverRefusal}
-          // `submitTransition` above stays unguarded (see its own docblock
-          // precedent, cited by `board.tsx`'s `submitDirect`/`submitFromDialog`)
-          // — a rejected `ingest` here is an unhandled promise rejection, not a
-          // state this component tracks, so there is nothing to pass but `null`.
-          // Not Ruling 27's scope: that ruling is about a fabricated `{rule,
-          // reason}` pair standing in for a real refusal, which this file never
-          // did — it just never caught the rejection at all.
-          transportError={null}
+          // E2-29 — this slot now carries the sheet's own `transportError`,
+          // the same value the paragraph above renders when the dialog is
+          // closed. It was the literal `null` while `submitTransition` was
+          // unguarded (it awaited `ingest` with no `catch`), and the slot is
+          // therefore the one that had to change when that `catch` landed: the
+          // dialog is the surface in view during a Move, so it — not the
+          // paragraph it is covering — is the one that speaks. Same sentence,
+          // same class, same Ruling 27 split: a dropped connection is not an
+          // adjudication and never wears the refusal's words.
+          transportError={transportError}
           uploadEvidence={uploadEvidence}
         />
       ) : null}

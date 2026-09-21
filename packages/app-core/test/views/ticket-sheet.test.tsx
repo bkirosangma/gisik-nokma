@@ -533,6 +533,57 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(serverBox).toHaveTextContent('ticket.transitioned is not a registered event type.');
   });
 
+  /**
+   * 3.178 / E2-29 — a dropped connection during a Move used to produce nothing
+   * at all.
+   *
+   * `submitTransition` awaited `dataSource.ingest([...])` with no `try`, and its
+   * call site is `void submitTransition(submission)` — so a REJECTED ingest was
+   * an unhandled promise rejection. The sheet does hold a transport sentence,
+   * but it renders only when `!moveOpen`; the dialog that replaces it while a
+   * Move is being made was handed the literal `transportError={null}`, so there
+   * was no surface anywhere that could speak. The sibling writes on the same
+   * sheet (`submitTicketEvent` for Close/Reopen/Delete) do catch and disclose,
+   * which is what makes this an omission rather than a design.
+   *
+   * The assertion is deliberately about WHICH surface speaks and in WHICH
+   * voice: the alert is read inside the Move dialog (the surface in view — the
+   * sheet's own copy is gated out while it is open), and it must not wear the
+   * refusal's sentence or its class. A dropped connection is not an
+   * adjudication, and a person cannot act on it as one.
+   */
+  it('3.178 / E2-29: a rejected ingest during a Move is spoken by the dialog, never as the server’s own verdict', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => {
+        throw new Error('network unreachable');
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'filed at the portal');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('We could not reach the server for this move — network unreachable');
+    expect(alert).not.toHaveTextContent('Refused by the server');
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
+    // The dialog stays: the retry lives here, and so does the sentence.
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+  });
+
   it('a committed batch closes the dialog and clears any earlier refusal', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());
