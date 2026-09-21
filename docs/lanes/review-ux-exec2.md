@@ -2597,6 +2597,27 @@ names what it measured.
 **The boundary on this reach, stated plainly:** six ids of 2606, chosen because they were checkable —
 **0.2 % of the catalogue.** I am not claiming the catalogue is verified. I am claiming one of its scan
 claims was re-run and holds, and that the rest remains unreached.
+## R2.17d — TWO NAMED UNIVERSES NOW COMPLETE
+
+The controller directed the remaining phase-1 time at my own not-reached list. Two of my §1 universes are
+now read end to end rather than sampled, and that is the claim being made here — **complete, not spot-
+checked**:
+
+| universe | size | what was reached | verdict |
+|---|---|---|---|
+| **`apps/web/src`** (§1.3 in round 1) | **38 files** | every file read or surveyed: the shell (`app-nav`, `account-menu`, `inbox-nav-link`, `last-project-nav`, `legal-chrome`, `legal-nav`, `shell-refusal`, `expired-session`), the account sections, the toggles, the filter trio (`filter-cycle`, `filter-edits`, `tri-state-choice`), the naming hooks (`use-project-name`, `use-workspace-name`, `use-last-project`, `use-last-workspace`), `ticket-location`, `board-search-scope`, `backlog-rank-controls`, the authoring pair, `ist-today`, `list-narrowing-word` | **no new finding** — and two controls are worth naming as *better* than my own findings assume: `backlog-rank-controls.tsx:291,300` **has** a `submitting` latch where my `E2-29` found `submitTransition` has none, and `tri-state-choice.tsx:14` carries its state as a **glyph as well as** a colour (*"never colour alone"*) |
+| **`packages/ui/src/components`** | **11 files** | all read: `avatar`, `button`, `card`, `chip`, `dialog`, `info-tip`, `segmented-control`, `select`, `sheet`, `switch`, `table`, `toast` | **no new finding**; the two candidates raised were killed on their last link (`table.tsx`'s clickable row is redundant over a real title button; `inbox-view.tsx`'s ungated "Load more" is gated by its caller) |
+
+**One thing the `apps/web/src` pass changed, and it is a correction to my own framing rather than a finding.**
+I have filed four findings of the shape *"a control offers what can only be refused or discarded"* (`E2-2`,
+`E2-20`, `E2-29`, `E2-40`). The two controls named above show the codebase **also** does the opposite
+consistently where it matters — a latch, a state carried by shape as well as colour — so those findings read
+as omissions against a live house style, which is the argument I made for each of them and can now make with
+two more measured examples.
+
+**Still unreached, and it is a short list:** `/settings` at screen level (its components are read), the bulk
+of the 13.x catalogue, and `packages/editor/src/index.ts`, `attachment-claims.ts` and the two remaining
+`webview` files.
 ## R2.18 — THE LAST UNREAD SCREENS, AND WHY I STOPPED HUNTING
 
 Two surfaces I had never opened — the **Calendar** (`calendar-view.tsx`, 514 lines) and the **Timeline**
