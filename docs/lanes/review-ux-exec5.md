@@ -1490,6 +1490,12 @@ end-to-end (no writes) · the delete/undo round trip (no writes) · **NARROW VIE
 but the page stayed at 1512 px (macOS full-screen window); the repo's `apps/web/e2e-viewport/responsive.spec.ts`
 measures 390/768/1512 and I did not run it; signed-out routes at 390 px were later reached in the second browser (above).
 
+**Timeline note.** A network outage on this box (13:32–13:46 IST, DNS/API unreachable; reported by the controller)
+ended my turn mid-way. The branch tip at that moment, `51db89d6`, had been pushed at 13:31, so nothing was lost;
+work resumed at 13:49 from that commit. Cross-lane state at 13:49: exec 3 (13:49) and exec 6 (13:32) pushed during
+the window — citation-range trims and a seventh attempted refutation of `E6-9` (holds) — and nothing new touches a
+finding of mine.
+
 ### 6.2 Read in source
 
 `board.tsx` (card view `:1000-1063`, drag `:940-1000`, drop `:640-665`, `:875-885`) · `ticket-sheet.tsx` (`:654-700`,
