@@ -10,8 +10,8 @@
 # ⬛ THE SUBMISSION AT A GLANCE — one screen, for a judge ruling on six reports
 
 **Counts, measured from the sections below rather than written from memory.** 19 landed findings from
-round 1 (`E2-1`–`E2-19`; all 19 ACCEPTED, base 49 points) · **29 new** (`E2-20`–`E2-48`; **18 Important,
-11 Minor, 0 Critical**) · **48 in the report** · 77 cited paths, none missing · every line number inside its
+round 1 (`E2-1`–`E2-19`; all 19 ACCEPTED, base 49 points) · **30 new** (`E2-20`–`E2-49`; **18 Important,
+12 Minor, 0 Critical**) · **49 in the report** · 77 cited paths, none missing · every line number inside its
 file · every finding carries a severity line.
 
 **Three decisions the rules forced, each argued at its site.**
@@ -54,7 +54,7 @@ failure mode of this session; it was caught only because a finding count I re-ru
 back **43** instead of 26. Restored from `ef219034` (verified clean before use) and redone with **function**
 replacements, which do not interpret dollar-patterns. The diff is now exactly the two intended edits.
 **A final automated audit of both artifacts, re-run at the end of phase 1 and clean on every section.**
-Counts measured against the sections rather than remembered: **29 round-2 findings, 18 Important / 11
+Counts measured against the sections rather than remembered: **30 round-2 findings, 18 Important / 12
 Minor, 0 Critical, every one with a severity line; 43 refutation targets and 43 rows, no duplicates, and the
 stated count equal to the measured one.** Both files' citations resolve — **79 distinct paths in the report
 and 22 in the refutations file, none missing, every line number inside its file.** No duplicated finding
@@ -1383,212 +1383,6 @@ between them is docs-only (§R2.3), so the code layer is current. The graph loca
 claim above cites a line I opened myself**, per the rules' warning that the graph's edge is a pointer and
 not evidence.
 
-# R2.19 — NEW FINDING, BATCH 9 — and it is about my own change
-
-### E2-46 (r2) — IMPORTANT · A typed `[text](url)` becomes markup with no escape suggestion, where every other formatting trigger offers one — a hole in §2's named property that my own change opened
-
-**WHAT.** Spec §2's named mechanic is that *"nothing silently becomes markup"*: when a typed reserved
-sequence triggers formatting, the editor surfaces an inline suggestion offering the escaped literal.
-`packages/editor/src/schema/extensions.ts:76-96` records that `markdownLinks` went **false → true** under the
-owner's 2026-09-20 ruling (*"both"*), **which my own change set landed**, and then records the consequence
-at `:91-96`:
-
-> *"⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT DOES NOT WIDEN THE ESCAPE MECHANIC: a typed link now
-> fires an input rule, but **typing one offers no escape suggestion where `**due soon**` does.** That
-> asymmetry is measured in `test/schema.test.ts` (9.95) with its cause left unestablished rather than
-> guessed — owner: whoever next touches the trigger coverage."*
-
-**And the measurement is a probe, not an inference.** `test/schema.test.ts:354-360` (case **9.95**): *"typing
-> this link does NOT offer the escape suggestion that `**due soon**` offers, even though both fire an input
-> rule and both are formatting the escape mechanic exists to let a user keep literal. **Measured, not
-> inferred** — a probe typed both and read `getEscapeSuggestion` on each."*
-
-**WHY it is wrong.** A person types `[the doc](https://gst.gov.in)` and the text becomes a **link** — the
-product's own example of markup — with **no suggestion to keep it literal**, where typing `**due soon**`
-offers exactly that. So the escape mechanic's coverage is now *smaller than the trigger set it exists to
-cover*, and the trigger set grew by one **because of a ruling whose premise was that the property §2 names
-already did not hold for pasted URLs** (`extensions.ts:79-86`). That premise is sound for the *paste* path —
-and the ruling did not address the *typed* path, on which the property now holds for `**bold**` and fails
-for a link. **The asymmetry is the defect: one trigger out of the set has no way back.**
-
-**Classification, stated plainly: this is a RECORDED, OWNED, OPEN gap — not "the product behaving as
-ruled."** The owner ruled on `markdownLinks`, not on the trigger table; the file names an owner for this
-asymmetry specifically (*"whoever next touches the trigger coverage in `extensions/escape-suggestion.ts`"*),
-and it says the cause is *unestablished*, which is an invitation rather than a decision. **I am filing it as
-the lane that caused it**, because my `markdownLinks: true` is what made a typed link fire an input rule at
-all — and because a reviewer who reports only other people's mistakes has skipped the set he is best placed
-to see.
-
-**WHAT WOULD HAVE BEEN BETTER.** Either add the typed-link rule to the escape trigger table — so
-`[text](url)` offers *"Keep as literal text"* beside `**due soon**`'s — or record a ruling that the typed
-link is deliberately outside the mechanic, which would be a decision about §2 rather than a side effect of a
-decision about an option. ⚠ **I did not establish the cause either**, and I am not guessing at one: the
-file says the probe read `getEscapeSuggestion` on both paths, and the reason one is empty is the thing the
-next reader should open rather than inherit from me.
-
-**MEASUREMENT.** Opened: `packages/editor/src/schema/extensions.ts:76-96` (the reversal and the recorded
-asymmetry), `:195-196` (`EscapeSuggestion` **is** the last entry `buildEditorExtensions` returns — I checked,
-because the escape mechanic's command override depends on it), `packages/editor/test/schema.test.ts:342-361`
-(case 9.95, the measured probe), `packages/editor/src/extensions/escape-suggestion.ts:6-120` (the mechanism,
-its measured Tiptap failure, and the two-part fix).
-
-**Source:** new area — `packages/editor` beyond the four files I had read, reached by working my own
-coverage list as instructed. **Severity: Important.**
-
----
-*Batch 11 filed. Running total of round-2 new findings: `E2-20`–`E2-48` (29) — 18 Important, 11 Minor.*
-# R2.20 — NEW FINDING, BATCH 10
-
-### E2-47 (r2) — MINOR · The ticket sheet's own symbol sweep names three unwired exports and misses a fourth, whose docblock hands its correctness gap to a caller that does not exist
-
-**WHAT.** `packages/app-core/src/views/ticket-sheet.tsx:891-899` records a measured sweep:
-
-> *"The claim is COMPOSED elsewhere already: `packages/editor/src/drive/attachment-claims.ts` exports
-> `composeUploadAttachmentAdded` and `composeDriveReferenceAdded`, both tested. **Neither has a production
-> caller** — the symbol sweep returns their tests, their export and one docblock citation, and nothing else —
-> **and neither does `EvidencePicker`**, the other path that would emit one. Mobile has no wiring for the
-> event at all. So the code to make a claim existed and was never reachable from a screen."*
-
-**A fourth export in that family is not named: `transitionRequiresEvidence`.**
-`packages/editor/src/attachments/require-evidence.ts:61`, exported from the package barrel
-(`packages/editor/src/index.ts:66`). A walk of every `.ts`/`.tsx` under `apps/` and `packages/` outside `dist/`
-and tests returns **zero production callers** — its only non-test mentions are its own declaration, the barrel
-export and the compiled copies in `dist/`. ⚠ **The one apparent hit, `ticket-sheet.tsx:897`, is the docblock
-text above** — I checked it because a grep hit that is prose reads exactly like a call site.
-
-**WHY it is wrong, and why the fourth one matters more than the three that are named.** Its docblock is
-explicit that it does **not** reproduce the engine's state resolution — it matches the `fromStateId` the
-caller hands it verbatim, where the engine folds the ticket's state through every published `stateMapping`
-first (`transition.ts:60`, `:92`) — and it prices both failure directions: a false `true` prompts for evidence
-a live edge does not require, and a false `false` **"skips the prompt a live edge does require, which the
-server then refuses on submission for lack of `evidenceAttachmentId`"**. It then hands that gap onward:
-*"closing it means folding the state id here too, which is **this function's caller's business** (whoever
-wires it to a ticket's live state)"*. **That caller does not exist.** So a documented correctness gap is
-assigned to an owner who is not in the building, in a file whose three siblings were swept and named and this
-one was not — which is the shape where a gap reads as *tracked* precisely because a sweep was run nearby.
-
-**WHAT WOULD HAVE BEEN BETTER.** Two answers, both one line: **export it or delete it.** If the client is not
-going to decide the evidence prompt from the workflow definition — and the sheet's own docblock says the
-engine is the authority — then the function should not be public, because a public symbol with a documented
-unclosed gap invites a future caller to take it up without the folding its docblock requires. If it *is* to be
-used, the folding belongs inside it, since the docblock already establishes that no caller can be expected to
-know. **Either way the sweep in the sheet should name four, not three**, so the next reader does not have to
-re-run it to learn that this one exists.
-
-**MEASUREMENT.** Opened: `packages/editor/src/attachments/require-evidence.ts:1-67` (in full — the mirror, the
-two facts it derives by reading the engine, and the state-resolution gap it declines to close);
-`packages/editor/src/index.ts:66` (the barrel export); `packages/app-core/src/views/ticket-sheet.tsx:891-899`
-(the recorded sweep that names three); and a walk of every `.ts`/`.tsx` under `apps/` + `packages/` excluding
-`dist/` for the symbol, which returns **6 non-test mentions: 4 in `dist/`, its declaration, and the barrel**
-— zero callers. Also checked, and it holds: `EscapeSuggestion` **is** the last entry
-`buildEditorExtensions` returns (`schema/extensions.ts:195`), which the escape mechanic's command override
-depends on.
-
-**Source:** `packages/editor` beyond the four files I had read — reached by working my own coverage list as
-the controller directed. **Severity: Minor** — nothing is broken by an unused export; what is wrong is a
-public symbol with an unclosed gap whose owner is named as a caller that does not exist, inside a sweep that
-counted its neighbours and not it.
-### E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the symptom here is an empty board with no error
-
-**WHAT.** `apps/mobile/src/app.tsx:28-60`:
-
-```
-useEffect(() => {
-  if (workspaceId === '' || TOKEN === '') return;
-  let stop: (() => void) | undefined;
-  void (async () => {
-    const storage = await createOpSqliteStorage();      // :32
-    const replica = await createReplica({ storage });   // :33
-    const outbox  = createOutbox({ storage, replica }); // :34
-    const engine  = createSyncEngine({ … });            // :35-39
-    const dataSource = createReplicaDataSource({ … });  // :40
-    setDs(dataSource);                                  // :41
-    …
-  })();
-  return () => stop?.();
-}, [workspaceId]);
-```
-
-**No `catch`, no `.catch`, nothing.** `ds` is set **only on success**, and every consumer is gated on it:
-`BoardScreen`'s effect opens `if (ds === null) return;` (`board-screen.tsx:22`), and `TicketScreen` returns
-`<Text>Opening…</Text>` while `ds === null` (`ticket-screen.tsx:31`).
-
-**WHY it is wrong, and what makes it reachable — the last link.** `createOpSqliteStorage`
-(`storage/op-sqlite-storage.ts:43-46`) is `const { open } = await import('@op-engineering/op-sqlite'); return
-wrapOpSqliteDatabase(open({ name }));` — **a dynamic import of a NATIVE module, then a database open**. Both
-reject: a dynamic import fails when the native module is not linked or not present for the platform, and
-`open` throws when the database cannot be created. **So the phone's first await is genuinely rejectable, and
-nothing catches it** — the app renders, `ds` stays `null`, and the Board is an empty list with no row, no
-sentence and no error, for ever. A person sees a workspace with no work in it.
-
-**This is the sibling of `E2-43`, and I am filing it separately for one reason: the symptom is different.**
-There, the desktop shell showed *"Opening local replica…"* — a loading sentence that never resolves, which
-at least says *something is happening*. Here the shell shows **an empty board**, which is a claim about the
-workspace. The same absent `catch` produces a persistent lie in one and a persistent wait in the other, and a
-fix applied to one shell would leave the other.
-
-**WHAT WOULD HAVE BEEN BETTER.** A `catch` on the IIFE writing into an error state the shell renders in place
-of the Board — the shape `E2-43` asks for on desktop. The two shells share their architecture (`createReplica
-→ createOutbox → createSyncEngine → createReplicaDataSource`, then `setDs`) and differ only in the storage
-adapter, so one pattern read twice would fix both.
-
-**MEASUREMENT.** Opened: `apps/mobile/src/app.tsx:1-97` (the env tokens, the effect and its four awaits, the
-`setDs` at `:41`, the two screens' gates); `apps/mobile/src/storage/op-sqlite-storage.ts:43-46` (the dynamic
-import and `open`); `apps/mobile/src/screens/board-screen.tsx:22` and `ticket-screen.tsx:31` (the gates).
-⚠ **Not driven:** I did not run the app, so I claim the code path and the rejectability of the first await,
-not a reproduction.
-
-**Source:** `apps/mobile` beyond the two screens `E2-41`/`E2-42` needed — reached by working my own coverage
-list as the controller directed. **Severity: Important.**
-### E2-49 (r2) — MINOR · Push registration's declared contract is not total: a transport failure escapes as a rejection its only caller voids
-
-**WHAT.** `apps/mobile/src/push/register-push.ts:9-38` declares
-`Promise<{ registered: boolean; reason?: string }>` and returns a discriminated outcome for four cases — a
-token failure (`:28-30`, `reason: 'no-token'`), a 404 (`:36`, `'transport-unavailable'`), any non-ok
-(`:37`, `` `http-${res.status}` ``) and success (`:38`). **The `fetch` at `:31` is not inside any `catch`**, so a
-transport failure — offline, a dropped socket — **rejects** instead of returning `{ registered: false,
-reason: … }`.
-
-**And its only caller voids it.** `apps/mobile/src/app.tsx:52`: `void registerPushToken({ baseUrl: API_BASE,
-token: TOKEN });` — a `void`, so the rejection is unhandled and the caller never learns.
-
-**WHY it is wrong, with the blast radius stated honestly rather than inflated.** The file's own docblock
-says it is *"written to degrade honestly — the app keeps working without push"*, and that is true: push is
-optional, the server has no `/v1/push/registrations` route yet (the file verified that), and nothing a person
-sees depends on this call. **What is wrong is narrower and real: the function's declared return type
-promises totality — every path answers `{registered, reason}` — and one path does not.** A caller written
-against the signature would have no reason to expect a rejection, and the one that exists does not handle
-one. That is the same shape as `E2-45` (a void'd promise on a control whose failure is silent) at a fraction
-of the consequence, and it is worth one line because a type that over-promises is what makes the next caller
-write the wrong thing.
-
-**WHAT WOULD HAVE BEEN BETTER.** Move the `fetch` inside the `try` at `:26-30`, or add a second `catch`
-returning `{ registered: false, reason: 'unreachable' }` — the vocabulary is already there in spirit (the
-404 arm is `'transport-unavailable'`, which is a *different* fact from a request that never got an answer,
-and conflating them would be the mistake Ruling 27/33 exists to prevent). ⚠ **And the reason must be a
-third value, not the 404 one** — this product has a standing rule that a refusal and a dropped connection are
-never the same word.
-
-**MEASUREMENT.** Opened: `apps/mobile/src/push/register-push.ts:1-39` (in full — the four return arms, the
-`try`/`catch` that covers only `getToken`, and the unguarded `doFetch` at `:31`);
-`apps/mobile/src/app.tsx:52` (the `void` call site). ⚠ **Checked and NOT a defect, so it is not filed:** the
-permission denial at `:21` throws, and that throw **is** caught by the `try` at `:26` — I read it expecting a
-second hole and there is not one.
-
-**Source:** `apps/mobile` beyond the files `E2-41`/`E2-42`/`E2-48` needed — reached by working my own
-coverage list as the controller directed. **Severity: Minor.**
-
----
-
-*executor 2 — UX, round 2. Phase 1 in progress. Branch `exec2/review-ux-r2`; pushed at each checkpoint.
-**No fix, no PR.***
-
----
-
-# R2.7 — NEW FINDINGS, BATCH 2
-
----
-
 ### E2-23 (r2) — IMPORTANT · "You have no passkeys yet." is asserted over a read that failed
 
 **WHAT.** `apps/web/app/account/page.tsx:180` — `passkeyClient.list().then(setPasskeys, () => setPasskeys([]));`
@@ -2796,7 +2590,7 @@ screen was not: `E2-44` is the finding. **The lesson I would keep: "I am finding
 reading about the files already opened, not about the files not yet opened** — and I nearly used it to skip
 two.
 
-**What phase 1 leaves, stated as the boundary:** 29 new findings on the landed 19, one withdrawal, one
+**What phase 1 leaves, stated as the boundary:** 30 new findings on the landed 19, one withdrawal, one
 standing-up against a ruling, five candidates examined and rejected with their measurements, one omission
 recorded as mine, and no refutations — because I read all three concurrent reports and could not falsify
 one.
@@ -3109,7 +2903,7 @@ Round 2 took me into **the workflow builder** (`E2-20`–`E2-22`), **`/account`*
 **`/inbox`** (`E2-26`), **the offline/degraded components and both other shells** (`E2-25`), and the
 shared **`Dialog`/`Select`/`Toast` primitives (`E2-27`, `E2-31`, `E2-34`, `E2-33`)**.
 
-**Sources of the 29 new findings, recounted at this push** (the earlier text here said 19; the paragraph
+**Sources of the 30 new findings, recounted at this push** (the earlier text here said 19; the paragraph
 is corrected rather than left to drift):
 
 | source | count | members |
@@ -3156,13 +2950,224 @@ the graph pointed, it did not verify.
    would have cost **15** rather than earned 5. That is the clearest argument for verifying a lead before
    filing it, and I am recording it because the near-miss is more instructive than the catch.
 
+# R2.19 — NEW FINDING, BATCH 9 — and it is about my own change
+
+### E2-46 (r2) — IMPORTANT · A typed `[text](url)` becomes markup with no escape suggestion, where every other formatting trigger offers one — a hole in §2's named property that my own change opened
+
+**WHAT.** Spec §2's named mechanic is that *"nothing silently becomes markup"*: when a typed reserved
+sequence triggers formatting, the editor surfaces an inline suggestion offering the escaped literal.
+`packages/editor/src/schema/extensions.ts:76-96` records that `markdownLinks` went **false → true** under the
+owner's 2026-09-20 ruling (*"both"*), **which my own change set landed**, and then records the consequence
+at `:91-96`:
+
+> *"⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT DOES NOT WIDEN THE ESCAPE MECHANIC: a typed link now
+> fires an input rule, but **typing one offers no escape suggestion where `**due soon**` does.** That
+> asymmetry is measured in `test/schema.test.ts` (9.95) with its cause left unestablished rather than
+> guessed — owner: whoever next touches the trigger coverage."*
+
+**And the measurement is a probe, not an inference.** `test/schema.test.ts:354-360` (case **9.95**): *"typing
+> this link does NOT offer the escape suggestion that `**due soon**` offers, even though both fire an input
+> rule and both are formatting the escape mechanic exists to let a user keep literal. **Measured, not
+> inferred** — a probe typed both and read `getEscapeSuggestion` on each."*
+
+**WHY it is wrong.** A person types `[the doc](https://gst.gov.in)` and the text becomes a **link** — the
+product's own example of markup — with **no suggestion to keep it literal**, where typing `**due soon**`
+offers exactly that. So the escape mechanic's coverage is now *smaller than the trigger set it exists to
+cover*, and the trigger set grew by one **because of a ruling whose premise was that the property §2 names
+already did not hold for pasted URLs** (`extensions.ts:79-86`). That premise is sound for the *paste* path —
+and the ruling did not address the *typed* path, on which the property now holds for `**bold**` and fails
+for a link. **The asymmetry is the defect: one trigger out of the set has no way back.**
+
+**Classification, stated plainly: this is a RECORDED, OWNED, OPEN gap — not "the product behaving as
+ruled."** The owner ruled on `markdownLinks`, not on the trigger table; the file names an owner for this
+asymmetry specifically (*"whoever next touches the trigger coverage in `extensions/escape-suggestion.ts`"*),
+and it says the cause is *unestablished*, which is an invitation rather than a decision. **I am filing it as
+the lane that caused it**, because my `markdownLinks: true` is what made a typed link fire an input rule at
+all — and because a reviewer who reports only other people's mistakes has skipped the set he is best placed
+to see.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either add the typed-link rule to the escape trigger table — so
+`[text](url)` offers *"Keep as literal text"* beside `**due soon**`'s — or record a ruling that the typed
+link is deliberately outside the mechanic, which would be a decision about §2 rather than a side effect of a
+decision about an option. ⚠ **I did not establish the cause either**, and I am not guessing at one: the
+file says the probe read `getEscapeSuggestion` on both paths, and the reason one is empty is the thing the
+next reader should open rather than inherit from me.
+
+**MEASUREMENT.** Opened: `packages/editor/src/schema/extensions.ts:76-96` (the reversal and the recorded
+asymmetry), `:195-196` (`EscapeSuggestion` **is** the last entry `buildEditorExtensions` returns — I checked,
+because the escape mechanic's command override depends on it), `packages/editor/test/schema.test.ts:342-361`
+(case 9.95, the measured probe), `packages/editor/src/extensions/escape-suggestion.ts:6-120` (the mechanism,
+its measured Tiptap failure, and the two-part fix).
+
+**Source:** new area — `packages/editor` beyond the four files I had read, reached by working my own
+coverage list as instructed. **Severity: Important.**
+
+---
+*Batch 11 filed. Running total of round-2 new findings: `E2-20`–`E2-48` (29) — 18 Important, 11 Minor.*
+# R2.20 — NEW FINDING, BATCH 10
+
+### E2-47 (r2) — MINOR · The ticket sheet's own symbol sweep names three unwired exports and misses a fourth, whose docblock hands its correctness gap to a caller that does not exist
+
+**WHAT.** `packages/app-core/src/views/ticket-sheet.tsx:891-899` records a measured sweep:
+
+> *"The claim is COMPOSED elsewhere already: `packages/editor/src/drive/attachment-claims.ts` exports
+> `composeUploadAttachmentAdded` and `composeDriveReferenceAdded`, both tested. **Neither has a production
+> caller** — the symbol sweep returns their tests, their export and one docblock citation, and nothing else —
+> **and neither does `EvidencePicker`**, the other path that would emit one. Mobile has no wiring for the
+> event at all. So the code to make a claim existed and was never reachable from a screen."*
+
+**A fourth export in that family is not named: `transitionRequiresEvidence`.**
+`packages/editor/src/attachments/require-evidence.ts:61`, exported from the package barrel
+(`packages/editor/src/index.ts:66`). A walk of every `.ts`/`.tsx` under `apps/` and `packages/` outside `dist/`
+and tests returns **zero production callers** — its only non-test mentions are its own declaration, the barrel
+export and the compiled copies in `dist/`. ⚠ **The one apparent hit, `ticket-sheet.tsx:897`, is the docblock
+text above** — I checked it because a grep hit that is prose reads exactly like a call site.
+
+**WHY it is wrong, and why the fourth one matters more than the three that are named.** Its docblock is
+explicit that it does **not** reproduce the engine's state resolution — it matches the `fromStateId` the
+caller hands it verbatim, where the engine folds the ticket's state through every published `stateMapping`
+first (`transition.ts:60`, `:92`) — and it prices both failure directions: a false `true` prompts for evidence
+a live edge does not require, and a false `false` **"skips the prompt a live edge does require, which the
+server then refuses on submission for lack of `evidenceAttachmentId`"**. It then hands that gap onward:
+*"closing it means folding the state id here too, which is **this function's caller's business** (whoever
+wires it to a ticket's live state)"*. **That caller does not exist.** So a documented correctness gap is
+assigned to an owner who is not in the building, in a file whose three siblings were swept and named and this
+one was not — which is the shape where a gap reads as *tracked* precisely because a sweep was run nearby.
+
+**WHAT WOULD HAVE BEEN BETTER.** Two answers, both one line: **export it or delete it.** If the client is not
+going to decide the evidence prompt from the workflow definition — and the sheet's own docblock says the
+engine is the authority — then the function should not be public, because a public symbol with a documented
+unclosed gap invites a future caller to take it up without the folding its docblock requires. If it *is* to be
+used, the folding belongs inside it, since the docblock already establishes that no caller can be expected to
+know. **Either way the sweep in the sheet should name four, not three**, so the next reader does not have to
+re-run it to learn that this one exists.
+
+**MEASUREMENT.** Opened: `packages/editor/src/attachments/require-evidence.ts:1-67` (in full — the mirror, the
+two facts it derives by reading the engine, and the state-resolution gap it declines to close);
+`packages/editor/src/index.ts:66` (the barrel export); `packages/app-core/src/views/ticket-sheet.tsx:891-899`
+(the recorded sweep that names three); and a walk of every `.ts`/`.tsx` under `apps/` + `packages/` excluding
+`dist/` for the symbol, which returns **6 non-test mentions: 4 in `dist/`, its declaration, and the barrel**
+— zero callers. Also checked, and it holds: `EscapeSuggestion` **is** the last entry
+`buildEditorExtensions` returns (`schema/extensions.ts:195`), which the escape mechanic's command override
+depends on.
+
+**Source:** `packages/editor` beyond the four files I had read — reached by working my own coverage list as
+the controller directed. **Severity: Minor** — nothing is broken by an unused export; what is wrong is a
+public symbol with an unclosed gap whose owner is named as a caller that does not exist, inside a sweep that
+counted its neighbours and not it.
+### E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the symptom here is an empty board with no error
+
+**WHAT.** `apps/mobile/src/app.tsx:28-60`:
+
+```
+useEffect(() => {
+  if (workspaceId === '' || TOKEN === '') return;
+  let stop: (() => void) | undefined;
+  void (async () => {
+    const storage = await createOpSqliteStorage();      // :32
+    const replica = await createReplica({ storage });   // :33
+    const outbox  = createOutbox({ storage, replica }); // :34
+    const engine  = createSyncEngine({ … });            // :35-39
+    const dataSource = createReplicaDataSource({ … });  // :40
+    setDs(dataSource);                                  // :41
+    …
+  })();
+  return () => stop?.();
+}, [workspaceId]);
+```
+
+**No `catch`, no `.catch`, nothing.** `ds` is set **only on success**, and every consumer is gated on it:
+`BoardScreen`'s effect opens `if (ds === null) return;` (`board-screen.tsx:22`), and `TicketScreen` returns
+`<Text>Opening…</Text>` while `ds === null` (`ticket-screen.tsx:31`).
+
+**WHY it is wrong, and what makes it reachable — the last link.** `createOpSqliteStorage`
+(`storage/op-sqlite-storage.ts:43-46`) is `const { open } = await import('@op-engineering/op-sqlite'); return
+wrapOpSqliteDatabase(open({ name }));` — **a dynamic import of a NATIVE module, then a database open**. Both
+reject: a dynamic import fails when the native module is not linked or not present for the platform, and
+`open` throws when the database cannot be created. **So the phone's first await is genuinely rejectable, and
+nothing catches it** — the app renders, `ds` stays `null`, and the Board is an empty list with no row, no
+sentence and no error, for ever. A person sees a workspace with no work in it.
+
+**This is the sibling of `E2-43`, and I am filing it separately for one reason: the symptom is different.**
+There, the desktop shell showed *"Opening local replica…"* — a loading sentence that never resolves, which
+at least says *something is happening*. Here the shell shows **an empty board**, which is a claim about the
+workspace. The same absent `catch` produces a persistent lie in one and a persistent wait in the other, and a
+fix applied to one shell would leave the other.
+
+**WHAT WOULD HAVE BEEN BETTER.** A `catch` on the IIFE writing into an error state the shell renders in place
+of the Board — the shape `E2-43` asks for on desktop. The two shells share their architecture (`createReplica
+→ createOutbox → createSyncEngine → createReplicaDataSource`, then `setDs`) and differ only in the storage
+adapter, so one pattern read twice would fix both.
+
+**MEASUREMENT.** Opened: `apps/mobile/src/app.tsx:1-97` (the env tokens, the effect and its four awaits, the
+`setDs` at `:41`, the two screens' gates); `apps/mobile/src/storage/op-sqlite-storage.ts:43-46` (the dynamic
+import and `open`); `apps/mobile/src/screens/board-screen.tsx:22` and `ticket-screen.tsx:31` (the gates).
+⚠ **Not driven:** I did not run the app, so I claim the code path and the rejectability of the first await,
+not a reproduction.
+
+**Source:** `apps/mobile` beyond the two screens `E2-41`/`E2-42` needed — reached by working my own coverage
+list as the controller directed. **Severity: Important.**
+### E2-49 (r2) — MINOR · Push registration's declared contract is not total: a transport failure escapes as a rejection its only caller voids
+
+**WHAT.** `apps/mobile/src/push/register-push.ts:9-38` declares
+`Promise<{ registered: boolean; reason?: string }>` and returns a discriminated outcome for four cases — a
+token failure (`:28-30`, `reason: 'no-token'`), a 404 (`:36`, `'transport-unavailable'`), any non-ok
+(`:37`, `` `http-${res.status}` ``) and success (`:38`). **The `fetch` at `:31` is not inside any `catch`**, so a
+transport failure — offline, a dropped socket — **rejects** instead of returning `{ registered: false,
+reason: … }`.
+
+**And its only caller voids it.** `apps/mobile/src/app.tsx:52`: `void registerPushToken({ baseUrl: API_BASE,
+token: TOKEN });` — a `void`, so the rejection is unhandled and the caller never learns.
+
+**WHY it is wrong, with the blast radius stated honestly rather than inflated.** The file's own docblock
+says it is *"written to degrade honestly — the app keeps working without push"*, and that is true: push is
+optional, the server has no `/v1/push/registrations` route yet (the file verified that), and nothing a person
+sees depends on this call. **What is wrong is narrower and real: the function's declared return type
+promises totality — every path answers `{registered, reason}` — and one path does not.** A caller written
+against the signature would have no reason to expect a rejection, and the one that exists does not handle
+one. That is the same shape as `E2-45` (a void'd promise on a control whose failure is silent) at a fraction
+of the consequence, and it is worth one line because a type that over-promises is what makes the next caller
+write the wrong thing.
+
+**WHAT WOULD HAVE BEEN BETTER.** Move the `fetch` inside the `try` at `:26-30`, or add a second `catch`
+returning `{ registered: false, reason: 'unreachable' }` — the vocabulary is already there in spirit (the
+404 arm is `'transport-unavailable'`, which is a *different* fact from a request that never got an answer,
+and conflating them would be the mistake Ruling 27/33 exists to prevent). ⚠ **And the reason must be a
+third value, not the 404 one** — this product has a standing rule that a refusal and a dropped connection are
+never the same word.
+
+**MEASUREMENT.** Opened: `apps/mobile/src/push/register-push.ts:1-39` (in full — the four return arms, the
+`try`/`catch` that covers only `getToken`, and the unguarded `doFetch` at `:31`);
+`apps/mobile/src/app.tsx:52` (the `void` call site). ⚠ **Checked and NOT a defect, so it is not filed:** the
+permission denial at `:21` throws, and that throw **is** caught by the `try` at `:26` — I read it expecting a
+second hole and there is not one.
+
+**Source:** `apps/mobile` beyond the files `E2-41`/`E2-42`/`E2-48` needed — reached by working my own
+coverage list as the controller directed. **Severity: Minor.**
+
+---
+
+*executor 2 — UX, round 2. Phase 1 in progress. Branch `exec2/review-ux-r2`; pushed at each checkpoint.
+**No fix, no PR.***
+
+---
+
+# R2.7 — NEW FINDINGS, BATCH 2
+
+---
+
+
+---
+
+*Batch 12 filed. Running total of round-2 new findings: `E2-20`–`E2-49` (30) — 18 Important, 12 Minor.*
+
 ---
 
 *executor 2 — UX, round 2. **State at this push, and the phase is stated from the clock rather than from
 my sense of how much work I have done:** phase 1 runs to **15:41:50 IST** and **has not ended**; the wall
 clock at this edit is **13:48**. 
-**29 new findings** (`E2-20`–`E2-48`; **18 Important, 11 Minor**) on top of the landed 19
-(`E2-1`–`E2-19`) — **48 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling
+**30 new findings** (`E2-20`–`E2-49`; **18 Important, 12 Minor**) on top of the landed 19
+(`E2-1`–`E2-19`) — **49 in the report** — with one withdrawal (`E2-9`), one standing-up against a ruling
 (`E2-7`), every candidate I examined and deliberately did not file recorded individually in §R2.11 with
 its measurement, one omission recorded as mine, and **no refutations, because I read all five lanes and
 could not falsify one of the 37 peer findings I checked**. Branch `exec2/review-ux-r2`, pushed at every
