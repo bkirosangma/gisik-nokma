@@ -1360,6 +1360,7 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 | *"2601 ids across 25 files"* | **2606** | `node scripts/check-case-ids.mjs` |
 | *"`onClick` → `sc-camel-on-click` (160 attributes)"* | not recounted (exec 2 measured 161; I never cited the repo copy) | — |
 | my own §5 first count (13/6) | **14/5** | `grep -c '^### E5-'` + the heading text |
+| a heading tally through the shell proxy (`grep … \| grep -c IMPORTANT` → 17) | **22** (`awk` over the file: `total=33 critical=1 important=22 minor=10`) | the proxy paginates long `grep` output (`[+8 more]`), so a count piped from it is a count of the first page |
 
 ### 6.6 Held for phase 2 (refutations) — noted, not filed
 
