@@ -593,7 +593,8 @@ detector is broken"* when its universe is empty. This one has no such control, s
 nothing, or a JSON reporter whose output shape changed (`testResults` renamed), reads as a pass at
 `ci.yml:449`. The repo's own `check-case-ids.mjs` header says why this matters (*"A matcher that returns zero
 results on every real file looks IDENTICAL, from the outside, to a matcher that never fires at all"*), and this
-checker is the one of the nine that did not adopt it. **Latent, not live:** today the two `.skipIf(` files
+checker did not adopt it (of the nine I read six; `check-env-example`, `check-runbook-commands` and
+`check-task-ledger` were run green, not read, so I do not claim it is the only one). **Latent, not live:** today the two `.skipIf(` files
 (`apps/server/test/ops/pg-dump.test.ts`, `restore-drill.test.ts`) are under the covered prefix and no other
 guard spelling (`.runIf(`, `describe.skip(`, `it.skip(`) is in use — measured with `git ls-files | xargs grep -lF`
 — and CI has not executed the step since 2026-09-06 (every job `steps: 0`, `runner_name: ""`, already recorded by
