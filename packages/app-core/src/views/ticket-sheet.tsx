@@ -456,7 +456,7 @@ export function TicketSheet({
   projectName,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
-  const [tab, setTab] = useState<'details' | 'history'>('details');
+  const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
   /**
    * Full screen (sheet prototype parity, 2026-09-20). Local state, like `tab`:
    * it is a way of LOOKING at this sheet rather than anything the server holds,
@@ -2615,6 +2615,140 @@ export function TicketSheet({
         </button>
       }
     >
+      {/*
+        THE CHIPS LINE (`desktop.dc.html:1128-1133`), under the title and above
+        the tabs: the state chip, then the `Restricted` chip when the standing
+        audience is explicit, then the `Closed by … on …` chip when the ticket is
+        closed.
+
+        ⚠ THE PROTOTYPE'S *Recorded in this browser · 12:04:18* IS NOT DRAWN, and
+        its absence is a decision rather than an omission: nothing in our data is
+        that clock, and a fabricated timestamp on a sheet whose whole subject is
+        per-field attribution is the one lie this file exists to refuse.
+
+        ⚠ AND THE CLOSED CHIP MOVED UP HERE, from the state line below. The badge
+        span in the row was removed in the same change rather than left beside
+        it — two copies of `Closed by … on …` on one screen leaves a reader no
+        way to tell which is the record. It is NOT a new claim: it is the same
+        sentence the badge carried, drawn where the prototype draws it. */}
+      <div className="gn-ticket-sheet__chips" data-testid="sheet-chips">
+        <Chip tone={state.stateCategory}>{currentStateName}</Chip>
+        {standingVisibility?.resolvedMode === 'explicit' ? (
+          <Chip tone="restricted">Restricted</Chip>
+        ) : null}
+        {closed !== null ? (
+          <Chip tone="terminal">{`Closed by ${nameOf(closed.actorId)} on ${formatDate(closed.at)}`}</Chip>
+        ) : null}
+      </div>
+
+      {/*
+        ONE ELEMENT, THREE FACTS — and it used to be TWO elements.
+
+        ## The duplication the owner ruled away (2026-09-20)
+
+        Until this change the same question was answered twice on one
+        screen: this line drew the parent's TITLE as plain text, and the
+        subtasks head drew a `Subtask of {title}` chip for the same parent —
+        with the restricted case worded differently in each place
+        (`Restricted parent — exists, but you can't see it` here,
+        `Subtask of a restricted parent` there), and "At project root"
+        appearing here and NOTHING appearing there. Two elements, one
+        question, two sets of words, in two places *"and only one of them is
+        where a person looks for the hierarchy"*.
+
+        The owner ruled the merge, verbatim: *"you can keep the badge. but
+        the placement is confusing. there is already a
+        `gn-ticket-sheet__parent` section above. put the badge in that
+        position instead. you can remove that `gn-ticket-sheet__parent`."*
+        So the chip came UP into this position and the subtasks head lost
+        its copy. The wrapper keeps the old class so the rule at
+        `ui.css`'s `.gn-ticket-sheet__parent` is still the thing that draws
+        this line — the alternative was renaming it and leaving an orphaned
+        rule behind, which the same ruling forbids.
+
+        ## The three arms, and WHY the root arm is not the badge
+
+        A RESTRICTED parent is existence-without-title — the ticket has a
+        parent and this viewer may not see which; rendering it as "At
+        project root" would turn a restriction into a vanish (invariant 5).
+        A NULL parent really is at the root, and **a root is not a subtask**,
+        so it does not get a "Subtask of" badge: the sentence stays, because
+        a crumb chain that ends at the project is a different reading of the
+        same silence. A visible parent shows the badge, as a control that
+        opens it when a caller passed `onOpenTicket` and as the pill
+        otherwise — `onOpenTicket`'s own recorded rule.
+
+        ⚠ **READING TAKEN, AND IT IS ONE ARM TO CHANGE:** the badge is the
+        VISIBLE arm's; the root and restricted arms keep their sentences. If
+        the owner meant the chip's own behaviour — nothing at root — that is
+        this one arm.
+
+        ## And the PROTOTYPE'S row is not what this is
+
+        The chip's CSS comment cites `desktop.dc.html:1237`, the authority's
+        subtasks header row, as its origin. **The owner is ruling the
+        placement AWAY from the authority deliberately**, so that citation
+        is not an argument against this and must not be quoted back as one.
+        The divergence is recorded here the way the ticket-key spec recorded
+        its own. What the authority DOES still own is the chip's CONTENT and
+        its one-hop behaviour, both unchanged.
+
+        ## The chip's own reasoning, carried up with it
+
+        - **One hop, never a chain.** The chip names the IMMEDIATE parent, as
+          the prototype's `openParent` does (`:3611`); the parent's own sheet
+          draws its own indicator in turn, so a nesting or a cycle is walked
+          sheet by sheet and no traversal lives here to loop.
+        - **With no `onOpenTicket` it is a PILL and not a control** — that
+          prop's own docblock: *"a control that cannot be honoured"* is not
+          drawn.
+        - **The restricted arm is a PILL, never a control, and it names the
+          restriction rather than the ticket.** The controller ruled it on
+          2026-09-20 after the alternative was priced: the read is a
+          discriminated union whose restricted arm *structurally cannot*
+          carry a title (`routes/tickets.ts:144-168`), the parent's title is
+          read INSIDE the `canSee` branch the restricted arm never reaches
+          (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
+          and cases `7.212` and `6.14` pin the existence-versus-title
+          contrast in both directions.
+          ⚠ **THE REASON FIRST RECORDED WAS WRONG, and it is corrected rather
+          than deleted:** it cited 6.66's *"no table stores a ticket
+          title"*, which was true when 6.66 was written and is stale now —
+          `proj_tickets` exists
+          (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
+          serves `title: titleOf(parentState)` out of it. **The conclusion
+          never rested on it.**
+          And the prototype's own label fallback — `p ? p.title :
+          sheet.parentId` (`:3609`) — would have put an ID where a name
+          belongs and made the chip a control pointing at a ticket this
+          viewer's own read 404s (case 6.14). The pill re-words a disclosure
+          the sheet already makes; it does not widen one.
+        - **It must not read as "no parent"** — a root is a different fact —
+          which is why the restricted arm exists rather than being omitted.
+      */}
+      <div className="gn-ticket-sheet__parent" data-testid="sheet-parent-indicator">
+        {parent === null ? (
+          <span>At project root</span>
+        ) : parent.kind === 'restricted' ? (
+          <span className="gn-ticket-sheet__restricted" data-testid="sheet-parent-restricted">
+            Restricted parent — exists, but you can&apos;t see it
+          </span>
+        ) : openParentSheet === undefined ? (
+          <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
+            {`Subtask of ${parent.title}`}
+          </span>
+        ) : (
+          <button
+            type="button"
+            className="gn-chip gn-ticket-sheet__parent-chip"
+            data-testid="sheet-parent-chip"
+            onClick={() => openParentSheet(parent.id)}
+          >
+            {`Subtask of ${parent.title}`}
+          </button>
+        )}
+      </div>
+
       {/* ONE SEGMENTED CONTROL, the way the authority draws them
           (`desktop.dc.html@6d7b67c0a52c:1134-1140`): a `var(--segBg)` track at
           `border-radius:9px`, 2px padding and 2px gap, the selected tab on
@@ -2632,14 +2766,17 @@ export function TicketSheet({
           Measured by an independent reviewer: NO suite renders the sheet — the accessible-name sweeps navigate `/p/:projectId` WITHOUT `?ticket=`, and the sheet mounts only when that parameter is present — so the number cannot move in EITHER direction today.
           The witness is the unit assertion (`toHaveAccessibleName('Ticket sections')`), and the rise would be exactly one `ariaLabel` the day something renders it.
 
-          ⚠ The authority's THIRD tab is not drawn. `Attachments` (`:3589`) is a
-          READ behind that tab, not a surface, and the dispatch's rule for this
-          task is to say which and not to assume it — the question is with the
-          controller. Two tabs, one control, no invented tab. */}
+          ⚠ The authority's THIRD tab WAS not drawn, and it is now. `Attachments`
+          (`:3589`) is a READ behind that tab; it was left out while the question
+          of drawing a third surface was open, and **the owner ruled it IN on
+          2026-09-22** (spec decision 5 — *"add the Attachments tab"*). So the
+          tab is BUILT rather than assumed, and `16.81`'s count moved 2 → 3 in
+          the same change. */}
       <SegmentedControl
         options={[
           { value: 'details', label: 'Details' },
           { value: 'history', label: 'History' },
+          { value: 'attachments', label: 'Attachments' },
         ]}
         value={tab}
         onChange={setTab}
@@ -2722,11 +2859,13 @@ export function TicketSheet({
             <span className="gn-ticket-sheet__provenance">
               {formatStateProvenance(currentStateName, ticketRead.stateProvenance)}
             </span>
-            {closed !== null ? (
-              <span className="gn-sheet__closed-badge">
-                <Chip tone="terminal">{`Closed by ${nameOf(closed.actorId)} on ${formatDate(closed.at)}`}</Chip>
-              </span>
-            ) : null}
+            {/* ⚠ THE `Closed by … on …` BADGE WAS HERE AND IS NOT ANY MORE. It
+                moved UP into the chips line (`sheet-chips`, above the tabs) on
+                2026-09-22, which is where the prototype draws it
+                (`desktop.dc.html:1130`). It was MOVED rather than copied: the
+                span that drew it here was deleted in the same change, so the
+                sentence is on the page exactly once and the case that reads it
+                (`16.110`) asserts that count. */}
             {/*
               Spec §5.3: Close only from a terminal, not-yet-closed state;
               Reopen only once closed. The two buttons never both show, but
@@ -2778,114 +2917,6 @@ export function TicketSheet({
             {closed !== null ? (
               <span className="gn-sheet__closed-note">Closed — reopen it first</span>
             ) : null}
-          </div>
-
-          {/*
-            ONE ELEMENT, THREE FACTS — and it used to be TWO elements.
-
-            ## The duplication the owner ruled away (2026-09-20)
-
-            Until this change the same question was answered twice on one
-            screen: this line drew the parent's TITLE as plain text, and the
-            subtasks head drew a `Subtask of {title}` chip for the same parent —
-            with the restricted case worded differently in each place
-            (`Restricted parent — exists, but you can't see it` here,
-            `Subtask of a restricted parent` there), and "At project root"
-            appearing here and NOTHING appearing there. Two elements, one
-            question, two sets of words, in two places *"and only one of them is
-            where a person looks for the hierarchy"*.
-
-            The owner ruled the merge, verbatim: *"you can keep the badge. but
-            the placement is confusing. there is already a
-            `gn-ticket-sheet__parent` section above. put the badge in that
-            position instead. you can remove that `gn-ticket-sheet__parent`."*
-            So the chip came UP into this position and the subtasks head lost
-            its copy. The wrapper keeps the old class so the rule at
-            `ui.css`'s `.gn-ticket-sheet__parent` is still the thing that draws
-            this line — the alternative was renaming it and leaving an orphaned
-            rule behind, which the same ruling forbids.
-
-            ## The three arms, and WHY the root arm is not the badge
-
-            A RESTRICTED parent is existence-without-title — the ticket has a
-            parent and this viewer may not see which; rendering it as "At
-            project root" would turn a restriction into a vanish (invariant 5).
-            A NULL parent really is at the root, and **a root is not a subtask**,
-            so it does not get a "Subtask of" badge: the sentence stays, because
-            a crumb chain that ends at the project is a different reading of the
-            same silence. A visible parent shows the badge, as a control that
-            opens it when a caller passed `onOpenTicket` and as the pill
-            otherwise — `onOpenTicket`'s own recorded rule.
-
-            ⚠ **READING TAKEN, AND IT IS ONE ARM TO CHANGE:** the badge is the
-            VISIBLE arm's; the root and restricted arms keep their sentences. If
-            the owner meant the chip's own behaviour — nothing at root — that is
-            this one arm.
-
-            ## And the PROTOTYPE'S row is not what this is
-
-            The chip's CSS comment cites `desktop.dc.html:1237`, the authority's
-            subtasks header row, as its origin. **The owner is ruling the
-            placement AWAY from the authority deliberately**, so that citation
-            is not an argument against this and must not be quoted back as one.
-            The divergence is recorded here the way the ticket-key spec recorded
-            its own. What the authority DOES still own is the chip's CONTENT and
-            its one-hop behaviour, both unchanged.
-
-            ## The chip's own reasoning, carried up with it
-
-            - **One hop, never a chain.** The chip names the IMMEDIATE parent, as
-              the prototype's `openParent` does (`:3611`); the parent's own sheet
-              draws its own indicator in turn, so a nesting or a cycle is walked
-              sheet by sheet and no traversal lives here to loop.
-            - **With no `onOpenTicket` it is a PILL and not a control** — that
-              prop's own docblock: *"a control that cannot be honoured"* is not
-              drawn.
-            - **The restricted arm is a PILL, never a control, and it names the
-              restriction rather than the ticket.** The controller ruled it on
-              2026-09-20 after the alternative was priced: the read is a
-              discriminated union whose restricted arm *structurally cannot*
-              carry a title (`routes/tickets.ts:144-168`), the parent's title is
-              read INSIDE the `canSee` branch the restricted arm never reaches
-              (`routes/tickets.ts:353-372`, the code's own words at `:354-356`),
-              and cases `7.212` and `6.14` pin the existence-versus-title
-              contrast in both directions.
-              ⚠ **THE REASON FIRST RECORDED WAS WRONG, and it is corrected rather
-              than deleted:** it cited 6.66's *"no table stores a ticket
-              title"*, which was true when 6.66 was written and is stale now —
-              `proj_tickets` exists
-              (`migrations/1787961800000_proj-tickets.sql`) and the visible arm
-              serves `title: titleOf(parentState)` out of it. **The conclusion
-              never rested on it.**
-              And the prototype's own label fallback — `p ? p.title :
-              sheet.parentId` (`:3609`) — would have put an ID where a name
-              belongs and made the chip a control pointing at a ticket this
-              viewer's own read 404s (case 6.14). The pill re-words a disclosure
-              the sheet already makes; it does not widen one.
-            - **It must not read as "no parent"** — a root is a different fact —
-              which is why the restricted arm exists rather than being omitted.
-          */}
-          <div className="gn-ticket-sheet__parent" data-testid="sheet-parent-indicator">
-            {parent === null ? (
-              <span>At project root</span>
-            ) : parent.kind === 'restricted' ? (
-              <span className="gn-ticket-sheet__restricted" data-testid="sheet-parent-restricted">
-                Restricted parent — exists, but you can&apos;t see it
-              </span>
-            ) : openParentSheet === undefined ? (
-              <span className="gn-chip gn-ticket-sheet__parent-chip" data-testid="sheet-parent-chip">
-                {`Subtask of ${parent.title}`}
-              </span>
-            ) : (
-              <button
-                type="button"
-                className="gn-chip gn-ticket-sheet__parent-chip"
-                data-testid="sheet-parent-chip"
-                onClick={() => openParentSheet(parent.id)}
-              >
-                {`Subtask of ${parent.title}`}
-              </button>
-            )}
           </div>
 
           {ticketRead.rollup !== null ? (
@@ -3339,34 +3370,6 @@ export function TicketSheet({
             })}
           </dl>
 
-          {attachmentsUnavailable === undefined ? (
-            <AttachmentList entries={attachments ?? []} />
-          ) : (
-            /*
-              The three-way distinction this sheet draws for the ledger tab,
-              applied to the files: an ANSWER (drawn above, empty or not), a WAIT
-              (nothing yet — `AttachmentList`'s own silence), and a FAILURE, which
-              is this sentence. It is deliberately not a `Loading…` line: a read
-              that failed under the word "Loading…" is a wait that will never end,
-              wearing the clothes of one that will. **(The ticket read draws a
-              FOURTH arm the files do not need — an answered `null` — since E4-23;
-              `attachments` has no 404 affordance to answer with, so there is no
-              third null here.)**
-            */
-            <p
-              // `alert`, matching this sheet's five other failure sentences
-              // (`:1542`, `:1556`, `:1569`, `:1749`, `:1815`). The CSS twin it
-              // borrows its rule from carries NO role at all, and copying that
-              // omission would have been the quieter choice — but a read that
-              // failed is exactly what a reader must be told about.
-              role="alert"
-              className="gn-ticket-sheet__attachments-error"
-              data-testid="sheet-attachments-unavailable"
-            >
-              {`This ticket's attachments could not be read — ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
-            </p>
-          )}
-
           {/*
             Spec §6's audience section. **⚠ CORRECTED 2026-09-20.** This read: "It
             is mounted here and it is DARK against the shipped server: this
@@ -3462,6 +3465,36 @@ export function TicketSheet({
               )
             }
           />
+        </div>
+      ) : tab === 'attachments' ? (
+        <div className="gn-ticket-sheet__attachments">
+          {attachmentsUnavailable === undefined ? (
+            <AttachmentList entries={attachments ?? []} />
+          ) : (
+            /*
+              The three-way distinction this sheet draws for the ledger tab,
+              applied to the files: an ANSWER (drawn above, empty or not), a WAIT
+              (nothing yet — `AttachmentList`'s own silence), and a FAILURE, which
+              is this sentence. It is deliberately not a `Loading…` line: a read
+              that failed under the word "Loading…" is a wait that will never end,
+              wearing the clothes of one that will. **(The ticket read draws a
+              FOURTH arm the files do not need — an answered `null` — since E4-23;
+              `attachments` has no 404 affordance to answer with, so there is no
+              third null here.)**
+            */
+            <p
+              // `alert`, matching this sheet's five other failure sentences
+              // (`:1542`, `:1556`, `:1569`, `:1749`, `:1815`). The CSS twin it
+              // borrows its rule from carries NO role at all, and copying that
+              // omission would have been the quieter choice — but a read that
+              // failed is exactly what a reader must be told about.
+              role="alert"
+              className="gn-ticket-sheet__attachments-error"
+              data-testid="sheet-attachments-unavailable"
+            >
+              {`This ticket's attachments could not be read — ${attachmentsUnavailable}. That is a failure of this read, not a statement about the ticket: it may answer on a retry.`}
+            </p>
+          )}
         </div>
       ) : (
         <HistoryTab

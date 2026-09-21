@@ -1,4 +1,4 @@
-import { cleanup, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import type { TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import type { AttachmentListEntry, TicketRead } from '@gisik-nokma/app-core';
@@ -183,6 +183,16 @@ describe('16.58 the page asks the attachments read for the OPEN ticket', () => {
     // page must ask at all before "it asked with the right arguments" means
     // anything.
     const asked = openTheTicket(async () => [ENTRY]);
+    // ⚠ THE TAB IS OPENED FIRST, and this is a MECHANICAL edit to the case rather
+    // than a change in what it proves: the owner's 2026-09-22 ruling moved the
+    // attachment list out of Details and behind its own third tab (spec decision
+    // 5), so the real page no longer draws it on the tab a reader lands on. The
+    // claim — the production caller asks the REAL question with the REAL
+    // arguments — is untouched.
+    await waitFor(() =>
+      expect(screen.getByRole('tablist', { name: 'Ticket sections' })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
     await waitFor(() => expect(screen.getByText('gst-receipt.pdf')).toBeInTheDocument());
     // THE ARGUMENTS, which is the half the sheet's own suite cannot see: a page
     // that read attachments for some OTHER ticket would draw a plausible list
@@ -199,6 +209,13 @@ describe('16.58 the page asks the attachments read for the OPEN ticket', () => {
     openTheTicket(async () => {
       throw new Error(reason);
     });
+    // The same tab, for the same reason as ARM ONE: the failure sentence is
+    // drawn inside the Attachments panel, so it is not on screen until that tab
+    // is open.
+    await waitFor(() =>
+      expect(screen.getByRole('tablist', { name: 'Ticket sections' })).toBeInTheDocument(),
+    );
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
     const notice = await screen.findByTestId('sheet-attachments-unavailable');
     expect(notice).toHaveTextContent(reason);
     expect(screen.queryByText('gst-receipt.pdf')).toBeNull();

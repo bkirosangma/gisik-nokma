@@ -2039,6 +2039,12 @@ button.gn-ticket-sheet__crumb--link {
 .gn-ticket-sheet__state { display: flex; align-items: center; gap: 0.7rem; flex-wrap: wrap; }
 .gn-ticket-sheet__provenance { color: var(--gn-text-muted); font-size: 0.85rem; }
 .gn-ticket-sheet__parent { margin: 0.6rem 0; color: var(--gn-text-muted); }
+/* The header's chips line (spec 2026-09-22 decision 2, `desktop.dc.html:1128-1133`)
+   — under the title and ABOVE the tabs, so it renders outside every tab panel.
+   Flex and wrap for the reason every other chip row in this file is: the three
+   chips (state · Restricted · Closed) are drawn independently and any subset can
+   be present, so the row must not be arranged for one of them. */
+.gn-ticket-sheet__chips { display: flex; gap: 0.625rem; align-items: center; flex-wrap: wrap; margin: 0 0 1rem; }
 .gn-ticket-sheet__restricted { color: var(--gn-restricted); }
 /* The subtasks section's header row — the prototype's own row, not an invention
    (`desktop.dc.html:1237`, `align-items:baseline;gap:10px;flex-wrap:wrap`) — the

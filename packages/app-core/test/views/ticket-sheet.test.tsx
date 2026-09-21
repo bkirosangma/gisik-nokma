@@ -921,24 +921,43 @@ describe('TicketSheet — the attachment list (Task 12a wiring)', () => {
     expect(document.body.textContent).not.toContain('Google Drive');
   });
 
-  it('PLANTED DEFECT: supplied entries render inside the details tab, both kinds told apart', async () => {
+  it('PLANTED DEFECT: supplied entries render under the Attachments tab, both kinds told apart', async () => {
     const read = ticketRead();
     renderSheet(read, sheetSource(read), { attachments: ENTRIES });
     await settled();
-    const details = document.querySelector('.gn-ticket-sheet__details')!;
-    const kinds = [...details.querySelectorAll('.gn-attachment')].map((node) =>
+    // ⚠ THE TAB OPENED HERE CHANGED on 2026-09-22 (owner ruling, spec decision 5):
+    // this section moved out of Details and behind its own third tab, so the
+    // container the entries are read from is the Attachments panel rather than
+    // `.gn-ticket-sheet__details`. The claim — both kinds drawn and told apart —
+    // is unchanged.
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    const panel = document.querySelector('.gn-ticket-sheet__attachments')!;
+    const kinds = [...panel.querySelectorAll('.gn-attachment')].map((node) =>
       node.getAttribute('data-attachment-kind'),
     );
     expect(kinds).toEqual(['upload', 'drive-reference']);
-    expect(details.textContent).toContain('captured 20 Aug 2026');
+    expect(panel.textContent).toContain('captured 20 Aug 2026');
   });
 
-  it('PLANTED DEFECT: the attachment list belongs to the details tab, not to history', async () => {
+  it('PLANTED DEFECT: the attachment list belongs to the Attachments tab, and to no other', async () => {
     const user = userEvent.setup();
     const read = ticketRead();
     renderSheet(read, sheetSource(read), { attachments: ENTRIES });
     await settled();
+    // The tab it belongs to draws it...
+    await user.click(screen.getByRole('tab', { name: 'Attachments' }));
+    expect(document.querySelector('.gn-attachments')).not.toBeNull();
+    // ...and the two tabs either side of it do not. ⚠ THIS CASE'S CLAIM MOVED
+    // with the section it guards: it read *"belongs to the details tab, not to
+    // history"*, and the owner's ruling moved the list behind a third tab. The
+    // property is unchanged — the list is drawn under ONE tab and no other —
+    // which is why the case gained arms rather than being retired. Its old form
+    // passed over the move VACUOUSLY: with the list no longer in Details, a
+    // single "not under History" assertion was true of a build that drew it
+    // nowhere at all.
     await user.click(screen.getByRole('tab', { name: 'History' }));
+    expect(document.querySelector('.gn-attachments')).toBeNull();
+    await user.click(screen.getByRole('tab', { name: 'Details' }));
     expect(document.querySelector('.gn-attachments')).toBeNull();
   });
 });
@@ -2692,13 +2711,12 @@ describe('sheet prototype parity', () => {
     // says it exists to replace exactly those bordered buttons.
     const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
     const tabs = within(tablist).getAllByRole('tab');
-    expect(tabs.map((t) => t.textContent)).toEqual(['Details', 'History']);
-
-    // TWO, and the count is an assertion rather than a description: the
-    // authority's third tab is `Attachments` (`:3589`), which is a READ behind a
-    // surface. Drawing it here would be inventing a tab the dispatch says to ask
-    // about, so its ABSENCE is pinned until that question is answered.
-    expect(tabs).toHaveLength(2);
+    // ⚠ THREE since 2026-09-22, and this line used to assert TWO. The absence
+    // was pinned while the question of the authority's third tab was open; the
+    // owner ruled it IN (spec 2026-09-22 decision 5 — "add the Attachments
+    // tab"), so the case now asserts the ruled shape rather than the absence.
+    expect(tabs.map((t) => t.textContent)).toEqual(['Details', 'History', 'Attachments']);
+    expect(tabs).toHaveLength(3);
 
     // ⚠ The name is NEW. `role="tablist"` on this sheet carried no accessible
     // name at all before this change, and the shared component REQUIRES one — so
@@ -2768,6 +2786,102 @@ describe('sheet prototype parity', () => {
     await userEvent.click(screen.getByRole('button', { name: 'Exit full screen' }));
     expect(screen.getByRole('button', { name: 'Full screen' })).toBeInTheDocument();
     expect(screen.getByTestId('sheet-scrim').className).not.toContain('--full');
+  });
+});
+
+/**
+ * TASK 3 of `docs/superpowers/plans/2026-09-22-sheet-prototype-parity.md` — the
+ * header's chips line, the parent line under it, and the third tab.
+ *
+ * The prototype draws, under the title, a chips line carrying the state chip and
+ * the `Restricted` chip, then the tabs — Details · History · **Attachments**
+ * (`desktop.dc.html:1128-1140`). This build drew the state chip inside the
+ * Details body, the parent line beneath it, and TWO tabs. The moves are asserted
+ * pairwise by `compareDocumentPosition` rather than by index into markup, which
+ * a whitespace or wrapper change would move.
+ *
+ * ⚠ The prototype's third element on that line — *Recorded in this browser ·
+ * 12:04:18* — is **deliberately NOT drawn** and no case asks for it: nothing in
+ * our data is that clock, and inventing one is forbidden (spec decision 2).
+ */
+describe('sheet prototype parity — the header, the parent line and the tabs', () => {
+  /** The same shape `16.57` uses, local because that describe's fixture is its own. */
+  const ENTRY: AttachmentListEntry = {
+    kind: 'upload',
+    attachmentId: '01J9GATA000000000000000000',
+    filename: 'gst-receipt.pdf',
+    mime: 'application/pdf',
+    size: 48211,
+    sha256: null,
+  };
+
+  it('16.110 the chips line sits under the title — the state chip, the Restricted chip when the audience is explicit, and the Closed chip when closed — and it precedes the tablist', async () => {
+    // ARM ONE — the state chip and the Restricted chip. `explicit` is the one
+    // resolved mode the second chip is drawn for, and this fixture names it on
+    // BOTH halves of the pair the read carries.
+    renderSheet(ticketRead({ visibility: { ownMode: 'explicit', resolvedMode: 'explicit' } }));
+    await settled();
+    const chips = screen.getByTestId('sheet-chips');
+    expect(within(chips).getByText('Doing')).toBeInTheDocument();
+    expect(within(chips).getByText('Restricted')).toBeInTheDocument();
+    // It sits ABOVE the tablist — under the title, where the prototype draws it.
+    const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
+    expect(chips.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    cleanup();
+
+    // ARM TWO — the Closed chip. It MOVED here from the state line in this same
+    // change (the `gn-sheet__closed-badge` span was removed from the row), so
+    // this arm also witnesses the sentence is drawn exactly ONCE: a change that
+    // added the chip without removing the badge would leave a reader with two
+    // identical sentences and no way to tell which was the record.
+    const read = ticketRead({
+      ticket: ticketStateSeed({
+        stateId: 'done',
+        stateCategory: 'terminal',
+        closed: { actorId: 'user_anselma', at: '2026-08-20T19:00:00.000Z' },
+      }),
+    });
+    renderSheet(read, sheetSource(read));
+    await screen.findByText('Closed by Anselma Marak on 21 Aug 2026');
+    expect(
+      within(screen.getByTestId('sheet-chips')).getByText('Closed by Anselma Marak on 21 Aug 2026'),
+    ).toBeInTheDocument();
+    expect(screen.getAllByText('Closed by Anselma Marak on 21 Aug 2026')).toHaveLength(1);
+  });
+
+  it('16.110 CONTROL — a project-visible ticket draws NO Restricted chip', async () => {
+    // The control 16.110's first arm needs: its assertion is that a chip IS
+    // drawn, and `getByText('Restricted')` would pass just as happily on a build
+    // that drew the chip for EVERY ticket. The default seed is the ordinary
+    // `inherit`/`project` pair, so nothing here is a mode the product cannot
+    // produce.
+    renderSheet(ticketRead());
+    await settled();
+    expect(within(screen.getByTestId('sheet-chips')).queryByText('Restricted')).toBeNull();
+  });
+
+  it('16.111 the attachment list renders under the Attachments tab and NOT under Details', async () => {
+    renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [ENTRY] });
+    await settled();
+    // FIRST the absence, under the tab a reader lands on — this is the half the
+    // move is: the list used to be drawn in Details, and a change that ADDED the
+    // third tab without removing the old mount would pass a presence-only case.
+    expect(screen.queryByText('gst-receipt.pdf')).toBeNull();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    expect(screen.getByText('gst-receipt.pdf')).toBeInTheDocument();
+    // And the tab is a SWAP, not an addition: Details' own content is gone while
+    // it is open.
+    expect(screen.queryByTestId('field-description')).toBeNull();
+  });
+
+  it('16.112 the parent indicator follows the chips line and precedes the tabs', async () => {
+    renderSheet(ticketRead());
+    await settled();
+    const chips = screen.getByTestId('sheet-chips');
+    const parent = screen.getByTestId('sheet-parent-indicator');
+    const tablist = screen.getByRole('tablist', { name: 'Ticket sections' });
+    expect(chips.compareDocumentPosition(parent) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
+    expect(parent.compareDocumentPosition(tablist) & Node.DOCUMENT_POSITION_FOLLOWING).toBeTruthy();
   });
 });
 
@@ -4070,7 +4184,14 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     // state chip — which is the same `currentStateName` lookup and the surface
     // that still renders it. Both arms, in the same case, so neither can pass
     // for the other's reason.
-    expect(screen.getByText('Doing')).toBeInTheDocument();
+    // ⚠ SCOPED TO THE STATE ROW since 2026-09-22, and the scoping is required
+    // rather than tidy: the header's new chips line draws its OWN state chip, so
+    // a page-wide `getByText('Doing')` now finds two nodes and THIS property —
+    // the workflow's NAME for the state, never the raw id — belongs to the row.
+    // A body-wide assertion would have failed here for a reason unrelated to
+    // what the arm names, which is the shape this file's scoped comments refuse.
+    const row = document.querySelector('.gn-ticket-sheet__state') as HTMLElement;
+    expect(within(row).getByText('Doing')).toBeInTheDocument();
     expect(screen.getByRole('dialog').textContent ?? '').not.toContain('doing');
   });
 
@@ -4223,10 +4344,15 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
   };
 
   it('16.57 draws the entries, draws nothing for an empty list, and draws a sentence for a failure', async () => {
+    // ⚠ ALL THREE ARMS NOW OPEN THE ATTACHMENTS TAB FIRST (spec 2026-09-22
+    // decision 5, which moved this section out of Details and behind the third
+    // tab). The permitted mechanical edit named in the plan: the cases' claims
+    // are unchanged, only the tab they are read under is.
     // ARM ONE — the entries. This is also the control for everything below: the
     // section does render when it has something to render.
     renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [ENTRY] });
     await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
     expect(screen.getByText('gst-receipt.pdf')).toBeInTheDocument();
     expect(screen.queryByTestId('sheet-attachments-unavailable')).toBeNull();
     cleanup();
@@ -4235,6 +4361,7 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     // the component must not turn "there are none" into a warning.
     renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [] });
     await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
     expect(screen.queryByText('gst-receipt.pdf')).toBeNull();
     expect(screen.queryByTestId('sheet-attachments-unavailable')).toBeNull();
     cleanup();
@@ -4244,6 +4371,7 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     const reason = 'HTTP 404 for /v1/workspaces/ws/tickets/tk/attachments';
     renderSheet(ticketRead(), sheetSource(ticketRead()), { attachmentsUnavailable: reason });
     await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
     const notice = screen.getByTestId('sheet-attachments-unavailable');
     expect(notice).toHaveTextContent("This ticket's attachments could not be read");
     expect(notice).toHaveTextContent(reason);
