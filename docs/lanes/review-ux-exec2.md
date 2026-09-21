@@ -7,6 +7,105 @@
 
 ---
 
+# ⬛ ROUND 2 — READ THIS BLOCK FIRST
+
+**Branch:** `exec2/review-ux-r2`, cut from `origin/main` **`a7b6292b`**. Everything below §0 of the
+round-1 report is the **landed round-1 text, unchanged**, kept because round 2 re-validates it.
+This block is what is new.
+
+## R2.1 — THE ID MAPPING (so the judge can connect the two rounds)
+
+Round-2 §3 names ids `E<lane>-<n>`. My landed report used `F1`–`F9` and `V1`–`V10`. The mapping, in
+order, is fixed and total:
+
+| round-2 id | landed id | claimed severity |
+|---|---|---|
+| `E2-1` … `E2-9` | `F1` … `F9` | 4 Important · 5 Minor |
+| `E2-10` … `E2-15` | `V1` … `V6` | 4 Important (V1,V3,V4,V5) · 1 Critical (V2) · 1 Minor (V6) |
+| `E2-16` … `E2-19` | `V7` … `V10` | 3 Important (V7,V8,V9) · 1 Critical (V10) |
+| **`E2-20` onward** | **new in round 2 — marked `(r2)`** | — |
+
+**Landed base, at the round-1 judged severities:** Critical 2 × 5 = 10, Important 11 × 3 = 33,
+Minor 6 × 1 = 6 → **49**, less the withdrawal in R2.2.
+
+## R2.2 — WITHDRAWALS, AND THE TWO RULINGS I MUST ANSWER
+
+Round-1's compiled ruling (`docs/lanes/review-compiled-controller.md`, read at `a7b6292b`) **accepted
+all 19 of my findings at my claimed severities.** It also, in doing so, **created rulings** that did not
+exist when I wrote — and round-2 §3 says a divergence with a recorded ruling scores *only* if I argue
+the ruling is mistaken. Two of my findings are exposed by that single sentence, and I handle them
+differently because the evidence differs.
+
+### ⛔ `E2-9` (`F9`) — **WITHDRAWN.** Free now; −3 after `T0 + 6 h`.
+
+The ruling at `review-compiled-controller.md:426-435` is *"**The behaviour STANDS.**"* — the comment box
+stays offered on a ticket where the post can only be refused. **That is now the product behaving as
+ruled, and I do not have an argument good enough to overturn it.** The judge's stated trade-off (gating
+on `comments.error` *"would hide a working control every time a transient read failed"*) is about the
+*comments* read, and my remedy would have had to move the gate to the *ticket* read — which is a
+different finding from the one I filed, and filing it under this id would be smuggling. **Withdrawn.**
+Recorded here rather than deleted, because a withdrawal the judge cannot see is not a withdrawal.
+
+### `E2-7` (`F7`) — **STOOD UP, with the argument the ruling requires.**
+
+Round 1 ruled (`:414-417`, §4 row 5): *"**The implementation's count STANDS.** … The product's band
+answers for the membership actually on screen, which is the better answer."* Round-2 §3 lets me answer
+that, and §3 says a reason connecting to other measured consequences weighs more. So:
+
+**The ruling is mistaken on the noun, and the product's own vocabulary is the measurement.**
+The band reads `epic · 4 tickets` (`ticket-list.tsx:669`, `` `${groupMeta} · ${section.rows.length} ${… 'ticket' : 'tickets'}` ``).
+Three of those four rows are tickets; the fourth is the **epic**. The product does not call an epic a
+ticket anywhere else, and I measured two places where it says the opposite:
+
+- `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:959` — the Backlog's own fold is
+  `inBacklog.filter((row) => row.typeRank !== EPIC_RANK)`, i.e. an epic is **excluded from the set called
+  tickets**, and its absence is what `epicsOnly` (`:963`) exists to explain.
+- `packages/app-core/src/views/board.tsx:207` — `EMPTY_BOARD_EPICS_COPY = 'No tickets in this view —
+  epics appear in the List.'` The board's own sentence tells the reader that when only epics are present
+  there are **no tickets**, and that epics are somewhere else.
+
+So the product holds two positions at once: on the Board and in the Backlog an epic is not a ticket, and
+in the List's group band it is counted as one. **The remedy is not to adopt the prototype's children-only
+count** — the ruling is right that the band should answer for what is on screen. **The remedy is to fix
+the noun**: `epic · 4 rows` or `epic · 3 tickets + 1 epic`. That keeps the ruling's stated principle and
+removes the false label, which is why I am asking for the ruling to be amended rather than reversed.
+
+**What would change my mind:** a measurement showing the product *elsewhere* counts an epic among
+tickets. I looked for one and did not find it; if the judge has it, this finding should be rejected.
+
+### `E2-5` (`F5`) — **LIVE, and the ruling is not what exposes it.**
+
+§4 row 4 **upheld the concern**: *"The implementation's destination is upheld; **the journey is not.** …
+**Rule:** keep the destination and give the empty My Work state a first-run pointer to New-project when
+the workspace has no projects."* The ruling therefore **ordered a change**, and R2.4 below measures that
+no code has moved since — so this is an unimplemented ruling, not a defect ruled away. Stated explicitly
+because round-2's category-2 sentence could otherwise be read against it.
+
+## R2.3 — NO CODE HAS MOVED UNDER THE LANDED FINDINGS
+
+Round-1 findings were measured at `e4baa425`. Today's `origin/main` is `a7b6292b`. **Every one of those
+19 findings still holds against today's tree**, and that is a measurement rather than an assumption:
+
+```
+$ git diff --name-only e4baa425..a7b6292b | grep -vc '^docs/'
+0
+$ git diff --name-only e4baa425..a7b6292b | wc -l
+10
+```
+All ten changed paths are under `docs/` (`controller-state*`, `executor-*state*`, `review-*`). **Zero
+files under `apps/` or `packages/`.** So no landed finding has been fixed, and none has been invalidated
+by drift. The re-validation round-2 asks for is therefore a re-reading, not a re-measurement — and I did
+re-open the load-bearing lines anyway (§R2.5).
+
+## R2.4 — WHAT IS NEW, AND WHERE IT COMES FROM
+
+Two things feed the new findings: the **~40 candidates my two round-1 sweeps produced and I never
+verified** (carried at `review-compiled-controller.md:647-669` as *"Carried, NOT raised"*), and the
+**areas my round-1 coverage statement named as unreached.** Each new finding below was opened and
+measured by me at `a7b6292b`; each cites the line I read, not the sweep's citation.
+
+---
+
 ## 0. HOW TO READ THIS, AND THE ONE THING THAT SHAPES THE WHOLE REPORT
 
 My concern is **what a person meets**. The product's help corpus — `docs/manual.md` and `docs/faq.md`,
@@ -972,3 +1071,185 @@ nine findings are themselves comments that a fix round wrote.
 V3–V5, V7–V9) · Minor 6 (F5–F9, V6) — plus ~40 unverified candidates indexed in §2d and §2e. Both
 sweeps have now returned; nothing is outstanding. Branch `exec2/review-ux` pushed for the controller to
 collect. **No PR opened, no file changed except this report.***
+
+---
+
+# R2.5 — NEW FINDINGS (round 2)
+
+Every line below was opened by me in this worktree at `a7b6292b`. Ids continue from `E2-19`; each is
+marked `(r2)`. Sources are named per finding: *carried candidate* (a lead from one of my round-1 sweeps
+that I never verified) or *new area* (named as unreached in my round-1 §6 coverage statement).
+
+---
+
+### E2-20 (r2) — IMPORTANT · Two admin screens stay on "Loading ticket types…" forever when a read rejects, and the comment beside one of them names that exact failure for a promise it did not apply it to
+
+**WHAT.** Both ticket-type screens fetch with a `Promise.all` that has **no rejection handler**, and both
+gate their whole render on the loaded state, so a rejection is an error drawn as an eternal load.
+
+`packages/app-core/src/workflow-builder/ticket-types/ticket-type-list-screen.tsx:175-181`:
+```
+void Promise.all([gateway.listTicketTypes(workspaceId), gateway.listWorkflows(workspaceId)]).then(
+  ([loadedTypes, loadedWorkflows]) => { … setTypes(loadedTypes); setWorkflows(loadedWorkflows); },
+);
+```
+`:199`: `if (types === null || workflows === null) return <p className="ticket-type-list__loading">Loading ticket types…</p>;`
+
+`packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:189-193` is the same
+shape (`Promise.all([gateway.listWorkflows(…), gateway.listTicketTypes(…)]).then(…)`, no handler), gated
+at `:244` `if (context === null) { … <p className="ticket-type-editor__loading">Loading ticket types…</p> … }`.
+
+**WHY it is wrong — and the comment is the measurement.** `ticket-type-list-screen.tsx:182-185`, the
+docblock attached to the **sibling** promise, reads:
+
+> *"A SEPARATE promise, and its own rejection handler. Folded into the `Promise.all` above, a failed count
+> would reject the whole tuple and **leave the screen on "Loading ticket types…" for ever** — the counts are
+> one segment of one meta line and must not be able to take the list down."*
+
+So the code **names the precise failure mode** — *"leave the screen on Loading ticket types… for ever"* —
+while avoiding it for a courtesy count, and leaves it present in the `Promise.all` the sentence names. The
+`getTicketCountsByType` promise at `:186-193` **does** carry a rejection handler. The author reasoned
+about the hazard, fixed it in the smaller place, and left it in the larger one. A reader who checks that
+comment will conclude the case is handled.
+
+**Consequence for a person.** These are the screens the help corpus calls the ones *"that make the product
+yours"* — and on a read failure the admin gets a spinner that never resolves, no error, no retry, and no
+way to tell it from a slow network. A reload is the only recovery, and nothing says so.
+
+**WHAT WOULD HAVE BEEN BETTER.** One rejection handler on the `Promise.all` writing into an error state
+the screen renders as `ShellRefusal` — the shape every other data screen in this app already uses, and the
+shape this very effect uses for its second promise.
+
+**MEASUREMENT.** Opened: `ticket-type-list-screen.tsx:173-199` (the effect, both promises, the gate);
+`ticket-type-editor-screen.tsx:187-197` and `:240-251`. Both `Promise.all` call sites were read in full;
+neither has a second argument to `.then`, and neither has a `.catch`.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Important.** I decline the sweep's Critical: no
+data is lost and the ledger is untouched, but two admin screens that cannot load and cannot say why is a
+real dead end.
+
+---
+
+### E2-21 (r2) — IMPORTANT · A rejected type migration destroys the mapping the admin just authored AND disables the control that would let them retry
+
+**WHAT.** `ticket-type-editor-screen.tsx:269-284`:
+```
+async function onMigrate(target, stateMap) {
+  if (outgoingWorkflow === null) return;
+  setRebind({ phase: 'migrating', toWorkflowId: target.id });
+  const outcome = await gateway.migrateTypeToWorkflow({ … stateMap … });   // no try / no catch
+  …
+}
+```
+The call site is `:551` `onConfirm={(stateMap) => void onMigrate(pendingTarget, stateMap)}` — a `void`, so
+a rejection is discarded entirely. Three things then hold at once:
+
+1. `rebind.phase` stays `'migrating'`, so `WorkflowRebindDialog` — rendered only at
+   `rebind.phase === 'mapping'` (`:546`) — **unmounts**.
+2. The dialog's `stateMap` was the admin's authored mapping for a schema-dropping move; it dies with the
+   unmount. (Precedent for the same shape: `state-mapping-dialog.tsx:46` holds that mapping in local state.)
+3. The control that reopens the mapping, `:509`
+   `disabled={!canAuthor || !bindingCommitted || rebind.phase === 'migrating'}`, is now **disabled
+   forever** — the phase never leaves `'migrating'`.
+
+**WHY it is wrong.** One dropped connection costs the admin their authored work and the only route back to
+it, and reports nothing. Compared with its two siblings in the same file this is the worst of the three:
+`onSave` (`:286`+) and the publish path both handle their outcomes; this one has no handler at all. The
+file's own vocabulary treats a refusal (`phase: 'refused'` at `:282`) as a first-class state worth
+rendering — so the omission is a gap in an otherwise complete state machine, and the state it omits is the
+one with no verdict to fall back on.
+
+**WHAT WOULD HAVE BEEN BETTER.** `try`/`catch` around the await, restoring `rebind.phase` to `'mapping'`
+on rejection and rendering the transport sentence **inside the still-mounted dialog**, so the mapping
+survives and the admin can retry. The dialog must not unmount until a verdict arrives.
+
+**MEASUREMENT.** Opened: `ticket-type-editor-screen.tsx:269-284` (`onMigrate`, both `setRebind` calls and
+the unguarded await), `:504-553` (the enable conditions at `:509`, the dialog gate at `:546`, the `void`
+call site at `:551`).
+
+**Source:** carried candidate (round-1 §2d). **Severity: Important** — agree with the sweep.
+
+---
+
+### E2-22 (r2) — MINOR · The state-mapping dialog is unmounted by the act of submitting, so a refusal costs the admin the mapping
+
+**WHAT.** `packages/app-core/src/workflow-builder/ui/publish-controls.tsx:64-65`: `submitPayload` begins
+`setState({ phase: 'submitting' })`. `:117` renders the dialog only while `state.phase === 'mapping'`, so
+submitting removes the surface that holds the mapping — before any verdict exists.
+`state-mapping-dialog.tsx:46` keeps that mapping in `const [mapping, setMapping] = useState<Record<string,
+string>>({})`, which dies with the unmount, and `:126` passes it onward as
+`onConfirm={(mapping) => void submitPayload(mapping)}` — a `void`, so a rejection is discarded too.
+
+**WHY it is wrong — and how strongly, stated precisely.** On `refused`/`invalid` the phase becomes
+`'refused'`/`'invalid'` (`:80-85`), which re-enables Publish (`:111` `disabled={issues.length > 0 ||
+state.phase === 'submitting'}`), so **the admin can redo the mapping from scratch — this is not a
+permanent strand, unlike `E2-21`.** The cost is exactly the authored mapping, discarded at the moment the
+admin most needs it: the refusal is the case where they must correct something and retry. A schema-dropping
+publish requires a destination for every dropped state, so the mapping is not trivial to redo.
+
+**WHAT WOULD HAVE BEEN BETTER.** Keep the dialog mounted through `submitting` and render the in-flight and
+refused states inside it, dismissing only on `committed`. One phase value; the dialog is already the
+surface in view.
+
+**MEASUREMENT.** Opened: `publish-controls.tsx:55-126` (the phase machine `:58`, `setState` at `:65`, the
+switch at `:75-86`, the gate at `:117`, the `void` at `:126`); `state-mapping-dialog.tsx:44-46` and `:82`.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor.** The sweep rated this Important; I lower
+it because the path out is intact and the refusal is displayed — the loss is rework, not a strand.
+
+---
+
+## R2.6 — THE CARRIED CANDIDATES: STATUS, SO THE JUDGE CAN SEE THE BOUNDARY
+
+My round-1 report carried ~40 unverified sweep candidates at §2d and §2e, and the round-1 ruling left
+them *"Carried, NOT raised"* (`review-compiled-controller.md:647-669`). Round 2 turns them into the
+largest available pool, so I am working them in order and **each one I file is a measurement I made
+myself**. Status at this push:
+
+| candidate | status |
+|---|---|
+| workflow-builder: two screens stuck on "Loading…" for ever | ✅ **filed — `E2-20`** |
+| workflow-builder: rejected migration strands the editor | ✅ **filed — `E2-21`** |
+| workflow-builder: mapping dialog unmounted before the answer | ✅ **filed — `E2-22`** |
+| `Dialog`: `aria-modal="true"` with no focus move, trap or return | ⏳ verifying (overlaps exec 1's `P8`, which the judge already ruled — see below) |
+| Comment carry-over across two different moves | ⏳ verifying |
+| Two `aria-modal` dialogs at once; one Escape closes both | ⏳ verifying |
+| Four submit buttons with no in-flight latch | ⏳ verifying (partly covered by my own `E2-19`) |
+| Sheet read arms carry no role | ⏳ verifying (partly covered by my own `E2-15`) |
+| `typeId`/`parentId`/`mode`/`toStateId` seeded once | ⏳ verifying |
+| Draft never cleared across a close | ⏳ verifying |
+| Passkeys "You have no passkeys yet." over a failed read | ⏳ verifying |
+| Two account sections with no `error` prop | ⏳ verifying |
+| Single-row mark-read and its Undo fail silently | ⏳ verifying |
+| Five offline components mounted nowhere | ⏳ verifying |
+| Unrecognised sync status reports "Live" | ⏳ verifying |
+| Bulk-close offline acceptance reported as "could not reach" | ⏳ verifying |
+| `M1`–`M9` (archived not disclosed; stale-data reload; no narrow rules; calendar throw; `aria-controls`; `AttachmentList`; history flattening; `PlainTextEditorSlot`; reopen seed) | ⏳ verifying |
+| `E2-20`'s two siblings from §2e (Move has no transport surface; partly-committed batch never reloads; Delete has no confirmation; the 15-second undo is the only way back; `if (submitting) return` cannot fire; `AttachmentListItem` has no caller) | ⏳ verifying |
+
+⚠ **One candidate I am deliberately NOT filing, and the reason is a rule.** The sweep's `Dialog` finding
+(`aria-modal="true"`, no focus trap) overlaps **exec 1's `P8`, which this judge already ruled on** —
+*"`aria-modal="true"` at `dialog.tsx:20` and `sheet.tsx:103`; attribute-level `inert` sweep → empty"*
+(`review-compiled-controller.md:86`). Round-2 §3 gives **0** to a re-finding that adds nothing, and the
+added measurement I would need (a keyboard-tab reproduction) needs a browser I do not have. I am verifying
+the *distinct* halves rather than re-raising the same claim, and I will say which I filed and which I did
+not.
+
+**Coverage note for round 2.** My round-1 §6 named `apps/mobile`, `apps/desktop`, the workflow builder,
+`/inbox`, `/members`, `/account`, `/settings`, `/mcp/*` and the 13.x case catalogue as unreached. Round 2
+has taken me into the **workflow builder** (`E2-20`–`E2-22`); the rest of that list stands as unreached
+until it is not, and I will keep this table current at every push.
+
+**How I used graphify (§6 of the rules).** Before opening any file I read `graphify-out/GRAPH_REPORT.md`'s
+community index and hubs, then ran `graphify query "ticket type list screen loading and error handling"`,
+which named the `ticket-type-editor-screen.tsx` community and the `ticket-types.test.tsx` /
+`workflow-builder/fake-gateway.ts` cluster and pointed me at the two screens without my reading the tree.
+⚠ **The graph is built from `e2769d60`, and my branch is `a7b6292b`** — I checked, and every commit
+between them is docs-only (§R2.3), so the code layer is current. The graph located the files; **every
+claim above cites a line I opened myself**, per the rules' warning that the graph's edge is a pointer and
+not evidence.
+
+---
+
+*executor 2 — UX, round 2. Phase 1 in progress. Branch `exec2/review-ux-r2`; pushed at each checkpoint.
+**No fix, no PR.***
