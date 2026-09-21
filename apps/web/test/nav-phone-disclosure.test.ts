@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Case `13.913` — E4-11 — at 390 px the signed-in shell's navigation bar was **390×310**
+ * Case `13.1137` — E4-11 — at 390 px the signed-in shell's navigation bar was **390×310**
  * (`getBoundingClientRect` on `.gn-nav`): the destination links wrapped to five
  * 44-px rows, 37 % of an 844-px viewport, and with the board's own chrome above
  * it the first card sat 1105 px down — **no ticket was on screen when the board

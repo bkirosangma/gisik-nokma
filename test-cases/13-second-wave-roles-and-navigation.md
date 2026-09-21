@@ -1601,7 +1601,7 @@ fallback this field exists to serve.
   number should not move — but that is a prediction, not a measurement, and the owner of that sweep is
   whoever next runs it.
 
-## The shell's nav on a phone: five rows in, one row out (lane ds1, 2026-09-21, batch B10) — cases `13.913`–`13.914`
+## The shell's nav on a phone: five rows in, one row out (lane ds1, 2026-09-21, batch B10) — cases `13.1137`–`13.1138`
 
 **The finding, round 2 `E4-11`, IMPORTANT.** On the board at `emulate 390x844`, `.gn-nav` measured
 **390×310** — the destination links wrapped to five 44-px rows, 37 % of the viewport. Measured at scroll
@@ -1613,17 +1613,18 @@ where the wrap came from — a 10-px horizontal overflow caused by the signed-in
 five rows. The prototype's only phone screen puts navigation in a bottom tab bar; the reviewer's remedy
 allowed either that or a single disclosure, and the disclosure is what this change takes.
 
-**Ids `13.913`–`13.914`, recounted REPO-WIDE at this tip — and the first recount was wrong, which is
-worth recording rather than tidying.** The first pass asked this FILE for its highest real id (`13.965`)
-and took the next two numbers. That universe was the file in hand, not the catalogue: `13.966` and
-`13.967` were already in use in `test-cases/13-second-wave-board-actions.md`, and `node
-scripts/check-case-ids.mjs` refused the tree with the duplicate named at both lines. **The sweep this
-file's id blocks are supposed to be recounted against is `test-cases/*.md`, and a per-file recount is
-not a smaller version of it — it is a different question.** Repo-wide over all 25 files, the free ids in
-the `13.9xx` band are `13.913`–`13.917` and `13.996`–`13.997`; a contiguous pair from the first run was
-taken, which is the block convention this file already uses. `13.999` is deliberately not treated as
-free: it is the file's own documented truncation trap (`13.9999` reads out as an id to a bare
-`grep '13\.[0-9][0-9][0-9]'`).
+**Ids `13.1137`–`13.1138`, taken from the block B10 was ALLOCATED — and the route to them is worth
+recording rather than tidying, because it produced three wrong answers before the right one.** The
+first pass took this pair from `13.913`/`13.914`, chosen by asking THIS FILE for its next free number.
+That universe was the file in hand, not the catalogue: a later pair minted the same way collided with
+`13.966`/`13.967`, already in use in `test-cases/13-second-wave-board-actions.md`, and
+`node scripts/check-case-ids.mjs` refused the tree with the duplicate named at both lines. **The sweep a
+per-file recount is not a smaller version of is `test-cases/*.md`; it is a different question.** The
+second answer was a self-declared reservation of `13.1054`–`13.1073`, verified free across all 25 files
+— correct as far as it went, and **superseded within the hour by the third answer**: the controller
+allocated §13 ids per RELEASE BATCH (`Fable, 22:0x`), and **B10 owns the block `13.1137`–`13.1156`**.
+Every §13 id this batch had already minted was renumbered into it, in one pass, in the commit that says
+so. A lane's own reservation is a reading that expires; an allocation is not.
 
 ### The mechanism, and the shape it was chosen for
 
@@ -1642,7 +1643,7 @@ mechanism the height depends on.
 
 ### The cases
 
-- ✅ **13.913 — the phone breakpoint hides the wrapper, and the wide arm does not.** This is a SOURCE
+- ✅ **13.1137 — the phone breakpoint hides the wrapper, and the wide arm does not.** This is a SOURCE
   scan, not a rendered one, and deliberately: the gate has no browser (`apps/web/e2e-*` is Playwright,
   not in `pnpm test`), and the property at issue is which declarations a rule carries, on which the
   stylesheet *is* the authority. `apps/web/test/nav-phone-disclosure.test.ts`. **Two controls, and
@@ -1658,7 +1659,7 @@ mechanism the height depends on.
   `@media (max-width: 40rem)` blocks, so "the 40rem block" is not a thing that exists — the block is
   selected by containing `.gn-nav__more`, which is why asking for the first one answers about
   `.gn-workspace-list`.
-- ✅ **13.914 — the toggle is wired to the panel, and the links are in the document in BOTH states.**
+- ✅ **13.1138 — the toggle is wired to the panel, and the links are in the document in BOTH states.**
   `apps/web/test/app-nav.test.tsx`. jsdom evaluates no media query, so the stylesheet test above can
   prove the breakpoint hides the wrapper but not that the button which unhides it is wired to it; this
   case covers the half the scan cannot reach. The toggle starts `aria-expanded="false"` with

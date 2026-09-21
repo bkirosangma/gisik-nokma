@@ -2285,7 +2285,7 @@ described") reddens **13.983 alone** (`expected function to throw an error, but 
   `maxLength` (deliberately, matching the name field), so an over-long description is refused by the
   domain on submission rather than prevented while typing. No case drives that path from the browser.
 
-## A SEVENTH ground for `textAccent`: the ghost button on a sunken row (lane ds1, 2026-09-21, batch B10) — case `13.1060`
+## A SEVENTH ground for `textAccent`: the ghost button on a sunken row (lane ds1, 2026-09-21, batch B10) — case `13.1145`
 
 **The finding, round 2 `E4-31`, scored PARTIAL → IMPORTANT.** `button.gn-button--ghost` inside the
 `/account` *Connected assistants* and `/mcp/tokens` rows, and `button.gn-button--ghost.fields-editor__required`
@@ -2313,7 +2313,7 @@ token docblocks so the move is legible.
 
 ### The case
 
-- ✅ **13.1060 — `textAccent` clears 4.5 against `fillTertiary` over `surfaceSunken`, all six
+- ✅ **13.1145 — `textAccent` clears 4.5 against `fillTertiary` over `surfaceSunken`, all six
   style×theme, and `neo`'s third composite is asserted to BE its second.** `packages/ui/test/tokens.test.ts`,
   inside `13.360`. **The mutation is the finding itself:** reverting only the two primitives to their
   pre-change values reddens this case on the THIRD assertion alone with

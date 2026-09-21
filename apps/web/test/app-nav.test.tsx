@@ -1094,7 +1094,7 @@ describe('pending-13.4xx AppNav is mounted on every page that must always show i
 });
 
 /**
- * Case `13.914` — E4-11 — THE PHONE DISCLOSURE'S WIRING, witnessed at the component because
+ * Case `13.1138` — E4-11 — THE PHONE DISCLOSURE'S WIRING, witnessed at the component because
  * the CSS arm cannot be: jsdom evaluates no media query, so a stylesheet test
  * can prove the breakpoint hides the wrapper but not that the button which
  * unhides it is wired to it.

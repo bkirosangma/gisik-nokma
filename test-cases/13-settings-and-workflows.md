@@ -1418,7 +1418,7 @@ driven through it would have passed against a page that sent no filter. It now *
 BEFORE cutting the page**, mirroring `store.ts`, where the filter joins the WHERE and therefore narrows
 what the cursor walks. (`packages/app-core/test/inbox/fake-gateway.ts`)
 
-## The type editor's issues list stops painting danger-toned text on a sunken surface (lane ds1, 2026-09-21, batch B10) — case `13.1061`
+## The type editor's issues list stops painting danger-toned text on a sunken surface (lane ds1, 2026-09-21, batch B10) — case `13.1146`
 
 **The finding, round 2 `P24`, IMPORTANT, flagged `r2 NEW`.** `ui.css` `.ticket-type-editor__issues` set
 `background: var(--gn-surface-sunken)` **and** `color: var(--gn-danger)` at `font-size: 0.8rem` — 12.8px,
@@ -1441,7 +1441,7 @@ the next reader of the finding does not reach for it.
 
 ### The case
 
-- ✅ **13.1061 — a gate-able sweep: every rule painting a token colour on `surfaceSunken` must name an fg
+- ✅ **13.1146 — a gate-able sweep: every rule painting a token colour on `surfaceSunken` must name an fg
   role the roster declares for it.** `packages/ui/test/tokens.test.ts`. This is the finding's own second
   half, which it called *"the instrument this regime has never had"* — it reads two files, needs no
   browser, and is scoped to `surfaceSunken` **because that is the surface the finding measured; widening it
@@ -1457,7 +1457,7 @@ the next reader of the finding does not reach for it.
 
 **No `Features.md` bullet.** This corrects an existing notice's paint; it adds no affordance.
 
-## The settings sidebar's section links port the prototype's four metrics (lane ds1, 2026-09-21, batch B10) — case `13.1064`
+## The settings sidebar's section links port the prototype's four metrics (lane ds1, 2026-09-21, batch B10) — case `13.1149`
 
 **The finding, round 2 `E4-25`, MINOR.** `nav.gn-settings__sidebar a` ×3 (`Ticket types` with
 `aria-current="page"`, `Workflows`, `Workspace`) measured **232×39**, `display: block`,
@@ -1472,7 +1472,7 @@ is the settings sidebar, and the stack suite's tap route list is seven routes wi
 
 ### The case
 
-- ✅ **13.1064 — all four declarations are present, the two halves that hold the row at 44 arrive
+- ✅ **13.1149 — all four declarations are present, the two halves that hold the row at 44 arrive
   TOGETHER, and four single-declaration mutation plants are each caught in the same path.**
   `apps/web/test/settings-shell-tokens.test.ts`. `padding: 0 14px` is asserted with `min-height` on
   purpose: the prototype's item carries **no vertical padding at all** and takes its height from

@@ -497,7 +497,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
 });
 
 /**
- * Case `13.1054` — E4-13 — the Title field wears the product's own field
+ * Case `13.1139` — E4-13 — the Title field wears the product's own field
  * treatment instead of painting as raw user-agent chrome.
  *
  * Opened *New ticket* on the board and measured the first control a person
@@ -519,7 +519,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
  * `packages/ui/test/components.test.tsx` pins what that rule *says* (`13.339`);
  * this case pins that this control is one of its wearers.
  */
-describe('13.1054 the Title field is a .gn-field__input, not raw UA chrome', () => {
+describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () => {
   const UI_CSS = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
 
   const renderDialog = () =>
@@ -533,7 +533,7 @@ describe('13.1054 the Title field is a .gn-field__input, not raw UA chrome', () 
       />,
     );
 
-  it('13.1054 the Title control carries the class', () => {
+  it('13.1139 the Title control carries the class', () => {
     renderDialog();
     const title = screen.getByLabelText('Title');
     // The control, not a wrapper — the fix is on the `<input>` itself.
@@ -541,7 +541,7 @@ describe('13.1054 the Title field is a .gn-field__input, not raw UA chrome', () 
     expect(title).toHaveClass('gn-field__input');
   });
 
-  it('13.1054 and the class it carries is a RULE, not a dead name', () => {
+  it('13.1139 and the class it carries is a RULE, not a dead name', () => {
     // CONTROL, first, for the same reason `sync-ux-css-binding.test.tsx` runs
     // one: without it a needle that matches nothing would make the assertion
     // below read as a pass on a stylesheet that had lost the block entirely.

@@ -1660,7 +1660,7 @@ duplicates (pre-existing, unrelated to this fix wave, carried since before Task 
 entry in `.superpowers/sdd/2026-09-16-board-prototype-port/progress.md`). Verified by ID, not by count.
 
 
-## The New-ticket dialog's Title field wears the product's field treatment (lane ds1, 2026-09-21, batch B10) — case `13.1054`
+## The New-ticket dialog's Title field wears the product's field treatment (lane ds1, 2026-09-21, batch B10) — case `13.1139`
 
 **The finding, round 2 `E4-13`, IMPORTANT.** The first control a person types into in *New ticket* was
 `<label class="gn-new-ticket__field">Title<input value=""></label>` — an `<input>` with **no class at
@@ -1671,16 +1671,18 @@ all**, inside a neumorphic sheet, on a dialog whose `Type` and `Parent` siblings
 rules (the actions row at `:2154`, the field wrapper at `:2155`), neither of which reaches the input, so
 the user-agent box is what painted.
 
-**Id `13.1054`, and the recount is the part worth recording.** The first pass asked
+**Id `13.1139`, and how it was arrived at is the part worth recording.** The first pass asked
 `13-second-wave-roles-and-navigation.md` for its next free number and collided with
-`13-second-wave-board-actions.md`; the guard named both lines. **B10 therefore reserves the contiguous
-block `13.1054`–`13.1073`**, verified free across all 25 catalogue files in one sweep, and records the
-reservation in `docs/lanes/release-2026-09-22-progress.md` so a peer lane does not take from it. A
-per-file "next free" is not a smaller version of the repo-wide question — it is a different question.
+`13-second-wave-board-actions.md`; the guard named both lines. **A per-file "next free" is not a smaller
+version of the repo-wide question — it is a different question.** The second answer was a self-declared
+reservation of `13.1054`–`13.1073`, verified free across all 25 catalogue files, and it was superseded
+within the hour by the third: the controller allocated §13 ids per RELEASE BATCH, and **B10 owns
+`13.1137`–`13.1156`**. This id was renumbered into that block in the same pass as every other §13 id the
+batch had minted.
 
 ### The case
 
-- ✅ **13.1054 — the Title control carries `gn-field__input`, and that class is a RULE, not a dead name.**
+- ✅ **13.1139 — the Title control carries `gn-field__input`, and that class is a RULE, not a dead name.**
   `packages/app-core/test/views/new-ticket-dialog.test.tsx`. **The two halves are asserted together
   because either alone is passable while the defect survives:** round 1's `P1` was exactly *"a control
   styled by no rule of its own"*, so a class that matches no selector block satisfies a class-name
@@ -1689,13 +1691,13 @@ per-file "next free" is not a smaller version of the repo-wide question — it i
   `inbox-css-binding.test.tsx` already establish for this question, guarded by its own control —
   without it, a needle that matched nothing would make the assertion a pass on a stylesheet that had
   lost the block entirely. `packages/ui/test/components.test.tsx` pins what that rule *says* (`13.339`);
-  this case pins that this control is one of its wearers. `13.1054` was minted with the fix and the
+  this case pins that this control is one of its wearers. `13.1139` was minted with the fix and the
   stylesheet was reverted to `HEAD` for the RED run, restored from a sha256-compared backup.
 
 **No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance and no
 new state, so there is no feature bullet to edit — recorded here rather than left as a silent omission.
 
-## The active-filter chip's remove control meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1055`
+## The active-filter chip's remove control meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1140`
 
 **The finding, round 2 `E4-14`, IMPORTANT.** On Calendar and Timeline (any view with a chip in the tray),
 `button.gn-project__filter-chip-remove` — `aria-label="Remove filter — Closed: hidden"` — measured
@@ -1708,7 +1710,7 @@ person reaches for rather than as a hard failure.
 
 ### The case
 
-- ✅ **13.1055 — the remove rule declares the 24-px floor, in a box that honours it, and the two
+- ✅ **13.1140 — the remove rule declares the 24-px floor, in a box that honours it, and the two
   declarations that made the glyph the control are still in force.** `packages/ui/test/components.test.tsx`.
   **A source scan, not a paint.** `apps/web/e2e-*` is Playwright and is not in `pnpm test`; the property
   at issue is what the rule declares, and the stylesheet is the authority on that. `1.5rem` is this
@@ -1724,7 +1726,7 @@ person reaches for rather than as a hard failure.
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance, so
 there is no feature bullet to edit — recorded here rather than left as a silent omission.
 
-## Every board card's `who · when` disclosure meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1056`
+## Every board card's `who · when` disclosure meets the 24-px in-list floor (lane ds1, 2026-09-21, batch B10) — case `13.1141`
 
 **The finding, round 2 `E4-3`, IMPORTANT, scored PARTIAL.** `button.gn-board-card__provenance`
 toggles the state-provenance line on each card. Measured on the board at 1512×900 against the product's
@@ -1737,7 +1739,7 @@ judge corrected the finding's "only sweep" absolute — `e2e-viewport/responsive
 
 ### The case
 
-- ✅ **13.1056 — the rule declares the 24-px in-list floor, and `DENSE_IN_LIST` classifies it as
+- ✅ **13.1141 — the rule declares the 24-px in-list floor, and `DENSE_IN_LIST` classifies it as
   in-list.** `apps/web/test/tap-target-density.test.ts`. **Both halves are asserted together and for
   the reason the table exists at all:** a floor in the CSS with no classification is judged at 44 the
   day a sweep reaches the board, and a classification with no floor absolves a control that does not
@@ -1763,7 +1765,7 @@ baseline — it needs a live stack on `:3001`, which another lane owns. **Owner:
 
 **No `Features.md` bullet.** This corrects an existing control's target size; it adds no affordance.
 
-## At phone width the ticket sheet's label column collapses (lane ds1, 2026-09-21, batch B10) — case `13.1057`
+## At phone width the ticket sheet's label column collapses (lane ds1, 2026-09-21, batch B10) — case `13.1142`
 
 **The finding, round 2 `E4-7`, IMPORTANT.** With the sheet open on `CCSO-6` at `emulate 390x844`, the
 description editor (`div.tiptap.ProseMirror`) measured **224×3195**; its container `dd` spanned
@@ -1776,7 +1778,7 @@ it nowhere).
 
 ### The case
 
-- ✅ **13.1057 — below 40rem the row is one column, the value can shrink, and Full screen is withdrawn.**
+- ✅ **13.1142 — below 40rem the row is one column, the value can shrink, and Full screen is withdrawn.**
   `packages/ui/test/components.test.tsx`. **`grid-template-columns: 1fr` is asserted together with
   `min-width: 0` on the `dd`, and that pair is the point:** a grid item's `min-width` is `auto`, so the
   column is floored at its content's min-content width and `1fr` alone would leave the editor pushing the
@@ -1792,7 +1794,7 @@ it nowhere).
 **No `Features.md` bullet.** This corrects an existing screen's layout at a width it already served; it
 adds no affordance.
 
-## The controls that painted as raw UA chrome join the bare-control convention (lane ds1, 2026-09-21, batch B10) — case `13.1058`
+## The controls that painted as raw UA chrome join the bare-control convention (lane ds1, 2026-09-21, batch B10) — case `13.1143`
 
 **The finding, round 2 `P1`, IMPORTANT** (filed as nine sites / seven controls, corrected to eight sites / six
 controls — the seventh, `gn-nav__signin`, was withdrawn because `.gn-nav a` reaches it from an ancestor).
@@ -1824,7 +1826,7 @@ keyword — and the shorthand resets every background property anyway.
 
 ### The case
 
-- ✅ **13.1058 — the extractor can tell both ways, all four buttons match a selector block, each declares
+- ✅ **13.1143 — the extractor can tell both ways, all four buttons match a selector block, each declares
   the reset in the file that owns it, and the editor's stays inside that file's no-colour rule.**
   `packages/ui/test/bare-control-coverage.test.ts`. The control runs FIRST and in both directions: 600+
   selector heads extracted, a class that genuinely has a rule reads as styled, an invented class reads as
@@ -1838,7 +1840,7 @@ keyword — and the shorthand resets every background property anyway.
 
 **No `Features.md` bullet.** This corrects existing controls' paint; it adds no affordance.
 
-## The board's whole-board empty state gets a treatment, and a recorded rationale (lane ds1, 2026-09-21, batch B10) — case `13.1059`
+## The board's whole-board empty state gets a treatment, and a recorded rationale (lane ds1, 2026-09-21, batch B10) — case `13.1144`
 
 **The finding, round 2 `P2`, IMPORTANT.** `board.tsx:528` renders
 `<div className="gn-board gn-board--empty">`, `:490` renders `gn-board__empty-copy` and `:494` renders
@@ -1860,7 +1862,7 @@ screen back toward a prototype that never had it — the second half of the find
 
 ### The case
 
-- ✅ **13.1059 — the container carries the sibling's shape, the copy takes the sibling's type, the action
+- ✅ **13.1144 — the container carries the sibling's shape, the copy takes the sibling's type, the action
   takes the shared constant, and the P1 reset still precedes this rule.** `packages/ui/test/components.test.tsx`.
   The last case is the one worth naming: **P1's bare-control reset and this rule BOTH match
   `.gn-board__empty-create`**, deliberately — P1 removed the UA chrome, this gives the product's own — and
@@ -1870,7 +1872,7 @@ screen back toward a prototype that never had it — the second half of the find
   `apps/web/e2e-*` is Playwright, which is not in `pnpm test`. `ui.css` was reverted to `HEAD` for the RED
   run and restored from a sha256-compared backup.
 
-## The timeline's nav buttons stop wearing the browser's bevel (lane ds1, 2026-09-21, batch B10) — case `13.1062`
+## The timeline's nav buttons stop wearing the browser's bevel (lane ds1, 2026-09-21, batch B10) — case `13.1147`
 
 **The finding, filed twice from two sides: round 2 `E4-15`** (MINOR — "the class HAS a rule, and the rule
 forgot the border") **and `P35`** (MINOR, `r2 NEW` phase 2 — the same rule, reached by asking whether a
@@ -1885,7 +1887,7 @@ different questions. `P35`'s own corroboration: the family's other two members, 
 
 ### The case
 
-- ✅ **13.1062 — the rule declares `border`, and it takes the calendar nav's own values.** `packages/ui/test/components.test.tsx`.
+- ✅ **13.1147 — the rule declares `border`, and it takes the calendar nav's own values.** `packages/ui/test/components.test.tsx`.
   **The assertion is the PRESENCE of the declaration, not the absence of `outset`**, and the difference
   matters: `outset` is what the UA applies *because* the declaration is missing, so a test searching a
   stylesheet for the string `outset` would pass on every tree, broken or fixed. The five values are
@@ -1897,7 +1899,7 @@ different questions. `P35`'s own corroboration: the family's other two members, 
 
 **No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance.
 
-## The overlay dismiss control is a 44-px circle, not a 21-px glyph (lane ds1, 2026-09-21, batch B10) — case `13.1063`
+## The overlay dismiss control is a 44-px circle, not a 21-px glyph (lane ds1, 2026-09-21, batch B10) — case `13.1148`
 
 **The finding, round 2 `E4-2`, MINOR.** `button.gn-sheet__close` — "×", `aria-label="Close sheet"` — the
 visible pointer control for leaving the product's most-used overlay, measured **23.59×21.20**
@@ -1917,7 +1919,7 @@ says so rather than letting the assertion imply a stricter claim.
 
 ### The case
 
-- ✅ **13.1063 — the dismiss control declares the 44-px floor in both dimensions, takes the prototype's
+- ✅ **13.1148 — the dismiss control declares the 44-px floor in both dimensions, takes the prototype's
   circle and fill, and answers the size question the same way the header's other control does.**
   `packages/ui/test/components.test.tsx`. **44, not the prototype's 32:** this is the same divergence
   `.gn-sheet__full` immediately above already records — *"this repo enforces the 44px tap-target floor on
@@ -1936,4 +1938,4 @@ says so rather than letting the assertion imply a stricter claim.
 that opens a sheet before measuring"*, because no current sweep enters a state where the sheet is open
 (`UNAUTHED_ROUTES` covers `/help`, `/privacy`, `/terms` and a 404 probe; the stack suite's tap pass
 measures `/my-work` alone). That is a Playwright change needing a live stack on `:3001`, out of this
-lane's reach; the owner is whoever widens that pass, and the same gap is recorded under `13.1056`.
+lane's reach; the owner is whoever widens that pass, and the same gap is recorded under `13.1141`.

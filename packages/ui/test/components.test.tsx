@@ -1466,7 +1466,7 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
 });
 
 /**
- * Case `13.1055` — E4-14 — the filter chip's remove control is a 24-px target,
+ * Case `13.1140` — E4-14 — the filter chip's remove control is a 24-px target,
  * not an 8×13 glyph wearing the control's own `cursor: pointer`.
  *
  * On Calendar and Timeline, `button.gn-project__filter-chip-remove`
@@ -1489,16 +1489,16 @@ describe('the Visibility section is styled to the prototype row (17.001–17.005
  * (24 + the chip's two 0.25rem paddings = 32) is stated in the rule and was
  * not measured on a running server.
  */
-describe('13.1055 the filter chip remove control meets the 24-px in-list floor', () => {
+describe('13.1140 the filter chip remove control meets the 24-px in-list floor', () => {
   const REMOVE = '.gn-project__filter-chip-remove';
 
-  it('13.1055 the rule declares the floor, in this file\'s own unit', () => {
+  it('13.1140 the rule declares the floor, in this file\'s own unit', () => {
     const body = rule(REMOVE);
     expect(body).toMatch(/min-width:\s*1\.5rem/);
     expect(body).toMatch(/min-height:\s*1\.5rem/);
   });
 
-  it('13.1055 and it declares a box that HONOURS a min size', () => {
+  it('13.1140 and it declares a box that HONOURS a min size', () => {
     // The load-bearing half, and the one a `min-height`-only edit would miss:
     // with `padding: 0` the element's height IS its line box, so the floor
     // needs a box that honours it. `.gn-attention__title`'s own note holds
@@ -1507,7 +1507,7 @@ describe('13.1055 the filter chip remove control meets the 24-px in-list floor',
     expect(rule(REMOVE)).toMatch(/place-items:\s*center/);
   });
 
-  it('13.1055 the two declarations that made the GLYPH the control are still in force', () => {
+  it('13.1140 the two declarations that made the GLYPH the control are still in force', () => {
     // Not a control — the pair is the negative half of the fix, asserted so a
     // later edit cannot silently undo it. `padding: 0` and `line-height: 1`
     // are what made the glyph the control in the first place; either coming
@@ -1519,7 +1519,7 @@ describe('13.1055 the filter chip remove control meets the 24-px in-list floor',
 });
 
 /**
- * Case `13.1057` — E4-7 — at phone width the ticket sheet's label column
+ * Case `13.1142` — E4-7 — at phone width the ticket sheet's label column
  * collapses, so the description stops running off the sheet.
  *
  * The row is a two-column grid with a fixed `8rem` label column. At 390 px the
@@ -1535,7 +1535,7 @@ describe('13.1055 the filter chip remove control meets the 24-px in-list floor',
  * server, and `apps/web/e2e-*` is Playwright, which is not in `pnpm test` —
  * what this scan proves is that the breakpoint declares them.
  */
-describe('13.1057 the ticket sheet collapses its label column at phone width', () => {
+describe('13.1142 the ticket sheet collapses its label column at phone width', () => {
   /**
    * The `@media` blocks whose header contains `query`, braces matched. Local to
    * this case because `components.test.tsx`'s `rule()` reads top-level
@@ -1566,7 +1566,7 @@ describe('13.1057 the ticket sheet collapses its label column at phone width', (
     }
   };
 
-  it('13.1057 the 40rem block that carries the collapse exists', () => {
+  it('13.1142 the 40rem block that carries the collapse exists', () => {
     // POSITIVE CONTROL for both assertions below: without it they would fail
     // against `undefined` rather than redden on the declaration.
     expect(
@@ -1575,13 +1575,13 @@ describe('13.1057 the ticket sheet collapses its label column at phone width', (
     ).toBeGreaterThan(0);
   });
 
-  it('13.1057 the label column becomes one column AND the value can shrink', () => {
+  it('13.1142 the label column becomes one column AND the value can shrink', () => {
     const phone = mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field')[0] as string;
     expect(phone).toMatch(/\.gn-ticket-sheet__field\s*\{\s*grid-template-columns:\s*1fr;/);
     expect(phone).toMatch(/\.gn-ticket-sheet__field dd\s*\{\s*min-width:\s*0;/);
   });
 
-  it('13.1057 Full screen is withdrawn below the same width', () => {
+  it('13.1142 Full screen is withdrawn below the same width', () => {
     const phone = mediaBlocksContaining('(max-width: 40rem)', '.gn-ticket-sheet__field')[0] as string;
     // Same block as the collapse, deliberately: two breakpoints for one
     // screen's phone treatment is how they drift apart.
@@ -1590,7 +1590,7 @@ describe('13.1057 the ticket sheet collapses its label column at phone width', (
 });
 
 /**
- * Case `13.1059` — P2 — the board's whole-board empty state is styled, and the
+ * Case `13.1144` — P2 — the board's whole-board empty state is styled, and the
  * three classes it renders stop matching nothing.
  *
  * `board.tsx` renders `gn-board gn-board--empty` (`:528`), `gn-board__empty-copy`
@@ -1611,8 +1611,8 @@ describe('13.1057 the ticket sheet collapses its label column at phone width', (
  *
  * **Not painted** — what is asserted is what the rules declare.
  */
-describe('13.1059 the board\'s whole-board empty state is styled', () => {
-  it('13.1059 the container carries the column sibling\'s shape', () => {
+describe('13.1144 the board\'s whole-board empty state is styled', () => {
+  it('13.1144 the container carries the column sibling\'s shape', () => {
     const body = rule('.gn-board--empty');
     expect(body).toMatch(/background:\s*var\(--gn-fill-quaternary\)/);
     expect(body).toMatch(/border-radius:\s*var\(--gn-radius-card\)/);
@@ -1623,14 +1623,14 @@ describe('13.1059 the board\'s whole-board empty state is styled', () => {
     expect(body).toMatch(/text-align:\s*center/);
   });
 
-  it('13.1059 the copy takes the sibling copy\'s type', () => {
+  it('13.1144 the copy takes the sibling copy\'s type', () => {
     // Same numbers as `.gn-board__column-empty-copy` deliberately: the two
     // sentences are the same kind of sentence and one scale apart would show.
     expect(rule('.gn-board__empty-copy')).toMatch(/font-size:\s*0\.9375rem/);
     expect(rule('.gn-board__empty-copy')).toMatch(/color:\s*var\(--gn-text-muted\)/);
   });
 
-  it('13.1059 the action takes the shared control constant', () => {
+  it('13.1144 the action takes the shared control constant', () => {
     const body = rule('.gn-board__empty-create');
     expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
     expect(body).toMatch(/color:\s*var\(--gn-text-accent\)/);
@@ -1643,7 +1643,7 @@ describe('13.1059 the board\'s whole-board empty state is styled', () => {
     expect(body).not.toMatch(/outset|inset/);
   });
 
-  it('13.1059 the P1 bare-control reset and this rule both match, and this one is later', () => {
+  it('13.1144 the P1 bare-control reset and this rule both match, and this one is later', () => {
     // The overlap is deliberate and is pinned rather than left to be
     // rediscovered: P1 removes the UA chrome, this gives the product's own.
     // If the two rules ever swap order the action silently loses its fill.
@@ -1656,7 +1656,7 @@ describe('13.1059 the board\'s whole-board empty state is styled', () => {
 });
 
 /**
- * Case `13.1062` — E4-15 (and P35, filed from the other side) — the timeline's
+ * Case `13.1147` — E4-15 (and P35, filed from the other side) — the timeline's
  * Earlier / Today / Later buttons stop wearing the browser's default bevel.
  *
  * `.gn-timeline__nav` declared a radius, a background, a colour, a font, padding
@@ -1674,12 +1674,12 @@ describe('13.1059 the board\'s whole-board empty state is styled', () => {
  * stylesheet would pass on every tree, broken or fixed. What can fail is the
  * declaration.
  */
-describe('13.1062 the timeline nav declares a border, so no UA bevel survives', () => {
-  it('13.1062 the rule declares border: none', () => {
+describe('13.1147 the timeline nav declares a border, so no UA bevel survives', () => {
+  it('13.1147 the rule declares border: none', () => {
     expect(rule('.gn-timeline__nav')).toMatch(/border:\s*none/);
   });
 
-  it('13.1062 and it takes the calendar nav\'s own values', () => {
+  it('13.1147 and it takes the calendar nav\'s own values', () => {
     // Asserted as a PAIR with the sibling rule rather than as literals: the
     // finding's remedy is that the two views' navs agree, so a later edit that
     // re-diverges one of them is the regression to catch.
@@ -1697,7 +1697,7 @@ describe('13.1062 the timeline nav declares a border, so no UA bevel survives', 
     }
   });
 
-  it('13.1062 the family\'s other two members were already carrying it', () => {
+  it('13.1147 the family\'s other two members were already carrying it', () => {
     // P35's own observation, kept as the calibration control for the pair
     // above: `.gn-timeline__bar` and `.gn-timeline__open` declare `border:
     // none` while the nav did not, which is what made the omission an omission
@@ -1708,7 +1708,7 @@ describe('13.1062 the timeline nav declares a border, so no UA bevel survives', 
 });
 
 /**
- * Case `13.1063` — E4-2 — the sheet's and the dialog's Close glyph is a
+ * Case `13.1148` — E4-2 — the sheet's and the dialog's Close glyph is a
  * 44-px target, not a 21-px glyph in a transparent box.
  *
  * `button.gn-sheet__close` measured **23.59×21.20** with `padding: 1px 6px`
@@ -1732,10 +1732,10 @@ describe('13.1062 the timeline nav declares a border, so no UA bevel survives', 
  * decision; a later edit that gave the close the prototype's 32 would redden
  * here instead of shipping two answers.
  */
-describe('13.1063 the overlay dismiss control meets the 44px standalone floor', () => {
+describe('13.1148 the overlay dismiss control meets the 44px standalone floor', () => {
   const CLOSE = '.gn-sheet__close';
 
-  it('13.1063 the rule declares the floor in both dimensions', () => {
+  it('13.1148 the rule declares the floor in both dimensions', () => {
     const body = rule(CLOSE);
     expect(body).toMatch(/min-width:\s*2\.75rem/);
     expect(body).toMatch(/min-height:\s*2\.75rem/);
@@ -1747,13 +1747,13 @@ describe('13.1063 the overlay dismiss control meets the 44px standalone floor', 
     expect(body).toMatch(/justify-content:\s*center/);
   });
 
-  it('13.1063 it takes the prototype\'s circle and fill', () => {
+  it('13.1148 it takes the prototype\'s circle and fill', () => {
     const body = rule(CLOSE);
     expect(body).toMatch(/border-radius:\s*999px/);
     expect(body).toMatch(/background:\s*var\(--gn-fill-tertiary\)/);
   });
 
-  it('13.1063 the header\'s two controls answer the size question the same way', () => {
+  it('13.1148 the header\'s two controls answer the size question the same way', () => {
     // The decision, asserted as a pair: both are standalone controls in the
     // sheet header, so both take 44 and neither takes the prototype's 32.
     for (const selector of [CLOSE, '.gn-sheet__full']) {
@@ -1764,7 +1764,7 @@ describe('13.1063 the overlay dismiss control meets the 44px standalone floor', 
     }
   });
 
-  it('13.1063 the dialog\'s close shares the rule, so both overlays get it', () => {
+  it('13.1148 the dialog\'s close shares the rule, so both overlays get it', () => {
     // `.gn-dialog__close, .gn-sheet__close { … }` is ONE rule with two heads.
     // Asserted rather than assumed, because the fix would silently cover only
     // half the overlays if a later edit split them.

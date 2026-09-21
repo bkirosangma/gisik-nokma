@@ -339,7 +339,7 @@ describe('13.910 — exactly ONE rule carries the current item, across both styl
 });
 
 /**
- * Case `13.1064` — E4-25 — the settings sidebar's section links take the four
+ * Case `13.1149` — E4-25 — the settings sidebar's section links take the four
  * metrics `:3145` carries, which this file used to list as deliberately NOT
  * ported.
  *
@@ -358,7 +358,7 @@ describe('13.910 — exactly ONE rule carries the current item, across both styl
  * takes its height from `min-height`, so porting either alone leaves the row
  * able to drift off 44 again the moment the font does.
  */
-describe('13.1064 the settings sidebar item ports the prototype\'s four metrics', () => {
+describe('13.1149 the settings sidebar item ports the prototype\'s four metrics', () => {
   const measuredFour = (source: string): Record<string, boolean> => {
     const rule = ruleFor(source, SIDEBAR_ITEM);
     return {
@@ -369,7 +369,7 @@ describe('13.1064 the settings sidebar item ports the prototype\'s four metrics'
     };
   };
 
-  it('13.1064 all four are declared', () => {
+  it('13.1149 all four are declared', () => {
     const found = measuredFour(css);
     expect(
       Object.entries(found)
@@ -379,7 +379,7 @@ describe('13.1064 the settings sidebar item ports the prototype\'s four metrics'
     ).toEqual([]);
   });
 
-  it('13.1064 the two halves that hold the row at 44 arrive together', () => {
+  it('13.1149 the two halves that hold the row at 44 arrive together', () => {
     // `min-height` without `padding: 0` leaves 8px of vertical padding under a
     // 44px floor, and `padding: 0 0.875rem` without the floor is the 39 the
     // finding measured. Neither alone is the port.
@@ -389,7 +389,7 @@ describe('13.1064 the settings sidebar item ports the prototype\'s four metrics'
     expect(rule, 'the pre-fix two-axis padding came back').not.toMatch(/padding:\s*0\.5rem 0\.7rem/);
   });
 
-  it('13.1064 a planted rule missing any one of the four is caught, in the same path', () => {
+  it('13.1149 a planted rule missing any one of the four is caught, in the same path', () => {
     // MUTATION WITNESS. `withRule` replaces the FIRST match through the same
     // `ruleFor` the case above reads, so each plant traverses the measurement's
     // path rather than being appended past it. Each plant drops exactly one

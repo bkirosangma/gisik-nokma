@@ -1082,7 +1082,7 @@ describe('textAccent — Round 2d (2026-09-09)', () => {
    * the composite/sunken safety margin the derivation bought beyond what the
    * declared rows require.
    *
-   * **AND THE THIRD COMPOSITE, case `13.1060`, added 2026-09-21 by round-2 finding E4-31: a
+   * **AND THE THIRD COMPOSITE, case `13.1145`, added 2026-09-21 by round-2 finding E4-31: a
    * ghost button over `fillTertiary` does not only sit on `surface`.** On
    * `/account` and `/mcp/tokens` it sits on `surfaceSunken`, so the ground that
    * has to be cleared is `fillTertiary` composited over `surfaceSunken` —
@@ -2134,7 +2134,7 @@ describe('13.693 — the green700 calibration is computed on the shipped ground'
 });
 
 /**
- * Case `13.1061` — P24 — every rule that paints a token colour on
+ * Case `13.1146` — P24 — every rule that paints a token colour on
  * `surfaceSunken` names an fg role the roster actually declares for it.
  *
  * The finding's own second half: *"a sweep in the shape the extraction used
@@ -2156,7 +2156,7 @@ describe('13.693 — the green700 calibration is computed on the shipped ground'
  * A source scan, and it says so: it proves the roster COVERS the pair, not
  * that the pair passes — the loop above is what measures the ratios.
  */
-describe('13.1061 token colours on surfaceSunken are declared pairs', () => {
+describe('13.1146 token colours on surfaceSunken are declared pairs', () => {
   const UI_CSS_TEXT = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
   /** `surface-sunken` → `surfaceSunken`, the same transform `cssVariableName` inverts. */
   const toRole = (kebab: string): string => kebab.replace(/-([a-z])/g, (_, c: string) => c.toUpperCase());
@@ -2183,7 +2183,7 @@ describe('13.1061 token colours on surfaceSunken are declared pairs', () => {
     return found;
   }
 
-  it('13.1061 the sweep can see a violation — planted, in the same path', () => {
+  it('13.1146 the sweep can see a violation — planted, in the same path', () => {
     // CONTROL, FIRST and in both directions. Without it, a regex that matched
     // nothing would report "no violations" over a stylesheet that had lost the
     // family entirely — the same green-for-the-wrong-reason shape the sweep
@@ -2199,7 +2199,7 @@ describe('13.1061 token colours on surfaceSunken are declared pairs', () => {
     expect(undeclaredOnSunken(plantedOk)).toHaveLength(0);
   });
 
-  it('13.1061 no rule in ui.css paints an undeclared token colour on surfaceSunken', () => {
+  it('13.1146 no rule in ui.css paints an undeclared token colour on surfaceSunken', () => {
     const violations = undeclaredOnSunken(UI_CSS_TEXT);
     expect(
       violations,
@@ -2208,7 +2208,7 @@ describe('13.1061 token colours on surfaceSunken are declared pairs', () => {
     ).toEqual([]);
   });
 
-  it('13.1061 the rule the finding named carries the tone on its BORDER, not its text', () => {
+  it('13.1146 the rule the finding named carries the tone on its BORDER, not its text', () => {
     // The fix is only correct if the danger signal survives it. `danger` as a
     // 3px non-text boundary owes 3:1, not 4.5, and clears it on this surface.
     const rule = UI_CSS_TEXT.match(/\.ticket-type-editor__issues\s*\{([^}]*)\}/);

@@ -4,7 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
 
 /**
- * Case `13.1058` — P1 — the controls that painted as raw user-agent chrome now
+ * Case `13.1143` — P1 — the controls that painted as raw user-agent chrome now
  * match a selector block of their own.
  *
  * P1 swept every static `className` literal on a
@@ -88,8 +88,8 @@ function styledSomewhere(className: string): boolean {
   return HEADS.some((head) => re.test(head));
 }
 
-describe('13.1058 the controls P1 found with no rule of their own now have one', () => {
-  it('13.1058 the extractor is not silently empty, and it can tell both ways', () => {
+describe('13.1143 the controls P1 found with no rule of their own now have one', () => {
+  it('13.1143 the extractor is not silently empty, and it can tell both ways', () => {
     // CONTROL, FIRST, and both directions — a needle that matched nothing would
     // make every assertion below depend on a broken extractor, and a needle
     // that matched everything would make them all pass unconditionally.
@@ -101,7 +101,7 @@ describe('13.1058 the controls P1 found with no rule of their own now have one',
     expect(styledSomewhere('gn-board')).toBe(true);
   });
 
-  it('13.1058 each of the four BUTTONS matches a selector block', () => {
+  it('13.1143 each of the four BUTTONS matches a selector block', () => {
     for (const className of [
       'gn-board__empty-create',
       'add-rule-menu__trigger',
@@ -112,7 +112,7 @@ describe('13.1058 the controls P1 found with no rule of their own now have one',
     }
   });
 
-  it('13.1058 each of the four declares the reset, in the stylesheet that owns it', () => {
+  it('13.1143 each of the four declares the reset, in the stylesheet that owns it', () => {
     // Not just "some rule exists" — the RIGHT rule, carrying the reset. A class
     // that matched an unrelated selector would satisfy the case above and leave
     // the UA `outset` edge in place.
@@ -134,7 +134,7 @@ describe('13.1058 the controls P1 found with no rule of their own now have one',
     expect(editorReset?.[1]).toMatch(/padding:\s*0/);
   });
 
-  it('13.1058 the editor reset stays inside that file\'s no-colour rule', () => {
+  it('13.1143 the editor reset stays inside that file\'s no-colour rule', () => {
     // `editor.css`'s header forbids a bare colour keyword as well as literals,
     // which is why the reset writes `background: none` rather than the
     // reviewer's `transparent`. Asserted, because "none" and "transparent" are
