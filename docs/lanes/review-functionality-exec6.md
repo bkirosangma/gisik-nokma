@@ -74,7 +74,42 @@ was chosen.
 
 _(written last; every subsection below is filled in as the work lands)_
 
-### 2.1 Graph and semantic-search usage
+### 2.1 Graph and semantic-search usage — the honest result
+
+**What I ran, in order, before opening any source file:**
+
+1. `graphify-out/GRAPH_REPORT.md` — header (`10970 nodes · 19700 edges · 705 communities`, built from `e2769d60`;
+   HEAD `a7b6292b` differs by two doc-only merges), the **God Nodes** list and **Surprising Connections**. Result:
+   the god nodes are test scaffolding (`createTestDatabase()`, `TestDatabase`, `testEnvelope()`, `stubServices()`)
+   and two coordination documents; the one production symbol in the top ten is `buildProjectionRegistry()`. The
+   five "surprising connections" are all `main() → evaluateEvent()` INFERRED edges, which is the ingest pipeline
+   and not a surprise.
+2. The **Community Hubs** index (lines 17–690), filtered to my universe with
+   `grep -nE 'apps/server/src|packages/(domain|rule-engine|sync-client|mcp-server)/src|app-core/src/(online|replica)|scripts/check'`
+   → **one line**, a superseded coordination note about `check-migration-order.mjs`. The hub list is a flat list
+   of basenames (`event-store.ts`, `check-permission.ts`, `routes/tickets.ts`, `canSee`, `evaluateEvent`,
+   `replica-data-source.ts`, `workflow.ts`, `vocabulary.ts` …) with no path and no edge counts, so it names the
+   load-bearing symbols but cannot tell me which file to open for a *behavioural* question.
+3. **So I enumerated from the filesystem** (`find`, `ls`, `wc -l`) — §1 — and used the graph's hub names as a
+   checklist of symbols to reach (`canSee`, `evaluateEvent`, `check-permission.ts`, `event-store.ts`,
+   `replica-data-source.ts`, `workflow.ts`, `vocabulary.ts` — all reached; `sweep-orphans.ts`, `timeline-model.ts`,
+   `my-work.ts` — not reached, listed in §2.3).
+4. `mcp__semble__search` against the worktree root, three queries:
+   - *"evaluate an event against workflow transitions and refuse with a reason"* → pointed at
+     `rule-engine/src/checks/workflow-rebind.ts:93`, `workflow-defined.ts:8`, `transition.ts:1`,
+     `memory-context.ts:49`, `app-core/src/views/ticket-sheet.tsx:658` — the first three are where E6-2/E6-8
+     were measured.
+   - *"invite mint refuses owner role and guest with projectIds"* → `invites/acceptance.ts:182`,
+     `routes/invites.ts:324`, `online/invites-admin.ts:30`, `domain/src/events/invites.ts:111`,
+     `web/…/members/page.tsx:720` — the last of which is where E6-9 was found (the channel select sits 120 lines
+     below the hit).
+   - (§7) the prototype comparison used plain `grep` over the export, since semble indexes the repo, not the
+     staged export.
+
+**Tokens saved:** the graph did not save me reading — it saved me *guessing*. The report's hub names and the two
+semble hits are what put E6-2, E6-8 and E6-9 in files I would otherwise have reached only by walking 144 server
+files. What it could not do is answer a behavioural question ("does X refuse Y"); every one of those was
+answered by a probe (Appendices A–H).
 
 ### 2.2 Reached
 
