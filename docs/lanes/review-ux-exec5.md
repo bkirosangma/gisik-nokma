@@ -863,6 +863,43 @@ accessibility trees recorded earlier in this report.
 
 ---
 
+### E5-25 — IMPORTANT · A write after the session expires is reported as *"We could not reach the server"* — at nine sites in seven files — and none of them sends the person to sign in, though every READ does `[SOURCE]`
+
+**WHAT.** The events door answers refusals inside a `200` body (`routes/events.ts:102` `return { results }`); a
+`401` is produced only by the session guard before the handler (`auth/require-session.ts:102`
+`reply.code(401).send(UNAUTHENTICATED_BODY)`). The client transport throws `HttpError` on any non-2xx
+(`online/http.ts:134`) with `message = "HTTP 401 for /v1/events"`. Every write `catch` in the product then paints
+that as transport: `ticket-sheet.tsx:1074` *"We could not reach the server for this change — HTTP 401 for
+/v1/events"*, and the same sentence at `board.tsx:1430`, `:1532`, `:1736`, `bulk-close-dialog.tsx:233`,
+`backlog-rank-controls.tsx:186`, `backlog-start-button.tsx:113`, `workspace-settings-form.tsx:298`,
+`page.tsx:848` (the delete's Undo) — nine sites, `grep -rn 'could not reach the server'`. Meanwhile
+`apps/web/src/expired-session.tsx` is *"The ONE author of 'a 401 is not a refusal, it is a session that ended'"* and
+its hook is fed **reads only**: `page.tsx:1094-1098` `useSignInOnExpiredSession([board.error, list.error,
+ticketTypes.error])`; `inbox/page.tsx:234`; `w/[workspaceId]/page.tsx:219`. No write error is on any of those lists.
+
+**WHY.** A person whose session lapsed while a sheet was open presses Move, Close, Delete, Save, Start, or Undo, and
+is told the server is unreachable — the server was reached and said the one thing the product elsewhere treats as
+its own category. Rulings 27/33 split *refusal* from *transport*; a session that ended is a third thing, and the
+`expired-session.tsx` docblock (`:9-18`) records that leaving it on the wrong side produced *"a panel telling a person
+their work 'cannot be read', when the true and actionable sentence is sign in again"* — for reads. The writes were
+never brought under the same rule. The person's typed comment / title draft is also stranded behind a sentence that
+suggests retrying, when retrying cannot succeed.
+
+**WHAT WOULD HAVE BEEN BETTER.** One predicate on the catch — `error instanceof HttpError && error.status === 401` (the
+transport HAS the status, `http.ts:50`) — routing to the same `/sign-in?next=` redirect reads use, with a sentence
+*"Your session has ended — sign in again to send this."*; or feed each page's write-error state into its existing
+`useSignInOnExpiredSession` list.
+
+**MEASUREMENT.** `[SOURCE]` every line above opened. Not driven: I will not sign the owner's session out, and the
+browser stopped hydrating before I could inject a `401` on `/v1/events` (§6.1) — the injection would have been the
+same technique as E5-13/E5-15 and is the reproduction the judge can run: wrap `fetch` to answer `401` for `POST
+/v1/events`, press `Move`, read the transport slot.
+
+**SEVERITY: Important** (claimed). The product tells a person something untrue about itself at the moment they can
+least afford it, on every write surface, and withholds the one action that would help.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -924,16 +961,16 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**24 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 24). By claimed severity, read from the
-heading text: **Critical 1 · Important 16 · Minor 7** (1 + 16 + 7 = 24).
+**25 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 25). By claimed severity, read from the
+heading text: **Critical 1 · Important 17 · Minor 7** (1 + 17 + 7 = 25).
 
 - **Critical (1):** E5-13
-- **Important (16):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24
+- **Important (17):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25
 - **Minor (7):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 24. **Reproduced with an injected failure, zero server writes:** E5-13,
-E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23.
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24 = 19 of 25. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
 sections' failed reads — and further, the overwrite), E5-15 (ticket-types loading forever), E5-20 (stacked dialogs and
@@ -1064,5 +1101,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 24 findings — Critical 1 · Important 16 · Minor 7 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 25 findings — Critical 1 · Important 17 · Minor 7 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
