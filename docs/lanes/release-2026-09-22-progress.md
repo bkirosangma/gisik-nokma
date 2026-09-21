@@ -21,3 +21,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-V5 | done | ab79978e | 13.1163 contested arm via ticketLocation.locate (RED 2 / GREEN 638) |
 | T-E2-38 | done | af14c3f4 | 13.1164 archived chip on the project page (RED 1 / GREEN 640) |
 | T-E5-23 | done | 962eae8f | 13.1165 founder's empty home (RED 1 / GREEN 642) |
+| T-E5-34 | done | db88a264 | 13.1166 archived route named+badged (RED 1 / GREEN 644) |
