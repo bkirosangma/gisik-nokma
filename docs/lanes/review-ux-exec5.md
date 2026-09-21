@@ -38,23 +38,23 @@ measurement the landed one lacks, the finding says so and names the landed id.
 
 | route | file | lines | walked in browser? |
 |---|---|---|---|
-| `/` | `app/page.tsx` | — | redirects to `/workspaces` |
-| `/workspaces` | `app/workspaces/page.tsx` | 669 | |
-| `/sign-in` | `app/sign-in/page.tsx` | 496 | |
-| `/invite/[token]` | `app/invite/[token]/page.tsx` | 127 | |
-| `/inbox` | `app/inbox/page.tsx` | 512 | |
-| `/account` | `app/account/page.tsx` | 309 | |
-| `/settings` | `app/settings/page.tsx` | 382 | |
-| `/help` | `app/help/page.tsx` | 23 | |
-| `/privacy`, `/terms` | `app/privacy/page.tsx`, `app/terms/page.tsx` | 202, 209 | |
-| `/mcp/authorize` | `app/mcp/authorize/page.tsx` | 260 | |
-| `/mcp/tokens` | `app/mcp/tokens/page.tsx` | 33 | |
-| `/w/[workspaceId]` | `app/w/[workspaceId]/page.tsx` | 1122 | |
-| `/w/[workspaceId]/my-work` | `app/w/[workspaceId]/my-work/page.tsx` | 82 | |
-| `/w/[workspaceId]/members` | `app/w/[workspaceId]/members/page.tsx` | 1002 | |
-| `/w/[workspaceId]/p/[projectId]` | `app/w/[workspaceId]/p/[projectId]/page.tsx` | 3414 | |
-| `/w/[workspaceId]/settings/ticket-types` (+ `/new`, `/[typeId]`) | 3 files | 34, 34, 35 | |
-| `/w/[workspaceId]/settings/workflows` (+ `/new`, `/[workflowId]`, `/[workflowId]/history`) | 4 files | 40, 77, 102, 53 | |
+| `/` | `app/page.tsx` | — | redirects to `/workspaces` | yes (landed on `/workspaces`) |
+| `/workspaces` | `app/workspaces/page.tsx` | 669 | yes |
+| `/sign-in` | `app/sign-in/page.tsx` | 496 | no (already signed in) |
+| `/invite/[token]` | `app/invite/[token]/page.tsx` | 127 | no (no live token) — source |
+| `/inbox` | `app/inbox/page.tsx` | 512 | yes (empty state) |
+| `/account` | `app/account/page.tsx` | 309 | yes (+ injected failed read, captured PUT) |
+| `/settings` | `app/settings/page.tsx` | 382 | yes, Ticket types tab (+ injected 500); Workflows/Workspace tabs no |
+| `/help` | `app/help/page.tsx` | 23 | no |
+| `/privacy`, `/terms` | `app/privacy/page.tsx`, `app/terms/page.tsx` | 202, 209 | no |
+| `/mcp/authorize` | `app/mcp/authorize/page.tsx` | 260 | yes |
+| `/mcp/tokens` | `app/mcp/tokens/page.tsx` | 33 | yes |
+| `/w/[workspaceId]` | `app/w/[workspaceId]/page.tsx` | 1122 | no — source only |
+| `/w/[workspaceId]/my-work` | `app/w/[workspaceId]/my-work/page.tsx` | 82 | no |
+| `/w/[workspaceId]/members` | `app/w/[workspaceId]/members/page.tsx` | 1002 | yes |
+| `/w/[workspaceId]/p/[projectId]` | `app/w/[workspaceId]/p/[projectId]/page.tsx` | 3414 | yes — Board tab, Filters sheet, New-ticket dialog, ticket sheet (`CCSO-3`), Move dialog; Backlog/List/Calendar/Timeline tabs no |
+| `/w/[workspaceId]/settings/ticket-types` (+ `/new`, `/[typeId]`) | 3 files | 34, 34, 35 | list via `/settings` yes; editor no |
+| `/w/[workspaceId]/settings/workflows` (+ `/new`, `/[workflowId]`, `/[workflowId]/history`) | 4 files | 40, 77, 102, 53 | no — source only |
 
 ### 1.2 The view layer — `packages/app-core/src/views/` (23 files)
 
