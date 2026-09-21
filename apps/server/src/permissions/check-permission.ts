@@ -528,9 +528,14 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  * - **CLOSED:** `POST /v1/events`, which calls `ingestClientBatch` with the
  *   session `requireSession` resolved.
  * - **NOT CLOSED, by design:** direct `ingestBatch` — the internal append path.
- * - **NOT CLOSED, because it does not exist yet:** `POST /v1/sync` (Plan 10).
- *   **When it is built it must call `ingestClientBatch`**, or offline-originated
- *   events bypass this gate entirely.
+ * - **CLOSED:** `POST /v1/sync` (Plan 10 Batch A, landed 2026-09-04) —
+ *   `sync-service.ts` calls `ingestClientBatch` for the client's offline claim
+ *   (its `claim.contested` append is the server-origin exception above, through
+ *   `serverAppend`). Witnessed by `sync-route.test.ts`'s door test 12.102: an
+ *   offline claim wearing envelope-origin `server` is contested by this gate,
+ *   not committed. (E3-32 — this bullet previously read "does not exist yet"
+ *   after the route had existed, called this gate and been tested for 16 days;
+ *   `test/permissions/check-permission.test.ts` now asserts this text.)
  *
  * ## Do not fold this into `IngestDeps.gates`
  *
