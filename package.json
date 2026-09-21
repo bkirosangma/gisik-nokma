@@ -13,6 +13,7 @@
     "check:tasks": "node scripts/check-task-ledger.mjs",
     "check:db-tz": "node scripts/check-db-timezone.mjs",
     "check:migrations": "node scripts/check-migration-order.mjs",
+    "check:ctl": "bash scripts/ctl/ctl selftest",
     "test:e2e:stack": "pnpm --filter @gisik-nokma/web run test:e2e:stack",
   "test:e2e:viewport": "pnpm --filter @gisik-nokma/web run test:e2e:viewport",
     "dev:stack": "docker compose --env-file .env -f docker-compose.dev.yml up -d server web",
