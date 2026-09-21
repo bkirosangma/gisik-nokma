@@ -4,7 +4,7 @@
 
 **Rule I hold myself to (rules §3):** a refutation names the target id and the FALSIFYING MEASUREMENT — a line I opened or a reproduction I ran. A rejected refutation costs me the target's points, so a finding I checked and found holding is recorded here as a check, not filed as a refutation.
 
-**Instrument.** Source at `a07a7fc2`, whose product code is byte-identical to the tree the Opus lanes painted: `git diff --stat a7b6292b HEAD -- apps packages` → **0 lines**. Prototype: the staged export `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/Gisik Nokma - Desktop.dc.html`, sha256 re-measured at opening → `3d142d464a070b33…`. No browser paint of my own in phase 2 (the `:3041` listener, pid 99771, is exec 4's `next dev` with `cwd /Users/kiro/my_projects/gisik-nokma-exec4/apps/web` — measured with `lsof`, not used).
+**Instrument.** Source at `a07a7fc2`, whose product code is byte-identical to the tree the Opus lanes painted: `git diff --stat a7b6292b HEAD -- apps packages` → **0 lines**. Prototype: the staged export `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/Gisik Nokma - Desktop.dc.html`, sha256 re-measured at opening → `3d142d464a070b33…`. **Paint, from 15:23 IST:** the `:3041` listener (pid 99771) is exec 4's `next dev` with `cwd /Users/kiro/my_projects/gisik-nokma-exec4/apps/web` (measured with `lsof`); its product code is the byte-identical tree above, so I drove it from a fresh isolated context in the Chrome DevTools MCP — signed out for `/privacy`, then signed in by the door exec 4 records (`:3001`'s magic-link form as `kiro@e2e.gisik-nokma.local`, the Mailpit link, the host-scoped `localhost` cookie). Nothing was written except the session row sign-in makes; the persisted project-view preference was returned to *Board* after the Timeline/List/Calendar reads.
 
 ## Branch heads read
 
@@ -18,7 +18,7 @@
 
 ## 0. Refutations filed
 
-**None at 15:18 IST.** Every finding of exec 4's that I could reach at source held — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
+**None at 15:35 IST.** Every finding of exec 4's that I could reach at source held, and every painted number of theirs I re-painted reproduced (§1a) — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
 
 ## 1. Exec 4's findings, checked at source — the line I opened, and the verdict
 
@@ -52,7 +52,27 @@ The opponent's report is painted (`:3041`); I cannot re-paint, so each check bel
 | `E4-35` (`.gn-segmented__item` has no horizontal padding) | `ui.css:4648-4662` — `flex: 1; display: inline-flex; … min-height: 2.75rem; …` and no `padding`/`min-width`. | **holds** (the 31-px paint is theirs) |
 | `E4-36` (results count is a plain `<p>`; no-match is `role="status"`) | `help-browser.tsx:207` `<p className="gn-help__results-count">`; `:672` `<p className="gn-help__none" role="status">`. | **holds** |
 
-**Not opened** (no time in the phase for a source check, and no reason to doubt them): `E4-7`, `E4-16`, `E4-20`, `E4-22`, `E4-24`, `E4-25`, `E4-26`, `E4-27`, `E4-28`, `E4-29`. **Twenty-six of thirty-six checked; twenty-six hold.** Where a check found a slip, it is in a mechanism or count sentence, never in the measured claim, and I do not file a refutation on a slip — rules §3 prices a rejected refutation at the target's points, and a judge who opens the line will find the finding standing.
+### 1a. Exec 4's painted numbers, RE-PAINTED by me (15:23–15:32 IST, 1200 px, light, same tree)
+
+| target | their number | my paint | verdict |
+|---|---|---|---|
+| `E4-1` | two link crumbs *Open questions* on `CCSO-6` | `nav[aria-label="Ticket location"] .gn-ticket-sheet__crumb` → `SPAN Convenience Corner · SPAN Shop operations · BUTTON Open questions (sheet-crumb-epic) · BUTTON Open questions (sheet-crumb-parent) · SPAN CCSO-6` | **reproduces** |
+| `E4-2` | close 24×21 | `button.gn-sheet__close` **23.6×21.2** | **reproduces** |
+| `E4-3` | 24 × 66×21, `inline-block` | 24 cards, 24 `button.gn-board-card__provenance`, every one **66.2×21.3**, `display: inline-block` | **reproduces** |
+| `E4-4` | two nameless `textbox`es | `[contenteditable=true]` × 2, both `role=textbox`, `aria-label` null, `aria-labelledby` null | **reproduces** |
+| `E4-5` | `h1` → one `button` child, `aria-label="Rename Convenience Corner"`, 316×41 | `h1.gn-page-title` has **1** child node, `button.gn-workspace-home__rename-trigger` `aria-label="Rename Convenience Corner"`, **316.5×41** | **reproduces** |
+| `E4-9` | two `<main>` | `document.querySelectorAll('main').length` → **2** on the builder; `input.workflow-builder-screen__name` **403** px wide at 1200 (its intrinsic width — the 415 layout viewport at 390 was not re-emulated) | **reproduces** (the 390 half not re-painted) |
+| `E4-14` | 8×13 | `button.gn-project__filter-chip-remove` **8.1×13**, `padding 0`, `font-size 13px`, `line-height 13px`, `aria-label="Remove filter — Closed: hidden"` | **reproduces** |
+| `E4-15` | `2px outset`, three buttons | `button.gn-timeline__nav` × 3: **81.9×33.6 / 66.7×33.6 / 73.7×33.6**, each `border: 2px outset rgb(0,0,0)`, `background rgb(241,234,227)`; `button.gn-timeline__bar` → `0px none` | **reproduces** (and is my `P35`) |
+| `E4-24` | board `H1` → `H3` | headings on the board: `H1 Shop operations · H3 Simple kanban · H3 Errand with waits`; on the List view `H1 · H3 Recently assigned · H3 Open questions … · H3 No epic … · H3 Registrations …` | **reproduces** |
+| `E4-25` | 232×39 | `nav.gn-settings__sidebar a` × 3, each **232×39.2**, `padding 8px 11.2px`, `display block` | **reproduces** |
+| `E4-27` | *Publish* 84×36 with a 1-px border and 6-px radius | `button.publish-controls__publish` **83.7×36.4**, `border: 1px solid rgb(51,98,159)`, `radius 6px` | **reproduces** |
+| `E4-28` | calendar: no roles, day cells are `div`s, dates in `title` | `.gn-calendar [role]` → **0**; first `.gn-calendar__day` is a `DIV` with text `31` and no `aria-label`; an item `<button>` carries `title="starts 18 Aug — Kiro's claim · needed by 5 Oct — Kiro's claim"` and no `aria-label` | **reproduces** |
+| `E4-35` | *All* 31 wide | `/inbox` tabs: **All 30.6×44**, Unread 63.7×44, Mentions 77.5×44, each `padding: 1px 6px`; tablist `aria-label="Filter notifications"` | **reproduces** |
+| `E4-10` | four class-less gallery buttons | not re-painted: `/settings/workflows/new` not visited; source holds (§1) | — |
+| §4 row *calendar nav 31×36* | 31×36, border none | `.gn-calendar__nav` × 2: **30.8×36**, `border: 0px none` | reproduces |
+
+**Not opened at source** (no reason to doubt them; time went to the paints above): `E4-7`, `E4-16`, `E4-20`, `E4-22`, `E4-26`, `E4-29`. **Thirty of thirty-six checked at source or at paint; thirty hold.** Where a check found a slip, it is in a mechanism or count sentence, never in the measured claim, and I do not file a refutation on a slip — rules §3 prices a rejected refutation at the target's points, and a judge who opens the line will find the finding standing.
 
 ## 2. Findings of other lanes on surfaces I built — checked because I know what they were meant to do
 
@@ -70,9 +90,28 @@ The opponent's report is painted (`:3041`); I cannot re-paint, so each check bel
 - **`E4-9`'s outer-`main` attribution** (`layout.tsx`) is inaccurate — the outer `<main className="gn-shell">` is the route page's own (`…/workflows/[workflowId]/page.tsx:57`), as it is on every route (`settings/page.tsx:170`, `inbox/page.tsx:385`, …). The painted count of two is what the finding rests on and it is right.
 - **Exec 4's note on my `P2`'s WHY sentence** (*"a sentence in inherited text and a UA button"* describes `gn-board__empty-create`, which `apps/web` never renders because `onCreateTicket` is never passed — `board.tsx:493`, `grep -rn onCreateTicket apps/web/app apps/web/src` → 0) is **correct**, and a dated Defence under `P2` in my report now says so: P2's WHAT (three classes, zero selector blocks) stands; its first-run consequence in `apps/web` is the sentence alone, and the UA button is the consequence for any host that passes the callback.
 
+## 4. Where this lane would DEFEND — the expected attack on each exposed finding, answered in advance
+
+Defence paragraphs are dated and sit under the finding in `review-ui-exec1.md`; this is the index.
+
+| finding | the sentence a refuter would quote | the answer, and where it is |
+|---|---|---|
+| `I1` (Critical) | *"no browser-based UI instrument has executed ANYWHERE"* — but I ran one by hand and exec 4 painted 33 findings | the claim is about the instruments and any gate; both hand runs are the finding's consequence. Narrowed under I1 (15:22) to *no AUTOMATED browser instrument since 2026-09-06*, and re-measured a fourth time at `09:51Z`: fourteen jobs `steps: 0`, `e2e`/`viewport` skipped, last success `34023679658` |
+| `P1` (Important) | *"six static measurements, zero painted"*; *"a fourth stylesheet would collapse it"*; *"the `<a>` members are styled by a global rule like the withdrawn seventh"* | three of six now painted by me (`2px outset rgb(0,0,0)`, `rgb(239,239,239)`) with a styled control beside them as the instrument's control; the fourth stylesheet exists (React Flow, `workflow-canvas.tsx:10`), was enumerated (108 blocks) and reaches none; `globals.css:39` is colour-only where `.gn-nav a` was a designed rule — all three under P1 |
+| `P2` (Important) | *"the UA button in the WHY is never rendered"* | conceded and narrowed under P2: the WHAT (three classes, zero blocks) is unchanged; the web host's consequence is the sentence alone |
+| `P24` (Important) | *"computed, not painted"* | exec 4 painted 3.84:1 in `hig`/`minimal`, attributed under P24 |
+| `P31` (Important) | *"bullet 3 names a tree reading with no instrument"* | both bars painted by me on four routes (`/privacy`, `/settings`, `/w/<id>`, `/settings/workflows`), under P31 |
+| `P18`, `P19`, `P21`, `P22`, `P8`, `P12`, `P13`, `P35` | *"not painted"* | now painted — by exec 4 (P18, P22) or by me (P19, P21, P8, P12, P13, P35), each dated under the finding |
+| `P16` (Important) | *"the scanner is as the case describes"* | the finding reproduces the scanner and runs it on a rule that sets the forbidden declaration; the case stays green — the measurement is in the finding, not asserted |
+| `P34` (Important) | *"the views are reachable, so the ratchet covers them"* | the ratchet visits ROUTES and the views are TABS; `measureTapTargets` has one call on `/my-work` (re-opened this phase, `viewport.spec.ts:170`), and exec 4's `E4-12` measures the same population |
+| `P35`, `P36` (Minor, half) | *"duplicates of `E4-15` / `E4-24`"* | P35 overlaps `E4-15` and says so (§3); P36 is a different defect from `E4-24` (a REPEATED level, not a skipped one), painted on two routes with a control route |
+
 ## Log
 
 - 15:05:44 IST — `git status`: `P35` uncommitted from the previous session; verified its cited lines (`ui.css:3427-3434` no `border`; `globals.css:84` font-only; `timeline-view.tsx:234-262` three buttons), labelled it phase-2 / half points, added its §8 row, membership check `1/18/20 = 39`, pushed as `a07a7fc2`.
 - 15:06 — read `origin/exec4/review-ui:docs/lanes/review-refutations-exec4.md` (`ccd60196`): no refutation of mine; painted corroborations of `P18`, `P19`, `P24`; a note on `P2`'s WHY sentence.
 - 15:07–15:19 — exec 4's report read in full; the §1 checks above.
 - 15:15 — heads re-read; exec 4 at `674decb2` adds a painted corroboration of `P22`. No lane has filed a refutation of an exec-1 finding as of this line.
+- 15:22 — I1 narrowed and re-measured; P1's fourth-stylesheet condition closed.
+- 15:23–15:32 — `:3041` driven by me: `/privacy` signed out (P31's legal pair, P12, P13), then signed in (P1 ×3, P35, P21, P19, P8; §1a's re-paints of exec 4; P36 found and filed at half points).
+- 15:35 — heads re-read (`exec4` `872758a3`: two mechanism slips I noted corrected in its report, dated; `exec6` `2ee7cc03`: `R6-3 → E2-28`; `exec2` `d370d830`; `exec3` `c5524156`; `exec5` `858d824c`). No lane has filed a refutation of an exec-1 finding as of this line.
