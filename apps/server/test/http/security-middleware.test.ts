@@ -581,6 +581,78 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
     expect(response.statusCode).not.toBe(403);
     expect(recorder.passed).toHaveLength(1);
   });
+
+  /**
+   * E6-15 — cross-site WebSocket hijacking. `GET /v1/stream` is a READ (it
+   * changes no state), which is why every other `GET` in this file is outside
+   * the check — but a WebSocket upgrade is exempt from the same-origin policy
+   * that makes those other reads safe to leave unchecked: a page at a foreign
+   * origin can open one under the victim's ambient cookie and receive their
+   * live event stream. `app.inject({ method: 'GET', url: '/v1/stream' })`
+   * exercises the same `onRequest` hook a real upgrade would hit — this file's
+   * own "wiring" describe block above already established that the hook runs
+   * for `/v1/stream` before anything downstream does, and nothing here needs
+   * an actual socket to prove the hook refuses the HANDSHAKE before it opens.
+   */
+  describe('the /v1/stream WebSocket upgrade (E6-15)', () => {
+    /**
+     * Case ids jump to `13.1100` rather than continuing from `13.198`: this
+     * file's own catalogue (`test-cases/13-deployment-dogfooding.md`) records
+     * `13.101–13.200` as Lane E's block and `13.201–13.240` as Lane C's — both
+     * already minted with unrelated cases (`grep`-confirmed) — and this task
+     * has no assigned block. `13.1100` is unused anywhere in `test-cases/`.
+     */
+    /**
+     * 13.1100 — a cookie-carrying GET /v1/stream handshake with a FORGED HTTP-Origin is refused 403 forbidden_origin, same as a mutating door.
+     */
+    it('a cookie-carrying handshake with a FORGED HTTP-Origin is refused 403 forbidden_origin', async () => {
+      const { app, recorder } = build(HTTP_ORIGIN_ON);
+      const response = await app.inject({
+        method: 'GET',
+        url: '/v1/stream',
+        headers: { ...COOKIE, origin: 'https://evil.example' },
+      });
+      await app.close();
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: 'forbidden_origin' });
+      expect(recorder.passed).toEqual([]);
+    });
+
+    /**
+     * 13.1101 — a cookie-carrying GET /v1/stream handshake with NO HTTP-Origin at all is refused too — require, not just validate.
+     */
+    it('a cookie-carrying handshake with NO HTTP-Origin at all is refused', async () => {
+      const { app } = build(HTTP_ORIGIN_ON);
+      const response = await app.inject({ method: 'GET', url: '/v1/stream', headers: COOKIE });
+      await app.close();
+      expect(response.statusCode).toBe(403);
+      expect(response.json()).toEqual({ error: 'forbidden_origin' });
+    });
+
+    /**
+     * 13.1102 — the configured WEB_ORIGIN is let through, so a same-origin client's real handshake still reaches the socket route.
+     */
+    it('the configured WEB_ORIGIN is let through to the socket route', async () => {
+      const { app, recorder } = build(HTTP_ORIGIN_ON);
+      await app.inject({ method: 'GET', url: '/v1/stream', headers: { ...COOKIE, origin: WEB_ORIGIN } });
+      await app.close();
+      expect(recorder.passed).toEqual([{ method: 'GET', routeUrl: '/v1/stream' }]);
+    });
+
+    /**
+     * 13.1103 — the control: a BEARER handshake (no cookie) is untouched by this check regardless of Origin, matching every other route in this file — there is no ambient credential to forge.
+     */
+    it('a BEARER handshake with no cookie is untouched, even with a foreign Origin', async () => {
+      const { app, recorder } = build(HTTP_ORIGIN_ON);
+      await app.inject({
+        method: 'GET',
+        url: '/v1/stream',
+        headers: { authorization: 'Bearer whatever', origin: 'https://evil.example' },
+      });
+      await app.close();
+      expect(recorder.passed).toEqual([{ method: 'GET', routeUrl: '/v1/stream' }]);
+    });
+  });
 });
 
 // ── Rate limiting: three buckets ─────────────────────────────────────────────
