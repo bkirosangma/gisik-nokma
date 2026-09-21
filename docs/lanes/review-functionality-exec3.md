@@ -39,7 +39,7 @@ ruled is not the prototype and are off by one against the one that is (F3). The 
 **confirmations of gaps the project already records and owns** (F4, F5) — reported because I reproduced
 them independently, not because they are news.
 
-### Round 2 — eighteen new findings, and the one that matters
+### Round 2 — nineteen new findings, and the one that matters
 
 **`E3-14` (Critical, claimed) is a hole in this product's CSRF control, measured against a real
 authenticated session (§24).** `HTTP_ORIGIN_PROTECTED_ROUTES` holds 11 patterns and **five
@@ -48,7 +48,7 @@ cookie-authenticated mutating routes are not in it**, including `POST /v1/me/inv
 survived: the guard written to catch exactly this compares the protected set against **the suite's own
 table**, a closed loop, and passes green beside the gap.
 
-**Nine Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
+**Ten Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
 command is printed beside it. **§23, §36, §38, §39, §40 and §41 record ten attacks on other lanes' findings — all ten failed**, one of them across concerns, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
@@ -1381,13 +1381,13 @@ I read the patterns against the tree rather than trusting the empty result.
 | severity | count | members |
 |---|---|---|
 | **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES`; **re-measured with a real session (§24), then DEMONSTRATED on three of the five (§32, §33)**: a forged-Origin request made the victim a member of a workspace (memberships 1→2, three ledger events), a second declined their invitation, a third joined by token — with the trusted follow-up answering 404 because the forgery had already spent the single-use invite. ⚠ **BOUNDED AND STATED (§33.1): all three need an id or token the attacker does not obviously have, which I did not establish a way to obtain. The two `PUT`s need no secret and are preflight-bounded (§14.8). **A judge weighing severity by what was demonstrated should rule Important; Critical rests on the project's own criterion for this set.** |
-| **Important (claimed)** | **9** |  `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) · `E3-26` (`Features.md`:2350 says nothing links to the authoring routes and `AppNav` has no settings entry — the nav renders a Settings link and a `/settings` shell pointing at all six) |
+| **Important (claimed)** | **10** |   `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) · `E3-26` (`Features.md`:2350 says nothing links to the authoring routes and `AppNav` has no settings entry — the nav renders a Settings link and a `/settings` shell pointing at all six) · `E3-27` (two files say `checkErrandTemplate` is "not yet landed"; the seeder calls it as a throwing guard and it has eleven cases) |
 | **Minor** | **8** | `E3-18` (**revised DOWN from Important, §34** — the replica's dangling-parent divergence is real and reproduced, but its trigger is corrupt data: no door can set a dangling `parent_id`) · `E3-25` (case 6.96: `SyncItem` "three members" vs four) · `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 fixtures" vs 86) · `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) · `E3-17` (outbox refactor total 8, its own bullets sum to 9) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
 | **Instrument defects in my own method** | **2** | §15 — the 439-hit sweep, not filed as findings · §24.1 — the cookie probe whose controls did not fire, recorded rather than discarded |
 | **Corrections to this report's own claims** | **5** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) · §14.4 (**`check-no-silent-skips` does not refuse an empty universe** — exec6's `E6-6` was right and I was wrong) |
 
-**Round-2 total: 18 new findings** (1 Critical claimed, 9 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
+**Round-2 total: 19 new findings** (1 Critical claimed, 10 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
 findings re-validated, 15 verified-clean claims (§20), and 5 corrections to this report's own claims.
 
 **Nine of the fifteen are measured by RUNNING something** — `E3-14` by injection at the assembled app with
@@ -3097,3 +3097,74 @@ candidate, so a malformed escape falls back to the raw spelling rather than to `
 the hook and the sign-in matcher at the line; I did not audit the five budgets' VALUES against a traffic
 model, which is a capacity question rather than a correctness one.** `security-middleware.test.ts`'s
 rate-limit cases (`:463-760`) were read for what they assert, not re-run.
+
+---
+
+## 45. `E3-27` (r2) — **IMPORTANT (claimed)** — Two files say `checkErrandTemplate` is *"not yet landed on this branch"*; it landed, the SEEDER CALLS IT as a throwing guard, and it has eleven cases
+
+**WHAT.** Two places carry the same claim, both still standing:
+
+- `Features.md:452` — *"⚙️ **Canonical errand-with-waits workflow template** — **will be pinned by Plan 11's
+  `checkErrandTemplate` oracle (not yet landed on this branch)**: the frozen tracker's own lane ids, every
+  non-terminal state one hop from `initialStateId` … and `require-comment` on every move into `done`."*
+- `packages/app-core/test/workflow-builder/templates.test.ts:66` — *"// checkErrandTemplate oracle **(not yet
+  landed on this branch**; verified …)"*
+
+**WHY it is wrong — measured, and the oracle's status is the strongest kind of "landed":**
+
+```
+apps/server/src/seed/templates.ts:41          export function checkErrandTemplate(template: Omit<WorkflowDef,
+                                              'id' | 'version'>): TemplateCheck {
+
+apps/server/src/seed/seed-convenience-corner.ts:133
+        const templateCheck = checkErrandTemplate(ERRAND_WITH_WAITS_TEMPLATE);
+        if (!templateCheck.ok) {
+          throw new Error(`the errand-with-waits template cannot carry the tracker board:
+                           ${templateCheck.problems.join('; ')}`);
+        }
+
+apps/server/test/seed/templates.test.ts       11 `it(` cases, including a mutation suite that drives
+                                              `checkErrandTemplate(mutated)` to refuse
+```
+
+**The oracle is not merely present — it is a THROWING GUARD ON THE SEED PATH.** The convenience-corner
+seeder, which is how the product's own dogfood workspace is built, calls it and aborts if it refuses. So the
+sentence *"will be pinned by"* describes as future work a check that **already gates a shipped script**, and
+the two files telling a reader otherwise are `Features.md` — the workspace's declared source of truth — and a
+test docblock.
+
+**WHY IT IS WORTH FILING RATHER THAN SHRUGGING AT.** The claim's consequence is the one this report keeps
+returning to: **a lane that reads it writes the oracle.** Eleven cases and a live production guard would then
+be duplicated, and the duplicated version would be the one with no seeder wiring and no mutation suite behind
+it — precisely the "two expressions of one rule, free to disagree" shape the repo names everywhere. **And the
+`Features.md` bullet already describes the oracle's own rules correctly** (lane ids, non-terminal states one
+hop from `initialStateId`, `require-comment` into `done`), so the sentence is not ignorant of the thing it
+denies having — it simply was never updated when the thing landed.
+
+**THE EVIDENCE THAT THIS IS DRIFT AND NOT A DIFFERENT ORACLE.** The bullet names `checkErrandTemplate`
+**by that exact identifier**, and the function at `seed/templates.ts:41` has that identifier and the signature
+the bullet's plan would give it (`Omit<WorkflowDef, 'id' | 'version'>`). `packages/domain/src/workflows/
+errand-with-waits.ts:5` says in its own docblock: *"Its shape is pinned by Plan 11's `checkErrandTemplate`"* —
+present tense, in the source the template lives in. **Three artifacts agree the oracle exists and pins it; two
+say it does not.**
+
+**WHAT WOULD HAVE BEEN BETTER.** One edit in each file, in the change set that landed the oracle: drop *"(not
+yet landed on this branch)"* and the *"will be pinned by"* future tense, and point at
+`seed/templates.test.ts` the way the neighbouring bullets point at their own tests. **The durable fix is again
+the missing instrument** — §30.1 and §42 both name it: `Features.md` is the one source-of-truth document in
+this repository with **no checker**, so a sentence about the product's own state has nothing that re-derives
+it. A grep for `` `identifier` `` in backticks against `className`/`functionName` existence would be crude and
+would still have caught this one.
+
+**SEVERITY: Important (claimed).** Same class as `E3-20`–`E3-26` — a stale declaration of a gap — with the
+added weight that the gap is closed by a **throwing production guard**, so the stale sentence understates the
+system by more than a test would. Not Critical: nothing misbehaves.
+
+**MEASUREMENT.** `Features.md:452` and `packages/app-core/test/workflow-builder/templates.test.ts:66` read in
+full; `seed/templates.ts:41` (the definition), `seed-convenience-corner.ts:131-136` (the call and its throw),
+`test/seed/templates.test.ts` (11 cases, `grep -cE "^\s*it\("`), `packages/domain/src/workflows/
+errand-with-waits.ts:5` (the present-tense reference). **Control on the sweep:**
+`grep -rn "not yet landed"` over `packages apps Features.md test-cases`, excluding `node_modules` and `dist`,
+returns **three** hits — the two above and `test-cases/13-deployment-dogfooding.md:104`, which is a *struck*
+sentence about id renumbering and is **not** the same claim, so the phrase is not a shared idiom I am
+misreading.
