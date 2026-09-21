@@ -43,9 +43,11 @@ printf 'no logs here\n' > "$cr-body.md"   # outside the repo, so a bookkeeping `
 checkpr() { ( cd "$cr" && python3 "$HERE/verbs/check-pr.py" "$cr" plan.md docs/lanes/release-2026-09-22-progress.md "$cr-body.md" 2>&1 ); }
 check "check-pr: merge commit is on the branch" '[ "$(cd "$cr" && /usr/bin/git log --merges --format=%s origin/main..HEAD | grep -c Merge)" -eq 1 ]'
 check "check-pr: one task commit + the merge of origin/main passes" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 0 bookkeeping commits, 1 files, 0 failures"'
-( cd "$cr" && echo claim > docs/lanes/release-2026-09-22-progress.md.claim && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05 claim: T-X1 (1 task)" && echo body > docs/lanes/body-note.md && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05: the §4 PR body, with log paths" )
-check "check-pr: batch-id bookkeeping subjects pass and are not tasks" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 2 bookkeeping commits, 3 files, 0 failures"'
-( cd "$cr" && echo three > docs/x.md && /usr/bin/git commit -q -am "oops: not a ruling id" )
+( cd "$cr" && printf '| B05 | claimed | - | 1 task |\n' >> docs/lanes/release-2026-09-22-progress.md && /usr/bin/git commit -q -am "B05 claim: T-X1 (1 task)" && mkdir -p docs/lanes/pr-bodies && echo body > docs/lanes/pr-bodies/b05.md && /usr/bin/git add -A && /usr/bin/git commit -q -m "B05: the §4 PR body, with log paths" && echo more >> docs/lanes/pr-bodies/b05.md && /usr/bin/git commit -q -am "| B05 | claimed — PR body amended" )
+check "check-pr: batch-id bookkeeping (progress file, pr-bodies/) passes and is not a task" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 3 bookkeeping commits, 3 files, 0 failures"'
+( cd "$cr" && echo three > docs/x.md && /usr/bin/git commit -q -am "B05: cite each new case id (touches a task file)" )
+check "check-pr: a batch-id subject whose diff leaves the bookkeeping paths fails, naming the files" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "batch-id subject but the diff touches files outside.*docs/x.md"'
+( cd "$cr" && echo four > docs/x.md && /usr/bin/git commit -q -am "oops: not a ruling id" )
 check "check-pr: a non-merge, non-bookkeeping commit without a ruling id still fails" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "commit subject does not start with a ruling id in the plan: .oops"'
 check "check-pr: a B-prefixed word that is not a batch id is not bookkeeping" '( cd "$cr" && /usr/bin/git commit -q --allow-empty -m "Bugfix: not a batch id" ); out=$(checkpr); printf "%s" "$out" | grep -q "ruling id in the plan: .Bugfix"'
 rm -rf "$cb" "$cr" "$cr-body.md" "$co"
