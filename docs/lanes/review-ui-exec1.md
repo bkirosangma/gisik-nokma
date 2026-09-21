@@ -642,7 +642,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 ### P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta queue reads eleven items outstanding; seven have shipped, including its own row 0
 
-**WHAT.** `docs/design/prototype-delta-2026-09-18.md` is this project's prototype-provenance authority: 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* **Seven of those eleven rows are closed as of this tree — every one still presented as outstanding.**
+**WHAT.** `docs/design/prototype-delta-2026-09-18.md` is this project's prototype-provenance authority: 25 screens, a per-screen verdict, and an ordered queue of 11 items under *"**Row 0 is the one item that is not a screen and not optional** … it precedes everything else."* **Eight of those eleven rows are closed as of this tree — every one still presented as outstanding**, and that count includes one from the `held` group, which I had excluded from the sweep until a held row's own citation was checked.
 
 **MEASUREMENT — each row re-derived, with the source of the answer named.**
 
@@ -655,6 +655,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 | **5. isTypeEditor** ("blocked") | *"field `required` toggle is a schema gap **needing a ruling**"* | **CLOSED** — `fields-editor.tsx:53` cites the owner ruling and `:104/:132-133` implement the toggle. |
 | **8. isTypes** | *"no reorder op, no per-type count"* | **CLOSED** — the screen's own docblock: *"the ↑/↓ reorder controls — **BUILT 2026-09-19**"* (`:43`), and `:30` lists *"the reorder and the count"* as built. |
 | **10. isInvite** | *"3 fields on the read"* | **CLOSED** — `InviteSummary` (`online/invites.ts:3-7`) carries exactly `workspaceId`, `workspaceName`, `role`; the page renders the last two. |
+| **`isMembers`** (in the **`held`** group) | *"`packages/app-core/src/online/mappers.ts:405-408` **drops `role`**"* — **owner hold** | **CLOSED, and the cited line now holds something else entirely.** `mappers.ts:405-408` today is the `uncategorizedChildren` guard about `RollupToViewer` — **unrelated to members**. `RosterMember = Actor & { role: string; email?: string }` (`view-types.ts:60`) carries the field, and `mappers.ts:464` is `role: asString(member['role'], …)` — **the mapper READS it**. `members/page.tsx:518` renders `<span className="gn-chip gn-members__role">{member.role}</span>`. So this held row is closed and its citation is the third drifted one on this page. |
 | **7. isMcpTokens** | *"rows need `name`+badge"* | **wire half CLOSED, badge unverified** — `token-store.ts:201` returns `name`; `mcp-tokens-screen.tsx:40` carries `name: string | null`. |
 | **11. isMcpAuth** | *"no deny route"* | **CLOSED by import, not by reading the handler** — `mcp-device.ts:5` imports `denyDeviceCode` and `:33-41` reasons about the denial's CSRF surface. |
 
@@ -666,7 +667,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHY IT IS WRONG.** Not a product defect — **the artefact that DIRECTS product work**, and its own opening records the price of exactly this staleness: **two dispatches were voided by rows that had already closed, each costing "a whole dispatch".** The header's remedy is *"re-measure a row before you act on it"* — but with all 11 printed as outstanding that is a per-row tax on every future lane, and **the two rows already known-closed in that same commit were not marked.** **The failure is not that the readings expired — the header says they would. It is that the correction went into the header and not into the rows.**
 
-**⚠ STATED AS THE LOWER BOUND IT IS.** **Two of the eleven are untested.** Row 9 (`isWorkspace`) **I could not decide** — the page carries substantial archive logic and I could not separate "chips and description exist" from "they do not" without reading the render. Row 6 (`isInbox`) is **likely closed but unproven**: `inbox-bulk.test.tsx` exists so the bulk client ships, but a grep that returns nothing because I did not know the route's shape is **not evidence of absence**. Row 7's badge and row 11's handler are asserted from an import and a docblock rather than from reading the path. The four `held` rows and the six `none` rows were not touched. **So: 7 closed, 2 partial, 2 untested — and the untested two are not a clean bill.**
+**⚠ STATED AS THE LOWER BOUND IT IS.** **Two of the eleven are untested.** Row 9 (`isWorkspace`) **I could not decide** — the page carries substantial archive logic and I could not separate "chips and description exist" from "they do not" without reading the render. Row 6 (`isInbox`) is **likely closed but unproven**: `inbox-bulk.test.tsx` exists so the bulk client ships, but a grep that returns nothing because I did not know the route's shape is **not evidence of absence**. Row 7's badge and row 11's handler are asserted from an import and a docblock rather than from reading the path. The four `held` rows and the six `none` rows were not touched. **So: 8 closed, 2 partial, 2 untested — and the untested two are not a clean bill.**
 
 **WHAT WOULD HAVE BEEN BETTER.** Mark a closed row in place — `✅ closed by #447` is a two-word edit to a line the closing commit already had open, and it is the "correct the sentence rather than delete it" discipline this document uses everywhere else. And name the string to find rather than a bare `:NNN`: *"asserts `surfaceSunken` is `#ede4db`"* survives a 200-line drift; `:1939` does not.
 
@@ -742,7 +743,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
-- `P26` ⚠ r2 — the prototype-delta queue reads 11 rows outstanding; 7 have shipped, including its own row 0
+- `P26` ⚠ r2 — the prototype-delta queue reads 11 rows outstanding; 8 have shipped, including its own row 0 and one from the held group
 
 **MINOR — 14**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
