@@ -3,6 +3,43 @@
 Every file in this directory is UNPACKED from an owner export, never hand-edited. This file records
 which export, so the next refresh is one command and one diff.
 
+## ⚠ A NEWER EXPORT EXISTS AND IS NOT THIS COPY — its line numbers are 1 LOWER
+
+The owner's **2026-09-20** export is at `gisik-nokma-lanes/prototype-2026-09-20/Gisik Nokma -
+Desktop.dc.html` — **4,049 lines, 316,911 B, sha256
+`3d142d464a070b332efe4cf93fa6ca646f8d8941d657d9c361ceb3f086112ae5`**. **It is not what this directory
+holds.** `desktop.dc.html` is the **2026-09-18** export's output (blob `6d7b67c0a52c…`, 4,050 lines,
+320,109 B, sha256 `2cda054b4320ebb6…`), which is the table under *The current export* below — so a
+`:NNN` citation into the committed copy must have **1 subtracted** to find the same text in the
+2026-09-20 file.
+
+Measured 2026-09-21 over both files in full, not at sample anchors:
+
+| | |
+|---|---|
+| lines agreeing under a shift of one (committed line N = export line N−1) | **3,732 of 4,049 — 92.2 %** |
+| lines differing in content under that shift | **317** — 222 change the count of `sc-camel-*` (the transfer encoding `support.js` decodes: the committed copy carries 225, the export 0); the other 95 differ otherwise |
+| longest unbroken run of differing lines | **11** (`659`–`669`), and agreeing lines resume after it |
+
+**That last row is what makes the shift usable rather than a guess.** A broken mapping would mismatch
+*every* line after the break; instead the file re-agrees, so the differences are in-place changes rather
+than further shifts. The whole difference is a net **one** line and it is settled inside the first seven
+lines — the diff carries **zero insertion hunks** and its **two deletions are both in the first three
+hunks** — so the shift is `+1` from `:8` on. Its cause is not the `sc-camel-*` encoding alone: a change in
+that count accounts for 222 of the 317, and the remaining 95 are stated above rather than folded into it.
+
+**Why this is recorded rather than fixed.** The files citing this one BY LINE are the affected set, and a
+bare `:NNN` is 1 off against the 2026-09-20 export — small enough that a reader checking one value would
+not notice. Counted 2026-09-21 rather than asserted, because the size of the set is the whole argument:
+`grep -rlE 'desktop\.dc\.html(@[0-9a-f]{6,40})?:[0-9]' apps packages` (minus `node_modules`) returns
+**92 files**, and the same command with the `:[0-9]` requirement dropped returns **113** — so the
+instrument distinguishes *cites a line* from *mentions the file*, which is the distinction this note
+turns on. **That 92 is a reading of today's tree and expires**; re-run it rather than quoting it.
+Repointing those files is not this note's to do; the form that survives a refresh already exists and is
+documented in `docs/design/prototype-delta-2026-09-18.md`:
+**`desktop.dc.html@<blob-sha12>:<line>`**, resolvable with `git show <blob-sha12>`. This is a third
+reason to prefer it over a bare line number.
+
 ## The current export
 
 | | |
