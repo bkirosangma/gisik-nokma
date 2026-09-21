@@ -1654,3 +1654,55 @@ describe('13.1059 the board\'s whole-board empty state is styled', () => {
     expect(styledAt).toBeGreaterThan(resetAt);
   });
 });
+
+/**
+ * Case `13.1062` — E4-15 (and P35, filed from the other side) — the timeline's
+ * Earlier / Today / Later buttons stop wearing the browser's default bevel.
+ *
+ * `.gn-timeline__nav` declared a radius, a background, a colour, a font, padding
+ * and a cursor — **and no `border`** — so the UA's `2px outset rgb(0,0,0)`
+ * survived the rule: measured with the product's own `background:
+ * rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`. This is
+ * outside round 1's P1 population by construction — P1 selected classes with
+ * ZERO matching selector blocks and this one matched — which is the finding's
+ * real lesson: *"matched a selector block"* and *"is fully styled"* are
+ * different questions.
+ *
+ * **The assertion is the PRESENCE OF `border`, not the absence of `outset`**,
+ * and the difference matters: `outset` is what the UA applies *because* the
+ * declaration is missing, so a test looking for the string `outset` in a
+ * stylesheet would pass on every tree, broken or fixed. What can fail is the
+ * declaration.
+ */
+describe('13.1062 the timeline nav declares a border, so no UA bevel survives', () => {
+  it('13.1062 the rule declares border: none', () => {
+    expect(rule('.gn-timeline__nav')).toMatch(/border:\s*none/);
+  });
+
+  it('13.1062 and it takes the calendar nav\'s own values', () => {
+    // Asserted as a PAIR with the sibling rule rather than as literals: the
+    // finding's remedy is that the two views' navs agree, so a later edit that
+    // re-diverges one of them is the regression to catch.
+    const timeline = rule('.gn-timeline__nav');
+    const calendar = rule('.gn-calendar__nav');
+    for (const property of [
+      /min-height:\s*2\.25rem/,
+      /border:\s*none/,
+      /border-radius:\s*var\(--gn-radius-control\)/,
+      /background:\s*var\(--gn-fill-tertiary\)/,
+      /color:\s*var\(--gn-text-accent\)/,
+    ]) {
+      expect(timeline, `timeline nav: ${String(property)}`).toMatch(property);
+      expect(calendar, `calendar nav: ${String(property)}`).toMatch(property);
+    }
+  });
+
+  it('13.1062 the family\'s other two members were already carrying it', () => {
+    // P35's own observation, kept as the calibration control for the pair
+    // above: `.gn-timeline__bar` and `.gn-timeline__open` declare `border:
+    // none` while the nav did not, which is what made the omission an omission
+    // rather than a convention.
+    expect(rule('.gn-timeline__bar')).toMatch(/border:\s*none/);
+    expect(rule('.gn-timeline__open')).toMatch(/border:\s*none/);
+  });
+});

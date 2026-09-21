@@ -3621,12 +3621,33 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   gap: 0.5rem;
   padding: 0.5rem;
 }
+/* E4-15 / P35 (2026-09-21). This rule declared a radius, a background, a
+   colour, a font, padding and a cursor — and **no `border`** — so the three
+   Earlier / Today / Later buttons kept the user agent's `2px outset` bevel:
+   measured `border: 2px outset rgb(0,0,0)` with the product's own
+   `background: rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`.
+   The rule applied; the UA border survived it. **That is outside round 1's P1
+   population by construction** — P1 selected classes with ZERO matching
+   selector blocks, and this one matched — and it is why P35 filed the same
+   defect from the other side: *"matched a selector block"* and *"is fully
+   styled"* are different questions.
+
+   The values are the CALENDAR nav's own (`:3295`), which is the same
+   three-button control on the sibling view, so the two views' navs now agree
+   rather than one of them wearing the browser's default bevel. `border: none`
+   is the property that removes the bevel; the rest is the harmonisation the
+   calendar already settled. */
 .gn-timeline__nav {
-  border-radius: 6px;
-  background: var(--gn-surface-raised);
-  color: var(--gn-text);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-height: 2.25rem; /* 36px */
+  padding: 0 0.75rem; /* 12px */
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-accent);
   font: inherit;
-  padding: 0.2rem 0.6rem;
   cursor: pointer;
 }
 .gn-timeline__glyph { color: var(--gn-text-muted); margin: 0 0.2rem; }

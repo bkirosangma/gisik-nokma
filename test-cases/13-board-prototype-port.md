@@ -1869,3 +1869,30 @@ screen back toward a prototype that never had it — the second half of the find
   pinned by index rather than assumed. **Not painted**: what is asserted is what the rules declare, and
   `apps/web/e2e-*` is Playwright, which is not in `pnpm test`. `ui.css` was reverted to `HEAD` for the RED
   run and restored from a sha256-compared backup.
+
+## The timeline's nav buttons stop wearing the browser's bevel (lane ds1, 2026-09-21, batch B10) — case `13.1062`
+
+**The finding, filed twice from two sides: round 2 `E4-15`** (MINOR — "the class HAS a rule, and the rule
+forgot the border") **and `P35`** (MINOR, `r2 NEW` phase 2 — the same rule, reached by asking whether a
+matched selector block means a fully-styled control). `.gn-timeline__nav` — the three Earlier / Today /
+Later buttons — declared a radius, a background, a colour, a font, padding and a cursor, **and no
+`border`**, so the user agent's `2px outset rgb(0,0,0)` survived the rule: measured with the product's own
+`background: rgb(241,234,227)`, `border-radius: 6px`, `padding: 3.2px 9.6px`. **This is outside round 1's
+`P1` population by construction** — P1 selected classes with ZERO matching selector blocks, and this one
+matched — which is the lesson both findings share: *"matched a selector block"* and *"is fully styled"* are
+different questions. `P35`'s own corroboration: the family's other two members, `.gn-timeline__bar` and
+`.gn-timeline__open`, already carry `border: none`; the nav did not.
+
+### The case
+
+- ✅ **13.1062 — the rule declares `border`, and it takes the calendar nav's own values.** `packages/ui/test/components.test.tsx`.
+  **The assertion is the PRESENCE of the declaration, not the absence of `outset`**, and the difference
+  matters: `outset` is what the UA applies *because* the declaration is missing, so a test searching a
+  stylesheet for the string `outset` would pass on every tree, broken or fixed. The five values are
+  asserted as a PAIR with `.gn-calendar__nav` rather than as literals, because the remedy is that the two
+  views' navs agree — a later edit re-diverging one of them is the regression. A third assertion keeps
+  `P35`'s observation as calibration: the family's other two members already carried it. **Not painted** —
+  the ratios and measurements above are the findings' own. `ui.css` was reverted to `HEAD` for the RED run
+  and restored from a sha256-compared backup. Package suites: ui 416, web 639.
+
+**No `Features.md` bullet.** This corrects an existing control's paint; it adds no affordance.
