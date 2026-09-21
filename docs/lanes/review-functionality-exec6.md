@@ -1670,7 +1670,8 @@ true: `auth/routes.ts` registers `method: ['GET', 'POST']` only.) **And a fifth,
 false the moment it was written:** *"CONSUMED by the SMTP magic-link sender task. Until that lands the log sender is
 what sends, whatever is set here"* — `git blame -L 236,236` → `935f5d66`, and `git show 935f5d66 --stat` lists
 `apps/server/src/auth/smtp-magic-link-sender.ts` (+99) and `select-senders.ts` (+52) in that same commit;
-`selectMagicLinkSender` (`select-senders.ts:5-11`) returns the SMTP sender whenever `SMTP_URL` is set. An operator
+`selectMagicLinkSender` (`select-senders.ts:5-11`) returns the SMTP sender whenever `SMTP_URL` is set. The file has been edited three
+times since (`ebb21aab`, `5b4f8fc9` on 2026-09-08; `a6c3d5cc` on 2026-09-18) with the sentence intact. An operator
 reading `.env.example` today is told that setting `SMTP_URL` changes nothing. (Sweep: `git grep -n -i "not yet on main\|not yet landed\|until .* lands"` over `apps packages deploy
 Features.md test-cases scripts` minus `dist` and tests → 10 lines: these two, E3-27's `Features.md:452`, five where "until … lands" is a runtime sentence about a frame,
 a roster or a sweep (`Features.md:463`, `:2345`, `:2932`, `p/[projectId]/page.tsx:1330`,
