@@ -188,6 +188,8 @@ the file's own measured contrast notes.
   numbers are **≥** those, and every pre-existing case still passes with at most these
   edits: (a) a visibility case clicks the trigger before touching a radio; (b) an
   attachments case switches to the Attachments tab first; (c) `16.81` expects three tabs.
+  (d) two fixture edits the plan names in Task 7, where the comment composer's footer sentence
+  moves into the editor slot (`comments-thread.test.tsx`, `ticket-sheet-comments.test.tsx`).
   A case that needs any other edit is a functionality change and stops the work.
 - **Order** is asserted once, structurally: a case collects the `data-testid`s
   `sheet-chips`, `sheet-parent-indicator`, `field-description`, `field-state`,
