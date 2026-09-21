@@ -1650,7 +1650,39 @@ rather than the *disclosing* one.
 - **No test covers the replica's answer for it** — `grep -rn "restricted" packages/app-core/test/replica/replica-data-source.test.ts`
   returns two hits, neither of them a parent; `grep -rn "dangling" apps packages --include=*.test.ts`
   returns only the two server files above.
-- ⚠ **This finding is READ, not RUN.** I did not stand up the replica against a dangling parent and
-  observe the client — the two code paths and the three tests above are what I measured. **If the judge
-  wants a reproduction rather than a reading, that is the gap**, and I am naming it rather than letting
-  the two code quotations imply a run.
+- ✅ **AND IT IS RUN, not merely read — the reproduction is below.** My first version of this finding said
+  it was read-only and would have scored nothing; I built the reproduction rather than leave it there.
+
+**THE REPRODUCTION.** A probe at `packages/app-core/test/replica/zz-e3-probe.test.ts`, created, run and
+**deleted in the same shell invocation** (`git status --porcelain` empty afterwards). It builds a real
+replica over `createBetterSqliteStorage()`, loads a bootstrap carrying one workflow and one ticket type,
+applies a real `ticket.created` whose `parentId` is a fresh ULID **that is never created and never
+delivered**, then asks the shipped read:
+
+```ts
+const danglingParent = newUlid();          // never created, never delivered
+const childId = newUlid();
+await replica.applyServerItem(
+  envelope({ kind: 'ticket', id: childId }, 'ticket.created', {
+    typeId: TYPE_TASK, projectId: PROJECT, parentId: danglingParent, title: 'Child of nothing',
+  }),
+);
+…
+const read = await ds.query.getTicket(WS, childId);
+```
+
+**Output — the answer, the id, and the proof the answer came from the fallback arm:**
+
+```
+PROBE replica parent for a dangling parent_id = {"kind":"restricted","id":"01M313S3BRXT34F2NCJA20XSE7"}
+PROBE the dangling id was            = 01M313S3BRXT34F2NCJA20XSE7
+PROBE replica.getTicket(dangling) is = null
+```
+
+The third line is the load-bearing one: **`replica.getTicket` answered `null`, and the read still emitted
+`restricted`** — so the marker did not come from a parent the replica holds, it came from the `:1175`
+fallback. Test Files 1 passed, Tests 1 passed.
+
+**The online control, in the same round:** `test/routes/ticket-crumbs.test.ts:244-248` writes the same
+shape through the server and asserts `parent` is `null`. **Two shipped implementations, one input, two
+answers** — and the offline one manufactures the ancestor.
