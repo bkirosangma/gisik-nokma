@@ -76,6 +76,7 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 #    ticket   01EXF5XW3ZZZV7PD0P6B5HWGPX (CCSO-6, parent = epic 03HCQDZB48MNR2EK4M9E1BQH96 "Open questions")
 #    workflow 0CGPSP01CRYGGMDM4CG17RP822 · ticket type `errand`
 #    e.g. http://localhost:3041/w/0TZSS5W6ATCTF2YBPMWGGP9JF5/p/0XB92YA4CGEBF9S285AH4SDXR1?ticket=01EXF5XW3ZZZV7PD0P6B5HWGPX
+#    guest pass (E4-33/34, the PERMISSION-REFUSED row): the same steps with accountant@e2e.gisik-nokma.local
 # 6. viewports: Chrome DevTools device emulation 390×844 (mobile, touch), 768×1024, 1512×900; dark via
 #    "Emulate CSS prefers-color-scheme: dark". Every measurement is getBoundingClientRect / getComputedStyle
 #    in the console; the a11y-tree claims are the Accessibility panel (or CDP Accessibility.getFullAXTree).
@@ -585,6 +586,7 @@ _(so §3 is not a list of defects — each row is a measurement I took that came
 | **320×568 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, `/my-work`, `/account`, `/help`, `errand`, the builder — overflow/reflow only |
 | **768×1024 · light · neo** | the sheet open on the board, `/workspaces`, `/w/:id`, `/members`, the builder, `errand`, `/account` |
 | **1512 · light AND dark · `hig` / `minimal`** (`data-style` set client-side, nothing persisted) | 15 route/states (the board, the sheet open, `/workspaces`, `/w/:id`, `/my-work`, `/members`, `/settings`, ticket-types list + `errand`, workflows list + builder, `/account`, `/inbox`, `/help`, `/mcp/tokens`) — contrast + UA-chrome; dark re-run on `/account`, `errand`, the builder |
+| **1512 · light · neo · signed in as the GUEST** `accountant@e2e.gisik-nokma.local` (`role: guest`, `name: ''`; same Mailpit path; the owner session was restored afterwards) | `/workspaces`, `/w/:id`, the board, the sheet open, `/members`, `/settings`, ticket-types list, the builder, `/my-work` — refusal/restricted arms and labels |
 | **1512 · dark** (`emulate colorScheme: dark`) | the sheet open, `/workspaces`, `/w/:id`, `/my-work`, `/members`, `/settings`, `errand`, the builder, `/account`, `/inbox`, `/help`, `/mcp/tokens`, and the four board views |
 
 Screenshots taken and **committed** under `docs/lanes/exec4-paint/`: `board-1512.jpeg`, `board-390.jpeg`, `sheet-390-description.jpeg` (JPEG q55–60, 260 KB total). The numbers in the findings are from `getBoundingClientRect`/`getComputedStyle`; the screenshots are the human check.
