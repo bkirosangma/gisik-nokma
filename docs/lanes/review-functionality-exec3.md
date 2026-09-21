@@ -1571,3 +1571,86 @@ printed beside it, and this is the third instance in this round of a number that
 **MEASUREMENT.** The command above, run from the repo root at this sha — **the docblock's own command,
 verbatim**, which is the strongest available form of this check. `node_modules`/`dist` filtered out (the
 docblock's own parenthetical does the same and says so).
+
+---
+
+## 19. `E3-18` (r2) — **IMPORTANT (claimed)** — The two shipped `DataSource` implementations disagree about a dangling parent, and the offline one makes the existence claim case 6.68 was fixed to stop
+
+**WHAT.** A ticket whose `parent_id` names a **ticket that was never created** is a reachable state in
+this product, and the two implementations of the ticket read answer it **differently**:
+
+| source | code | answer for a dangling `parent_id` |
+|---|---|---|
+| **online** — `apps/server/src/routes/tickets.ts` | `:400-404` | `parent = null` |
+| **offline replica** — `packages/app-core/src/replica/replica-data-source.ts` | `:1164-1175` | `{ kind: 'restricted', id: <the dangling id> }` |
+
+**Online**, the ordering is explicit and commented:
+
+```ts
+const parentRow = await loadTicketRow(deps.pool, workspaceId, ticket.parent_id);
+if (parentRow === undefined) {
+  // A parent_id naming no row. The projection already resolved this
+  // ticket as a root; claiming a restricted parent would invent one.
+  parent = null;
+}
+```
+
+**Offline**, the two cases — *"there is a parent here you may not see"* and *"there is no parent here at
+all"* — collapse into one arm:
+
+```ts
+const found = await replica.getTicket(state.parentId);
+parent =
+  found?.confirmed != null
+    ? { kind: 'ticket', id: state.parentId, title: titleOf(found.confirmed) }
+    : { kind: 'restricted', id: state.parentId };
+```
+
+`replica.getTicket(danglingId)` is `null` — the id was never created, so nothing was ever delivered for
+it — so the dangling case takes the `restricted` arm.
+
+**WHY IT IS WRONG, and why it is the same defect twice.** `{ kind: 'restricted', id }` means *"there IS a
+parent here whose name you do not get"*. Emitting it for an id with no row is **an existence claim with
+no evidence** — precisely what `ticket-crumbs.test.ts:244-248` was written to prevent on the server side,
+precisely what `routes/tickets.ts:402-404` refuses in its own words (*"claiming a restricted parent would
+invent one"*), and precisely the class case **6.68** closed for the crumb walk
+(`routes/tickets.ts:621-631`). **The fix was applied at two of the three places the shape occurs.**
+
+**AND THE REPLICA'S OWN COMMENT CLAIMS THE PARITY IT DOES NOT HAVE.** It justifies the arm as *"the shape
+Plan 4's read uses for a parent this viewer may not have"* — true for that case, and **false for this
+one**, because Plan 4's read answers `null` here. The same comment *does* name a second case it covers
+(*"Locally it also covers 'not delivered yet'"*), so the author was enumerating the arm's meanings and
+**the dangling case is the one missing from the enumeration** — which is why it survived.
+
+**CONSEQUENCE, stated as the user meets it.** The same ticket renders differently in the two clients: the
+web client shows it as a root with no breadcrumb; `apps/desktop` and `apps/mobile`, which both construct
+`createReplicaDataSource` (`membership.ts`'s own note measures this at `src/app.tsx:56` and `:40`
+respectively), show a breadcrumb segment for a parent that does not exist. **The offline client invents
+an ancestor.**
+
+**WHAT WOULD HAVE BEEN BETTER.** `parent = found?.confirmed != null ? {…} : null` — matching the online
+read — if the replica can distinguish *"absent"* from *"present but not delivered"*. **It can**: that is
+the same distinction `restrictedParent` already draws for the list read at this file's own `:1171`, and
+the comment says so. Where the two genuinely cannot be told apart the conservative arm is defensible;
+here they can, and the code takes the arm that claims more rather than the one that claims less — the
+opposite of the rule the comment states.
+
+**SEVERITY: Important (claimed).** It is a client-visible behavioural divergence between two shipped
+implementations of one read, in a direction the project has already classified as a defect twice (cases
+6.68 and its sibling), on an input the server side has a dedicated test for. Not Critical: no data is
+lost, nothing is exposed that was not already visible, and the claim is false in the *inventing* direction
+rather than the *disclosing* one.
+
+**MEASUREMENT.**
+- `apps/server/src/routes/tickets.ts:400-404` — the online ordering, read at the line.
+- `packages/app-core/src/replica/replica-data-source.ts:1164-1175` — the replica arm, read at the line.
+- **The dangling case is REACHABLE and the online answer is PINNED**: `test/routes/ticket-crumbs.test.ts:244`
+  creates a ticket with `parentId: neverCreated` and `:248` asserts `expect(danglingRead.json().parent).toBeNull()`;
+  `test/routes/list.test.ts:713` asserts *"the dangling parent was actually written"*.
+- **No test covers the replica's answer for it** — `grep -rn "restricted" packages/app-core/test/replica/replica-data-source.test.ts`
+  returns two hits, neither of them a parent; `grep -rn "dangling" apps packages --include=*.test.ts`
+  returns only the two server files above.
+- ⚠ **This finding is READ, not RUN.** I did not stand up the replica against a dangling parent and
+  observe the client — the two code paths and the three tests above are what I measured. **If the judge
+  wants a reproduction rather than a reading, that is the gap**, and I am naming it rather than letting
+  the two code quotations imply a run.
