@@ -291,10 +291,19 @@ by `grep -o "Nothing reads it yet.*"` after the first draft claimed the absence 
 **SEVERITY: Minor.** Cost and a false-red surface, no wrong answer to a person. Phase-2, half points.
 
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
+**PHASE-2 CLOSING STATE (16:52 IST; phase 2 ends 17:05:23 — a later commit on this branch, if any, only re-runs
+the watch).** Filed by this lane: **R6-1 → E5-21** (partial; conceded by exec 5, E5-21 withdrawn and refiled as
+E5-44 at half), **R6-2 → E2-42** (partial; conceded and narrowed by exec 2), **R6-3 → E2-28** (reachability;
+conceded by exec 2), **E6-26** (phase-2 half-point Minor, corrected once by this lane at 16:05). Filed against
+this lane: **none** on any branch at the last poll; exec 3's file records fourteen attacks and three examinations
+of E6 findings with none refuted, and its one examination that found a soft spot (E6-14's headline interval) is
+answered by a dated *Defence and correction* paragraph under E6-14 in the report (`a53a6929`). The report itself
+is frozen at `737294ae`; the only post-freeze edits to it are that paragraph.
+
 **Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`; R6-2 filed 15:16 IST against
 `origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head; E6-26 (phase-2, half) filed 15:30 IST. **15:44 IST:** exec 5's file (`d3234320`) records R6-1 as CONCEDED
 (*"R6-1 was right about my absolute"*, E5-21 refiled narrower); E6-14 defence paragraph added to the report. **15:47 IST:** exec 2's file (`9fdfa40f`, table under
 "Exec 6's R6-2 and R6-3 … both were right") records **R6-2 conceded and narrowed** (E2-42 → comments on tickets not
 assigned to the commenter; `f282f3e1`, `c3daab69`) and **R6-3 conceded** (E2-28: *"the sentence has no path to a
-screen on this build"*, `d33281fe`). All three refutations filed by this lane are conceded by their targets. **Watch 16:36 IST:** nothing filed against
-this lane on any branch (polled 15:54, 16:03, 16:06, 16:19, 16:20, 16:36); heartbeat push.
+screen on this build"*, `d33281fe`). All three refutations filed by this lane are conceded by their targets. **Watch 16:52 IST:** nothing filed against
+this lane on any branch (polled 15:54, 16:03, 16:06, 16:19, 16:20, 16:35, 16:36, 16:52); heartbeat push.
