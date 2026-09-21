@@ -1342,7 +1342,10 @@ defect was found, recorded and left in the shared hook.
 [ENTITY NAME] · Governed by the laws of [JURISDICTION]"* and, in the body, *"operated by [ENTITY NAME], [REGISTERED
 ADDRESS]. For anything in this policy, write to [CONTACT EMAIL]"* — **10 bracketed placeholders**, 7 distinct
 (`[DATE]`, `[ENTITY NAME]`, `[JURISDICTION]`, `[REGISTERED ADDRESS]`, `[CONTACT EMAIL]`, `[RESPONSE PERIOD]`,
-`[SUPERVISORY AUTHORITY]`), measured by regex over `main.innerText`. No sentence on the page says it is a draft.
+`[SUPERVISORY AUTHORITY]`), measured by regex over `main.innerText`. `/terms` the same way: **9** placeholders,
+6 distinct, opening *"An agreement between you and [ENTITY NAME] · Governed by the laws of [JURISDICTION]"*, with
+`[MINIMUM AGE]` and `[LIABILITY CAP]` in the body. No sentence on either page says it is a draft (regex for
+`draft|placeholder|not reviewed` → no match on both).
 
 **The recorded choice, quoted.** `privacy/page.tsx:1-24`: *"⚠️ BOILERPLATE. NOT REVIEWED BY A LAWYER … Before Gisik
 Nokma handles one real user's data: … 2. Every [BRACKETED PLACEHOLDER] must be replaced with a real value … **This
@@ -1364,7 +1367,7 @@ that E5-33's flow asks every new person to agree to this notice as it stands.
 details are not yet filled in"* — until the placeholders are, and the sign-in line phrased as *"… the draft Terms and
 Privacy notice"* until then.
 
-**MEASUREMENT.** `[BROWSER]` `/privacy` text and regex count as above; `[SOURCE]` `privacy/page.tsx:1-24`;
+**MEASUREMENT.** `[BROWSER]` `/privacy` and `/terms` text and regex counts as above; `[SOURCE]` `privacy/page.tsx:1-24`;
 `sign-in/page.tsx:491`; `test-cases/13-pre-launch-checklist.md:149`.
 
 **SEVERITY: Minor** (claimed).
