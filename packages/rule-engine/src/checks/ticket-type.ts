@@ -16,6 +16,40 @@ import { ACCEPT, builtinRankRefusal, refuse } from './refusals.js';
  * state: the seeds are canonical constants, and last-definition-wins means the
  * type's own history says nothing about whether THIS definition is allowed. A
  * check that consulted the context would be claiming otherwise.
+ *
+ * ## What a CUSTOM re-rank does to tickets already placed — a decision (E6-3)
+ *
+ * The rank invariants are write-time invariants: a child's type outranks its
+ * parent's and a type at or below `DEEPEST_RANK` always has a parent are asked
+ * of every `ticket.created` and `ticket.reparented` against the definitions
+ * current at that moment (`hierarchy.ts`, four sites) and are NOT re-asked of
+ * tickets already placed when a type's rank changes. So a custom type
+ * re-ranked from 2 to 3 while tasks (rank 3) sit under it is ACCEPTED here,
+ * and the ledger then holds a placement the write doors refuse to reproduce
+ * — a task moved out from under such a feature cannot be moved back, and a
+ * feature re-ranked to the deepest rank keeps its place at the root while a
+ * new one may not (measured in `test/ticket-type-rerank.test.ts`, case 5.80).
+ *
+ * That is the product's position, not a gap left for later, and the reason is
+ * the owner's (2026-08-26, Plan 2 open question 6, restated at
+ * `workflow-defined.ts`'s stranding block): occupancy is a builder courtesy,
+ * never an engine input. A replica is visibility-scoped, so an engine whose
+ * verdict on a DEFINITION depended on where tickets sit would answer one way
+ * on the server and another on a client by construction — the thing the
+ * shared fixture suite exists to prevent. It is the same shape as re-pointing
+ * a type's workflow (case 5.32): existing tickets stay where they are, and
+ * the definition describes what happens from now on. The type editor says so
+ * at the moment the rank is changed ("Tickets already placed keep their
+ * place", `ticket-type-editor-screen.tsx`), so the admin decides with the
+ * consequence in front of them rather than meeting it at the next reparent.
+ *
+ * The alternative the review proposed — refuse the re-rank with a count of
+ * the tickets it would misplace — needs a context method that enumerates a
+ * type's tickets (nothing on `EngineContext` does; `getChildrenStates` and
+ * `getEntityState` are keyed by ticket id), which the `countWorkspaceOwners`
+ * precedent shows how to add server-only, and it makes a definition's legality
+ * an occupancy question. That is an owner ruling, not a lane's call; until it
+ * is made, this check stays as it is and the sentence above stays true.
  */
 export async function checkTicketTypeDefined(
   env: EventEnvelope,
