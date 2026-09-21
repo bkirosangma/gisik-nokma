@@ -325,6 +325,17 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 ---
 
+
+### E4-21 — **IMPORTANT** — The searchable `Select` (New-ticket *Type* and *Parent*, the type editor's *Workflow*) has no visible focus indicator: the rule that suppresses the input's outline has no replacement
+
+**MEASUREMENT (painted, New-ticket dialog, 1512).** `input[role=combobox]` focused: `input.matches(':focus-visible')` → **true**; `outline-style: none`; the wrapping `div.gn-select__trigger.gn-select__trigger--searchable.gn-field__input` → `outline-style: none`, `box-shadow` unchanged from its resting neo inset (`rgba(176,152,132,0.6) 4px 4px 9px inset, …`), `:focus-within` true. Control in the same dialog: the bare Title input focused → `outline: auto 1px rgb(0,95,204)` (the UA ring). Source: `packages/ui/src/ui.css:2474` `.gn-select__trigger--searchable input:focus { outline: none; }`; the only focus rule for the field class is `.gn-field__input:focus-visible` (`:4771`), which matches the **div** when the div is focused — and in the searchable variant the div is never focused, the input is. `grep -n "focus-within" packages/ui/src/ui.css` → **0**. The three mounts: `new-ticket-dialog.tsx:145`, `:204`, `ticket-type-editor-screen.tsx:360`.
+
+**WHY IT IS WRONG.** WCAG 2.4.7 (Focus Visible, AA): a keyboard user Tabbing through the New-ticket dialog sees the ring on Title, then nothing on Type, nothing on Parent. The rule at `:2474` is the classic outline-suppression-without-replacement; `.gn-project-card__door:focus-visible { outline: none }` (`globals.css:1160-1164`) shows the repo knows the right shape — it suppresses and immediately re-draws on `::after`.
+
+**WHAT WOULD HAVE BEEN BETTER.** `.gn-select__trigger--searchable:focus-within { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }` beside the suppression, or drop the suppression.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects)_
