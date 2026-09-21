@@ -1499,8 +1499,18 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   description row whether or not a claim exists: `ticket.created` writes `fields.title` and nothing
   else, so on a ticket nobody had described there was no row for an editor to mount into, and
   enabling the composer alone would have changed almost nothing.
+  **The composer's CHROME is shared, and since 2026-09-22 both composers wear it (sheet prototype parity).**
+  `TicketEditorSlot` draws a toolbar tray, a sunken field and a footer row carrying a hint on the left and the
+  submit control on the right; the comment composer's control reads `Post` (the prototype's word) where the
+  description's reads `Save description`. The footer's left slot is filled by `footerNote?: string` — one
+  additive optional field on the twice-written contract, carrying the host's sentence in comment mode (the
+  prototype's `cmtHint`) and the Markdown hint in description mode, and drawn EMPTY when a comment mount
+  supplies neither, so the two composers never borrow each other's advice. Because `TicketEditor` renders the
+  hint below the field, it gained `hintSlot?: 'below' | 'none'` (default `'below'`, which leaves every other
+  mount identical) so the slot can draw the hint in its own footer without printing it twice.
   `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/app/layout.tsx`,
-  `packages/editor/src/components/TicketEditorSlot.tsx`, `packages/app-core/src/views/editor-slot.tsx`
+  `packages/editor/src/components/TicketEditorSlot.tsx`, `packages/editor/src/components/TicketEditor.tsx`,
+  `packages/app-core/src/views/editor-slot.tsx`
 - ⚙️ **`ObjectStore`, and where attachment bytes actually live** — a three-verb interface
   (`put`/`getStream`/`delete`) behind which `LocalDiskStore` (dev/test) and `S3ObjectStore`
   (S3-compatible, path-style addressing default `true` so MinIO and R2 work unconfigured) are

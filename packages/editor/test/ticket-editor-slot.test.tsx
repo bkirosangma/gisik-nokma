@@ -94,6 +94,7 @@ type AppCoreEditorSlotProps = {
   placeholder?: string;
   autoFocus?: boolean;
   labelledBy?: string;
+  footerNote?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
@@ -628,5 +629,83 @@ describe('17.023 / V7 — the composer clears on acceptance, not on resolution',
     // leave the person typing the next comment into the previous one.
     expect(proseMirrorText(view)).toBe('');
     view.unmount();
+  });
+});
+
+/**
+ * 13.1270 / 13.1271 / 13.1273 — THE COMPOSER CHROME
+ * (spec `2026-09-22-sheet-prototype-parity-design.md` §8, `TicketEditorSlot`).
+ *
+ * The prototype dresses BOTH composers with one chrome: a toolbar tray on top,
+ * a sunken field for the words, and a **footer row** carrying a hint on the
+ * left and the submit control on the right (`desktop.dc.html:1168-1173`,
+ * `:1298-1331`). Two sentences carry the behaviour:
+ *
+ *   - the footer takes the SUBMIT control, whose label is `Post` in comment
+ *     mode and `Save description` in description mode (spec decision 9);
+ *   - the LEFT of the footer is a slot, not a constant. `footerNote` (the
+ *     additive optional field this task adds to the twice-written contract)
+ *     supplies it in comment mode — the prototype's `cmtHint` — and the
+ *     Markdown hint keeps it in description mode, because the prototype's
+ *     comment composer has no Markdown hint and its description composer does.
+ *
+ * **THE HINT MUST NOT BE DRAWN TWICE, and that is what `hintSlot` is for.**
+ * `TicketEditor` renders toolbar → content → hint, so a slot that drew the hint
+ * in its own footer WITHOUT telling the editor to stop would print the sentence
+ * in both places at once. `hintSlot: 'none'` is the mechanism; the assertions
+ * below are the reading.
+ *
+ * These cases mount the slot DIRECTLY with `mode`/`doc`/`readOnly` rather than
+ * through `makeProps()`, deliberately: what is under test is the presence and
+ * position of the chrome, and `makeProps`'s defaults (`doc: null`, a resolving
+ * `submit`) would say nothing about it. `submit` is supplied so the control is
+ * the real one rather than the disabled-and-explained arm.
+ */
+describe('13.1270 the composer chrome', () => {
+  it('13.1270 draws a footer row holding the submit control, labelled Post in comment mode and Save description in description mode', () => {
+    const c = render(<TicketEditorSlot mode="comment" doc={null} readOnly={false} workspaceId="ws" ticketId="t" submit={async () => true} />);
+    const footer = c.container.querySelector('.editor-slot__footer');
+    expect(footer).not.toBeNull();
+    expect(footer!.contains(c.getByRole('button', { name: 'Post' }))).toBe(true);
+    c.unmount();
+    const d = render(<TicketEditorSlot mode="description" doc={null} readOnly={false} workspaceId="ws" ticketId="t" submit={async () => true} />);
+    expect(d.container.querySelector('.editor-slot__footer')!.contains(d.getByRole('button', { name: 'Save description' }))).toBe(true);
+  });
+
+  it('13.1271 the footer note sits in the footer in comment mode; the Markdown hint sits in the footer in description mode; neither is drawn twice', () => {
+    const c = render(<TicketEditorSlot mode="comment" doc={null} readOnly={false} workspaceId="ws" ticketId="t" footerNote="Posting records an event citing you." />);
+    const footer = c.container.querySelector('.editor-slot__footer')!;
+    expect(footer.textContent).toContain('Posting records an event citing you.');
+    expect(c.container.querySelectorAll('.ticket-editor__hint')).toHaveLength(0);
+    c.unmount();
+    const d = render(<TicketEditorSlot mode="description" doc={null} readOnly={false} workspaceId="ws" ticketId="t" />);
+    expect(d.container.querySelector('.editor-slot__footer')!.textContent).toContain('Markdown:');
+    expect(d.container.querySelectorAll('.editor-slot__hint')).toHaveLength(1);
+  });
+
+  /**
+   * 13.1273 — THE CONTROL, and it is a DIRECTION the pair above does not read.
+   *
+   * 13.1271 counts `.editor-slot__hint` in description mode; the sentence that
+   * must NOT appear twice is the Markdown hint, and `.editor-slot__hint` is the
+   * FOOTER's class. So the mutation `hintSlot={isComment ? 'none' : 'below'}`
+   * — the natural way to write the prop if you think of the footer note as a
+   * comment-mode concern — leaves the editor's own `.ticket-editor__hint` in
+   * place in description mode while the footer draws `MARKDOWN_HINT` too. The
+   * footer count is still 1, the comment arm still reads 0, and 13.1271 stays
+   * green over the exact defect it exists to prevent.
+   *
+   * This case reads the OTHER half of the same fact: in description mode the
+   * editor's own hint is gone. Two independent readings of one property, which
+   * is why it is a control with its own id rather than a second assertion in
+   * 13.1271.
+   */
+  it('13.1273 CONTROL — in description mode the Markdown hint is in the footer ONLY; the editor draws none', () => {
+    const d = render(<TicketEditorSlot mode="description" doc={null} readOnly={false} workspaceId="ws" ticketId="t" />);
+    expect(d.container.querySelectorAll('.ticket-editor__hint')).toHaveLength(0);
+    // And the footer's slot really carries it, so the count above is not a
+    // reading of an empty composer with the sentence printed nowhere at all.
+    expect(d.container.querySelector('.editor-slot__hint')!.textContent).toContain('Markdown:');
+    d.unmount();
   });
 });

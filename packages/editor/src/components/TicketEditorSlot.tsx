@@ -4,6 +4,7 @@ import { emptyDoc, isDocJson, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { UploadResult } from '../upload.js';
 import { composeEditorSubmission, type EditorSubmission } from '../attachments/compose-editor-submission.js';
+import { MARKDOWN_HINT } from './EditorToolbar.js';
 import { TicketEditor } from './TicketEditor.js';
 
 /**
@@ -94,6 +95,20 @@ export type EditorSlotProps = {
    * the three field-name sets for equality so a one-sided addition fails.
    */
   labelledBy?: string;
+  /**
+   * One sentence for the composer's footer, left of the submit control — the
+   * prototype's `cmtHint` slot (`desktop.dc.html:1329`). Optional and additive
+   * (spec 2026-09-22); the read-only `PlainTextEditorSlot` ignores it, as it
+   * ignores every capability field. In comment mode it REPLACES the Markdown
+   * hint (the prototype's comment composer has none); in description mode the
+   * Markdown hint keeps the slot and this field is not read.
+   *
+   * `app-core`'s half carries the same paragraph and the same reasoning — the
+   * two are written twice and `test/ticket-editor-slot.test.tsx` compares their
+   * field-name sets for equality, so this field exists here because it exists
+   * there and not for any reason of this package's own.
+   */
+  footerNote?: string;
   // Editor capabilities. Optional in the shared declaration because Plan 6's
   // read-only PlainTextEditorSlot supplies none of them. This component STATES
   // the gap rather than pretending: without `submit` the submit button is
@@ -232,6 +247,12 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
     return upload(file);
   }
 
+  // One reading of `mode`, taken once and used by every place below that has to
+  // know which writing surface this is. `mode` is the shared declaration's
+  // discriminator, so a host cannot mount a description composer that calls
+  // itself a comment.
+  const isComment = props.mode === 'comment';
+
   return (
     <div className="editor-slot">
       <TicketEditor
@@ -243,12 +264,12 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         // discriminator, so a host cannot mount a description composer that
         // calls itself a comment, and no new field has to travel through
         // app-core to say what `mode` has said all along.
-        label={props.mode === 'comment' ? 'Comment' : 'Description'}
+        label={isComment ? 'Comment' : 'Description'}
         // Passed straight through. When the host points at a visible caption,
         // that wins in `TicketEditor` and the `label` above is not rendered at
         // all — so a mount that supplies both gets one name, from the caption.
         {...(props.labelledBy === undefined ? {} : { labelledBy: props.labelledBy })}
-        placeholder={props.placeholder ?? (props.mode === 'comment' ? 'Write a comment…' : 'Describe this ticket…')}
+        placeholder={props.placeholder ?? (isComment ? 'Write a comment…' : 'Describe this ticket…')}
         queryUsers={props.queryUsers ?? NO_MENTIONS}
         uploadAttachment={uploadOrRefuse}
         // The host owns event emission. Non-image uploads reach the ticket's
@@ -260,26 +281,62 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         onSubmit={(doc) => void handleSubmit(doc)}
         onEditorReady={() => setReady(true)}
         editorRef={editorRef}
-      />
-      <button
-        type="button"
-        className="editor-slot__submit"
-        disabled={submitting || !canSubmit}
-        title={disabledReason}
         /*
-          THE REASON, REACHABLE. A `disabled` button is removed from the focus
-          order, so a `title` on it is spoken to nobody: the explanation reached
-          a mouse user who happened to hover, and stopped there. The `title`
-          stays for that reader, and `aria-describedby` points at the hidden
-          span below so the same sentence is attached to the control wherever
-          the control is reached — a screen reader's element list, a form
-          summary — rather than only on hover.
+          ⚠ THE PROMPT'S OWN HINT LINE IS SUPPRESSED HERE, and the footer below
+          is what draws it instead.
+
+          `TicketEditor` renders toolbar → content → hint, so a slot that drew
+          the hint in a footer of its own WITHOUT this prop would print the
+          sentence twice: once under the field and once in the footer. The slot
+          is the one place that knows the chrome has moved, so it is the one
+          place that can say so — hence a prop rather than an inference. Its
+          default is `'below'`, which keeps every other mount of `TicketEditor`
+          (the desktop app's, and `ticket-editor.test.tsx`'s) identical to what
+          it was.
         */
-        aria-describedby={disabledReason === undefined ? undefined : disabledReasonId}
-        onClick={() => void handleSubmit()}
-      >
-        {props.mode === 'comment' ? 'Comment' : 'Save description'}
-      </button>
+        hintSlot="none"
+      />
+      <div className="editor-slot__footer">
+        {/*
+          THE LEFT OF THE FOOTER IS A SLOT, and WHICH SENTENCE FILLS IT IS THE
+          WHOLE OF THE `footerNote` CONTRACT. The prototype draws a hint in both
+          composers (`desktop.dc.html:1173`, `:1329`) and they are DIFFERENT
+          sentences: the description box explains Markdown, the comment box
+          promises what posting does. So the two modes do not share one hint —
+          comment mode takes the host's sentence, description mode keeps the
+          Markdown hint, and neither mode draws both.
+
+          A comment composer with no `footerNote` gets an EMPTY paragraph rather
+          than the Markdown hint: silently substituting the other composer's
+          sentence would tell a commenter that `**bold**` works when the product
+          has not said so for that surface, and the empty slot is the honest
+          reading of "the host supplied nothing".
+        */}
+        <p className="editor-slot__hint">
+          {isComment ? (props.footerNote ?? '') : props.readOnly ? '' : MARKDOWN_HINT}
+        </p>
+        <button
+          type="button"
+          className="editor-slot__submit"
+          disabled={submitting || !canSubmit}
+          title={disabledReason}
+          /*
+            THE REASON, REACHABLE. A `disabled` button is removed from the focus
+            order, so a `title` on it is spoken to nobody: the explanation reached
+            a mouse user who happened to hover, and stopped there. The `title`
+            stays for that reader, and `aria-describedby` points at the hidden
+            span below so the same sentence is attached to the control wherever
+            the control is reached — a screen reader's element list, a form
+            summary — rather than only on hover.
+          */
+          aria-describedby={disabledReason === undefined ? undefined : disabledReasonId}
+          onClick={() => void handleSubmit()}
+        >
+          {/* The prototype's word for this control (`:1330`). A LABEL change
+              only: `handleSubmit` and the event it composes are untouched. */}
+          {isComment ? 'Post' : 'Save description'}
+        </button>
+      </div>
       {disabledReason !== undefined && (
         <span
           id={disabledReasonId}
