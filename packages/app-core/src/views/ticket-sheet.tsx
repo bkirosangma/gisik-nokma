@@ -1578,10 +1578,25 @@ export function TicketSheet({
    * The authority's ancestors each open that ticket's sheet, and `onOpenTicket`
    * is the prop that does it — present on the mount, absent for a caller that
    * cannot open anything (`page.tsx` passes it). With no callback the crumb
-   * degrades to the SAME plain span the restricted arm uses, which is that
-   * prop's own recorded rule: *"a control that cannot be honoured"* is not
-   * drawn. One hop per crumb, exactly as the `Subtask of` chip does it, and no
-   * traversal lives here to loop.
+   * degrades to a plain span, which is that prop's own recorded rule: *"a
+   * control that cannot be honoured"* is not drawn. One hop per crumb, exactly
+   * as the `Subtask of` chip does it, and no traversal lives here to loop.
+   *
+   * ⚠ **P4 — "THE SAME PLAIN SPAN THE RESTRICTED ARM USES" WAS FALSE, AND THIS
+   * PARAGRAPH SAID IT.** The two arms share a SHAPE (a plain `<span>` with the
+   * base class and no testid behaviour of its own) and **not an ink**:
+   * `.gn-ticket-sheet__crumb--restricted` carries `var(--gn-restricted)`
+   * (`ui.css`), while this arm carries the bare class and inherits
+   * `var(--gn-text-muted)` from `.gn-ticket-sheet__crumbs`. So a crumb that is
+   * merely NOT OPENABLE and a crumb whose ticket the viewer may not SEE were
+   * painted the same way by a sentence that claimed they were the same span —
+   * and the sentence was the only thing making them look alike.
+   *
+   * The wrong half is the word SAME, not the design: **the inks stay
+   * different**, because "you cannot open this here" and "you may not see this"
+   * are different facts and this surface already keeps them apart everywhere
+   * else. What was missing was an honest description, and the identical
+   * sentence in `Features.md` is corrected in the same change.
    */
   /**
    * P3 — THE PARENT CRUMB READS `KEY Title`, AND THE EPIC CRUMB DOES NOT.

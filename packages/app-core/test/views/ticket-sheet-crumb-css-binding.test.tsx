@@ -148,3 +148,44 @@ describe('17.025 / E4-30 — the crumb arms take three different inks', () => {
     expect(declared(link, 'font')).toBe('inherit');
   });
 });
+
+/**
+ * 17.028 / P4 — "THE SAME PLAIN SPAN" IS NOT THE SAME SPAN.
+ *
+ * The `onOpenTicket`-less arm's docblock said the crumb *"degrades to the SAME
+ * plain span the restricted arm uses"*, and that sentence was the only thing
+ * making the two arms look alike. They share a SHAPE — a plain `<span>` with the
+ * base class — and not an INK:
+ *
+ *   - the RESTRICTED arm carries the modifier and `var(--gn-restricted)`;
+ *   - the NO-CALLBACK arm carries the bare class, has **no rule of its own at
+ *     all**, and inherits `var(--gn-text-muted)` from the nav.
+ *
+ * **The inks stay different on purpose**, so the remedy is the SENTENCE and not
+ * the CSS: *"you cannot open this here"* and *"you may not see this"* are
+ * different facts, and this surface keeps them apart everywhere else. A case is
+ * still owed, because a corrected sentence with nothing behind it drifts back —
+ * and the cheapest way to make the two arms the same span is to give the bare
+ * class the restricted modifier, which is exactly what this reddens on.
+ */
+describe('17.028 / P4 — the no-callback crumb is the same SHAPE as the restricted one, not the same ink', () => {
+  it('the bare crumb has NO rule of its own — the arm is the ABSENCE of a modifier', () => {
+    // An absence, which is the only way to see it: a `.gn-ticket-sheet__crumb`
+    // rule of its own would mean the no-callback arm had been given a colour
+    // (most plausibly the restricted one, "to match"), and the sentence this
+    // case guards would become true in the direction that removes the
+    // distinction.
+    expect(stripComments(UI_CSS)).not.toMatch(/^\.gn-ticket-sheet__crumb\s*\{/m);
+  });
+
+  it('the two arms therefore take different inks — restricted, vs the nav’s muted ink', () => {
+    const restricted = ruleBody(UI_CSS, '.gn-ticket-sheet__crumb--restricted');
+    const nav = ruleBody(UI_CSS, '.gn-ticket-sheet__crumbs');
+    const restrictedInk = declared(restricted, 'color');
+    const inheritedInk = declared(nav, 'color');
+    expect(restrictedInk).toBe('var(--gn-restricted)');
+    expect(inheritedInk).toBe('var(--gn-text-muted)');
+    // THE PROPERTY THE SENTENCE DENIED.
+    expect(restrictedInk).not.toBe(inheritedInk);
+  });
+});
