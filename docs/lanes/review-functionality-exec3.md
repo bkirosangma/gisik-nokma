@@ -3536,3 +3536,61 @@ product's — but I do not withdraw it, because §5:407's dependence on two of t
 contradiction inside one section rather than a stale citation to a far-off file. **Not measured, and named rather
 than implied:** I checked §5's counts only; the other six never-opened sections (§1, §2, §3, §7, §8, §10) still
 have no claims checked, and §3's 118 candidate countable bullets are the largest remaining surface.
+
+## 54. Round 2 — `Features.md` §3 opened: two counts checked, both exact, and four instruments of mine that were wrong before they were right
+
+§3 (foundation & ledger, 356 lines) is the largest of the seven sections §51 recorded as never opened, carrying
+**68 bullets with an explicit numeric count.** This section records what has been checked there and — because
+the yield here is a *verified-clean* result rather than a finding — the four wrong numbers I produced on the way,
+each with the control that killed it. **In four of four cases the code was right and my instrument was wrong.**
+
+### 54.1 `Features.md:364` — *"one row per `### Task N:` heading across the eleven implementation plans (177 today)"*. **177 exactly. Verified clean.**
+
+**My first count said 167 and I nearly filed a finding on it.** My pattern was `^###\s+Task\s+\d+:`, which
+excludes the letter-suffixed headings — and the eleven plans use **`### Task 4a:`, `Task 9a:`, `Task 9b:`,
+`Task 11a:`, `Task 12a:`, `Task 12b:`, `Task 12c:`, `Task 13a:`, `Task 15b:`** among others. Widening to
+`#{2,4}\s+Task\s+\d+` gives **177**, exactly the number claimed. The ledger's own docblock is what makes the
+letter-suffixed form *expected* rather than incidental: *"one row per TASK ID declared by a `### Task N:`
+heading … One row per ID, NOT one per heading line: a heading may declare two (`### Task 4a / 4b: Workspaces +
+Invite` owes rows 4a AND 4b)."* **Blind spelling, fourth occurrence in this round.** The claim holds.
+
+### 54.2 `Features.md:31` — *"`primitives` (hex palette) resolved into 35 semantic `TOKEN_ROLES` for light AND dark"*. **35 exactly. Verified clean.**
+
+`TOKEN_ROLES` is an **array** at `packages/ui/src/tokens.ts:635`; `TokenRole = (typeof TOKEN_ROLES)[number]`
+(`:791`) derives the union from it, and the emitter maps it once (`:1412`). Counted by bracket depth with comments
+stripped: **35**, every member a semantic role — `surface`, `text`, `border`, `fill*`, `tintWarning`, `focusRing`,
+`shadow`, `brand`, `accent`, `danger`, `warning`, `success`, the four `category*`, `blocked`, `pending`,
+`restricted`, `contested`, `customMarker`.
+
+**Two instruments failed on this one claim before the third worked**, and both printed a confident number:
+1. *"50 entries"* — my first parse matched the **`primitives` object literal** that precedes the array, not
+   `TOKEN_ROLES` at all.
+2. *"50 roles"* — a non-greedy `\[(.*?)\]` capture ran past the array's bracket and collected **apostrophes
+   inside docblocks**, producing members like `"s \`Next\` label — the text that says where you are rather
+   than"`. The tell was that two entirely different instruments agreed on 50: **agreement between two broken
+   instruments is not corroboration**, and it is the shape this report keeps catching elsewhere.
+3. **Correct parse** — from `export const TOKEN_ROLES = [` to the closing `]` at column 0, comments stripped,
+   string literals collected only at depth 1 — gives **35**, matching the claim.
+
+### 54.3 Two more §3 counts I started and did NOT measure — named, not implied.
+
+- **§3:350**, *"the NINE replica tables — eight until ruling P36 added `snapshot_provenance`"*: **not measured.**
+  My search for the DDL returned **zero** files under `packages/app-core/src/**/*.ts` containing `CREATE TABLE`,
+  which means my path assumption is wrong rather than the claim — the replica DDL lives somewhere I did not look.
+  A zero from a search that never reached the artifact is not evidence, and I am not filing it as anything.
+- **§3:21**, *"CI pipeline (skeleton) … a single job installs via pnpm"*: **not measured, and the one number I did
+  produce is meaningless.** `.github/workflows/ci.yml` shows job-like keys including `scope`, `check-env`,
+  `check-runbook`, `check-citations`, `check-help`, `check-tasks`, `check-migrations`, `build`, `typecheck`,
+  `server-tests`, `other-tests`, `e2e`, `viewport` and `gate` — but my pattern matched at two-space indent and so
+  also swept up `pull_request` and `push`, which are children of `on:`, not jobs. **The bullet is titled
+  "(skeleton)" and may be a deliberately historical description of the initial pipeline**, which would make the
+  present-tense reading mine, not the catalogue's — and I have not read the bullet in full to decide. Recorded as
+  open rather than filed.
+
+### 54.4 Where §3 stands.
+
+**Checked: 2 claims of 68 countable bullets, both exact.** No finding in §3 so far — and that is the honest
+result: §3's bullets, unlike §4's and §6's, are densely tied to named modules and their counts match what the
+code holds. **The remaining 66 candidate bullets in §3, and the whole of §1, §2, §7, §8 and §10, stay unopened
+or unchecked**, and §3's own `177`/`35` results now carry the same weight as any other verified-clean claim in
+§20.
