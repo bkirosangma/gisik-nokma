@@ -14,7 +14,7 @@ Generated 2026-09-21 from `docs/lanes/review-scores.tsv` at `main` `b8b09fb5` by
 8. **Model routing is per task** (§2). You are Haiku: do `haiku` tasks yourself. For a `sonnet` or `opus` task, dispatch the Agent tool with `model: "sonnet"` / `"opus"` and the task's brief block VERBATIM as the prompt, followed by the line: *"Work in `<worktree>` on the current branch. Do not commit; leave the change in the working tree and report: files changed, the test you added, and its RED→GREEN output."* Then YOU run the package suite, read the log, and commit. A subagent's report is a claim; the log you read is the evidence.
 9. **`OWNER` / `OWNER-DECISION` tasks are not yours.** Append them to the progress file as `NEEDS-OWNER` and move on.
 10. **Do not touch `reference/`, do not add dependencies, do not refactor beyond the finding.** If the cited line has moved, find it by the quoted text (`grep -rn "<quoted words>"`) — the finding's report section (linked in every brief) has the surrounding code.
-11. **Reviewer pass before the PR** (§4 checklist), recorded in the PR body. **Then push, then open the PR, then verify** `gh pr view --json headRefOid` equals `git rev-parse HEAD`.
+11. **Reviewer pass before the PR** (§4 checklist), recorded in the PR body. **Before the PR: `scripts/ctl/ctl check-pr <branch> --body /tmp/pr-<batch>.md` must print `OK`; then `scripts/ctl/ctl pr open <branch> --title "<batch id>: <title> (<n> tasks)" --body /tmp/pr-<batch>.md --require-checked`.** The hook refuses `git push`-then-`gh pr create` by hand.
 12. **Progress file:** `docs/lanes/release-2026-09-22-progress.md` — one line per task as you finish it: `| <task id> | done|skipped|blocked|needs-owner | <commit sha> | <test name or note> |`. It travels in the batch PR. **On restart, read it first and continue from the first task without a line.**
 
 ## §1 — THE LOOP (for every batch, in the order of §3)
@@ -35,13 +35,12 @@ pnpm turbo run build > /tmp/build.log 2>&1; echo EXIT=$?          # once; rebuil
 
 # 2. batch verification
 #    - every package you touched: suite green (log per package, read the summary)
-#    - root checks: pnpm check:env; pnpm check:tasks; pnpm check:runbook; pnpm check:citations; pnpm check:help; pnpm check:migrations; node scripts/check-case-ids.mjs   (each rc=0)
+#    - scripts/ctl/ctl checks   (eight checks + two controls; rc=0)
 #    - reviewer pass (§4) — write the answers into the PR body
 
 # 3. push, PR, verify, next batch
-git push -u origin HEAD
-gh pr create --base main --title "<batch id>: <batch title> (<n> tasks)" --body-file /tmp/pr-<batch>.md
-gh pr view --json headRefOid --jq .headRefOid; git rev-parse HEAD     # must be equal
+scripts/ctl/ctl check-pr <branch> --body /tmp/pr-<batch>.md                                   # writes .git/ctl/checked-<sha>; must print OK
+scripts/ctl/ctl pr open <branch> --title "<batch id>: <batch title> (<n> tasks)" --body /tmp/pr-<batch>.md --require-checked   # pushes, opens, verifies head and body
 ```
 
 ## §2 — MODEL ROUTING
@@ -101,6 +100,9 @@ Batches run in this order, best value per hour first. **One driver takes the nex
 | **B17** | ANY | sonnet | deepseek | 12 | 4.8 (8) | 33–132 | Instruments that cannot fail or never run |
 | **B18** | ANY | haiku | deepseek | 37 | 5.5 (9.2) | 160–201 | Prose drift sweep — docblocks, catalogue markers, counts |
 
+
+**Topology (owner, 2026-09-21 18:4x):** at most **three DeepSeek lanes and three Claude lanes under one controller**. DeepSeek lanes take whole-DeepSeek batches in §3 order (B03, B04, B05 first, then B06, B08, B09, B10, B11, B13, B14, B15, B17, B18); Claude lanes take the Claude batches in order (B01, B02, B07, B12, B16); **when every Claude-assigned task is done, the Claude lanes take DeepSeek-assigned batches** in the same order, never the reverse. One batch per session; a lane that finishes claims the next unclaimed batch of its kind in the progress file. Until `scripts/ctl/ctl` is live, lanes run in PUSH-ONLY mode: they push after every task, commit the PR body to `docs/lanes/pr-bodies/<batch>.md`, and the controller opens and lands the PR through the verbs.
+
 Totals: committed 27 h (60 tasks) · through the cut 40.8 h (79 tasks) · whole plan 105.1 h batched, 175.3 h solo, 231 tasks.
 
 ## §4 — THE REVIEWER PASS (write the answers into every PR body)
@@ -110,7 +112,7 @@ Totals: committed 27 h (60 tasks) · through the cut 40.8 h (79 tasks) · whole 
 3. `Features.md` and `test-cases/` diffs: each changed bullet/case names the task; no case renumbered; every new case id is the next free one in its file (`node scripts/check-case-ids.mjs` green).
 4. No `AskUserQuestion`, no `docker compose`, no dependency added, no `reference/` change, no `console.log` left behind.
 5. The progress file has one line per task in the batch.
-6. Paste the seven root-check exit codes and each package suite's summary line.
+6. Paste the `ctl checks` summary line and each package suite's summary line.
 
 PR body template:
 
@@ -119,7 +121,8 @@ PR body template:
 Tasks (in commit order): <T-… — one line each — commit sha>
 Tests RED→GREEN: <test name — log path> …
 Package suites: <pkg>: Test Files N passed (N) · Tests N passed (N)
-Root checks: check:env 0 · check:tasks 0 · check:runbook 0 · check:citations 0 · check:help 0 · check:migrations 0 · check-case-ids 0
+ctl checks: <summary line>
+ctl check-pr: <summary line>
 Reviewer pass (§4): 1 … 2 … 3 … 4 … 5 … 6 …
 Needs owner: <task ids or none>
 
