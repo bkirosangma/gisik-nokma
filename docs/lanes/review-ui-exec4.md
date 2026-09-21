@@ -312,6 +312,19 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 ---
 
+
+### E4-20 — **MINOR** — The workflow builder opens with `fitView`, so every control on a state node is painted at 74 % of its size on a 1512-px desktop (a 10×10 Blocked checkbox, ~9-px labels) and at ~52 % on a phone; the prototype draws the canvas at 1:1 inside a scrolling card
+
+**MEASUREMENT (painted).** 1512×900: `.react-flow__viewport` `transform: matrix(0.744928, …)`; canvas `564×480`; per node `input.nodrag "Blocked"` → **10×10**, `button.gn-select__trigger "Category"` → **103×33** (the 44-px control at 0.745), `span "Start"` `font-size: 12px` painted in a `22×13` box (~9 px). 390×844: the same checkbox → **7×7**, the trigger → `69×22`. 768: `10×10`. Source: `packages/app-core/src/workflow-builder/ui/workflow-canvas.tsx:57` `fitView`; `.gn-workflow-canvas { height: 100%; min-height: 480px }` (`ui.css:2179`). The type-scale sweep reads computed `font-size` (12px, above its 12-px floor) and cannot see the transform — painted text under the floor that no instrument can report.
+
+**PROTOTYPE.** `Desktop.dc.html` `isBuilder` block (`:1012`), lines `:1026-1028`: the canvas card is `overflow:auto; min-height:480px` around a fixed `820×520` drawing — nodes at 1:1, scroll for the rest. **Category 3: diverges with no ruling found** (`grep -n "fitView\|zoom" docs/superpowers/plans/2026-08-20-08-workflow-builder.md` → the prop in a code listing at `:3087`, no sentence about it).
+
+**WHY IT IS WRONG.** The Blocked checkbox is wrapped in its `<label>` (`state-node.tsx:46-56`), so the label is the target — but the label's painted height is ~13 px too. A person can pinch or scroll-zoom, but the first paint is the one that has to be legible.
+
+**WHAT WOULD HAVE BEEN BETTER.** `fitView={false}` with `defaultViewport={{ zoom: 1 }}` and the prototype's scrolling card, or `fitViewOptions={{ minZoom: 1 }}` so fit never shrinks below 1:1; and give the canvas more height than 480 px on a 900-px viewport.
+
+---
+
 ## 4. MATCHES AND RULED DIVERGENCES CHECKED
 
 _(so §3 is not a list of defects)_
