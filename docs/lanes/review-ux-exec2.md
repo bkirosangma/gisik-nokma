@@ -3049,7 +3049,7 @@ eighth**.
 > `:735-741` returns `{ data: null, error: { status, … } }` — the promise **resolves**, `.then` fires, and
 > `router.push('/sign-in')` runs on the strength of an answer the handler never read. So *"a 5xx"* belongs in the other
 > arm: on that path the product is not silent, it **navigates to Sign in as though the sign-out succeeded**, while the
-> server answered that it did not. Measured further at 15:46: better-auth's `/sign-out` route (`dist/api/routes/sign-out.mjs`,
+> server answered that it did not. Measured further at 15:44: better-auth's `/sign-out` route (`dist/api/routes/sign-out.mjs`,
 > opened) catches and logs a failed `deleteSession`, always runs `deleteSessionCookie(ctx)`, and answers 200 — so a
 > non-2xx from this route can come only from infrastructure in front of it (a proxy's 502/503), never from the route's
 > own failure. That makes the 5xx arm narrow and infra-dependent, which is why it is recorded here and not filed.
