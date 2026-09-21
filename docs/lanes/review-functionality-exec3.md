@@ -1820,3 +1820,62 @@ invocation** (`git status --porcelain` empty after both). They import `evaluateE
 which is the trap `E3-2` records against another lane's measurement. All definitions travel as events
 (`workflow.defined`, `ticket-type.defined`), so the context needs no seed and no database. Both runs:
 `Tests 1 passed`.
+
+---
+
+## 22. `E3-19`, STRENGTHENED — the product states the principle, enforces it at TWO doors, and a third door walks around it
+
+Added after filing `E3-19`, because a control run during the probing turned out to be the finding's
+own proof. **This sharpens `E3-19`; it does not replace it.**
+
+**The control.** In the same engine context — a parent `P` in `done` and CLOSED, a child `C` under it — I
+asked the engine to do the thing the invariant is about, through a different door:
+
+```
+create a NEW child under the closed parent:
+  → {"refused":true, "rule":"hierarchy.parent-terminal",
+     "reason":"\"Parent\" is finished (Done). Adding live work reopens it —
+               choose a state to reopen it to, then add this ticket."}
+```
+
+**Read that sentence and then read the result of the child's move.** The product's own words state the
+principle — ***"Adding live work reopens it"*** — and it enforces that principle at **two** doors:
+
+| door | rule | result |
+|---|---|---|
+| `ticket.created` — a new child under a finished parent | `hierarchy.parent-terminal` | **refused**, with the sentence above |
+| `ticket.reparented` — moving a live child under a finished parent | `hierarchy.parent-terminal` (`hierarchy.ts:150`, `:298`) | **refused** |
+| **`ticket.transitioned` — an existing child moving back INTO live work under a finished parent** | *(none)* | **ACCEPTED** |
+
+**Measured, the second reachable order — close the parent FIRST, then reopen the child:**
+
+```
+P: todo -> done                                   → accepted
+close P                                           → accepted   (P: {stateId:"done", closed:true})
+C: done -> todo   (under the CLOSED parent)       → {"refused":false}   <-- ACCEPTED
+C's state after                                   → {stateId:"todo", category:"open"}
+```
+
+So the ledger holds **a closed ticket with live work under it**, reached without ever needing the
+close-with-an-open-child order that `E3-19`'s first probe used. **Two independent orders reach the same
+state, and the door that would refuse it in either order is the one that does not exist.**
+
+**WHY THIS UPGRADES THE FINDING RATHER THAN MERELY REINFORCING IT.** `E3-19` as first filed rested on an
+argument about what "parents cannot outrun children" means — and I said then that a reader could
+reasonably say the invariant was only ever meant one way. **That argument is no longer available.** The
+product does not merely have a one-way invariant; it has a **principle it states in a user-facing
+sentence**, a **refusal that names it**, and **a door that reaches the same state without it.** This is
+not an ambiguity about scope — it is the sentence *"Adding live work reopens it"* being true at two doors
+and false at the third.
+
+**The fix is therefore not a reinterpretation but an omission:** the transition door needs the check the
+other two already have — refuse a move into a NON-terminal state when the ticket's resolved parent is
+`closed` (or terminal), with the `hierarchy.parent-terminal` rule id the product already mints and the
+same class of sentence. The parent's title is already resolvable at that point by the same reader
+`hierarchy.ts:150` uses to name it.
+
+**MEASUREMENT.** A third engine probe, `packages/rule-engine/test/zz-e3-probe-terminal3.test.ts` —
+created, run and **deleted in the same shell invocation** (`git status --porcelain` empty afterwards),
+importing `evaluateEvent` and `buildMemoryContext` by **relative path** so nothing resolves through a
+stale `dist`. `Tests 1 passed`. The refusal text above is `evaluateEvent`'s own, copied verbatim from the
+probe's output, not paraphrased.
