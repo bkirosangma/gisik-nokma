@@ -25,7 +25,8 @@ E3-27; its filed refutations as of `a647510b` are R6-1 → E5-21 and R6-2 → E2
 
 ## Refutations filed
 
-**None.** Sixteen attacks across two sessions (ten in phase 1, six here) produced no falsifying measurement; the
+**None.** Fourteen attacks across two sessions (ten in phase 1, four here: E6-16, E6-21, E6-17, E6-14) and three
+more findings examined without an attack (E6-15, E6-10, E6-24) produced no falsifying measurement; the
 closest — E6-14's headline interval — is measured against the domain's clock rather than the wire's, and the
 finding's second clause holds regardless. A rejected refutation costs the target's points, and no target below is
 worth that on the evidence in hand. The table is the work.
@@ -44,7 +45,7 @@ Ten attacks were made in phase 1 and recorded in the report (§23: E6-1, E6-2, E
 | **E6-10**, **E6-24** (Important — half-migrated type; replica reads serve a deleted ticket) | read in full; both rest on appendix probes with printed before/after rows and positive controls; E6-24's premise (only `getTickets`/`getBoard` filter) is what my own F5/E3-5 measured at `:996`/`:1029` | **not attacked** — no cheaper falsification than re-running their probes, and my F5 is their premise |
 | **E6-14** (Minor — the delete toast's "no ticket key" reason *"stopped being true thirteen minutes before it was written"*) | `git log -1 --format=%ci ac18f2bc` → `2026-09-20 13:04:40`; `18d7e391` → `13:17:51` (13 min 11 s — the headline's interval reproduces). But what `ac18f2bc` shipped is the **composition function and its test** (`git show --stat`: `packages/domain/src/prefix.ts` with `export function ticketKey(…)` at `:177` of that revision (`:248` today), `apps/server/src/read/ticket-numbers.ts`, `apps/server/test/read/ticket-key.test.ts`; **no route**); the served `key` field on the detail read arrived with `git log -S'ticketKey(' -- apps/server/src/routes/tickets.ts` → **`277b5d22`, 2026-09-20 23:07:56** — ten hours **after** the docblock, not thirteen minutes before it. So at 13:17 the sheet had no key on any wire; the domain had a function. | **not filed.** The finding's second clause — *"the same file now reads the key"*, `ticket-sheet.tsx:1588` `ticketRead.key ?? ticketRead.title`, opened — is true today and carries the Minor on its own; a refutation of the headline's timing alone would be rejected on that clause and cost the point. Recorded so the judge can price the headline's interval at what it is: the domain's clock, not the wire's. |
 
-**Sixteen attacks, sixteen findings standing.** Two of the sixteen changed my report (E6-6, E6-11), one (E6-21)
+**Fourteen attacks and three examinations, seventeen findings standing.** Two of them changed my report (E6-6, E6-11), one (E6-21)
 became the load-bearing measurement of my own Critical's defence, and one (E6-14) has a headline interval measured
 against the wrong artifact and a second clause that holds regardless.
 

@@ -4401,4 +4401,5 @@ in the code that readers open first.
 
 **Whole-report state at this stamp:** round 1 `E3-1`–`E3-8` (8, none withdrawn) · round 2 `E3-9`–`E3-29` (21, frozen at
 `f8b5e929`) · phase 2 `E3-30`–`E3-33` (4, half). Ids contiguous `E3-1` … `E3-33`, no gaps. Refutations filed against
-other lanes: **0** (sixteen attacks, all recorded with their measurement in `review-refutations-exec3.md`).
+other lanes: **0** (fourteen attacks and three examinations, all recorded with their measurement in
+`review-refutations-exec3.md`).
