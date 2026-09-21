@@ -538,9 +538,12 @@ which"* — while a signed-in person always has at least the current session, so
 `/account` (`[BROWSER]`) can only be a failed read painted as an empty state. A third site does not even hedge:
 `account/page.tsx:180` `passkeyClient.list().then(setPasskeys, () => setPasskeys([]))` → `passkeys-section.tsx:96-97`
 *"You have no passkeys yet."* — *"yet"* asserts a fact about the account, over a read that answered nothing, to a
-person who (here) holds seventeen (`[BROWSER]` `/account` lists 17 `Delete passkey …` controls). This is the brief's
-expensive shape inverted: the server ACCEPTS a claim the client invented — and, for passkeys, the client asserts an
-absence the server never stated.
+person who (here) holds seventeen (`[BROWSER]` `/account` lists 17 `Delete passkey …` controls). A fourth, `:67` `getMyWorkspaces().then(setWorkspaces, () => setWorkspaces([]))`, paints the *"Your workspaces"*
+heading over an empty list (`workspaces-section.tsx` has no empty arm) and its comment (`:58-66`) calls the silence
+*"Deliberate, not an oversight"* while inviting the fix (*"that's an `error` state added here"*). Four failed-read
+collapses, all on one page (a regex sweep for `.then(<setter>, () => set…(` over `apps/web` and `packages/app-core/src`
+→ exactly these four). This is the brief's expensive shape inverted: the server ACCEPTS a claim the client invented
+— and, for passkeys and workspaces, the client asserts an absence the server never stated.
 
 **WHAT WOULD HAVE BEEN BETTER.** Hold `prefs = null` on a failed read and render the five rows disabled with *"Your
 preferences could not be loaded"*; make `toggleKind` refuse to save unless the last `load` succeeded; same for
