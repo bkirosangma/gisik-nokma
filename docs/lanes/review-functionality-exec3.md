@@ -4294,3 +4294,93 @@ finds a recorded reason for the omission that this lane's search missed, the fin
   → **empty** (the merge base is this branch's base, `a7b6292b`; main's six commits since are controller anchors
   and restart-surface rotations). Every line cited by every finding in this report is byte-identical on `main`.
 - *"§7.5, the mappers refuse to default"* — executor 6 confirmed it (*"likely a defence, not a refutation"*).
+
+## 68. `E3-32` (phase 2, HALF) — **IMPORTANT (claimed)** — The envelope-origin gate's own status list says `POST /v1/sync` *"does not exist yet"* and is *"NOT CLOSED"*; the door has existed since 2026-09-04, calls the gated ingest, and a test witnesses the gate firing on it (15:35 IST)
+
+**WHAT.** `apps/server/src/permissions/check-permission.ts:528-533` — the docblock of the check that refuses a client
+wearing the server's provenance (`SERVER_ORIGIN_REASON`), enumerating which doors it closes:
+
+> `- **CLOSED:** POST /v1/events …`
+> `- **NOT CLOSED, by design:** direct ingestBatch — the internal append path.`
+> `- **NOT CLOSED, because it does not exist yet:** POST /v1/sync (Plan 10). **When it is built it must call
+> ingestClientBatch**, or offline-originated events bypass this gate entirely.`
+
+**WHY it is wrong.** The door exists and is closed, and the record says the opposite of both:
+
+- `apps/server/src/sync/sync-routes.ts:490-491` — `app.post('/v1/sync', { preHandler: requireSession, …`; first
+  committed in `999d4860` (2026-09-04, #98, *"Plan 10 Batch A: the server sync surface"*).
+- `apps/server/src/sync/sync-service.ts:370` — `const [result] = await deps.ingest.ingestClientBatch([event], userId);`
+  — the client's offline claim goes through the **gated** door, exactly as the docblock demanded; `:71` says so in
+  prose.
+- `apps/server/test/sync/sync-route.test.ts:346-361` — a `ticket.field_set` with `origin: 'server'` posted to
+  `/v1/sync` by a member answers `{ status: 'contested', rule: PERMISSION_ROLE_RULE, reason: SERVER_ORIGIN_REASON }`
+  — the gate firing on the door the docblock says is not there.
+- The sentence dates from `fc904f4a` (2026-08-31, *"the envelope-origin forgery, closed at the client door only"*);
+  `check-permission.ts` has been committed **16 times** since, last `d13dc546` (2026-09-20), and the status list never
+  moved.
+
+This is `E3-1`'s shape exactly — *"an open-gap section still declares a closed security-relevant leak"* (the
+controller's words, ACCEPTED at Important) — in the gate's own file rather than a test's: a reader auditing the
+forgery gate is told one of its three doors is open and unbuilt, and the instruction for building it reads as
+pending work.
+
+**WHAT WOULD HAVE BEEN BETTER.** Flip the third bullet to *"CLOSED: `POST /v1/sync` (Plan 10 Batch A, 2026-09-04)
+— `sync-service.ts` calls `ingestClientBatch`; witnessed by `sync-route.test.ts`"*. And the detector the controller
+proposed for `E3-1`: a status list is greppable by the route it names — `grep -rn "'/v1/sync'" apps/server/src` is the
+whole instrument.
+
+**MEASUREMENT.** Lines opened: `check-permission.ts:520-533`; `sync-routes.ts:483-500`; `sync-service.ts:71`, `:370`;
+`sync-route.test.ts:345-361`; `git log --format='%h %ad' -- apps/server/src/sync/sync-routes.ts | tail -1` →
+`999d4860 2026-09-04`; `git log -S'NOT CLOSED, because it does not exist yet' -- …/check-permission.ts | tail -1`
+→ `fc904f4a 2026-08-31`; `git log --format=%h -- …/check-permission.ts | wc -l` → 16. **Not run:** the sync test
+(it needs the test Postgres); the witness is cited from its assertion, opened at the line. **Control:** the same
+docblock's first bullet (`POST /v1/events` → `ingestClientBatch`) is true — `routes/events.ts` is the door `E3-14`'s
+control row exercised.
+
+**SEVERITY: Important (claimed), scored at half.** A security gate's own enumeration of its doors is wrong about
+one of three, in the direction that sends a reader to build a closure that exists.
+
+## 69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist yet"* and that its own position is *"immediately after `proj_workflows`"*; both were false the day the sentence landed, and the file it says must move *"in the same commit"* did (15:35 IST)
+
+**WHAT.** `apps/server/src/projections/proj-projects.ts:26-32`: *"§8 pins `proj_entity_heads, proj_workflows,
+proj_ticket_types, proj_projects, …`. `proj_ticket_types` does not exist yet, so this one's §8 position today is
+immediately after `proj_workflows` — an INSERT, not an append. See `./index.ts` and `test/projection-order.test.ts`,
+both of which must move in the same commit."*
+
+**WHY it is wrong.** `apps/server/migrations/1787961700000_proj-ticket-types.sql` creates the table;
+`projections/index.ts:65-75` registers `workflowsProjection`, then `ticketTypesProjection` (*"§8 position 3 … It
+INSERTS above proj_projects, which had been immediately after proj_workflows only because this position was
+empty"*), then `projProjects` (*"§8 position 4"*). So `proj-projects` is not immediately after `proj_workflows`, the
+table it says is missing is registered above it, and the neighbour file carries the correction the docblock says
+must travel with it. Dates: the docblock landed in `dd7bfcfd` (2026-09-01, #57); the ticket-types projection landed in
+`6cb631d0` (2026-09-01, #59) — the same day; `proj-projects.ts` has been committed 5 times since, last `4d11d8f8`
+(2026-09-20), with the sentence intact.
+
+**WHAT WOULD HAVE BEEN BETTER.** Delete the two sentences; `index.ts:66-72` already says what is true and why.
+
+**MEASUREMENT.** Lines opened: `proj-projects.ts:24-33`; `projections/index.ts:62-76`; the migration's filename;
+`git log -S` and `git log --diff-filter=A` as above. **Control:** the first sentence of the same docblock (the §8
+order) matches `index.ts:24`'s list word for word.
+
+**SEVERITY: Minor (claimed), scored at half.** A registration-order comment stale since the day it was written; no
+runtime consequence (`projection-order.test.ts` pins the real order).
+
+## 70. Phase-2 sweep — three refused premises still asserted in eleven source comments (15:35 IST; coverage, not a finding)
+
+`grep -rniE "nothing on this branch|nothing (anywhere )?refuses|no check compares|does not exist yet|not yet landed"`
+over `apps/server/src`, `packages/*/src`, `apps/web/app` (dist excluded) → 18 lines. Besides the two findings above,
+**eleven** restate a premise the engine now refuses, each read at the line:
+
+| premise (refused at) | where it still stands |
+|---|---|
+| *"nothing refuses a cross-project parent"* — case 6.57, refused `hierarchy.ts:125`/`:274` (`E3-31`) | `read/restricted-parents.ts:39` · `routes/tickets.ts:116` · `app-core/src/views/ticket-sheet.tsx:259` · `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:1142` · `test/routes/tickets-read.test.ts:465` · `visibility/rollup.ts:208` |
+| *"nothing on this branch refuses the cycle"* — case 6.58, refused `hierarchy.ts:237`/`:257-258` (`E3-22`) | `visibility/grant-backfill.ts:226` · `projections/proj-visibility.ts:196` · `routes/list.ts:367` · `projections/tickets.ts:496` (*"nothing refuses a …"* — read: the cycle case) |
+| *"no check compares them"* (workspace of parent vs child) — case 6.84, refused `hierarchy.ts:124`/`:250` (`E3-21`) | `visibility/rollup.ts:204-206` |
+
+The remaining lines of the 18 are true or self-correcting (`bootstrap-workspace.ts:44` describes an intended
+non-refusal; `check-permission.ts:249`, `:374` describe the founding window by design; `online/index.ts:9` is a docblock
+that records its own correction; `draft-store.ts:90` and `page.tsx:1330` are UI-lane sentences not checked here).
+**These eleven are not filed separately**: each is the same premise as a finding already filed, and the judge asked
+that the trio be rulable as one mechanism (§27). They are the trio's true width — three catalogue lines, one column
+comment, eleven source comments — and the reason a fix to the three case lines alone would leave the premise alive
+in the code that readers open first.
