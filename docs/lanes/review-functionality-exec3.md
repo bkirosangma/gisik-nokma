@@ -4093,7 +4093,7 @@ permits. No finding above is edited; the only insertions above this line are dat
 
 **WHAT I got wrong.** §30.1 says *"THE FILE IS NOW FULLY ENUMERATED — twenty open declarations"* and
 *"all twenty lines read in full … each checked."* Its table's five rows carry the counts **6 · 3 · 6 · 1 · 1**.
-Measured this session, by **membership rather than size** (the rule in [[a-wrong-count-marks-a-structural-defect]]):
+Measured this session, by **membership rather than size** (compare the members, not the sizes):
 the ids at the twenty line numbers the section itself lists (`sed -n '<n>p' test-cases/06-auth-visibility.md`
 for each of `73 77 82 87 93 95 97 98 107 115 116 117 129 131 193 198 199 201 202 203`) are
 `6.61 6.65 6.66 6.71 6.51 6.53 6.57 6.58 6.77 6.82 6.83 6.84 6.94 6.96 6.130 6.31 6.41 6.123 6.124 6.125`.
