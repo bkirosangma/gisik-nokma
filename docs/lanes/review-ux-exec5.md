@@ -880,7 +880,7 @@ that as transport: `ticket-sheet.tsx:1074` *"We could not reach the server for t
 its hook is fed **reads only**: `page.tsx:1094-1098` `useSignInOnExpiredSession([board.error, list.error,
 ticketTypes.error])`; `inbox/page.tsx:234`; `w/[workspaceId]/page.tsx:219`. No write error is on any of those lists — and it could not be: the sheet's `transportError` is component-local state
 (`ticket-sheet.tsx:1074` `setTransportError`), never lifted to the page that owns the hook. The irony is that the
-sentence already CONTAINS the hook's predicate — `EXPIRED_SESSION_PREFIX = 'HTTP 401 '` (`expired-session.tsx`) is a
+sentence already CONTAINS the hook's predicate — `EXPIRED_SESSION_PREFIX = 'HTTP 401 '` (`expired-session.tsx:49`) is a
 string match, and `"… — HTTP 401 for /v1/events"` carries it — so the classifier exists and the writes simply never
 reach it.
 
