@@ -596,6 +596,136 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(serverBox).toHaveTextContent('ticket.transitioned is not a registered event type.');
   });
 
+  /**
+   * 3.178 / E2-29 — a dropped connection during a Move used to produce nothing
+   * at all.
+   *
+   * `submitTransition` awaited `dataSource.ingest([...])` with no `try`, and its
+   * call site is `void submitTransition(submission)` — so a REJECTED ingest was
+   * an unhandled promise rejection. The sheet does hold a transport sentence,
+   * but it renders only when `!moveOpen`; the dialog that replaces it while a
+   * Move is being made was handed the literal `transportError={null}`, so there
+   * was no surface anywhere that could speak. The sibling writes on the same
+   * sheet (`submitTicketEvent` for Close/Reopen/Delete) do catch and disclose,
+   * which is what makes this an omission rather than a design.
+   *
+   * The assertion is deliberately about WHICH surface speaks and in WHICH
+   * voice: the alert is read inside the Move dialog (the surface in view — the
+   * sheet's own copy is gated out while it is open), and it must not wear the
+   * refusal's sentence or its class. A dropped connection is not an
+   * adjudication, and a person cannot act on it as one.
+   */
+  it('3.178 / E2-29: a rejected ingest during a Move is spoken by the dialog, never as the server’s own verdict', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      () => {
+        throw new Error('network unreachable');
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'filed at the portal');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+
+    const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent('We could not reach the server for this move — network unreachable');
+    expect(alert).not.toHaveTextContent('Refused by the server');
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
+    // The dialog stays: the retry lives here, and so does the sentence.
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+  });
+
+  /**
+   * 3.182 / E5-27 — THE MOVE CONTROL HAS AN IN-FLIGHT STATE.
+   *
+   * E2-29's transport arm (3.178) gave a dropped connection a sentence. This is
+   * the other half of the same finding, and it is a different defect: with the
+   * request merely SLOW the dialog said nothing because there was nothing to
+   * say yet, and Move stayed enabled — so "still sending", "already failed" and
+   * "already succeeded" were indistinguishable to the person deciding whether
+   * to press again. `blocked` is the form's validity and only that; the dialog
+   * had no way to express "a submission is already in flight".
+   *
+   * The ingest is held open behind a deferred promise rather than rejecting,
+   * and that is the whole design of the case: a REJECTING ingest also reddens
+   * under a fix that only resets the latch on the error path, so it cannot
+   * distinguish a latch from a `finally`. Holding it open tests the window
+   * itself — the state the person is actually in while the network is slow.
+   *
+   * THE SECOND PRESS IS ASSERTED, not assumed away. Disabling a button is a
+   * DOM fact; whether a second submission can still be FILED is the property
+   * that matters, and the two come apart whenever the guard is missing and
+   * `userEvent` dispatches before React re-renders. `source.ingested` is the
+   * ledger of what actually went out.
+   */
+  it('3.182 / E5-27: a Move in flight disables the control, and a second press files nothing', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    let release: (() => void) | null = null;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      async (events) => {
+        await new Promise<void>((resolve) => {
+          release = resolve;
+        });
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-08-20T09:00:00.000Z',
+        }));
+      },
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('Comment (required by this transition)'), 'filed at the portal');
+
+    const dialog = screen.getByRole('dialog', { name: 'Move ticket' });
+    const moveButton = within(dialog).getByRole('button', { name: 'Move' });
+    // Before the press it is enabled — the field the case moves must be the
+    // ONLY thing that turns it off, or "disabled" would prove nothing.
+    expect(moveButton).toBeEnabled();
+
+    await user.click(moveButton);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // The request is out and unanswered: the control says so.
+    await waitFor(() =>
+      expect(within(dialog).getByRole('button', { name: 'Move' })).toBeDisabled(),
+    );
+    // And a second press — the person's natural response to a slow network —
+    // files nothing at all. Measured against the LEDGER, not the attribute.
+    await user.click(within(dialog).getByRole('button', { name: 'Move' }));
+    expect(source.ingested).toHaveLength(1);
+
+    // Release: the latch clears, the dialog closes, and the button is gone
+    // with it — the happy path still works through the same flag.
+    await act(async () => {
+      release?.();
+      await Promise.resolve();
+    });
+    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull());
+  });
+
   it('a committed batch closes the dialog and clears any earlier refusal', async () => {
     const user = userEvent.setup();
     const source = renderSheet(ticketRead());
@@ -668,6 +798,95 @@ describe('TicketSheet — the instant pre-check, with a cache to evaluate agains
     // user as though it were about their move.
     expect(preview.textContent).not.toContain('malformed');
     expect(preview.textContent).not.toContain('toStateId');
+  });
+
+  /**
+   * 3.186 (E5-7). The candidate carries `{ to }` and nothing else, so the
+   * preview is
+   * asked a question the submission does not ask: the dialog shows
+   * `Comment (required by this transition)`, its own `blocked` clears the
+   * moment the person types, Move becomes ENABLED — and the refusal sentence
+   * beside it stays. `evaluateRequireComment` reads `payload.comment?.text`, so
+   * the comment is the one rule kind whose value the CANDIDATE can carry; the
+   * evidence fix beside it did exactly this and was never extended to the
+   * comment box.
+   */
+  it('PLANTED DEFECT: the require-comment preview stops refusing once the comment its own box asked for is typed', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read), { cache: cacheForTicket() });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    // doing → done declares require-comment.
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    // The CONTROL: nothing typed yet, so this refusal is CORRECT — the person
+    // has not answered, and Move is disabled. The case below is about the
+    // refusal CLEARING, not about it never having fired.
+    expect(await screen.findByText(/instant check/)).toHaveTextContent('require-comment');
+
+    const box = screen.getByLabelText('Comment (required by this transition)');
+    await user.type(box, 'review note');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+    expect(document.querySelector('.gn-refusal--preview')).toBeNull();
+
+    // …and a comment that is only WHITESPACE is not a comment: the submission
+    // sends `comment.trim()`, and `evaluateRequireComment` trims what it reads,
+    // so the two agree on every value that can change the verdict.
+    await user.clear(box);
+    await user.type(box, '   ');
+    expect(await screen.findByText(/instant check/)).toHaveTextContent('require-comment');
+  });
+
+  /**
+   * 3.185 (E2-40). `require-field` reads the value out of the TICKET STATE
+   * (`rule-engine/src/rules/require-field.ts:9`), not out of the candidate's
+   * payload — which is why the real path sends the field claims FIRST, in one
+   * ordered batch, before the transition. The preview evaluates ONE candidate
+   * against cached state and has no such batch, so a field the ticket does not
+   * already carry is invisible to it: the dialog's own input asks for the
+   * value, its gate clears the moment it is typed, and the preview beside it
+   * keeps saying the field is not set — for ever.
+   */
+  it('PLANTED DEFECT: the preview stops refusing once the field its own input asked for is filled', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'doing' && transition.to === 'done'
+          ? { ...transition, rules: [{ kind: 'require-field', field: 'invoiceNo' }] }
+          : transition,
+      ),
+    };
+    const read = ticketRead();
+    const cache = createClientStateCache();
+    cache.upsertTicket(read.ticket);
+    cache.upsertWorkflowDef(gated);
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => gated,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source, { cache });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    // Before anything is typed the refusal is CORRECT — the field has no value
+    // on the ticket and nothing has been collected. This is the control: the
+    // assertion below is about the refusal CLEARING, not about it being absent
+    // for some unrelated reason.
+    const preview = await screen.findByText(/instant check/);
+    expect(preview).toHaveTextContent('require-field');
+
+    await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move' })).toBeEnabled());
+    // The person answered the question the dialog asked, and the answer reached
+    // the same evaluation the submission will cause — so the refusal goes.
+    expect(document.querySelector('.gn-refusal--preview')).toBeNull();
   });
 });
 
@@ -1495,6 +1714,88 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     expect(within(row).getByText(/roster could not be loaded/i)).toBeInTheDocument();
   });
 
+  /**
+   * RULING E4-18 — `...people.map((member) => ({ value: member.id, label:
+   * member.name }))` rendered a BLANK 13px option for a member with no
+   * display name (a real, seeded member: `accountant@e2e.gisik-nokma.local`,
+   * `name: ''`). `provenance.ts`'s own honesty contract ("a missing display
+   * name falls back to the raw actor id — attributed, never blank") already
+   * governs the sibling `visibility-editor.tsx` picker via `actorLabel`; this
+   * is the same contract applied here.
+   */
+  it('a member with no display name renders by id, never a blank option', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
+        { id: 'user_nameless', name: '', role: 'guest' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(read, source);
+    await settled();
+    const listbox = await openAssigneeList();
+    const options = within(listbox).getAllByRole('option');
+    expect(options.map((option) => option.textContent)).toEqual([
+      'Unassigned',
+      'Kiro',
+      'Anselma Marak',
+      'user_nameless',
+    ]);
+    // The blank-string failure mode this ruling closes: no option's visible
+    // text is empty, which a `.toEqual` on the full array above could in
+    // principle still satisfy by accident if the array itself were wrong —
+    // this is the assertion that addresses the failure mode directly.
+    for (const option of options) {
+      expect(option.textContent).not.toBe('');
+    }
+  });
+
+  /**
+   * RULING E5-4 — the @mention list's own half of the same defect class
+   * E4-18 closed on the Assignee picker: `queryUsers` filtered on
+   * `member.name.toLowerCase().includes(needle)` and mapped `name:
+   * member.name` verbatim, so a nameless member was both invisible (a
+   * blank row, if listed at all) AND unreachable (typing anything could
+   * never match an empty string). `queryUsers` is captured off a fake
+   * `EditorSlotComponent`, the same dependency-injection seam 13.989's own
+   * describe block uses, since it is a closure private to `TicketSheet`
+   * and not otherwise reachable from a test.
+   */
+  it('the @mention list resolves a nameless member by id, and finds them by typing it', async () => {
+    const read = ticketRead();
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [
+        { id: 'user_kiro', name: 'Kiro', role: 'owner' },
+        { id: 'user_nameless', name: '', role: 'guest' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    let captured: ((query: string) => Promise<Array<{ userId: string; name: string }>>) | undefined;
+    const fakeSlot: EditorSlotComponent = (props) => {
+      captured = props.queryUsers;
+      return null;
+    };
+    renderSheet(read, source, { editorSlot: fakeSlot });
+    await settled();
+    expect(captured).toBeDefined();
+
+    const all = await captured!('');
+    expect(all).toContainEqual({ userId: 'user_nameless', name: 'user_nameless' });
+
+    // Reachable by typing the id — the raw empty name could never have
+    // matched anything, so this is the assertion that would fail if the
+    // resolved label were used only for DISPLAY and the OLD raw name were
+    // still what `.includes(needle)` matched against.
+    const found = await captured!('user_nameless');
+    expect(found.map((person) => person.userId)).toContain('user_nameless');
+  });
+
   it('names who assigned the ticket, in the sibling rows’ own shape', async () => {
     renderSheet(
       ticketRead({
@@ -1783,6 +2084,51 @@ describe('F — the subtasks section', () => {
     // where the missing thing is a character rather than a pixel.
     expect(within(section).getByTestId('subtask-tkt-s1').textContent).toBe('Order the brochures · To do');
     expect(within(section).getByTestId('subtask-tkt-s2').textContent).toBe('Book the venue · Done');
+  });
+
+  /**
+   * 17.041 (V8) — THE FALSE ALERT EVERY PARENT TICKET RAISED ON ITS ORDINARY
+   * LOAD.
+   *
+   * `subtaskRows` was `subtasks.data ?? []`, so the in-flight window read as an
+   * EMPTY list — and `useLiveQuery` resets `data` to `null` on every KEY change,
+   * which the subtasks key does the moment the ticket read lands
+   * (`${ticketId}:subtasks:${projectId}`). So for the whole second round trip
+   * `subtaskRows.length` was 0 while `subtaskExpected` was the server's real
+   * child count, `subtasksIncomplete` was true, and the section rendered a
+   * `role="alert"` telling the person the list was *"not shown rather than shown
+   * short"* — about a list that was merely still being read.
+   *
+   * The child read is held open here rather than raced: a slow promise makes the
+   * window deterministic and lets the case assert BOTH ends of it.
+   */
+  it('PLANTED DEFECT: no false "not shown rather than shown short" alert while the child read is in flight', async () => {
+    const read = ticketRead({ rollup: { totalChildren: 1, terminalChildren: 0, restrictedCount: 0 } });
+    let release: () => void = () => undefined;
+    const source = createFakeDataSource({
+      getTicket: async () => read,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: () =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve({ projectId: 'prj_f', rows: [child({ ticketId: 'tkt-s1', title: 'Order the brochures' })] });
+        }),
+    });
+    renderSheet(read, source);
+    await settled();
+
+    // The ticket read has landed (the sheet is painted) and the child read has
+    // not. NEITHER arm may be drawn: the alert would be a lie about a list
+    // nobody has read yet, and the empty arm would be the same lie quieter.
+    expect(screen.queryByTestId('sheet-subtasks-incomplete')).toBeNull();
+    expect(screen.queryByTestId('sheet-subtasks-empty')).toBeNull();
+
+    await act(async () => {
+      release();
+    });
+    expect(await screen.findByTestId('subtask-tkt-s1')).toBeInTheDocument();
   });
 
   it('16.16 says what a subtask IS when there are none', async () => {
@@ -3012,6 +3358,165 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
+   * E4-1 / E5-3 — THE SAME ANCESTOR IS NAMED ONCE WHEN IT IS BOTH THE EPIC AND
+   * THE PARENT.
+   *
+   * The server's ancestry walk starts at `state.parentId` and returns the first
+   * ancestor whose type is an epic, so when the ticket's DIRECT PARENT is an
+   * epic, `epic.id === parent.id` (`apps/server/src/routes/tickets.ts`). The bar
+   * rendered both under two independent null checks and nothing compared their
+   * ids, so the painted crumbs read:
+   *
+   *     Convenience Corner › Shop operations › Open questions › Open questions › CCSO-6
+   *
+   * — one ancestor, named twice, a depth the hierarchy does not have. **The
+   * blast radius is the ordinary case, not an edge: 23 of the 26 tickets in the
+   * seeded project have an epic as their direct parent** (the reviewer's own
+   * count, and they painted one and said so). The prototype never shows this
+   * shape, so it gives no authority for it.
+   *
+   * ⚠ NO EXISTING FIXTURE COULD SEE THIS: `ticketRead()`'s default carries a
+   * parent and no epic, and every case that sets an `epic` sets a DISTINCT id
+   * (`EPIC`), so the equal-id shape was never rendered by any case in this file.
+   * This fixture is the first, and it is the shape the seed produces 23 times.
+   */
+  /**
+   * E5-3 — THE SAME SHAPE WITH BOTH REFS `restricted`.
+   *
+   * The case above covers the visible pair. This is the arm the id comparison
+   * has to reach WITHOUT a title to compare: the server's walk answers
+   * `{kind:'restricted', id}` both for the parent branch and for the epic hop
+   * when the ticket is one the viewer may not see (or one the ledger records as
+   * deleted), so a viewer can be sent two restricted refs to ONE ticket. **An
+   * implementation that compared TITLES, or that special-cased `kind`, would
+   * pass the visible case and draw `Restricted parent` twice here** — which is
+   * the same defect, on the screen of the person least able to notice it is the
+   * same ticket, because a restricted crumb carries no title to compare by eye.
+   *
+   * `16.65` owns the property that a restricted ancestor is NAMED rather than
+   * dropped; this case is its one-hop companion, and it asserts BOTH halves:
+   * named once, and the surviving crumb is the parent's.
+   */
+  /**
+   * P3 — THE PARENT CRUMB READS THE PARENT'S KEY; THE EPIC CRUMB NEVER DOES.
+   *
+   * The prototype labels its parent crumb `p.id + " " + p.title`
+   * (`Gisik Nokma - Desktop.dc.html:3417`) and its epic crumb `e.title` alone
+   * (`:3410-3413`). The product matched the epic and not the parent, because the
+   * wire carried no key for an ancestor. **The cost was not cosmetic: the key is
+   * what disambiguates**, so a ticket whose epic and parent share a title drew
+   * two identical crumbs.
+   *
+   * ⚠ THREE ARMS, because `ParentRef.key` has three states and the render treats
+   * exactly one of them differently — see that type's docblock. A case that only
+   * asserted the happy path would leave `null` and `undefined` indistinguishable
+   * from a bug that drops the key.
+   */
+  it('17.027 / P3: a parent crumb shows the parent’s KEY, and the epic crumb stays title-only', async () => {
+    const read = ticketRead({
+      parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: 'CCSO-9' },
+      epic: { kind: 'ticket', id: EPIC, title: 'Open Questions', key: 'CCSO-7' },
+    });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      // The epic carries a key on this fixture and does NOT render it — the
+      // prototype's `e.title`, and the reason a key on the epic ref is
+      // meaningless rather than merely unused.
+      'Open Questions',
+      'CCSO-9 Registrations',
+      'CCSO-1183',
+    ]);
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('CCSO-9 Registrations');
+    expect(screen.getByTestId('sheet-crumb-epic').textContent).toBe('Open Questions');
+  });
+
+  it('17.027 / P3: a parent key that could NOT be composed falls back to the title alone — never a half label', async () => {
+    // `null` is the ticket-number ruling's own absence: the number is derived
+    // from the ledger's order, so a snapshot-bounded read composes no key, and a
+    // key is not worth refusing the read over.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: null } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
+    // And the separator-space trap: a naive `${key} ${title}` with a null key
+    // prints " Registrations" — a leading space nobody sees in a browser and
+    // every assertion above would still pass.
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).not.toMatch(/^\s/);
+  });
+
+  it('17.027 / P3: a parent ref that carries NO key field at all renders the title alone', async () => {
+    // The third state: absent. A producer that does not carry a key for this ref
+    // (the grandparent's ref is the one the product has) must read exactly like
+    // `null` on screen, and neither may read as an empty crumb.
+    const read = ticketRead({ parent: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+    expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
+  });
+
+  it('17.026 / E5-3: two restricted refs to the SAME ticket draw one crumb, not two', async () => {
+    const read = ticketRead({
+      parent: { kind: 'restricted', id: PARENT },
+      epic: { kind: 'restricted', id: PARENT },
+    });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    // NAMED, not dropped — the vanish `invariant 5` forbids.
+    expect(crumbTexts()).toContain('Restricted parent');
+    // …and named ONCE. `filter` on the text rather than a set size, because the
+    // crumb text is a constant here and a set would collapse the duplicate the
+    // case exists to find.
+    expect(crumbTexts().filter((text) => text === 'Restricted parent')).toHaveLength(1);
+    expect(screen.queryByTestId('sheet-crumb-epic')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
+  });
+
+  it('17.024 / E4-1: when the direct parent IS the epic, the ancestor is named ONCE', async () => {
+    // The one-hop shape: the epic IS the parent, same id, and the title the
+    // server sends for both is the same row's title.
+    const read = ticketRead({ epic: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
+    renderSheet(read, sheetSource(read), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    // THE PROPERTY, asserted apart from the list: the ancestor appears once.
+    // Reverting the comparison makes this read `2` while the list assertion
+    // above it still looks plausible on a casual read.
+    expect(crumbTexts().filter((text) => text === 'Registrations')).toHaveLength(1);
+    // The surviving crumb is the PARENT's — the nearer one, and the one a
+    // reader of this sheet looks for — so the epic crumb is the one dropped.
+    expect(screen.queryByTestId('sheet-crumb-epic')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
+    // And the bar is then IDENTICAL to the no-epic bar, which is the point: a
+    // one-hop ticket has one ancestor and the path states one.
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      'Registrations',
+      'CCSO-1183',
+    ]);
+  });
+
+  /**
    * 16.63 — the GRANDPARENT crumb, which is the whole of what the owner's
    * *"grandparent"* asked for and which the old three-crumb bar had nowhere to
    * put.
@@ -3377,5 +3882,225 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     // And the reason is not dressed as a wait — the failure arm this sheet
     // already draws for the ticket read and the ledger tab is the model.
     expect(notice.textContent).not.toContain('Loading');
+  });
+});
+
+/**
+ * 3.190 (E5-9) — A REFUSAL ANSWERS WHERE THE CONTROL IS.
+ *
+ * `Delete` sits in the sheet's footer, at the very END of a body that scrolls:
+ * the lane that filed this measured `.gn-ticket-sheet__body` at `clientHeight
+ * 756` against `scrollHeight 4036`, with the footer's top **3,942.8 px** below
+ * the tab bar — roughly five viewports. Delete's refusal rode the shared
+ * `gn-refusal--server` slot at the HEAD of that body, so a person who scrolled
+ * to the bottom, pressed Delete, and was refused got the answer where they
+ * could not see it. The recorded ruling (`deleteTicket`'s own docblock) chose
+ * "the engine's own refusal … rather than a button that silently is not there";
+ * that ruling is about WHETHER Delete is offered, not about where its answer
+ * lands, so this case does not disturb it.
+ */
+describe('E5-9 a refused Delete answers beside the button that was pressed', () => {
+  it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'permission.role',
+          reason: 'Only an admin may delete this ticket.',
+        })),
+    );
+    renderSheet(read, source);
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Delete' }));
+
+    const refusal = await screen.findByText(/Refused by the server/);
+    // One sentence, never two: the footer answer REPLACES the shared slot's,
+    // rather than being a second copy of the same fact on one screen.
+    expect(screen.getAllByText(/Refused by the server/)).toHaveLength(1);
+    // …and it is in the surface the person is looking at. `.closest('footer')`
+    // is the structural claim; the pixel claim is the lane's measurement above,
+    // which a jsdom sheet cannot make (it lays nothing out).
+    expect(refusal.closest('footer')).not.toBeNull();
+  });
+});
+
+/**
+ * 3.189 (E5-20) — ONE ESCAPE, TWO `role="dialog"` ELEMENTS, AND ONLY ONE OF
+ * THEM SHOULD CLOSE.
+ *
+ * `Move…` mounts `TransitionDialog` → `Dialog` INSIDE the sheet's own subtree,
+ * so the DOM holds two modal dialogs at once. `Dialog` installs a
+ * document-level `keydown` that closes on Escape and (until this change) never
+ * called `preventDefault()`; `Sheet` installs one that closes the sheet on
+ * Escape unless `event.defaultPrevented` — and its own docblock states the
+ * contract: *"A child that handles Escape must call `preventDefault()` for this
+ * guard to see it."* The guard was added for the title field and never reached
+ * the `Dialog` in the same package, which is the child every Move, Reopen and
+ * Bulk-close goes through.
+ *
+ * ⚠ **The harness has a vacuity the sibling case's docblock already names, and
+ * this one closes it by asserting the SPY.** `renderSheet`'s default `onClose`
+ * is a fresh `vi.fn()` that never unmounts anything, so "the sheet is still on
+ * screen" is true whatever happens — including on the defect. `open` is not a
+ * prop of this sheet at all; the caller owns it. So the assertion is that the
+ * sheet's `onClose` was NOT CALLED, and that is what a duplicate close would
+ * have done to the real app.
+ */
+describe('E5-20 Escape in the Move dialog does not close the sheet under it', () => {
+  it('PLANTED DEFECT: one Escape closes the Move dialog and leaves the sheet open', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const read = ticketRead();
+    renderSheet(read, sheetSource(read), { onClose });
+    await settled();
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Waiting on counterparty' }),
+    );
+
+    // The stack the finding measured: two modal dialogs, the Move one on top.
+    expect(screen.getAllByRole('dialog')).toHaveLength(2);
+    expect(screen.getByRole('dialog', { name: 'Move ticket' })).toBeInTheDocument();
+
+    await user.keyboard('{Escape}');
+
+    // The Move dialog took the Escape — that is the gesture the person made…
+    expect(screen.queryByRole('dialog', { name: 'Move ticket' })).toBeNull();
+    // …and the sheet underneath did NOT also take it. `onClose`, not the
+    // absence of the sheet, is the measurement: see this block's docblock.
+    expect(onClose).not.toHaveBeenCalled();
+  });
+});
+
+describe('13.1112 the ticket read ANSWERS null (E4-23)', () => {
+  /**
+   * 13.1112 — E4-23. `useLiveQuery` reported `data` and `error` and nothing else, so
+   * "the read answered `null`" and "the read has not answered yet" were the SAME
+   * render: `data === null`. The sheet gated its whole body on `read.data === null`
+   * and drew `Loading…`.
+   *
+   * `null` is not a gap here — it is the transport's deliberate 404 affordance.
+   * Every `/v1` read door answers ONE frozen 404 body for "no such thing" and for
+   * "not yours" (`apps/server/src/routes/tickets.ts`, `READ_NOT_FOUND_BODY`), so a
+   * mistyped id, a soft-deleted ticket and a ticket this viewer may not see all
+   * arrive as `null`. The sheet therefore said "Loading…" for ever, on a screen the
+   * server had already answered.
+   *
+   * Asserted on the pair, because the two live in one branch: the absent sentence
+   * renders AND `Loading…` does not. A case asserting only the sentence passes on a
+   * sheet that draws both.
+   */
+  it('13.1112 a ticket the server answers 404 for says it is not here, not “Loading…”', async () => {
+    const source = createFakeDataSource({
+      getTicket: async () => null,
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: async (projectId: string) => ({ projectId, rows: [] }),
+      getTicketTypes: async () => [],
+    });
+    render(
+      <TicketSheet
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        currentUserId="user_kiro"
+        onClose={vi.fn()}
+      />,
+    );
+
+    const absent = await screen.findByTestId('sheet-ticket-absent');
+    // The sentence names BOTH readings, because the one-body refusal is the whole
+    // reason the server will not say which.
+    expect(absent.textContent ?? '').toMatch(/deleted/i);
+    expect(absent.textContent ?? '').toMatch(/may not be able to see it/i);
+    expect(screen.queryByText('Loading…')).toBeNull();
+  });
+
+  /**
+   * 13.1113 — the control for the case above, which must not be satisfiable by a
+   * sheet that never draws `Loading…` at all. A read that has genuinely not answered
+   * yet still says so; if this reddens, the "not here" arm has swallowed the wait.
+   */
+  it('13.1113 a read still in flight still says “Loading…”, and the absent sentence is not drawn', async () => {
+    const source = createFakeDataSource({
+      getTicket: () => new Promise(() => {}),
+      getWorkflowDef: async () => WF_ERRAND,
+      getMembers: async () => [],
+      getTicketHistory: async () => [],
+      getTickets: async (projectId: string) => ({ projectId, rows: [] }),
+      getTicketTypes: async () => [],
+    });
+    render(
+      <TicketSheet
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        currentUserId="user_kiro"
+        onClose={vi.fn()}
+      />,
+    );
+
+    expect(await screen.findByText('Loading…')).toBeInTheDocument();
+    expect(screen.queryByTestId('sheet-ticket-absent')).toBeNull();
+  });
+});
+
+describe('17.072 a committed move does not carry its comment to the next one (E2-32)', () => {
+  /**
+   * 17.072 — E2-32. `comment` and `fieldValues` are cleared by neither reset
+   * effect: the destination-change effect clears `evidenceAttachmentId`/
+   * `uploadError`, and the `!open` effect does the same on close. The docblock
+   * beside the latter defends keeping the comment — *"typing into a dialog and
+   * losing it to a stray Cancel is a real cost"* — and that argument is about
+   * CANCEL, while the effect serves Cancel and Commit alike. The dialog is mounted
+   * for the sheet's whole life (`open={moveOpen}`), so after a committed move —
+   * which only calls `setMoveOpen(false)` — the comment is still in state, and
+   * `submit` puts it on the wire for the NEXT move: **a comment written about move
+   * A is recorded as the comment for move B.**
+   *
+   * Asserted on the state the person can SEE: after one committed move, reopening
+   * the dialog and choosing the same destination must find an EMPTY box. The
+   * first move's arm is the control — its comment reaches the wire — without
+   * which "empty on reopen" would be satisfiable by a box that never held
+   * anything.
+   */
+  it('17.072 the comment box is empty on the next Move, and the first comment still reaches the wire', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+
+    // ARM ONE — pick Done, write the comment, commit.
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(
+      screen.getByLabelText('Comment (required by this transition)'),
+      'shipped on the morning van',
+    );
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    // THE CONTROL: the comment really reached the wire for the move it belonged to.
+    expect(source.ingested[0]![0]!.payload).toEqual({
+      to: 'done',
+      comment: { text: 'shipped on the morning van' },
+    });
+
+    // ARM TWO — reopen and pick the SAME destination again.
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+
+    expect(screen.getByLabelText('Comment (required by this transition)')).toHaveValue('');
   });
 });

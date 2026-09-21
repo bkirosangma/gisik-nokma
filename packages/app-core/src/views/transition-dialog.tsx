@@ -139,8 +139,24 @@ export type TransitionDialogProps = {
    * needing a `ticketId`: **a contract that cannot carry a fact its caller
    * holds.** Advisory still — it decides nothing — but it must be able to see
    * what the submission will actually carry.
+   *
+   * ⚠ **THE SAME OMISSION, ONE RULE KIND OVER — E2-40.** `fieldValues` was
+   * missing here too, and the consequence is the same sentence: the dialog
+   * renders an input for every field a `require-field` rule names, its OWN gate
+   * clears the moment the person types (`missingFields`), and the submission
+   * sends those claims first in the ordered batch — while the preview, asked
+   * with two arguments, kept answering *"the field is not set"*. `require-field`
+   * differs from `require-evidence` in WHERE its value is read
+   * (`rule-engine/src/rules/require-field.ts:9` reads the ticket state, not the
+   * payload), so the value travels as a state overlay rather than a payload key;
+   * see `precheckEvent`'s `pendingFields` for that reasoning.
    */
-  precheck: (toStateId: string, evidenceAttachmentId?: string | null) => Promise<PrecheckResult>;
+  precheck: (
+    toStateId: string,
+    evidenceAttachmentId?: string | null,
+    fieldValues?: Record<string, string>,
+    comment?: string,
+  ) => Promise<PrecheckResult>;
   /** The authority's answer, shown VERBATIM whenever present. */
   serverRefusal: { rule: string; reason: string } | null;
   /**
@@ -168,6 +184,28 @@ export type TransitionDialogProps = {
    * alongside the words "Refused by the server".
    */
   transportError: string | null;
+  /**
+   * E5-27 — is a submission IN FLIGHT? While true the Move button is disabled.
+   *
+   * `blocked` (`:360-364` below) is the FORM's validity and nothing else: it
+   * says whether what is on screen could be submitted, never whether something
+   * already was. Without this prop the dialog had no way to express the second
+   * fact, so a dropped connection left Move enabled and the person's natural
+   * response — press again — was indistinguishable from the first press for a
+   * request that had in fact gone through.
+   *
+   * OPTIONAL, and its absence means "no latch is worn on this mount" rather
+   * than "not submitting": `board.tsx`'s card dialog passes nothing, because
+   * the board holds its latch on the arrows (`MoveArrows.submitting`) and its
+   * dialog path is a different finding. A default of `false` would have made
+   * that call site assert something untrue about itself.
+   *
+   * The caller owns the flag, and it must clear it in a `finally` — this
+   * dialog cannot tell a resolved submission from a rejected one, and a latch
+   * cleared only on the happy path disables Move for ever the first time the
+   * network drops.
+   */
+  submitting?: boolean;
   uploadEvidence?: (file: File) => Promise<{ attachmentId: string }>;
   /**
    * The dialog only ever OFFERS what the gesture meant (owner request,
@@ -215,6 +253,8 @@ export function TransitionDialog({
   precheck,
   serverRefusal,
   transportError,
+  submitting,
+
   uploadEvidence,
   offerStateIds,
   initialToStateId,
@@ -282,7 +322,7 @@ export function TransitionDialog({
     setPreview(null);
     if (toStateId === '') return;
     let cancelled = false;
-    void precheckRef.current(toStateId, evidenceAttachmentId).then((result) => {
+    void precheckRef.current(toStateId, evidenceAttachmentId, fieldValues, comment).then((result) => {
       if (!cancelled) setPreview(result);
     });
     return () => {
@@ -291,7 +331,20 @@ export function TransitionDialog({
     // `evidenceAttachmentId` is a dependency because it CHANGES THE ANSWER:
     // `require-evidence` is evaluated against the candidate, and attaching a
     // file between two runs of the same destination must re-ask.
-  }, [toStateId, evidenceAttachmentId]);
+    //
+    // `fieldValues` is here for the same reason one rule kind over:
+    // `require-field` is read from the ticket STATE the engine is handed, and
+    // this dialog's inputs are where that value lives before the submission
+    // carries it — so typing into a field the dialog itself asked for has to
+    // re-ask, or the refusal the person just answered stays on screen beside an
+    // enabled Move for ever.
+    //
+    // `comment` joins them for the third rule kind, and for the reason the
+    // evidence fix already recorded: the box appears because `require-comment`
+    // is on this edge, typing clears `blocked`, and the preview beside it was
+    // still answering "none was provided" because the candidate had never been
+    // told what the box holds.
+  }, [toStateId, evidenceAttachmentId, fieldValues, comment]);
 
   /**
    * ⚠ **EVIDENCE IS PER-MOVE, AND THE CLAIM IS NOW REACHABLE FOR THE FIRST TIME.**
@@ -344,10 +397,21 @@ export function TransitionDialog({
    * see, silently satisfying a rule.
    *
    * Cleared on CLOSE rather than on open, so the abandoned attempt is discarded
-   * at the moment it is abandoned. **The comment and the field values still
-   * persist across a reopen — pre-existing behaviour, left alone deliberately:**
-   * typing into a dialog and losing it to a stray Cancel is a real cost, and
-   * unlike an attachment id it is visible in the reopened dialog.
+   * at the moment it is abandoned. **The comment and the field values persist
+   * across a reopen, and that is deliberate:** typing into a dialog and losing it
+   * to a stray Cancel is a real cost, and unlike an attachment id it is visible in
+   * the reopened dialog.
+   *
+   * ⚠ **AND THAT SENTENCE NAMED ONLY CANCEL, WHILE THIS EFFECT SERVES COMMIT
+   * TOO — WHICH WAS THE DEFECT (E2-32, 2026-09-21).** A committed move closes the
+   * dialog the same way, so the finished move's comment survived into the NEXT
+   * one and `submit` put it on the wire: a comment written about move A recorded
+   * as move B's. **The fix is NOT here**, and deliberately so — this effect
+   * cannot tell the two closes apart, and giving it a flag would be this
+   * component guessing at a fact only the caller has. `TicketSheet` remounts the
+   * dialog per committed move instead (its `key`), which discards the whole
+   * finished attempt and nothing else. **What this effect still owns is the
+   * Cancel half, unchanged.**
    */
   useEffect(() => {
     if (!open) {
@@ -512,7 +576,7 @@ export function TransitionDialog({
 
       <div className="gn-transition__actions">
         <Button onClick={onClose}>Cancel</Button>
-        <Button variant="primary" disabled={blocked} onClick={submit}>
+        <Button variant="primary" disabled={blocked || submitting === true} onClick={submit}>
           Move
         </Button>
       </div>

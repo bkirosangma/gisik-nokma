@@ -12,6 +12,26 @@ const LABELS: Record<NotificationKind, string> = {
 export type NotificationsSectionProps = {
   mutedKinds: readonly NotificationKind[];
   onToggle: (kind: NotificationKind) => void;
+  /**
+   * Set when the caller's own read of the stored preferences failed. Every
+   * row renders disabled and the section states the refusal rather than
+   * letting a person "toggle" a guess — see `account/page.tsx`'s `prefsError`
+   * (ruling E5-13): a failed read used to fall back to an all-on guess that a
+   * toggle would then PUT as the whole document, silently un-muting whatever
+   * was actually stored.
+   */
+  error?: string | null;
+  /**
+   * Set when the last SAVE (not read) was refused — distinct from `error`.
+   * Ruling E2-24(a): a refused save reverted the optimistic flip with no
+   * rendered outcome at all; the only trace was the switch silently
+   * snapping back. Rendered as its own refusal WITHOUT disabling the rows
+   * (unlike `error`): the data is still current once the revert settles,
+   * only the last attempted change did not stick. Mutually exclusive with
+   * `error` in practice — `toggleKind` cannot run while `prefs` is unset,
+   * so a read failure and a save refusal are never both live at once.
+   */
+  saveError?: string | null;
 };
 
 /**
@@ -37,10 +57,24 @@ export type NotificationsSectionProps = {
  * `AppearanceSection`'s controls hand their caller a value rather than
  * reaching for a setter themselves.
  */
-export function NotificationsSection({ mutedKinds, onToggle }: NotificationsSectionProps) {
+export function NotificationsSection({
+  mutedKinds,
+  onToggle,
+  error = null,
+  saveError = null,
+}: NotificationsSectionProps) {
   return (
     <section className="gn-account__section gn-account__notifications">
       <h2 className="gn-account__section-title">Notifications</h2>
+      {error !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {error}
+        </p>
+      ) : saveError !== null ? (
+        <p role="alert" className="gn-refusal gn-refusal--server">
+          {saveError}
+        </p>
+      ) : null}
       {NOTIFICATION_KINDS.map((kind) => (
         /* The switch is `@gisik-nokma/ui`'s, extracted 2026-09-18 when the
            Settings → Workspace tab needed the same control — see that
@@ -52,6 +86,7 @@ export function NotificationsSection({ mutedKinds, onToggle }: NotificationsSect
           key={kind}
           className="gn-account__notification-row"
           checked={!mutedKinds.includes(kind)}
+          disabled={error !== null}
           onChange={() => onToggle(kind)}
         >
           {LABELS[kind]}

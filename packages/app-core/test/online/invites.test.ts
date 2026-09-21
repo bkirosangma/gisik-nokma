@@ -46,11 +46,56 @@ describe('3.89 createHttpInviteGateway — reading what a link opens', () => {
       workspaceId: 'ws_1',
       workspaceName: 'Convenience Corner',
       role: 'guest',
+      // The shape widened for E5-18 (2026-09-21); THIS body sends no expiry,
+      // so it is carried as null — 17.066 is the case that measures one present.
+      expiresAt: null,
     });
     // The transport turns the door's 404 into `null`; the fake stands in for
     // that by answering `null` for an unknown path, which is the same value.
     expect(await gateway.getInvite('tok_dead')).toBeNull();
     expect(http.calls).toEqual(['GET /v1/invites/tok_1', 'GET /v1/invites/tok_dead']);
+  });
+
+  /**
+   * 17.066 — E5-18. The door has served a FOURTH field since 2026-09-19 —
+   * `expiresAt`, the presented token's own window
+   * (`apps/server/src/routes/invites.ts:417`, the `isInvite` expiry ruling) — and
+   * this mapper read three fields and dropped it. So the invitee-facing page could
+   * not say when the link lapses, while `/workspaces` renders the same fact for a
+   * waiting invitation (`Invited … · lapses …`). The fact was on the wire and
+   * thrown away between the door and the screen.
+   */
+  it('17.066 carries the token’s own expiry, which the door has served since 2026-09-19', async () => {
+    const http = fakeHttp({
+      '/v1/invites/tok_1': {
+        workspaceId: 'ws_1',
+        workspaceName: 'Convenience Corner',
+        role: 'guest',
+        expiresAt: '2026-09-30T04:30:00.000Z',
+      },
+    });
+    const gateway = createHttpInviteGateway(http);
+    expect(await gateway.getInvite('tok_1')).toEqual({
+      workspaceId: 'ws_1',
+      workspaceName: 'Convenience Corner',
+      role: 'guest',
+      expiresAt: '2026-09-30T04:30:00.000Z',
+    });
+  });
+
+  /**
+   * 17.066's control — a body that carries NO expiry answers `null` for it rather
+   * than inventing a day, and the rest of the summary still arrives. Without this
+   * the widening could be satisfied by a mapper that defaulted the field, which
+   * would put an expiry on screen that no door sent.
+   */
+  it('17.066 control: a body with no expiry answers null for it, not an invented day', async () => {
+    const http = fakeHttp({
+      '/v1/invites/tok_1': { workspaceId: 'ws_1', workspaceName: 'CC', role: 'guest' },
+    });
+    const summary = await createHttpInviteGateway(http).getInvite('tok_1');
+    expect(summary).not.toBeNull();
+    expect(summary?.expiresAt).toBeNull();
   });
 
   it('3.90 PLANTED DEFECT: an unrecognised role is a dead link, not a cast', async () => {
@@ -73,6 +118,7 @@ describe('3.89 createHttpInviteGateway — reading what a link opens', () => {
       workspaceId: 'ws_1',
       workspaceName: 'CC',
       role: 'admin',
+      expiresAt: null,
     });
   });
 
@@ -182,6 +228,7 @@ describe('3.94 the gateway over the REAL transport, not a stub of it', () => {
       workspaceId: 'ws_1',
       workspaceName: 'CC',
       role: 'member',
+      expiresAt: null,
     });
     await expect(gateway.acceptInvite('tok_1')).rejects.toMatchObject({ serverMessage: 'gone' });
     expect(seen.map((call) => call.input)).toEqual([

@@ -18,6 +18,7 @@ import {
   EPIC_RANK,
   TicketSheet,
   TimelineView,
+  actorLabel,
   isBuiltinEpicType,
   makeSubmittedFactory,
   matchesBoardCard,
@@ -134,24 +135,45 @@ export default function ProjectPage() {
 const BUILTIN_TYPE_LADDER = BUILTIN_TICKET_TYPE_SEEDS.map((seed) => ({
   id: seed.id,
   name: seed.name,
+  // The RANK travels with the ladder (E5-16): `NewTicketDialog` chooses which
+  // type a root ticket starts on, and a ladder without ranks left it naming
+  // `typeOptions[0]` — the top of the hierarchy. Derived from the domain's own
+  // seed list, like the two fields above it, so it cannot drift from the
+  // hierarchy the engine enforces.
+  rank: seed.rank,
 }));
 
 export const BUILTIN_LADDER_NOTICE =
   'Showing the four built-in ticket types while this workspace’s own types load.';
 
 /**
- * THE BACKLOG'S TWO EMPTY SENTENCES (owner ruling, 2026-09-20), hoisted out of the JSX
- * so the page spec can assert the same strings the tab renders rather than re-typing
- * them — the discipline `EMPTY_BOARD_COPY`'s own docblock gives, and the reason
+ * THE BACKLOG'S THREE EMPTY SENTENCES (owner ruling, 2026-09-20; the third added
+ * for E5-40, 2026-09-21), hoisted out of the JSX so the page spec can assert the
+ * same strings the tab renders rather than re-typing them — the discipline
+ * `EMPTY_BOARD_COPY`'s own docblock gives, and the reason
  * `packages/app-core/src/index.ts` re-exports the board's pair.
  *
  * `BACKLOG_EMPTY_COPY` is the original and is UNCHANGED: it is true of a backlog with
  * nothing in it, and nothing about the epic ruling made it false there.
- * `BACKLOG_EMPTY_EPICS_COPY` is the new one and is reached ONLY when every row the
+ * `BACKLOG_EMPTY_EPICS_COPY` is the second and is reached ONLY when every row the
  * tab would have drawn was an epic — see `backlogNarrowing`'s `epicsOnly`.
+ *
+ * `BACKLOG_EMPTY_ACTIVE_ONLY_COPY` is the third, and it exists because the first
+ * was being said in a state it is not true of. "Only tickets in progress" writes
+ * `stateCategories: ['active']` into the SERVER read (`listFilter`, above
+ * `useTicketList`), and a backlog ticket's category is `open` — so the toggle
+ * strips every backlog row before any screen-level fold can see it, `shown` and
+ * `total` both read 0, and nothing inside `backlogNarrowing` can tell a backlog
+ * emptied BY THE TOGGLE from one that is genuinely empty. The toggle's state is
+ * known only at the render site, so the choice is made there — and the sentence
+ * chosen is true of BOTH: it says the backlog is hidden, which the toggle does
+ * whether or not anything was behind it. `TicketList` may draw a backlog that is
+ * empty for a reason, and this is that reason named.
  */
 export const BACKLOG_EMPTY_COPY = 'Nothing in the backlog — new tickets land here.';
 export const BACKLOG_EMPTY_EPICS_COPY = 'Nothing in the backlog — epics appear in the List.';
+export const BACKLOG_EMPTY_ACTIVE_ONLY_COPY =
+  'The backlog is hidden while “Only tickets in progress” is on.';
 
 /**
  * The view rail's five choices, in the rail's own order.
@@ -963,16 +985,21 @@ function ProjectBoard() {
    * anything else keeps the original sentence, and case 13.1044 asserts both
    * arms** — one sentence for both would be false of one of them.
    *
-   * RECORDED, NOT FIXED: "Only tickets in progress" sets `stateCategories:
-   * ['active']` SERVER-SIDE (`listFilter`, above `useTicketList`) — a
-   * backlog ticket's category is `open`, so that toggle strips every backlog
-   * row out of `list.rows` before this memo ever sees them. With the toggle
-   * on, the Backlog tab reads "Nothing in the backlog — new tickets land
-   * here." over a project that may hold plenty; both `shown` and `total`
-   * read 0, so nothing here can tell the two apart from inside this memo,
-   * and nothing on the Backlog tab today says the toggle is why. Owner:
-   * whoever next revisits the toggle's own scope (its docblock already notes
-   * it predates this tab).
+   * ✅ **AND THE TOGGLE'S ARM IS CLOSED TOO (E5-40, 2026-09-21).** This memo
+   * used to carry a `RECORDED, NOT FIXED` for "Only tickets in progress": it
+   * sets `stateCategories: ['active']` SERVER-SIDE (`listFilter`, above
+   * `useTicketList`), and a backlog ticket's category is `open`, so the toggle
+   * strips every backlog row out of `list.rows` before this memo ever sees
+   * them — both `shown` and `total` read 0, so nothing HERE can tell a backlog
+   * emptied by the toggle from one that is genuinely empty. **The fix is not in
+   * this memo, and deliberately so:** the toggle's own state is known at the
+   * RENDER SITE, which picks `BACKLOG_EMPTY_ACTIVE_ONLY_COPY` on `activeOnly`
+   * instead of inferring the cause from a set that cannot carry it. The
+   * sentence it picks — *"The backlog is hidden while 'Only tickets in
+   * progress' is on."* — is true whether or not anything sat behind the
+   * toggle, which is what makes it the right one for a state this fold cannot
+   * resolve. The scope note beside the switch names the Backlog now too; it
+   * had named three tabs of five.
    */
   const backlogNarrowing = useMemo(() => {
     if (list.rows === null || listNarrowing === null) return null;
@@ -1509,7 +1536,7 @@ function ProjectBoard() {
   const typeOptions =
     ticketTypes.data === null
       ? BUILTIN_TYPE_LADDER
-      : ticketTypes.data.map((type) => ({ id: type.id, name: type.name }));
+      : ticketTypes.data.map((type) => ({ id: type.id, name: type.name, rank: type.rank }));
 
   /**
    * The board's own column names, id → name, for the `stateIds` chip below.
@@ -1774,14 +1801,24 @@ function ProjectBoard() {
      * Keyed on `rows === null`, NOT on `error !== null` — those are different facts
      * and only the first one is about parents.
      *
-     * `parentCandidates` above is built from `list.rows`. `list.error` is
+     * `parentCandidates` above is built from `list.rows`. `list.error` USED to be
      * `list.error ?? preferences.error` (`ticket-list.ts`'s `useTicketList`), so an
      * ordinary preferences 500 — or a `setPrefs` PUT the user triggered themselves —
-     * sets it while the rows sit there intact. Keyed on the error alone, this told a
+     * set it while the rows sat there intact. Keyed on the error alone, this told a
      * user that the tickets which could be a parent *"cannot be shown"*, and offered a
      * PREFERENCES failure as the reason, while the very same page could have listed
      * them. Two false sentences at once, and the state a stale parent could be
      * submitted from. Witnessed at 3.158.
+     *
+     * **⚠ AND THAT FOLD WAS THE ROOT OF E5-42 (fixed 2026-09-21), which this comment
+     * was the only place to record at the time.** This arm dodged the fold by keying
+     * on `rows === null` as well — but the four TAB arms below key on the field alone,
+     * so the same preferences failure painted *"The ticket list cannot be shown yet.
+     * HTTP … for /v1/me/preferences"* over intact rows on four of the five tabs. The
+     * fold is gone: `useTicketList` now returns `error: list.error` and a separate
+     * `prefsError` for the preferences half, which renders beside the column chooser.
+     * This arm's keying is unchanged and still right — it is simply no longer the only
+     * place in this file that knows the difference.
      *
      * Keyed on the rows it says only what it can see: either there are candidates or
      * there are not. The dialog refuses the stale parent independently
@@ -2053,8 +2090,9 @@ function ProjectBoard() {
               */}
               {activeOnly ? (
                 <span className="gn-project__scope-note" data-testid="list-filter-note">
-                  the list, calendar and timeline are asking only for tickets in progress —
-                  not started and done are both excluded. The board is not narrowed.
+                  the list, calendar, timeline and backlog are asking only for tickets in
+                  progress — not started and done are both excluded, and the backlog is
+                  emptied. The board is not narrowed.
                 </span>
               ) : null}
             </div>
@@ -2592,20 +2630,33 @@ function ProjectBoard() {
                     prefs={list.prefs}
                     onPrefsChange={list.setPrefs}
                     prefsEditable={list.canSetPrefs}
+                    prefsError={list.prefsError}
                     labels={labels}
                     onOpenTicket={openTicket}
                     emptyCopy={
                       /*
-                        THE SAME TWO CASES AS THE BOARD, one tab over (owner ruling,
-                        2026-09-20). `TicketList` is handed only the surviving rows, so
-                        it cannot tell a backlog that holds nothing from one whose only
-                        tickets are epics — the fold above answers it where both sets
-                        exist. A backlog emptied by anything else keeps the original
-                        sentence, which was written to be true of that.
+                        THREE CASES NOW, and the FIRST one is the toggle (E5-40,
+                        2026-09-21). `activeOnly` writes `stateCategories: ['active']`
+                        into the server read, so with it on the backlog is empty for a
+                        reason no fold in this file can see: `backlogNarrowing` is
+                        computed from the ALREADY-narrowed `list.rows`, where both
+                        `shown` and `total` read 0 and `epicsOnly` is false. The
+                        original sentence was therefore rendered over a backlog that
+                        may hold plenty. The toggle's own state is known HERE, so the
+                        choice is made here, and the sentence it picks is true whether
+                        or not anything sat behind the toggle.
+
+                        Below it, the same two cases as the Board, one tab over (owner
+                        ruling, 2026-09-20): `TicketList` is handed only the surviving
+                        rows, so it cannot tell a backlog that holds nothing from one
+                        whose only tickets are epics — the fold above answers that one
+                        where both sets exist.
                       */
-                      backlogNarrowing.epicsOnly
-                        ? BACKLOG_EMPTY_EPICS_COPY
-                        : BACKLOG_EMPTY_COPY
+                      activeOnly
+                        ? BACKLOG_EMPTY_ACTIVE_ONLY_COPY
+                        : backlogNarrowing.epicsOnly
+                          ? BACKLOG_EMPTY_EPICS_COPY
+                          : BACKLOG_EMPTY_COPY
                     }
                     /*
                       THE START CAPABILITY, gated on `session.kind ===
@@ -2736,6 +2787,7 @@ function ProjectBoard() {
                 // user's arrangements. Passed through, the controls are DISABLED in
                 // that window instead of accepting a click that does nothing.
                 prefsEditable={list.canSetPrefs}
+                prefsError={list.prefsError}
                 labels={labels}
                 onOpenTicket={openTicket}
                 /*
@@ -3308,29 +3360,36 @@ function FiltersSheet({
         <p className="gn-filters__pending">No members to choose from.</p>
       ) : (
         <div className="gn-filters__person-list">
-          {members.map((member) => (
-            <TriStateChoice
-              key={member.id}
-              className="gn-filters__choice--row"
-              label={member.name}
-              mode={choiceMode(filter, key, member.id)}
-              onCycle={() => setFilter((current) => withCycledId(current, key, member.id))}
-            >
-              {/*
-                `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
-                its span (`components/avatar.tsx`), so left unhidden it
-                doubles this checkbox's accessible name to "Uma One Uma
-                One" — the label's accname concatenates every descendant's
-                text/label, and the plain `<span>` right after already
-                carries the real one. Decorative here, not a second source
-                of truth.
-              */}
-              <span aria-hidden="true">
-                <Avatar name={member.name} size="small" />
-              </span>
-              <span>{member.name}</span>
-            </TriStateChoice>
-          ))}
+          {members.map((member) => {
+            // RULING E5-4: `member.name` verbatim is blank for the
+            // magic-link population (`name: ''`), painting a row with no
+            // visible text and no accessible name — closed the same way
+            // E4-18 closed it on the ticket sheet's own pickers.
+            const label = actorLabel(member.id, member.name);
+            return (
+              <TriStateChoice
+                key={member.id}
+                className="gn-filters__choice--row"
+                label={label}
+                mode={choiceMode(filter, key, member.id)}
+                onCycle={() => setFilter((current) => withCycledId(current, key, member.id))}
+              >
+                {/*
+                  `aria-hidden`: `Avatar` sets its OWN `aria-label`/`title` on
+                  its span (`components/avatar.tsx`), so left unhidden it
+                  doubles this checkbox's accessible name to "Uma One Uma
+                  One" — the label's accname concatenates every descendant's
+                  text/label, and the plain `<span>` right after already
+                  carries the real one. Decorative here, not a second source
+                  of truth.
+                */}
+                <span aria-hidden="true">
+                  <Avatar name={label} size="small" />
+                </span>
+                <span>{label}</span>
+              </TriStateChoice>
+            );
+          })}
         </div>
       )}
     </fieldset>

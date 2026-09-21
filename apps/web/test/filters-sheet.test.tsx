@@ -211,6 +211,35 @@ describe('13.447 picking an assignee narrows the board and discloses it', () => 
     expect(screen.getByText('Carve the new workflow')).toBeInTheDocument();
     expect(screen.queryByText('Restock the cold shelf')).not.toBeInTheDocument();
   });
+
+  /**
+   * RULING E5-4 — two of the finding's "four sites" render `member.name`
+   * verbatim in this SAME person-row: the Assignee group here and the
+   * Collaborators group below it, both fed by `personSection`. A member
+   * with no display name (the magic-link population, `name: ''`) used to
+   * paint a row with no visible text and no accessible name — the
+   * `getByRole('button', { name: … })` query below is the same shape
+   * every other case in this file already uses to find a row, so this is
+   * the case that shows a nameless member was simply unfindable that way.
+   */
+  it('E5-4 a member with no display name renders and is findable by id, in both person groups', async () => {
+    render(
+      <Providers
+        services={servedBoard(twoCards, {
+          getMembers: async () => [...ROSTER, { id: 'u_nameless', name: '', role: 'guest' }],
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await screen.findByText('Restock the cold shelf');
+
+    const dialog = await openFilters();
+    const assignee = within(dialog).getByRole('group', { name: 'Assignee' });
+    expect(within(assignee).getByRole('button', { name: 'u_nameless' })).toBeInTheDocument();
+    const collaborators = within(dialog).getByRole('group', { name: 'Collaborators' });
+    expect(within(collaborators).getByRole('button', { name: 'u_nameless' })).toBeInTheDocument();
+  });
 });
 
 describe('13.448 picking a type chip narrows the board and discloses it', () => {

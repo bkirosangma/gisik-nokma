@@ -1202,6 +1202,26 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   sits inside this block's ✅ deliberately, not by oversight:** the behavioural half of this port is
   test-observed, the geometric half is screenshot-observed only, and flipping the block either way
   would misreport one of them. The mixed marker is the honest reading until a rendered sweep exists.
+  **RULING E2-23 (closed), added to this same pending block:** a failed passkey LIST read used to
+  collapse to `setPasskeys([])`, and `PasskeysSection` then asserted "You have no passkeys yet." over a
+  read that never confirmed that — the one silent-omission collapse on this page that fed a false
+  ASSERTION rather than an honestly-hedged one. `PasskeysSection` now takes a `listFailed` flag,
+  independent of the `error` prop above (an add/remove refusal): it renders "Your passkeys could not be
+  loaded." instead of the named empty state, but ONLY when there is nothing else to show — a caller
+  still holding a real, previously-read list keeps rendering it even if a later poll fails. Four cases:
+  the component states the refusal instead of the empty claim; a real list survives an unrelated later
+  `listFailed`; the page wires a rejected `listUserPasskeys()` through to the refusal; the negative
+  control (no alert, no refusal, when there is no failure) is the pre-existing case above, unchanged —
+  (`packages/app-core/test/account/passkeys-section.test.tsx`, `apps/web/test/account-page.test.tsx`).
+  **RULING E5-19 (closed), added to this same pending block:** "Save name" had no success arm at all —
+  a save, and (independently) a message-less refusal, both painted identically to a save that had simply
+  not been clicked yet, the button stopping "Saving…" with nothing else on screen. Two fixes: `saveName`
+  now tells "no error" apart from "an error object with no `message`" (`result.error?.message ?? null`
+  previously collapsed both to the same `null` a real success returns), falling back to a stated sentence
+  for the latter; and `ProfileSection` gained a `role="status"` "Name saved" on success, cleared the
+  moment the field is edited again so a stale confirmation cannot describe a value no longer on screen.
+  Three cases: the success message; the message-less-refusal fallback (asserted NOT to also render the
+  status role); and the edit-clears-the-confirmation arm — (`apps/web/test/account-page.test.tsx`).
   **Not yet ID-allocated**: this file's own header requires the next free block
   (after 13.399) to be requested from the controller before minting, and this task has no channel to
   request one — the same gap `apps/web/test/app-nav.test.tsx`'s own `pending-13.4xx` describe block
@@ -1732,7 +1752,14 @@ superseded by Round 24 — not renumbered, not reused.
   ratchets an accessible-name floor on that string which `e2e-stack/passkey-registration.spec.ts` also
   addresses the control by. — (`apps/web/test/app-nav.test.tsx`)
 - **13.419** ✅ The menu heads with the signed-in name and email, the identity the replaced control used
-  to carry. — (`apps/web/test/app-nav.test.tsx`)
+  to carry. **RULING E5-37 (closed), same case's own contract extended, no new id (§13's numeric space
+  is contested across concurrent batches tonight — controller allocation, 2026-09-21 21:0x — so this
+  ruling holds none there):** `useCurrentUser`'s `name: user.name ?? user.id` never caught an EMPTY
+  string, and better-auth's magic-link population creates every email sign-up with `name: ''`. Two new
+  arms on the SAME describe block: the trigger's accessible name and the menu header both fall back to
+  the EMAIL for a `name === ''` user, and both fall back further to the raw id when even the email is
+  empty — the same `name → email → id` order `members/page.tsx`'s `memberLabel` already uses. —
+  (`apps/web/test/app-nav.test.tsx`, `apps/web/src/providers.tsx`)
 - **13.420** ✅ Escape closes the menu AND returns focus to the trigger. The focus half is the
   load-bearing one: closing without it strands focus at the document root, so a keyboard user who opens
   the menu and changes their mind must tab from the top of the page. A case asserting only that the menu
@@ -2343,3 +2370,31 @@ described") reddens **13.983 alone** (`expected function to throw an error, but 
 - **The 500-character bound is asserted at the schema, not at the input.** The form carries no
   `maxLength` (deliberately, matching the name field), so an over-long description is refused by the
   domain on submission rather than prevented while typing. No case drives that path from the browser.
+
+## The inbox's single-row read and its Undo, which failed in silence — cases `13.1108`–`13.1109` (E5-10, 2026-09-21)
+
+**The defect, in the file's own words, twice.** `markRead(id)` flipped the row optimistically and then
+`void gateway.markRead(id).catch(() => loadFirstPage())` — a reload and NO sentence. `undoMarkAllRead()`
+had the same. The BULK path sixty lines up classifies its failure and renders it, and its docblock
+records why it does: *"The first version of this catch reloaded and said NOTHING: a reader over the bound
+saw a click do nothing and the list snap back, with no sentence anywhere."* **The single-row and undo
+paths were still that first version** — the defect the bulk arm's own note says it fixed, standing in the
+two arms beside it.
+
+The Undo's is the worse of the two: the reader has just been TOLD by the toast that those notifications
+are unread again, and a failed undo leaves the screen contradicting a sentence the page has already
+withdrawn.
+
+- **13.1108** ✅ A refused single-row mark-read SAYS SO, and a failure that never reached a server says
+  THAT instead — never a refusal. **The row splits by KIND where the bulk arm splits by STATUS**: the
+  bulk route's 400 is its bound, a number only a bulk request can exceed, while the single-row route's
+  only status is the 404 that both "not yours" and "does not exist" share — so an `HttpError` of any
+  status is the server adjudicating and anything else never reached one. —
+  (`apps/web/test/inbox-bulk.test.tsx`)
+- **13.1109** ✅ A refused Undo says so, beside the toast, rather than silently leaving the rows read.
+  Its own slot, not the bulk one: the two are said in different places, and this sentence has to outlive
+  the toast the Undo just closed. — (`apps/web/test/inbox-bulk.test.tsx`)
+
+**Three constants, not the bulk pair reused.** `ROW_REFUSED_COPY` / `ROW_UNREACHED_COPY` /
+`UNDO_FAILED_COPY` — the bulk sentences say *"Those notifications"*, and a plural said about one row is a
+second false statement laid on top of the missing one.

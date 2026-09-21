@@ -97,7 +97,10 @@ type AppCoreEditorSlotProps = {
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
-  submit?: (submission: AppCoreEditorSlotSubmission) => Promise<void>;
+  // V7 — mirrored from app-core's seam, and the TYPE is part of the parity the
+  // assignment below asserts: `Promise<void>` here would stop representing the
+  // other half, and the assignment would pass while the two genuinely differed.
+  submit?: (submission: AppCoreEditorSlotSubmission) => Promise<boolean>;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -195,7 +198,11 @@ function makeProps(overrides: Partial<TicketEditorSlotProps> = {}): TicketEditor
     queryUsers: async () => [],
     uploadAttachment: vi.fn(async (_file: File) => UPLOADED),
     emitAttachmentAdded: vi.fn(async (_uploaded: EditorSlotUpload) => {}),
-    submit: vi.fn(async (_submission: EditorSubmission) => {}),
+    // V7 — the stub ANSWERS, and the answer is part of the contract now: a
+    // `void` return would read as "not accepted" and the composer would never
+    // clear, so a default that said nothing would fail every clear-related case
+    // for a reason that has nothing to do with what they test.
+    submit: vi.fn(async (_submission: EditorSubmission) => true),
     ...overrides,
   };
 }
@@ -250,7 +257,7 @@ describe('TicketEditorSlot', () => {
    * 9.76 — the slot mounted the way app-core mounts it, with NO `editorRef`, populates its own `ownRef`, submits `comment.added`, fires `onDone` and clears. Every other runtime case in this file injects `editorRef`, so this is the only case that exercises the production branch. Not the end-to-end mount — that is 9.61, which `apps/web` now builds.
    */
   it('mounted the way app-core mounts it — no editorRef — the slot uses its OWN ref, submits, and clears', async () => {
-    const submit = vi.fn(async (_submission: EditorSubmission) => {});
+    const submit = vi.fn(async (_submission: EditorSubmission) => true);
     const onDone = vi.fn();
     const view = render(<TicketEditorSlot {...makeProps({ submit, onDone, doc: DOC })} />);
     await vi.waitFor(() => {
@@ -274,7 +281,7 @@ describe('TicketEditorSlot', () => {
    * 9.66 — a successful comment submit clears the composer.
    */
   it('comment mode: submit sends comment.added and clears the composer on success', async () => {
-    const submit = vi.fn(async (_submission: EditorSubmission) => {});
+    const submit = vi.fn(async (_submission: EditorSubmission) => true);
     const onDone = vi.fn();
     const { view } = await mountSlot(makeProps({ submit, onDone, doc: DOC }));
     expect(proseMirrorText(view)).toContain('the words');
@@ -293,7 +300,7 @@ describe('TicketEditorSlot', () => {
   });
 
   it('description mode: submit sends ticket.field_set and keeps the content', async () => {
-    const submit = vi.fn(async (_submission: EditorSubmission) => {});
+    const submit = vi.fn(async (_submission: EditorSubmission) => true);
     const { view } = await mountSlot(makeProps({ mode: 'description', doc: DOC, submit }));
     submitButton(view).click();
     await vi.waitFor(() => {
@@ -341,6 +348,11 @@ describe('TicketEditorSlot', () => {
     });
     const submit = vi.fn(async (_submission: EditorSubmission) => {
       await gate;
+      // V7 — the answer travels WITH the resolution. A stub that resolved with
+      // nothing would read as "not accepted", so the composer would not clear
+      // and this case would fail for a reason unrelated to the double-click it
+      // exists to pin.
+      return true;
     });
     const { view } = await mountSlot(makeProps({ submit, doc: DOC }));
     // Both clicks land in the same React batch: `disabled` is not committed yet
@@ -460,7 +472,7 @@ describe('TicketEditorSlot', () => {
     // an editor whose options were not read through a ref.
     view.rerender(
       <TicketEditorSlot
-        {...makeProps({ doc: DOC, placeholder: 'changed', submit: vi.fn(async (_s: EditorSubmission) => {}) })}
+        {...makeProps({ doc: DOC, placeholder: 'changed', submit: vi.fn(async (_s: EditorSubmission) => true) })}
         editorRef={editorRef}
       />,
     );
@@ -541,3 +553,68 @@ function pasteFile(editor: Editor, file: File): void {
   } as unknown as ClipboardEvent;
   editor.view.someProp('handlePaste', (handler) => handler(editor.view, event, editor.state.doc.slice(0)));
 }
+
+/**
+ * V7 — A REFUSED CLAIM MUST NOT COST THE AUTHOR THEIR WORDS.
+ *
+ * The clear lives inside the `try`, after the `await`, and the paragraph beside
+ * it says so: *"a refused claim must never cost the user their words"*. The
+ * mechanism it relied on was **the absence of a throw**, and a refusal does not
+ * throw — `TicketSheet.submitComment` records the server's answer in
+ * `serverRefusal` and RETURNS NORMALLY. So the promise resolved, the composer
+ * cleared, and the person lost what they had written while the refusal sat on
+ * screen beside an empty box.
+ *
+ * This is the one place in this codebase where the two categories the product
+ * keeps apart everywhere else — *the server answered "no"* and *nobody
+ * answered* (`Ruling 27/33`; the sheet's separate `serverRefusal` /
+ * `transportError` / `editorError` slots) — collapsed into one, and the
+ * collapse deleted text.
+ *
+ * THE CASE DRIVES THE SLOT DIRECTLY rather than through the sheet, because the
+ * slot is where the clear is. `false` is the whole of the fix's contract, and
+ * the second case is the CONTROL: an ACCEPTED submission must still clear, or a
+ * fix that simply stopped clearing would satisfy the first assertion and leave
+ * the composer unusable for the next comment.
+ */
+describe('17.023 / V7 — the composer clears on acceptance, not on resolution', () => {
+  it('17.023: a REFUSED claim leaves the words in the composer', async () => {
+    const submit = vi.fn(async (_submission: EditorSubmission) => false);
+    const onDone = vi.fn();
+    const onError = vi.fn();
+    const { view } = await mountSlot(makeProps({ submit, doc: DOC, onDone, onError }));
+
+    expect(proseMirrorText(view)).toContain('the words');
+    submitButton(view).click();
+    await vi.waitFor(() => {
+      expect(submit).toHaveBeenCalledTimes(1);
+    });
+    // Give the resolution a turn to be acted on wrongly.
+    await Promise.resolve();
+
+    // THE PROPERTY: the words are still there.
+    expect(proseMirrorText(view)).toContain('the words');
+    // Nothing was sent, so nothing was done — and it is not an ERROR either:
+    // the server REFUSED, which the sheet renders in its own slot. Routing this
+    // through `onError` would put one outcome in two slots, which is the
+    // anti-pattern the sheet's `submitTicketEvent` docblock records.
+    expect(onDone).not.toHaveBeenCalled();
+    expect(onError).not.toHaveBeenCalled();
+    view.unmount();
+  });
+
+  it('CONTROL — an ACCEPTED claim still clears, and fires onDone', async () => {
+    const submit = vi.fn(async (_submission: EditorSubmission) => true);
+    const onDone = vi.fn();
+    const { view } = await mountSlot(makeProps({ submit, doc: DOC, onDone }));
+
+    submitButton(view).click();
+    await vi.waitFor(() => {
+      expect(onDone).toHaveBeenCalled();
+    });
+    // A fix that stopped clearing altogether would satisfy the case above and
+    // leave the person typing the next comment into the previous one.
+    expect(proseMirrorText(view)).toBe('');
+    view.unmount();
+  });
+});

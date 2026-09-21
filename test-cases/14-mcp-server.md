@@ -5,6 +5,8 @@ themselves, whose writes are attributable in the ledger as an assistant's rather
 
 **Legend:** ✅ covered by a test · ❌ not yet · 🚫 out of scope, with a reason.
 
+**⚠ MINT FROM A BLOCK, NOT THE TIP, WHILE THE RELEASE RUNS — `14.150`–`14.159` is ALLOCATED to release batch B09 (lane ds5, 2026-09-21)**, of which `14.150` is minted. The release plan tells every batch to mint "the next free id in that file's section", and six batches were doing that at once; the same rule had already collided twice in §10 and §13 the same day, so B09 took a block clear of every live tip instead. Measured before choosing, across ALL remote branches rather than `origin/main`: §14's occupied ordinals ran to **`14.113`**. A lane minting here should read this line first.
+
 *Numbering starts at 14.1. This section was **reserved** by §15's header for
 `docs/superpowers/plans/2026-09-07-mcp-server.md`, and the plan assigns the finished catalogue to its
 **Task 11**. This file is opened early, by Task 1, because 14.1–14.3 are real passing cases the moment the
@@ -16,8 +18,8 @@ file's then-highest id rather than renumbering, exactly as §13 records doing fo
 one exception a reader will otherwise trip on: **`14.100` is Task 5's manual end-to-end case**, minted
 out of band when a Task 5/Task 6 id collision was fixed. The `last_used` column added on the owner's
 2026-09-08 ruling therefore sits at `14.102–14.103`, not `14.100–14.101`. That collision was caught by
-`check-case-ids`, not by reading. **Next free: `14.112`** — recounted 2026-09-19 after the denial
-door took `14.104`–`14.111`.***
+`check-case-ids`, not by reading. `14.112`–`14.112b` are E6-16's (release plan B01, 2026-09-21). **Next
+free: `14.113`.***
 
 ## Task 1 — configuration (`packages/mcp-server`)
 
@@ -122,6 +124,8 @@ which is the door that requires identity, and therefore the door that needs CSRF
 - **14.109** ✅ Approve still posts to `/v1/mcp/device/approve` — the positive control proving the two doors really are two. — (`apps/web/test/mcp-authorize.test.tsx`)
 - **14.110** ✅ Both controls are disabled until a code is present, so neither can be pressed into an empty POST. — (`apps/web/test/mcp-authorize.test.tsx`)
 - **14.111** ✅ A refusal on DENY is rendered as a sentence naming BOTH possibilities ("not recognised … already been used"), and the form returns rather than sticking in a sending state. — (`apps/web/test/mcp-authorize.test.tsx`)
+- **14.112** ✅ E6-16 — an MCP token cannot approve a device code, not even its own successor. `requireSession` accepts either a real better-auth session or an MCP personal-access-token bearer, and nothing previously distinguished them, so a token could mint a SUCCESSOR device code that survives revoking the token that minted it — falsifying the consent page's "it lasts until you revoke it". Mints a real token by walking the flow once as a signed-in person, then uses THAT token (not the session bearer) to attempt approving a second code: `403 { error: 'mcp_token_may_not_decide_device_grant' }`. *Planted defect, run: reverting `require-session.ts`'s two `authKind` stamps and `mcp-device.ts`'s two refusal checks reddens 14.112 and 14.112b together — `expected 200 to be 403` on both, the approval and the exchange both succeeding through the forged authority. Restored, full suite green.* — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.112b** ✅ The mirror for DENY: an MCP token cannot deny a device code either, same refusal, same reason a forged deny is no less an act on someone else's authority than a forged approve. — (`apps/server/test/mcp/device-flow.test.ts`)
 
 *The accessible names on this screen are asserted **by string** (`getByRole('button', { name: 'Deny' })`), because `e2e-viewport`'s sweep counts `aria-label` ATTRIBUTES and cannot tell one name from another — and **neither accessible-names baseline carries a `/mcp/authorize` key** (measured 2026-09-19), so nothing else in the suite is watching these strings.*
 
@@ -588,3 +592,30 @@ test wrote, not that it shows the credential the CLI is holding.*
 > cover it. Declaring the new `textMuted` on `surfaceSunken` combination in `CONTRAST_PAIRS` was part
 > of the change: that list is self-declared enforcement, so a pair nobody lists is a pair nobody
 > checks, and shipping a new fg-on-bg without its row is the gap rather than a formality.
+
+## The revoke screen's READ: a failure is not an empty account — case `14.150` (E2-44, 2026-09-21)
+
+**The id is `14.150`, taken as part of B09's `14.150`–`14.159` block rather than from the tip** — the
+allocation is recorded in this file's header above. It was first minted as `14.113`, the tip of §14 as the
+tree showed it (`14.112`), and moved here for the reason that header gives: the same tip-minting rule had
+already collided twice on 2026-09-21 (§10's `10.90`, §13's `13.1050`–`13.1051`), so this lane took a block
+clear of every live tip instead. Measured across ALL remote branches rather than one, §14's occupied
+ordinals ran to `14.113`.
+
+**The defect.** `McpTokensScreen`'s loader is `http.get('/v1/me/mcp-tokens').then(ok, () => setTokens([]))`.
+`[]` is not a neutral value here — it is exactly what the empty arm asserts over: *"No assistants are
+connected. One appears here after you approve it on the connect page."* A 500, a dropped connection or an
+unparseable body was therefore drawn as a confident statement about the person's account, on the one screen
+whose whole subject is which assistants still hold access, and the sentence it printed sent them to approve
+a second assistant they did not need.
+
+- **14.150** ✅ A rejected read renders a failure sentence and NEITHER the empty state nor the list —
+  asserted on the pair, because the absence is the half that matters: a screen rendering both would pass an
+  assertion on the sentence alone. A second case is the control, and it is what stops the fix from
+  over-reaching: an **answered** empty list still renders the empty state, so "no assistants" stays
+  reachable rather than being traded for a sentence that is never true. —
+  (`apps/web/test/mcp-tokens-page.test.tsx`)
+
+**The sentence carries the server's own words when it sent any** (`refusalText(cause.body)`, the same narrowing
+`revoke` and the rename path already use), and otherwise says what is true — that the read did not come back,
+that the list is unknown rather than empty, and the one recovery there is.

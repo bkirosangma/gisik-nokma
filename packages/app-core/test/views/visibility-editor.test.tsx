@@ -1,12 +1,14 @@
-import { render, screen } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
 import { visibilitySetPayload } from '@gisik-nokma/domain';
 import type { DataSource } from '../../src/data-source.js';
 import {
   LOCKOUT_WARNING_COPY,
   OWNER_ALWAYS_SEES_COPY,
+  READ_ONLY_COPY,
+  writeUnreachedCopy,
   VisibilityEditor,
   type VisibilityClaim,
 } from '../../src/views/visibility-editor.js';
@@ -152,6 +154,37 @@ describe('3.104 the owner’s read bypass is disclosed, on every mode', () => {
     mount({ canEdit: false });
     expect(screen.getByText(OWNER_ALWAYS_SEES_COPY)).toBeInTheDocument();
     expect(screen.queryByRole('radio', { name: 'Only the people I name' })).toBeNull();
+  });
+
+  /**
+   * 17.063 — F4. The read-only arm answered *"then who can?"* — the exact question
+   * a person who has just been told "no" is asking — with a sentence that omitted
+   * the two roles most likely to be able to help and that contradicts its own
+   * sibling two declarations up.
+   *
+   * The server's rule (`apps/server/src/permissions/check-permission.ts:1058-1060`)
+   * is `hasProjectAdminRights(eff) || sessionUserId === creatorId`, and
+   * `hasProjectAdminRights` (`effective-role.ts`) is
+   * `workspaceRole === 'owner' || workspaceRole === 'admin' || projectAdmin`. So a
+   * WORKSPACE owner or admin may change any ticket's visibility, and the shipped
+   * sentence named neither — while `LOCKOUT_WARNING_COPY` right beside it says
+   * *"or the workspace owner, who always sees"*. Two sentences in one component
+   * disagreeing about who may act.
+   *
+   * Asserted on the pair: the corrected sentence is present AND the understated
+   * one is absent. A case asserting only the first passes over a component
+   * rendering both.
+   */
+  it('17.063 the read-only sentence names the WORKSPACE owner and admin, not only a project admin', () => {
+    mount({ canEdit: false });
+
+    expect(screen.getByText(READ_ONLY_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(/^Only a project admin, or whoever created this ticket,/)).toBeNull();
+    // And the two roles the server's own predicate admits are both NAMED — the
+    // omission is the defect, so a sentence that merely rewords it would pass a
+    // presence-only assertion.
+    expect(READ_ONLY_COPY).toMatch(/workspace owner/i);
+    expect(READ_ONLY_COPY).toMatch(/workspace .*admin|admin/i);
   });
 });
 
@@ -654,5 +687,157 @@ describe('the standing line carries the prototype’s dot (17.004, 17.006)', () 
     // jobs are kept different on purpose.
     expect(typeof labelOf({ id: NAMELESS, name: '', role: 'guest' })).toBe('string');
     expect(labelOf({ id: NAMELESS, name: '', role: 'guest' })).toBe(NAMELESS);
+  });
+});
+
+/**
+ * 17.042 (E2-33c) — THE FIELDSET CANNOT OUTLIVE THE SENTENCE IT CONTRADICTS.
+ *
+ * The seed is one-shot (`useState`), and the ONE behaviour that re-runs it is a
+ * QUERYKEY change: `useLiveQuery` answers `null` and the "Loading…" branch
+ * remounts this subtree, so a ticket SWITCH is correct. A RELOAD keeps the key,
+ * so `current` updates IN PLACE with this component still mounted — and the
+ * standing sentence renders from `current` while the fieldset renders from the
+ * seeded state. Two modes on one screen, with Apply sending the stale one.
+ *
+ * The reconcile is keyed on the CLAIM'S CONTENT, not on the object: `current` is
+ * a fresh object on every read, so an identity key would wipe a half-authored
+ * fieldset whenever a stream event merely re-delivered the same claim. Both
+ * directions are asserted here, because only the pair distinguishes "reconciles"
+ * from "resets on every render".
+ */
+describe('E2-33c a reload that changes the standing claim re-seeds the fieldset', () => {
+  const standing = (ownMode: VisibilityClaim['ownMode'], userIds: string[]): VisibilityClaim => ({
+    ownMode,
+    // `resolvedMode` has no `inherit` member — resolution always RESOLVES, and
+    // `project` is what an inheriting ticket resolves to by default
+    // (`ROOT_DEFAULT_MODE`). Spelled rather than passed through, so the two
+    // fields cannot drift into a shape the wire cannot send.
+    resolvedMode: ownMode === 'inherit' ? 'project' : ownMode,
+    userIds,
+    claim: null,
+  });
+
+  function mountEditor(props: { current: VisibilityClaim | null }) {
+    const source = recordingSource();
+    const view = render(
+      <VisibilityEditor
+        dataSource={source.dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        canEdit
+        {...props}
+      />,
+    );
+    return view;
+  }
+
+  const chosenMode = (): HTMLInputElement | null =>
+    document.querySelector<HTMLInputElement>('input[name="gn-visibility-mode"]:checked');
+
+  it('PLANTED DEFECT: the fieldset follows the standing claim when the claim moves under it', () => {
+    const view = mountEditor({ current: standing('explicit', [ANSELMA]) });
+    expect(chosenMode()?.value).toBe('explicit');
+    expect(screen.getByRole('checkbox', { name: 'Anselma Marak' })).toBeChecked();
+
+    // Somebody else changed this ticket's audience and the read came back: same
+    // query key, so the component is STILL MOUNTED and the seed never re-ran.
+    view.rerender(
+      <VisibilityEditor
+        dataSource={recordingSource().dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        canEdit
+        current={standing('inherit', [])}
+      />,
+    );
+
+    // The fieldset now says what the sentence above it says: the mode moved, and
+    // `inherit` draws no people picker at all — so the roster the old claim named
+    // is not left standing under a sentence that no longer names it.
+    expect(chosenMode()?.value).toBe('inherit');
+    expect(screen.queryByRole('checkbox', { name: 'Anselma Marak' })).toBeNull();
+  });
+
+  it('a reload that re-delivers the SAME claim leaves a half-authored fieldset alone', () => {
+    const view = mountEditor({ current: standing('explicit', [ANSELMA]) });
+
+    // The person starts editing: somebody added to the roster.
+    const dipu = screen.getByRole('checkbox', { name: 'Dipu' });
+    fireEvent.click(dipu);
+    expect(screen.getByRole('checkbox', { name: 'Dipu' })).toBeChecked();
+
+    // Same claim, new object — a stream event re-delivered it.
+    view.rerender(
+      <VisibilityEditor
+        dataSource={recordingSource().dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        canEdit
+        current={standing('explicit', [ANSELMA])}
+      />,
+    );
+    expect(screen.getByRole('checkbox', { name: 'Dipu' })).toBeChecked();
+  });
+});
+
+describe('17.064 a rejected visibility write (V3)', () => {
+  /**
+   * 17.064 — V3. `apply` set `{kind:'sending'}` and then awaited
+   * `dataSource.ingest([…])` with NO try/catch, and its call site is
+   * `onClick={() => void apply()}` — a `void`, so the rejection was discarded
+   * entirely. `submission` therefore stayed `'sending'` for ever: the Apply button
+   * is `disabled={… || submission.kind === 'sending'}`, and the only sentence the
+   * component can render sits under `submission.kind === 'refused'`, which had
+   * become unreachable. A transport failure left a permanently disabled control
+   * and nothing said — the same shape `BulkCloseDialog` two files away already
+   * handles with a `transportError` slot.
+   *
+   * Asserted on the PAIR, because the two halves are one state: the sentence is
+   * present AND Apply is live again. Either alone passes over the defect — a
+   * component that re-enabled the control and said nothing, or one that spoke and
+   * left the control dead, would each satisfy one half.
+   */
+  it('17.064 a rejected write says so, and Apply comes back', async () => {
+    const user = userEvent.setup();
+    const source = recordingSource();
+    const cause = new Error('HTTP 500 for /v1/events');
+    source.dataSource.ingest = async () => {
+      throw cause;
+    };
+    mount({}, source);
+
+    await user.click(await screen.findByRole('radio', { name: 'Everyone in the workspace' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    expect(await screen.findByText(writeUnreachedCopy(cause))).toBeInTheDocument();
+    // THE HALF THE DEFECT IS NAMED FOR: before the fix the control stayed
+    // disabled for ever, so a reader could neither retry nor understand.
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
+  });
+
+  /**
+   * 17.065 — the control for the case above: a COMMITTED write still ends clean: no transport sentence,
+   * and the success path still calls `onChanged`. Without it the fix could be
+   * "always render the transport sentence", which would be false of every write
+   * that landed.
+   */
+  it('17.065 a committed write says nothing about the server being unreachable', async () => {
+    const user = userEvent.setup();
+    const onChanged = vi.fn();
+    mount({ onChanged });
+
+    await user.click(await screen.findByRole('radio', { name: 'Everyone in the workspace' }));
+    await user.click(screen.getByRole('button', { name: 'Apply' }));
+
+    await waitFor(() => expect(onChanged).toHaveBeenCalled());
+    expect(screen.queryByText(/could not reach the server/)).toBeNull();
+    expect(screen.getByRole('button', { name: 'Apply' })).toBeEnabled();
   });
 });

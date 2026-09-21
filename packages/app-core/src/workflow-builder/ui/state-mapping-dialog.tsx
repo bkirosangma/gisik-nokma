@@ -40,10 +40,39 @@ export function StateMappingDialog(props: {
   targetStates: { id: string; name: string }[];
   fromVersion: number;
   toVersion: number;
+  /**
+   * E5-28 — what the person had already chosen, when this dialog is being
+   * re-entered rather than opened.
+   *
+   * The dialog used to own its mapping outright, and `PublishControls` set
+   * `submitting` before awaiting the server — which unmounted it. So a REFUSAL
+   * returned the person to an idle Publish button with the mapping gone, and
+   * pressing Publish again reopened an EMPTY dialog. The owner of the mapping
+   * is now the caller, and this is how it hands it back.
+   *
+   * It is the INITIAL value and not a controlled one, deliberately: the dialog
+   * still owns what is typed into it from this point on, or every keystroke
+   * would need a round trip through the parent to appear.
+   */
+  initialMapping?: Record<string, string>;
   onCancel(): void;
   onConfirm(mapping: Record<string, string>): void;
+  /**
+   * True while the publish this mapping belongs to is on the wire (E2-22). The
+   * dialog is NOT unmounted for it — the caller keeps it mounted for the whole
+   * attempt precisely because `mapping` lives HERE, and a remount would discard
+   * the map the admin just authored. This only states the state on the controls.
+   */
+  submitting?: boolean;
+  /**
+   * The attempt's verdict when it did not commit, rendered INSIDE this dialog
+   * rather than in the controls' banner: the mapping is still here, is still the
+   * admin's, and is the thing they will retry with, so the answer belongs on it.
+   * `null` while nothing has been answered (including the in-flight window).
+   */
+  outcome?: { kind: 'refused' | 'invalid'; title: string; rule?: string; detail: string } | null;
 }) {
-  const [mapping, setMapping] = useState<Record<string, string>>({});
+  const [mapping, setMapping] = useState<Record<string, string>>(props.initialMapping ?? {});
   const complete = props.dropped.every((state) => mapping[state.id] !== undefined);
   const loading = props.occupancy === null && !props.occupancyFailed;
   return (
@@ -71,17 +100,44 @@ export function StateMappingDialog(props: {
           </li>
         ))}
       </ul>
+      {/* The attempt's own verdict, in the surface that holds the mapping — the
+          same two facts the controls' banner carries when this dialog is not the
+          one the attempt was made on. `role="alert"` because it answers a press
+          the person just made. */}
+      {props.outcome !== undefined && props.outcome !== null ? (
+        <div
+          className={`publish-controls__banner publish-controls__banner--${props.outcome.kind}`}
+          role="alert"
+        >
+          <p className="publish-controls__banner-title">{props.outcome.title}</p>
+          <p className="publish-controls__banner-reason">{props.outcome.detail}</p>
+          {props.outcome.rule === undefined ? null : (
+            <p className="publish-controls__banner-rule">{`rule: ${props.outcome.rule}`}</p>
+          )}
+        </div>
+      ) : null}
       <div className="state-mapping-dialog__actions">
-        <button type="button" className="state-mapping-dialog__cancel" onClick={props.onCancel}>
+        {/* Both controls rest while the request is in flight. Publish, because a
+            second press would submit a second publish for the same mapping;
+            Cancel, because the outcome of a claim already sent cannot be
+            un-asked and would land on a screen that had moved on. The guard
+            LIFTS the moment a verdict arrives — that is what makes the retry
+            free, and it is the whole reason this dialog is not unmounted. */}
+        <button
+          type="button"
+          className="state-mapping-dialog__cancel"
+          disabled={props.submitting === true}
+          onClick={props.onCancel}
+        >
           Cancel
         </button>
         <button
           type="button"
           className="state-mapping-dialog__confirm"
-          disabled={!complete}
+          disabled={!complete || props.submitting === true}
           onClick={() => props.onConfirm(mapping)}
         >
-          Publish with this mapping
+          {props.submitting === true ? 'Publishing…' : 'Publish with this mapping'}
         </button>
       </div>
     </div>

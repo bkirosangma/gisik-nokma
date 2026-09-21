@@ -33,9 +33,13 @@ export default function AccountPage() {
   const { dataSource, notificationPreferences } = useAppServices();
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [prefs, setPrefs] = useState<NotificationPreferences | null>(null);
+  const [prefsError, setPrefsError] = useState<string | null>(null);
+  const [prefsSaveError, setPrefsSaveError] = useState<string | null>(null);
   const [sessions, setSessions] = useState<SessionSummary[] | null>(null);
+  const [sessionError, setSessionError] = useState<string | null>(null);
   const [passkeys, setPasskeys] = useState<PasskeySummary[] | null>(null);
   const [passkeyError, setPasskeyError] = useState<string | null>(null);
+  const [passkeysListFailed, setPasskeysListFailed] = useState(false);
   const passkeyClient = useMemo(() => createPasskeyClient(), []);
   const sessionsClient = useMemo(
     // `?.session?.token`, not `?.session.token` — `session.data`'s own type
@@ -68,17 +72,18 @@ export default function AccountPage() {
   }, [dataSource]);
 
   useEffect(() => {
-    // Same silent-omission treatment the Workspaces effect above gives a
-    // failed read, and the SAME reason: this is a convenience control, not
-    // `/account`'s primary content, so a refusal here should not block the
-    // rest of the page. `{ mutedKinds: [] }` here is NOT
-    // `EMPTY_NOTIFICATION_PREFERENCES` reused — that constant's own docblock
-    // (`packages/domain/src/notification-preferences.ts`) defines it as what
-    // a person who has NEVER SAVED a preference reads, which is a claim about
-    // their history. A failed read has no idea whether they ever saved one;
-    // the literal below merely renders every kind as on for this visit,
-    // without asserting that fact about the account.
-    notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }));
+    // RULING E5-13: unlike the Workspaces effect above, a failed read here
+    // does NOT collapse to a guessed document. `toggleKind` below PUTs the
+    // whole preferences document built from `prefs` — so a guessed
+    // `{ mutedKinds: [] }` standing in for "loaded" would let one toggle
+    // silently overwrite whatever the person actually had muted with a
+    // document built from a guess. `prefs` stays `null` (never loaded) and
+    // `prefsError` carries the refusal instead; `toggleKind`'s own
+    // `if (prefs === null) return;` guard then refuses to save on this path
+    // for free.
+    notificationPreferences
+      .load()
+      .then(setPrefs, () => setPrefsError('Your preferences could not be loaded'));
   }, [notificationPreferences]);
 
   useEffect(() => {
@@ -98,8 +103,14 @@ export default function AccountPage() {
       // confirms it — re-listing is what proves a session is actually gone,
       // the same distrust `toggleKind`'s own `.catch()` has for a state this
       // component did not itself confirm.
-      await sessionsClient.revoke(token);
-      sessionsClient.list().then(setSessions);
+      //
+      // RULING E2-24(b): the result used to be read and discarded — a
+      // refusal left the list simply failing to shrink, with nothing on
+      // screen to say why. Same `{ error }`-then-conditionally-reload shape
+      // `addPasskey`/`removePasskey` below already use.
+      const result = await sessionsClient.revoke(token);
+      setSessionError(result.error);
+      if (result.error === null) sessionsClient.list().then(setSessions);
     },
     [sessionsClient],
   );
@@ -171,13 +182,22 @@ export default function AccountPage() {
 
   const reloadPasskeys = useCallback(() => {
     if (!signedIn) return;
-    // Same silent-omission treatment the three effects above give a failed
-    // read, and the same reason — except for one difference worth naming: a
-    // refused ADD or REMOVE below is NOT silent, because the person just
-    // performed a WebAuthn ceremony and a no-op after touching a fingerprint
-    // sensor is indistinguishable from success. Only the passive LIST read
-    // collapses to `[]`.
-    passkeyClient.list().then(setPasskeys, () => setPasskeys([]));
+    // RULING E2-23: a failed LIST read does NOT collapse to `[]` any more —
+    // `PasskeysSection` would then assert "You have no passkeys yet.", a
+    // claim about the account this read never confirmed (the sibling
+    // Sessions section already hedges the same shape with "…to show" rather
+    // than asserting none exist). `passkeys` is left as it was and
+    // `passkeysListFailed` carries the refusal instead. A refused ADD or
+    // REMOVE below is unrelated and still surfaces through `passkeyError`,
+    // because the person just performed a WebAuthn ceremony and a no-op
+    // after touching a fingerprint sensor is indistinguishable from success.
+    passkeyClient.list().then(
+      (list) => {
+        setPasskeys(list);
+        setPasskeysListFailed(false);
+      },
+      () => setPasskeysListFailed(true),
+    );
   }, [passkeyClient, signedIn]);
 
   useEffect(() => {
@@ -208,8 +228,15 @@ export default function AccountPage() {
   );
 
   const saveName = useCallback(async (name: string) => {
+    // RULING E5-19: `result.error?.message ?? null` collapsed TWO different
+    // facts to the same `null` — "no error at all" (a real success) and "an
+    // error object with no message" (better-auth's own client types make
+    // `message` optional). `ProfileSection` reads `error === null` as
+    // success, so a message-less refusal used to render as though it had
+    // worked. The two are told apart here.
     const result = await authClient.updateUser({ name });
-    return { error: result.error?.message ?? null };
+    if (result.error === null || result.error === undefined) return { error: null };
+    return { error: result.error.message ?? 'The server refused this change and did not say why.' };
   }, []);
 
   const toggleKind = useCallback(
@@ -220,12 +247,29 @@ export default function AccountPage() {
         mutedKinds: muted ? prefs.mutedKinds.filter((k) => k !== kind) : [...prefs.mutedKinds, kind],
       };
       setPrefs(next); // optimistic
+      // Cleared on every fresh attempt, not left from a PRIOR refused one —
+      // a stale "could not be saved" message sitting on screen through a
+      // now-successful toggle would misdescribe the row it is next to.
+      setPrefsSaveError(null);
       void notificationPreferences.save(next).catch(() => {
+        // RULING E2-24(a): a refused save used to revert with no rendered
+        // outcome at all — the only trace was the switch silently snapping
+        // back. Stated here, distinct from `prefsError` (a READ failure).
+        setPrefsSaveError('Your change could not be saved. It has been reverted.');
         // Revert to the true stored state on a failed save, rather than
         // leaving the optimistic flip standing for a change the server never
         // recorded — the same distrust `apps/web/app/inbox/page.tsx`'s
-        // `markRead` catch has for its own optimistic flip.
-        notificationPreferences.load().then(setPrefs);
+        // `markRead` catch has for its own optimistic flip. The revert read
+        // ITSELF now has a rejection handler too: previously, a revert that
+        // also failed left the optimistic (wrong) flip standing silently,
+        // with no trace at all. Falling back to `prefsError` here — the
+        // same state a failed INITIAL read uses — is not an approximation:
+        // a double failure leaves this component in exactly that epistemic
+        // state, not knowing the true value, so it earns the same disabled
+        // treatment.
+        notificationPreferences
+          .load()
+          .then(setPrefs, () => setPrefsError('Your preferences could not be loaded'));
       });
     },
     [prefs, notificationPreferences],
@@ -263,19 +307,29 @@ export default function AccountPage() {
           <ProfileSection name={user.name} email={user.email} onSave={saveName} />
         ) : null}
         <AppearanceSection />
-        {prefs !== null ? (
-          <NotificationsSection mutedKinds={prefs.mutedKinds} onToggle={toggleKind} />
+        {prefs !== null || prefsError !== null ? (
+          <NotificationsSection
+            mutedKinds={prefs?.mutedKinds ?? []}
+            onToggle={toggleKind}
+            error={prefsError}
+            saveError={prefsSaveError}
+          />
         ) : null}
         {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
         {sessions !== null ? (
-          <SessionsSection sessions={sessions} onRevoke={(token) => void revokeSession(token)} />
+          <SessionsSection
+            sessions={sessions}
+            onRevoke={(token) => void revokeSession(token)}
+            error={sessionError}
+          />
         ) : null}
-        {passkeys !== null ? (
+        {passkeys !== null || passkeysListFailed ? (
           <PasskeysSection
-            passkeys={passkeys}
+            passkeys={passkeys ?? []}
             onAdd={(name) => void addPasskey(name)}
             onRemove={(id) => void removePasskey(id)}
             error={passkeyError}
+            listFailed={passkeysListFailed}
           />
         ) : null}
         {/* Connected assistants — MOVED HERE in Round 21 (owner: "lets move MCP

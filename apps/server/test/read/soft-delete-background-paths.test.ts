@@ -52,8 +52,13 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  *      constant's own definition and the docblock that quotes it → **4 written
  *      LONGHAND**, in three functions on two different aliases.
  *
- * **13 + 4 = 17 SQL statements carry the rule.** One further application is
- * written in TypeScript and is published below rather than counted here.
+ * **13 + 4 = 17 SQL statements carry the rule** — as swept on 2026-09-20. Two
+ * have been added since and neither is in that arithmetic: `read/live-ticket.ts`
+ * (the attachments lane, 2026-09-20; recorded in `test-cases/16-remaining-doors.md`)
+ * and row 18 below (release batch B07, 2026-09-21). Re-run the two sweeps in
+ * the tree you are standing in rather than trusting either number. One further
+ * application is written in TypeScript and is published below rather than
+ * counted here.
  *
  * ⚠ **"Eleven" appears in the dispatch AND in a withdrawn sentence in
  * `visible-where.ts`'s own docblock. Neither is reproducible; these two sweeps
@@ -78,6 +83,7 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * | 15 | `routes/builder-reads.ts:504` | `readTicketCounts` (**longhand, on alias `k`**) | **THIS FILE** — case below |
  * | 16 | `projections/rollups.ts:221` | `recomputeParent` (**longhand**) | **Arm 1** — `proj_rollups.total_children` for a parent that KEEPS a row |
  * | 17 | `projections/rollups.ts:320` | the stale-row DELETE (**longhand**) | **Arm 1** — the same case |
+ * | 18 | `routes/list.ts`, `epicAncestors`' recursive member (`AND ${LIVE_TICKET_WHERE}` after the visibility hop) | the epic-group walk (round-2 E6-11) | `test/routes/list.test.ts` — "E6-11: a deleted epic ends the walk like an invisible one" (case 17.126) |
  *
  * ⚠ **Rows 6 and 7 were labelled the wrong way round** when this table was first
  * written — `:141` read "shared" and `:252` read "rest". Corrected at the line,
@@ -152,39 +158,69 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * — the file's own docblock says it is *"`LIVE_TICKET_WHERE`'s rule reaching the
  * one surface that cannot filter its row, so it is applied to the TITLE alone"*.
  *
- * **MEASURED SURVIVOR**: with the `row.deleted_at === null &&` conjunct removed,
- * 89 tests across 7 files stay green. The same invocation run against site 6
- * (`my-work.ts:141`) reports 18 failures — so the command CAN fail, and an edit
- * to that very file reaches the compiled artifact. Neither arm contains the word
- * `contested`, and `test/routes/my-work.test.ts` never exercises a deleted
- * ticket. Covering it needs a contested-claim fixture, which is a different
- * subsystem from anything this task builds.
+ * **MEASURED SURVIVOR when this was written, WITNESSED since 2026-09-21** (round-1
+ * F4, release batch B07). Then: with the `row.deleted_at === null &&` conjunct
+ * removed, 89 tests across 7 files stayed green, while the same invocation run
+ * against site 6 (`my-work.ts:141`) reported 18 failures — the command could
+ * fail, and an edit to that file reached the compiled artifact; neither arm
+ * contained the word `contested`, and `test/routes/my-work.test.ts` never
+ * exercised a deleted ticket. Now: that suite's last case (case 17.124, "F4:
+ * the deleted ticket keeps its row and loses its title; the live sibling keeps
+ * both") contests two of the owner's own tickets, reads both titles by VALUE,
+ * soft-deletes one, and reads again — the row survives, the title is `null`,
+ * the live sibling is unchanged. Re-run of the same mutation against it:
+ * `Tests  1 failed | 24 passed (25)`, at `expected 'Contested, then deleted'
+ * to be null`. It is constrained by that case and by nothing in THIS file,
+ * which is why the paragraph stays: this file's table of sites says which arm
+ * covers each, and for this one the answer is neither arm.
  *
- * **Named owner: whoever next picks up the contested-claim surface.**
- *
- * #### (c) `packages/app-core/src/replica/replica-data-source.ts:947` and `:980` — the OFFLINE source's two gates
+ * #### (c) `packages/app-core/src/replica/replica-data-source.ts` — the OFFLINE source's two gates
  *
  * The client has **two** implementations of `DataSource`, and Arm 1 walks only
  * the ONLINE one. The replica — Plan 10's local store, which is what a user sees
- * offline — applies the same rule in TypeScript in two places, each with a
- * docblock naming `LIVE_TICKET_WHERE` as the rule it is carrying:
- * `:947` (`if ((state.deleted ?? null) !== null) continue;`, the ticket
- * enumeration) and `:980` (`(state.deleted ?? null) === null`, the same boundary
- * read beside `closed`).
+ * offline — applied the rule in TypeScript in two places when this was
+ * written, each with a docblock naming `LIVE_TICKET_WHERE` as the rule it is
+ * carrying — cited by CONTENT, because this paragraph carried `:947` and
+ * `:980` and both came to rest on other lines (`getMyWork`'s refusal and a
+ * `stateNameOf` binding — resolving, and neither a gate; round-1 F5): the
+ * `if ((state.deleted ?? null) !== null) continue;` in `getTickets`' ticket
+ * enumeration, and the `(state.deleted ?? null) === null` conjunct beside
+ * `closed` in `getBoard`'s filter. ⚠ "Two places" counted the GATES, not the
+ * reads: three sibling reads had no gate at all (`listTicketSummaries`,
+ * `myWork`, `searchOfflineCopy` — round-2 E6-24, fixed in release batch B07
+ * and pinned by case 12.399), so the file now carries the rule at four reads.
  *
- * **BOTH MEASURED SURVIVORS**: with each conjunct removed in turn, app-core's
- * replica suite reads **27 passed / 0 failed** and `apps/server`'s
- * `test/dual-client` reads **21 passed / 0 failed** — and the mutation reached
- * the artifact, checked rather than assumed: that test imports
- * `../../src/replica/replica-data-source.js`, not the package name, so nothing
- * resolved through a stale `dist`.
+ * **BOTH MEASURED SURVIVORS when this was written, on ONE valid witness — and
+ * WITNESSED since 2026-09-21 (round-1 F5, release batch B07, case 17.125)**:
+ * `packages/app-core/test/replica/replica-deleted-reads.test.ts` now holds the
+ * deleted-ticket fixture this arm asked for, and the same two mutations each
+ * redden exactly their own case there (`Tests 1 failed | 5 passed (6)`, twice).
+ * Then: with each conjunct removed in turn, app-core's replica suite read
+ * **27 passed / 0 failed**. That suite
+ * imports `../../src/replica/replica-data-source.js` by RELATIVE PATH
+ * (`packages/app-core/test/replica/replica-data-source.test.ts`), so the
+ * mutation reached what it measured. ⚠ **This paragraph ALSO published
+ * `apps/server`'s `test/dual-client` reading 21 passed / 0 failed under the
+ * same warrant, and the warrant was false of it** (round-1 F2): `test/dual-client/
+ * rig.ts` imports `@gisik-nokma/app-core` by PACKAGE NAME, which resolves
+ * through `dist`, and nothing rebuilt `dist` between the mutation and that
+ * run — the built copy still carried both gates, so the 21/0 half could not
+ * have failed and measured nothing. Re-measured 2026-09-21: no file under
+ * `apps/server/test` imports `packages/app-core` by a relative path (`grep -rnE
+ * "^\s*import .*from '[^']*packages/app-core" apps/server/test/` → 0, with
+ * `grep -rln "from '@gisik-nokma/app-core'" apps/server/test/` → 3 files as the
+ * control). The 27/0 half is the measurement, and it is sufficient; the 21/0
+ * reading is withdrawn as evidence rather than deleted, because a number that
+ * was published and later found unwarranted is a fact about this record.
  *
  * ⚠ **The pre-existing I2 note in `test-cases/16-remaining-doors.md` already
  * named these two as unconstrained, at `:888`/`:921` — line numbers that have
  * since rot. It was right about them and its citations had drifted**, which is
  * why this file cites by what the line READS rather than by where it sat.
  *
- * **Named owner: whoever next picks up Plan 10's replica reads.**
+ * **The owner line this paragraph carried ("whoever next picks up Plan 10's
+ * replica reads") is discharged by case 17.125; kept as a sentence about the
+ * record rather than as an open assignment.**
  *
  * **A case recording ALL THREE gaps is minted in `test-cases/` (16.90).**
  *

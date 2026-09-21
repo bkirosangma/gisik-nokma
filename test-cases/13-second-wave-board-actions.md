@@ -1915,6 +1915,23 @@ with them.
   current value** (`select.tsx:255` renders the placeholder otherwise).
   **Mutation-witnessed twice:** `submitAssignee` never ingesting reddens it, and collapsing a refused roster
   back into `[]` — the sheet's own old behaviour — reddens it too.
+  **A FIFTH arm added, RULING E4-18 (closed), same file, no new id (§13's own numbering is exhausted —
+  see `test-cases/17-open-work.md`'s block-allocation rule; this ruling has none there either):** a member
+  with no display name used to render as a BLANK 13px option — `...people.map((member) => ({ value:
+  member.id, label: member.name }))`, `member.name` verbatim — breaking the same honesty contract
+  `provenance.ts` states for every other actor label on this sheet (`visibility-editor.tsx:410`'s own
+  picker already keeps it via `actorLabel`). The picker now routes through `actorLabel(member.id,
+  member.name)` too, so a nameless member reads by its raw id rather than as nothing — asserted with a
+  seeded three-member roster (one carrying `name: ''`) against the full rendered option-text array, plus
+  a direct check that no option's text is the empty string.
+  **A SIXTH arm, RULING E5-4 (closed), same no-new-id reasoning:** the @mention list's own `queryUsers`
+  filtered on `member.name.toLowerCase().includes(needle)` and mapped `name: member.name` verbatim, so a
+  nameless member was both an invisible (blank) row AND unreachable by typing — an empty string can
+  never match a needle. `queryUsers` now resolves the label through `actorLabel` BEFORE matching, not
+  after; asserted by capturing the closure off a fake `EditorSlotComponent` (the same dependency-
+  injection seam 13.989's own describe block uses) and calling it directly, since it is private to
+  `TicketSheet` — the resolved list contains the nameless member labelled by id, and querying by that id
+  finds them.
 
 ### What is NOT covered, named rather than implied
 
@@ -2026,3 +2043,37 @@ measures another.**
   branch is what the mutation kills.
 - **No browser run yet.** The dispatch asks for one (*"a typed change survives a reload … the
   `set by {actor} on {date}` line moves"*) and it is owed.
+
+## A ticket the server answers 404 for says so, instead of loading for ever — cases `13.1112`–`13.1113` (E4-23, 2026-09-21)
+
+**Why this case is in §13 and not in §16, which is where the sheet's other cases live.** The id is from
+**B09's block `13.1107`–`13.1116`**, recorded in the §13 index header (`13-deployment-dogfooding.md`).
+§16's own header states that both of its lane blocks are fully spent and that a lane whose block is empty
+does not mint from the tip — so §13's block is where this lane may mint, and the case sits in the §13
+part-file that already carries the sheet's screen-level work rather than in a section it cannot write to.
+The same reasoning put the inbox filter tabs (`13.969`–`13.975`) in §13 instead of §11.
+
+**The defect.** `useLiveQuery` reported `data` and `error` and nothing else, so *"the read has not answered
+yet"* and *"the read answered `null`"* were the same render — `data === null`. `getTicket` returns the
+transport's `null` for a 404 on a GET, and that `null` is deliberate: every `/v1` read door sends ONE
+frozen body for "no such thing" and for "not yours" (`READ_NOT_FOUND_BODY`,
+`apps/server/src/routes/tickets.ts`), so a mistyped id, a soft-deleted ticket and a ticket this viewer may
+not see are one answer and a client that told them apart would be inventing the existence oracle the
+server refused to provide. The sheet gated its whole body on `data === null` and drew `Loading…` — a
+server refusal rendered as a wait that never ends, measured on a live page at 2.5 s, 8.5 s, 18.5 s and 61 s.
+
+- **13.1112** ✅ A ticket the server answers 404 for renders *"This ticket is not here — it may have been
+  deleted, or you may not be able to see it."*, and `Loading…` is NOT on the screen. Asserted on the pair,
+  because the two states shared one branch: a case asserting only the sentence passes on a sheet drawing
+  both. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.1113** ✅ A read still in flight still says `Loading…`, and the absent sentence is not
+  rendered. Without this the case above could be satisfied by a sheet that had stopped drawing the wait
+  altogether — which would trade one false statement for another. —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+
+**The sentence names BOTH readings on purpose.** The server will not say which of "deleted" and "not
+yours" happened, so a screen that picked one would be making the distinction the one-body refusal exists
+to prevent. `useLiveQuery` gained `settled` for this — the alternative readings were both worse: an
+`answered` sentinel on every `T` would grow a case in every adapter, and using `error` for a
+null-means-404 convention would put a transport detail inside a hook that deliberately knows no status
+codes.

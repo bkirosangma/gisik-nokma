@@ -1222,3 +1222,77 @@ describe('GET /v1/projects/:projectId/tickets — backlog and closed (owner requ
     expect(groups[backlogKey]?.label).toBe('Backlog');
   });
 });
+
+describe('GET /v1/projects/:projectId/tickets — a soft-deleted epic ancestor (round-2 E6-11, release batch B07)', () => {
+  /**
+   * `epicAncestors` walks the parent chain with the visibility predicate at
+   * every hop and, until this change, nothing about `deleted_at` — so a deleted
+   * epic's TITLE went on labelling its live children's group, while the detail
+   * door answers `restricted` for the same parent and search withholds the
+   * same title. The walk now ends at a deleted ancestor exactly as it ends at
+   * an invisible one (7.80): the children fall to `no-epic`, and the title
+   * appears nowhere in the body.
+   *
+   * A LIVE epic with its own child sits in the same project as the control:
+   * it keeps its key and its label after the delete, so `no-epic` for the
+   * deleted one is the flag answering and not a walk that groups nothing.
+   */
+  let projectId: string;
+  let deletedEpicId: string;
+  let childOfDeletedId: string;
+  let liveEpicId: string;
+  let childOfLiveId: string;
+  const DELETED_EPIC_TITLE = 'Epic that will be deleted';
+  const LIVE_EPIC_TITLE = 'Epic that stays';
+
+  beforeAll(async () => {
+    projectId = newUlid();
+    deletedEpicId = newUlid();
+    childOfDeletedId = newUlid();
+    liveEpicId = newUlid();
+    childOfLiveId = newUlid();
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.created', payload: { name: 'List with a deleted epic' } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: read.world.owner, projectAdmin: true } }),
+      makeCommitted({ ...ws, entity: { kind: 'project', id: projectId }, type: 'project.member_added', payload: { userId: read.world.member, projectAdmin: false } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: deletedEpicId }, type: 'ticket.created', payload: { typeId: 'epic', projectId, parentId: null, title: DELETED_EPIC_TITLE } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: childOfDeletedId }, type: 'ticket.created', payload: { typeId: 'task', projectId, parentId: deletedEpicId, title: 'Task under the deleted epic' } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: liveEpicId }, type: 'ticket.created', payload: { typeId: 'epic', projectId, parentId: null, title: LIVE_EPIC_TITLE } }),
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: childOfLiveId }, type: 'ticket.created', payload: { typeId: 'task', projectId, parentId: liveEpicId, title: 'Task under the live epic' } }),
+    ]);
+  }, 60_000);
+
+  it('E6-11: a deleted epic ends the walk like an invisible one — its children fall to `no-epic` and its title is nowhere in the body', async () => {
+    // Before the delete: both epics head their own groups, by title.
+    const before = byKey(await listOf('member', projectId, { groupBy: 'epic', limit: 200 }));
+    expect(before[deletedEpicId]).toEqual({ label: DELETED_EPIC_TITLE, cards: [deletedEpicId, childOfDeletedId].sort() });
+    expect(before[liveEpicId]).toEqual({ label: LIVE_EPIC_TITLE, cards: [liveEpicId, childOfLiveId].sort() });
+
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: read.world.workspaceId, actorId: read.world.owner, entity: { kind: 'ticket', id: deletedEpicId }, type: 'ticket.deleted', payload: {} }),
+    ]);
+
+    const response = await getList('member', projectId, { groupBy: 'epic', limit: 200 });
+    expect(response.statusCode).toBe(200);
+    // Positive controls: the body carries the child and the live epic's group
+    // is intact, so the absences below are a filter and not an empty answer.
+    expect(response.body).toContain(childOfDeletedId);
+    const list = response.json() as ListResponse;
+    const grouped = byKey(list);
+    expect(grouped[liveEpicId]).toEqual({ label: LIVE_EPIC_TITLE, cards: [liveEpicId, childOfLiveId].sort() });
+
+    // THE TITLE is the deleted ticket's content, and the crumb, the detail
+    // door and search already withhold it. It appears nowhere.
+    expect(response.body).not.toContain(DELETED_EPIC_TITLE);
+    expect(list.groups.map((group) => group.key)).not.toContain(deletedEpicId);
+    expect(grouped['no-epic']).toEqual({ label: 'No epic', cards: [childOfDeletedId] });
+
+    // The card keeps `parentId` — the same decided boundary 7.80 pins for an
+    // invisible parent (the id is disclosed, the title is not) — and carries no
+    // `epicId`, which is the field the walk fills.
+    const child = list.groups.flatMap((group) => group.cards).find((card) => card.ticketId === childOfDeletedId);
+    expect(child?.parentId).toBe(deletedEpicId);
+    expect(child?.epicId).toBeNull();
+  });
+});

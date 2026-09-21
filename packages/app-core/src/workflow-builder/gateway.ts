@@ -53,6 +53,37 @@ export type MigrationOutcome =
   | { status: 'migrated'; count: number }
   | { status: 'refused'; rule: string; reason: string };
 
+/**
+ * The server declined to answer a read — the `/v1` doors answer a bare 404 for
+ * "no such thing OR not yours" and deliberately do not say which.
+ *
+ * **Declared HERE, in the contract, rather than in the web shell that first
+ * needed it (E2-39, 2026-09-21).** It lived in
+ * `apps/web/src/authoring/data-source-gateway.ts`, and the cost of that address
+ * was recorded twice in that shell's own prose: `WorkflowBuilderScreen` — which
+ * is in THIS package — could not narrow its roster catch on a type it could not
+ * import, so its `listMembers(...).catch(() => [])` swallowed a 500, a dropped
+ * connection and an unparseable body alike and handed `BuilderEnvironment.members`
+ * the EMPTY roster. The adapter's own text calls that "the very lie" it declined
+ * to invent; the caller told it instead, into rule summaries and
+ * `require-different-user` editors. `app-core` depends on `domain`,
+ * `rule-engine`, `sync-client`, `ui` and `@xyflow/react` — nothing under `apps/`
+ * — so the narrowing was a CONTRACT move, which is what this is.
+ *
+ * The message is the adapter's own, unchanged, so nothing a reader sees on screen
+ * moves with it; `apps/web`'s gateway re-exports this class, so `instanceof`
+ * holds on both sides of the boundary and there is exactly ONE class, not a
+ * subclass pair that could drift.
+ */
+export class AuthoringReadRefused extends Error {
+  readonly route: string;
+  constructor(route: string) {
+    super(`The server did not answer ${route}. It exists and is not yours, or it does not exist.`);
+    this.name = 'AuthoringReadRefused';
+    this.route = route;
+  }
+}
+
 export interface WorkflowAuthoringGateway {
   listWorkflows(workspaceId: string): Promise<PublishedWorkflowDef[]>;
   /**

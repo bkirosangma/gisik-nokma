@@ -46,10 +46,47 @@ export function Dialog({ open, title, onClose, children }: DialogProps) {
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
-      if (event.key === 'Escape') onClose();
+      if (event.key === 'Escape') {
+        onClose();
+        /**
+         * THE CONTRACT `Sheet` DOCUMENTS, WHICH THIS COMPONENT DID NOT HONOUR.
+         *
+         * `packages/ui/src/components/sheet.tsx` installs its own document
+         * `keydown` that closes the sheet on Escape UNLESS
+         * `event.defaultPrevented`, and its docblock says outright: *"A child
+         * that handles Escape must call `preventDefault()` for this guard to
+         * see it."* `Dialog` is that child whenever it is mounted inside a
+         * sheet — every Move, Reopen and Bulk-close goes through it — and it
+         * never called it, so ONE Escape closed both surfaces: the person who
+         * meant to cancel a move landed back on the board with the sheet gone.
+         *
+         * ⚠ **THE `capture` ARGUMENT IS LOAD-BEARING, NOT STYLE.** Both
+         * listeners are on `document`, and listeners on one node run in
+         * REGISTRATION order — the sheet mounts first, so its listener is
+         * registered first and would run first, reading `defaultPrevented` as
+         * `false` before this line could ever set it. Preventing it from a
+         * later bubble listener is too late; the sheet has already closed. A
+         * CAPTURE-phase listener on `document` fires before every bubble-phase
+         * listener on that same node, whatever the registration order, which is
+         * what makes this one line sufficient. MEASURED, not reasoned: the
+         * `preventDefault()` line ALONE, in the bubble phase, left the case RED
+         * — `expected "spy" to not be called at all, but actually been called
+         * 1 times` (`/tmp/ds1-T-E5-20-bubble2.log`) — and adding this argument
+         * is what turned it green (`/tmp/ds1-T-E5-20-capture2.log`). The
+         * measurement needs the `ui` package REBUILT first: `app-core` imports
+         * `@gisik-nokma/ui` by name from `dist`, so the first two runs of this
+         * experiment moved nothing at all.
+         *
+         * It does NOT `stopPropagation()`: the event must still reach the
+         * target, or a field inside the sheet that handles Escape (the ticket
+         * title's "abandon the draft") would stop working. This only states
+         * that the escape was consumed.
+         */
+        event.preventDefault();
+      }
     };
-    document.addEventListener('keydown', onKeyDown);
-    return () => document.removeEventListener('keydown', onKeyDown);
+    document.addEventListener('keydown', onKeyDown, true);
+    return () => document.removeEventListener('keydown', onKeyDown, true);
   }, [open, onClose]);
 
   // See the docblock above: focus enters the panel on open, so the dialog is

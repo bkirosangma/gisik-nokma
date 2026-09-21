@@ -1,4 +1,5 @@
 import type { DataSource } from '@gisik-nokma/app-core';
+import { AuthoringReadRefused } from '@gisik-nokma/app-core';
 import type { MigrationOutcome, MigrationRequest, WorkflowAuthoringGateway } from '@gisik-nokma/app-core';
 import { HttpError, type HttpClient } from '@gisik-nokma/app-core/online';
 import type {
@@ -108,26 +109,29 @@ import type {
  * caller says 'unavailable' rather than guessing a number" — so all four throw
  * `AuthoringReadRefused` instead.
  *
- * TWO consumers are built for it and one is NOT, and the difference matters
- * enough to say here rather than in a commit message. `WorkflowListScreen`
- * renders a load error on any rejection (`workflow-list-screen.tsx`, the
- * `.catch` that sets `loadFailed`), and `builder-wiring.tsx` narrows on
- * `AuthoringReadRefused` specifically — a 404 is "the no-guests door turned me
- * away", anything else is `refused` and rendered as such (a guest may not call
- * the members route at all — executor ruling 2026-09-02).
- * `WorkflowBuilderScreen` does NOT: `listMembers(...).catch(() => [])` is
- * blanket, so a 500, a dropped connection or an unparseable roster body becomes
- * the empty roster — the very lie the paragraph directly above says this
- * adapter declined to invent, told by the caller instead, into rule summaries
- * and `require-different-user` editors. That screen is `packages/app-core`, and
- * the narrowing that would fix it is not available to it: `AuthoringReadRefused`
- * is declared in THIS file, and `app-core` depends on `domain`, `rule-engine`,
- * `ui` and `@xyflow/react` — and on nothing under `apps/`, which is the part
- * that matters here. So the fix is a contract move, not a one-line catch, and it is
- * RECORDED in the coordination doc (Plan 8 Task 13 fix round, 2026-09-03) rather
- * than annexed here. The reason the adapter still rejects is unchanged: an
- * adapter that guessed `[]` would take the choice away from every consumer,
- * including the two that handle it correctly.
+ * THREE consumers are built for it, and the third took a contract move to get
+ * there. `WorkflowListScreen` renders a load error on any rejection
+ * (`workflow-list-screen.tsx`, the `.catch` that sets `loadFailed`);
+ * `builder-wiring.tsx` narrows on `AuthoringReadRefused` specifically — a 404 is
+ * "the no-guests door turned me away", anything else is `refused` and rendered as
+ * such (a guest may not call the members route at all — executor ruling
+ * 2026-09-02); and `WorkflowBuilderScreen` narrows on the same class since
+ * **E2-39 (2026-09-21)**.
+ *
+ * **That third consumer is the reason the class moved.** It used to be declared
+ * in THIS file, and `WorkflowBuilderScreen` lives in `packages/app-core`, which
+ * depends on `domain`, `rule-engine`, `sync-client`, `ui` and `@xyflow/react` —
+ * and on nothing under `apps/`. So its roster catch could not be narrowed and
+ * stayed blanket — `listMembers(...).catch(() => [])` — which turned a 500, a
+ * dropped connection or an unparseable roster body into the same empty array a
+ * refusal produces, and flowed that into rule summaries and
+ * `require-different-user` editors: the very lie the paragraph directly above
+ * says this adapter declined to invent, told by the caller instead. The class is
+ * now declared in the contract (`@gisik-nokma/app-core` →
+ * `workflow-builder/gateway.ts`) and re-exported here, so the narrowing was a
+ * one-line catch after all. The reason the adapter itself still REJECTS is
+ * unchanged: an adapter that guessed `[]` would take the choice away from every
+ * consumer, including the three that handle it correctly.
  *
  * ## What the response types buy, and what they do not
  *
@@ -167,20 +171,23 @@ import type {
  * The server declined to answer this read — a 404 from a `/v1` read door, which
  * means "no such thing OR not yours" and deliberately does not say which.
  *
- * A named class rather than a bare `Error` because one caller acts on the
+ * A named class rather than a bare `Error` because a caller acts on the
  * distinction: `builder-wiring.tsx` reads a 404 on the roster as "the no-guests
  * door turned me away, so treat me as a guest", and must NOT read a 500 or a
  * dropped connection the same way — that would render a read-only builder to
  * someone whose authorization was never established.
+ *
+ * **RE-EXPORTED, not declared here, since E2-39 (2026-09-21).** The class was
+ * declared in this file, and the cost of that address was this file's own prose:
+ * `WorkflowBuilderScreen` lives in `packages/app-core` and could not narrow its
+ * roster catch on a type it could not import, so its blanket
+ * `listMembers(...).catch(() => [])` reported a failed roster read as an empty
+ * one. It is now declared in the contract
+ * (`@gisik-nokma/app-core` → `workflow-builder/gateway.ts`) and re-exported here,
+ * so there is ONE class and `instanceof` holds on both sides. The message and
+ * the `route` field are unchanged, so nothing a reader sees moved with it.
  */
-export class AuthoringReadRefused extends Error {
-  readonly route: string;
-  constructor(route: string) {
-    super(`The server did not answer ${route}. It exists and is not yours, or it does not exist.`);
-    this.name = 'AuthoringReadRefused';
-    this.route = route;
-  }
-}
+export { AuthoringReadRefused };
 
 /** `null` is the 404 affordance; every read that has no honest empty rejects on it. */
 function answered<T>(raw: T | null, route: string): T {

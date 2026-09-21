@@ -891,6 +891,53 @@ describe('Round 24 the account menu', () => {
     await userEvent.keyboard('{ArrowUp}');
     expect(screen.getByRole('menuitem', { name: 'Sign out Kiro' })).toHaveFocus();
   });
+
+  /**
+   * RULING E5-37 — `name: user.name ?? user.id` never caught an EMPTY
+   * string (`??` only catches `null`/`undefined`), and better-auth's
+   * magic-link population creates every email sign-up with `name: ''`. The
+   * shell then had no idea who was signed in: an empty accessible name on
+   * this trigger, an empty menu header, a "?" monogram. Every one of those
+   * surfaces reads `useCurrentUser`'s `name`, so fixing that one hook fixes
+   * all of them — this case is the trigger and the menu header together,
+   * the two the finding's own transcript quoted verbatim ("Account menu
+   * for ", an empty header line).
+   */
+  it('E5-37 an email sign-up (name === "") falls back to the email, not a blank name', async () => {
+    currentPath = '/workspaces';
+    mockSessionUser = { id: 'u_no_name', name: '', email: 'anjali@example.com' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const trigger = await screen.findByRole('button', { name: 'Account menu for anjali@example.com' });
+    await userEvent.click(trigger);
+    expect(screen.getByRole('menu')).toHaveTextContent('anjali@example.com');
+  });
+
+  it('E5-37 a person with neither name nor email is not announced with a blank suffix', async () => {
+    // A shape the type admits ({ id, name, email? }) even if the product's
+    // own better-auth config would not produce it today. This case first
+    // expected `Account menu for u_bare` — the id as the floor of the chain.
+    // Landed E4-33 (13.1054, the shell's one reading in `display-label.ts`)
+    // rules the other way for THIS control: a person with no label gets
+    // `Account menu` with the suffix OMITTED, because `Account menu for ` is
+    // the defect and an opaque id read aloud is not a name. The id fallback
+    // E5-37 wrote survives in `useSessionStatus`, whose consumers print a
+    // name with no label helper. The property this case keeps is the one
+    // both rulings share: never a blank suffix, never an empty name.
+    currentPath = '/workspaces';
+    mockSessionUser = { id: 'u_bare', name: '', email: '' };
+    render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+    const trigger = await screen.findByRole('button', { name: 'Account menu' });
+    expect(trigger).toBeInTheDocument();
+    expect(trigger.getAttribute('aria-label')).not.toMatch(/for\s*$/);
+  });
 });
 
 /**

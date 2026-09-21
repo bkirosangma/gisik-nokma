@@ -153,6 +153,30 @@ export function useAppServices(): AppServices {
 }
 
 /**
+ * RULING E5-37. `name: user.name ?? user.id` never caught an EMPTY string —
+ * `??` only catches `null`/`undefined` — and better-auth's magic-link
+ * population creates a user with `name: name || ''`, so every email sign-up
+ * carries `name === ''`, confirmed in the database (`members/page.tsx`'s own
+ * `memberLabel` docblock records the same population fact). The result was
+ * an empty accessible name and an empty monogram on every surface this
+ * shell shows the signed-in person's name — "Workspaces — ", "Account menu
+ * for ", a bare "?" avatar.
+ *
+ * Same `name → email → id` order `members/page.tsx`'s `memberLabel` already
+ * uses for the SAME better-auth population, so the two surfaces cannot
+ * describe one person differently. Fixed once, here, rather than at each of
+ * `useCurrentUser`'s and `useSessionStatus`'s five consumer sites, so none
+ * of them can drift back to a bare `??`.
+ */
+function userDisplayName(user: { name: string; id: string; email?: unknown }): string {
+  const name = user.name.trim();
+  if (name !== '') return name;
+  const email = typeof user.email === 'string' ? user.email.trim() : '';
+  if (email !== '') return email;
+  return user.id;
+}
+
+/**
  * The signed-in user, or null while the session loads / when signed out.
  *
  * `email` joined in Round 24, for the account menu's header: the nav's control
@@ -173,7 +197,15 @@ export function useCurrentUser(): { id: string; name: string; email: string | nu
   if (user === undefined || user === null) return null;
   return {
     id: user.id,
-    name: user.name ?? user.id,
+    // The RAW name, deliberately: the shell's one reading of "what do we call
+    // this person" is `display-label.ts` (E4-33, landed) — `displayLabelOf`
+    // falls back to the email for the label and `avatarNameOf` to the email's
+    // handle for the monogram. Rewriting `name` to the email HERE (E5-37's
+    // first shape) reached the avatar as a name and made the monogram's title
+    // the whole address, which B03's 13.1054 pins as the defect. E5-37's
+    // `name → email → id` fallback lives on in `useSessionStatus` below, whose
+    // consumers print a name and have no label helper.
+    name: user.name,
     email: typeof user.email === 'string' && user.email !== '' ? user.email : null,
   };
 }
@@ -203,7 +235,7 @@ export function useSessionStatus(): SessionStatus {
   const session = authClient.useSession();
   const user = session.data?.user;
   if (user !== undefined && user !== null) {
-    return { kind: 'signed-in', user: { id: user.id, name: user.name ?? user.id } };
+    return { kind: 'signed-in', user: { id: user.id, name: userDisplayName(user) } };
   }
   return session.isPending ? { kind: 'loading' } : { kind: 'signed-out' };
 }

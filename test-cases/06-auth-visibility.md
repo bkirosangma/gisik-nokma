@@ -261,6 +261,35 @@ Mirrors `Features.md` §6. Status: `❌` not covered · `✅` covered · `🟡` 
 - **6.148** ✅ **THE P22 FIXTURE — a revoked person whose PROJECT-scope roster row is still standing is swept anyway.** The one state in which the sanctioned reader and the forbidden one give different answers, and therefore the only state in which the rule is testable at all. `membership.revoked` deletes the workspace-scope row and may not touch the project-scope one (a different entity's stream — `proj-memberships.ts` explains why), so a roster row STANDS for someone who is not a member and a bare `SELECT role FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2` calls them current: case 6.137's bug, here in the expensive direction, where the sweep would exclude a departed person as a member and keep their data forever — the exact finding the tool exists to close. The premise is asserted first and PRINTED rather than counted (`[{ scope_kind: 'project', project_id, role: 'member' }]`), because a fixture whose surviving row was absent would prove only that a missing row confers nothing. Built through the ledger AND the projection per 6.146 — `project.member_added` via `record()`, never `seedMember(..., [{projectId}])`, which would re-apply `membership.granted` to the projection without appending it to the ledger. Two mutations driven, each reddening THIS case and nothing else in the file: replacing `resolveEffectiveRole` with the unfiltered direct read (the 6.137 shape), and dropping `scope_kind = 'workspace'` from the DELETE's own guard, which lets the surviving row veto the deletion at the last step instead of the first. The same state is already pinned for `canSee` at `test/visibility/can-see.test.ts`; retention needed its own, because a rule proved in one caller is not proved in another. — `apps/server/test/tools/sweep-user-preferences.test.ts`
 - **6.149** ✅ **Both sweeps' deletions are safe against what can change between reading and writing — one predicate ANDed with nothing it did not intend, one DELETE that re-states its own condition.** `sweepInviteTokens` deletes BY PREDICATE rather than by the id list its dry run returned, so one statement decides and acts on the same committed snapshot; the predicate is now PARENTHESISED, because its top level is an `OR` and `AND` binds tighter, so the first requirement to append `AND workspace_id = $1` would otherwise bind as `expires_at <= now() OR (EXISTS(…) AND workspace_id = $1)` and sweep every lapsed token in every workspace — a statement that still parses and still runs. `sweepUserPreferences` cannot use that shape (its window start comes from the ledger, per row), so its DELETE carries the membership condition instead of delegating eligibility to a TypeScript variable read three round-trips earlier: steps 1–3 are separate awaited statements with no enclosing transaction, and `user_preferences` is AUTHORED — "nothing derives it from the ledger and nothing rebuilds it" (`migrations/1788295700000_user-preferences.sql`) — so a `membership.granted` committing mid-sweep would destroy a now-current member's row unrecoverably. When the guard fires the row stays, `swept` still names it and `deleted` does not count it: the two numbers disagree, which is the honest report of a race rather than a claim the row went. *The `scope_kind = 'workspace'` filter on that guard is DRIVEN by 6.148 — widening it reintroduces 6.137 in the same expensive direction. The RACE ITSELF is not driven by any test: interleaving a commit between two awaited statements needs a hook this suite does not have, and a fixture that could not lose the race would be a check that cannot fail. Named rather than implied; owner: whoever gives these tools a scheduling surface, which is the round in which concurrent sweeps become real.* — `apps/server/src/tools/sweep-invite-tokens.ts`, `apps/server/src/tools/sweep-user-preferences.ts`
 
+## A member or guest can leave a workspace (E6-21)
+
+`check-role-permission.test.ts` — no case markers exist in that file for the pre-engine role gate
+(see its own header note: the right ids belong to Plan 4 Tasks 12–14's catalogue pass, not yet run),
+so this section carries the entries and cites the file by path rather than by an in-file marker.
+
+- **6.150** ✅ `checkRolePermission`'s `membership.revoked` arm gated EVERY submission on
+  `isWorkspaceAdmin`, including a person revoking their OWN membership — refused
+  `WORKSPACE_MEMBERSHIP_REASON`, identically to a plain member trying to manage someone ELSE'S. Two
+  documents already assumed leaving was possible: `http-origin.ts`'s CSRF docblock excludes the
+  invite-accept door from the protected set because acceptance lands "in a workspace they can leave",
+  and the export's privacy copy promises the same. Fixed with one arm: `membership.revoked` where
+  `payload.userId === ctx.sessionUserId` returns `null` (not refused) for ANY role, checked before the
+  `isWorkspaceAdmin` gate. Three levels of proof: (1) pure `checkRolePermission`, `it.each(['guest',
+  'member', 'admin'])`, isolated from the ingest pipeline; (2) the real client door,
+  `ingestClientBatch`, proving a member's leave-claim commits and the same person is refused as a
+  non-member immediately after; (3) the control — a plain member still cannot revoke someone else's
+  membership, `WORKSPACE_MEMBERSHIP_REASON` unchanged. RED confirmed by reverting the arm: 3 failed
+  (both `guest`/`member` pure cases, plus the client-door commit — `admin` never failed, since
+  `isWorkspaceAdmin` already let an admin's self-revoke through before this fix). GREEN restored: 53
+  passed. **The sole-owner exception is NOT re-guarded at this gate**: `rule-engine/checks/
+  membership.ts`'s last-owner guard runs in the ENGINE, after this gate, for every door, and counts
+  owners in the world rather than trusting an actor check — already covered by that file's own
+  `'refuses revoking the only owner, naming last-owner'` case, unchanged by this fix. **Not built
+  here, per the finding's own split: a `Leave` control on the workspace home or account page** — the
+  finding calls that "the UX lane's half; the door is this lane's." —
+  `apps/server/test/permissions/check-role-permission.test.ts`,
+  `apps/server/src/permissions/check-permission.ts`
+
 ## The link read serves the TOKEN's expiry (executor 2, 2026-09-19) — case `13.988`
 
 **The `isInvite` expiry ruling** (`docs/lanes/owner-holds.md` §1, `THE DOORS, RULED`). The door was measured

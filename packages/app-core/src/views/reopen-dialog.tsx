@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useEffect, useState } from 'react';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 
 /** Which authority produced the refusal being shown. They are never the same thing. */
@@ -60,6 +60,29 @@ export function ReopenDialog({
   onCancel,
 }: ReopenDialogProps) {
   const [toStateId, setToStateId] = useState(reopenStates[0]?.id ?? '');
+  /**
+   * ⚠ THE SEED RUNS ONCE, AND `reopenStates` IS SET PER ATTEMPT (E2-33b,
+   * 2026-09-21).
+   *
+   * `create-ticket-flow.tsx` builds this list for each refused attempt it opens
+   * the offer for, so a rerender can hand a mounted dialog a list that no longer
+   * holds the standing id. This `Select` is the NON-searchable variant, whose
+   * trigger renders `selected ? selected.label : placeholder`
+   * (`packages/ui/src/select/select.tsx`) — so the button then read `Select…` —
+   * *nothing chosen* — while `toStateId` was non-empty and the confirm was
+   * ENABLED by the emptiness test below. The screen and the payload disagreeing
+   * is the one thing this product refuses by name.
+   *
+   * Narrow on purpose, like the ticket dialog's re-seed (E2-33a): it fires only
+   * when the standing destination has LEFT the list, and it re-asks the question
+   * the initial seed asked. A re-seed on every change would replace a
+   * destination the person can still make.
+   */
+  useEffect(() => {
+    if (toStateId === '') return;
+    if (reopenStates.some((state) => state.id === toStateId)) return;
+    setToStateId(reopenStates[0]?.id ?? '');
+  }, [reopenStates, toStateId]);
   return (
     <Dialog open={open} title="Reopen parent?" onClose={onCancel}>
       <p className="gn-reopen__summary">
@@ -99,7 +122,15 @@ export function ReopenDialog({
       ) : null}
       <div className="gn-reopen__actions">
         <Button onClick={onCancel}>Cancel</Button>
-        <Button variant="primary" disabled={toStateId === ''} onClick={() => onAccept(toStateId)}>
+        {/* MEMBERSHIP, not emptiness (E2-33b): `toStateId === ''` passes for an id
+            the list no longer offers. The effect above re-seeds that case; this is
+            the belt to its braces, so a payload can only ever carry an offered
+            state. */}
+        <Button
+          variant="primary"
+          disabled={toStateId === '' || !reopenStates.some((state) => state.id === toStateId)}
+          onClick={() => onAccept(toStateId)}
+        >
           Reopen and proceed
         </Button>
       </div>

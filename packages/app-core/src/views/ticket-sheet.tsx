@@ -404,6 +404,26 @@ export type TicketSheetProps = {
  * clear it. **Why the branch exists did NOT change:** `data` is null on a
  * failure AND on a real absence, and an error must never render as an absence.
  *
+ * ## And what it does when the read ANSWERS `null` (E4-23, 2026-09-21)
+ *
+ * A fourth arm, between the failure and the wait, and it exists because `data`
+ * being null was doing THREE jobs rather than two. `getTicket` returns the
+ * transport's 404 affordance — `createHttpClient` answers `null` for a 404 on a
+ * GET, deliberately, because every `/v1` read door sends ONE frozen body for "no
+ * such thing" and for "not yours" (`READ_NOT_FOUND_BODY`,
+ * `apps/server/src/routes/tickets.ts`) and a client that told them apart would be
+ * inventing the existence oracle the server refused to provide. So a mistyped id,
+ * a soft-deleted ticket and a ticket this viewer may not see are ONE answer, and
+ * that answer was drawn as `Loading…` — a server refusal rendered as a wait that
+ * never ends, measured on a live page at 2.5 s, 8.5 s, 18.5 s and 61 s.
+ *
+ * `useLiveQuery` now reports `settled`, so the three states are told apart:
+ * `data === null && !settled` is the wait, `data === null && settled` is that one
+ * refusal, and each renders its own words. **The sentence names both readings** —
+ * *"This ticket is not here — it may have been deleted, or you may not be able to
+ * see it."* — because naming only one of them would be this screen making the
+ * distinction the server declined to make.
+ *
  * `HistoryTab` (below) applies the SAME three-way distinction to the ledger tab.
  */
 export function TicketSheet({
@@ -434,6 +454,15 @@ export function TicketSheet({
    */
   const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  /**
+   * How many moves have COMMITTED. Bumped beside `setMoveOpen(false)` on the
+   * success path and used as `TransitionDialog`'s `key`, so a committed move is a
+   * fresh dialog the next time it opens (E2-32, 2026-09-21) while a Cancel —
+   * which does not bump it — still preserves what was typed. The reason is at the
+   * bump site; the short version is that the dialog's own `!open` effect serves
+   * Cancel and Commit alike and can only honour one of them.
+   */
+  const [movesCommitted, setMovesCommitted] = useState(0);
   const [serverRefusal, setServerRefusal] = useState<{ rule: string; reason: string } | null>(null);
   /**
    * Ruling 33 (fix round 2, 2026-09-17) — Close/Reopen's OWN transport-error
@@ -447,6 +476,27 @@ export function TicketSheet({
    * name until this ruling gave it a proper slot.
    */
   const [transportError, setTransportError] = useState<string | null>(null);
+  /**
+   * THE FOOTER'S OWN PAIR, and the same two facts as `serverRefusal` /
+   * `transportError` one screen down (E5-9, 2026-09-21).
+   *
+   * WHY PLACEMENT IS PART OF THE ANSWER HERE. `Delete` is the last thing in the
+   * sheet's body, and that body scrolls: the lane that filed this measured
+   * `.gn-ticket-sheet__body` at `clientHeight 756` against `scrollHeight 4036`,
+   * with the footer's top 3,942.8 px below the tab bar. The shared slots sit at
+   * the HEAD of that body, so a person who scrolled to the foot, pressed Delete
+   * and was refused was answered about five viewports above their own eyes —
+   * the sentence was on screen in the DOM and nowhere near the screen they were
+   * looking at. `TransitionDialog` already owns its own refusal slots for
+   * exactly this reason; Delete had none.
+   *
+   * These are separate STATE, not a flag on the shared pair, because the two
+   * sentences must never coexist: every submission clears BOTH pairs (see
+   * `submitTicketEvent`'s `clearBoth`), so one click's outcome is one sentence
+   * in one place.
+   */
+  const [footerRefusal, setFooterRefusal] = useState<{ rule: string; reason: string } | null>(null);
+  const [footerTransport, setFooterTransport] = useState<string | null>(null);
   /**
    * A THIRD slot, and the third distinct fact: something the editor itself
    * could not do, where the server was never asked.
@@ -623,6 +673,25 @@ export function TicketSheet({
     );
   }
 
+  // **The read ANSWERED `null` — a distinct state from "not answered yet" (E4-23,
+  // 2026-09-21).** `null` is the transport's deliberate 404 affordance: every `/v1`
+  // read door answers ONE frozen body for "no such thing" and for "not yours"
+  // (`apps/server/src/routes/tickets.ts`, `READ_NOT_FOUND_BODY`), so a mistyped id,
+  // a soft-deleted ticket and a ticket this viewer may not see all arrive here as
+  // `null` and are deliberately indistinguishable. Gating on `data === null` alone
+  // drew all three as `Loading…` — a server refusal rendered as a wait that never
+  // ends, measured at 61 s on a live page. The sentence names BOTH readings because
+  // the one-body refusal is exactly the reason the server will not say which.
+  if (read.data === null && read.settled) {
+    return (
+      <Sheet open title="Ticket" onClose={onClose}>
+        <p className="gn-ticket-sheet__absent" data-testid="sheet-ticket-absent">
+          This ticket is not here — it may have been deleted, or you may not be able to see it.
+        </p>
+      </Sheet>
+    );
+  }
+
   if (read.data === null) {
     return (
       <Sheet open title="Ticket" onClose={onClose}>
@@ -668,27 +737,44 @@ export function TicketSheet({
    * it comes back as a REFUSAL naming the client's own payload as malformed,
    * which is a refusal about this code shown to a user as if it were about
    * their move.
+   *
+   * `fieldValues` is the OTHER half of "what the submission will carry", and it
+   * travels by a different road for a reason worth stating: `require-comment`
+   * and `require-evidence` are read from the CANDIDATE, so their values go into
+   * the payload above; `require-field` is read from the TICKET STATE
+   * (`rule-engine/src/rules/require-field.ts:9`), so a payload key could not
+   * reach it at all. The dialog's collected field values therefore ride
+   * `pendingFields`, which applies them to the ticket the engine sees — the
+   * preview's stand-in for the ordered batch the real path sends.
    */
   const precheck = async (
     toStateId: string,
     evidenceAttachmentId?: string | null,
+    fieldValues?: Record<string, string>,
+    comment?: string,
   ): Promise<PrecheckResult> => {
     if (cache === undefined) return { kind: 'not-evaluated', why: 'missing-local-state' };
     // The candidate must carry WHAT THE SUBMISSION WILL CARRY, or the engine
     // evaluates a claim nobody is about to make — and `require-evidence` is
     // exactly that case: an absent id reads as "none was provided" and the
-    // preview refused a move the user had just satisfied.
+    // preview refused a move the user had just satisfied. `require-comment` is
+    // the second case of the same omission, read off the payload by
+    // `evaluateRequireComment`, so it rides the payload too — with the SAME
+    // trim the submission applies, so a whitespace-only comment is unset on
+    // both paths rather than on one.
     const payload: Record<string, unknown> = { to: toStateId };
     if (evidenceAttachmentId !== undefined && evidenceAttachmentId !== null) {
       payload['evidenceAttachmentId'] = evidenceAttachmentId;
     }
+    const text = comment?.trim() ?? '';
+    if (text !== '') payload['comment'] = { text };
     const candidate: SubmittedEvent = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
       type: 'ticket.transitioned',
       payload,
     });
-    return precheckEvent(candidate, cache);
+    return precheckEvent(candidate, cache, { pendingFields: fieldValues });
   };
 
   /**
@@ -709,6 +795,21 @@ export function TicketSheet({
    * `require-field` rule sees the value the dialog just collected.
    */
   const submitTransition = async (submission: TransitionSubmission): Promise<void> => {
+    // E5-27 — the latch, the same one and the same shape `submitTicketEvent`
+    // above uses. The early return is the belt; the `disabled` the dialog
+    // renders off this same flag is the braces, and it is the primary defence:
+    // React re-renders `disabled` onto the DOM before a second click can land,
+    // and this line covers a synchronous double-invoke that lands in the same
+    // render pass.
+    //
+    // ONE LATCH FOR THE SHEET, deliberately, not a second one for the Move
+    // path: a sheet with two writes in flight at once has no single answer to
+    // "what is happening", and the Move dialog is modal, so the footer it
+    // would be racing is behind it anyway. The visible consequence — Close,
+    // Reopen and Delete are disabled for the lifetime of a Move's ingest — is
+    // the correct one rather than a cost.
+    if (submitting) return;
+    setSubmitting(true);
     const fieldEvents = Object.entries(submission.fieldValues).map(([fieldId, value]) =>
       make({
         workspaceId,
@@ -728,40 +829,77 @@ export function TicketSheet({
       type: 'ticket.transitioned',
       payload: transitionPayload,
     });
-    const results = await dataSource.ingest([...fieldEvents, transition]);
-    const failed = results.find((result) => result.status !== 'committed');
-    /*
-      BOTH READS ARE RE-ASKED ON EVERY ANSWER, not only the happy one (E2-36).
-      The batch above is ordered `[...fieldEvents, transition]` so a
-      `require-field` rule sees what the dialog just collected (:708-710) — which
-      means a batch that is refused AT THE TRANSITION has usually already
-      committed its field claims. The refusal arms below set `serverRefusal` and
-      used to RETURN with no reload, so the sheet sat behind the refusal still
-      painted with the pre-move values while the server already held the new
-      ones.
+    try {
+      const results = await dataSource.ingest([...fieldEvents, transition]);
+      const failed = results.find((result) => result.status !== 'committed');
+      /*
+        BOTH READS ARE RE-ASKED ON EVERY ANSWER, not only the happy one (E2-36).
+        The batch above is ordered `[...fieldEvents, transition]` so a
+        `require-field` rule sees what the dialog just collected (:708-710) — which
+        means a batch that is refused AT THE TRANSITION has usually already
+        committed its field claims. The refusal arms below set `serverRefusal` and
+        used to RETURN with no reload, so the sheet sat behind the refusal still
+        painted with the pre-move values while the server already held the new
+        ones.
 
-      ⚠ The staleness window is stated for what it is, because the finding's
-      first draft overstated it ("nothing re-read"). A committed
-      `ticket.field_set` moves the workspace stream, so with `/v1/stream` live
-      the sheet DOES re-read itself and the window is a beat. What does not
-      repair is the socket-absent or socket-slow case — the same case
-      `page.tsx`'s delete handler was fixed for on 2026-09-20 (see `onDeleted`'s
-      docblock: "with the `/v1/stream` socket absent the list still showed a row
-      the toast had just said was deleted"). One reload site for both answers
-      removes the question rather than narrowing the window.
-    */
-    read.reload();
-    history.reload();
-    if (failed === undefined) {
+        ⚠ The staleness window is stated for what it is, because the finding's
+        first draft overstated it ("nothing re-read"). A committed
+        `ticket.field_set` moves the workspace stream, so with `/v1/stream` live
+        the sheet DOES re-read itself and the window is a beat. What does not
+        repair is the socket-absent or socket-slow case — the same case
+        `page.tsx`'s delete handler was fixed for on 2026-09-20 (see `onDeleted`'s
+        docblock: "with the `/v1/stream` socket absent the list still showed a row
+        the toast had just said was deleted"). One reload site for both answers
+        removes the question rather than narrowing the window.
+      */
+      read.reload();
+      history.reload();
+      if (failed === undefined) {
+        setServerRefusal(null);
+        setTransportError(null);
+        setMoveOpen(false);
+        // **A COMMITTED move is a fresh dialog next time (E2-32, 2026-09-21).**
+        // The dialog's own `!open` effect deliberately keeps `comment` and
+        // `fieldValues` across a close — *"typing into a dialog and losing it to a
+        // stray Cancel is a real cost"* — and that argument is about CANCEL, while
+        // the effect serves Commit alike. The dialog is mounted for the sheet's
+        // whole life, so without this the next Move carried the previous move's
+        // words onto the wire: a comment written about move A recorded as move B's.
+        // Bumping this KEY remounts the dialog, which discards the whole abandoned
+        // attempt and nothing else — Cancel does not bump it, so the cost the
+        // docblock defends is untouched.
+        setMovesCommitted((count) => count + 1);
+        return;
+      }
+      // The authority's own words, carried without paraphrase. A refusal is a
+      // named rule and a reason the engine wrote; an `invalid` is the door's code
+      // and message. Both reach the user as they were said.
+      setTransportError(null);
+      if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
+      else setServerRefusal({ rule: failed.code, reason: failed.message });
+    } catch (cause) {
+      // E2-29 — a dropped connection during a Move, which used to produce
+      // nothing at all. The await above had no `catch` and the call site is
+      // `void submitTransition(submission)`, so a rejected `ingest` was an
+      // unhandled promise rejection: the sheet's own transport sentence renders
+      // only when `!moveOpen`, and the dialog replacing it was handed the
+      // literal `null`, so no surface could speak. Same channel and same
+      // sentence the sibling writes here use (`submitTicketEvent`), and the
+      // same one `board.tsx`'s `submitFromDialog` reaches for a dialog Move —
+      // Ruling 27's split: a silence is not an adjudication, so this is
+      // `transportError`/`gn-refusal--transport`, never a `{rule, reason}` pair
+      // standing in for one. The dialog stays open, and it is the dialog that
+      // carries the sentence: it is the surface in view, and the retry lives
+      // there.
+      const message = cause instanceof Error ? cause.message : String(cause);
       setServerRefusal(null);
-      setMoveOpen(false);
-      return;
+      setTransportError(`We could not reach the server for this move — ${message}`);
+    } finally {
+      // In a `finally`, not after the await, for the reason `submitTicketEvent`'s
+      // own docblock records: a REJECTED ingest must not leave Move disabled for
+      // ever, which resetting only on the happy path would do.
+      setSubmitting(false);
     }
-    // The authority's own words, carried without paraphrase. A refusal is a
-    // named rule and a reason the engine wrote; an `invalid` is the door's code
-    // and message. Both reach the user as they were said.
-    if (failed.status === 'refused') setServerRefusal({ rule: failed.rule, reason: failed.reason });
-    else setServerRefusal({ rule: failed.code, reason: failed.message });
   };
 
   /**
@@ -825,7 +963,7 @@ export function TicketSheet({
    * user nothing**: `TicketEditorSlot` clears the composer only in `comment`
    * mode, so a refused description save leaves their words on screen.
    */
-  const submitDescription = async (submission: EditorSlotSubmission): Promise<void> => {
+  const submitDescription = async (submission: EditorSlotSubmission): Promise<boolean> => {
     const event = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
@@ -837,7 +975,7 @@ export function TicketSheet({
     if (result === undefined) {
       setServerRefusal(null);
       setTransportError('The server did not answer this change.');
-      return;
+      return false;
     }
     if (result.status === 'committed') {
       setServerRefusal(null);
@@ -851,10 +989,13 @@ export function TicketSheet({
       setEditorError(null);
       read.reload();
       history.reload();
-      return;
+      return true;
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
     else setServerRefusal({ rule: result.code, reason: result.message });
+    // V7 — NOT ACCEPTED, and the composer must keep the words. Reached by a
+    // `refused`, by an `invalid`, and by any status this build does not name.
+    return false;
   };
 
   /**
@@ -866,11 +1007,16 @@ export function TicketSheet({
    * ticket read would be a request that cannot have a different answer. What a
    * comment DOES join is the thread and the ledger tab, and both are reloaded.
    *
-   * The composer clears itself on success without help from here:
-   * `TicketEditorSlot.handleSubmit` clears in `comment` mode only, which is the
-   * half of its contract this mode exists for.
+   * The composer clears itself on success without help from here, and **V7 is
+   * why "success" is now a SIGNAL rather than the absence of a throw**:
+   * `TicketEditorSlot.handleSubmit` clears in `comment` mode only, and it clears
+   * on this function's own `true`. It used to clear on the promise RESOLVING,
+   * and a refusal resolves — this function records the server's answer in
+   * `serverRefusal` and returns normally — so a refused comment wiped the
+   * composer and cost the author the words they had just written, which is the
+   * outcome the slot's own docblock promises cannot happen.
    */
-  const submitComment = async (submission: EditorSlotSubmission): Promise<void> => {
+  const submitComment = async (submission: EditorSlotSubmission): Promise<boolean> => {
     const event = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
@@ -882,7 +1028,7 @@ export function TicketSheet({
     if (result === undefined) {
       setServerRefusal(null);
       setTransportError('The server did not answer this change.');
-      return;
+      return false;
     }
     if (result.status === 'committed') {
       setServerRefusal(null);
@@ -890,10 +1036,13 @@ export function TicketSheet({
       setEditorError(null);
       comments.reload();
       history.reload();
-      return;
+      return true;
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
     else setServerRefusal({ rule: result.code, reason: result.message });
+    // V7 — NOT ACCEPTED, and the composer must keep the words. Reached by a
+    // `refused`, by an `invalid`, and by any status this build does not name.
+    return false;
   };
 
   /**
@@ -1001,9 +1150,16 @@ export function TicketSheet({
   const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> => {
     const people = members.data ?? [];
     const needle = query.trim().toLowerCase();
+    // RULING E5-4: `member.name` verbatim is blank for the magic-link
+    // population (`name: ''`) — the same defect E4-18 closed on the
+    // Assignee picker, here on the @mention list. Resolved through
+    // `actorLabel` BEFORE matching, not after: a nameless member is
+    // otherwise never reachable by typing (their raw name never matches
+    // anything) and, once resolved, is found the same way any other
+    // person is — by what this list actually shows for them.
     return people
-      .filter((member) => needle === '' || member.name.toLowerCase().includes(needle))
-      .map((member) => ({ userId: member.id, name: member.name }));
+      .map((member) => ({ userId: member.id, name: actorLabel(member.id, member.name) }))
+      .filter((person) => needle === '' || person.name.toLowerCase().includes(needle));
   };
 
   /**
@@ -1062,7 +1218,38 @@ export function TicketSheet({
   const submitTicketEvent = async (
     type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
     onCommitted: () => void,
+    /**
+     * WHERE this event's answer is shown (E5-9). `'sheet'` is the shared slot at
+     * the head of the body; `'footer'` is the one beside Delete.
+     *
+     * The state machine is SHARED on purpose — the refusal/transport split, the
+     * `submitting` latch and the three-outcome branch are one decision, and a
+     * delete that grew a private copy is how the two drift. What is NOT shared
+     * is the PLACEMENT, because the two controls are not equally far from the
+     * shared slot: `Delete` sits at the end of a body that legitimately scrolls
+     * thousands of pixels, and the lane that filed this measured the footer's
+     * top 3,942.8 px below the tab bar — so an answer rendered at the head is an
+     * answer the person who pressed the button cannot see. `Close`/`Reopen` sit
+     * in that same footer, but their refusals are rendered by `TransitionDialog`
+     * (which owns its own slot) or by the shared one while the person is still
+     * at the head of the body.
+     */
+    sink: 'sheet' | 'footer',
   ): Promise<void> => {
+    // ONE pair of writers per sink, chosen once. Every branch below states its
+    // outcome through these rather than through the setters directly, so a
+    // future outcome cannot land in the wrong place by omission.
+    const putRefusal = sink === 'footer' ? setFooterRefusal : setServerRefusal;
+    const putTransport = sink === 'footer' ? setFooterTransport : setTransportError;
+    // Both sinks are cleared by every submission, whichever one this is: two
+    // sentences about one click's outcome — one stale, one current — is the
+    // defect the shared slot's own comment below already refuses.
+    const clearBoth = (): void => {
+      setServerRefusal(null);
+      setTransportError(null);
+      setFooterRefusal(null);
+      setFooterTransport(null);
+    };
     if (submitting) return;
     setSubmitting(true);
     try {
@@ -1076,20 +1263,19 @@ export function TicketSheet({
       const result = results[0];
       if (result === undefined) {
         // Ruling 27/33/34: silence is not a refusal — `transportError`, never
-        // a hand-built `{rule, reason}` pair standing in for one. `serverRefusal`
-        // is cleared here too, the same pairing the `catch` branch below
+        // a hand-built `{rule, reason}` pair standing in for one. The other
+        // slot is cleared here too, the same pairing the `catch` branch below
         // already does: without it, a REFUSED answer followed by a SILENT one
         // (two separate clicks, two separate ingests) would leave the old
         // "Refused by the server — …" notice on screen alongside the new
         // transport one — two notices for one click's outcome, the earlier one
         // describing an answer that is no longer what happened.
-        setServerRefusal(null);
-        setTransportError('The server did not answer this change.');
+        clearBoth();
+        putTransport('The server did not answer this change.');
         return;
       }
       if (result.status === 'committed') {
-        setServerRefusal(null);
-        setTransportError(null);
+        clearBoth();
         // What a COMMITTED event does next is the caller's — Close/Reopen
         // re-read (the ticket's own state moved), Delete closes and narrates
         // (the ticket is gone from every view). Everything before this line is
@@ -1099,16 +1285,16 @@ export function TicketSheet({
         onCommitted();
         return;
       }
-      setTransportError(null);
-      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
-      else setServerRefusal({ rule: result.code, reason: result.message });
+      clearBoth();
+      if (result.status === 'refused') putRefusal({ rule: result.rule, reason: result.reason });
+      else putRefusal({ rule: result.code, reason: result.message });
     } catch (error) {
       // Ruling 27/33: a transport failure is not a refusal either — same
       // `transportError` channel `board.tsx`'s `submitDirect` (`:1082-1088`)
       // uses, own sentence, never `serverRefusal`.
-      setServerRefusal(null);
+      clearBoth();
       const message = error instanceof Error ? error.message : String(error);
-      setTransportError(`We could not reach the server for this change — ${message}`);
+      putTransport(`We could not reach the server for this change — ${message}`);
     } finally {
       setSubmitting(false);
     }
@@ -1207,10 +1393,19 @@ export function TicketSheet({
 
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
-    submitTicketEvent(type, () => {
-      read.reload();
-      history.reload();
-    });
+    submitTicketEvent(
+      type,
+      () => {
+        read.reload();
+        history.reload();
+      },
+      // The shared slot. Their own refusals are the one case that reaches it
+      // from the foot of the sheet: Close/Reopen are rendered only while
+      // `TransitionDialog` is closed, and its copy is not on screen then — see
+      // the slot's own comment, which is what makes that placement deliberate
+      // rather than an oversight.
+      'sheet',
+    );
 
   /**
    * `Delete` — the SOFT delete, and the sheet's only removal.
@@ -1235,12 +1430,23 @@ export function TicketSheet({
    * Delete gets the engine's own refusal in `gn-refusal--server` rather than a
    * button that silently is not there. **A hidden control cannot explain
    * itself.**
+   *
+   * ## ⚠ AND ITS REFUSAL ANSWERS IN THE FOOTER, NOT AT THE HEAD OF THE BODY
+   *
+   * The ruling above is about WHETHER Delete is offered; it never weighed
+   * WHERE its answer lands, and the answer landed five screens away (E5-9;
+   * the measurement is on `footerRefusal`). The sink is `'footer'` for that
+   * reason: the sentence renders beside the button the person just pressed.
    */
   const deleteTicket = (): Promise<void> =>
-    submitTicketEvent('ticket.deleted', () => {
-      onClose();
-      onDeleted?.(ticketId, ticketRead.title);
-    });
+    submitTicketEvent(
+      'ticket.deleted',
+      () => {
+        onClose();
+        onDeleted?.(ticketId, ticketRead.title);
+      },
+      'footer',
+    );
 
   const state = ticketRead.ticket;
   /**
@@ -1311,13 +1517,37 @@ export function TicketSheet({
    *
    * `rollup === null` is a real fact (no children at all, `ticket-cards.ts`'s
    * own reading), so it is not treated as an unknown to be excused.
+   *
+   * ⚠ **AND "UNREAD" IS NOT "EMPTY" — V8, 2026-09-21.** `subtaskRows` used to be
+   * `subtasks.data ?? []`, which reads an in-flight or failed read as a list of
+   * zero — and `useLiveQuery` resets `data` to `null` on every KEY change, which
+   * this one does the moment the ticket read lands (the key carries the project
+   * id; see its own comment). So on EVERY ordinary parent-ticket load, for the
+   * whole second round trip, `subtaskRows.length` was 0 while `subtaskExpected`
+   * was the server's real child count — and the section rendered a
+   * `role="alert"` telling the person the list was *"not shown rather than shown
+   * short"* about a list nobody had read yet. The reconciliation is now gated on
+   * the read having ANSWERED, which is strictly narrower and keeps the property
+   * this section exists for: a short list is still never drawn silently.
+   *
+   * ⚠ **A FAILED read is lumped in with a pending one here, and that is named
+   * rather than hidden:** `subtasks.error` is not consulted below, so a child
+   * read that REJECTS (past `LIST_ROW_CAP`, or a dropped connection) renders
+   * neither the alert, nor the empty sentence, nor a failure sentence — the
+   * section draws nothing at all. The empty sentence it used to draw in that
+   * case was a false claim about the ticket, so this is smaller, but it is still
+   * an absence: **owner — whoever next touches this section**, and the three-arm
+   * treatment `HistoryTab` already uses (error tested BEFORE `data === null`) is
+   * the model.
    */
+  const subtasksUnread = subtasks.data === null;
   const subtaskRows = subtasks.data ?? [];
   const subtaskExpected =
     ticketRead.rollup === null
       ? 0
       : ticketRead.rollup.totalChildren - ticketRead.rollup.restrictedCount;
-  const subtasksIncomplete = ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
+  const subtasksIncomplete =
+    !subtasksUnread && ticketRead.rollup !== null && subtaskRows.length !== subtaskExpected;
 
   /**
    * The chip's two inputs, bound ONCE and outside the JSX.
@@ -1563,12 +1793,100 @@ export function TicketSheet({
    * The authority's ancestors each open that ticket's sheet, and `onOpenTicket`
    * is the prop that does it — present on the mount, absent for a caller that
    * cannot open anything (`page.tsx` passes it). With no callback the crumb
-   * degrades to the SAME plain span the restricted arm uses, which is that
-   * prop's own recorded rule: *"a control that cannot be honoured"* is not
-   * drawn. One hop per crumb, exactly as the `Subtask of` chip does it, and no
-   * traversal lives here to loop.
+   * degrades to a plain span, which is that prop's own recorded rule: *"a
+   * control that cannot be honoured"* is not drawn. One hop per crumb, exactly
+   * as the `Subtask of` chip does it, and no traversal lives here to loop.
+   *
+   * ⚠ **P4 — "THE SAME PLAIN SPAN THE RESTRICTED ARM USES" WAS FALSE, AND THIS
+   * PARAGRAPH SAID IT.** The two arms share a SHAPE (a plain `<span>` with the
+   * base class and no testid behaviour of its own) and **not an ink**:
+   * `.gn-ticket-sheet__crumb--restricted` carries `var(--gn-restricted)`
+   * (`ui.css`), while this arm carries the bare class and inherits
+   * `var(--gn-text-muted)` from `.gn-ticket-sheet__crumbs`. So a crumb that is
+   * merely NOT OPENABLE and a crumb whose ticket the viewer may not SEE were
+   * painted the same way by a sentence that claimed they were the same span —
+   * and the sentence was the only thing making them look alike.
+   *
+   * The wrong half is the word SAME, not the design: **the inks stay
+   * different**, because "you cannot open this here" and "you may not see this"
+   * are different facts and this surface already keeps them apart everywhere
+   * else. What was missing was an honest description, and the identical
+   * sentence in `Features.md` is corrected in the same change.
    */
+  /**
+   * P3 — THE PARENT CRUMB READS `KEY Title`, AND THE EPIC CRUMB DOES NOT.
+   *
+   * That asymmetry is the prototype's, not an invention here: its parent crumb
+   * is `p.id + " " + p.title` (`Gisik Nokma - Desktop.dc.html:3417`) and its
+   * epic crumb is `e.title` alone (`:3410-3413`). The product matched the epic
+   * and not the parent, because
+   * the wire carried no key for an ancestor — and the cost was not cosmetic:
+   * **the key is what disambiguates**, so a ticket whose epic and parent share a
+   * title drew two IDENTICAL crumbs and a reader could not tell one ancestor
+   * from two of them.
+   *
+   * `key` is `string | null | undefined` on `ParentRef` and the three states are
+   * three facts — see that type's docblock. Only ONE of them renders a key: a
+   * string. `null` (this read could not compose one) and absent (this ref
+   * carries none — every epic) both fall back to the title alone, which is the
+   * only behaviour they share.
+   */
+  // ⚠ WHICH CRUMB IT IS — THE `noun` — DECIDES, NOT WHETHER A KEY IS PRESENT.
+  // The first version of this helper showed the key whenever the ref had one,
+  // and it drew `CCSO-7 Open Questions` for the EPIC as readily as for the
+  // parent: the asymmetry lives in the PROTOTYPE'S TWO CRUMBS, so a renderer
+  // that keys off the data cannot express it. Deriving it from `noun` is sound
+  // and deriving it from `testId` would not be — the same distinction the
+  // parameter above already records: the noun is which crumb this is, the test
+  // selector is how a test finds it.
+  //
+  // The parameter is the TICKET arm alone, and that is the narrowing rather than
+  // a convenience: `ancestorCrumb` answers the restricted case before it reaches
+  // either call site, so a restricted ref can never be labelled here — and a
+  // signature that admitted one would invite a `Restricted …` string built in
+  // two places instead of the one that already exists.
+  const crumbLabel = (
+    ancestor: Extract<NonNullable<ParentRef>, { kind: 'ticket' }>,
+    noun: 'epic' | 'parent',
+  ): string => {
+    const key = ancestor.key;
+    const withKey = noun === 'parent' && typeof key === 'string' && key !== '';
+    return withKey ? `${key} ${ancestor.title}` : ancestor.title;
+  };
+
   const epicCrumb = ticketRead.epic;
+  /**
+   * E4-1 / E5-3 — THE EPIC CRUMB IS OMITTED WHEN IT IS THE PARENT, because a
+   * crumb list is a PATH or it is nothing.
+   *
+   * The server's ancestry walk (`apps/server/src/routes/tickets.ts`) starts at
+   * `state.parentId` and returns the first ancestor whose type is an epic — so
+   * when the ticket's DIRECT PARENT is an epic, `epic.id === parent.id`. The
+   * bar then rendered the same ancestor twice under two independent null
+   * checks, and nothing compared their ids:
+   *
+   *     Convenience Corner › Shop operations › Open questions › Open questions › CCSO-6
+   *
+   * Two link crumbs, one ticket, and a depth the hierarchy does not have. That
+   * is the argument this file already makes three lines up in the other
+   * direction — *"a breadcrumb that skips a level states a hierarchy the
+   * product does not have"* — and the owner's own ruling quoted above is a
+   * chain of DISTINCT layers. It is not cosmetic for a screen-reader user, who
+   * hears two identical links and cannot tell one ancestor from two.
+   *
+   * **Blast radius, measured by the reviewer:** `23 of 26` tickets in the
+   * seeded project have an epic as their direct parent, so this is the ordinary
+   * shape rather than an edge. The prototype never shows the doubled form (its
+   * fixtures' `parentId` and `epicId` sets are disjoint), so it gives no
+   * authority for it.
+   *
+   * The comparison is on `id` ACROSS both `ParentRef` arms — a `restricted`
+   * ancestor carries an id and no title, and two restricted refs to one ticket
+   * are the same node for the same reason. **The EPIC crumb is the one dropped
+   * and the PARENT crumb is kept**: the parent is the nearer, and it is the one
+   * whose testid a reader of this file would look for.
+   */
+  const epicCrumbIsTheParent = epicCrumb !== null && parent !== null && epicCrumb.id === parent.id;
   const ancestorCrumb = (
     // `NonNullable`, because BOTH call sites have already answered the null
     // case — a missing ancestor is an omitted crumb, not a rendered one — and
@@ -1591,7 +1909,7 @@ export function TicketSheet({
       </span>
     ) : onOpen === undefined ? (
       <span className="gn-ticket-sheet__crumb" data-testid={testId}>
-        {ancestor.title}
+        {crumbLabel(ancestor, noun)}
       </span>
     ) : (
       <button
@@ -1600,7 +1918,7 @@ export function TicketSheet({
         data-testid={testId}
         onClick={() => onOpen(ancestor.id)}
       >
-        {ancestor.title}
+        {crumbLabel(ancestor, noun)}
       </button>
     );
 
@@ -1706,7 +2024,15 @@ export function TicketSheet({
             // `ticket.assigned` with `null` is a legal state the control must be
             // able to express, and a picker with no way back to it cannot.
             { value: UNASSIGNED, label: 'Unassigned' },
-            ...people.map((member) => ({ value: member.id, label: member.name })),
+            // RULING E4-18: `member.name` verbatim rendered a BLANK option
+            // for a member with no display name, breaking the honesty
+            // contract `provenance.ts` states ("a missing display name
+            // falls back to the raw actor id — attributed, never blank")
+            // and `visibility-editor.tsx:410`'s own picker already keeps.
+            ...people.map((member) => ({
+              value: member.id,
+              label: actorLabel(member.id, member.name),
+            })),
           ]}
           value={state.assigneeId ?? UNASSIGNED}
           onChange={(next) => {
@@ -1805,8 +2131,18 @@ export function TicketSheet({
                   only when there is one, the parent only when there is one.
                   Each is preceded by its own separator, so a chain with no
                   ancestors at all renders exactly the two crumbs the project
-                  and the ticket need. */}
-              {epicCrumb === null ? null : (
+                  and the ticket need.
+
+                  ⚠ AND THE GRANDPARENT ONLY WHEN IT IS NOT THE PARENT
+                  (E4-1/E5-3): the authority's own conditionals do not cover
+                  that case because ITS fixtures never produce it, but the
+                  server's ancestry walk does — see `epicCrumbIsTheParent` above
+                  for the mechanism, the 23-of-26 blast radius, and why the EPIC
+                  is the crumb dropped rather than the parent. With the
+                  comparison removed the bar reads
+                  `… › Open questions › Open questions › CCSO-6`: one ancestor,
+                  named twice, stating a depth the hierarchy does not have. */}
+              {epicCrumb === null || epicCrumbIsTheParent ? null : (
                 <>
                   <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                     ›
@@ -2250,7 +2586,14 @@ export function TicketSheet({
                 {ticketRead.rollup === null ? '' : ` · ${formatRollup(ticketRead.rollup)}`}
               </p>
             </div>
-            {subtasksIncomplete ? (
+            {/*
+              Nothing at all while the child read is in flight — not the alert,
+              and not the empty sentence either. Both are claims about a list
+              nobody has read yet; the alert is the louder one and the one V8
+              measured, and the empty arm was the same false claim one notch
+              quieter. What renders is decided by the ANSWER, never by `null`.
+            */}
+            {subtasksUnread ? null : subtasksIncomplete ? (
               // THE RECONCILIATION, rendered rather than swallowed. A short list
               // here is the one failure this section could hide, so it is said
               // in the server's own numbers instead of drawn.
@@ -2532,12 +2875,15 @@ export function TicketSheet({
             <AttachmentList entries={attachments ?? []} />
           ) : (
             /*
-              The three-way distinction this sheet already draws for the ticket
-              read and for the ledger tab, applied to the files: an ANSWER (drawn
-              above, empty or not), a WAIT (nothing yet — `AttachmentList`'s own
-              silence), and a FAILURE, which is this sentence. It is deliberately
-              not a `Loading…` line: a read that failed under the word "Loading…"
-              is a wait that will never end, wearing the clothes of one that will.
+              The three-way distinction this sheet draws for the ledger tab,
+              applied to the files: an ANSWER (drawn above, empty or not), a WAIT
+              (nothing yet — `AttachmentList`'s own silence), and a FAILURE, which
+              is this sentence. It is deliberately not a `Loading…` line: a read
+              that failed under the word "Loading…" is a wait that will never end,
+              wearing the clothes of one that will. **(The ticket read draws a
+              FOURTH arm the files do not need — an answered `null` — since E4-23;
+              `attachments` has no 404 affordance to answer with, so there is no
+              third null here.)**
             */
             <p
               // `alert`, matching this sheet's five other failure sentences
@@ -2617,7 +2963,14 @@ export function TicketSheet({
             expensive mistake.
           */}
           <CommentsThread
-            comments={comments.data ?? []}
+            // V4 — `comments.data` VERBATIM, never `?? []`. The collapse was
+            // here, at the boundary, and it is what turned a read still in
+            // flight into "Comments · 0" and "No comments yet." — a claim about
+            // the ticket made before anyone had asked it. `CommentsThread` now
+            // takes `null` and has an arm for it; the History tab three arms up
+            // has always done it this way, with `result.data === null` drawn as
+            // its own state rather than as an empty ledger.
+            comments={comments.data}
             commentsUnavailable={comments.error ?? undefined}
             nameOf={nameOf}
             composer={
@@ -2643,7 +2996,20 @@ export function TicketSheet({
           />
         </div>
       ) : (
-        <HistoryTab result={history} nameOf={nameOf} />
+        <HistoryTab
+          result={history}
+          nameOf={nameOf}
+          // E4-19 / E5-8 — the two resolvers `describeEvent` needs so a history
+          // line can name a state and a ticket type rather than printing the raw
+          // id the ledger carries. Both fall back to the id, the same `?? id`
+          // idiom `workflow-builder/summaries.ts:20` uses, so a state this
+          // ticket's workflow no longer declares — or a ladder that failed to
+          // read, leaving `ticketTypes.data` null — still names something.
+          stateName={(stateId) =>
+            workflow.data?.states.find((candidate) => candidate.id === stateId)?.name ?? stateId
+          }
+          typeName={(typeId) => ticketTypes.data?.find((def) => def.id === typeId)?.name ?? typeId}
+        />
       )}
 
       {/* The prototype's footer (`desktop.dc.html:1371-1373`), and it is now the
@@ -2675,6 +3041,33 @@ export function TicketSheet({
           `ui.css` carries beside `.gn-ticket-sheet__footer` — the reason is a
           `Sheet` API change, measured there rather than asserted here. */}
       <footer className="gn-ticket-sheet__footer">
+        {/*
+          DELETE'S OWN ANSWER, HERE RATHER THAN AT THE HEAD OF THE BODY.
+
+          The shared slots above sit at the top of the one scrolling body; this
+          one is where the person is when they press the button. The lane that
+          filed E5-9 measured the footer's top **3,942.8 px** below the tab bar
+          (`scrollHeight 4036` against `clientHeight 756`), so an answer rendered
+          in the shared slot arrived about five viewports above the eyes that
+          asked for it. Same two facts, same sentences, own placement — the
+          reasoning, and why this is a separate PAIR of states rather than a flag
+          on the shared one, is on `footerRefusal`'s declaration.
+
+          It renders INSIDE the footer element so the answer is structurally
+          attached to the control, which is the property the case asserts: a
+          jsdom sheet lays nothing out, so the pixel claim is the lane's and the
+          containment claim is this test's.
+        */}
+        {footerRefusal !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--server">
+            {`Refused by the server — ${footerRefusal.rule}: ${footerRefusal.reason}`}
+          </p>
+        ) : null}
+        {footerTransport !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--transport">
+            {footerTransport}
+          </p>
+        ) : null}
         <button
           type="button"
           className="gn-ticket-sheet__delete"
@@ -2687,6 +3080,14 @@ export function TicketSheet({
 
       {workflow.data != null ? (
         <TransitionDialog
+          /*
+            ⚠ THE KEY IS LOAD-BEARING (E2-32, 2026-09-21). A committed move
+            remounts this dialog, which is what discards the finished move's
+            `comment` and `fieldValues`; the dialog cannot do it itself, because
+            its only close-time effect must also preserve them for a Cancel.
+            Cancel does not change the key, so nothing typed is lost to one.
+          */
+          key={movesCommitted}
           open={moveOpen}
           workflow={workflow.data}
           fromStateId={state.stateId}
@@ -2699,14 +3100,22 @@ export function TicketSheet({
           onSubmit={(submission) => void submitTransition(submission)}
           precheck={precheck}
           serverRefusal={serverRefusal}
-          // `submitTransition` above stays unguarded (see its own docblock
-          // precedent, cited by `board.tsx`'s `submitDirect`/`submitFromDialog`)
-          // — a rejected `ingest` here is an unhandled promise rejection, not a
-          // state this component tracks, so there is nothing to pass but `null`.
-          // Not Ruling 27's scope: that ruling is about a fabricated `{rule,
-          // reason}` pair standing in for a real refusal, which this file never
-          // did — it just never caught the rejection at all.
-          transportError={null}
+          // E2-29 — this slot now carries the sheet's own `transportError`,
+          // the same value the paragraph above renders when the dialog is
+          // closed. It was the literal `null` while `submitTransition` was
+          // unguarded (it awaited `ingest` with no `catch`), and the slot is
+          // therefore the one that had to change when that `catch` landed: the
+          // dialog is the surface in view during a Move, so it — not the
+          // paragraph it is covering — is the one that speaks. Same sentence,
+          // same class, same Ruling 27 split: a dropped connection is not an
+          // adjudication and never wears the refusal's words.
+          transportError={transportError}
+          // E5-27 — the sheet's own latch, the one `submitTicketEvent` already
+          // wears for Close/Reopen/Delete and `submitTransition` now wears too.
+          // The dialog disables Move while it is true, so "still sending",
+          // "already failed" and "already succeeded" stop looking identical to
+          // the person deciding whether to press again.
+          submitting={submitting}
           uploadEvidence={uploadEvidence}
         />
       ) : null}
@@ -2770,9 +3179,13 @@ export function TicketSheet({
 function HistoryTab({
   result,
   nameOf,
+  stateName,
+  typeName,
 }: {
   result: LiveQueryResult<TicketHistoryEvent[]>;
   nameOf: (userId: string) => string;
+  stateName?: (stateId: string) => string;
+  typeName?: (typeId: string) => string;
 }) {
   if (result.error !== null) {
     return (
@@ -2806,7 +3219,7 @@ function HistoryTab({
           {`Showing the first ${HISTORY_PAGE_LIMIT} entries — this ticket's history may go on past them.`}
         </p>
       ) : null}
-      <HistoryList events={result.data} nameOf={nameOf} />
+      <HistoryList events={result.data} nameOf={nameOf} stateName={stateName} typeName={typeName} />
     </>
   );
 }

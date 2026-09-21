@@ -104,6 +104,76 @@ describe('POST /v1/mcp/device/approve', () => {
     expect(res.statusCode).toBe(404);
     expect(res.json()).toEqual({ error: 'unknown_code' });
   });
+
+  /**
+   * 14.112 — E6-16 — an MCP token may not approve a device code, even its own
+   * successor. Mints a real MCP token by walking the flow once as a signed-in
+   * person (code, approve, exchange), then uses THAT token — not the session
+   * bearer — to attempt approving a SECOND device code. Without the
+   * `authKind` fence, this would succeed and hand the assistant a credential
+   * that survives revoking the one that minted it.
+   */
+  it('14.112 an MCP token cannot approve a device code — not even its own successor', async () => {
+    const { app, otp } = buildTestApp(db);
+    const user = await signInWithPhone(app, otp, '+911100000003');
+
+    const firstCode = (
+      await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })
+    ).json() as { deviceCode: string; userCode: string };
+    await app.inject({
+      method: 'POST', url: '/v1/mcp/device/approve',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: firstCode.userCode },
+    });
+    const issued = (
+      await app.inject({ method: 'POST', url: '/v1/mcp/device/token', payload: { deviceCode: firstCode.deviceCode } })
+    ).json() as { token: string };
+
+    const secondCode = (
+      await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })
+    ).json() as { userCode: string };
+    const res = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/approve',
+      headers: { authorization: `Bearer ${issued.token}` },
+      payload: { userCode: secondCode.userCode },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: 'mcp_token_may_not_decide_device_grant' });
+  });
+
+  /**
+   * 14.112's mirror, for deny — the store's own answer for an unapproved code
+   * that gets denied is `unknown_code` on the next poll, so a successful deny
+   * here would be silent unless the fence itself is what is being asserted,
+   * which is why the response is checked directly rather than through a poll.
+   */
+  it('14.112b an MCP token cannot deny a device code either', async () => {
+    const { app, otp } = buildTestApp(db);
+    const user = await signInWithPhone(app, otp, '+911100000004');
+
+    const firstCode = (
+      await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })
+    ).json() as { deviceCode: string; userCode: string };
+    await app.inject({
+      method: 'POST', url: '/v1/mcp/device/approve',
+      headers: { authorization: `Bearer ${user.token}` },
+      payload: { userCode: firstCode.userCode },
+    });
+    const issued = (
+      await app.inject({ method: 'POST', url: '/v1/mcp/device/token', payload: { deviceCode: firstCode.deviceCode } })
+    ).json() as { token: string };
+
+    const secondCode = (
+      await app.inject({ method: 'POST', url: '/v1/mcp/device/code', payload: {} })
+    ).json() as { userCode: string };
+    const res = await app.inject({
+      method: 'POST', url: '/v1/mcp/device/deny',
+      headers: { authorization: `Bearer ${issued.token}` },
+      payload: { userCode: secondCode.userCode },
+    });
+    expect(res.statusCode).toBe(403);
+    expect(res.json()).toEqual({ error: 'mcp_token_may_not_decide_device_grant' });
+  });
 });
 
 describe('POST /v1/mcp/device/token', () => {

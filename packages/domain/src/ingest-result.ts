@@ -1,6 +1,14 @@
 import type { EnvelopeErrorCode } from './parse-event.js';
 
-export type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id';
+/**
+ * `'invalid-byte'` (E6-18) — distinct from `'invalid-payload'`, which is a
+ * PARSE-TIME zod refusal. This is a COMMIT-TIME refusal: the payload parsed
+ * cleanly (no schema here yet refines against it) and Postgres's `jsonb`
+ * refused the U+0000 byte inside it when the write reached the database,
+ * SQLSTATE `22P05` — same layer `'duplicate-event-id'` is detected at, for
+ * the same reason: some failures are provable only once the transaction runs.
+ */
+export type IngestErrorCode = EnvelopeErrorCode | 'duplicate-event-id' | 'invalid-byte';
 
 /**
  * The rule name the entity↔workspace refusal reports (coordination doc §11).

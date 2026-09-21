@@ -129,9 +129,19 @@ export async function evaluateTicketTransitioned(
 
   // Invariant above all workflows (spec invariant 3): parents cannot outrun
   // children. Runs before any authored rule; no definition can switch it off.
+  //
+  // A SOFT-DELETED child is not open work (E6-4). `getChildrenStates` serves
+  // deleted rows by documented design — the server's reader says so and hands
+  // the live-only predicate to its callers — and until this conjunct the count
+  // here included a child that "stops appearing in views", so the refusal
+  // named a number every view reported as zero, and from the product's UI the
+  // parent could never be finished. The same boundary read as `closed` above:
+  // `deleted?` is optional on the domain type.
   if (toState.category === 'terminal') {
     const children = await ctx.getChildrenStates(ticket.id);
-    const openCount = children.filter((child) => child.stateCategory !== 'terminal').length;
+    const openCount = children.filter(
+      (child) => child.stateCategory !== 'terminal' && (child.deleted ?? null) === null,
+    ).length;
     if (openCount > 0) {
       return {
         refused: true,

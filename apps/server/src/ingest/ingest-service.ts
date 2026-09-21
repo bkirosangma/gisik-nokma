@@ -14,6 +14,7 @@ import { createEngineContext } from '../engine-context.js';
 import type { ServerGate } from '../gates/server-gate.js';
 import {
   insertEvent,
+  isInvalidUnicodeEscape,
   isUniqueViolation,
   lockEntity,
   lockWorkspace,
@@ -374,6 +375,22 @@ export function createIngestService(deps: IngestDeps): IngestService {
             eventId: submitted.id,
             code: 'duplicate-event-id',
             message: `an event with id ${submitted.id} is already in the ledger`,
+          },
+          committed: null,
+        };
+      }
+      // E6-18 — the SAME shape as the duplicate-id arm above and for the same
+      // reason: this is a failure provable only once the transaction runs, not
+      // at parse time, so it is caught here rather than refused earlier by a
+      // schema. Narrow by design (SQLSTATE 22P05 only, nothing wider) — see
+      // `isInvalidUnicodeEscape`'s own docblock.
+      if (isInvalidUnicodeEscape(error)) {
+        return {
+          result: {
+            status: 'invalid',
+            eventId: submitted.id,
+            code: 'invalid-byte',
+            message: `event ${submitted.id}'s payload contains a byte (U+0000) Postgres cannot store`,
           },
           committed: null,
         };

@@ -138,6 +138,44 @@ describe('14.97 the list shows what is honestly available', () => {
   });
 });
 
+describe('14.150 a read of your connected assistants that FAILS', () => {
+  /**
+   * 14.150 — E2-44. `load`'s rejection arm was `() => setTokens([])`, and `[]` is
+   * exactly the value the empty arm asserts over ("No assistants are connected.
+   * One appears here after you approve it on the connect page."). So a 500 was
+   * drawn as a confident statement about the person's account, on the one screen
+   * whose whole subject is which assistants still hold access — and the sentence
+   * it printed sent them to a connect page to approve a second one.
+   *
+   * Asserted on the pair, and the absence is the half that matters: the failure
+   * sentence is present AND the empty state is not. Asserting only the sentence
+   * would pass on a screen that rendered both.
+   */
+  it('14.150 a rejected read is a failure sentence, never “No assistants are connected”', async () => {
+    fetchStub(() => ({ status: 500, body: { error: 'internal' } }));
+    mount();
+
+    const failed = await screen.findByTestId('mcp-tokens-failed');
+    expect(failed.textContent ?? '').toMatch(/could not be loaded/i);
+    expect(screen.queryByTestId('mcp-tokens-empty')).toBeNull();
+    expect(screen.queryByTestId('mcp-tokens-list')).toBeNull();
+  });
+
+  /**
+   * 14.150, second half — the CONTROL that the pair is not satisfied by a screen
+   * which simply never renders the empty state. An ANSWERED empty list still has
+   * to say the empty sentence; otherwise "no assistants" is unreachable and the
+   * fix would have traded one false statement for another.
+   */
+  it('14.150 control: an ANSWERED empty list still renders the empty state', async () => {
+    fetchStub(() => ({ status: 200, body: { tokens: [] } }));
+    mount();
+
+    await screen.findByTestId('mcp-tokens-empty');
+    expect(screen.queryByTestId('mcp-tokens-failed')).toBeNull();
+  });
+});
+
 describe('14.98 revoking', () => {
   it('DELETEs that row’s id and reloads the list from the server', async () => {
     // TWO rows, and the SECOND is the one revoked. With one row the assertion

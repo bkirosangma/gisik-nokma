@@ -4,6 +4,9 @@ import Link from 'next/link';
 import { useParams, useRouter } from 'next/navigation';
 import { useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
+// Imported rather than the literal re-spelled — `packages/domain/` owns the zone,
+// the same reason `/workspaces` imports it for its own `lapses …` line.
+import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 import { InviteAcceptanceError, type InviteSummary } from '@gisik-nokma/app-core/online';
 import { useAppServices, useSessionStatus } from '../../../src/providers.js';
 
@@ -44,6 +47,23 @@ import { useAppServices, useSessionStatus } from '../../../src/providers.js';
  * is a POST, the body survives, and `InviteAcceptanceError.serverMessage`
  * carries the door's own words to the screen unparaphrased.
  */
+/**
+ * A day, in the workspace's own zone — the SAME shape `/workspaces` uses for a
+ * waiting invitation's `lapses …` (`workspaces/page.tsx:352`), rather than a
+ * second date vocabulary on a second page. `an unknown date` for an unparseable
+ * instant rather than `Invalid Date`, which is not a day anybody set.
+ */
+function onDay(iso: string): string {
+  const at = new Date(iso);
+  if (Number.isNaN(at.getTime())) return 'on an unknown date';
+  return at.toLocaleDateString('en-IN', {
+    timeZone: IST_TIME_ZONE,
+    year: 'numeric',
+    month: 'short',
+    day: 'numeric',
+  });
+}
+
 export default function InvitePage() {
   const router = useRouter();
   const params = useParams<{ token: string }>();
@@ -51,26 +71,36 @@ export default function InvitePage() {
   const { invites } = useAppServices();
   const session = useSessionStatus();
 
-  const [invite, setInvite] = useState<InviteSummary | null | 'loading'>('loading');
+  const [invite, setInvite] = useState<InviteSummary | null | 'loading' | 'unreachable'>('loading');
   const [refusal, setRefusal] = useState<string | null>(null);
+  /** Bumped by "Try again" — the effect below is keyed on it (V9). */
+  const [attempt, setAttempt] = useState(0);
 
   useEffect(() => {
     let live = true;
+    setInvite('loading');
     invites.getInvite(token).then(
       (summary) => {
         if (live) setInvite(summary);
       },
       () => {
-        // A transport failure is not the same as a dead link, but the only
-        // thing this page can honestly do with either is stop claiming there
-        // is a workspace to join.
-        if (live) setInvite(null);
+        // **A transport failure is NOT a dead link, and this used to say it was**
+        // (V9, 2026-09-21). The arm set `invite = null` for ANY rejection, so a
+        // dropped connection, a 500 or an unparseable body all rendered the
+        // dead-link sentence — which sends the person to ask for a replacement
+        // for a link that was never tried, retiring a link that may be perfectly
+        // good. `null` is kept for the ANSWERED 404 (the transport's read
+        // affordance, and the server's one frozen body for used/withdrawn/lapsed,
+        // which really does mean the link opens nothing); everything else is this
+        // fourth state, whose only honest sentence is that the link could not be
+        // CHECKED, plus the retry that a transport failure may clear.
+        if (live) setInvite('unreachable');
       },
     );
     return () => {
       live = false;
     };
-  }, [invites, token]);
+  }, [invites, token, attempt]);
 
   const accept = (): void =>
     void invites.acceptInvite(token).then(
@@ -90,16 +120,64 @@ export default function InvitePage() {
       <Card className="gn-invite">
         {invite === 'loading' ? (
           <p>Checking the invitation…</p>
+        ) : invite === 'unreachable' ? (
+          <>
+            {/*
+              NOT the dead-link sentence, and the difference is the whole of V9.
+              That sentence tells the person to ask for a new invitation — advice
+              that RETIRES the one they hold — on the strength of a read that
+              never came back. So this says what actually happened, and says the
+              one thing a person in this state most needs to know: nothing has
+              been used up by trying.
+            */}
+            <p className="gn-invite__unreachable" data-testid="invite-unreachable" role="status">
+              This invitation could not be checked — the server did not answer. Nothing has been
+              used up, so the link may still be good.
+            </p>
+            <Button variant="primary" onClick={() => setAttempt((n) => n + 1)}>
+              Try again
+            </Button>
+          </>
         ) : invite === null ? (
-          <p className="gn-invite__dead">
-            This invitation link does not open anything. It may have been used, withdrawn, or
-            lapsed — ask whoever invited you for a new one.
-          </p>
+          <>
+            <p className="gn-invite__dead">
+              This invitation link does not open anything. It may have been used, withdrawn, or
+              lapsed — ask whoever invited you for a new one.
+            </p>
+            {/*
+              AND IT OFFERS SOMEWHERE TO GO (E5-18, 2026-09-21). The arm was one
+              `<p>` in a Card with no link at all: a person who followed a dead
+              link, possibly while signed out, was given a sentence and no next
+              step. `/workspaces` is where their own waiting invitations live —
+              including the one this link was for, if they signed in under the
+              address it was sent to — so it is the honest destination rather than
+              a generic home link.
+            */}
+            <p>
+              <Link href="/workspaces">See your workspaces</Link>
+              {' '}— any invitation waiting for you is there.
+            </p>
+          </>
         ) : (
           <>
             <p>
               You are invited to join <strong>{invite.workspaceName}</strong> as {invite.role}.
             </p>
+            {/*
+              WHEN THIS LINK STOPS WORKING (E5-18, 2026-09-21). The door has served
+              this since 2026-09-19 — it is the presented TOKEN's own window — and
+              the client dropped it for two days, so a person deciding whether to
+              act now could not see the deadline. `/workspaces` renders the same
+              fact for a waiting invitation (`Invited … · lapses …`), and this is
+              the same sentence shape rather than a second vocabulary.
+              `null` draws NOTHING: the shipped door always sends one, and a day
+              this page made up would be a deadline nobody set.
+            */}
+            {invite.expiresAt === null ? null : (
+              <p className="gn-invite__expiry" data-testid="invite-expiry">
+                {`This link lapses ${onDay(invite.expiresAt)}.`}
+              </p>
+            )}
             {session.kind === 'loading' ? (
               <p role="status">Checking whether you are signed in…</p>
             ) : session.kind === 'signed-out' ? (

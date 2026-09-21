@@ -13,7 +13,7 @@ import {
 import { PARENT_TERMINAL_RULE, precheckEvent } from '../precheck.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type { TicketRead } from '../view-types.js';
-import { NewTicketDialog, type NewTicketDraft } from './new-ticket-dialog.js';
+import { NewTicketDialog, type NewTicketDraft, type TypeOption } from './new-ticket-dialog.js';
 import { ReopenDialog, type RefusalOrigin } from './reopen-dialog.js';
 
 export type CreateTicketFlowProps = {
@@ -23,7 +23,8 @@ export type CreateTicketFlowProps = {
   workspaceId: string;
   projectId: string;
   currentUserId: string;
-  typeOptions: Array<{ id: string; name: string }>;
+  /** See `NewTicketDialogProps.typeOptions` — this flow only passes it through. */
+  typeOptions: readonly TypeOption[];
   /** See `NewTicketDialogProps.parentCandidates` — this flow only passes it through. */
   parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
   /** See `NewTicketDialogProps.parentCandidatesUnavailable`. */
@@ -357,7 +358,23 @@ export function CreateTicketFlow({
         New ticket
       </Button>
       <NewTicketDialog
-        open={dialogOpen}
+        /**
+         * ⚠ ONE MODAL AT A TIME (E2-34, 2026-09-21).
+         *
+         * The `needs-reopen` arm opens the offer and returns WITHOUT clearing
+         * `dialogOpen` — which is right, because the draft must survive the
+         * detour — but `open` here used to be `dialogOpen` alone, so BOTH
+         * surfaces rendered: two `role="dialog"` elements, both `aria-modal="true"`,
+         * telling assistive technology that the top one was the only modal on the
+         * page. That is a lie about the page, not a layout preference.
+         *
+         * The offer REPLACES this dialog while it is up and hands it back when it
+         * closes, so `dialogOpen` keeps meaning "the person is composing a ticket"
+         * (the draft survives) while exactly one modal is ever rendered. E5-20
+         * (case 3.189) fixed the other half of the same stack — one Escape no
+         * longer closes both surfaces — and neither half implies the other.
+         */
+        open={dialogOpen && reopenPrompt === null}
         typeOptions={typeOptions}
         parentCandidates={parentCandidates}
         parentCandidatesUnavailable={parentCandidatesUnavailable}

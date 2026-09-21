@@ -8,6 +8,7 @@ import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
+import { shellRefusalCopy } from '../src/shell-refusal.js';
 
 /**
  * The roster, the invite mint, the pending list, and the role gate (Plan 6
@@ -179,7 +180,7 @@ describe('3.129 a member sees the roster and none of the invite machinery', () =
   it('3.131 renders a refusal for a read that failed for any other reason', async () => {
     mount({ listPending: async () => Promise.reject(new InviteAdminError(500, null)) });
     await waitFor(() =>
-      expect(screen.getByText(/cannot be shown yet/)).toBeInTheDocument(),
+      expect(screen.getByText(/could not be loaded/)).toBeInTheDocument(),
     );
     expect(screen.queryByText(ADMIN_ONLY)).toBeNull();
     expect(screen.queryByRole('heading', { name: 'Invite somebody' })).toBeNull();
@@ -280,6 +281,60 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
 });
 
 /**
+ * E6-9 — the Channel select used to offer `email`/`sms`/`whatsapp` while the
+ * door (`INVITE_CHANNELS`, `@gisik-nokma/domain`) accepts only
+ * `email`/`phone`: two offered channels were refused at the door, 422, and
+ * `phone` — the one the door accepts — was never offered. Built from
+ * `INVITE_CHANNELS` (`CHANNEL_LABELS`, `page.tsx`) so the two cannot drift
+ * again; `sms`/`whatsapp` both reach a phone, so the option reads
+ * "Phone (SMS)" for the person filling the form.
+ */
+describe('3.902 the Channel select offers exactly what the door accepts (E6-9)', () => {
+  it('renders email and Phone (SMS) — never sms or whatsapp', async () => {
+    const user = userEvent.setup();
+    mount({ listPending: async () => [] });
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+    await user.click(within(form!).getByRole('button', { name: /Channel/ }));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'email',
+      'Phone (SMS)',
+    ]);
+  });
+
+  /**
+   * 3.903 — the assertion the role select already has (3.133/3.134's sibling):
+   * submitting each OFFERED option sends the door the WIRE VALUE it accepts,
+   * not the display label. `INVITE_CHANNELS` is `['email', 'phone']`, in that
+   * order, which is the order the picker renders them and the order this
+   * table submits them.
+   */
+  it.each([
+    ['email', 'email'],
+    ['Phone (SMS)', 'phone'],
+  ])('submitting "%s" sends channel: "%s" to the door', async (optionLabel, wireValue) => {
+    const bodies: unknown[] = [];
+    mount({
+      listPending: async () => [],
+      mintInvite: async (_workspaceId, request) => {
+        bodies.push(request);
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form');
+    expect(form).not.toBeNull();
+    await user.click(within(form!).getByRole('button', { name: /Channel/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: optionLabel }));
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect((bodies[0] as { channel: string }).channel).toBe(wireValue);
+  });
+});
+
+/**
  * 3.135 THE OTHER PLANTED DEFECT TASK 15b NAMES — the minted token is shown
  * ONCE and is absent from the pending list.
  *
@@ -313,6 +368,52 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
     expect(row?.textContent).not.toContain('tok_raw_secret');
     // And no affordance promising a second look.
     expect(screen.queryByRole('button', { name: /show|reveal|copy again/i })).toBeNull();
+  });
+
+  /**
+   * RULING V2, CRITICAL. Before this ruling, `minted` was `MintForm`'s own
+   * local state, set on a successful mint and then passed to `onMinted` —
+   * `loadPending`, a network re-read. `loadPending`'s FAILURE arm flips
+   * `adminGate` away from `'admin'`, the only state that mounts `MintForm`
+   * at all: the form unmounted and the just-minted, one-time URL — the
+   * thing `COPY_IT_NOW` had just said "cannot be shown again" — died with
+   * it, unrecoverable. `listPending` here answers successfully on the
+   * FIRST call (mount's own read) and rejects on the SECOND (the
+   * post-mint re-read `onMinted` triggers), reproducing exactly that
+   * sequence.
+   */
+  it('E5-V2 a rejected post-mint re-read does not take the just-minted URL with it', async () => {
+    const url = 'http://localhost:3001/invite/tok_raw_secret';
+    let listCalls = 0;
+    mount({
+      listPending: async () => {
+        listCalls += 1;
+        if (listCalls === 1) return [];
+        throw new InviteAdminError(500, null);
+      },
+      mintInvite: async () => ({
+        inviteId: PENDING.inviteId,
+        url,
+        expiresAt: '2026-09-08T10:00:00.000Z',
+      }),
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+
+    expect(await screen.findByText(url)).toBeInTheDocument();
+    // The re-read's own refusal renders too — proving the failure actually
+    // happened, not merely that this case forgot to trigger it — and the
+    // URL survives it standing right beside that refusal.
+    await waitFor(() => expect(listCalls).toBe(2));
+    // The sentence every read refusal carries is `shellRefusalCopy`'s — E5-30
+    // (B09) replaced "cannot be shown yet" product-wide and exported the copy so
+    // a spec asserts what renders rather than re-typing it.
+    await waitFor(() =>
+      expect(screen.getByText(shellRefusalCopy('The invitations for this workspace'))).toBeInTheDocument(),
+    );
+    expect(screen.getByText(url)).toBeInTheDocument();
+    expect(screen.getByText(COPY_IT_NOW)).toBeInTheDocument();
   });
 
   it('3.136 names a pending row with no credential behind it as dead, not as never-lapsing', async () => {

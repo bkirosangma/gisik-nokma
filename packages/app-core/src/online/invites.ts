@@ -4,6 +4,25 @@ export type InviteSummary = {
   workspaceId: string;
   workspaceName: string;
   role: 'admin' | 'member' | 'guest';
+  /**
+   * When the PRESENTED TOKEN stops working, ISO-8601 — the door's fourth field
+   * since 2026-09-19 (the `isInvite` expiry ruling), and **the one this mapper
+   * read past for two days (E5-18, 2026-09-21).** The fact was on the wire and
+   * dropped between the door and the screen, which is why the invitee-facing page
+   * could not say when the link lapses while `/workspaces` renders the same fact
+   * for a waiting invitation.
+   *
+   * **It is the TOKEN's window, not the invitation's**, and the door's own
+   * docblock says why: `invite_tokens` holds one row per PRESENTATION while
+   * `proj_invites` has no expiry column at all, so a revoked-and-reissued
+   * invitation has several tokens each with its own window. It is the value
+   * `openableInvite` matched on, so it cannot disagree with the predicate that
+   * admitted the call.
+   *
+   * `null` when the body carried none — a shape the shipped door does not send,
+   * and which must NOT be filled with an invented day.
+   */
+  expiresAt: string | null;
 };
 
 /**
@@ -114,7 +133,14 @@ export function createHttpInviteGateway(http: HttpClient): InviteGateway {
       ) {
         return null;
       }
-      return { workspaceId: record['workspaceId'], workspaceName: record['workspaceName'], role };
+      return {
+        workspaceId: record['workspaceId'],
+        workspaceName: record['workspaceName'],
+        role,
+        // Carried when the door sent one, and `null` when it did not — NEVER a
+        // default: a day nobody sent would be this reader inventing a deadline.
+        expiresAt: typeof record['expiresAt'] === 'string' ? record['expiresAt'] : null,
+      };
     },
     async acceptInvite(token) {
       let raw: unknown;

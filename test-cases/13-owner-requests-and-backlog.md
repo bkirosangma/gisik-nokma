@@ -2263,6 +2263,20 @@ so one sentence for both would be false of one of them. **Every case below there
   this view cannot disclose — and *"an epic is why this is empty"* would be a half-truth there.
   ⚠ **Minted on the controller's instruction** after this executor measured the site and asked rather than
   assuming §6's "delta ZERO" covered the whole set — `#602` minted nothing for it.
+- **13.1115** ✅ **THE BACKLOG SITE'S THIRD ARM, closed by E5-40 (2026-09-21).** `13.1044`'s two arms
+  answer "is an epic why this is empty?"; this one answers a question neither can, because the
+  **"Only tickets in progress"** switch writes `stateCategories: ['active']` into the **server** read and a
+  backlog ticket's category is `open` — so the toggle strips every backlog row before any screen-level fold
+  sees it, and both `shown` and `total` read 0. **A backlog emptied by the toggle and one that is genuinely
+  empty are the same state inside `backlogNarrowing`**, which is why the choice is made at the render site,
+  where `activeOnly` is known: *"The backlog is hidden while “Only tickets in progress” is on."* — true
+  whether or not anything sat behind the toggle. The page had carried this as `RECORDED, NOT FIXED`.
+  **Both arms are asserted**, and the stub APPLIES the filter rather than ignoring it — a `getTickets` that
+  returned every row would render the backlog correctly and the defect could not appear at all.
+  — (`apps/web/test/backlog-tab.test.tsx`)
+  **And the scope note now names the Backlog**, which it had left out of its list of narrowed surfaces
+  ("the list, calendar and timeline" over three tabs of five), together with `docs/manual.md`, which quotes
+  the note verbatim and gains the Backlog's own paragraph. — (`apps/web/test/page-refusals.test.tsx`)
 - **The shipped help moves too, and it is easy to miss.** `docs/faq.md` and `docs/manual.md` carry the
   calendar's cause-list **as prose**, and the manual additionally quotes the Board's and the Backlog's empty
   sentences. `scripts/help-content.mjs` generates both into `content.generated.ts`, which `check:help` gates.
@@ -2278,3 +2292,35 @@ survivors and were not**: they mutate `packages/app-core`, which `apps/web` impo
 through `./dist`, so the web suite was reading a stale artifact and the mutation never ran. The battery now
 greps the DIST — not the source — and a mutation that never ran is indistinguishable from a killed one
 from the outside.
+
+## A preferences failure is not a LIST failure — cases `13.1116`–`13.1107` (E5-42, 2026-09-21)
+
+**The defect.** `useTicketList` returned `error: list.error ?? preferences.error`, folding the
+preferences hook's error — set on a failed `getPreferences` AND on a failed `putPreferences` — into the
+SAME field the ticket read uses. Every refusing tab arm keys on that field FIRST, before it looks at
+`rows`: Backlog, List, Calendar and Timeline each render `ShellRefusal what="…" message={list.error}` over
+rows that had loaded perfectly. `setPrefs` is what the List's own column chooser calls, so the person's
+own click — *show me the Assignee column* — could produce *"The ticket list cannot be shown yet. HTTP …
+for /v1/me/preferences"*. The Board was the negative control, and is why this was four tabs of five
+rather than five.
+
+**The fix.** The two failures have different causes and different remedies, so they are different fields:
+`error` is now `list.error` alone, and `prefsError` carries the preferences half. It renders BESIDE the
+column chooser — *"Your column choice was not saved — {the server's own words}"* — because that is where
+the person who needs the sentence is standing.
+
+- **13.1116** ✅ The preferences error is its own field: with `getPreferences` rejecting and
+  `getTickets` answering, the rows are intact, the list reports NO failure, and the preferences failure
+  reaches `prefsError`. **Both halves are asserted in one case** — the control arm makes the ticket
+  read fail and asserts it still reaches `error`, without which the case would pass on a hook that had
+  simply stopped reporting errors at all. — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1107** ✅ The sentence, where a person meets it: beside the column chooser, over rows that are
+  still drawn, with the list's own summary still a claim about the project. Asserted on the PAIR,
+  because a screen that replaced the list with the preference failure would pass an assertion on the
+  sentence alone — which is the defect E5-42 reports. — (`packages/app-core/test/views/ticket-list.test.tsx`)
+
+**One place in the page already knew this and said so.** `parentsUnavailable` dodged the fold by keying
+on `rows === null` as well, and its docblock recorded that a preferences 500 was not a parent-candidate
+failure — witnessed at `3.158`. That comment was the only record of the fold's blast radius, and the four
+tab arms beside it did not share its guard. The fold is gone now, so the guard is no longer the only
+place in the file that knows the difference; its own note is kept and extended rather than deleted.

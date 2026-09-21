@@ -2,7 +2,7 @@ import { useEffect, useState } from 'react';
 import { Button } from '@gisik-nokma/ui';
 import type { PublishedWorkflowDef, TicketTypeDef } from '@gisik-nokma/domain';
 import { createDraftStore, type WorkflowDraft } from '../draft-store.js';
-import type { WorkflowAuthoringGateway, WorkspaceMember } from '../gateway.js';
+import { AuthoringReadRefused, type WorkflowAuthoringGateway, type WorkspaceMember } from '../gateway.js';
 import {
   BuilderProvider,
   canAuthorRole,
@@ -18,6 +18,18 @@ import { PublishControls } from './publish-controls.js';
 import { ReadOnlyBanner } from './read-only-banner.js';
 import { SystemRulesPanel } from './system-rules-panel.js';
 import { WorkflowCanvas } from './workflow-canvas.js';
+
+/**
+ * RULING E5-41 (CRITICAL). Keyed on the WORKSPACE and the draft's own def id
+ * (stable across a re-mount of the edit route, `[workflowId]/page.tsx`,
+ * which re-fetches the same published id every time) rather than on nothing
+ * — two workflows in the same workspace, or the same workflow across two
+ * workspaces (a session token this product does not have), must not share a
+ * slot.
+ */
+function draftStorageKey(workspaceId: string, workflowId: string): string {
+  return `gn-workflow-draft:${workspaceId}:${workflowId}`;
+}
 
 function WorkflowNameField() {
   const store = useBuilderStore();
@@ -58,18 +70,66 @@ export function WorkflowBuilderScreen(props: {
   initialDraft: WorkflowDraft;
   onPublished?: (payload: PublishedWorkflowDef) => void;
 }) {
-  const [store] = useState(() => createDraftStore(props.initialDraft));
+  const storageKey = draftStorageKey(props.workspaceId, props.initialDraft.def.id);
+  const [store] = useState(() => {
+    // RULING E5-41 (CRITICAL): recover an in-progress draft this SAME tab
+    // left in `sessionStorage` rather than always starting from the
+    // server's last-published version — the manual already promises "for
+    // this session only" persistence for box positions, so this is the
+    // same promise kept for the rest of the draft too. Every unsaved
+    // state/arrow/rule used to die on any navigation (the nav bar, the
+    // breadcrumb, the browser's back button) with no marker and no
+    // recovery; this closes that for every case that keeps the TAB alive,
+    // which is everything the finding measured. A corrupt or inaccessible
+    // entry (private browsing, quota, a shape from an older build) falls
+    // back to the server's draft rather than crashing the screen.
+    try {
+      const saved = window.sessionStorage.getItem(storageKey);
+      if (saved !== null) return createDraftStore(JSON.parse(saved) as WorkflowDraft);
+    } catch {
+      // fall through to the server's draft
+    }
+    return createDraftStore(props.initialDraft);
+  });
   const [data, setData] = useState<{ members: WorkspaceMember[]; ticketTypes: TicketTypeDef[] } | null>(null);
   const [loadFailed, setLoadFailed] = useState(false);
+
+  useEffect(() => {
+    // Written on every change, not only on unmount — a tab CLOSE fires no
+    // React cleanup at all, so an unmount-only write would still lose the
+    // draft to the one case the manual does not promise to survive anyway,
+    // while ALSO losing it to a crash or a forced reload, which it does.
+    return store.subscribe(() => {
+      try {
+        window.sessionStorage.setItem(storageKey, JSON.stringify(store.getState()));
+      } catch {
+        // sessionStorage unavailable (private mode, quota) — the draft
+        // still lives in `store`; only the recovery-on-remount promise
+        // above is what silently goes back to being unmet.
+      }
+    });
+  }, [store, storageKey]);
 
   useEffect(() => {
     let cancelled = false;
     // A guest may not call GET /v1/workspaces/:id/members (executor ruling
     // 2026-09-02, coordination doc ~5442-5465; see gateway.ts's listMembers
     // docstring) — that refusal is not a load failure, it is an empty roster.
-    // Only listTicketTypes rejecting is treated as fatal to this screen.
+    //
+    // **Narrowed to the refusal (E2-39, 2026-09-21).** The catch used to be
+    // blanket — `catch(() => [])` — so a 500, a dropped connection or an
+    // unparseable roster body became the same empty array a refusal produces,
+    // and flowed into `BuilderEnvironment.members`, which the rule editors and
+    // rule summaries read. An admin then authored rules against a workspace that
+    // appeared to hold nobody, with nothing on screen saying the read had failed.
+    // The refusal class is declared in `gateway.ts` now, so the narrowing is
+    // possible here at all — the adapter's docblocks record that it previously
+    // was not, `app-core` depending on nothing under `apps/`.
     Promise.all([
-      props.gateway.listMembers(props.workspaceId).catch(() => [] as WorkspaceMember[]),
+      props.gateway.listMembers(props.workspaceId).catch((cause: unknown) => {
+        if (cause instanceof AuthoringReadRefused) return [] as WorkspaceMember[];
+        throw cause;
+      }),
       props.gateway.listTicketTypes(props.workspaceId),
     ])
       .then(([members, ticketTypes]) => {
@@ -119,7 +179,20 @@ export function WorkflowBuilderScreen(props: {
             <WorkflowNameField />
             <div className="workflow-builder-screen__actions">
               <AddStateButton />
-              <PublishControls onPublished={props.onPublished} />
+              <PublishControls
+                onPublished={(payload) => {
+                  // The recovered draft is now the server's own truth — clearing
+                  // it here (rather than leaving it to expire on its own) is what
+                  // stops a stale pre-publish version from resurfacing if this
+                  // same id is ever opened again in this tab.
+                  try {
+                    window.sessionStorage.removeItem(storageKey);
+                  } catch {
+                    // already inaccessible; nothing more to clear
+                  }
+                  props.onPublished?.(payload);
+                }}
+              />
             </div>
           </div>
         </header>

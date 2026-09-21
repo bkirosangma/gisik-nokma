@@ -35,7 +35,13 @@ vi.mock('../src/auth-client.js', () => ({
   },
 }));
 
-import InboxPage, { BULK_REFUSED_COPY, BULK_UNREACHED_COPY } from '../app/inbox/page.js';
+import InboxPage, {
+  BULK_REFUSED_COPY,
+  BULK_UNREACHED_COPY,
+  ROW_REFUSED_COPY,
+  ROW_UNREACHED_COPY,
+  UNDO_FAILED_COPY,
+} from '../app/inbox/page.js';
 
 afterEach(() => {
   push.mockClear();
@@ -69,7 +75,14 @@ const THREE_UNREAD = [
 
 type SetReadFn = (ids: readonly string[], read: boolean) => Promise<string[]>;
 
-function renderInbox(notifications: Notification[], setRead: SetReadFn) {
+function renderInbox(
+  notifications: Notification[],
+  setRead: SetReadFn,
+  // Defaulted to the silent success every case before 13.1108 wants, and
+  // overridden by that case alone — which is the one that measures the
+  // single-row failure.
+  markRead: (id: string) => Promise<void> = async () => undefined,
+) {
   render(
     <Providers
       services={stubServices(
@@ -78,7 +91,7 @@ function renderInbox(notifications: Notification[], setRead: SetReadFn) {
           notifications: {
             list: async () => ({ notifications, nextCursor: null }),
             unreadCount: async () => notifications.filter((n) => !n.read).length,
-            markRead: async () => undefined,
+            markRead,
             setRead,
           },
         },
@@ -239,5 +252,106 @@ describe('16.41 the inbox bulk action and its Undo', () => {
     // The sentence described the FIRST attempt; leaving it standing while the
     // second succeeds would describe something that is over.
     await waitFor(() => expect(screen.queryByText(BULK_REFUSED_COPY)).toBeNull());
+  });
+});
+
+describe('13.1108/13.1109 the single-row reads and the Undo, which spoke to nobody (E5-10)', () => {
+  /**
+   * 13.1108 — E5-10. `markRead(id)` flipped the row optimistically and then
+   * `void gateway.markRead(id).catch(() => loadFirstPage())` — a reload and NO
+   * sentence. The bulk path sixty lines up classifies the failure and renders it,
+   * and its own docblock records why: *"The first version of this catch reloaded
+   * and said NOTHING: a reader over the bound saw a click do nothing and the list
+   * snap back, with no sentence anywhere."* The single-row path was still that
+   * first version.
+   *
+   * Both arms are asserted, because the page tells a server REFUSAL apart from a
+   * transport failure everywhere else and a row must not be the one place that
+   * collapses them: an `HttpError` is the server adjudicating, anything else
+   * never reached one. **The row splits by KIND where the bulk arm splits by
+   * STATUS** — the bulk route's 400 is its bound, a number only a bulk request
+   * can exceed, and the single-row route's only status is the 404 both arms of
+   * "not yours" and "does not exist" share.
+   */
+  it('13.1108 a refused single-row mark-read SAYS SO rather than reloading in silence', async () => {
+    renderInbox(THREE_UNREAD, async (ids) => [...ids], async () => {
+      // The route's 404 for a row that is not yours and for one that does not
+      // exist — one frozen body, and the gateway does not swallow it (11.138).
+      throw new HttpError(404, '/v1/me/notifications/01JN0000000000000000000001/read', {
+        error: 'not_found',
+      });
+    });
+
+    // EVERY row shares this ticket's title, so the query is plural and the
+    // FIRST is clicked — a singular query reddens for a reason that is not this case's.
+    const rows = await screen.findAllByRole('button', { name: /Renew the DLT registration/ });
+    await userEvent.click(rows[0]!);
+
+    expect(await screen.findByText(ROW_REFUSED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(ROW_UNREACHED_COPY)).toBeNull();
+  });
+
+  it('13.1108 a single-row mark-read that never reached a server says THAT instead, never a refusal', async () => {
+    renderInbox(THREE_UNREAD, async (ids) => [...ids], async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    // EVERY row shares this ticket's title, so the query is plural and the
+    // FIRST is clicked — a singular query reddens for a reason that is not this case's.
+    const rows = await screen.findAllByRole('button', { name: /Renew the DLT registration/ });
+    await userEvent.click(rows[0]!);
+
+    expect(await screen.findByText(ROW_UNREACHED_COPY)).toBeInTheDocument();
+    expect(screen.queryByText(ROW_REFUSED_COPY)).toBeNull();
+  });
+
+  /**
+   * 13.1109 — the Undo. `undoMarkAllRead` had the SAME silent catch
+   * (`void gateway.setRead(ids, false).catch(() => loadFirstPage())`), so a
+   * failed undo flipped the rows back to read with nothing said — and the reader
+   * had just been TOLD they were unread, by a toast that then disappeared.
+   */
+  it('13.1109 a REFUSED undo says so, rather than silently leaving the rows read', async () => {
+    renderInbox(THREE_UNREAD, async (ids, read) => {
+      if (!read) throw new HttpError(404, '/v1/me/notifications/read', { error: 'not_found' });
+      return [...ids];
+    });
+
+    await userEvent.click(await screen.findByRole('button', { name: 'Mark 3 read' }));
+    await userEvent.click(await screen.findByRole('button', { name: 'Undo' }));
+
+    expect(await screen.findByText(UNDO_FAILED_COPY)).toBeInTheDocument();
+  });
+});
+
+describe('17.071 the single row’s failure speaks in the ROW’s vocabulary (E2-26)', () => {
+  /**
+   * 17.071 — E2-26, filed independently of E5-10 against the same lines
+   * (`inbox/page.tsx:278`, `:269-279`) and judged to score alongside it. The fix
+   * landed with E5-10; what this case adds is the property that fix turns on and
+   * that E5-10's case does NOT assert.
+   *
+   * **The finding's own remedy was "reuse the same two sentences the bulk path
+   * already has — one fact, one vocabulary, no new copy", and this case asserts
+   * the opposite on purpose, so the deviation is visible rather than silent.**
+   * The bulk pair says *"Those notifications were not marked read"* — a plural,
+   * about a set. Said about ONE row it is a second false statement laid on top of
+   * the missing one: the reader clicked one row and is told about several. So the
+   * row has its own pair, and this case pins BOTH halves of that choice — the
+   * row's sentence present, the bulk's absent.
+   */
+  it('17.071 the row says “That notification”, never the bulk path’s “Those notifications”', async () => {
+    renderInbox(THREE_UNREAD, async (ids) => [...ids], async () => {
+      throw new TypeError('Failed to fetch');
+    });
+
+    const rows = await screen.findAllByRole('button', { name: /Renew the DLT registration/ });
+    await userEvent.click(rows[0]!);
+
+    expect(await screen.findByText(ROW_UNREACHED_COPY)).toBeInTheDocument();
+    // THE HALF THAT MAKES THIS A DIFFERENT CASE FROM E5-10's: the bulk sentence
+    // is the one the finding asked for, and it must NOT be the one rendered.
+    expect(screen.queryByText(BULK_UNREACHED_COPY)).toBeNull();
+    expect(screen.queryByText(BULK_REFUSED_COPY)).toBeNull();
   });
 });

@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, join } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, ORIGINS, type Origin, type SubmittedEvent } from '@gisik-nokma/domain';
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
@@ -72,6 +75,45 @@ const CLIENT_ORIGINS: Origin[] = ORIGINS.filter((origin) => origin !== 'server')
 type _RoutesCannotReachTheInternalDoor = ClientIngest['ingestBatch'];
 // @ts-expect-error — AppDeps.ingest must stay narrowed; see ClientIngest above.
 type _AppDepsIngestIsNarrowed = AppDeps['ingest']['ingestBatch'];
+
+/**
+ * E3-32 — a status list is prose, and prose does not fail when what it
+ * describes changes under it. `SERVER_ORIGIN_REASON`'s own docblock (above
+ * `checkPermission` in `check-permission.ts`) once read `POST /v1/sync`
+ * "**NOT CLOSED, because it does not exist yet**" — while the route had
+ * existed, called this gate, and been witnessed by `sync-route.test.ts`'s
+ * door test (12.102) for 16 days. Nothing reread the list against reality,
+ * because nothing COULD; a docblock is not an instrument until a test reads
+ * it back. This is that instrument, matching the pattern
+ * `test/docs/recorded-decisions.test.ts` already uses for prose elsewhere.
+ */
+const CHECK_PERMISSION_SOURCE = readFileSync(
+  join(dirname(fileURLToPath(import.meta.url)), '../../src/permissions/check-permission.ts'),
+  'utf8',
+);
+
+describe("SERVER_ORIGIN_REASON's status list stays true to the routes it names (E3-32)", () => {
+  it('12.398 says POST /v1/sync is CLOSED, not "does not exist yet"', () => {
+    expect(CHECK_PERMISSION_SOURCE).toContain('**CLOSED:** `POST /v1/sync`');
+    // The exact stale bullet, not the bare substring: "does not exist yet"
+    // alone also occurs twice elsewhere in this file for an unrelated reason
+    // (a WORKSPACE that does not exist yet), so a bare-substring assertion
+    // would be satisfied by text this task never touched.
+    expect(CHECK_PERMISSION_SOURCE).not.toContain('NOT CLOSED, because it');
+  });
+
+  /**
+   * The positive control: without it, a moved docblock or a typo'd path would
+   * make the `readFileSync` above throw or read an unrelated file, and "does
+   * not contain the stale phrase" would pass for a reason unrelated to the
+   * status list being accurate.
+   */
+  it('reads the real file, not empty or the wrong one', () => {
+    expect(CHECK_PERMISSION_SOURCE.length).toBeGreaterThan(10_000);
+    expect(CHECK_PERMISSION_SOURCE).toContain('SERVER_ORIGIN_REASON');
+    expect(CHECK_PERMISSION_SOURCE).toContain('NOT CLOSED, by design');
+  });
+});
 
 let db: TestDatabase;
 

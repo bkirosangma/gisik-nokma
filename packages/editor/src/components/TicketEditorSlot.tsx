@@ -102,7 +102,15 @@ export type EditorSlotProps = {
   queryUsers?: (query: string) => Promise<MentionCandidate[]>;
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
-  submit?: (submission: EditorSubmission) => Promise<void>;
+  // V7 — `Promise<boolean>`, and it must stay in step with the OTHER half of
+  // this contract (`packages/app-core/src/views/editor-slot.tsx`'s
+  // `EditorSlotProps`): the two are written twice and a case asserts neither has
+  // a field the other lacks, so this is a copy that is checked rather than a
+  // copy that drifts. `true` means THE SERVER ACCEPTED THE CLAIM; a refusal, an
+  // invalid answer, a silence or a rejection all mean the composer must keep the
+  // person's words. It was `Promise<void>`, and `void` cannot say which
+  // happened — so the clear ran on every one of those five outcomes.
+  submit?: (submission: EditorSubmission) => Promise<boolean>;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -173,7 +181,20 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
     submittingRef.current = true;
     setSubmitting(true);
     try {
-      await submit(composeEditorSubmission(props.mode, currentDoc));
+      // V7 — THE SIGNAL, NOT THE ABSENCE OF AN EXCEPTION. `await submit(...)`
+      // resolving used to be read as "the claim landed", and a REFUSAL resolves:
+      // `TicketSheet.submitComment` records the server's answer in
+      // `serverRefusal` and returns normally. So a refused comment cleared the
+      // composer and the author lost what they had written — the exact outcome
+      // the paragraph below promises cannot happen. "No exception" is not "the
+      // server accepted it" anywhere else in this codebase, and it is not here.
+      const accepted = await submit(composeEditorSubmission(props.mode, currentDoc));
+      if (!accepted) {
+        // The server answered and did not accept, or never answered at all. Both
+        // keep the words; neither is a reason to fire `onDone`, because nothing
+        // was done.
+        return;
+      }
       if (props.mode === 'comment') {
         // The claim landed and the composer resets for the next one. Only
         // comment mode clears: a description is now the saved value, and
@@ -182,9 +203,11 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
       }
       props.onDone?.();
     } catch (err) {
-      // A refused claim must never cost the user their words. The clear lives
-      // INSIDE the try, after the await, so a rejection skips it — and onDone
-      // does not fire, because nothing was done.
+      // A rejected claim must never cost the user their words either. The clear
+      // lives INSIDE the try, after the await, so a rejection skips it — and
+      // onDone does not fire, because nothing was done. (This paragraph used to
+      // say "a REFUSED claim", which was wrong in the direction the whole fix is
+      // about: a refusal RESOLVED, so it never reached here at all.)
       props.onError?.(err);
     } finally {
       submittingRef.current = false;

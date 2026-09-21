@@ -99,13 +99,22 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
   }
 
   // Reads head state through `getTicketStateFromDb`, which does NOT filter
-  // `deleted_at` — deliberately, and not a hole here: this fanout runs on a
-  // claim that has just COMMITTED, about a ticket the actor could see at the
-  // time, and it addresses the assignee. A ticket deleted in the same instant
-  // is a race the `canSeeTicket` guard below cannot close either; the
-  // soft-delete predicate belongs to the READS that render notifications
-  // (`notifications/sweep.ts` filters at the source), not to an event handler
-  // that must not silently swallow a delivery it was told to make.
+  // `deleted_at`, and the reason that is safe is the DOOR, not this handler:
+  // the engine's live-ticket gate (`packages/rule-engine/src/checks/deletion.ts`,
+  // `checkTicketLive`, E6-2) refuses every ordinary write against a
+  // soft-deleted ticket, so a claim that reaches this fanout COMMITTED against
+  // a ticket that was live when the engine read it. Until that gate existed
+  // this paragraph asserted the premise and the door did not enforce it —
+  // round 2 measured `ticket.assigned` committing against a ticket whose
+  // detail door already answered 404, and the peer's inbox serving the result.
+  // What remains is the same-instant race, a delete that commits between the
+  // engine's read and this one; the `canSeeTicket` guard below cannot close it
+  // (`canSee` does not mean "not deleted" — `read/visible-where.ts`), and the
+  // inbox read (`notifications/store.ts`) filters nothing, so a letter
+  // delivered inside that window stays delivered — the Delete PR's own ruling
+  // for letters delivered before a ticket went away. `notifications/sweep.ts`
+  // is a PRODUCER (due-soon, stale) that filters at its source; it is not the
+  // read that renders this handler's rows, and an earlier wording said it was.
   async function titleOf(workspaceId: string, ticketId: string): Promise<string> {
     const state = await getTicketStateFromDb(deps.pool, workspaceId, ticketId);
     const value = state?.fields['title']?.value;

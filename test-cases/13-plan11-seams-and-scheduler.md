@@ -599,4 +599,42 @@ reconciled, never overwritten.
   13.194's recorded decision (scope limited to restore scratch databases, never production, no DDL-capable
   credential). Sentence fragments, not paragraphs — a paragraph breaks on rewrapping and teaches people to
   delete the test, while a single word like "scratch" would survive the decision being reversed
+- 13.197 ✅ E3-14 — three cookie-authenticatable mutations unrecorded in `HTTP_ORIGIN_PROTECTED_ROUTES`
+  are now in it and covered by 13.116–13.119's parameterised rows: `PUT /v1/me/notification-preferences`,
+  `POST /v1/me/invitations/:inviteId/accept` (membership-granting) and its `/decline` sibling. Distinct
+  from the invite TOKEN accept and `PUT /v1/me/preferences`, both still deliberately outside the set by a
+  recorded ruling this case does not revisit (`http-origin.ts`'s own docblock)
+- 13.198 ✅ E3-15 — the set-equality drift guard (13.116) compares two hand-maintained lists (the suite's
+  table and the production `Set`), so a route missing from BOTH leaves it green — the exact shape 13.197
+  found. This case measures the ASSEMBLED APP instead: `buildApp`'s test-only `options.onRoute`, wired
+  before a single route is registered (a hook attached by the caller afterward misses every root-level
+  route — MEASURED, catching only 2 of ~20). Every mutating route the real app serves must be in
+  `HTTP_ORIGIN_PROTECTED_ROUTES` or a commented allow-list of the six public doors. Control asserted in
+  the same test: the seam must have observed both a root-level route and a child-`register()` route, or
+  it would pass vacuously. RED against the pre-13.197 route set (proven by temporarily removing one route
+  from both hand-maintained lists: 13.116 stayed green, this case reddened), GREEN at head.
+  `app.printRoutes({ commonPrefix: false })` was tried first and rejected — MEASURED, it silently drops
+  `/api/auth/*` from its tree (a `find-my-way` internal-node quirk under that option)
+**Case ids below sit in release batch B01's §13 block `13.1077`–`13.1086` (the per-batch table in
+`test-cases/13-hig-per-screen.md`, allocated by the controller 2026-09-21), not continuing from `13.198`:
+`13.101–13.200` is Lane E's block and `13.201–13.240` is Lane C's (both recorded in
+`test-cases/13-deployment-dogfooding.md`), both already minted with unrelated cases by the time this task
+ran — `13.201–13.203` is the scheduler-generalisation errand, found by `check-case-ids.mjs` flagging a
+duplicate. These four were first minted as `13.1100`–`13.1103` from a next-free reading, before the batch
+table existed; the controller renumbered them line-precisely into B01's block before landing, because
+`13.1100`–`13.1103` fall inside B06's block `13.1097`–`13.1106`. Ids already on `main` never move.**
+
+- 13.1077 ✅ E6-15 — a cookie-carrying `GET /v1/stream` handshake with a FORGED HTTP-Origin is refused
+  403 `forbidden_origin`, the same refusal a mutating door gets. `GET /v1/stream` is a WebSocket upgrade,
+  exempt from the same-origin policy that makes every other read in this server safe to leave unchecked
+  (13.117's table is mutating routes only) — without this, a foreign page opens the socket under the
+  victim's ambient cookie and receives their live event stream. RED reproduced by temporarily reverting
+  `httpOriginRefused`'s stream branch: `expected 403 to be 401` (the request reached `requireSession`,
+  which answered for the wrong reason). GREEN at head
+- 13.1078 ✅ the same handshake with NO HTTP-Origin header at all is also refused — require, not just
+  validate, matching 13.118's rule for the mutating doors
+- 13.1079 ✅ the correctly-configured `WEB_ORIGIN` is let through to the socket route, so a same-origin
+  client's real handshake still reaches it — the recorder sees exactly one admitted request
+- 13.1080 ✅ the control: a BEARER handshake (no cookie) is untouched by this check regardless of Origin,
+  same as every other route in this file — there is no ambient credential to forge
 

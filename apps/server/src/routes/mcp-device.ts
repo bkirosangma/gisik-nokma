@@ -16,6 +16,15 @@ import {
 export const UNKNOWN_CODE_BODY = { error: 'unknown_code' } as const;
 export const EXPIRED_CODE_BODY = { error: 'expired_code' } as const;
 export const INVALID_BODY = { error: 'invalid' } as const;
+/**
+ * E6-16 — an MCP token's own refusal, distinct from the four above: the
+ * caller IS authenticated, and the code IS real; what is refused is an
+ * assistant approving (or denying) a device grant on its own authority. The
+ * consent page's "it lasts until you revoke it" is a promise about a decision
+ * a PERSON made in a browser, and a token approving its own successor would
+ * make that promise false — a token that outlives its own revocation.
+ */
+export const MCP_TOKEN_MAY_NOT_DECIDE_BODY = { error: 'mcp_token_may_not_decide_device_grant' } as const;
 
 /**
  * The device-authorization flow, in four doors.
@@ -93,6 +102,15 @@ export function registerMcpDeviceRoutes(
       },
     },
     async (request, reply) => {
+      // E6-16 — an MCP token can reach this route (it is a `requireSession`
+      // route, and the fallback resolves one), so a token could otherwise
+      // approve a SUCCESSOR device code that survives revoking the token that
+      // minted it. Refused BEFORE the code is looked up, same as the schema
+      // check above: the caller's own authority is wrong regardless of what
+      // the code names.
+      if (request.authKind === 'mcp-token') {
+        return reply.code(403).send(MCP_TOKEN_MAY_NOT_DECIDE_BODY);
+      }
       const { userCode } = request.body as { userCode: string };
       const outcome = await approveDeviceCode(
         deps.pool,
@@ -149,6 +167,13 @@ export function registerMcpDeviceRoutes(
       },
     },
     async (request, reply) => {
+      // E6-16 — the mirror of approve's fence, for the mirror reason: without
+      // it, a compromised or merely careless MCP-authenticated client could
+      // deny a device code out from under a person mid-approval in the
+      // browser, on its own authority rather than theirs.
+      if (request.authKind === 'mcp-token') {
+        return reply.code(403).send(MCP_TOKEN_MAY_NOT_DECIDE_BODY);
+      }
       const { userCode } = request.body as { userCode: string };
       const outcome = await denyDeviceCode(deps.pool, userCode.trim().toUpperCase(), now());
       if (outcome === 'expired') return reply.code(410).send(EXPIRED_CODE_BODY);
