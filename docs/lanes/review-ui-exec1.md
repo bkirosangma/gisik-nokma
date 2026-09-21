@@ -2,6 +2,19 @@
 
 **Lane:** exec 1 · branch `exec1/review-ui`, cut from `origin/main = e4baa425966b331fdc1b189e3d1c86b667e30acc` · 2026-09-21
 **Method:** enumerate → cover → state coverage including what was **not** reached. No fix branch, no fix commit, no PR.
+**ROUND-2 DELTA, AT A GLANCE — what changed and why.**
+
+| id | round 1 | round 2 | reason |
+|---|---|---|---|
+| **P8** | IMPORTANT, filed as a discovery | **MINOR (product) / IMPORTANT (follow-on)** | the product **already records** the gap at `board.tsx:394-397` as *"a named follow-on"* — filing it as a discovery was wrong. The argument is now the connected one: the remedy exists in-repo, tested (`filters-sheet.test.tsx:153`, cases `13.445`/`13.446`), on a less-used surface. |
+| **P13** | MINOR, cited WCAG 2.4.1 | **MINOR, claim WITHDRAWN** | ARIA11 (landmarks) is a sufficient technique for 2.4.1 and `<main>` is on every route, so the product probably **conforms**. Kept as a keyboard-convenience finding with the conformance claim removed. |
+| **P12** | IMPORTANT, argued from uniqueness | **IMPORTANT, re-argued** | the WCAG Understanding document **disclaims** a uniqueness requirement, and supplies a better argument: *"for web applications (single page applications) where the view changes dynamically, the title should also be changed dynamically to reflect the content or topic of the current view."* |
+| **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
+| **P15–P20** | — | **6 NEW findings** | the prototype copy is a broken camelCase transform (P15); the truncating-scanner negative assertion (P16); the heading-level skip (P17); navigation announces nothing (P18); the unnamed `tablist` (P19); the calendar's missing grid semantics (P20). |
+| **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
+
+**Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
+
 **ROUND 2 (2026-09-21).** Branch `exec1/review-ui-r2`, cut from `origin/main = a7b6292b`. Round-1 findings **stay and are re-scored**; revisions are marked **⚠ r2**; new findings continue the numbering and are marked **r2**. Independent duplicates with the Opus lane both score, per `REVIEW-R2-RULES-2026-09-21.md` §3 — I have not read that lane's report and do not coordinate with it.
 
 **Prototype authority:** the staged export at `/Users/kiro/my_projects/gisik-nokma-lanes/prototype-2026-09-20/`.
