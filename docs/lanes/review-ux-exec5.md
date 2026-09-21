@@ -964,14 +964,14 @@ three siblings that do it right.
 
 ### E5-28 — IMPORTANT · A dropped connection during Publish leaves the workflow builder's Publish button disabled for ever with no sentence; a refusal discards the state mapping the person just built `[SOURCE]` (verifies exec 2 §2e's "state-mapping dialog unmounted before the server answers", and goes further)
 
-**WHAT.** `workflow-builder/ui/publish-controls.tsx:62-84` `submitPayload`: `setState({ phase: 'submitting' })`,
+**WHAT.** `workflow-builder/ui/publish-controls.tsx:64-86` `submitPayload`: `setState({ phase: 'submitting' })`,
 then `await env.gateway.submit([event])` — **no `try`/`catch`** (the file's only `try` is around the occupancy READ,
-`:91-98`). Both callers discard the promise: `:87` `await submitPayload()` inside `onPublishClick` (itself invoked
-as `void onPublishClick()`, `:105`), and `:126` `onConfirm={(mapping) => void submitPayload(mapping)}`. The Publish
-button is `disabled={issues.length > 0 || state.phase === 'submitting'}` (`:103`), and nothing but a server answer
+`:95-98`). Both callers discard the promise: `:91` `await submitPayload()` inside `onPublishClick` (itself invoked
+as `void onPublishClick()`, `:113`), and `:126` `onConfirm={(mapping) => void submitPayload(mapping)}`. The Publish
+button is `disabled={issues.length > 0 || state.phase === 'submitting'}` (`:111`), and nothing but a server answer
 ever leaves `submitting`. So a transport failure — the request never reaching the server — leaves the person with a
-greyed Publish, no banner (`:129-145` render only `published`/`refused`/`invalid`), and no way back but a reload.
-Separately, the confirm path sets `submitting` and so unmounts `StateMappingDialog` (`:116`, rendered only while
+greyed Publish, no banner (`:129-146` render only `published`/`refused`/`invalid`), and no way back but a reload.
+Separately, the confirm path sets `submitting` and so unmounts `StateMappingDialog` (`:117`, rendered only while
 `phase === 'mapping'`) before the server answers; on `refused` the banner says *"The server refused this publish."*
 under an idle Publish button and the mapping the person built is gone — pressing Publish again reopens an EMPTY
 mapping dialog.
@@ -985,7 +985,7 @@ the person the work the dialog exists to collect.
 **WHAT WOULD HAVE BEEN BETTER.** A `catch` that sets a `transport` phase with the sheet's sentence and re-enables
 Publish; on `refused`, keep the mapping in state and reopen the dialog pre-filled.
 
-**MEASUREMENT.** `[SOURCE]` `publish-controls.tsx:55-147` opened in full; `grep -n 'catch\|try {'` → the occupancy
+**MEASUREMENT.** `[SOURCE]` `publish-controls.tsx:55-148` opened in full; `grep -n 'catch\|try {'` → the occupancy
 read only. Not driven (§6.1; the builder needs a draft to publish, which is a write).
 
 **SEVERITY: Important** (claimed). A stuck control with no sentence, on the surface the manual calls "the one thing
