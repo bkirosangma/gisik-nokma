@@ -3198,7 +3198,19 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    inherits. The heading gap this leaves is real, **pre-existing** (the base page
    had no `<h1>` either), and recorded with an owner rather than fixed inside a
    design port. */
+/* E4-9: at `emulate 390x844` this field measured **403 px wide** and pushed
+   `document.documentElement.scrollWidth` to **415** on a 390-px viewport — the
+   page scrolled sideways by 25 px. An `<input>`'s intrinsic width is roughly its
+   `size` attribute times the character width, and the `font-size: 2.125rem`
+   below makes that enormous; `min-width: 0` on a flex/grid child is what lets
+   it shrink, and `box-sizing: border-box` keeps the 1px border inside the
+   100%. All three are the fix and none alone is: `width: 100%` without
+   `min-width: 0` is floored by the intrinsic size, and `min-width: 0` without
+   `width: 100%` does not fill the column. */
 .workflow-builder-screen__name {
+  width: 100%;
+  min-width: 0;
+  box-sizing: border-box;
   min-height: 2.5625rem;
   padding: 0 0.875rem;
   border: 1px solid var(--gn-border);

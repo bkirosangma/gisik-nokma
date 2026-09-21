@@ -1520,3 +1520,33 @@ roster, and an un-stubbed read rejects **by name** — surfacing as an unhandled
 A summary that counted only tests would have read it as green. `ui.css` and the two components were
 reverted to `HEAD` for the RED run (with a rebuild, so the revert reached the compiled artifact) and
 restored from sha256-compared backups. Package suites: ui 420, app-core 1725, web 647.
+
+## The builder page has one `<main>`, and its name field can shrink (lane ds1, 2026-09-21, batch B10) — case `13.1156`
+
+**The finding, round 2 `E4-9`, PARTIAL → scored IMPORTANT.** At `emulate 390x844` on
+`/w/<id>/settings/workflows/<workflowId>`: `document.querySelectorAll('main')` → **2** — `main.gn-shell`
+(parent `body`) and `main.workflow-builder-screen__canvas` (parent
+`div.workflow-builder-screen__layout`, nested inside it) — and
+`document.documentElement.scrollWidth` → **415** on a 390-px viewport, a 25-px sideways scroll, with
+`.workflow-builder-screen__name` itself **403 px wide**. The judge's correction: the outer main is the
+ROUTE PAGE, not `layout.tsx` as the finding said — which is why the fix is in the screen and not in the
+shell.
+
+### The case
+
+- ✅ **13.1156 — the route renders exactly one `<main>` and the canvas is a named region; the name field
+  declares all three shrink properties.** `apps/web/test/builder-route.test.tsx`. The canvas is a
+  `<section aria-label="Canvas">`: a page has one main, and `aria-label` is what keeps the canvas
+  addressable now that it is not a landmark of its own (asserted through `getByRole('region', …)`, so a
+  `<section>` that lost its label would redden). **Both halves are asserted because they have different
+  causes** — the double landmark is route structure, the overflow is CSS — and a fix for either alone
+  leaves the other. **The overflow half is asserted as the three DECLARATIONS rather than as a
+  measurement**, and it says so: jsdom has no layout engine, so a width cannot be measured here, and
+  `width: 100%` without `min-width: 0` is floored by the input's intrinsic size while `min-width: 0`
+  without `width: 100%` does not fill the column — all three or none. `ui.css` and the screen were
+  reverted to `HEAD` for the RED run (with a rebuild, so the revert reached the compiled artifact) and
+  restored from sha256-compared backups. Package suites: ui 423, app-core 1725, web 652.
+
+**One third of the remedy is NOT done, named rather than implied:** the finding also asks for the builder
+route in the stack suite's overflow loop — a Playwright change needing a live stack on `:3001`, the same
+deferral recorded under `13.1141`, `13.1148` and `13.1151`. **Owner: whoever widens that loop.**

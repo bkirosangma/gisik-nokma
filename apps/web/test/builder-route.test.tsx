@@ -305,3 +305,46 @@ describe('13.1152 the builder\'s Publish is the shared Button, and the page rule
     }
   });
 });
+
+/**
+ * Case `13.1156` — E4-9 — the builder page has ONE `<main>`, and its name field
+ * can shrink on a phone.
+ *
+ * Measured at `emulate 390x844`: `document.querySelectorAll('main')` → **2**,
+ * `main.gn-shell` (parent `body`) and `main.workflow-builder-screen__canvas`
+ * (parent `div.workflow-builder-screen__layout`, nested inside it), and
+ * `document.documentElement.scrollWidth` → **415** on a 390-px viewport — a
+ * 25-px sideways scroll, with the name field itself **403 px wide**. A page has
+ * one main; the canvas is a named region inside it.
+ *
+ * **Both halves are asserted because the finding named both and they have
+ * different causes:** the double landmark is a ROUTE-structure defect and the
+ * overflow is a CSS one, and a fix for either alone leaves the other. **The
+ * overflow half is asserted as the three declarations rather than as a
+ * measurement** — jsdom has no layout engine, so a width cannot be measured
+ * here; what the case can prove is that the pair that makes the field
+ * shrinkable is present, and it says so rather than implying a painted number.
+ */
+describe('13.1156 the builder page has one main and a shrinkable name field', () => {
+  it('13.1156 the route renders exactly one <main>, and the canvas is a named region', async () => {
+    renderWithAuthoring({});
+    // The screen is mounted (not the loading arm) before the landmark census
+    // means anything — otherwise "one main" could be a page that drew nothing.
+    expect(await screen.findByRole('button', { name: 'Publish' })).toBeInTheDocument();
+    expect(document.querySelectorAll('main'), 'the page has more than one <main>').toHaveLength(1);
+    expect(document.querySelector('.workflow-builder-screen__canvas')?.tagName).toBe('SECTION');
+    expect(screen.getByRole('region', { name: 'Canvas' })).toBeInTheDocument();
+  });
+
+  it('13.1156 the name field declares all three shrink properties', () => {
+    const css = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
+    const body = /\.workflow-builder-screen__name\s*\{([^}]*)\}/.exec(css);
+    expect(body, 'no rule for .workflow-builder-screen__name').not.toBeNull();
+    // All three, because none alone is the fix: `width: 100%` without
+    // `min-width: 0` is floored by the input's intrinsic size, and
+    // `min-width: 0` without `width: 100%` does not fill the column.
+    expect(body?.[1]).toMatch(/width:\s*100%/);
+    expect(body?.[1]).toMatch(/min-width:\s*0/);
+    expect(body?.[1]).toMatch(/box-sizing:\s*border-box/);
+  });
+});
