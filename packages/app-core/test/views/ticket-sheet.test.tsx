@@ -2783,7 +2783,7 @@ describe('sheet prototype parity', () => {
   });
 });
 
-describe('G — Priority, Due and Type as rows', () => {
+describe('G — Priority, Due, Start and Type as rows', () => {
   /** A ticket claiming NOTHING, so every absence copy is exercised. */
   const bare = (): TicketRead => ticketRead({ ticket: ticketStateSeed({ fields: {} }) });
 
@@ -3212,14 +3212,21 @@ describe('G — Priority, Due and Type as rows', () => {
     });
   });
 
-  it('16.30 draws them in the prototype’s order: Assignee, Priority, Due, Type', async () => {
-    // Order is transcribed, not chosen: the prototype draws these five in this
-    // sequence (`desktop.dc.html:1183-1205`), and a sheet that reordered them
-    // would be a different claim about which facts matter most.
+  it('16.30 draws them in the prototype’s order: Assignee, Priority, Due, Start, Type', async () => {
+    // Order is transcribed, not chosen: the prototype draws them in this
+    // sequence (`desktop.dc.html:1183-1205`, with Start beside Due since spec
+    // 2026-09-22), and a sheet that reordered them would be a different claim
+    // about which facts matter most.
     renderSheet(ticketRead());
     await settled();
 
-    const rows = ['field-assignee', 'field-priority', 'field-due', 'field-type'];
+    const rows = [
+      'field-assignee',
+      'field-priority',
+      'field-due',
+      'field-start',
+      'field-type',
+    ];
     const drawn = rows.map((id) => screen.getByTestId(id));
     for (let i = 1; i < drawn.length; i += 1) {
       const before = drawn[i - 1]!;
@@ -3231,6 +3238,32 @@ describe('G — Priority, Due and Type as rows', () => {
         Node.DOCUMENT_POSITION_FOLLOWING,
       );
     }
+
+    // ⚠ AND A PAIRWISE WALK OVER A NAMED LIST CANNOT SEE AN OMISSION — the
+    // reason the assertion above was NOT enough on its own. `field-start` is
+    // missing from the array on this case's first writing after Task 7 added the
+    // row, and every assertion above still passed: the four ids it named were
+    // present and in order, and the walk never asked what ELSE the sheet draws.
+    // **The array is a transcription of the prototype's order, so it can only
+    // ever confirm the ids somebody remembered to list.** The bolded reading
+    // below is derived from the DOM instead: it names the door G rows by the
+    // LABELS a person sees, in document order, so a row inserted among them
+    // reddens here whether or not anyone updated the array above.
+    //
+    // Scoped to the LEADING rows on purpose: the description and the generic
+    // custom-field loop draw `field-*` rows after these, and their count is
+    // unbounded by design, so "the sheet draws exactly five" would be a false
+    // claim rather than a stronger one.
+    // Read through the class, not a testid: the fields list is a plain `<dl
+    // className="gn-ticket-sheet__fields">` and carries no testid of its own.
+    // Asserted non-null FIRST, so a renamed class reports itself rather than
+    // reading as "the sheet draws no labels".
+    const fieldRows = document.querySelector('.gn-ticket-sheet__fields');
+    expect(fieldRows).not.toBeNull();
+    const leadingLabels = [...(fieldRows?.querySelectorAll('dt') ?? [])]
+      .slice(0, 5)
+      .map((dt) => dt.textContent);
+    expect(leadingLabels).toEqual(['Assignee', 'Priority', 'Due', 'Start', 'Type']);
   });
 });
 
