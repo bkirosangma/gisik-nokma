@@ -1893,7 +1893,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with two tabs: "
+                    "text": "Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You get a panel with three tabs: "
                   },
                   {
                     "kind": "bold",
@@ -1901,11 +1901,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " and "
+                    "text": ", "
                   },
                   {
                     "kind": "bold",
                     "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attachments"
                   },
                   {
                     "kind": "text",
@@ -1959,7 +1967,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — the \"Who can see this\" section. (§10)"
+                      "text": " — the pill on the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Visibility"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row, which opens a menu. (§10)"
                     }
                   ],
                   [
@@ -1987,7 +2003,88 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Everything else on that panel is there to read rather than to change: the current stage, the type, the priority and the other field rows all show who claimed the value and when. Four rows are real controls — the title box at the top, the \"Assignee\" picker, the description box, and the "
+                    "text": "Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restricted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip when its audience is a named list rather than the project or the workspace, and a "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Closed by … on …\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip once it is closed. Directly below that line is where the job sits: "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"At project root\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", or a "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Subtask of …\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " chip that opens the job above it, or "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "\"Restricted parent — exists, but you can't see it\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The Details tab then reads top to bottom: the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "description"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " box first, then the field rows — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "State"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assignee"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Priority"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
                   },
                   {
                     "kind": "bold",
@@ -1995,7 +2092,141 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " date box."
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Type"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Visibility"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — then "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Subtasks"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", then "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Comments"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". That order is the prototype's, and the alternating tint on every second field row is decoration that nothing depends on."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "The State row is a row of facts rather than a dropdown, on purpose."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It shows the stage, who moved the job there and when, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Move…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button. A stage change has to go through the rules on the move (§7), and a dropdown would step around them. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " sits beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and is the same kind of control — a date box that commits when you click away or press Enter, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Escape"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " abandons what you typed without closing the panel."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Everything else on that panel is there to read rather than to change: the type and the other field rows all show who claimed the value and when. The controls are the title box at the top, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assignee"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Priority"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker, the description box, the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " date boxes, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Visibility"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " pill."
                   }
                 ]
               }
@@ -2055,19 +2286,19 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot set a start date."
+                      "text": "A start date is no longer on this list — you can set one now."
                     },
                     {
                       "kind": "text",
-                      "text": " (See the box below for the one thing that comes close, and why it is not a substitute.) "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job panel's "
                     },
                     {
                       "kind": "bold",
-                      "text": "A due date is no longer on this list"
+                      "text": "Start"
                     },
                     {
                       "kind": "text",
-                      "text": " — see the row above for the precedent — because the website can now set one: the job panel's "
+                      "text": " row is a date box beside "
                     },
                     {
                       "kind": "bold",
@@ -2075,7 +2306,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " row is a date box, and clearing it takes the claim off."
+                      "text": ", and clearing it takes the claim off. (The box below records the one thing that comes close and is "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "not"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " the same thing.) "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "A due date is likewise no longer on this list"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — for the same reason, and with the same control."
                     }
                   ],
                   [
@@ -2103,7 +2350,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". A move carrying the \"require a comment\" rule still puts its own box on the Move dialog (§7) and records what you type on the move. "
+                      "text": ". Its button says "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Post"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and the line beside it says what posting does — it records an event citing you. A move carrying the \"require a comment\" rule still puts its own box on the Move dialog (§7) and records what you type on the move. "
                     },
                     {
                       "kind": "bold",
@@ -2121,7 +2376,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's files, and the comment box takes one too. The "
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The job sheet's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attachments"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " tab lists the job's files, and the comment box takes one too. The "
                     },
                     {
                       "kind": "bold",
@@ -3668,7 +3931,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — by epic, status, assignee, type, or flat (no grouping)."
+                      "text": " — by epic, status, assignee, type, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", or flat (no grouping)."
                     }
                   ],
                   [
@@ -3678,7 +3949,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — from status, assignee, due date, type, progress."
+                      "text": " — from status, assignee, due date, type, progress, "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "priority"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ]
                 ]

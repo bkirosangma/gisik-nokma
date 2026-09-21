@@ -348,18 +348,36 @@ words are kept exactly as you typed them, so check what you typed if you are fus
 ### What you can change afterwards
 
 Open a job by clicking it on any of the job tabs — the Backlog, Board, List, Calendar or Timeline. You
-get a panel with two tabs: **Details** and **History**.
+get a panel with three tabs: **Details**, **History** and **Attachments**.
 
 On the Details tab you can do **three things**:
 
 1. **Move it to another stage** — the **Move…** button. (§7)
-2. **Change who can see it** — the "Who can see this" section. (§10)
+2. **Change who can see it** — the pill on the **Visibility** row, which opens a menu. (§10)
 3. **Set or clear its due date** — the **Due** row's date box. Clearing the box takes the claim off
    rather than claiming a blank date. (§5)
 
-Everything else on that panel is there to read rather than to change: the current stage, the type, the
-priority and the other field rows all show who claimed the value and when. Four rows are real controls —
-the title box at the top, the "Assignee" picker, the description box, and the **Due** date box.
+Under the job's title, above the tabs, there is a short line of chips: the stage it is in, a
+**Restricted** chip when its audience is a named list rather than the project or the workspace, and a
+*"Closed by … on …"* chip once it is closed. Directly below that line is where the job sits: *"At project
+root"*, or a *"Subtask of …"* chip that opens the job above it, or *"Restricted parent — exists, but you
+can't see it"*.
+
+The Details tab then reads top to bottom: the **description** box first, then the field rows — **State**,
+**Assignee**, **Priority**, **Due**, **Start**, **Type**, **Visibility** — then **Subtasks**, then
+**Comments**. That order is the prototype's, and the alternating tint on every second field row is
+decoration that nothing depends on.
+
+**The State row is a row of facts rather than a dropdown, on purpose.** It shows the stage, who moved the
+job there and when, and the **Move…** button. A stage change has to go through the rules on the move (§7),
+and a dropdown would step around them. **Start** sits beside **Due** and is the same kind of control — a
+date box that commits when you click away or press Enter, and **Escape** abandons what you typed without
+closing the panel.
+
+Everything else on that panel is there to read rather than to change: the type and the other field rows
+all show who claimed the value and when. The controls are the title box at the top, the **Assignee**
+picker, the **Priority** picker, the description box, the **Due** and **Start** date boxes, and the
+**Visibility** pill.
 
 ### The things you cannot do to a job
 
@@ -372,10 +390,11 @@ This is the honest list. Each one is an absence, not a hidden button.
   It stays read-only in exactly two cases, and the row itself says which — the workspace roster has not
   loaded, or the job is on a person outside the roster you can see. **On the phone and desktop apps
   there is no "Assignee" row at all**, so there a job's assignee can be neither read nor set.
-- **You cannot set a start date.** (See the box below for the one thing that comes close, and why it
-  is not a substitute.) **A due date is no longer on this list** — see the row above for the
-  precedent — because the website can now set one: the job panel's **Due** row is a date box, and
-  clearing it takes the claim off.
+- **A start date is no longer on this list — you can set one now.** It is kept here, rather than
+  deleted, so a reader who remembers it as an absence finds the correction where they last saw it. The
+  job panel's **Start** row is a date box beside **Due**, and clearing it takes the claim off. (The box
+  below records the one thing that comes close and is *not* the same thing.) **A due date is likewise no
+  longer on this list** — for the same reason, and with the same control.
 - **The description is no longer on this list — you can write it now.** It is kept here, rather than
   deleted, so a reader who remembers it as an absence finds the correction where they last saw it.
   Type into the description on the job panel and save it; the panel reads back who set it and when.
@@ -383,14 +402,15 @@ This is the honest list. Each one is an absence, not a hidden button.
   quietly lost.
 - **You can leave a comment on a job now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The job sheet carries a
-  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. A move
+  comment thread, with a box at the end of it reading *"Add a comment — @ to mention someone"*. Its button
+  says **Post**, and the line beside it says what posting does — it records an event citing you. A move
   carrying the "require a comment" rule still puts its own box on the Move dialog (§7) and records what
   you type on the move. **The phone app cannot leave one, for now** — commenting from the phone needs a
   signed-in identity the phone shell does not have yet, so the control is withheld there rather than
   shipped in a shape that always fails silently (E5-44).
 - **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
-  remembers it as an absence finds the correction where they last saw it. The job sheet lists the job's
-  files, and the comment box takes one too. The **description** box is still the exception: a file
+  remembers it as an absence finds the correction where they last saw it. The job sheet's
+  **Attachments** tab lists the job's files, and the comment box takes one too. The **description** box is still the exception: a file
   dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
   puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
