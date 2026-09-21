@@ -39,7 +39,7 @@ ruled is not the prototype and are off by one against the one that is (F3). The 
 **confirmations of gaps the project already records and owns** (F4, F5) — reported because I reproduced
 them independently, not because they are news.
 
-### Round 2 — nineteen new findings, and the one that matters
+### Round 2 — twenty new findings, and the one that matters
 
 **`E3-14` (Critical, claimed) is a hole in this product's CSRF control, measured against a real
 authenticated session (§24).** `HTTP_ORIGIN_PROTECTED_ROUTES` holds 11 patterns and **five
@@ -48,7 +48,7 @@ cookie-authenticated mutating routes are not in it**, including `POST /v1/me/inv
 survived: the guard written to catch exactly this compares the protected set against **the suite's own
 table**, a closed loop, and passes green beside the gap.
 
-**Ten Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
+**Eleven Important, eight Minor, and eight round-1 findings re-validated with none withdrawn** — and one of
 the seventeen was revised **down** by me before a judge could (§34). Every count is measured and every
 command is printed beside it. **§23, §36, §38, §39, §40 and §41 record ten attacks on other lanes' findings — all ten failed**, one of them across concerns, and two of them changed something here: `E6-6` showed a claim in this report to be false, and `E6-11` bounds §7.1's scope, and one of them (`E6-6`) showed a claim in this report to be wrong,
 and §15, §20.1, §31 and §35 record six times my own sweep's universe or pattern was the defect rather than
@@ -1381,13 +1381,13 @@ I read the patterns against the tree rather than trusting the empty result.
 | severity | count | members |
 |---|---|---|
 | **Critical (claimed)** | **1** | `E3-14` — five cookie-authenticated mutating routes outside `HTTP_ORIGIN_PROTECTED_ROUTES`; **re-measured with a real session (§24), then DEMONSTRATED on three of the five (§32, §33)**: a forged-Origin request made the victim a member of a workspace (memberships 1→2, three ledger events), a second declined their invitation, a third joined by token — with the trusted follow-up answering 404 because the forgery had already spent the single-use invite. ⚠ **BOUNDED AND STATED (§33.1): all three need an id or token the attacker does not obviously have, which I did not establish a way to obtain. The two `PUT`s need no secret and are preflight-bounded (§14.8). **A judge weighing severity by what was demonstrated should rule Important; Critical rests on the project's own criterion for this set.** |
-| **Important (claimed)** | **10** |   `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) · `E3-26` (`Features.md`:2350 says nothing links to the authoring routes and `AppNav` has no settings entry — the nav renders a Settings link and a `/settings` shell pointing at all six) · `E3-27` (two files say `checkErrandTemplate` is "not yet landed"; the seeder calls it as a throwing guard and it has eleven cases) |
+| **Important (claimed)** | **11** |    `E3-15` (drift guard compares the set to its own table) · `E3-16` (roster-cut citation drifted twice; the correction note now misdirects the fix) · `E3-19` (the parent-terminal invariant is one-directional; a parent can be closed with an open child — **reproduced**, §21–22) · `E3-20` (case 6.82: *"cannot ship"* / *"ABSENT from the type"* — it shipped) · `E3-21` (case 6.84: *"no check compares them"* — two do) · `E3-22` (case 6.58's own cycle reproduction uses the event `hierarchy.cycle` refuses) · `E3-23` (case 6.124: unconstrained URL variable — `config.ts` names the case number as closed) · `E3-24` (case 6.66: *"existence-versus-the-row, not existence-versus-title"* — the shipped branch carries the title; **the only one whose staleness could cause a reader to REMOVE a shipped behaviour**) · `E3-26` (`Features.md`:2350 says nothing links to the authoring routes and `AppNav` has no settings entry — the nav renders a Settings link and a `/settings` shell pointing at all six) · `E3-27` (two files say `checkErrandTemplate` is "not yet landed"; the seeder calls it as a throwing guard and it has eleven cases) · `E3-28` (two documents count the offline-born ticket's doors as three and never name `getTicket`; the code's comment says "THE THIRD NAME WAS MISSING" and the registry has it) |
 | **Minor** | **8** | `E3-18` (**revised DOWN from Important, §34** — the replica's dangling-parent divergence is real and reproduced, but its trigger is corrupt data: no door can set a dangling `parent_id`) · `E3-25` (case 6.96: `SyncItem` "three members" vs four) · `E3-9` (envelope "thirteen fields" vs 11) · `E3-10` (registry "SIXTEEN/thirteen" vs 18/15) · `E3-11` (`Features.md` "84 fixtures" vs 86) · `E3-12` (`Features.md` "eleven checks" vs 12) · `E3-13` (citation resolves to the wrong line) · `E3-17` (outbox refactor total 8, its own bullets sum to 9) |
 | **Round-1 findings, re-validated and standing** | **8** | `E3-1` … `E3-8` (§13) — **none withdrawn** |
 | **Instrument defects in my own method** | **2** | §15 — the 439-hit sweep, not filed as findings · §24.1 — the cookie probe whose controls did not fire, recorded rather than discarded |
 | **Corrections to this report's own claims** | **5** | §17.1 (three `Features.md` lines) · §17.2 (my §7.2 `tickets.ts` citation) · §14.4 (**`check-no-silent-skips` does not refuse an empty universe** — exec6's `E6-6` was right and I was wrong) |
 
-**Round-2 total: 19 new findings** (1 Critical claimed, 10 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
+**Round-2 total: 20 new findings** (1 Critical claimed, 11 Important claimed, 8 Minor) — **including one revised DOWN by me before a judge could, §34**, plus 8 round-1
 findings re-validated, 15 verified-clean claims (§20), and 5 corrections to this report's own claims.
 
 **Nine of the fifteen are measured by RUNNING something** — `E3-14` by injection at the assembled app with
@@ -3244,3 +3244,72 @@ same conclusion §30.1 and §42 reached from the other end.**
 and §14 audited; **§9 (editor/documents/attachments), §12 (offline sync, ~660 lines) and §13 (deployment,
 ~525 lines) are still unreached**, and the `test-cases/` ✅ set remains unasked. **Three sections and the ✅
 set are what a lane with more time should take ahead of re-reading anything I have already covered.**
+
+---
+
+## 48. `E3-28` (r2) — **IMPORTANT (claimed)** — Two documents count the offline-born ticket's doors as three and never name `getTicket`; the code's own comment says *"THE THIRD NAME WAS MISSING"* and the registry now has it
+
+**WHAT.** Two places state the same enumeration:
+
+- `Features.md:2054` — *"⚙️ **A ticket born offline reaches THREE doors, and they now agree** —
+  `listTicketSummaries` carries it (badged, with its queued event ids); `getTickets` and `getBoard` do not…"*
+- `test-cases/12-offline-sync-apps.md:1410` — *"12.187 ✅ **a ticket born offline reaches THREE doors, and this
+  case is the only thing that made them [agree]**"*
+
+**WHY it is wrong — the code's own registry has a different three, and its comment says the difference was a fix.**
+
+```ts
+// packages/app-core/src/replica/replica-data-source.ts
+export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = {
+  getTickets: OFFLINE_BORN_ABSENCE,
+  getBoard:   OFFLINE_BORN_ABSENCE,
+  getTicket:  OFFLINE_BORN_ABSENCE,      // <-- the door neither document names
+};
+```
+
+And above it, in `OFFLINE_BORN_ABSENCE`'s own `field`:
+
+> **THE THIRD NAME WAS MISSING AND IS THE SAME ARGUMENT**: `getTicket` returns `null` for exactly these
+> tickets, because `TicketRead.stateProvenance` is as unfillable as the two view-row fields. **An absence
+> value whose whole purpose is to be the enumerable name of a gap was itself under-enumerated.**
+
+**So the under-enumeration was found, argued and fixed — in the code — and the two documents that carry the
+count were not carried with it.** The bullet's three are `{listTicketSummaries, getTickets, getBoard}`; the
+registry's three omitting doors are `{getTickets, getBoard, getTicket}`. **They are both "three", they are
+different members, and `getTicket` appears in neither document** — measured with a word boundary, because a
+naive grep for `getTicket` matches `getTickets` and would have reported a mention that is not there:
+
+```
+Features.md:2054                       genuine `getTicket`: 0     `getTickets`: 2
+test-cases/12-offline-sync-apps.md:1410  genuine `getTicket`: 0
+```
+
+**WHY THE MISSING MEMBER MATTERS, which is what makes it more than a count.** `getTicket` is the door that
+answers an offline-born ticket with **`null`** rather than with a row — so a person who sees the badged
+summary (`listTicketSummaries` carries it, deliberately) and opens it gets nothing. **That is a user-facing
+consequence the bullet's reader cannot reach**, because the bullet enumerates the doors it agrees are handled
+and stops. `OFFLINE_BORN_ABSENCE.field` names all three fields (`ListRow.` / `BoardCard.` /
+`TicketRead.stateProvenance`) — so the code names the third and the prose does not.
+
+**AND 12.187 IS A ✅, so the catalogue reports this as covered.** The case asserts the three doors it knows
+about; the fourth is asserted by nothing here. **`check-case-citations` asks a ✅ id for a live test, which
+this has — so the tick is true about the citation and silent about the scope.** Same asymmetry `E3-26`
+recorded for a ✅ bullet in `Features.md`.
+
+**WHAT WOULD HAVE BEEN BETTER.** One clause in each, in the change set that fixed the registry: name
+`getTicket` as the fourth door, or say *"three OMITTING doors — `getTickets`, `getBoard`, `getTicket`"* and
+count `listTicketSummaries` separately as the one that carries it. **And the deeper fix is the one the code
+already made**: the registry is the enumerable datum and the prose should be derived from it rather than
+restated — which is what `OFFLINE_BORN_OMISSIONS`'s own docblock says the registry exists for (*"so a caller
+can enumerate them without calling"*).
+
+**SEVERITY: Important (claimed).** Same class as `E3-20`–`E3-27`, with the correction recorded in the code and
+an argument in the code's own words that this exact under-enumeration is the defect the registry exists to
+prevent. Not Critical: nothing misbehaves; the door's behaviour is correct and only its DESCRIPTION is short.
+
+**MEASUREMENT.** `Features.md:2054` and `test-cases/12-offline-sync-apps.md:1410` read in full;
+`replica-data-source.ts:573-576` (the registry) and `:535-545` (its comment, quoting the *"THIRD NAME WAS
+MISSING"* sentence); the counts taken with `grep -oE "getTicket([^s]|$)"` **after a naive `grep -o "getTicket"`
+returned 2 for a line containing only `getTickets`** — the prefix trap, controlled for. **Also recorded: my
+first attempt to print the contexts used an `awk` loop that re-matched the same offset and produced a 5 GB
+output before being killed; the measurement above is from the clean re-run, not from that one.**
