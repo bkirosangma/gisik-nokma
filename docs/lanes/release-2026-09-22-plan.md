@@ -56,30 +56,50 @@ gh pr view --json headRefOid --jq .headRefOid; git rev-parse HEAD     # must be 
 
 Counts: haiku 114, sonnet 105, opus 10, OWNER 1, OWNER-DECISION 1. Total estimated effort 175.3 h across all 231 tasks.
 
+### §2b — BACKEND: which tasks a DeepSeek executor may run (owner, 2026-09-21: "deepseek execs are available again")
+
+| backend | rule | tasks |
+|---|---|---|
+| **deepseek** (`deepseek-flash[1m]` through `exec-claude.sh`, backend `deepseek`) | every `haiku` task, and every `sonnet` task that is not a security predicate, not rule-engine work and not a Critical | 212 |
+| **claude-sonnet** | security predicates (B01), rule-engine/engine classes, the two Criticals (E5-13, E5-41) | 7 |
+| **claude-opus** | the ten invariant/atomicity/ordering tasks | 10 |
+| owner | I1, E6-26 | 2 |
+
+Each task brief carries its backend on its first line. A batch runs in ONE session: its backend is the strictest its tasks need (§3 column); a controller may split the deepseek-capable tasks of a mixed batch into a second, DeepSeek session on the same branch — one commit per task keeps that clean.
+
+### §2c — WHAT CHANGES FOR A DEEPSEEK DRIVER (read this with §0; it overrides rules 8 and 12 there)
+
+1. **You run every task in your batch yourself.** The Agent tool's `model` override is ignored on a DeepSeek session — every subagent is deepseek-flash — so §0 rule 8 does not apply. A batch that contains a `claude-sonnet` or `claude-opus` task is not yours; if you were launched on one, do only the `deepseek` tasks, append `skipped — needs claude` lines for the rest, and say so in your closing line.
+2. **The session does not auto-compact.** Read `Ctx NN%` on your status line after every task. At **≥ 60 %** push, then run `/compact`; at **≥ 85 %** push and stop with `CONTEXT FULL — restart me from the progress file` in the pane. One batch per session; never carry a second batch in the same session.
+3. **Budget death is sudden.** On any `402`, `Insufficient Balance` or repeated `API Error`, `git push` immediately (a task not pushed dies with the session), print `BUDGET: <text>` and stop. The controller relaunches you from the progress file.
+4. **Paste the RED run and the GREEN run into the commit body** (the summary lines, from the log file), not a sentence saying they happened. The reviewer pass reads the log; a claim without the lines is a claim.
+5. **Never assert a painted number you did not paint, and never write an absolute ("every", "always", "nothing") the test does not prove.** Round 2 scored DeepSeek-authored findings down for exactly this; the same reviewer reads your PR.
+6. Everything else in §0 stands: never main, Node 22, one package suite at a time to a log file, build before suites, `Features.md` + `test-cases/` in the same commit, one commit per task, no `AskUserQuestion`, the progress line.
+
 ## §3 — BATCH ORDER, LANES AND THE RELEASE CUT
 
 Batches run in this order, best value per hour first. **One driver takes the next unclaimed batch** (claim it with a line `| <batch> | claimed | <date time> | <worktree> |` in the progress file, pushed on the batch branch); up to three drivers may run at once, one per worktree: `/Users/kiro/my_projects/gisik-nokma-exec6`, `/Users/kiro/my_projects/gisik-nokma-exec2`, `/Users/kiro/my_projects/gisik-nokma-exec4` (the lane column says which concern the batch is about, not who must do it — if the standing executor session of a worktree is alive, that session is the driver there). **Hours are batched hours** (solo estimate × 0.6, since a batch shares its setup, one suite run and one review). **Release cut:** with three drivers at ~9 productive hours each before the **10:30 IST 2026-09-22 PR cut-off**, the committed release set is **B01, B02, B03, B04, B05** (27 h); **B06, B07** are stretch; everything after B07 is post-release and runs to completion afterwards. The controller rebuilds the stack from `main` after the last release merge (about 14 minutes).
 
-| batch | lane | session model | tasks | batched h (solo h) | ranks | title |
-|---|---|---|---|---|---|---|
-| **B01** | FUNC | sonnet | 8 | 6.8 (11.2) | 42–113 | Server doors — security and refusal shape *(committed)* |
-| **B02** | UX | sonnet | 9 | 7.3 (12.1) | 24–116 | Account page, workflow-builder draft, identity — both Criticals *(committed)* |
-| **B03** | UI | haiku | 10 | 3.2 (5.4) | 1–27 | Accessible names and roles *(committed)* |
-| **B04** | UI | haiku | 27 | 5.2 (8.7) | 8–227 | The help corpus and the small copy fixes *(committed)* |
-| **B05** | UI | sonnet | 6 | 4.5 (7.5) | 30–79 | Keyboard, focus and dialog containment *(committed)* |
-| **B06** | UX | sonnet | 12 | 7.4 (12.4) | 58–141 | New-ticket and Move dialogs |
-| **B07** | FUNC | opus | 7 | 6.4 (10.6) | 77–123 | Soft-delete integrity — engine, replica, list **← RELEASE CUT after this batch** |
-| **B08** | UX | sonnet | 14 | 9.7 (16.2) | 59–153 | Ticket sheet — crumbs, history, comments, Move/Publish arms |
-| **B09** | UX | sonnet | 15 | 9.7 (16.1) | 57–138 | Failure states on the web — reads and writes that speak |
-| **B10** | UI | haiku | 27 | 8.5 (14.2) | 13–152 | Paint — UA chrome, phone width, contrast, headings |
-| **B11** | UX | sonnet | 10 | 6.3 (10.6) | 98–147 | Session expiry and dead controls |
-| **B12** | FUNC | opus | 4 | 4.2 (7) | 133–136 | Workflow and type invariants in the rule engine |
-| **B13** | UX | sonnet | 8 | 4.4 (7.4) | 103–211 | Due date, soft-delete undo, members picker |
-| **B14** | UX | sonnet | 14 | 6.3 (10.5) | 124–203 | Minimal shells — phone and desktop |
-| **B15** | UI | sonnet | 4 | 1.7 (2.9) | 143–228 | Calendar, timeline and canvas for assistive tech |
-| **B16** | FUNC | opus | 7 | 3.2 (5.3) | 157–231 | Outbox ordering, projection verifier, domain schema drift |
-| **B17** | ANY | sonnet | 12 | 4.8 (8) | 33–132 | Instruments that cannot fail or never run |
-| **B18** | ANY | haiku | 37 | 5.5 (9.2) | 160–201 | Prose drift sweep — docblocks, catalogue markers, counts |
+| batch | lane | session model | backend | tasks | batched h (solo h) | ranks | title |
+|---|---|---|---|---|---|---|---|
+| **B01** | FUNC | sonnet | claude-sonnet (deepseek-capable tasks may be split out to a DeepSeek session) | 8 | 6.8 (11.2) | 42–113 | Server doors — security and refusal shape *(committed)* |
+| **B02** | UX | sonnet | claude-sonnet (deepseek-capable tasks may be split out to a DeepSeek session) | 9 | 7.3 (12.1) | 24–116 | Account page, workflow-builder draft, identity — both Criticals *(committed)* |
+| **B03** | UI | haiku | deepseek | 10 | 3.2 (5.4) | 1–27 | Accessible names and roles *(committed)* |
+| **B04** | UI | haiku | deepseek | 27 | 5.2 (8.7) | 8–227 | The help corpus and the small copy fixes *(committed)* |
+| **B05** | UI | sonnet | deepseek | 6 | 4.5 (7.5) | 30–79 | Keyboard, focus and dialog containment *(committed)* |
+| **B06** | UX | sonnet | deepseek | 12 | 7.4 (12.4) | 58–141 | New-ticket and Move dialogs |
+| **B07** | FUNC | opus | claude-opus (deepseek-capable tasks may be split out to a DeepSeek session) | 7 | 6.4 (10.6) | 77–123 | Soft-delete integrity — engine, replica, list **← RELEASE CUT after this batch** |
+| **B08** | UX | sonnet | deepseek | 14 | 9.7 (16.2) | 59–153 | Ticket sheet — crumbs, history, comments, Move/Publish arms |
+| **B09** | UX | sonnet | deepseek | 15 | 9.7 (16.1) | 57–138 | Failure states on the web — reads and writes that speak |
+| **B10** | UI | haiku | deepseek | 27 | 8.5 (14.2) | 13–152 | Paint — UA chrome, phone width, contrast, headings |
+| **B11** | UX | sonnet | deepseek | 10 | 6.3 (10.6) | 98–147 | Session expiry and dead controls |
+| **B12** | FUNC | opus | claude-opus (deepseek-capable tasks may be split out to a DeepSeek session) | 4 | 4.2 (7) | 133–136 | Workflow and type invariants in the rule engine |
+| **B13** | UX | sonnet | deepseek | 8 | 4.4 (7.4) | 103–211 | Due date, soft-delete undo, members picker |
+| **B14** | UX | sonnet | deepseek | 14 | 6.3 (10.5) | 124–203 | Minimal shells — phone and desktop |
+| **B15** | UI | sonnet | deepseek | 4 | 1.7 (2.9) | 143–228 | Calendar, timeline and canvas for assistive tech |
+| **B16** | FUNC | opus | claude-opus (deepseek-capable tasks may be split out to a DeepSeek session) | 7 | 3.2 (5.3) | 157–231 | Outbox ordering, projection verifier, domain schema drift |
+| **B17** | ANY | sonnet | deepseek | 12 | 4.8 (8) | 33–132 | Instruments that cannot fail or never run |
+| **B18** | ANY | haiku | deepseek | 37 | 5.5 (9.2) | 160–201 | Prose drift sweep — docblocks, catalogue markers, counts |
 
 Totals: committed 27 h (60 tasks) · through the cut 40.8 h (79 tasks) · whole plan 105.1 h batched, 175.3 h solo, 231 tasks.
 
@@ -108,243 +128,243 @@ Needs owner: <task ids or none>
 
 ## §5 — THE RANKED LIST (all 231; rank = severity × impact ÷ hours)
 
-| rank | task | batch | model | sev | h | score | finding |
-|---|---|---|---|---|---|---|---|
-| 1 | `T-E4-4` | B03 | haiku | I | 0.6 | 25 | E4-4 — **IMPORTANT** — The description editor and the comment composer are `role="textbox"` elements with NO accessible … |
-| 2 | `T-E4-5` | B03 | haiku | I | 0.6 | 25 | E4-5 — **IMPORTANT** — The workspace home's `<h1>` is a button, so the page's level-1 heading is named "Rename … |
-| 3 | `T-P12` | B03 | haiku | I | 0.6 | 25 | P12 — **IMPORTANT** — Every screen in the product has the same document title |
-| 4 | `T-P19` | B03 | haiku | I | 0.6 | 25 | P19 — **IMPORTANT** ⚠ **r2 NEW** — The product's primary view switcher is a `role="tablist"` with NO accessible name, … |
-| 5 | `T-P21` | B03 | haiku | I | 0.6 | 25 | P21 — **IMPORTANT** ⚠ **r2 NEW, MEASUREMENT CORRECTED TWICE BEFORE THE BOUNDARY — THE SECOND CORRECTION IS THE … |
-| 6 | `T-P22` | B03 | haiku | I | 0.6 | 25 | P22 — **IMPORTANT** ⚠ **r2 NEW** — Two `role="menu"` elements have no accessible name, and one of them has a named twin … |
-| 7 | `T-P31` | B03 | haiku | I | 0.6 | 25 | P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at … |
-| 8 | `T-E5-1` | B04 | haiku | I | 0.5 | 24 | E5-1 — IMPORTANT · The help says "there is no dragging on the board"; every card is draggable and carries move arrows … |
-| 9 | `T-E5-24` | B04 | haiku | I | 0.5 | 24 | E5-24 — IMPORTANT · Five more passages of the help describe a product that no longer exists — "no change role", "you … |
-| 10 | `T-E6-1` | B04 | haiku | I | 0.5 | 24 | E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete` |
-| 11 | `T-F1-ux` | B04 | haiku | I | 0.5 | 24 | F1 — IMPORTANT · The in-app help describes a product that no longer exists, in at least six places |
-| 12 | `T-E2-55` | B04 | haiku | M | 0.25 | 16 | E2-55 (r2) — IMPORTANT · The FAQ and the manual both say the 200-entry history cap is disclosed *"at the top"*; the … |
-| 13 | `T-E4-11` | B10 | haiku | I | 0.75 | 16 | E4-11 — **IMPORTANT** — At 390 px the signed-in shell's navigation bar is 310 px tall — 37 % of the viewport — where … |
-| 14 | `T-E4-13` | B10 | haiku | I | 0.75 | 16 | E4-13 — **IMPORTANT** — The New-ticket dialog's Title field is a bare `<input>` that paints as a 2-px inset user-agent … |
-| 15 | `T-E4-14` | B10 | haiku | I | 0.75 | 16 | E4-14 — **IMPORTANT** — The active-filter chip's remove control is an 8×13 px "×" |
-| 16 | `T-E4-3` | B10 | haiku | I | 0.75 | 16 | E4-3 — **IMPORTANT** — Every board card carries a 66×21 px `who · when` disclosure button that no sweep has ever … |
-| 17 | `T-E4-7` | B10 | haiku | I | 0.75 | 16 | E4-7 — **IMPORTANT** — At phone width the ticket sheet's description is clipped: the field row keeps its 8-rem label … |
-| 18 | `T-E5-38` | B04 | haiku | M | 0.25 | 16 | E5-38 — MINOR · The sign-in page binds agreement to a Privacy notice that reads "Operated by [ENTITY NAME] · Governed … |
-| 19 | `T-F5-ux` | B04 | haiku | M | 0.25 | 16 | F5 — MINOR · The founding flow lands a new owner on a page of four negatives; the prototype lands on the list with a … |
-| 20 | `T-F8-ux` | B04 | haiku | M | 0.25 | 16 | F8 — MINOR · A recorded self-test count is stale, in the block that documents the freshness gate |
-| 21 | `T-P1` | B10 | haiku | I | 0.75 | 16 | P1 — **IMPORTANT** ⚠ **r2 CORRECTION — SIX, NOT SEVEN: the seventh was refuted by an ancestor rule and is withdrawn** — … |
-| 22 | `T-P2` | B10 | haiku | I | 0.75 | 16 | P2 — **IMPORTANT** — The board's whole-board empty state has no prototype counterpart, and is the one board empty state … |
-| 23 | `T-E4-33` | B03 | haiku | M | 0.4 | 12.5 | E4-33 — **MINOR** — For a person with no display name — the product's default email sign-up — the shell's own labels … |
-| 24 | `T-E5-13` | B02 | sonnet | C | 2 | 12.5 | E5-13 — CRITICAL · After a failed preferences read, `/account` paints all five notifications ON and one toggle PUTs a … |
-| 25 | `T-E5-41` | B02 | sonnet | C | 2 | 12.5 | E5-41 — CRITICAL · An unpublished workflow draft — every state, arrow and rule — is discarded by any navigation, … |
-| 26 | `T-P13` | B03 | haiku | M | 0.4 | 12.5 | P13 — **MINOR** ⚠ **r2 REVISION — the WCAG 2.4.1 CLAIM IS WITHDRAWN** — no skip link; a keyboard-only user Tabs the nav … |
-| 27 | `T-V6` | B03 | haiku | M | 0.4 | 12.5 | V6 — MINOR · Five tab-loading arms on the project page carry no role, in a file that uses one three times |
-| 28 | `T-E2-23` | B02 | sonnet | I | 1.25 | 12 | E2-23 (r2) — IMPORTANT · "You have no passkeys yet." is asserted over a read that failed |
-| 29 | `T-E2-24` | B02 | sonnet | I | 1.25 | 12 | E2-24 (r2) — IMPORTANT · A notification preference can end up showing a state the server never recorded, and no account … |
-| 30 | `T-E4-17` | B05 | sonnet | I | 1.25 | 12 | E4-17 — **IMPORTANT** — Both keyboard close paths of the shared `Select` that I drove — Escape, and Enter to pick — end … |
-| 31 | `T-E4-21` | B05 | sonnet | I | 1.25 | 12 | E4-21 — **IMPORTANT** — The searchable `Select` (New-ticket *Type* and *Parent*, the type editor's *Workflow*) has no … |
-| 32 | `T-E4-31` | B10 | haiku | I | 0.75 | 12 | E4-31 — **IMPORTANT** — Ghost buttons placed on a sunken row paint at **3.99:1** (light) / **4.00:1** (dark) in `hig` … |
-| 33 | `T-E6-7` | B17 | haiku | M | 0.25 | 12 | E6-7 — MINOR — Migration prefixes are hand-rounded and future-dated with no recorded convention, so the plans' own … |
-| 34 | `T-F8-fn` | B17 | haiku | M | 0.25 | 12 | F8 — LOW / observation — `check:db-tz` is the only one of the nine checkers with no automated invocation |
-| 35 | `T-I2` | B10 | haiku | M | 0.25 | 12 | I2 — **IMPORTANT** — The `e2e-stack` suite's committed artefact records a defect that was fixed eight hours later, and … |
-| 36 | `T-P15` | B17 | haiku | M | 0.25 | 12 | P15 — **MINOR** ⚠ **r2 NEW, CORRECTED DOWNWARD IN THE SAME ROUND** — the repo's generated prototype copy is one line … |
-| 37 | `T-P18` | B05 | sonnet | I | 1.25 | 12 | P18 — **IMPORTANT** ⚠ **r2 NEW** — A client-side navigation announces nothing: no title change, no focus move, no live … |
-| 38 | `T-P23` | B05 | sonnet | I | 1.25 | 12 | P23 — **IMPORTANT** ⚠ **r2 NEW** — The searchable Select's input has its focus outline REMOVED and nothing replaces it, … |
-| 39 | `T-P24` | B10 | haiku | I | 0.75 | 12 | P24 — **IMPORTANT** ⚠ **r2 NEW** — A painted text colour measures 3.84:1 at 12.8px, and it is UNDECLARED, so the gate … |
-| 40 | `T-P5` | B17 | haiku | M | 0.25 | 12 | P5 — **MINOR (product) / IMPORTANT (record)** — An owner-requested control was neither built nor reported |
-| 41 | `T-P9` | B05 | sonnet | I | 1.25 | 12 | P9 — **IMPORTANT** — `SegmentedControl` carries full ARIA tab semantics and implements none of the tab keyboard model |
-| 42 | `T-E3-14` | B01 | sonnet | I | 1.5 | 10 | 14.7.1 — `E3-14` (r2) — **CRITICAL (claimed)** — FIVE cookie-authenticated mutating routes are outside … |
-| 43 | `T-E3-15` | B01 | sonnet | I | 1.5 | 10 | 14.7.2 — `E3-15` (r2) — **IMPORTANT (claimed)** — The guard written to catch exactly this cannot catch it, and its own … |
-| 44 | `T-E3-32` | B01 | sonnet | I | 1.5 | 10 | 68. `E3-32` (phase 2, HALF) — **IMPORTANT (claimed)** — The envelope-origin gate's own status list says `POST /v1/sync` … |
-| 45 | `T-E4-10` | B10 | haiku | M | 0.4 | 10 | E4-10 — **MINOR** — The workflow template gallery's four buttons paint as raw user-agent chrome — a population round … |
-| 46 | `T-E4-15` | B10 | haiku | M | 0.4 | 10 | E4-15 — **MINOR** — The timeline's Earlier / Today / Later buttons paint with the browser's 2-px outset bevel: the … |
-| 47 | `T-E4-2` | B10 | haiku | M | 0.4 | 10 | E4-2 — **MINOR** — The ticket sheet's and the dialog's Close glyph paints at 24×21 px — no rule gives it a size, the … |
-| 48 | `T-E4-25` | B10 | haiku | M | 0.4 | 10 | E4-25 — **MINOR** — The Settings sidebar's three section links are 39 px tall; the prototype's are `min-height:44px`, … |
-| 49 | `T-E4-26` | B10 | haiku | M | 0.4 | 10 | E4-26 — **MINOR** — In the List view the only two per-row controls — the collapse caret (22×22) and the title button … |
-| 50 | `T-E4-27` | B10 | haiku | M | 0.4 | 10 | E4-27 — **MINOR** — The ticket-type editor's *Save ticket type* is a page-local `<button>` at 36 px with a 1-px border … |
-| 51 | `T-E4-35` | B10 | haiku | M | 0.4 | 10 | E4-35 — **MINOR** — `.gn-segmented__item` sets no horizontal padding, so where the track is content-sized the *All* tab … |
-| 52 | `T-E4-8` | B10 | haiku | M | 0.4 | 10 | E4-8 — **IMPORTANT** — The editor's formatting strip is the one control family in the neumorphic sheet drawn with hard … |
-| 53 | `T-E6-15` | B01 | sonnet | I | 1.5 | 10 | E6-15 — IMPORTANT — Cross-site WebSocket hijacking: a cookie-authenticated `/v1/stream` handshake from a foreign Origin … |
-| 54 | `T-E6-16` | B01 | sonnet | I | 1.5 | 10 | E6-16 — IMPORTANT — An MCP token can approve a new device code, so one token mints a successor that survives its own … |
-| 55 | `T-P27` | B10 | haiku | M | 0.4 | 10 | P27 — **MINOR** ⚠ **r2 NEW** — The viewport suite's narrowest width is 390px; WCAG 1.4.10 Reflow specifies 320px, which … |
-| 56 | `T-P35` | B10 | haiku | M | 0.4 | 10 | P35 — **MINOR** ⚠ **r2 NEW — PHASE 2 (written before the 15:05:23 freeze but not committed until after it; scores at … |
-| 57 | `T-E2-20` | B09 | sonnet | I | 1.25 | 9.6 | E2-20 (r2) — IMPORTANT · Two admin screens stay on "Loading ticket types…" forever when a read rejects, and the comment … |
-| 58 | `T-E2-21` | B06 | sonnet | I | 1.25 | 9.6 | E2-21 (r2) — IMPORTANT · A rejected type migration destroys the mapping the admin just authored AND disables the … |
-| 59 | `T-E2-29` | B08 | sonnet | I | 1.25 | 9.6 | E2-29 (r2) — IMPORTANT · A dropped connection during a Move produces nothing at all, and the Move control has no … |
-| 60 | `T-E2-39` | B09 | sonnet | I | 1.25 | 9.6 | E2-39 (r2) — IMPORTANT · A failed roster read becomes "nobody is in this workspace", and the workflow builder's own … |
-| 61 | `T-E2-40` | B06 | sonnet | I | 1.25 | 9.6 | E2-40 (r2) — IMPORTANT · A `require-field` move previews as refused for ever, even after the person fills the field its … |
-| 62 | `T-E2-44` | B09 | sonnet | I | 1.25 | 9.6 | E2-44 (r2) — IMPORTANT · A failed read of your connected assistants is drawn as "No assistants are connected" |
-| 63 | `T-E2-46` | B08 | sonnet | I | 1.25 | 9.6 | E2-46 (r2) — IMPORTANT · A typed `[text](url)` becomes markup with no escape suggestion, where every other formatting … |
-| 64 | `T-E4-18` | B02 | sonnet | I | 1.25 | 9.6 | E4-18 — **IMPORTANT** — The Assignee picker renders a BLANK 13-px option for a member with no display name — the same … |
-| 65 | `T-E4-19` | B08 | sonnet | I | 1.25 | 9.6 | E4-19 — **IMPORTANT** — The History tab's headline is the raw event-type slug — `ticket.field_set` three times in a row … |
-| 66 | `T-E4-23` | B09 | sonnet | I | 1.25 | 9.6 | E4-23 — **IMPORTANT** — A ticket the server answers `404` for — never existed, soft-deleted, or invisible to this … |
-| 67 | `T-E5-15` | B09 | sonnet | I | 1.25 | 9.6 | E5-15 — IMPORTANT · A refused or failed ticket-types read leaves Settings on "Loading ticket types…" for ever — the … |
-| 68 | `T-E5-27` | B08 | sonnet | I | 1.25 | 9.6 | E5-27 — IMPORTANT · A Move that fails in transport is silence — no sentence, no latch, the dialog stays open — while … |
-| 69 | `T-E5-28` | B08 | sonnet | I | 1.25 | 9.6 | E5-28 — IMPORTANT · A dropped connection during Publish leaves the workflow builder's Publish button disabled for ever … |
-| 70 | `T-E5-37` | B02 | sonnet | I | 1.25 | 9.6 | E5-37 — IMPORTANT · For every email sign-up the shell does not know who you are: "Workspaces — ", an empty menu header, … |
-| 71 | `T-E5-4` | B02 | sonnet | I | 1.25 | 9.6 | E5-4 — IMPORTANT · Every email sign-up is a BLANK row in the assignee picker, the @mention list and the Filters sheet — … |
-| 72 | `T-E5-40` | B09 | sonnet | I | 1.25 | 9.6 | E5-40 — IMPORTANT · With "Only tickets in progress" on, the Backlog tab says "Nothing in the backlog — new tickets land … |
-| 73 | `T-E5-42` | B09 | sonnet | I | 1.25 | 9.6 | E5-42 — IMPORTANT · A failed preferences read — or a failed save of "which columns to show" that the person just … |
-| 74 | `T-E5-7` | B06 | sonnet | I | 1.25 | 9.6 | E5-7 — IMPORTANT · With a comment typed and Move enabled, the dialog still says *"none was provided"* — the exact … |
-| 75 | `T-E5-8` | B08 | sonnet | I | 1.25 | 9.6 | E5-8 — IMPORTANT · The History tab prints raw event names — `ticket.field_set` three times in a row — and never says … |
-| 76 | `T-E6-18` | B01 | sonnet | I | 1.25 | 9.6 | E6-18 — IMPORTANT — One byte (U+0000) answers 500 through twenty-three parameters on nineteen doors — every raw id … |
-| 77 | `T-E6-24` | B07 | sonnet | I | 1.25 | 9.6 | E6-24 — IMPORTANT — The phone's board and the desktop's ticket list keep showing a soft-deleted ticket, and the phone's … |
-| 78 | `T-F3-ux` | B08 | sonnet | I | 1.25 | 9.6 | F3 — IMPORTANT · A comment renders as plain text while the composer offers marks it discards; a link's destination is … |
-| 79 | `T-P8` | B05 | sonnet | I | 1.25 | 9.6 | P8 — **MINOR (product) / IMPORTANT (follow-on)** ⚠ **r2 REVISION** — `Dialog` and `Sheet` declare `aria-modal="true"`, … |
-| 80 | `T-V10` | B06 | sonnet | I | 1.25 | 9.6 | V10 — CRITICAL · "Create" has no re-entrancy guard, and each call mints a fresh id: a double press files two tickets |
-| 81 | `T-V4` | B08 | sonnet | I | 1.25 | 9.6 | V4 — IMPORTANT · The comment thread reports a still-loading read as "Comments · 0" and "No comments yet." |
-| 82 | `T-V7` | B08 | sonnet | I | 1.25 | 9.6 | V7 — IMPORTANT · A comment the server REFUSES costs the author the words they just wrote |
-| 83 | `T-V9` | B09 | sonnet | I | 1.25 | 9.6 | V9 — IMPORTANT · The invite page reports a transport failure as a dead link, and sends the person to ask for a … |
-| 84 | `T-E4-12` | B17 | sonnet | I | 1 | 9 | E4-12 — **IMPORTANT** — When the signed-in instrument runs, its tap-target population is ONE route at ONE width, and … |
-| 85 | `T-F2-ux` | B17 | sonnet | I | 1 | 9 | F2 — IMPORTANT · The only gate over the help corpus cannot fail on the property that matters |
-| 86 | `T-I1` | B17 | OWNER | I | 1 | 9 | I1 — **CRITICAL** — No browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate … |
-| 87 | `T-P11` | B17 | sonnet | I | 1 | 9 | P11 — **IMPORTANT** — The `Select` panel is outside the population of every rendered-property sweep, for two … |
-| 88 | `T-P16` | B17 | sonnet | I | 1 | 9 | P16 — **IMPORTANT** ⚠ **r2 NEW** — One styling case asserts the ABSENCE of a declaration through a scanner that … |
-| 89 | `T-P34` | B17 | sonnet | I | 1 | 9 | P34 — **IMPORTANT** ⚠ **r2 NEW** — FOUR of the project page's five views are outside the tap-target ratchet's … |
-| 90 | `T-E6-2` | B07 | opus | I | 1.75 | 8.6 | E6-2 — IMPORTANT — The ingest door accepts every ordinary write against an already soft-deleted ticket, and … |
-| 91 | `T-E6-4` | B07 | opus | I | 1.75 | 8.6 | E6-4 — IMPORTANT — A soft-deleted open child blocks its parent's close with a refusal about a child no view can show; … |
-| 92 | `T-F2-fn` | B07 | opus | I | 1.75 | 8.6 | F2 — IMPORTANT — A recorded survivor measurement's stated warrant is false: the second witness read a stale `dist` |
-| 93 | `T-F4-fn` | B07 | opus | I | 1.75 | 8.6 | F4 — MEDIUM — `routes/my-work.ts:364`, the contested-claim title gate, is a confirmed open gap |
-| 94 | `T-F5-fn` | B07 | opus | I | 1.75 | 8.6 | F5 — MEDIUM — The replica's two TypeScript gates are confirmed open gaps, and the table's citations for them have rotted |
-| 95 | `T-E5-19` | B02 | sonnet | M | 0.6 | 8.3 | E5-19 — MINOR · "Save name" says nothing on success, and a refusal without a message is reported as success `[SOURCE]` |
-| 96 | `T-E4-9` | B10 | haiku | I | 0.75 | 8 | E4-9 — **IMPORTANT** — The workflow builder renders TWO `<main>` landmarks, and at 390 px its name field is 403 px … |
-| 97 | `T-E4-32` | B10 | haiku | M | 0.4 | 7.5 | E4-32 — **MINOR** — The builder's advisories heading paints `warning` on `surfaceSunken` at **3.71:1** (13.6 px) in … |
-| 98 | `T-E2-45` | B11 | sonnet | I | 1.25 | 7.2 | E2-45 (r2) — IMPORTANT · "Sign out" can fail silently, and the menu closes either way |
-| 99 | `T-E4-1` | B08 | sonnet | I | 1.25 | 7.2 | E4-1 — **IMPORTANT** — The ticket sheet's breadcrumb renders the SAME ancestor twice whenever the direct parent is an … |
-| 100 | `T-E4-30` | B08 | sonnet | I | 1.25 | 7.2 | E4-30 — **IMPORTANT** — The sheet's ancestor crumbs are links painted in exactly the ink of the non-link crumbs beside … |
-| 101 | `T-E5-10` | B09 | sonnet | I | 1.25 | 7.2 | E5-10 — IMPORTANT · A single-row "mark read" and the bulk Undo fail SILENTLY — the exact first-version defect the bulk … |
-| 102 | `T-E5-16` | B06 | sonnet | I | 1.25 | 7.2 | E5-16 — IMPORTANT · "New ticket" pre-selects **Epic** — the top of the hierarchy — and a mis-filed type cannot be … |
-| 103 | `T-E5-2` | B13 | sonnet | I | 1.25 | 7.2 | E5-2 — IMPORTANT · A ticket a week overdue looks like every other card on the Board; the export's card carries the key … |
-| 104 | `T-E5-20` | B06 | sonnet | I | 1.25 | 7.2 | E5-20 — IMPORTANT · One Escape in the Move dialog closes the ticket sheet under it — the `Sheet`'s own guard says a … |
-| 105 | `T-E5-25` | B11 | sonnet | I | 1.25 | 7.2 | E5-25 — IMPORTANT · A write after the session expires is reported as *"We could not reach the server"* — at nine sites … |
-| 106 | `T-E5-3` | B08 | sonnet | I | 1.25 | 7.2 | E5-3 — IMPORTANT · A ticket directly under an epic reads `Epic › Epic › KEY` — the crumb states a four-deep chain the … |
-| 107 | `T-E5-31` | B11 | sonnet | I | 1.25 | 7.2 | E5-31 — IMPORTANT · The signed-out app bar offers Workspaces, Account, an Inbox icon and "No workspace selected — pick … |
-| 108 | `T-E5-32` | B11 | sonnet | I | 1.25 | 7.2 | E5-32 — IMPORTANT · The help promises a signed-out link to a job "remembers where you were headed"; every data page … |
-| 109 | `T-E5-5` | B11 | sonnet | I | 1.25 | 7.2 | E5-5 — IMPORTANT · The Filters sheet offers a Collaborators control that no view applies, and tells the person … |
-| 110 | `T-E5-6` | B13 | sonnet | I | 1.25 | 7.2 | E5-6 — IMPORTANT · A due date can be seen in four places, computed as "overdue", and notified as "due soon" — and set … |
-| 111 | `T-E5-9` | B06 | sonnet | I | 1.25 | 7.2 | E5-9 — IMPORTANT · A refused Delete answers five screens above the button that was pressed `[BROWSER]` `[SOURCE]` — and … |
-| 112 | `T-E6-21` | B01 | sonnet | I | 1.25 | 7.2 | E6-21 — IMPORTANT — A member or guest cannot leave a workspace: the gate refuses a self-revocation, no route or control … |
-| 113 | `T-E6-9` | B01 | sonnet | I | 1.25 | 7.2 | E6-9 — IMPORTANT — The members page's invite form offers three channels; the door refuses two of them, and the one it … |
-| 114 | `T-F4-ux` | B09 | sonnet | I | 1.25 | 7.2 | F4 — IMPORTANT · The visibility editor's read-only sentence can never render in the shipped app — and states the rule … |
-| 115 | `T-V1` | B11 | sonnet | I | 1.25 | 7.2 | V1 — IMPORTANT · The Board's empty states invite a person to create a ticket, and no caller in the web app wires the … |
-| 116 | `T-V2` | B02 | sonnet | I | 1.25 | 7.2 | V2 — CRITICAL · A failed pending-list re-read destroys a one-time invitation URL that cannot be recovered |
-| 117 | `T-V3` | B09 | sonnet | I | 1.25 | 7.2 | V3 — IMPORTANT · A rejected visibility write leaves Apply permanently disabled and silent |
-| 118 | `T-V5` | B11 | sonnet | I | 1.25 | 7.2 | V5 — IMPORTANT · A "My contested claims" title button is a dead click, under a comment claiming all four sections … |
-| 119 | `T-V8` | B06 | sonnet | I | 1.25 | 7.2 | V8 — IMPORTANT · Opening any parent ticket raises a false "this list is not shown rather than shown short" alert |
-| 120 | `T-E2-22` | B06 | sonnet | M | 0.6 | 6.7 | E2-22 (r2) — MINOR · The state-mapping dialog is unmounted by the act of submitting, so a refusal costs the admin the … |
-| 121 | `T-E5-18` | B09 | sonnet | M | 0.6 | 6.7 | E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all … |
-| 122 | `T-E5-30` | B09 | sonnet | M | 0.6 | 6.7 | E5-30 — MINOR · The shared read-refusal panel on five routes says "… cannot be shown **yet**", appends the transport's … |
-| 123 | `T-E6-11` | B07 | sonnet | M | 0.6 | 6.7 | E6-11 — MINOR — The list serves a soft-deleted epic's title as a group header; the detail door withholds the same title … |
-| 124 | `T-E2-41` | B14 | sonnet | I | 1 | 6 | E2-41 (r2) — IMPORTANT · Two screens in the phone shell render a failed read as a benign state — an empty board, and … |
-| 125 | `T-E2-42` | B14 | sonnet | I | 1 | 6 | E2-42 (r2) — IMPORTANT · A comment posted from the phone is recorded as the ASSIGNEE's words |
-| 126 | `T-E2-43` | B14 | sonnet | I | 1 | 6 | E2-43 (r2) — IMPORTANT · The desktop shell's own startup has no rejection handler, so a failure to initialize is drawn … |
-| 127 | `T-E2-48` | B14 | sonnet | I | 1 | 6 | E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the … |
-| 128 | `T-E2-52` | B14 | sonnet | I | 1 | 6 | E2-52 (r2) — IMPORTANT · On the phone, typing `@` in the comment editor states **"No people match"** for every query, … |
-| 129 | `T-E5-26` | B14 | sonnet | I | 1 | 6 | E5-26 — IMPORTANT · The desktop app's only first-run sentence sends a person to a Settings screen it does not have, for … |
-| 130 | `T-E5-44` | B14 | sonnet | I | 1 | 6 | E5-44 — IMPORTANT · (phase 2, half points — the narrowed core of withdrawn E5-21) The manual sends a person to the … |
-| 131 | `T-E6-26` | B17 | OWNER-DECISION | M | 0.5 | 6 | E6-26 — MINOR — `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the … |
-| 132 | `T-E6-6` | B17 | sonnet | M | 0.5 | 6 | E6-6 — MINOR — `check-no-silent-skips.mjs` prints `ok` on an empty report: an instrument with no positive control on … |
-| 133 | `T-E3-19` | B12 | opus | I | 1.75 | 5.1 | 21. `E3-19` (r2) — **IMPORTANT (claimed)** — The parent-terminal invariant is enforced in ONE direction: a child can be … |
-| 134 | `T-E6-10` | B12 | opus | I | 1.75 | 5.1 | E6-10 — IMPORTANT — The bulk rebind route can be refused part-way by the permission gate, leaving the type's tickets … |
-| 135 | `T-E6-3` | B12 | opus | I | 1.75 | 5.1 | E6-3 — IMPORTANT — Re-ranking a custom ticket type is accepted with tickets already placed where the new rank forbids, … |
-| 136 | `T-E6-8` | B12 | opus | I | 1.75 | 5.1 | E6-8 — IMPORTANT — A workflow republish can put a parent with open children into a terminal state, and `ticket.closed` … |
-| 137 | `T-E2-26` | B09 | sonnet | M | 0.6 | 5 | E2-26 (r2) — MINOR · A single notification's read-state is reverted silently, where its bulk sibling speaks |
-| 138 | `T-E2-32` | B09 | sonnet | M | 0.6 | 5 | E2-32 (r2) — MINOR · A committed move does not clear the comment, so the next move submits the previous move's words |
-| 139 | `T-E2-33` | B06 | sonnet | M | 0.6 | 5 | E2-33 (r2) — IMPORTANT · Three dialogs seed a choice once from a prop and guard it by emptiness rather than membership, … |
-| 140 | `T-E2-34` | B06 | sonnet | M | 0.6 | 5 | E2-34 (r2) — MINOR · Two `aria-modal` dialogs open at once, and one Escape press closes both |
-| 141 | `T-E2-37` | B06 | sonnet | M | 0.6 | 5 | E2-37 (r2) — MINOR · The New-ticket draft survives its own close, so reopening offers the last ticket's title with … |
-| 142 | `T-E2-38` | B11 | sonnet | M | 0.6 | 5 | E2-38 (r2) — MINOR · An archived project's own board does not say it is archived |
-| 143 | `T-E4-16` | B15 | haiku | M | 0.4 | 5 | E4-16 — **MINOR** — React Flow's attribution link renders at 10 px with 1.10:1 contrast in dark mode (2.61:1 in light) |
-| 144 | `T-E4-24` | B10 | haiku | M | 0.4 | 5 | E4-24 — **MINOR** — The board, the List, My Work and the builder skip a heading level: `h1` → `h3` with no `h2`, and … |
-| 145 | `T-E4-36` | B10 | haiku | M | 0.4 | 5 | E4-36 — **MINOR** — The help search announces "nothing matches" but never "9 answers": the no-match arm is a … |
-| 146 | `T-E5-23` | B11 | sonnet | M | 0.6 | 5 | E5-23 — MINOR · A brand-new owner's workspace home says "No projects you can open are active here" — a sentence written … |
-| 147 | `T-E5-34` | B11 | sonnet | M | 0.6 | 5 | E5-34 — MINOR · On an archived project's own page, the bar's project item names and links a DIFFERENT project — the … |
-| 148 | `T-E5-43` | B13 | sonnet | M | 0.6 | 5 | E5-43 — MINOR · "Today" on the Calendar and Timeline is computed once per render, so a tab left open across the IST day … |
-| 149 | `T-P10` | B10 | haiku | M | 0.4 | 5 | P10 — **MINOR** — The accessible-name ratchet's unit is an attribute; its failure message claims a property of … |
-| 150 | `T-P17` | B10 | haiku | M | 0.4 | 5 | P17 — **MINOR** ⚠ **r2 NEW** — `/my-work`'s heading outline skips level 2, the product IMPROVED on the prototype to get … |
-| 151 | `T-P3` | B08 | sonnet | M | 0.6 | 5 | P3 — **MINOR** — The parent crumb cannot show the parent's key; the prototype's does, and no ruling records the … |
-| 152 | `T-P36` | B10 | haiku | M | 0.4 | 5 | P36 — **MINOR** ⚠ **r2 NEW — PHASE 2 (filed 15:31 IST, after the freeze; scores at HALF per rules §2)** — Two settings … |
-| 153 | `T-P4` | B08 | sonnet | M | 0.6 | 5 | P4 — **MINOR** — "the SAME plain span" is not the same span |
-| 154 | `T-E2-30` | B13 | sonnet | I | 1.25 | 4.8 | E2-30 (r2) — IMPORTANT · The only way back from a soft delete is a 15-second toast |
-| 155 | `T-E4-28` | B15 | sonnet | I | 1.25 | 4.8 | E4-28 — **IMPORTANT** — The Calendar and the Timeline convey every date relationship by position alone: day cells and … |
-| 156 | `T-E5-11` | B13 | sonnet | I | 1.25 | 4.8 | E5-11 — IMPORTANT · The invite form asks a person to type comma-separated project ULIDs; the export draws a picker of … |
-| 157 | `T-E6-13` | B16 | sonnet | I | 1.25 | 4.8 | E6-13 — IMPORTANT — `verify:projections` reports DRIFT on a correct database after an ordinary type re-bind, so the … |
-| 158 | `T-E2-49` | B14 | haiku | M | 0.5 | 4 | E2-49 (r2) — MINOR · Push registration's declared contract is not total: a transport failure escapes as a rejection its … |
-| 159 | `T-E2-53` | B14 | sonnet | M | 0.5 | 4 | E2-53 (r2) — MINOR · The mobile editor host has no refusal vocabulary at all: three doors, and silence is the answer at … |
-| 160 | `T-E3-10` | B18 | haiku | M | 0.25 | 4 | 14.2 — `E3-10` (r2) — MINOR — The arithmetic of a stated correctness invariant is stale by two in **both** numbers |
-| 161 | `T-E3-11` | B18 | haiku | M | 0.25 | 4 | 14.6.1 — `E3-11` (r2) — MINOR — `Features.md` says the fixture suite holds **84**; it holds **86** |
-| 162 | `T-E3-12` | B18 | haiku | M | 0.25 | 4 | 14.6.2 — `E3-12` (r2) — MINOR — "eleven plain-language checks" — there are **twelve**, and the twelfth is the section's … |
-| 163 | `T-E3-13` | B18 | haiku | M | 0.25 | 4 | 14.6.3 — `E3-13` (r2) — MINOR — A citation in `visible-where.ts` resolves and points at the wrong line |
-| 164 | `T-E3-16` | B18 | haiku | M | 0.25 | 4 | 17.2 `E3-16` (r2) — **IMPORTANT (claimed)** — The roster-cut citation has drifted **twice**, and the files "corrected" … |
-| 165 | `T-E3-17` | B18 | haiku | M | 0.25 | 4 | 18. `E3-17` (r2) — MINOR — A docblock that says "re-run the stated command before trusting either number" gives a total … |
-| 166 | `T-E3-18` | B18 | haiku | M | 0.25 | 4 | 19. `E3-18` (r2) — **MINOR — revised DOWN from Important at §34** — The two shipped `DataSource` implementations … |
-| 167 | `T-E3-20` | B18 | haiku | M | 0.25 | 4 | 25. `E3-20` (r2) — **IMPORTANT (claimed)** — Case 6.82 declares a rollup capability "cannot ship" and "ABSENT from the … |
-| 168 | `T-E3-21` | B18 | haiku | M | 0.25 | 4 | 26. `E3-21` (r2) — **IMPORTANT (claimed)** — Case 6.84 declares a cross-workspace parent link "reachable and unrefused" … |
-| 169 | `T-E3-22` | B18 | haiku | M | 0.25 | 4 | 27. `E3-22` (r2) — **IMPORTANT (claimed)** — Case 6.58's stated reproduction of a cycle uses `ticket.reparented`, which … |
-| 170 | `T-E3-23` | B18 | haiku | M | 0.25 | 4 | 28. `E3-23` (r2) — **IMPORTANT (claimed)** — Case 6.124 is ❌ with owner "Plan 11"; the code that closed it names the … |
-| 171 | `T-E3-24` | B18 | haiku | M | 0.25 | 4 | 29. `E3-24` (r2) — **IMPORTANT (claimed)** — Case 6.66's thesis is INVERTED: it says the parent placeholder ships … |
-| 172 | `T-E3-25` | B18 | haiku | M | 0.25 | 4 | 30. `E3-25` (r2) — **MINOR (claimed)** — Case 6.96 says `SyncItem` "has three members"; it has four — **and this … |
-| 173 | `T-E3-26` | B18 | haiku | M | 0.25 | 4 | 42. `E3-26` (r2) — **IMPORTANT (claimed)** — `Features.md` says "Nothing in the app links to any of them yet" and … |
-| 174 | `T-E3-27` | B18 | haiku | M | 0.25 | 4 | 45. `E3-27` (r2) — **IMPORTANT (claimed)** — Two files say `checkErrandTemplate` is *"not yet landed on this branch"*; … |
-| 175 | `T-E3-28` | B18 | haiku | M | 0.25 | 4 | 48. `E3-28` (r2) — **IMPORTANT (claimed)** — Two documents count the offline-born ticket's doors as three and never … |
-| 176 | `T-E3-29` | B18 | haiku | M | 0.25 | 4 | 53. r2 finding E3-29 — `Features.md` §5 says "eleven registered types"; the registry carries eighteen, and the five it … |
-| 177 | `T-E3-30` | B18 | haiku | M | 0.25 | 4 | 65. `E3-30` (phase 2, HALF) — **IMPORTANT (claimed)** — Case 6.83 is ❌ asking for a measurement; the measurement … |
-| 178 | `T-E3-31` | B18 | haiku | M | 0.25 | 4 | 66. `E3-31` (phase 2, HALF) — **MINOR (claimed)** — Case 6.57 conditions on *"if Plan 3 admits a reparent that crosses … |
-| 179 | `T-E3-33` | B18 | haiku | M | 0.25 | 4 | 69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist … |
-| 180 | `T-E3-34` | B18 | haiku | M | 0.25 | 4 | 72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a … |
-| 181 | `T-E3-9` | B18 | haiku | M | 0.25 | 4 | 14.1 — `E3-9` (r2) — MINOR — A "thirteen fields" claim is false: the envelope schema has **eleven** |
-| 182 | `T-E4-22` | B14 | haiku | M | 0.5 | 4 | E4-22 — **MINOR** — The mobile board's rows are `TouchableOpacity`s with no `accessibilityRole`, so VoiceOver/TalkBack … |
-| 183 | `T-E6-12` | B18 | haiku | M | 0.25 | 4 | E6-12 — IMPORTANT — Two ❌ cases in `06-auth-visibility.md` declare guest admissions the product closed weeks ago, one … |
-| 184 | `T-E6-14` | B18 | haiku | M | 0.25 | 4 | E6-14 — MINOR — The delete toast's recorded reason for departing from the prototype ("this product has no ticket key") … |
-| 185 | `T-E6-22` | B16 | haiku | M | 0.25 | 4 | E6-22 — MINOR — The export advertises "ticket-only access" for someone outside the workspace; the product has no such … |
-| 186 | `T-E6-23` | B16 | haiku | M | 0.25 | 4 | E6-23 — MINOR — `BACKUP_TIME_UTC=25:00` or `99:99` is accepted and silently scheduled somewhere else (`99:99` → four … |
-| 187 | `T-E6-25` | B18 | haiku | M | 0.25 | 4 | E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit … |
-| 188 | `T-F1-fn` | B18 | haiku | M | 0.25 | 4 | F1 — IMPORTANT — An open-gap section still declares a closed security-relevant leak, with both supporting numbers stale … |
-| 189 | `T-F3-fn` | B18 | haiku | M | 0.25 | 4 | F3 — IMPORTANT — **My own lane's §17 group** cites an artifact the owner has ruled is not the prototype, and every … |
-| 190 | `T-F6-fn` | B18 | haiku | M | 0.25 | 4 | F6 — LOW — The soft-delete enumeration's own counts do not reproduce from the command printed beside them |
-| 191 | `T-F7-fn` | B18 | haiku | M | 0.25 | 4 | F7 — LOW — **My own lane's §17 block table** has one row and no rule for a lane with no allocation |
-| 192 | `T-I3` | B18 | haiku | M | 0.25 | 4 | I3 — **IMPORTANT** — `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by the same … |
-| 193 | `T-I4` | B18 | haiku | M | 0.25 | 4 | I4 — **MINOR** — `tap-targets.ts` cites a line range that resolves and misleads |
-| 194 | `T-I5` | B18 | haiku | M | 0.25 | 4 | I5 — **MINOR** — My own live handoff carries two position blocks that contradict each other, and the pointer that found … |
-| 195 | `T-P25` | B18 | haiku | M | 0.25 | 4 | P25 — **MINOR** ⚠ **r2 NEW** — Three live files cite the docblock of a component that was deleted, and one of them is … |
-| 196 | `T-P26` | B18 | haiku | M | 0.25 | 4 | P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta document is stale in BOTH of its halves: every numbered queue … |
-| 197 | `T-P28` | B14 | haiku | M | 0.5 | 4 | P28 — **MINOR** ⚠ **r2 NEW** — The mobile board's row is the one pressable in the app with no accessibility role, and … |
-| 198 | `T-P29` | B18 | haiku | M | 0.25 | 4 | P29 — **MINOR** ⚠ **r2 NEW** — The mock-only suite claims each stub carries its server `file:line`; two of ten carry … |
-| 199 | `T-P30` | B14 | haiku | M | 0.5 | 4 | P30 — **IMPORTANT** ⚠ **r2 NEW** — The mobile editor webview is TWO GENERATED LINKS BEHIND, and both links are unguarded |
-| 200 | `T-P32` | B18 | haiku | M | 0.25 | 4 | P32 — **MINOR** ⚠ **r2 NEW** — Why a control is disabled is put in `title` ON the disabled button, where it cannot be … |
-| 201 | `T-P33` | B18 | haiku | M | 0.25 | 4 | P33 — **MINOR** ⚠ **r2 NEW** — The export draws a timestamp on every inbox row; the product draws none, and no client … |
-| 202 | `T-P6` | B14 | haiku | M | 0.5 | 4 | P6 — **MINOR** — Mobile: two of three screens have no styling of any kind |
-| 203 | `T-P7` | B14 | haiku | M | 0.5 | 4 | P7 — **MINOR** — Desktop's task list has no rules at all |
-| 204 | `T-E6-5` | B16 | opus | I | 1.75 | 3.4 | E6-5 — IMPORTANT — After a transient sync failure, a later claim overtakes the backing-off claim it depends on; the … |
-| 205 | `T-E2-25` | B04 | haiku | M | 0.3 | 3.3 | E2-25 (r2) — IMPORTANT · Five components written for offline and degraded states reach no screen, and the two shells … |
-| 206 | `T-E2-27` | B04 | haiku | M | 0.3 | 3.3 | E2-27 (r2) — MINOR · An unrecognised sync status is reported as "Live", the healthiest word available |
-| 207 | `T-E2-31` | B13 | sonnet | M | 0.6 | 3.3 | E2-31 (r2) — MINOR · A re-entrancy guard whose stated purpose cannot happen, in a file that fixed the same guard … |
-| 208 | `T-E2-35` | B13 | sonnet | M | 0.6 | 3.3 | E2-35 (r2) — IMPORTANT · Deleting a ticket asks nothing, while the bulk close of the same soft delete gets a whole … |
-| 209 | `T-E2-36` | B04 | haiku | M | 0.3 | 3.3 | E2-36 (r2) — MINOR · A partly committed Move batch never reloads, so the sheet behind the refusal shows state the … |
-| 210 | `T-E2-47` | B04 | haiku | M | 0.3 | 3.3 | E2-47 (r2) — MINOR · The ticket sheet's own symbol sweep names three unwired exports and misses a fourth, whose … |
-| 211 | `T-E2-51` | B13 | sonnet | M | 0.6 | 3.3 | E2-51 (r2) — MINOR · My own `13.761` still asserts an absence the product reversed, with a reason that is now false and … |
-| 212 | `T-E2-54` | B04 | haiku | M | 0.3 | 3.3 | E2-54 (r2) — MINOR · `shell-refusal.tsx` says "`SERVING_GAPS` is empty — so NO read in this shell refuses for a serving … |
-| 213 | `T-E4-20` | B15 | sonnet | M | 0.6 | 3.3 | E4-20 — **MINOR** — The workflow builder opens with `fitView`, so every control on a state node is painted at 74 % of … |
-| 214 | `T-E4-29` | B04 | haiku | M | 0.3 | 3.3 | E4-29 — **MINOR** — The ticket-type editor's validation list paints Zod's own message, verbatim and without the field … |
-| 215 | `T-E4-34` | B04 | haiku | M | 0.3 | 3.3 | E4-34 — **MINOR** — A guest who *"can look, not touch"* is offered five rows whose accessible name is `Edit <type>` |
-| 216 | `T-E4-6` | B04 | haiku | M | 0.3 | 3.3 | E4-6 — **MINOR** — The visibility editor's people picker labels a member by a 26-character ULID |
-| 217 | `T-E5-12` | B04 | haiku | M | 0.3 | 3.3 | E5-12 — MINOR · The same workspace is "1 project" on `/workspaces` and "2 projects" on `/account` `[BROWSER]` `[SOURCE]` |
-| 218 | `T-E5-14` | B04 | haiku | M | 0.3 | 3.3 | E5-14 — MINOR · Ten reorder arrows, all disabled, the reason only in a hover `title`; and the shipped seed already … |
-| 219 | `T-E5-17` | B04 | haiku | M | 0.3 | 3.3 | E5-17 — MINOR · `/mcp/tokens` is a chrome-less orphan: no app nav, nothing links to it, and its own docblock says it is … |
-| 220 | `T-E5-22` | B04 | haiku | M | 0.3 | 3.3 | E5-22 — MINOR · "Add subtask" never says what it will file: under an Epic it silently births a Task (skipping Story); … |
-| 221 | `T-E5-29` | B04 | haiku | M | 0.3 | 3.3 | E5-29 — MINOR · The state-mapping dialog says "Publishing cannot see which tickets sit in which state" directly above … |
-| 222 | `T-E5-33` | B04 | haiku | M | 0.3 | 3.3 | E5-33 — MINOR · Pressing "Send magic link" with nothing typed makes a server round trip and paints the validator's own … |
-| 223 | `T-E5-35` | B04 | haiku | M | 0.3 | 3.3 | E5-35 — MINOR · No inbox row says WHEN — `createdAt` is on every notification and rendered nowhere — and the two rows … |
-| 224 | `T-E5-36` | B04 | haiku | M | 0.3 | 3.3 | E5-36 — MINOR · A workspace with no projects has no empty-project sentence on its `/workspaces` card — the owner's own … |
-| 225 | `T-E5-39` | B04 | haiku | M | 0.3 | 3.3 | E5-39 — MINOR · "Version history" lists v1…vN with no date and no author — the ledger records both on every … |
-| 226 | `T-F6-ux` | B04 | haiku | M | 0.3 | 3.3 | F6 — MINOR · A docblock states an absolute that the same card falsifies four lines later |
-| 227 | `T-F7-ux` | B04 | haiku | M | 0.3 | 3.3 | F7 — MINOR · The epic group count diverges from the prototype, and the divergence is declared but not ruled |
-| 228 | `T-P20` | B15 | sonnet | M | 0.6 | 3.3 | P20 — **MINOR** ⚠ **r2 NEW** — The month grid and the week columns carry no table or grid semantics, so a screen reader … |
-| 229 | `T-E6-17` | B16 | sonnet | M | 0.6 | 1.7 | E6-17 — MINOR — `ticket.assigned` and `ticket.collaborator_added` accept any non-empty string as a person — a … |
-| 230 | `T-E6-19` | B16 | sonnet | M | 0.6 | 1.7 | E6-19 — MINOR — A due date only has to look like `YYYY-MM-DD`: `2026-02-30`, `2026-13-45` and `0000-00-00` commit, and … |
-| 231 | `T-E6-20` | B16 | sonnet | M | 0.6 | 1.7 | E6-20 — MINOR — Ruling P15 ("a name of only spaces names nothing") closed titles, workspace, project and invite names — … |
+| rank | task | batch | model | backend | sev | h | score | finding |
+|---|---|---|---|---|---|---|---|---|
+| 1 | `T-E4-4` | B03 | haiku | deepseek | I | 0.6 | 25 | E4-4 — **IMPORTANT** — The description editor and the comment composer are `role="textbox"` elements with NO accessible … |
+| 2 | `T-E4-5` | B03 | haiku | deepseek | I | 0.6 | 25 | E4-5 — **IMPORTANT** — The workspace home's `<h1>` is a button, so the page's level-1 heading is named "Rename … |
+| 3 | `T-P12` | B03 | haiku | deepseek | I | 0.6 | 25 | P12 — **IMPORTANT** — Every screen in the product has the same document title |
+| 4 | `T-P19` | B03 | haiku | deepseek | I | 0.6 | 25 | P19 — **IMPORTANT** ⚠ **r2 NEW** — The product's primary view switcher is a `role="tablist"` with NO accessible name, … |
+| 5 | `T-P21` | B03 | haiku | deepseek | I | 0.6 | 25 | P21 — **IMPORTANT** ⚠ **r2 NEW, MEASUREMENT CORRECTED TWICE BEFORE THE BOUNDARY — THE SECOND CORRECTION IS THE … |
+| 6 | `T-P22` | B03 | haiku | deepseek | I | 0.6 | 25 | P22 — **IMPORTANT** ⚠ **r2 NEW** — Two `role="menu"` elements have no accessible name, and one of them has a named twin … |
+| 7 | `T-P31` | B03 | haiku | deepseek | I | 0.6 | 25 | P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at … |
+| 8 | `T-E5-1` | B04 | haiku | deepseek | I | 0.5 | 24 | E5-1 — IMPORTANT · The help says "there is no dragging on the board"; every card is draggable and carries move arrows … |
+| 9 | `T-E5-24` | B04 | haiku | deepseek | I | 0.5 | 24 | E5-24 — IMPORTANT · Five more passages of the help describe a product that no longer exists — "no change role", "you … |
+| 10 | `T-E6-1` | B04 | haiku | deepseek | I | 0.5 | 24 | E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete` |
+| 11 | `T-F1-ux` | B04 | haiku | deepseek | I | 0.5 | 24 | F1 — IMPORTANT · The in-app help describes a product that no longer exists, in at least six places |
+| 12 | `T-E2-55` | B04 | haiku | deepseek | M | 0.25 | 16 | E2-55 (r2) — IMPORTANT · The FAQ and the manual both say the 200-entry history cap is disclosed *"at the top"*; the … |
+| 13 | `T-E4-11` | B10 | haiku | deepseek | I | 0.75 | 16 | E4-11 — **IMPORTANT** — At 390 px the signed-in shell's navigation bar is 310 px tall — 37 % of the viewport — where … |
+| 14 | `T-E4-13` | B10 | haiku | deepseek | I | 0.75 | 16 | E4-13 — **IMPORTANT** — The New-ticket dialog's Title field is a bare `<input>` that paints as a 2-px inset user-agent … |
+| 15 | `T-E4-14` | B10 | haiku | deepseek | I | 0.75 | 16 | E4-14 — **IMPORTANT** — The active-filter chip's remove control is an 8×13 px "×" |
+| 16 | `T-E4-3` | B10 | haiku | deepseek | I | 0.75 | 16 | E4-3 — **IMPORTANT** — Every board card carries a 66×21 px `who · when` disclosure button that no sweep has ever … |
+| 17 | `T-E4-7` | B10 | haiku | deepseek | I | 0.75 | 16 | E4-7 — **IMPORTANT** — At phone width the ticket sheet's description is clipped: the field row keeps its 8-rem label … |
+| 18 | `T-E5-38` | B04 | haiku | deepseek | M | 0.25 | 16 | E5-38 — MINOR · The sign-in page binds agreement to a Privacy notice that reads "Operated by [ENTITY NAME] · Governed … |
+| 19 | `T-F5-ux` | B04 | haiku | deepseek | M | 0.25 | 16 | F5 — MINOR · The founding flow lands a new owner on a page of four negatives; the prototype lands on the list with a … |
+| 20 | `T-F8-ux` | B04 | haiku | deepseek | M | 0.25 | 16 | F8 — MINOR · A recorded self-test count is stale, in the block that documents the freshness gate |
+| 21 | `T-P1` | B10 | haiku | deepseek | I | 0.75 | 16 | P1 — **IMPORTANT** ⚠ **r2 CORRECTION — SIX, NOT SEVEN: the seventh was refuted by an ancestor rule and is withdrawn** — … |
+| 22 | `T-P2` | B10 | haiku | deepseek | I | 0.75 | 16 | P2 — **IMPORTANT** — The board's whole-board empty state has no prototype counterpart, and is the one board empty state … |
+| 23 | `T-E4-33` | B03 | haiku | deepseek | M | 0.4 | 12.5 | E4-33 — **MINOR** — For a person with no display name — the product's default email sign-up — the shell's own labels … |
+| 24 | `T-E5-13` | B02 | sonnet | claude-sonnet | C | 2 | 12.5 | E5-13 — CRITICAL · After a failed preferences read, `/account` paints all five notifications ON and one toggle PUTs a … |
+| 25 | `T-E5-41` | B02 | sonnet | claude-sonnet | C | 2 | 12.5 | E5-41 — CRITICAL · An unpublished workflow draft — every state, arrow and rule — is discarded by any navigation, … |
+| 26 | `T-P13` | B03 | haiku | deepseek | M | 0.4 | 12.5 | P13 — **MINOR** ⚠ **r2 REVISION — the WCAG 2.4.1 CLAIM IS WITHDRAWN** — no skip link; a keyboard-only user Tabs the nav … |
+| 27 | `T-V6` | B03 | haiku | deepseek | M | 0.4 | 12.5 | V6 — MINOR · Five tab-loading arms on the project page carry no role, in a file that uses one three times |
+| 28 | `T-E2-23` | B02 | sonnet | deepseek | I | 1.25 | 12 | E2-23 (r2) — IMPORTANT · "You have no passkeys yet." is asserted over a read that failed |
+| 29 | `T-E2-24` | B02 | sonnet | deepseek | I | 1.25 | 12 | E2-24 (r2) — IMPORTANT · A notification preference can end up showing a state the server never recorded, and no account … |
+| 30 | `T-E4-17` | B05 | sonnet | deepseek | I | 1.25 | 12 | E4-17 — **IMPORTANT** — Both keyboard close paths of the shared `Select` that I drove — Escape, and Enter to pick — end … |
+| 31 | `T-E4-21` | B05 | sonnet | deepseek | I | 1.25 | 12 | E4-21 — **IMPORTANT** — The searchable `Select` (New-ticket *Type* and *Parent*, the type editor's *Workflow*) has no … |
+| 32 | `T-E4-31` | B10 | haiku | deepseek | I | 0.75 | 12 | E4-31 — **IMPORTANT** — Ghost buttons placed on a sunken row paint at **3.99:1** (light) / **4.00:1** (dark) in `hig` … |
+| 33 | `T-E6-7` | B17 | haiku | deepseek | M | 0.25 | 12 | E6-7 — MINOR — Migration prefixes are hand-rounded and future-dated with no recorded convention, so the plans' own … |
+| 34 | `T-F8-fn` | B17 | haiku | deepseek | M | 0.25 | 12 | F8 — LOW / observation — `check:db-tz` is the only one of the nine checkers with no automated invocation |
+| 35 | `T-I2` | B10 | haiku | deepseek | M | 0.25 | 12 | I2 — **IMPORTANT** — The `e2e-stack` suite's committed artefact records a defect that was fixed eight hours later, and … |
+| 36 | `T-P15` | B17 | haiku | deepseek | M | 0.25 | 12 | P15 — **MINOR** ⚠ **r2 NEW, CORRECTED DOWNWARD IN THE SAME ROUND** — the repo's generated prototype copy is one line … |
+| 37 | `T-P18` | B05 | sonnet | deepseek | I | 1.25 | 12 | P18 — **IMPORTANT** ⚠ **r2 NEW** — A client-side navigation announces nothing: no title change, no focus move, no live … |
+| 38 | `T-P23` | B05 | sonnet | deepseek | I | 1.25 | 12 | P23 — **IMPORTANT** ⚠ **r2 NEW** — The searchable Select's input has its focus outline REMOVED and nothing replaces it, … |
+| 39 | `T-P24` | B10 | haiku | deepseek | I | 0.75 | 12 | P24 — **IMPORTANT** ⚠ **r2 NEW** — A painted text colour measures 3.84:1 at 12.8px, and it is UNDECLARED, so the gate … |
+| 40 | `T-P5` | B17 | haiku | deepseek | M | 0.25 | 12 | P5 — **MINOR (product) / IMPORTANT (record)** — An owner-requested control was neither built nor reported |
+| 41 | `T-P9` | B05 | sonnet | deepseek | I | 1.25 | 12 | P9 — **IMPORTANT** — `SegmentedControl` carries full ARIA tab semantics and implements none of the tab keyboard model |
+| 42 | `T-E3-14` | B01 | sonnet | claude-sonnet | I | 1.5 | 10 | 14.7.1 — `E3-14` (r2) — **CRITICAL (claimed)** — FIVE cookie-authenticated mutating routes are outside … |
+| 43 | `T-E3-15` | B01 | sonnet | claude-sonnet | I | 1.5 | 10 | 14.7.2 — `E3-15` (r2) — **IMPORTANT (claimed)** — The guard written to catch exactly this cannot catch it, and its own … |
+| 44 | `T-E3-32` | B01 | sonnet | claude-sonnet | I | 1.5 | 10 | 68. `E3-32` (phase 2, HALF) — **IMPORTANT (claimed)** — The envelope-origin gate's own status list says `POST /v1/sync` … |
+| 45 | `T-E4-10` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-10 — **MINOR** — The workflow template gallery's four buttons paint as raw user-agent chrome — a population round … |
+| 46 | `T-E4-15` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-15 — **MINOR** — The timeline's Earlier / Today / Later buttons paint with the browser's 2-px outset bevel: the … |
+| 47 | `T-E4-2` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-2 — **MINOR** — The ticket sheet's and the dialog's Close glyph paints at 24×21 px — no rule gives it a size, the … |
+| 48 | `T-E4-25` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-25 — **MINOR** — The Settings sidebar's three section links are 39 px tall; the prototype's are `min-height:44px`, … |
+| 49 | `T-E4-26` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-26 — **MINOR** — In the List view the only two per-row controls — the collapse caret (22×22) and the title button … |
+| 50 | `T-E4-27` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-27 — **MINOR** — The ticket-type editor's *Save ticket type* is a page-local `<button>` at 36 px with a 1-px border … |
+| 51 | `T-E4-35` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-35 — **MINOR** — `.gn-segmented__item` sets no horizontal padding, so where the track is content-sized the *All* tab … |
+| 52 | `T-E4-8` | B10 | haiku | deepseek | M | 0.4 | 10 | E4-8 — **IMPORTANT** — The editor's formatting strip is the one control family in the neumorphic sheet drawn with hard … |
+| 53 | `T-E6-15` | B01 | sonnet | claude-sonnet | I | 1.5 | 10 | E6-15 — IMPORTANT — Cross-site WebSocket hijacking: a cookie-authenticated `/v1/stream` handshake from a foreign Origin … |
+| 54 | `T-E6-16` | B01 | sonnet | claude-sonnet | I | 1.5 | 10 | E6-16 — IMPORTANT — An MCP token can approve a new device code, so one token mints a successor that survives its own … |
+| 55 | `T-P27` | B10 | haiku | deepseek | M | 0.4 | 10 | P27 — **MINOR** ⚠ **r2 NEW** — The viewport suite's narrowest width is 390px; WCAG 1.4.10 Reflow specifies 320px, which … |
+| 56 | `T-P35` | B10 | haiku | deepseek | M | 0.4 | 10 | P35 — **MINOR** ⚠ **r2 NEW — PHASE 2 (written before the 15:05:23 freeze but not committed until after it; scores at … |
+| 57 | `T-E2-20` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E2-20 (r2) — IMPORTANT · Two admin screens stay on "Loading ticket types…" forever when a read rejects, and the comment … |
+| 58 | `T-E2-21` | B06 | sonnet | deepseek | I | 1.25 | 9.6 | E2-21 (r2) — IMPORTANT · A rejected type migration destroys the mapping the admin just authored AND disables the … |
+| 59 | `T-E2-29` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | E2-29 (r2) — IMPORTANT · A dropped connection during a Move produces nothing at all, and the Move control has no … |
+| 60 | `T-E2-39` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E2-39 (r2) — IMPORTANT · A failed roster read becomes "nobody is in this workspace", and the workflow builder's own … |
+| 61 | `T-E2-40` | B06 | sonnet | deepseek | I | 1.25 | 9.6 | E2-40 (r2) — IMPORTANT · A `require-field` move previews as refused for ever, even after the person fills the field its … |
+| 62 | `T-E2-44` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E2-44 (r2) — IMPORTANT · A failed read of your connected assistants is drawn as "No assistants are connected" |
+| 63 | `T-E2-46` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | E2-46 (r2) — IMPORTANT · A typed `[text](url)` becomes markup with no escape suggestion, where every other formatting … |
+| 64 | `T-E4-18` | B02 | sonnet | deepseek | I | 1.25 | 9.6 | E4-18 — **IMPORTANT** — The Assignee picker renders a BLANK 13-px option for a member with no display name — the same … |
+| 65 | `T-E4-19` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | E4-19 — **IMPORTANT** — The History tab's headline is the raw event-type slug — `ticket.field_set` three times in a row … |
+| 66 | `T-E4-23` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E4-23 — **IMPORTANT** — A ticket the server answers `404` for — never existed, soft-deleted, or invisible to this … |
+| 67 | `T-E5-15` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E5-15 — IMPORTANT · A refused or failed ticket-types read leaves Settings on "Loading ticket types…" for ever — the … |
+| 68 | `T-E5-27` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | E5-27 — IMPORTANT · A Move that fails in transport is silence — no sentence, no latch, the dialog stays open — while … |
+| 69 | `T-E5-28` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | E5-28 — IMPORTANT · A dropped connection during Publish leaves the workflow builder's Publish button disabled for ever … |
+| 70 | `T-E5-37` | B02 | sonnet | deepseek | I | 1.25 | 9.6 | E5-37 — IMPORTANT · For every email sign-up the shell does not know who you are: "Workspaces — ", an empty menu header, … |
+| 71 | `T-E5-4` | B02 | sonnet | deepseek | I | 1.25 | 9.6 | E5-4 — IMPORTANT · Every email sign-up is a BLANK row in the assignee picker, the @mention list and the Filters sheet — … |
+| 72 | `T-E5-40` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E5-40 — IMPORTANT · With "Only tickets in progress" on, the Backlog tab says "Nothing in the backlog — new tickets land … |
+| 73 | `T-E5-42` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | E5-42 — IMPORTANT · A failed preferences read — or a failed save of "which columns to show" that the person just … |
+| 74 | `T-E5-7` | B06 | sonnet | deepseek | I | 1.25 | 9.6 | E5-7 — IMPORTANT · With a comment typed and Move enabled, the dialog still says *"none was provided"* — the exact … |
+| 75 | `T-E5-8` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | E5-8 — IMPORTANT · The History tab prints raw event names — `ticket.field_set` three times in a row — and never says … |
+| 76 | `T-E6-18` | B01 | sonnet | deepseek | I | 1.25 | 9.6 | E6-18 — IMPORTANT — One byte (U+0000) answers 500 through twenty-three parameters on nineteen doors — every raw id … |
+| 77 | `T-E6-24` | B07 | sonnet | deepseek | I | 1.25 | 9.6 | E6-24 — IMPORTANT — The phone's board and the desktop's ticket list keep showing a soft-deleted ticket, and the phone's … |
+| 78 | `T-F3-ux` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | F3 — IMPORTANT · A comment renders as plain text while the composer offers marks it discards; a link's destination is … |
+| 79 | `T-P8` | B05 | sonnet | deepseek | I | 1.25 | 9.6 | P8 — **MINOR (product) / IMPORTANT (follow-on)** ⚠ **r2 REVISION** — `Dialog` and `Sheet` declare `aria-modal="true"`, … |
+| 80 | `T-V10` | B06 | sonnet | deepseek | I | 1.25 | 9.6 | V10 — CRITICAL · "Create" has no re-entrancy guard, and each call mints a fresh id: a double press files two tickets |
+| 81 | `T-V4` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | V4 — IMPORTANT · The comment thread reports a still-loading read as "Comments · 0" and "No comments yet." |
+| 82 | `T-V7` | B08 | sonnet | deepseek | I | 1.25 | 9.6 | V7 — IMPORTANT · A comment the server REFUSES costs the author the words they just wrote |
+| 83 | `T-V9` | B09 | sonnet | deepseek | I | 1.25 | 9.6 | V9 — IMPORTANT · The invite page reports a transport failure as a dead link, and sends the person to ask for a … |
+| 84 | `T-E4-12` | B17 | sonnet | deepseek | I | 1 | 9 | E4-12 — **IMPORTANT** — When the signed-in instrument runs, its tap-target population is ONE route at ONE width, and … |
+| 85 | `T-F2-ux` | B17 | sonnet | deepseek | I | 1 | 9 | F2 — IMPORTANT · The only gate over the help corpus cannot fail on the property that matters |
+| 86 | `T-I1` | B17 | OWNER | owner | I | 1 | 9 | I1 — **CRITICAL** — No browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate … |
+| 87 | `T-P11` | B17 | sonnet | deepseek | I | 1 | 9 | P11 — **IMPORTANT** — The `Select` panel is outside the population of every rendered-property sweep, for two … |
+| 88 | `T-P16` | B17 | sonnet | deepseek | I | 1 | 9 | P16 — **IMPORTANT** ⚠ **r2 NEW** — One styling case asserts the ABSENCE of a declaration through a scanner that … |
+| 89 | `T-P34` | B17 | sonnet | deepseek | I | 1 | 9 | P34 — **IMPORTANT** ⚠ **r2 NEW** — FOUR of the project page's five views are outside the tap-target ratchet's … |
+| 90 | `T-E6-2` | B07 | opus | claude-opus | I | 1.75 | 8.6 | E6-2 — IMPORTANT — The ingest door accepts every ordinary write against an already soft-deleted ticket, and … |
+| 91 | `T-E6-4` | B07 | opus | claude-opus | I | 1.75 | 8.6 | E6-4 — IMPORTANT — A soft-deleted open child blocks its parent's close with a refusal about a child no view can show; … |
+| 92 | `T-F2-fn` | B07 | opus | claude-opus | I | 1.75 | 8.6 | F2 — IMPORTANT — A recorded survivor measurement's stated warrant is false: the second witness read a stale `dist` |
+| 93 | `T-F4-fn` | B07 | opus | claude-opus | I | 1.75 | 8.6 | F4 — MEDIUM — `routes/my-work.ts:364`, the contested-claim title gate, is a confirmed open gap |
+| 94 | `T-F5-fn` | B07 | opus | claude-opus | I | 1.75 | 8.6 | F5 — MEDIUM — The replica's two TypeScript gates are confirmed open gaps, and the table's citations for them have rotted |
+| 95 | `T-E5-19` | B02 | sonnet | deepseek | M | 0.6 | 8.3 | E5-19 — MINOR · "Save name" says nothing on success, and a refusal without a message is reported as success `[SOURCE]` |
+| 96 | `T-E4-9` | B10 | haiku | deepseek | I | 0.75 | 8 | E4-9 — **IMPORTANT** — The workflow builder renders TWO `<main>` landmarks, and at 390 px its name field is 403 px … |
+| 97 | `T-E4-32` | B10 | haiku | deepseek | M | 0.4 | 7.5 | E4-32 — **MINOR** — The builder's advisories heading paints `warning` on `surfaceSunken` at **3.71:1** (13.6 px) in … |
+| 98 | `T-E2-45` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | E2-45 (r2) — IMPORTANT · "Sign out" can fail silently, and the menu closes either way |
+| 99 | `T-E4-1` | B08 | sonnet | deepseek | I | 1.25 | 7.2 | E4-1 — **IMPORTANT** — The ticket sheet's breadcrumb renders the SAME ancestor twice whenever the direct parent is an … |
+| 100 | `T-E4-30` | B08 | sonnet | deepseek | I | 1.25 | 7.2 | E4-30 — **IMPORTANT** — The sheet's ancestor crumbs are links painted in exactly the ink of the non-link crumbs beside … |
+| 101 | `T-E5-10` | B09 | sonnet | deepseek | I | 1.25 | 7.2 | E5-10 — IMPORTANT · A single-row "mark read" and the bulk Undo fail SILENTLY — the exact first-version defect the bulk … |
+| 102 | `T-E5-16` | B06 | sonnet | deepseek | I | 1.25 | 7.2 | E5-16 — IMPORTANT · "New ticket" pre-selects **Epic** — the top of the hierarchy — and a mis-filed type cannot be … |
+| 103 | `T-E5-2` | B13 | sonnet | deepseek | I | 1.25 | 7.2 | E5-2 — IMPORTANT · A ticket a week overdue looks like every other card on the Board; the export's card carries the key … |
+| 104 | `T-E5-20` | B06 | sonnet | deepseek | I | 1.25 | 7.2 | E5-20 — IMPORTANT · One Escape in the Move dialog closes the ticket sheet under it — the `Sheet`'s own guard says a … |
+| 105 | `T-E5-25` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | E5-25 — IMPORTANT · A write after the session expires is reported as *"We could not reach the server"* — at nine sites … |
+| 106 | `T-E5-3` | B08 | sonnet | deepseek | I | 1.25 | 7.2 | E5-3 — IMPORTANT · A ticket directly under an epic reads `Epic › Epic › KEY` — the crumb states a four-deep chain the … |
+| 107 | `T-E5-31` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | E5-31 — IMPORTANT · The signed-out app bar offers Workspaces, Account, an Inbox icon and "No workspace selected — pick … |
+| 108 | `T-E5-32` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | E5-32 — IMPORTANT · The help promises a signed-out link to a job "remembers where you were headed"; every data page … |
+| 109 | `T-E5-5` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | E5-5 — IMPORTANT · The Filters sheet offers a Collaborators control that no view applies, and tells the person … |
+| 110 | `T-E5-6` | B13 | sonnet | deepseek | I | 1.25 | 7.2 | E5-6 — IMPORTANT · A due date can be seen in four places, computed as "overdue", and notified as "due soon" — and set … |
+| 111 | `T-E5-9` | B06 | sonnet | deepseek | I | 1.25 | 7.2 | E5-9 — IMPORTANT · A refused Delete answers five screens above the button that was pressed `[BROWSER]` `[SOURCE]` — and … |
+| 112 | `T-E6-21` | B01 | sonnet | deepseek | I | 1.25 | 7.2 | E6-21 — IMPORTANT — A member or guest cannot leave a workspace: the gate refuses a self-revocation, no route or control … |
+| 113 | `T-E6-9` | B01 | sonnet | deepseek | I | 1.25 | 7.2 | E6-9 — IMPORTANT — The members page's invite form offers three channels; the door refuses two of them, and the one it … |
+| 114 | `T-F4-ux` | B09 | sonnet | deepseek | I | 1.25 | 7.2 | F4 — IMPORTANT · The visibility editor's read-only sentence can never render in the shipped app — and states the rule … |
+| 115 | `T-V1` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | V1 — IMPORTANT · The Board's empty states invite a person to create a ticket, and no caller in the web app wires the … |
+| 116 | `T-V2` | B02 | sonnet | deepseek | I | 1.25 | 7.2 | V2 — CRITICAL · A failed pending-list re-read destroys a one-time invitation URL that cannot be recovered |
+| 117 | `T-V3` | B09 | sonnet | deepseek | I | 1.25 | 7.2 | V3 — IMPORTANT · A rejected visibility write leaves Apply permanently disabled and silent |
+| 118 | `T-V5` | B11 | sonnet | deepseek | I | 1.25 | 7.2 | V5 — IMPORTANT · A "My contested claims" title button is a dead click, under a comment claiming all four sections … |
+| 119 | `T-V8` | B06 | sonnet | deepseek | I | 1.25 | 7.2 | V8 — IMPORTANT · Opening any parent ticket raises a false "this list is not shown rather than shown short" alert |
+| 120 | `T-E2-22` | B06 | sonnet | deepseek | M | 0.6 | 6.7 | E2-22 (r2) — MINOR · The state-mapping dialog is unmounted by the act of submitting, so a refusal costs the admin the … |
+| 121 | `T-E5-18` | B09 | sonnet | deepseek | M | 0.6 | 6.7 | E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all … |
+| 122 | `T-E5-30` | B09 | sonnet | deepseek | M | 0.6 | 6.7 | E5-30 — MINOR · The shared read-refusal panel on five routes says "… cannot be shown **yet**", appends the transport's … |
+| 123 | `T-E6-11` | B07 | sonnet | deepseek | M | 0.6 | 6.7 | E6-11 — MINOR — The list serves a soft-deleted epic's title as a group header; the detail door withholds the same title … |
+| 124 | `T-E2-41` | B14 | sonnet | deepseek | I | 1 | 6 | E2-41 (r2) — IMPORTANT · Two screens in the phone shell render a failed read as a benign state — an empty board, and … |
+| 125 | `T-E2-42` | B14 | sonnet | deepseek | I | 1 | 6 | E2-42 (r2) — IMPORTANT · A comment posted from the phone is recorded as the ASSIGNEE's words |
+| 126 | `T-E2-43` | B14 | sonnet | deepseek | I | 1 | 6 | E2-43 (r2) — IMPORTANT · The desktop shell's own startup has no rejection handler, so a failure to initialize is drawn … |
+| 127 | `T-E2-48` | B14 | sonnet | deepseek | I | 1 | 6 | E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the … |
+| 128 | `T-E2-52` | B14 | sonnet | deepseek | I | 1 | 6 | E2-52 (r2) — IMPORTANT · On the phone, typing `@` in the comment editor states **"No people match"** for every query, … |
+| 129 | `T-E5-26` | B14 | sonnet | deepseek | I | 1 | 6 | E5-26 — IMPORTANT · The desktop app's only first-run sentence sends a person to a Settings screen it does not have, for … |
+| 130 | `T-E5-44` | B14 | sonnet | deepseek | I | 1 | 6 | E5-44 — IMPORTANT · (phase 2, half points — the narrowed core of withdrawn E5-21) The manual sends a person to the … |
+| 131 | `T-E6-26` | B17 | OWNER-DECISION | owner | M | 0.5 | 6 | E6-26 — MINOR — `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the … |
+| 132 | `T-E6-6` | B17 | sonnet | deepseek | M | 0.5 | 6 | E6-6 — MINOR — `check-no-silent-skips.mjs` prints `ok` on an empty report: an instrument with no positive control on … |
+| 133 | `T-E3-19` | B12 | opus | claude-opus | I | 1.75 | 5.1 | 21. `E3-19` (r2) — **IMPORTANT (claimed)** — The parent-terminal invariant is enforced in ONE direction: a child can be … |
+| 134 | `T-E6-10` | B12 | opus | claude-opus | I | 1.75 | 5.1 | E6-10 — IMPORTANT — The bulk rebind route can be refused part-way by the permission gate, leaving the type's tickets … |
+| 135 | `T-E6-3` | B12 | opus | claude-opus | I | 1.75 | 5.1 | E6-3 — IMPORTANT — Re-ranking a custom ticket type is accepted with tickets already placed where the new rank forbids, … |
+| 136 | `T-E6-8` | B12 | opus | claude-opus | I | 1.75 | 5.1 | E6-8 — IMPORTANT — A workflow republish can put a parent with open children into a terminal state, and `ticket.closed` … |
+| 137 | `T-E2-26` | B09 | sonnet | deepseek | M | 0.6 | 5 | E2-26 (r2) — MINOR · A single notification's read-state is reverted silently, where its bulk sibling speaks |
+| 138 | `T-E2-32` | B09 | sonnet | deepseek | M | 0.6 | 5 | E2-32 (r2) — MINOR · A committed move does not clear the comment, so the next move submits the previous move's words |
+| 139 | `T-E2-33` | B06 | sonnet | deepseek | M | 0.6 | 5 | E2-33 (r2) — IMPORTANT · Three dialogs seed a choice once from a prop and guard it by emptiness rather than membership, … |
+| 140 | `T-E2-34` | B06 | sonnet | deepseek | M | 0.6 | 5 | E2-34 (r2) — MINOR · Two `aria-modal` dialogs open at once, and one Escape press closes both |
+| 141 | `T-E2-37` | B06 | sonnet | deepseek | M | 0.6 | 5 | E2-37 (r2) — MINOR · The New-ticket draft survives its own close, so reopening offers the last ticket's title with … |
+| 142 | `T-E2-38` | B11 | sonnet | deepseek | M | 0.6 | 5 | E2-38 (r2) — MINOR · An archived project's own board does not say it is archived |
+| 143 | `T-E4-16` | B15 | haiku | deepseek | M | 0.4 | 5 | E4-16 — **MINOR** — React Flow's attribution link renders at 10 px with 1.10:1 contrast in dark mode (2.61:1 in light) |
+| 144 | `T-E4-24` | B10 | haiku | deepseek | M | 0.4 | 5 | E4-24 — **MINOR** — The board, the List, My Work and the builder skip a heading level: `h1` → `h3` with no `h2`, and … |
+| 145 | `T-E4-36` | B10 | haiku | deepseek | M | 0.4 | 5 | E4-36 — **MINOR** — The help search announces "nothing matches" but never "9 answers": the no-match arm is a … |
+| 146 | `T-E5-23` | B11 | sonnet | deepseek | M | 0.6 | 5 | E5-23 — MINOR · A brand-new owner's workspace home says "No projects you can open are active here" — a sentence written … |
+| 147 | `T-E5-34` | B11 | sonnet | deepseek | M | 0.6 | 5 | E5-34 — MINOR · On an archived project's own page, the bar's project item names and links a DIFFERENT project — the … |
+| 148 | `T-E5-43` | B13 | sonnet | deepseek | M | 0.6 | 5 | E5-43 — MINOR · "Today" on the Calendar and Timeline is computed once per render, so a tab left open across the IST day … |
+| 149 | `T-P10` | B10 | haiku | deepseek | M | 0.4 | 5 | P10 — **MINOR** — The accessible-name ratchet's unit is an attribute; its failure message claims a property of … |
+| 150 | `T-P17` | B10 | haiku | deepseek | M | 0.4 | 5 | P17 — **MINOR** ⚠ **r2 NEW** — `/my-work`'s heading outline skips level 2, the product IMPROVED on the prototype to get … |
+| 151 | `T-P3` | B08 | sonnet | deepseek | M | 0.6 | 5 | P3 — **MINOR** — The parent crumb cannot show the parent's key; the prototype's does, and no ruling records the … |
+| 152 | `T-P36` | B10 | haiku | deepseek | M | 0.4 | 5 | P36 — **MINOR** ⚠ **r2 NEW — PHASE 2 (filed 15:31 IST, after the freeze; scores at HALF per rules §2)** — Two settings … |
+| 153 | `T-P4` | B08 | sonnet | deepseek | M | 0.6 | 5 | P4 — **MINOR** — "the SAME plain span" is not the same span |
+| 154 | `T-E2-30` | B13 | sonnet | deepseek | I | 1.25 | 4.8 | E2-30 (r2) — IMPORTANT · The only way back from a soft delete is a 15-second toast |
+| 155 | `T-E4-28` | B15 | sonnet | deepseek | I | 1.25 | 4.8 | E4-28 — **IMPORTANT** — The Calendar and the Timeline convey every date relationship by position alone: day cells and … |
+| 156 | `T-E5-11` | B13 | sonnet | deepseek | I | 1.25 | 4.8 | E5-11 — IMPORTANT · The invite form asks a person to type comma-separated project ULIDs; the export draws a picker of … |
+| 157 | `T-E6-13` | B16 | sonnet | deepseek | I | 1.25 | 4.8 | E6-13 — IMPORTANT — `verify:projections` reports DRIFT on a correct database after an ordinary type re-bind, so the … |
+| 158 | `T-E2-49` | B14 | haiku | deepseek | M | 0.5 | 4 | E2-49 (r2) — MINOR · Push registration's declared contract is not total: a transport failure escapes as a rejection its … |
+| 159 | `T-E2-53` | B14 | sonnet | deepseek | M | 0.5 | 4 | E2-53 (r2) — MINOR · The mobile editor host has no refusal vocabulary at all: three doors, and silence is the answer at … |
+| 160 | `T-E3-10` | B18 | haiku | deepseek | M | 0.25 | 4 | 14.2 — `E3-10` (r2) — MINOR — The arithmetic of a stated correctness invariant is stale by two in **both** numbers |
+| 161 | `T-E3-11` | B18 | haiku | deepseek | M | 0.25 | 4 | 14.6.1 — `E3-11` (r2) — MINOR — `Features.md` says the fixture suite holds **84**; it holds **86** |
+| 162 | `T-E3-12` | B18 | haiku | deepseek | M | 0.25 | 4 | 14.6.2 — `E3-12` (r2) — MINOR — "eleven plain-language checks" — there are **twelve**, and the twelfth is the section's … |
+| 163 | `T-E3-13` | B18 | haiku | deepseek | M | 0.25 | 4 | 14.6.3 — `E3-13` (r2) — MINOR — A citation in `visible-where.ts` resolves and points at the wrong line |
+| 164 | `T-E3-16` | B18 | haiku | deepseek | M | 0.25 | 4 | 17.2 `E3-16` (r2) — **IMPORTANT (claimed)** — The roster-cut citation has drifted **twice**, and the files "corrected" … |
+| 165 | `T-E3-17` | B18 | haiku | deepseek | M | 0.25 | 4 | 18. `E3-17` (r2) — MINOR — A docblock that says "re-run the stated command before trusting either number" gives a total … |
+| 166 | `T-E3-18` | B18 | haiku | deepseek | M | 0.25 | 4 | 19. `E3-18` (r2) — **MINOR — revised DOWN from Important at §34** — The two shipped `DataSource` implementations … |
+| 167 | `T-E3-20` | B18 | haiku | deepseek | M | 0.25 | 4 | 25. `E3-20` (r2) — **IMPORTANT (claimed)** — Case 6.82 declares a rollup capability "cannot ship" and "ABSENT from the … |
+| 168 | `T-E3-21` | B18 | haiku | deepseek | M | 0.25 | 4 | 26. `E3-21` (r2) — **IMPORTANT (claimed)** — Case 6.84 declares a cross-workspace parent link "reachable and unrefused" … |
+| 169 | `T-E3-22` | B18 | haiku | deepseek | M | 0.25 | 4 | 27. `E3-22` (r2) — **IMPORTANT (claimed)** — Case 6.58's stated reproduction of a cycle uses `ticket.reparented`, which … |
+| 170 | `T-E3-23` | B18 | haiku | deepseek | M | 0.25 | 4 | 28. `E3-23` (r2) — **IMPORTANT (claimed)** — Case 6.124 is ❌ with owner "Plan 11"; the code that closed it names the … |
+| 171 | `T-E3-24` | B18 | haiku | deepseek | M | 0.25 | 4 | 29. `E3-24` (r2) — **IMPORTANT (claimed)** — Case 6.66's thesis is INVERTED: it says the parent placeholder ships … |
+| 172 | `T-E3-25` | B18 | haiku | deepseek | M | 0.25 | 4 | 30. `E3-25` (r2) — **MINOR (claimed)** — Case 6.96 says `SyncItem` "has three members"; it has four — **and this … |
+| 173 | `T-E3-26` | B18 | haiku | deepseek | M | 0.25 | 4 | 42. `E3-26` (r2) — **IMPORTANT (claimed)** — `Features.md` says "Nothing in the app links to any of them yet" and … |
+| 174 | `T-E3-27` | B18 | haiku | deepseek | M | 0.25 | 4 | 45. `E3-27` (r2) — **IMPORTANT (claimed)** — Two files say `checkErrandTemplate` is *"not yet landed on this branch"*; … |
+| 175 | `T-E3-28` | B18 | haiku | deepseek | M | 0.25 | 4 | 48. `E3-28` (r2) — **IMPORTANT (claimed)** — Two documents count the offline-born ticket's doors as three and never … |
+| 176 | `T-E3-29` | B18 | haiku | deepseek | M | 0.25 | 4 | 53. r2 finding E3-29 — `Features.md` §5 says "eleven registered types"; the registry carries eighteen, and the five it … |
+| 177 | `T-E3-30` | B18 | haiku | deepseek | M | 0.25 | 4 | 65. `E3-30` (phase 2, HALF) — **IMPORTANT (claimed)** — Case 6.83 is ❌ asking for a measurement; the measurement … |
+| 178 | `T-E3-31` | B18 | haiku | deepseek | M | 0.25 | 4 | 66. `E3-31` (phase 2, HALF) — **MINOR (claimed)** — Case 6.57 conditions on *"if Plan 3 admits a reparent that crosses … |
+| 179 | `T-E3-33` | B18 | haiku | deepseek | M | 0.25 | 4 | 69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist … |
+| 180 | `T-E3-34` | B18 | haiku | deepseek | M | 0.25 | 4 | 72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a … |
+| 181 | `T-E3-9` | B18 | haiku | deepseek | M | 0.25 | 4 | 14.1 — `E3-9` (r2) — MINOR — A "thirteen fields" claim is false: the envelope schema has **eleven** |
+| 182 | `T-E4-22` | B14 | haiku | deepseek | M | 0.5 | 4 | E4-22 — **MINOR** — The mobile board's rows are `TouchableOpacity`s with no `accessibilityRole`, so VoiceOver/TalkBack … |
+| 183 | `T-E6-12` | B18 | haiku | deepseek | M | 0.25 | 4 | E6-12 — IMPORTANT — Two ❌ cases in `06-auth-visibility.md` declare guest admissions the product closed weeks ago, one … |
+| 184 | `T-E6-14` | B18 | haiku | deepseek | M | 0.25 | 4 | E6-14 — MINOR — The delete toast's recorded reason for departing from the prototype ("this product has no ticket key") … |
+| 185 | `T-E6-22` | B16 | haiku | deepseek | M | 0.25 | 4 | E6-22 — MINOR — The export advertises "ticket-only access" for someone outside the workspace; the product has no such … |
+| 186 | `T-E6-23` | B16 | haiku | deepseek | M | 0.25 | 4 | E6-23 — MINOR — `BACKUP_TIME_UTC=25:00` or `99:99` is accepted and silently scheduled somewhere else (`99:99` → four … |
+| 187 | `T-E6-25` | B18 | haiku | deepseek | M | 0.25 | 4 | E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit … |
+| 188 | `T-F1-fn` | B18 | haiku | deepseek | M | 0.25 | 4 | F1 — IMPORTANT — An open-gap section still declares a closed security-relevant leak, with both supporting numbers stale … |
+| 189 | `T-F3-fn` | B18 | haiku | deepseek | M | 0.25 | 4 | F3 — IMPORTANT — **My own lane's §17 group** cites an artifact the owner has ruled is not the prototype, and every … |
+| 190 | `T-F6-fn` | B18 | haiku | deepseek | M | 0.25 | 4 | F6 — LOW — The soft-delete enumeration's own counts do not reproduce from the command printed beside them |
+| 191 | `T-F7-fn` | B18 | haiku | deepseek | M | 0.25 | 4 | F7 — LOW — **My own lane's §17 block table** has one row and no rule for a lane with no allocation |
+| 192 | `T-I3` | B18 | haiku | deepseek | M | 0.25 | 4 | I3 — **IMPORTANT** — `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by the same … |
+| 193 | `T-I4` | B18 | haiku | deepseek | M | 0.25 | 4 | I4 — **MINOR** — `tap-targets.ts` cites a line range that resolves and misleads |
+| 194 | `T-I5` | B18 | haiku | deepseek | M | 0.25 | 4 | I5 — **MINOR** — My own live handoff carries two position blocks that contradict each other, and the pointer that found … |
+| 195 | `T-P25` | B18 | haiku | deepseek | M | 0.25 | 4 | P25 — **MINOR** ⚠ **r2 NEW** — Three live files cite the docblock of a component that was deleted, and one of them is … |
+| 196 | `T-P26` | B18 | haiku | deepseek | M | 0.25 | 4 | P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta document is stale in BOTH of its halves: every numbered queue … |
+| 197 | `T-P28` | B14 | haiku | deepseek | M | 0.5 | 4 | P28 — **MINOR** ⚠ **r2 NEW** — The mobile board's row is the one pressable in the app with no accessibility role, and … |
+| 198 | `T-P29` | B18 | haiku | deepseek | M | 0.25 | 4 | P29 — **MINOR** ⚠ **r2 NEW** — The mock-only suite claims each stub carries its server `file:line`; two of ten carry … |
+| 199 | `T-P30` | B14 | haiku | deepseek | M | 0.5 | 4 | P30 — **IMPORTANT** ⚠ **r2 NEW** — The mobile editor webview is TWO GENERATED LINKS BEHIND, and both links are unguarded |
+| 200 | `T-P32` | B18 | haiku | deepseek | M | 0.25 | 4 | P32 — **MINOR** ⚠ **r2 NEW** — Why a control is disabled is put in `title` ON the disabled button, where it cannot be … |
+| 201 | `T-P33` | B18 | haiku | deepseek | M | 0.25 | 4 | P33 — **MINOR** ⚠ **r2 NEW** — The export draws a timestamp on every inbox row; the product draws none, and no client … |
+| 202 | `T-P6` | B14 | haiku | deepseek | M | 0.5 | 4 | P6 — **MINOR** — Mobile: two of three screens have no styling of any kind |
+| 203 | `T-P7` | B14 | haiku | deepseek | M | 0.5 | 4 | P7 — **MINOR** — Desktop's task list has no rules at all |
+| 204 | `T-E6-5` | B16 | opus | claude-opus | I | 1.75 | 3.4 | E6-5 — IMPORTANT — After a transient sync failure, a later claim overtakes the backing-off claim it depends on; the … |
+| 205 | `T-E2-25` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E2-25 (r2) — IMPORTANT · Five components written for offline and degraded states reach no screen, and the two shells … |
+| 206 | `T-E2-27` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E2-27 (r2) — MINOR · An unrecognised sync status is reported as "Live", the healthiest word available |
+| 207 | `T-E2-31` | B13 | sonnet | deepseek | M | 0.6 | 3.3 | E2-31 (r2) — MINOR · A re-entrancy guard whose stated purpose cannot happen, in a file that fixed the same guard … |
+| 208 | `T-E2-35` | B13 | sonnet | deepseek | M | 0.6 | 3.3 | E2-35 (r2) — IMPORTANT · Deleting a ticket asks nothing, while the bulk close of the same soft delete gets a whole … |
+| 209 | `T-E2-36` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E2-36 (r2) — MINOR · A partly committed Move batch never reloads, so the sheet behind the refusal shows state the … |
+| 210 | `T-E2-47` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E2-47 (r2) — MINOR · The ticket sheet's own symbol sweep names three unwired exports and misses a fourth, whose … |
+| 211 | `T-E2-51` | B13 | sonnet | deepseek | M | 0.6 | 3.3 | E2-51 (r2) — MINOR · My own `13.761` still asserts an absence the product reversed, with a reason that is now false and … |
+| 212 | `T-E2-54` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E2-54 (r2) — MINOR · `shell-refusal.tsx` says "`SERVING_GAPS` is empty — so NO read in this shell refuses for a serving … |
+| 213 | `T-E4-20` | B15 | sonnet | deepseek | M | 0.6 | 3.3 | E4-20 — **MINOR** — The workflow builder opens with `fitView`, so every control on a state node is painted at 74 % of … |
+| 214 | `T-E4-29` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E4-29 — **MINOR** — The ticket-type editor's validation list paints Zod's own message, verbatim and without the field … |
+| 215 | `T-E4-34` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E4-34 — **MINOR** — A guest who *"can look, not touch"* is offered five rows whose accessible name is `Edit <type>` |
+| 216 | `T-E4-6` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E4-6 — **MINOR** — The visibility editor's people picker labels a member by a 26-character ULID |
+| 217 | `T-E5-12` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-12 — MINOR · The same workspace is "1 project" on `/workspaces` and "2 projects" on `/account` `[BROWSER]` `[SOURCE]` |
+| 218 | `T-E5-14` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-14 — MINOR · Ten reorder arrows, all disabled, the reason only in a hover `title`; and the shipped seed already … |
+| 219 | `T-E5-17` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-17 — MINOR · `/mcp/tokens` is a chrome-less orphan: no app nav, nothing links to it, and its own docblock says it is … |
+| 220 | `T-E5-22` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-22 — MINOR · "Add subtask" never says what it will file: under an Epic it silently births a Task (skipping Story); … |
+| 221 | `T-E5-29` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-29 — MINOR · The state-mapping dialog says "Publishing cannot see which tickets sit in which state" directly above … |
+| 222 | `T-E5-33` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-33 — MINOR · Pressing "Send magic link" with nothing typed makes a server round trip and paints the validator's own … |
+| 223 | `T-E5-35` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-35 — MINOR · No inbox row says WHEN — `createdAt` is on every notification and rendered nowhere — and the two rows … |
+| 224 | `T-E5-36` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-36 — MINOR · A workspace with no projects has no empty-project sentence on its `/workspaces` card — the owner's own … |
+| 225 | `T-E5-39` | B04 | haiku | deepseek | M | 0.3 | 3.3 | E5-39 — MINOR · "Version history" lists v1…vN with no date and no author — the ledger records both on every … |
+| 226 | `T-F6-ux` | B04 | haiku | deepseek | M | 0.3 | 3.3 | F6 — MINOR · A docblock states an absolute that the same card falsifies four lines later |
+| 227 | `T-F7-ux` | B04 | haiku | deepseek | M | 0.3 | 3.3 | F7 — MINOR · The epic group count diverges from the prototype, and the divergence is declared but not ruled |
+| 228 | `T-P20` | B15 | sonnet | deepseek | M | 0.6 | 3.3 | P20 — **MINOR** ⚠ **r2 NEW** — The month grid and the week columns carry no table or grid semantics, so a screen reader … |
+| 229 | `T-E6-17` | B16 | sonnet | deepseek | M | 0.6 | 1.7 | E6-17 — MINOR — `ticket.assigned` and `ticket.collaborator_added` accept any non-empty string as a person — a … |
+| 230 | `T-E6-19` | B16 | sonnet | deepseek | M | 0.6 | 1.7 | E6-19 — MINOR — A due date only has to look like `YYYY-MM-DD`: `2026-02-30`, `2026-13-45` and `0000-00-00` commit, and … |
+| 231 | `T-E6-20` | B16 | sonnet | deepseek | M | 0.6 | 1.7 | E6-20 — MINOR — Ruling P15 ("a name of only spaces names nothing") closed titles, workspace, project and invite names — … |
 
 ## §6 — THE BATCHES AND THEIR BRIEFS (copy the fenced block of a task into a session — it is the whole instruction)
 
-### B01 — Server doors — security and refusal shape  ·  lane FUNC  ·  session model **sonnet**  ·  8 tasks  ·  ~6.8 h
+### B01 — Server doors — security and refusal shape  ·  lane FUNC  ·  session model **sonnet**  ·  backend **claude-sonnet (deepseek-capable tasks may be split out to a DeepSeek session)**  ·  8 tasks  ·  ~6.8 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b01-server-doors-security-and-refusa` · packages touched: @gisik-nokma/domain, @gisik-nokma/server.
 
@@ -362,7 +382,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b01-server-d
 #### T-E3-14  ·  sonnet  ·  IMPORTANT  ·  ~1.5 h  ·  rank 42
 
 ```
-TASK T-E3-14 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.5 h — judged IMPORTANT — rank 42/231
+TASK T-E3-14 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend claude-sonnet — effort ~1.5 h — judged IMPORTANT — rank 42/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1149, 131 lines — read the whole section first):
   14.7.1 — `E3-14` (r2) — **CRITICAL (claimed)** — FIVE cookie-authenticated mutating routes are outside `HTTP_ORIGIN_PROTECTED_ROUTES`, measured at the assembled app
@@ -383,7 +403,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-15  ·  sonnet  ·  IMPORTANT  ·  ~1.5 h  ·  rank 43
 
 ```
-TASK T-E3-15 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.5 h — judged IMPORTANT — rank 43/231
+TASK T-E3-15 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend claude-sonnet — effort ~1.5 h — judged IMPORTANT — rank 43/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1281, 66 lines — read the whole section first):
   14.7.2 — `E3-15` (r2) — **IMPORTANT (claimed)** — The guard written to catch exactly this cannot catch it, and its own docblock says so
@@ -404,7 +424,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-32  ·  sonnet  ·  IMPORTANT  ·  ~1.5 h  ·  rank 44
 
 ```
-TASK T-E3-32 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.5 h — judged IMPORTANT — rank 44/231
+TASK T-E3-32 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend claude-sonnet — effort ~1.5 h — judged IMPORTANT — rank 44/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:4301, 46 lines — read the whole section first):
   68. `E3-32` (phase 2, HALF) — **IMPORTANT (claimed)** — The envelope-origin gate's own status list says `POST /v1/sync` *"does not exist yet"* and is *"NOT CLOSED"*; the door has existed since 2026-09-04, calls the gated ingest, and a test witnesses the gate firing on it (15:35 IST)
@@ -425,7 +445,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-15  ·  sonnet  ·  IMPORTANT  ·  ~1.5 h  ·  rank 53
 
 ```
-TASK T-E6-15 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.5 h — judged IMPORTANT — rank 53/231
+TASK T-E6-15 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend claude-sonnet — effort ~1.5 h — judged IMPORTANT — rank 53/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1128, 62 lines — read the whole section first):
   E6-15 — IMPORTANT — Cross-site WebSocket hijacking: a cookie-authenticated `/v1/stream` handshake from a foreign Origin is accepted and serves the victim's ledger, while the same cookie and Origin are refused on `POST /v1/events`
@@ -446,7 +466,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-16  ·  sonnet  ·  IMPORTANT  ·  ~1.5 h  ·  rank 54
 
 ```
-TASK T-E6-16 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.5 h — judged IMPORTANT — rank 54/231
+TASK T-E6-16 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend claude-sonnet — effort ~1.5 h — judged IMPORTANT — rank 54/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1191, 49 lines — read the whole section first):
   E6-16 — IMPORTANT — An MCP token can approve a new device code, so one token mints a successor that survives its own revocation; the consent page's "It lasts until you revoke it" is false, and the same token mints admin invitations
@@ -467,7 +487,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-18  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 76
 
 ```
-TASK T-E6-18 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 76/231
+TASK T-E6-18 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 76/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1279, 73 lines — read the whole section first):
   E6-18 — IMPORTANT — One byte (U+0000) answers 500 through twenty-three parameters on nineteen doors — every raw id parameter, the founding name, the invite address, the ticket payload strings — commits a batch's earlier claims while reporting failure for all, and becomes a poison claim the offline outbox retries forever; the doors that refine or hash their input first answer 400/404
@@ -488,7 +508,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-21  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 112
 
 ```
-TASK T-E6-21 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 112/231
+TASK T-E6-21 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 112/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1419, 52 lines — read the whole section first):
   E6-21 — IMPORTANT — A member or guest cannot leave a workspace: the gate refuses a self-revocation, no route or control offers it, the export's privacy copy promises it, and the product's own CSRF exclusion of the invite-accept door rests on "a workspace they can leave"
@@ -509,7 +529,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-9  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 113
 
 ```
-TASK T-E6-9 — batch B01 (Server doors — security and refusal shape) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 113/231
+TASK T-E6-9 — batch B01 (Server doors — security and refusal shape) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 113/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:849, 45 lines — read the whole section first):
   E6-9 — IMPORTANT — The members page's invite form offers three channels; the door refuses two of them, and the one it accepts is not offered
@@ -527,7 +547,7 @@ COMMIT: `E6-9: <one line>` + body (test name / sentence fixed) + Co-Authored-By 
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B02 — Account page, workflow-builder draft, identity — both Criticals  ·  lane UX  ·  session model **sonnet**  ·  9 tasks  ·  ~7.3 h
+### B02 — Account page, workflow-builder draft, identity — both Criticals  ·  lane UX  ·  session model **sonnet**  ·  backend **claude-sonnet (deepseek-capable tasks may be split out to a DeepSeek session)**  ·  9 tasks  ·  ~7.3 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b02-account-page-workflow-builder-dr` · packages touched: @gisik-nokma/app-core, @gisik-nokma/web.
 
@@ -546,7 +566,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b02-account-
 #### T-E5-13  ·  sonnet  ·  CRITICAL  ·  ~2 h  ·  rank 24
 
 ```
-TASK T-E5-13 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~2 h — judged CRITICAL — rank 24/231
+TASK T-E5-13 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend claude-sonnet — effort ~2 h — judged CRITICAL — rank 24/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:590, 53 lines — read the whole section first):
   E5-13 — CRITICAL · After a failed preferences read, `/account` paints all five notifications ON and one toggle PUTs a whole document built from that guess — silently overwriting whatever the person had muted `[BROWSER, reproduced with zero server writes]` `[SOURCE]` (verifies exec 2 §2e's "two account sections with no error prop", and goes further)
@@ -567,7 +587,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-41  ·  sonnet  ·  CRITICAL  ·  ~2 h  ·  rank 25
 
 ```
-TASK T-E5-41 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~2 h — judged CRITICAL — rank 25/231
+TASK T-E5-41 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend claude-sonnet — effort ~2 h — judged CRITICAL — rank 25/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1485, 36 lines — read the whole section first):
   E5-41 — CRITICAL · An unpublished workflow draft — every state, arrow and rule — is discarded by any navigation, silently: no unsaved marker, no leave guard, no persistence; the manual warns only that box POSITIONS are "for this session only" `[SOURCE]`
@@ -588,7 +608,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-23  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 28
 
 ```
-TASK T-E2-23 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 28/231
+TASK T-E2-23 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 28/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1452, 29 lines — read the whole section first):
   E2-23 (r2) — IMPORTANT · "You have no passkeys yet." is asserted over a read that failed
@@ -609,7 +629,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-24  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 29
 
 ```
-TASK T-E2-24 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 29/231
+TASK T-E2-24 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 29/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1482, 41 lines — read the whole section first):
   E2-24 (r2) — IMPORTANT · A notification preference can end up showing a state the server never recorded, and no account section can say so
@@ -630,7 +650,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-18  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 64
 
 ```
-TASK T-E4-18 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 64/231
+TASK T-E4-18 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 64/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:318, 12 lines — read the whole section first):
   E4-18 — **IMPORTANT** — The Assignee picker renders a BLANK 13-px option for a member with no display name — the same member the visibility picker labels by ULID (E4-6), and this time the recorded rule is broken rather than stretched
@@ -651,7 +671,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-37  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 70
 
 ```
-TASK T-E5-37 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 70/231
+TASK T-E5-37 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 70/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1343, 39 lines — read the whole section first):
   E5-37 — IMPORTANT · For every email sign-up the shell does not know who you are: "Workspaces — ", an empty menu header, a "?" monogram, and the accessible names "Account menu for " and "Sign out " — the shared hook's `??` never fires on `''`, a defect the consent page found by driving the flow, recorded "for its owner", and patched only locally `[SOURCE]`
@@ -672,7 +692,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-4  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 71
 
 ```
-TASK T-E5-4 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 71/231
+TASK T-E5-4 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 71/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:310, 40 lines — read the whole section first):
   E5-4 — IMPORTANT · Every email sign-up is a BLANK row in the assignee picker, the @mention list and the Filters sheet — the members page fixed this for itself and left four sibling sites `[BROWSER]` `[SOURCE]`
@@ -693,7 +713,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-19  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 95
 
 ```
-TASK T-E5-19 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~0.6 h — judged MINOR — rank 95/231
+TASK T-E5-19 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 95/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:795, 20 lines — read the whole section first):
   E5-19 — MINOR · "Save name" says nothing on success, and a refusal without a message is reported as success `[SOURCE]`
@@ -714,7 +734,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V2  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 116
 
 ```
-TASK T-V2 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 116/231
+TASK T-V2 — batch B02 (Account page, workflow-builder draft, identity — both Criticals) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 116/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:747, 26 lines — read the whole section first):
   V2 — CRITICAL · A failed pending-list re-read destroys a one-time invitation URL that cannot be recovered
@@ -732,7 +752,7 @@ COMMIT: `V2: <one line>` + body (test name / sentence fixed) + Co-Authored-By li
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B03 — Accessible names and roles  ·  lane UI  ·  session model **haiku**  ·  10 tasks  ·  ~3.2 h
+### B03 — Accessible names and roles  ·  lane UI  ·  session model **haiku**  ·  backend **deepseek**  ·  10 tasks  ·  ~3.2 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b03-accessible-names-and-roles` · packages touched: @gisik-nokma/editor, @gisik-nokma/web.
 
@@ -752,7 +772,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b03-accessib
 #### T-E4-4  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 1
 
 ```
-TASK T-E4-4 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 1/231
+TASK T-E4-4 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 1/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/editor
 FINDING (exec4, docs/lanes/review-ui-exec4.md:135, 13 lines — read the whole section first):
   E4-4 — **IMPORTANT** — The description editor and the comment composer are `role="textbox"` elements with NO accessible name; the description row's visible label is the raw field id `description`
@@ -773,7 +793,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-5  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 2
 
 ```
-TASK T-E4-5 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 2/231
+TASK T-E4-5 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 2/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec4, docs/lanes/review-ui-exec4.md:149, 13 lines — read the whole section first):
   E4-5 — **IMPORTANT** — The workspace home's `<h1>` is a button, so the page's level-1 heading is named "Rename Convenience Corner"
@@ -794,7 +814,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P12  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 3
 
 ```
-TASK T-P12 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 3/231
+TASK T-P12 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 3/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:400, 23 lines — read the whole section first):
   P12 — **IMPORTANT** — Every screen in the product has the same document title
@@ -815,7 +835,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P19  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 4
 
 ```
-TASK T-P19 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 4/231
+TASK T-P19 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 4/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:547, 19 lines — read the whole section first):
   P19 — **IMPORTANT** ⚠ **r2 NEW** — The product's primary view switcher is a `role="tablist"` with NO accessible name, and the repo fixed the identical defect on the sheet's tablist
@@ -836,7 +856,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P21  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 5
 
 ```
-TASK T-P21 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 5/231
+TASK T-P21 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 5/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/editor
 FINDING (exec1, docs/lanes/review-ui-exec1.md:583, 26 lines — read the whole section first):
   P21 — **IMPORTANT** ⚠ **r2 NEW, MEASUREMENT CORRECTED TWICE BEFORE THE BOUNDARY — THE SECOND CORRECTION IS THE SUBSTANTIVE ONE** — The description editor is a `role="textbox"` with no accessible name, and its visible label is not associated with it
@@ -857,7 +877,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P22  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 6
 
 ```
-TASK T-P22 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 6/231
+TASK T-P22 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 6/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:610, 25 lines — read the whole section first):
   P22 — **IMPORTANT** ⚠ **r2 NEW** — Two `role="menu"` elements have no accessible name, and one of them has a named twin in the same product
@@ -878,7 +898,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P31  ·  haiku  ·  IMPORTANT  ·  ~0.6 h  ·  rank 7
 
 ```
-TASK T-P31 — batch B03 (Accessible names and roles) — model haiku — effort ~0.6 h — judged IMPORTANT — rank 7/231
+TASK T-P31 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.6 h — judged IMPORTANT — rank 7/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:862, 34 lines — read the whole section first):
   P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at least seven routes
@@ -899,7 +919,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-33  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 23
 
 ```
-TASK T-E4-33 — batch B03 (Accessible names and roles) — model haiku — effort ~0.4 h — judged MINOR — rank 23/231
+TASK T-E4-33 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 23/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec4, docs/lanes/review-ui-exec4.md:510, 9 lines — read the whole section first):
   E4-33 — **MINOR** — For a person with no display name — the product's default email sign-up — the shell's own labels degrade to dangling punctuation: `Workspaces — `, `Account menu for `, and a `?` avatar with an empty `title`
@@ -920,7 +940,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P13  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 26
 
 ```
-TASK T-P13 — batch B03 (Accessible names and roles) — model haiku — effort ~0.4 h — judged MINOR — rank 26/231
+TASK T-P13 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 26/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:424, 11 lines — read the whole section first):
   P13 — **MINOR** ⚠ **r2 REVISION — the WCAG 2.4.1 CLAIM IS WITHDRAWN** — no skip link; a keyboard-only user Tabs the nav on every navigation
@@ -941,7 +961,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V6  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 27
 
 ```
-TASK T-V6 — batch B03 (Accessible names and roles) — model haiku — effort ~0.4 h — judged MINOR — rank 27/231
+TASK T-V6 — batch B03 (Accessible names and roles) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 27/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:849, 17 lines — read the whole section first):
   V6 — MINOR · Five tab-loading arms on the project page carry no role, in a file that uses one three times
@@ -959,7 +979,7 @@ COMMIT: `V6: <one line>` + body (test name / sentence fixed) + Co-Authored-By li
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B04 — The help corpus and the small copy fixes  ·  lane UI  ·  session model **haiku**  ·  27 tasks  ·  ~5.2 h
+### B04 — The help corpus and the small copy fixes  ·  lane UI  ·  session model **haiku**  ·  backend **deepseek**  ·  27 tasks  ·  ~5.2 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b04-the-help-corpus-and-the-small-co` · packages touched: @gisik-nokma/app-core, @gisik-nokma/editor, @gisik-nokma/web.
 
@@ -996,7 +1016,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b04-the-help
 #### T-E5-1  ·  haiku  ·  IMPORTANT  ·  ~0.5 h  ·  rank 8
 
 ```
-TASK T-E5-1 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.5 h — judged IMPORTANT — rank 8/231
+TASK T-E5-1 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.5 h — judged IMPORTANT — rank 8/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:209, 32 lines — read the whole section first):
   E5-1 — IMPORTANT · The help says "there is no dragging on the board"; every card is draggable and carries move arrows `[BROWSER]` `[SOURCE]`
@@ -1017,7 +1037,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-24  ·  haiku  ·  IMPORTANT  ·  ~0.5 h  ·  rank 9
 
 ```
-TASK T-E5-24 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.5 h — judged IMPORTANT — rank 9/231
+TASK T-E5-24 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.5 h — judged IMPORTANT — rank 9/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:952, 27 lines — read the whole section first):
   E5-24 — IMPORTANT · Five more passages of the help describe a product that no longer exists — "no change role", "you cannot rename a job", "you cannot delete a job", "you cannot see what [visibility] is currently set to" `[BROWSER]` `[SOURCE]` — sibling of `exec2-F1`, none of its eight rows
@@ -1038,7 +1058,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-1  ·  haiku  ·  IMPORTANT  ·  ~0.5 h  ·  rank 10
 
 ```
-TASK T-E6-1 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.5 h — judged IMPORTANT — rank 10/231
+TASK T-E6-1 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.5 h — judged IMPORTANT — rank 10/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:336, 59 lines — read the whole section first):
   E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
@@ -1059,7 +1079,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F1-ux  ·  haiku  ·  IMPORTANT  ·  ~0.5 h  ·  rank 11
 
 ```
-TASK T-F1-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.5 h — judged IMPORTANT — rank 11/231
+TASK T-F1-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.5 h — judged IMPORTANT — rank 11/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:303, 97 lines — read the whole section first):
   F1 — IMPORTANT · The in-app help describes a product that no longer exists, in at least six places
@@ -1078,7 +1098,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-55  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 12
 
 ```
-TASK T-E2-55 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.25 h — judged MINOR — rank 12/231
+TASK T-E2-55 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 12/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:4043, 60 lines — read the whole section first):
   E2-55 (r2) — IMPORTANT · The FAQ and the manual both say the 200-entry history cap is disclosed *"at the top"*; the product renders the notice **after** the list, and the copy's own purpose is to stop a person believing they saw the whole history
@@ -1099,7 +1119,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-38  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 18
 
 ```
-TASK T-E5-38 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.25 h — judged MINOR — rank 18/231
+TASK T-E5-38 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 18/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1383, 38 lines — read the whole section first):
   E5-38 — MINOR · The sign-in page binds agreement to a Privacy notice that reads "Operated by [ENTITY NAME] · Governed by the laws of [JURISDICTION] … write to [CONTACT EMAIL]" — ten placeholders at paint — while the recorded choice says the page must not announce its own unreliability `[BROWSER, devtools isolated context]` `[SOURCE]` — category 2, argued
@@ -1120,7 +1140,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F5-ux  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 19
 
 ```
-TASK T-F5-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.25 h — judged MINOR — rank 19/231
+TASK T-F5-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 19/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:546, 44 lines — read the whole section first):
   F5 — MINOR · The founding flow lands a new owner on a page of four negatives; the prototype lands on the list with a confirmation
@@ -1139,7 +1159,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F8-ux  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 20
 
 ```
-TASK T-F8-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.25 h — judged MINOR — rank 20/231
+TASK T-F8-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 20/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:659, 23 lines — read the whole section first):
   F8 — MINOR · A recorded self-test count is stale, in the block that documents the freshness gate
@@ -1158,7 +1178,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-25  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 205
 
 ```
-TASK T-E2-25 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 205/231
+TASK T-E2-25 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 205/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1524, 56 lines — read the whole section first):
   E2-25 (r2) — IMPORTANT · Five components written for offline and degraded states reach no screen, and the two shells that do show those states hand-copy them
@@ -1179,7 +1199,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-27  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 206
 
 ```
-TASK T-E2-27 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 206/231
+TASK T-E2-27 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 206/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1609, 40 lines — read the whole section first):
   E2-27 (r2) — MINOR · An unrecognised sync status is reported as "Live", the healthiest word available
@@ -1200,7 +1220,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-36  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 209
 
 ```
-TASK T-E2-36 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 209/231
+TASK T-E2-36 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 209/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2100, 44 lines — read the whole section first):
   E2-36 (r2) — MINOR · A partly committed Move batch never reloads, so the sheet behind the refusal shows state the server no longer has
@@ -1221,7 +1241,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-47  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 210
 
 ```
-TASK T-E2-47 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 210/231
+TASK T-E2-47 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 210/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/editor
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3388, 58 lines — read the whole section first):
   E2-47 (r2) — MINOR · The ticket sheet's own symbol sweep names three unwired exports and misses a fourth, whose docblock hands its correctness gap to a caller that does not exist
@@ -1242,7 +1262,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-54  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 212
 
 ```
-TASK T-E2-54 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 212/231
+TASK T-E2-54 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 212/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3814, 59 lines — read the whole section first):
   E2-54 (r2) — MINOR · `shell-refusal.tsx` says "`SERVING_GAPS` is empty — so NO read in this shell refuses for a serving reason"; the register's own docblock says emptiness means no such thing, and `getTickets` still refuses
@@ -1263,7 +1283,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-29  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 214
 
 ```
-TASK T-E4-29 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 214/231
+TASK T-E4-29 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 214/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:459, 12 lines — read the whole section first):
   E4-29 — **MINOR** — The ticket-type editor's validation list paints Zod's own message, verbatim and without the field it refers to: *"String must contain at least 1 character(s)"*, twice, for an empty form
@@ -1284,7 +1304,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-34  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 215
 
 ```
-TASK T-E4-34 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 215/231
+TASK T-E4-34 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 215/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:520, 10 lines — read the whole section first):
   E4-34 — **MINOR** — A guest who *"can look, not touch"* is offered five rows whose accessible name is `Edit <type>`
@@ -1305,7 +1325,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-6  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 216
 
 ```
-TASK T-E4-6 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 216/231
+TASK T-E4-6 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 216/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:163, 12 lines — read the whole section first):
   E4-6 — **MINOR** — The visibility editor's people picker labels a member by a 26-character ULID
@@ -1326,7 +1346,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-12  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 217
 
 ```
-TASK T-E5-12 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 217/231
+TASK T-E5-12 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 217/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:570, 19 lines — read the whole section first):
   E5-12 — MINOR · The same workspace is "1 project" on `/workspaces` and "2 projects" on `/account` `[BROWSER]` `[SOURCE]`
@@ -1347,7 +1367,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-14  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 218
 
 ```
-TASK T-E5-14 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 218/231
+TASK T-E5-14 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 218/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:644, 26 lines — read the whole section first):
   E5-14 — MINOR · Ten reorder arrows, all disabled, the reason only in a hover `title`; and the shipped seed already carries the rank tie the arrows exist to prevent `[BROWSER]` `[SOURCE]`
@@ -1368,7 +1388,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-17  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 219
 
 ```
-TASK T-E5-17 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 219/231
+TASK T-E5-17 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 219/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:740, 27 lines — read the whole section first):
   E5-17 — MINOR · `/mcp/tokens` is a chrome-less orphan: no app nav, nothing links to it, and its own docblock says it is a Settings tab it left two rounds ago `[BROWSER]` `[SOURCE]`
@@ -1389,7 +1409,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-22  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 220
 
 ```
-TASK T-E5-22 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 220/231
+TASK T-E5-22 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 220/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:902, 23 lines — read the whole section first):
   E5-22 — MINOR · "Add subtask" never says what it will file: under an Epic it silently births a Task (skipping Story); the fallback rule is flagged "for a ruling" and unruled `[BROWSER]` `[SOURCE]`
@@ -1410,7 +1430,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-29  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 221
 
 ```
-TASK T-E5-29 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 221/231
+TASK T-E5-29 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 221/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1117, 21 lines — read the whole section first):
   E5-29 — MINOR · The state-mapping dialog says "Publishing cannot see which tickets sit in which state" directly above rows that say "3 tickets sit here today" `[SOURCE]`
@@ -1431,7 +1451,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-33  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 222
 
 ```
-TASK T-E5-33 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 222/231
+TASK T-E5-33 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 222/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1234, 23 lines — read the whole section first):
   E5-33 — MINOR · Pressing "Send magic link" with nothing typed makes a server round trip and paints the validator's own path — "[body.email] Invalid email address" `[BROWSER, devtools isolated context, 390 px]` `[SOURCE]`
@@ -1452,7 +1472,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-35  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 223
 
 ```
-TASK T-E5-35 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 223/231
+TASK T-E5-35 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 223/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1287, 28 lines — read the whole section first):
   E5-35 — MINOR · No inbox row says WHEN — `createdAt` is on every notification and rendered nowhere — and the two rows that could name their ticket do not: the mention drops a `ticketTitle` it carries, the contested claim has none and prints a rule slug `[SOURCE]` — category 3 (recorded as "render-only", unruled)
@@ -1473,7 +1493,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-36  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 224
 
 ```
-TASK T-E5-36 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 224/231
+TASK T-E5-36 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 224/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1316, 26 lines — read the whole section first):
   E5-36 — MINOR · A workspace with no projects has no empty-project sentence on its `/workspaces` card — the owner's own gap list names this (`workspaces-gap.md` item 12) and it is still open `[SOURCE]` — FIRST-RUN
@@ -1494,7 +1514,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-39  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 225
 
 ```
-TASK T-E5-39 — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 225/231
+TASK T-E5-39 — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 225/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1422, 26 lines — read the whole section first):
   E5-39 — MINOR · "Version history" lists v1…vN with no date and no author — the ledger records both on every `workflow.defined`, the read serves neither `[SOURCE]` — wire-limited, unruled
@@ -1515,7 +1535,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F6-ux  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 226
 
 ```
-TASK T-F6-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 226/231
+TASK T-F6-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 226/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:591, 32 lines — read the whole section first):
   F6 — MINOR · A docblock states an absolute that the same card falsifies four lines later
@@ -1534,7 +1554,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F7-ux  ·  haiku  ·  MINOR  ·  ~0.3 h  ·  rank 227
 
 ```
-TASK T-F7-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — effort ~0.3 h — judged MINOR — rank 227/231
+TASK T-F7-ux — batch B04 (The help corpus and the small copy fixes) — model haiku — backend deepseek — effort ~0.3 h — judged MINOR — rank 227/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:624, 34 lines — read the whole section first):
   F7 — MINOR · The epic group count diverges from the prototype, and the divergence is declared but not ruled
@@ -1550,7 +1570,7 @@ COMMIT: `F7: <one line>` + body (test name / sentence fixed) + Co-Authored-By li
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B05 — Keyboard, focus and dialog containment  ·  lane UI  ·  session model **sonnet**  ·  6 tasks  ·  ~4.5 h
+### B05 — Keyboard, focus and dialog containment  ·  lane UI  ·  session model **sonnet**  ·  backend **deepseek**  ·  6 tasks  ·  ~4.5 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b05-keyboard-focus-and-dialog-contai` · packages touched: @gisik-nokma/ui.
 
@@ -1566,7 +1586,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b05-keyboard
 #### T-E4-17  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 30
 
 ```
-TASK T-E4-17 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 30/231
+TASK T-E4-17 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 30/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:302, 15 lines — read the whole section first):
   E4-17 — **IMPORTANT** — Both keyboard close paths of the shared `Select` that I drove — Escape, and Enter to pick — end with focus dropped to `<body>`
@@ -1587,7 +1607,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-21  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 31
 
 ```
-TASK T-E4-21 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 31/231
+TASK T-E4-21 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 31/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:359, 10 lines — read the whole section first):
   E4-21 — **IMPORTANT** — The searchable `Select` (New-ticket *Type* and *Parent*, the type editor's *Workflow*) has no visible focus indicator: the rule that suppresses the input's outline has no replacement
@@ -1608,7 +1628,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P18  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 37
 
 ```
-TASK T-P18 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 37/231
+TASK T-P18 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 37/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:527, 19 lines — read the whole section first):
   P18 — **IMPORTANT** ⚠ **r2 NEW** — A client-side navigation announces nothing: no title change, no focus move, no live region
@@ -1629,7 +1649,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P23  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 38
 
 ```
-TASK T-P23 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 38/231
+TASK T-P23 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 38/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:636, 21 lines — read the whole section first):
   P23 — **IMPORTANT** ⚠ **r2 NEW** — The searchable Select's input has its focus outline REMOVED and nothing replaces it, so the control has no visible focus indicator
@@ -1650,7 +1670,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P9  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 41
 
 ```
-TASK T-P9 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 41/231
+TASK T-P9 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 41/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec1, docs/lanes/review-ui-exec1.md:271, 15 lines — read the whole section first):
   P9 — **IMPORTANT** — `SegmentedControl` carries full ARIA tab semantics and implements none of the tab keyboard model
@@ -1671,7 +1691,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P8  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 79
 
 ```
-TASK T-P8 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 79/231
+TASK T-P8 — batch B05 (Keyboard, focus and dialog containment) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 79/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec1, docs/lanes/review-ui-exec1.md:239, 31 lines — read the whole section first):
   P8 — **MINOR (product) / IMPORTANT (follow-on)** ⚠ **r2 REVISION** — `Dialog` and `Sheet` declare `aria-modal="true"`, and the missing containment is RECORDED as a named follow-on that the remedy already exists for
@@ -1689,7 +1709,7 @@ COMMIT: `P8: <one line>` + body (test name / sentence fixed) + Co-Authored-By li
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B06 — New-ticket and Move dialogs  ·  lane UX  ·  session model **sonnet**  ·  12 tasks  ·  ~7.4 h
+### B06 — New-ticket and Move dialogs  ·  lane UX  ·  session model **sonnet**  ·  backend **deepseek**  ·  12 tasks  ·  ~7.4 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b06-new-ticket-and-move-dialogs` · packages touched: @gisik-nokma/app-core, @gisik-nokma/domain, @gisik-nokma/rule-engine, @gisik-nokma/ui.
 
@@ -1711,7 +1731,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b06-new-tick
 #### T-E2-21  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 58
 
 ```
-TASK T-E2-21 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 58/231
+TASK T-E2-21 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 58/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1328, 40 lines — read the whole section first):
   E2-21 (r2) — IMPORTANT · A rejected type migration destroys the mapping the admin just authored AND disables the control that would let them retry
@@ -1732,7 +1752,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-40  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 61
 
 ```
-TASK T-E2-40 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 61/231
+TASK T-E2-40 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 61/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2286, 54 lines — read the whole section first):
   E2-40 (r2) — IMPORTANT · A `require-field` move previews as refused for ever, even after the person fills the field its own dialog asked for
@@ -1753,7 +1773,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-7  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 74
 
 ```
-TASK T-E5-7 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 74/231
+TASK T-E5-7 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 74/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:406, 36 lines — read the whole section first):
   E5-7 — IMPORTANT · With a comment typed and Move enabled, the dialog still says *"none was provided"* — the exact defect the file records as fixed for `require-evidence`, unfixed for `require-comment` `[BROWSER]` `[SOURCE]`
@@ -1774,7 +1794,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V10  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 80
 
 ```
-TASK T-V10 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 80/231
+TASK T-V10 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 80/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:978, 38 lines — read the whole section first):
   V10 — CRITICAL · "Create" has no re-entrancy guard, and each call mints a fresh id: a double press files two tickets
@@ -1795,7 +1815,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-16  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 102
 
 ```
-TASK T-E5-16 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 102/231
+TASK T-E5-16 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 102/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec5, docs/lanes/review-ux-exec5.md:702, 37 lines — read the whole section first):
   E5-16 — IMPORTANT · "New ticket" pre-selects **Epic** — the top of the hierarchy — and a mis-filed type cannot be changed afterwards; the export pre-selects the everyday type `[BROWSER]` `[SOURCE]` — category 3
@@ -1816,7 +1836,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-20  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 104
 
 ```
-TASK T-E5-20 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 104/231
+TASK T-E5-20 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 104/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec5, docs/lanes/review-ux-exec5.md:816, 40 lines — read the whole section first):
   E5-20 — IMPORTANT · One Escape in the Move dialog closes the ticket sheet under it — the `Sheet`'s own guard says a child must `preventDefault()`, and its sibling `Dialog` does not `[SOURCE]` `[BROWSER: the stacked pair observed]` (verifies exec 2 §2e's "two `aria-modal` dialogs … one Escape closing both", unmeasured there)
@@ -1837,7 +1857,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-9  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 111
 
 ```
-TASK T-E5-9 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 111/231
+TASK T-E5-9 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 111/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:473, 40 lines — read the whole section first):
   E5-9 — IMPORTANT · A refused Delete answers five screens above the button that was pressed `[BROWSER]` `[SOURCE]` — and this is the measured consequence the ruling on "offered to everyone" did not weigh
@@ -1858,7 +1878,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V8  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 119
 
 ```
-TASK T-V8 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 119/231
+TASK T-V8 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 119/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:917, 34 lines — read the whole section first):
   V8 — IMPORTANT · Opening any parent ticket raises a false "this list is not shown rather than shown short" alert
@@ -1879,7 +1899,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-22  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 120
 
 ```
-TASK T-E2-22 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~0.6 h — judged MINOR — rank 120/231
+TASK T-E2-22 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 120/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1369, 27 lines — read the whole section first):
   E2-22 (r2) — MINOR · The state-mapping dialog is unmounted by the act of submitting, so a refusal costs the admin the mapping
@@ -1900,7 +1920,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-33  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 139
 
 ```
-TASK T-E2-33 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~0.6 h — judged MINOR — rank 139/231
+TASK T-E2-33 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 139/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1889, 88 lines — read the whole section first):
   E2-33 (r2) — IMPORTANT · Three dialogs seed a choice once from a prop and guard it by emptiness rather than membership, so a later prop change leaves the screen and the payload disagreeing
@@ -1921,7 +1941,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-34  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 140
 
 ```
-TASK T-E2-34 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~0.6 h — judged MINOR — rank 140/231
+TASK T-E2-34 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 140/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1978, 54 lines — read the whole section first):
   E2-34 (r2) — MINOR · Two `aria-modal` dialogs open at once, and one Escape press closes both
@@ -1942,7 +1962,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-37  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 141
 
 ```
-TASK T-E2-37 — batch B06 (New-ticket and Move dialogs) — model sonnet — effort ~0.6 h — judged MINOR — rank 141/231
+TASK T-E2-37 — batch B06 (New-ticket and Move dialogs) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 141/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2145, 25 lines — read the whole section first):
   E2-37 (r2) — MINOR · The New-ticket draft survives its own close, so reopening offers the last ticket's title with Create enabled
@@ -1960,7 +1980,7 @@ COMMIT: `E2-37: <one line>` + body (test name / sentence fixed) + Co-Authored-By
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B07 — Soft-delete integrity — engine, replica, list  ·  lane FUNC  ·  session model **opus**  ·  7 tasks  ·  ~6.4 h  ·  ⛔ RELEASE CUT AFTER THIS BATCH
+### B07 — Soft-delete integrity — engine, replica, list  ·  lane FUNC  ·  session model **opus**  ·  backend **claude-opus (deepseek-capable tasks may be split out to a DeepSeek session)**  ·  7 tasks  ·  ~6.4 h  ·  ⛔ RELEASE CUT AFTER THIS BATCH
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b07-soft-delete-integrity-engine-rep` · packages touched: @gisik-nokma/app-core, @gisik-nokma/rule-engine, @gisik-nokma/server.
 
@@ -1977,7 +1997,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b07-soft-del
 #### T-E6-24  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 77
 
 ```
-TASK T-E6-24 — batch B07 (Soft-delete integrity — engine, replica, list) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 77/231
+TASK T-E6-24 — batch B07 (Soft-delete integrity — engine, replica, list) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 77/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1545, 97 lines — read the whole section first):
   E6-24 — IMPORTANT — The phone's board and the desktop's ticket list keep showing a soft-deleted ticket, and the phone's offline search still finds it: the Delete commit put its replica filter on the two reads those shells never call and on none of the three they do
@@ -1998,7 +2018,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-2  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 90
 
 ```
-TASK T-E6-2 — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — effort ~1.75 h — judged IMPORTANT — rank 90/231
+TASK T-E6-2 — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 90/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:396, 104 lines — read the whole section first):
   E6-2 — IMPORTANT — The ingest door accepts every ordinary write against an already soft-deleted ticket, and `ticket.assigned` on one manufactures an inbox notification that points at a 404
@@ -2019,7 +2039,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-4  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 91
 
 ```
-TASK T-E6-4 — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — effort ~1.75 h — judged IMPORTANT — rank 91/231
+TASK T-E6-4 — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 91/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:560, 66 lines — read the whole section first):
   E6-4 — IMPORTANT — A soft-deleted open child blocks its parent's close with a refusal about a child no view can show; and new children can be created under, or moved to, a soft-deleted parent
@@ -2040,7 +2060,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F2-fn  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 92
 
 ```
-TASK T-F2-fn — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — effort ~1.75 h — judged IMPORTANT — rank 92/231
+TASK T-F2-fn — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 92/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:200, 53 lines — read the whole section first):
   F2 — IMPORTANT — A recorded survivor measurement's stated warrant is false: the second witness read a stale `dist`
@@ -2061,7 +2081,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F4-fn  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 93
 
 ```
-TASK T-F4-fn — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — effort ~1.75 h — judged IMPORTANT — rank 93/231
+TASK T-F4-fn — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 93/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:309, 30 lines — read the whole section first):
   F4 — MEDIUM — `routes/my-work.ts:364`, the contested-claim title gate, is a confirmed open gap
@@ -2082,7 +2102,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F5-fn  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 94
 
 ```
-TASK T-F5-fn — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — effort ~1.75 h — judged IMPORTANT — rank 94/231
+TASK T-F5-fn — batch B07 (Soft-delete integrity — engine, replica, list) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 94/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:340, 26 lines — read the whole section first):
   F5 — MEDIUM — The replica's two TypeScript gates are confirmed open gaps, and the table's citations for them have rotted
@@ -2103,7 +2123,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-11  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 123
 
 ```
-TASK T-E6-11 — batch B07 (Soft-delete integrity — engine, replica, list) — model sonnet — effort ~0.6 h — judged MINOR — rank 123/231
+TASK T-E6-11 — batch B07 (Soft-delete integrity — engine, replica, list) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 123/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:946, 49 lines — read the whole section first):
   E6-11 — MINOR — The list serves a soft-deleted epic's title as a group header; the detail door withholds the same title as "the deleted ticket's content" — both decisions landed in the same commit, one as a ruling and one as a deferral
@@ -2121,7 +2141,7 @@ COMMIT: `E6-11: <one line>` + body (test name / sentence fixed) + Co-Authored-By
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B08 — Ticket sheet — crumbs, history, comments, Move/Publish arms  ·  lane UX  ·  session model **sonnet**  ·  14 tasks  ·  ~9.7 h
+### B08 — Ticket sheet — crumbs, history, comments, Move/Publish arms  ·  lane UX  ·  session model **sonnet**  ·  backend **deepseek**  ·  14 tasks  ·  ~9.7 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b08-ticket-sheet-crumbs-history-comm` · packages touched: @gisik-nokma/app-core, @gisik-nokma/editor, @gisik-nokma/server, @gisik-nokma/ui, @gisik-nokma/web.
 
@@ -2145,7 +2165,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b08-ticket-s
 #### T-E2-29  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 59
 
 ```
-TASK T-E2-29 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 59/231
+TASK T-E2-29 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 59/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1713, 47 lines — read the whole section first):
   E2-29 (r2) — IMPORTANT · A dropped connection during a Move produces nothing at all, and the Move control has no in-flight state
@@ -2166,7 +2186,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-46  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 63
 
 ```
-TASK T-E2-46 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 63/231
+TASK T-E2-46 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 63/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/editor
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3334, 51 lines — read the whole section first):
   E2-46 (r2) — IMPORTANT · A typed `[text](url)` becomes markup with no escape suggestion, where every other formatting trigger offers one — a hole in §2's named property that my own change opened
@@ -2187,7 +2207,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-19  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 65
 
 ```
-TASK T-E4-19 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 65/231
+TASK T-E4-19 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 65/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:331, 14 lines — read the whole section first):
   E4-19 — **IMPORTANT** — The History tab's headline is the raw event-type slug — `ticket.field_set` three times in a row with nothing saying which field — where the prototype writes a sentence and the wire carries the payload the sentence needs
@@ -2208,7 +2228,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-27  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 68
 
 ```
-TASK T-E5-27 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 68/231
+TASK T-E5-27 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 68/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1049, 33 lines — read the whole section first):
   E5-27 — IMPORTANT · A Move that fails in transport is silence — no sentence, no latch, the dialog stays open — while Close, Reopen and Delete on the same sheet have both; the sheet's own comment records the gap and hands the dialog `transportError={null}` `[SOURCE]` (verifies exec 2 §2d's "a transport failure during a Move has no surface at all", unmeasured there)
@@ -2229,7 +2249,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-28  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 69
 
 ```
-TASK T-E5-28 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 69/231
+TASK T-E5-28 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 69/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1083, 33 lines — read the whole section first):
   E5-28 — IMPORTANT · A dropped connection during Publish leaves the workflow builder's Publish button disabled for ever with no sentence; a refusal discards the state mapping the person just built `[SOURCE]` (verifies exec 2 §2e's "state-mapping dialog unmounted before the server answers", and goes further)
@@ -2250,7 +2270,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-8  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 75
 
 ```
-TASK T-E5-8 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 75/231
+TASK T-E5-8 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 75/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:443, 29 lines — read the whole section first):
   E5-8 — IMPORTANT · The History tab prints raw event names — `ticket.field_set` three times in a row — and never says WHAT changed; the export narrates every row `[BROWSER]` `[SOURCE]` — category 3
@@ -2271,7 +2291,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F3-ux  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 78
 
 ```
-TASK T-F3-ux — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 78/231
+TASK T-F3-ux — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 78/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:442, 53 lines — read the whole section first):
   F3 — IMPORTANT · A comment renders as plain text while the composer offers marks it discards; a link's destination is unrecoverable
@@ -2290,7 +2310,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V4  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 81
 
 ```
-TASK T-V4 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 81/231
+TASK T-V4 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 81/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:800, 24 lines — read the whole section first):
   V4 — IMPORTANT · The comment thread reports a still-loading read as "Comments · 0" and "No comments yet."
@@ -2311,7 +2331,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V7  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 82
 
 ```
-TASK T-V7 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 82/231
+TASK T-V7 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 82/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:876, 40 lines — read the whole section first):
   V7 — IMPORTANT · A comment the server REFUSES costs the author the words they just wrote
@@ -2332,7 +2352,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-1  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 99
 
 ```
-TASK T-E4-1 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 99/231
+TASK T-E4-1 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 99/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec4, docs/lanes/review-ui-exec4.md:87, 15 lines — read the whole section first):
   E4-1 — **IMPORTANT** — The ticket sheet's breadcrumb renders the SAME ancestor twice whenever the direct parent is an epic — which is 23 of the 26 tickets in the seeded project
@@ -2353,7 +2373,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-30  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 100
 
 ```
-TASK T-E4-30 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 100/231
+TASK T-E4-30 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 100/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:472, 14 lines — read the whole section first):
   E4-30 — **IMPORTANT** — The sheet's ancestor crumbs are links painted in exactly the ink of the non-link crumbs beside them, on the strength of a docblock that says the prototype does the same — and the prototype's stylesheet says the opposite
@@ -2374,7 +2394,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-3  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 106
 
 ```
-TASK T-E5-3 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 106/231
+TASK T-E5-3 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 106/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:279, 30 lines — read the whole section first):
   E5-3 — IMPORTANT · A ticket directly under an epic reads `Epic › Epic › KEY` — the crumb states a four-deep chain the product does not have `[BROWSER]` `[SOURCE]`
@@ -2395,7 +2415,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P3  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 151
 
 ```
-TASK T-P3 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~0.6 h — judged MINOR — rank 151/231
+TASK T-P3 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 151/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec1, docs/lanes/review-ui-exec1.md:320, 16 lines — read the whole section first):
   P3 — **MINOR** — The parent crumb cannot show the parent's key; the prototype's does, and no ruling records the difference
@@ -2416,7 +2436,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P4  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 153
 
 ```
-TASK T-P4 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — effort ~0.6 h — judged MINOR — rank 153/231
+TASK T-P4 — batch B08 (Ticket sheet — crumbs, history, comments, Move/Publish arms) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 153/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec1, docs/lanes/review-ui-exec1.md:337, 11 lines — read the whole section first):
   P4 — **MINOR** — "the SAME plain span" is not the same span
@@ -2434,7 +2454,7 @@ COMMIT: `P4: <one line>` + body (test name / sentence fixed) + Co-Authored-By li
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B09 — Failure states on the web — reads and writes that speak  ·  lane UX  ·  session model **sonnet**  ·  15 tasks  ·  ~9.7 h
+### B09 — Failure states on the web — reads and writes that speak  ·  lane UX  ·  session model **sonnet**  ·  backend **deepseek**  ·  15 tasks  ·  ~9.7 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b09-failure-states-on-the-web-reads-` · packages touched: @gisik-nokma/app-core, @gisik-nokma/web.
 
@@ -2459,7 +2479,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b09-failure-
 #### T-E2-20  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 57
 
 ```
-TASK T-E2-20 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 57/231
+TASK T-E2-20 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 57/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1248, 79 lines — read the whole section first):
   E2-20 (r2) — IMPORTANT · Two admin screens stay on "Loading ticket types…" forever when a read rejects, and the comment beside one of them names that exact failure for a promise it did not apply it to
@@ -2480,7 +2500,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-39  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 60
 
 ```
-TASK T-E2-39 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 60/231
+TASK T-E2-39 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 60/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2204, 79 lines — read the whole section first):
   E2-39 (r2) — IMPORTANT · A failed roster read becomes "nobody is in this workspace", and the workflow builder's own adapter calls that "the very lie"
@@ -2501,7 +2521,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-44  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 62
 
 ```
-TASK T-E2-44 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 62/231
+TASK T-E2-44 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 62/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2926, 65 lines — read the whole section first):
   E2-44 (r2) — IMPORTANT · A failed read of your connected assistants is drawn as "No assistants are connected"
@@ -2522,7 +2542,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-23  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 66
 
 ```
-TASK T-E4-23 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 66/231
+TASK T-E4-23 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 66/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:381, 14 lines — read the whole section first):
   E4-23 — **IMPORTANT** — A ticket the server answers `404` for — never existed, soft-deleted, or invisible to this viewer — opens a sheet that says **"Loading…"** forever: the client believes it is waiting while the server has already refused
@@ -2543,7 +2563,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-15  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 67
 
 ```
-TASK T-E5-15 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 67/231
+TASK T-E5-15 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 67/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:671, 30 lines — read the whole section first):
   E5-15 — IMPORTANT · A refused or failed ticket-types read leaves Settings on "Loading ticket types…" for ever — the same file's own docblock names this failure while leaving it in `[BROWSER, reproduced]` `[SOURCE]` (verifies exec 2 §2e's top Critical candidate; claimed lower)
@@ -2564,7 +2584,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-40  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 72
 
 ```
-TASK T-E5-40 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 72/231
+TASK T-E5-40 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 72/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1449, 35 lines — read the whole section first):
   E5-40 — IMPORTANT · With "Only tickets in progress" on, the Backlog tab says "Nothing in the backlog — new tickets land here" over a backlog the toggle emptied; the scope note and the manual name three tabs of five, and the file records the defect as "RECORDED, NOT FIXED" `[SOURCE]` — EMPTY that lies
@@ -2585,7 +2605,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-42  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 73
 
 ```
-TASK T-E5-42 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 73/231
+TASK T-E5-42 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 73/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1522, 34 lines — read the whole section first):
   E5-42 — IMPORTANT · A failed preferences read — or a failed save of "which columns to show" that the person just triggered — paints "The ticket list cannot be shown yet. HTTP … for /v1/me/preferences" over intact rows, on four of five tabs; the page's own comment names the hazard and fixed one consumer `[SOURCE]` — ERROR (a preference failure reported as a data failure)
@@ -2606,7 +2626,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V9  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 83
 
 ```
-TASK T-V9 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 83/231
+TASK T-V9 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 83/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:952, 25 lines — read the whole section first):
   V9 — IMPORTANT · The invite page reports a transport failure as a dead link, and sends the person to ask for a replacement
@@ -2627,7 +2647,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-10  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 101
 
 ```
-TASK T-E5-10 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 101/231
+TASK T-E5-10 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 101/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:514, 23 lines — read the whole section first):
   E5-10 — IMPORTANT · A single-row "mark read" and the bulk Undo fail SILENTLY — the exact first-version defect the bulk path's own docblock says it fixed `[SOURCE]` (verifies exec 2's §2e "single-row mark-read and its Undo failing silently", unmeasured there)
@@ -2648,7 +2668,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F4-ux  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 114
 
 ```
-TASK T-F4-ux — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 114/231
+TASK T-F4-ux — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 114/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:496, 49 lines — read the whole section first):
   F4 — IMPORTANT · The visibility editor's read-only sentence can never render in the shipped app — and states the rule wrongly
@@ -2667,7 +2687,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V3  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 117
 
 ```
-TASK T-V3 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 117/231
+TASK T-V3 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 117/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:774, 25 lines — read the whole section first):
   V3 — IMPORTANT · A rejected visibility write leaves Apply permanently disabled and silent
@@ -2688,7 +2708,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-18  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 121
 
 ```
-TASK T-E5-18 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~0.6 h — judged MINOR — rank 121/231
+TASK T-E5-18 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 121/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:768, 26 lines — read the whole section first):
   E5-18 — MINOR · The invite landing page offers Join or nothing: no Decline, no inviter, no expiry; the export draws all three — and its dead arm offers no link at all `[SOURCE]` `[BROWSER: dead arm]` — category 3, wire-limited
@@ -2709,7 +2729,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-30  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 122
 
 ```
-TASK T-E5-30 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~0.6 h — judged MINOR — rank 122/231
+TASK T-E5-30 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 122/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1139, 26 lines — read the whole section first):
   E5-30 — MINOR · The shared read-refusal panel on five routes says "… cannot be shown **yet**", appends the transport's raw string, and names no action; the workflow screens' sibling sentence names one `[SOURCE]`
@@ -2730,7 +2750,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-26  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 137
 
 ```
-TASK T-E2-26 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~0.6 h — judged MINOR — rank 137/231
+TASK T-E2-26 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 137/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1581, 27 lines — read the whole section first):
   E2-26 (r2) — MINOR · A single notification's read-state is reverted silently, where its bulk sibling speaks
@@ -2751,7 +2771,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-32  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 138
 
 ```
-TASK T-E2-32 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — effort ~0.6 h — judged MINOR — rank 138/231
+TASK T-E2-32 — batch B09 (Failure states on the web — reads and writes that speak) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 138/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1842, 42 lines — read the whole section first):
   E2-32 (r2) — MINOR · A committed move does not clear the comment, so the next move submits the previous move's words
@@ -2769,7 +2789,7 @@ COMMIT: `E2-32: <one line>` + body (test name / sentence fixed) + Co-Authored-By
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B10 — Paint — UA chrome, phone width, contrast, headings  ·  lane UI  ·  session model **haiku**  ·  27 tasks  ·  ~8.5 h
+### B10 — Paint — UA chrome, phone width, contrast, headings  ·  lane UI  ·  session model **haiku**  ·  backend **deepseek**  ·  27 tasks  ·  ~8.5 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b10-paint-ua-chrome-phone-width-cont` · packages touched: @gisik-nokma/app-core, @gisik-nokma/ui, @gisik-nokma/web.
 
@@ -2806,7 +2826,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b10-paint-ua
 #### T-E4-11  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 13
 
 ```
-TASK T-E4-11 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 13/231
+TASK T-E4-11 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 13/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec4, docs/lanes/review-ui-exec4.md:230, 13 lines — read the whole section first):
   E4-11 — **IMPORTANT** — At 390 px the signed-in shell's navigation bar is 310 px tall — 37 % of the viewport — where the only prototype drawn at that width puts navigation in a bottom tab bar
@@ -2827,7 +2847,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-13  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 14
 
 ```
-TASK T-E4-13 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 14/231
+TASK T-E4-13 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 14/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:257, 13 lines — read the whole section first):
   E4-13 — **IMPORTANT** — The New-ticket dialog's Title field is a bare `<input>` that paints as a 2-px inset user-agent box, 22 px tall, white, in a neumorphic dialog
@@ -2848,7 +2868,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-14  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 15
 
 ```
-TASK T-E4-14 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 15/231
+TASK T-E4-14 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 15/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:271, 11 lines — read the whole section first):
   E4-14 — **IMPORTANT** — The active-filter chip's remove control is an 8×13 px "×"
@@ -2869,7 +2889,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-3  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 16
 
 ```
-TASK T-E4-3 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 16/231
+TASK T-E4-3 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 16/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:119, 15 lines — read the whole section first):
   E4-3 — **IMPORTANT** — Every board card carries a 66×21 px `who · when` disclosure button that no sweep has ever measured and that no floor rule admits
@@ -2890,7 +2910,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-7  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 17
 
 ```
-TASK T-E4-7 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 17/231
+TASK T-E4-7 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 17/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:176, 13 lines — read the whole section first):
   E4-7 — **IMPORTANT** — At phone width the ticket sheet's description is clipped: the field row keeps its 8-rem label column, the editor gets 224 px of a 367-px sheet, and its text paints past the sheet's right edge
@@ -2911,7 +2931,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P1  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 21
 
 ```
-TASK T-P1 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 21/231
+TASK T-P1 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 21/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:184, 34 lines — read the whole section first):
   P1 — **IMPORTANT** ⚠ **r2 CORRECTION — SIX, NOT SEVEN: the seventh was refuted by an ancestor rule and is withdrawn** — interactive controls styled by no rule of their own
@@ -2932,7 +2952,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P2  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 22
 
 ```
-TASK T-P2 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 22/231
+TASK T-P2 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 22/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec1, docs/lanes/review-ui-exec1.md:219, 19 lines — read the whole section first):
   P2 — **IMPORTANT** — The board's whole-board empty state has no prototype counterpart, and is the one board empty state with no styling
@@ -2953,7 +2973,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-31  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 32
 
 ```
-TASK T-E4-31 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 32/231
+TASK T-E4-31 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 32/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:487, 11 lines — read the whole section first):
   E4-31 — **IMPORTANT** — Ghost buttons placed on a sunken row paint at **3.99:1** (light) / **4.00:1** (dark) in `hig` and `minimal` — an accent-on-fill-over-sunken composite that case 13.360 does not measure, on three routes
@@ -2974,7 +2994,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-I2  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 35
 
 ```
-TASK T-I2 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.25 h — judged MINOR — rank 35/231
+TASK T-I2 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 35/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:123, 17 lines — read the whole section first):
   I2 — **IMPORTANT** — The `e2e-stack` suite's committed artefact records a defect that was fixed eight hours later, and nothing in the file says which run produced it
@@ -2995,7 +3015,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P24  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 39
 
 ```
-TASK T-P24 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 39/231
+TASK T-P24 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 39/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec1, docs/lanes/review-ui-exec1.md:658, 19 lines — read the whole section first):
   P24 — **IMPORTANT** ⚠ **r2 NEW** — A painted text colour measures 3.84:1 at 12.8px, and it is UNDECLARED, so the gate cannot see it
@@ -3016,7 +3036,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-10  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 45
 
 ```
-TASK T-E4-10 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 45/231
+TASK T-E4-10 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 45/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:218, 11 lines — read the whole section first):
   E4-10 — **MINOR** — The workflow template gallery's four buttons paint as raw user-agent chrome — a population round 1's sweep could not see, because they carry no class at all
@@ -3037,7 +3057,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-15  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 46
 
 ```
-TASK T-E4-15 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 46/231
+TASK T-E4-15 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 46/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:283, 11 lines — read the whole section first):
   E4-15 — **MINOR** — The timeline's Earlier / Today / Later buttons paint with the browser's 2-px outset bevel: the class HAS a rule, and the rule forgot the border
@@ -3058,7 +3078,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-2  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 47
 
 ```
-TASK T-E4-2 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 47/231
+TASK T-E4-2 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 47/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:103, 15 lines — read the whole section first):
   E4-2 — **MINOR** — The ticket sheet's and the dialog's Close glyph paints at 24×21 px — no rule gives it a size, the prototype draws a 32-px filled circle, and the only larger pointer equivalent is the invisible scrim
@@ -3079,7 +3099,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-25  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 48
 
 ```
-TASK T-E4-25 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 48/231
+TASK T-E4-25 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 48/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec4, docs/lanes/review-ui-exec4.md:409, 10 lines — read the whole section first):
   E4-25 — **MINOR** — The Settings sidebar's three section links are 39 px tall; the prototype's are `min-height:44px`, the file says so, and calls it out of scope
@@ -3100,7 +3120,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-26  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 49
 
 ```
-TASK T-E4-26 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 49/231
+TASK T-E4-26 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 49/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:420, 10 lines — read the whole section first):
   E4-26 — **MINOR** — In the List view the only two per-row controls — the collapse caret (22×22) and the title button (22 px tall) — sit under the product's own 24-px in-list floor, the row has no whole-row door, and the list route is swept by neither suite
@@ -3121,7 +3141,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-27  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 50
 
 ```
-TASK T-E4-27 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 50/231
+TASK T-E4-27 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 50/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:431, 14 lines — read the whole section first):
   E4-27 — **MINOR** — The ticket-type editor's *Save ticket type* is a page-local `<button>` at 36 px with a 1-px border and a 6-px radius, beside a shared `Button` that is 44 px, border-less and control-radiused — and the prototype's is 44
@@ -3142,7 +3162,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-35  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 51
 
 ```
-TASK T-E4-35 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 51/231
+TASK T-E4-35 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 51/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:531, 12 lines — read the whole section first):
   E4-35 — **MINOR** — `.gn-segmented__item` sets no horizontal padding, so where the track is content-sized the *All* tab on `/inbox` paints **31 px wide** — the prototype's segment carries `padding:0 16px`
@@ -3163,7 +3183,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-8  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 52
 
 ```
-TASK T-E4-8 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 52/231
+TASK T-E4-8 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 52/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec4, docs/lanes/review-ui-exec4.md:190, 13 lines — read the whole section first):
   E4-8 — **IMPORTANT** — The editor's formatting strip is the one control family in the neumorphic sheet drawn with hard 1-px outlines, and the two recorded reasons that leave it that way rest on a false premise
@@ -3184,7 +3204,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P27  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 55
 
 ```
-TASK T-P27 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 55/231
+TASK T-P27 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 55/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:759, 14 lines — read the whole section first):
   P27 — **MINOR** ⚠ **r2 NEW** — The viewport suite's narrowest width is 390px; WCAG 1.4.10 Reflow specifies 320px, which `320` appears nowhere in either suite to test
@@ -3205,7 +3225,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P35  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 56
 
 ```
-TASK T-P35 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 56/231
+TASK T-P35 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 56/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec1, docs/lanes/review-ui-exec1.md:969, 22 lines — read the whole section first):
   P35 — **MINOR** ⚠ **r2 NEW — PHASE 2 (written before the 15:05:23 freeze but not committed until after it; scores at HALF per rules §2, no claim otherwise)** — The timeline's nav buttons keep the browser's default bevel, and P1's sweep could not see it: the rule EXISTS, the property is missing
@@ -3226,7 +3246,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-9  ·  haiku  ·  IMPORTANT  ·  ~0.75 h  ·  rank 96
 
 ```
-TASK T-E4-9 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.75 h — judged IMPORTANT — rank 96/231
+TASK T-E4-9 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.75 h — judged IMPORTANT — rank 96/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:204, 13 lines — read the whole section first):
   E4-9 — **IMPORTANT** — The workflow builder renders TWO `<main>` landmarks, and at 390 px its name field is 403 px wide, so the page overflows the phone viewport to 415
@@ -3247,7 +3267,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-32  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 97
 
 ```
-TASK T-E4-32 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 97/231
+TASK T-E4-32 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 97/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec4, docs/lanes/review-ui-exec4.md:499, 10 lines — read the whole section first):
   E4-32 — **MINOR** — The builder's advisories heading paints `warning` on `surfaceSunken` at **3.71:1** (13.6 px) in `hig`/`minimal` light, and `warning` is a foreground no `CONTRAST_PAIRS` row names
@@ -3268,7 +3288,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-24  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 144
 
 ```
-TASK T-E4-24 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 144/231
+TASK T-E4-24 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 144/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:396, 12 lines — read the whole section first):
   E4-24 — **MINOR** — The board, the List, My Work and the builder skip a heading level: `h1` → `h3` with no `h2`, and the builder's `h3`s hang under no `h1` at all
@@ -3289,7 +3309,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-36  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 145
 
 ```
-TASK T-E4-36 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 145/231
+TASK T-E4-36 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 145/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:544, 9 lines — read the whole section first):
   E4-36 — **MINOR** — The help search announces "nothing matches" but never "9 answers": the no-match arm is a `role="status"`, the count is a plain `<p>`
@@ -3310,7 +3330,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P10  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 149
 
 ```
-TASK T-P10 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 149/231
+TASK T-P10 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 149/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:305, 14 lines — read the whole section first):
   P10 — **MINOR** — The accessible-name ratchet's unit is an attribute; its failure message claims a property of assistive tech
@@ -3331,7 +3351,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P17  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 150
 
 ```
-TASK T-P17 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 150/231
+TASK T-P17 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 150/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:503, 23 lines — read the whole section first):
   P17 — **MINOR** ⚠ **r2 NEW** — `/my-work`'s heading outline skips level 2, the product IMPROVED on the prototype to get there, and no instrument measures heading level or order
@@ -3352,7 +3372,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P36  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 152
 
 ```
-TASK T-P36 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — effort ~0.4 h — judged MINOR — rank 152/231
+TASK T-P36 — batch B10 (Paint — UA chrome, phone width, contrast, headings) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 152/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:992, 15 lines — read the whole section first):
   P36 — **MINOR** ⚠ **r2 NEW — PHASE 2 (filed 15:31 IST, after the freeze; scores at HALF per rules §2)** — Two settings routes paint the same word as the page's `h1` and, 6 px under it, as the screen's `h2`: `Workflows / Workflows`, `Ticket types / Ticket types` — the export draws `Settings` over the section title
@@ -3370,7 +3390,7 @@ COMMIT: `P36: <one line>` + body (test name / sentence fixed) + Co-Authored-By l
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B11 — Session expiry and dead controls  ·  lane UX  ·  session model **sonnet**  ·  10 tasks  ·  ~6.3 h
+### B11 — Session expiry and dead controls  ·  lane UX  ·  session model **sonnet**  ·  backend **deepseek**  ·  10 tasks  ·  ~6.3 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b11-session-expiry-and-dead-controls` · packages touched: @gisik-nokma/app-core, @gisik-nokma/web.
 
@@ -3390,7 +3410,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b11-session-
 #### T-E2-45  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 98
 
 ```
-TASK T-E2-45 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 98/231
+TASK T-E2-45 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 98/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2992, 71 lines — read the whole section first):
   E2-45 (r2) — IMPORTANT · "Sign out" can fail silently, and the menu closes either way
@@ -3411,7 +3431,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-25  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 105
 
 ```
-TASK T-E5-25 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 105/231
+TASK T-E5-25 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 105/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:980, 40 lines — read the whole section first):
   E5-25 — IMPORTANT · A write after the session expires is reported as *"We could not reach the server"* — at nine sites in seven files — and none of them sends the person to sign in, though every READ does `[SOURCE]`
@@ -3432,7 +3452,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-31  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 107
 
 ```
-TASK T-E5-31 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 107/231
+TASK T-E5-31 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 107/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1166, 32 lines — read the whole section first):
   E5-31 — IMPORTANT · The signed-out app bar offers Workspaces, Account, an Inbox icon and "No workspace selected — pick one…" to a visitor who cannot use any of them, and no Sign in; the legal pages' bar offers Sign in `[BROWSER, devtools isolated context, 390 px]` `[SOURCE]` — FIRST-RUN / PERMISSION-REFUSED
@@ -3453,7 +3473,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-32  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 108
 
 ```
-TASK T-E5-32 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 108/231
+TASK T-E5-32 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 108/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1199, 34 lines — read the whole section first):
   E5-32 — IMPORTANT · The help promises a signed-out link to a job "remembers where you were headed"; every data page bounces to `/sign-in` with no `next=`, so the link is dropped — the invite link, the consent page and the settings shell all keep theirs `[BROWSER, devtools isolated context]` `[SOURCE]`
@@ -3474,7 +3494,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-5  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 109
 
 ```
-TASK T-E5-5 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 109/231
+TASK T-E5-5 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 109/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:351, 27 lines — read the whole section first):
   E5-5 — IMPORTANT · The Filters sheet offers a Collaborators control that no view applies, and tells the person afterwards `[BROWSER]` `[SOURCE]`
@@ -3495,7 +3515,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V1  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 115
 
 ```
-TASK T-V1 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 115/231
+TASK T-V1 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 115/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:716, 30 lines — read the whole section first):
   V1 — IMPORTANT · The Board's empty states invite a person to create a ticket, and no caller in the web app wires the control
@@ -3516,7 +3536,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-V5  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 118
 
 ```
-TASK T-V5 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 118/231
+TASK T-V5 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 118/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:825, 23 lines — read the whole section first):
   V5 — IMPORTANT · A "My contested claims" title button is a dead click, under a comment claiming all four sections resolve
@@ -3537,7 +3557,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-38  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 142
 
 ```
-TASK T-E2-38 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~0.6 h — judged MINOR — rank 142/231
+TASK T-E2-38 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 142/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2171, 28 lines — read the whole section first):
   E2-38 (r2) — MINOR · An archived project's own board does not say it is archived
@@ -3558,7 +3578,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-23  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 146
 
 ```
-TASK T-E5-23 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~0.6 h — judged MINOR — rank 146/231
+TASK T-E5-23 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 146/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:926, 25 lines — read the whole section first):
   E5-23 — MINOR · A brand-new owner's workspace home says "No projects you can open are active here" — a sentence written for the excluded member, read by the founder above the form that makes the first project `[SOURCE]` — FIRST-RUN
@@ -3579,7 +3599,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-34  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 147
 
 ```
-TASK T-E5-34 — batch B11 (Session expiry and dead controls) — model sonnet — effort ~0.6 h — judged MINOR — rank 147/231
+TASK T-E5-34 — batch B11 (Session expiry and dead controls) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 147/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1258, 28 lines — read the whole section first):
   E5-34 — MINOR · On an archived project's own page, the bar's project item names and links a DIFFERENT project — the docblock that made the item "a function of the ROUTE" is true only for live routes `[SOURCE]` — SOFT-DELETED (project) — extends `exec2-E2-38` with the measurement it lacks
@@ -3597,7 +3617,7 @@ COMMIT: `E5-34: <one line>` + body (test name / sentence fixed) + Co-Authored-By
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B12 — Workflow and type invariants in the rule engine  ·  lane FUNC  ·  session model **opus**  ·  4 tasks  ·  ~4.2 h
+### B12 — Workflow and type invariants in the rule engine  ·  lane FUNC  ·  session model **opus**  ·  backend **claude-opus (deepseek-capable tasks may be split out to a DeepSeek session)**  ·  4 tasks  ·  ~4.2 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b12-workflow-and-type-invariants-in-` · packages touched: @gisik-nokma/rule-engine, @gisik-nokma/server.
 
@@ -3611,7 +3631,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b12-workflow
 #### T-E3-19  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 133
 
 ```
-TASK T-E3-19 — batch B12 (Workflow and type invariants in the rule engine) — model opus — effort ~1.75 h — judged IMPORTANT — rank 133/231
+TASK T-E3-19 — batch B12 (Workflow and type invariants in the rule engine) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 133/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1863, 88 lines — read the whole section first):
   21. `E3-19` (r2) — **IMPORTANT (claimed)** — The parent-terminal invariant is enforced in ONE direction: a child can be moved out of terminal under a terminal parent, and the parent can then be CLOSED with an open child
@@ -3632,7 +3652,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-10  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 134
 
 ```
-TASK T-E6-10 — batch B12 (Workflow and type invariants in the rule engine) — model opus — effort ~1.75 h — judged IMPORTANT — rank 134/231
+TASK T-E6-10 — batch B12 (Workflow and type invariants in the rule engine) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 134/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:895, 50 lines — read the whole section first):
   E6-10 — IMPORTANT — The bulk rebind route can be refused part-way by the permission gate, leaving the type's tickets split across two workflows while the client is told "refused"; its docblock says that window is unreachable, and case 7.45 asserts "appends nothing"
@@ -3653,7 +3673,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-3  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 135
 
 ```
-TASK T-E6-3 — batch B12 (Workflow and type invariants in the rule engine) — model opus — effort ~1.75 h — judged IMPORTANT — rank 135/231
+TASK T-E6-3 — batch B12 (Workflow and type invariants in the rule engine) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 135/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:501, 58 lines — read the whole section first):
   E6-3 — IMPORTANT — Re-ranking a custom ticket type is accepted with tickets already placed where the new rank forbids, so the ledger holds hierarchies the engine itself then refuses to produce
@@ -3674,7 +3694,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-8  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 136
 
 ```
-TASK T-E6-8 — batch B12 (Workflow and type invariants in the rule engine) — model opus — effort ~1.75 h — judged IMPORTANT — rank 136/231
+TASK T-E6-8 — batch B12 (Workflow and type invariants in the rule engine) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 136/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:801, 47 lines — read the whole section first):
   E6-8 — IMPORTANT — A workflow republish can put a parent with open children into a terminal state, and `ticket.closed` (and the auto-close sweep) then accept it — the state the transition path refuses
@@ -3692,7 +3712,7 @@ COMMIT: `E6-8: <one line>` + body (test name / sentence fixed) + Co-Authored-By 
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B13 — Due date, soft-delete undo, members picker  ·  lane UX  ·  session model **sonnet**  ·  8 tasks  ·  ~4.4 h
+### B13 — Due date, soft-delete undo, members picker  ·  lane UX  ·  session model **sonnet**  ·  backend **deepseek**  ·  8 tasks  ·  ~4.4 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b13-due-date-soft-delete-undo-member` · packages touched: @gisik-nokma/app-core, @gisik-nokma/server, @gisik-nokma/web.
 
@@ -3710,7 +3730,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b13-due-date
 #### T-E5-2  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 103
 
 ```
-TASK T-E5-2 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 103/231
+TASK T-E5-2 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 103/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec5, docs/lanes/review-ux-exec5.md:242, 36 lines — read the whole section first):
   E5-2 — IMPORTANT · A ticket a week overdue looks like every other card on the Board; the export's card carries the key and a due label that turns red `[BROWSER]` `[SOURCE]` — category 3
@@ -3731,7 +3751,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-6  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 110
 
 ```
-TASK T-E5-6 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 110/231
+TASK T-E5-6 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 110/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:379, 26 lines — read the whole section first):
   E5-6 — IMPORTANT · A due date can be seen in four places, computed as "overdue", and notified as "due soon" — and set nowhere `[SOURCE]` `[BROWSER]` — category 3
@@ -3752,7 +3772,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-43  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 148
 
 ```
-TASK T-E5-43 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~0.6 h — judged MINOR — rank 148/231
+TASK T-E5-43 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 148/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1557, 27 lines — read the whole section first):
   E5-43 — MINOR · "Today" on the Calendar and Timeline is computed once per render, so a tab left open across the IST day boundary keeps yesterday's ring — and the manual places that boundary at half past six in the evening for London and late morning for Los Angeles `[SOURCE]` — recorded "NOT FIXED", unruled
@@ -3773,7 +3793,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-30  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 154
 
 ```
-TASK T-E2-30 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 154/231
+TASK T-E2-30 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 154/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1761, 45 lines — read the whole section first):
   E2-30 (r2) — IMPORTANT · The only way back from a soft delete is a 15-second toast
@@ -3794,7 +3814,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-11  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 156
 
 ```
-TASK T-E5-11 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 156/231
+TASK T-E5-11 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 156/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec5, docs/lanes/review-ux-exec5.md:538, 31 lines — read the whole section first):
   E5-11 — IMPORTANT · The invite form asks a person to type comma-separated project ULIDs; the export draws a picker of project names; the manual says the box "is not usable by a person" `[BROWSER]` `[SOURCE]` — category 3
@@ -3815,7 +3835,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-31  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 207
 
 ```
-TASK T-E2-31 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~0.6 h — judged MINOR — rank 207/231
+TASK T-E2-31 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 207/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:1807, 34 lines — read the whole section first):
   E2-31 (r2) — MINOR · A re-entrancy guard whose stated purpose cannot happen, in a file that fixed the same guard properly 200 lines away
@@ -3836,7 +3856,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-35  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 208
 
 ```
-TASK T-E2-35 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~0.6 h — judged MINOR — rank 208/231
+TASK T-E2-35 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 208/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2037, 62 lines — read the whole section first):
   E2-35 (r2) — IMPORTANT · Deleting a ticket asks nothing, while the bulk close of the same soft delete gets a whole dialog
@@ -3857,7 +3877,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-51  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 211
 
 ```
-TASK T-E2-51 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — effort ~0.6 h — judged MINOR — rank 211/231
+TASK T-E2-51 — batch B13 (Due date, soft-delete undo, members picker) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 211/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3604, 37 lines — read the whole section first):
   E2-51 (r2) — MINOR · My own `13.761` still asserts an absence the product reversed, with a reason that is now false and a citation that points at a different case
@@ -3875,7 +3895,7 @@ COMMIT: `E2-51: <one line>` + body (test name / sentence fixed) + Co-Authored-By
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B14 — Minimal shells — phone and desktop  ·  lane UX  ·  session model **sonnet**  ·  14 tasks  ·  ~6.3 h
+### B14 — Minimal shells — phone and desktop  ·  lane UX  ·  session model **sonnet**  ·  backend **deepseek**  ·  14 tasks  ·  ~6.3 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b14-minimal-shells-phone-and-desktop` · packages touched: @gisik-nokma/desktop, @gisik-nokma/mobile.
 
@@ -3899,7 +3919,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec2` · branch `rel/b14-minimal-
 #### T-E2-41  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 124
 
 ```
-TASK T-E2-41 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 124/231
+TASK T-E2-41 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 124/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2350, 40 lines — read the whole section first):
   E2-41 (r2) — IMPORTANT · Two screens in the phone shell render a failed read as a benign state — an empty board, and "Opening…" for ever
@@ -3920,7 +3940,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-42  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 125
 
 ```
-TASK T-E2-42 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 125/231
+TASK T-E2-42 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 125/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2391, 136 lines — read the whole section first):
   E2-42 (r2) — IMPORTANT · A comment posted from the phone is recorded as the ASSIGNEE's words
@@ -3941,7 +3961,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-43  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 126
 
 ```
-TASK T-E2-43 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 126/231
+TASK T-E2-43 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 126/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/desktop
 FINDING (exec2, docs/lanes/review-ux-exec2.md:2528, 56 lines — read the whole section first):
   E2-43 (r2) — IMPORTANT · The desktop shell's own startup has no rejection handler, so a failure to initialize is drawn as "Opening local replica…" for ever
@@ -3962,7 +3982,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-48  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 127
 
 ```
-TASK T-E2-48 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 127/231
+TASK T-E2-48 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 127/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3447, 51 lines — read the whole section first):
   E2-48 (r2) — IMPORTANT · The phone shell's startup has no rejection handler either — the sibling of `E2-43`, and the symptom here is an empty board with no error
@@ -3983,7 +4003,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-52  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 128
 
 ```
-TASK T-E2-52 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 128/231
+TASK T-E2-52 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 128/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3651, 71 lines — read the whole section first):
   E2-52 (r2) — IMPORTANT · On the phone, typing `@` in the comment editor states **"No people match"** for every query, because the host that answers mention queries was never wired
@@ -4004,7 +4024,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-26  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 129
 
 ```
-TASK T-E5-26 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 129/231
+TASK T-E5-26 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 129/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/desktop
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1021, 27 lines — read the whole section first):
   E5-26 — IMPORTANT · The desktop app's only first-run sentence sends a person to a Settings screen it does not have, for a token nothing issues — and the manual says the step is merely awkward `[SOURCE]` — FIRST-RUN
@@ -4025,7 +4045,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E5-44  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 130
 
 ```
-TASK T-E5-44 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~1 h — judged IMPORTANT — rank 130/231
+TASK T-E5-44 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 130/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec5, docs/lanes/review-ux-exec5.md:1585, 34 lines — read the whole section first):
   E5-44 — IMPORTANT · (phase 2, half points — the narrowed core of withdrawn E5-21) The manual sends a person to the phone to comment; on any ticket NOT assigned to them — every unassigned ticket, every ticket on someone else — the phone files the comment under another id, the sync door answers `invalid`, the outbox marks it failed without retry, and the screen shows nothing `[SOURCE]` + exec 6's …
@@ -4046,7 +4066,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-49  ·  haiku  ·  MINOR  ·  ~0.5 h  ·  rank 158
 
 ```
-TASK T-E2-49 — batch B14 (Minimal shells — phone and desktop) — model haiku — effort ~0.5 h — judged MINOR — rank 158/231
+TASK T-E2-49 — batch B14 (Minimal shells — phone and desktop) — model haiku — backend deepseek — effort ~0.5 h — judged MINOR — rank 158/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3499, 44 lines — read the whole section first):
   E2-49 (r2) — MINOR · Push registration's declared contract is not total: a transport failure escapes as a rejection its only caller voids
@@ -4067,7 +4087,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E2-53  ·  sonnet  ·  MINOR  ·  ~0.5 h  ·  rank 159
 
 ```
-TASK T-E2-53 — batch B14 (Minimal shells — phone and desktop) — model sonnet — effort ~0.5 h — judged MINOR — rank 159/231
+TASK T-E2-53 — batch B14 (Minimal shells — phone and desktop) — model sonnet — backend deepseek — effort ~0.5 h — judged MINOR — rank 159/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec2, docs/lanes/review-ux-exec2.md:3723, 43 lines — read the whole section first):
   E2-53 (r2) — MINOR · The mobile editor host has no refusal vocabulary at all: three doors, and silence is the answer at every one
@@ -4088,7 +4108,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-22  ·  haiku  ·  MINOR  ·  ~0.5 h  ·  rank 182
 
 ```
-TASK T-E4-22 — batch B14 (Minimal shells — phone and desktop) — model haiku — effort ~0.5 h — judged MINOR — rank 182/231
+TASK T-E4-22 — batch B14 (Minimal shells — phone and desktop) — model haiku — backend deepseek — effort ~0.5 h — judged MINOR — rank 182/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec4, docs/lanes/review-ui-exec4.md:370, 10 lines — read the whole section first):
   E4-22 — **MINOR** — The mobile board's rows are `TouchableOpacity`s with no `accessibilityRole`, so VoiceOver/TalkBack reads each row as text, not as a button
@@ -4109,7 +4129,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P28  ·  haiku  ·  MINOR  ·  ~0.5 h  ·  rank 197
 
 ```
-TASK T-P28 — batch B14 (Minimal shells — phone and desktop) — model haiku — effort ~0.5 h — judged MINOR — rank 197/231
+TASK T-P28 — batch B14 (Minimal shells — phone and desktop) — model haiku — backend deepseek — effort ~0.5 h — judged MINOR — rank 197/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec1, docs/lanes/review-ui-exec1.md:774, 22 lines — read the whole section first):
   P28 — **MINOR** ⚠ **r2 NEW** — The mobile board's row is the one pressable in the app with no accessibility role, and its sibling sets one explicitly
@@ -4130,7 +4150,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P30  ·  haiku  ·  MINOR  ·  ~0.5 h  ·  rank 199
 
 ```
-TASK T-P30 — batch B14 (Minimal shells — phone and desktop) — model haiku — effort ~0.5 h — judged MINOR — rank 199/231
+TASK T-P30 — batch B14 (Minimal shells — phone and desktop) — model haiku — backend deepseek — effort ~0.5 h — judged MINOR — rank 199/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec1, docs/lanes/review-ui-exec1.md:822, 39 lines — read the whole section first):
   P30 — **IMPORTANT** ⚠ **r2 NEW** — The mobile editor webview is TWO GENERATED LINKS BEHIND, and both links are unguarded
@@ -4151,7 +4171,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P6  ·  haiku  ·  MINOR  ·  ~0.5 h  ·  rank 202
 
 ```
-TASK T-P6 — batch B14 (Minimal shells — phone and desktop) — model haiku — effort ~0.5 h — judged MINOR — rank 202/231
+TASK T-P6 — batch B14 (Minimal shells — phone and desktop) — model haiku — backend deepseek — effort ~0.5 h — judged MINOR — rank 202/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/mobile
 FINDING (exec1, docs/lanes/review-ui-exec1.md:367, 13 lines — read the whole section first):
   P6 — **MINOR** — Mobile: two of three screens have no styling of any kind
@@ -4172,7 +4192,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P7  ·  haiku  ·  MINOR  ·  ~0.5 h  ·  rank 203
 
 ```
-TASK T-P7 — batch B14 (Minimal shells — phone and desktop) — model haiku — effort ~0.5 h — judged MINOR — rank 203/231
+TASK T-P7 — batch B14 (Minimal shells — phone and desktop) — model haiku — backend deepseek — effort ~0.5 h — judged MINOR — rank 203/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec2   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/desktop
 FINDING (exec1, docs/lanes/review-ui-exec1.md:381, 18 lines — read the whole section first):
   P7 — **MINOR** — Desktop's task list has no rules at all
@@ -4190,7 +4210,7 @@ COMMIT: `P7: <one line>` + body (test name / sentence fixed) + Co-Authored-By li
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B15 — Calendar, timeline and canvas for assistive tech  ·  lane UI  ·  session model **sonnet**  ·  4 tasks  ·  ~1.7 h
+### B15 — Calendar, timeline and canvas for assistive tech  ·  lane UI  ·  session model **sonnet**  ·  backend **deepseek**  ·  4 tasks  ·  ~1.7 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b15-calendar-timeline-and-canvas-for` · packages touched: @gisik-nokma/app-core.
 
@@ -4204,7 +4224,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b15-calendar
 #### T-E4-16  ·  haiku  ·  MINOR  ·  ~0.4 h  ·  rank 143
 
 ```
-TASK T-E4-16 — batch B15 (Calendar, timeline and canvas for assistive tech) — model haiku — effort ~0.4 h — judged MINOR — rank 143/231
+TASK T-E4-16 — batch B15 (Calendar, timeline and canvas for assistive tech) — model haiku — backend deepseek — effort ~0.4 h — judged MINOR — rank 143/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:295, 6 lines — read the whole section first):
   E4-16 — **MINOR** — React Flow's attribution link renders at 10 px with 1.10:1 contrast in dark mode (2.61:1 in light)
@@ -4225,7 +4245,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-28  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 155
 
 ```
-TASK T-E4-28 — batch B15 (Calendar, timeline and canvas for assistive tech) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 155/231
+TASK T-E4-28 — batch B15 (Calendar, timeline and canvas for assistive tech) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 155/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec4, docs/lanes/review-ui-exec4.md:446, 12 lines — read the whole section first):
   E4-28 — **IMPORTANT** — The Calendar and the Timeline convey every date relationship by position alone: day cells and week columns are unlabelled `div`s, items and bars are buttons placed by CSS `grid-column`, and the dates themselves live only in `title`
@@ -4246,7 +4266,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-20  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 213
 
 ```
-TASK T-E4-20 — batch B15 (Calendar, timeline and canvas for assistive tech) — model sonnet — effort ~0.6 h — judged MINOR — rank 213/231
+TASK T-E4-20 — batch B15 (Calendar, timeline and canvas for assistive tech) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 213/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec4, docs/lanes/review-ui-exec4.md:346, 12 lines — read the whole section first):
   E4-20 — **MINOR** — The workflow builder opens with `fitView`, so every control on a state node is painted at 74 % of its size on a 1512-px desktop (a 10×10 Blocked checkbox, ~9-px labels) and at ~52 % on a phone; the prototype draws the canvas at 1:1 inside a scrolling card
@@ -4267,7 +4287,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P20  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 228
 
 ```
-TASK T-P20 — batch B15 (Calendar, timeline and canvas for assistive tech) — model sonnet — effort ~0.6 h — judged MINOR — rank 228/231
+TASK T-P20 — batch B15 (Calendar, timeline and canvas for assistive tech) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 228/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec1, docs/lanes/review-ui-exec1.md:567, 15 lines — read the whole section first):
   P20 — **MINOR** ⚠ **r2 NEW** — The month grid and the week columns carry no table or grid semantics, so a screen reader loses the day-to-weekday association
@@ -4285,7 +4305,7 @@ COMMIT: `P20: <one line>` + body (test name / sentence fixed) + Co-Authored-By l
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B16 — Outbox ordering, projection verifier, domain schema drift  ·  lane FUNC  ·  session model **opus**  ·  7 tasks  ·  ~3.2 h
+### B16 — Outbox ordering, projection verifier, domain schema drift  ·  lane FUNC  ·  session model **opus**  ·  backend **claude-opus (deepseek-capable tasks may be split out to a DeepSeek session)**  ·  7 tasks  ·  ~3.2 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b16-outbox-ordering-projection-verif` · packages touched: @gisik-nokma/domain, @gisik-nokma/server, @gisik-nokma/sync-client.
 
@@ -4302,7 +4322,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec6` · branch `rel/b16-outbox-o
 #### T-E6-13  ·  sonnet  ·  IMPORTANT  ·  ~1.25 h  ·  rank 157
 
 ```
-TASK T-E6-13 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — effort ~1.25 h — judged IMPORTANT — rank 157/231
+TASK T-E6-13 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — backend deepseek — effort ~1.25 h — judged IMPORTANT — rank 157/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1032, 52 lines — read the whole section first):
   E6-13 — IMPORTANT — `verify:projections` reports DRIFT on a correct database after an ordinary type re-bind, so the restore drill it gates fails for a false reason and a real drift becomes indistinguishable from the known one
@@ -4323,7 +4343,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-22  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 185
 
 ```
-TASK T-E6-22 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model haiku — effort ~0.25 h — judged MINOR — rank 185/231
+TASK T-E6-22 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 185/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1472, 37 lines — read the whole section first):
   E6-22 — MINOR — The export advertises "ticket-only access" for someone outside the workspace; the product has no such tier — the door commits the naming and it confers nothing (category 3, no ruling found)
@@ -4344,7 +4364,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-23  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 186
 
 ```
-TASK T-E6-23 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model haiku — effort ~0.25 h — judged MINOR — rank 186/231
+TASK T-E6-23 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 186/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1510, 34 lines — read the whole section first):
   E6-23 — MINOR — `BACKUP_TIME_UTC=25:00` or `99:99` is accepted and silently scheduled somewhere else (`99:99` → four days out), while `9:00` throws; the daemon reads the value raw
@@ -4365,7 +4385,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-5  ·  opus  ·  IMPORTANT  ·  ~1.75 h  ·  rank 204
 
 ```
-TASK T-E6-5 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model opus — effort ~1.75 h — judged IMPORTANT — rank 204/231
+TASK T-E6-5 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model opus — backend claude-opus — effort ~1.75 h — judged IMPORTANT — rank 204/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/sync-client
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:627, 72 lines — read the whole section first):
   E6-5 — IMPORTANT — After a transient sync failure, a later claim overtakes the backing-off claim it depends on; the sync door turns it into a false, unresolved contest on the user's own ticket, and the edit is dropped
@@ -4386,7 +4406,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-17  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 229
 
 ```
-TASK T-E6-17 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — effort ~0.6 h — judged MINOR — rank 229/231
+TASK T-E6-17 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 229/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1241, 37 lines — read the whole section first):
   E6-17 — MINOR — `ticket.assigned` and `ticket.collaborator_added` accept any non-empty string as a person — a non-member, a fresh ULID, the word `nobody-here` — and the board renders it
@@ -4407,7 +4427,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-19  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 230
 
 ```
-TASK T-E6-19 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — effort ~0.6 h — judged MINOR — rank 230/231
+TASK T-E6-19 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 230/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1353, 32 lines — read the whole section first):
   E6-19 — MINOR — A due date only has to look like `YYYY-MM-DD`: `2026-02-30`, `2026-13-45` and `0000-00-00` commit, and the attention strip then says "Needed by 0000-00-00 — due within 7 days"
@@ -4428,7 +4448,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-20  ·  sonnet  ·  MINOR  ·  ~0.6 h  ·  rank 231
 
 ```
-TASK T-E6-20 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — effort ~0.6 h — judged MINOR — rank 231/231
+TASK T-E6-20 — batch B16 (Outbox ordering, projection verifier, domain schema drift) — model sonnet — backend deepseek — effort ~0.6 h — judged MINOR — rank 231/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec6   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1386, 32 lines — read the whole section first):
   E6-20 — MINOR — Ruling P15 ("a name of only spaces names nothing") closed titles, workspace, project and invite names — and left workflow, state, ticket-type, field and option names at `min(1)`, so a single space is a valid board column
@@ -4446,7 +4466,7 @@ COMMIT: `E6-20: <one line>` + body (test name / sentence fixed) + Co-Authored-By
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B17 — Instruments that cannot fail or never run  ·  lane ANY  ·  session model **sonnet**  ·  12 tasks  ·  ~4.8 h
+### B17 — Instruments that cannot fail or never run  ·  lane ANY  ·  session model **sonnet**  ·  backend **deepseek**  ·  12 tasks  ·  ~4.8 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b17-instruments-that-cannot-fail-or-` · packages touched: @gisik-nokma/server, @gisik-nokma/web.
 
@@ -4468,7 +4488,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b17-instrume
 #### T-E6-7  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 33
 
 ```
-TASK T-E6-7 — batch B17 (Instruments that cannot fail or never run) — model haiku — effort ~0.25 h — judged MINOR — rank 33/231
+TASK T-E6-7 — batch B17 (Instruments that cannot fail or never run) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 33/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:737, 63 lines — read the whole section first):
   E6-7 — MINOR — Migration prefixes are hand-rounded and future-dated with no recorded convention, so the plans' own `node-pg-migrate create` produces a prefix below an already-applied migration for ~a day after each merge
@@ -4489,7 +4509,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F8-fn  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 34
 
 ```
-TASK T-F8-fn — batch B17 (Instruments that cannot fail or never run) — model haiku — effort ~0.25 h — judged MINOR — rank 34/231
+TASK T-F8-fn — batch B17 (Instruments that cannot fail or never run) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 34/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:445, 57 lines — read the whole section first):
   F8 — LOW / observation — `check:db-tz` is the only one of the nine checkers with no automated invocation
@@ -4510,7 +4530,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P15  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 36
 
 ```
-TASK T-P15 — batch B17 (Instruments that cannot fail or never run) — model haiku — effort ~0.25 h — judged MINOR — rank 36/231
+TASK T-P15 — batch B17 (Instruments that cannot fail or never run) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 36/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:436, 25 lines — read the whole section first):
   P15 — **MINOR** ⚠ **r2 NEW, CORRECTED DOWNWARD IN THE SAME ROUND** — the repo's generated prototype copy is one line offset from the owner's export, and 71 files cite it by line
@@ -4529,7 +4549,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P5  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 40
 
 ```
-TASK T-P5 — batch B17 (Instruments that cannot fail or never run) — model haiku — effort ~0.25 h — judged MINOR — rank 40/231
+TASK T-P5 — batch B17 (Instruments that cannot fail or never run) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 40/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:349, 17 lines — read the whole section first):
   P5 — **MINOR (product) / IMPORTANT (record)** — An owner-requested control was neither built nor reported
@@ -4550,7 +4570,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E4-12  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 84
 
 ```
-TASK T-E4-12 — batch B17 (Instruments that cannot fail or never run) — model sonnet — effort ~1 h — judged IMPORTANT — rank 84/231
+TASK T-E4-12 — batch B17 (Instruments that cannot fail or never run) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 84/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec4, docs/lanes/review-ui-exec4.md:244, 12 lines — read the whole section first):
   E4-12 — **IMPORTANT** — When the signed-in instrument runs, its tap-target population is ONE route at ONE width, and its text-contrast population is ZERO routes
@@ -4571,7 +4591,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F2-ux  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 85
 
 ```
-TASK T-F2-ux — batch B17 (Instruments that cannot fail or never run) — model sonnet — effort ~1 h — judged IMPORTANT — rank 85/231
+TASK T-F2-ux — batch B17 (Instruments that cannot fail or never run) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 85/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec2, docs/lanes/review-ux-exec2.md:401, 40 lines — read the whole section first):
   F2 — IMPORTANT · The only gate over the help corpus cannot fail on the property that matters
@@ -4590,7 +4610,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-I1  ·  OWNER  ·  IMPORTANT  ·  ~1 h  ·  rank 86
 
 ```
-TASK T-I1 — batch B17 (Instruments that cannot fail or never run) — model OWNER — effort ~1 h — judged IMPORTANT — rank 86/231
+TASK T-I1 — batch B17 (Instruments that cannot fail or never run) — model OWNER — backend owner — effort ~1 h — judged IMPORTANT — rank 86/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:102, 20 lines — read the whole section first):
   I1 — **CRITICAL** — No browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
@@ -4612,7 +4632,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P11  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 87
 
 ```
-TASK T-P11 — batch B17 (Instruments that cannot fail or never run) — model sonnet — effort ~1 h — judged IMPORTANT — rank 87/231
+TASK T-P11 — batch B17 (Instruments that cannot fail or never run) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 87/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:287, 17 lines — read the whole section first):
   P11 — **IMPORTANT** — The `Select` panel is outside the population of every rendered-property sweep, for two independent reasons
@@ -4633,7 +4653,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P16  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 88
 
 ```
-TASK T-P16 — batch B17 (Instruments that cannot fail or never run) — model sonnet — effort ~1 h — judged IMPORTANT — rank 88/231
+TASK T-P16 — batch B17 (Instruments that cannot fail or never run) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 88/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:462, 40 lines — read the whole section first):
   P16 — **IMPORTANT** ⚠ **r2 NEW** — One styling case asserts the ABSENCE of a declaration through a scanner that truncates multi-line rules, so it cannot fail when the thing it guards returns
@@ -4654,7 +4674,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P34  ·  sonnet  ·  IMPORTANT  ·  ~1 h  ·  rank 89
 
 ```
-TASK T-P34 — batch B17 (Instruments that cannot fail or never run) — model sonnet — effort ~1 h — judged IMPORTANT — rank 89/231
+TASK T-P34 — batch B17 (Instruments that cannot fail or never run) — model sonnet — backend deepseek — effort ~1 h — judged IMPORTANT — rank 89/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:941, 27 lines — read the whole section first):
   P34 — **IMPORTANT** ⚠ **r2 NEW** — FOUR of the project page's five views are outside the tap-target ratchet's population, because the ratchet visits routes and the views are tabs
@@ -4675,7 +4695,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-26  ·  OWNER-DECISION  ·  MINOR  ·  ~0.5 h  ·  rank 131
 
 ```
-TASK T-E6-26 — batch B17 (Instruments that cannot fail or never run) — model OWNER-DECISION — effort ~0.5 h — judged MINOR — rank 131/231
+TASK T-E6-26 — batch B17 (Instruments that cannot fail or never run) — model OWNER-DECISION — backend owner — effort ~0.5 h — judged MINOR — rank 131/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-refutations-exec6.md:249, 61 lines — read the whole section first):
   E6-26 — MINOR — `proj_rollups` is recomputed inside every ticket, workflow and reparent transaction, replayed by the release-gate verifier, and read by nothing in the product — a state `Features.md` records as interim ("Nothing reads it yet") for a reason that has since expired
@@ -4697,7 +4717,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-6  ·  sonnet  ·  MINOR  ·  ~0.5 h  ·  rank 132
 
 ```
-TASK T-E6-6 — batch B17 (Instruments that cannot fail or never run) — model sonnet — effort ~0.5 h — judged MINOR — rank 132/231
+TASK T-E6-6 — batch B17 (Instruments that cannot fail or never run) — model sonnet — backend deepseek — effort ~0.5 h — judged MINOR — rank 132/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:700, 36 lines — read the whole section first):
   E6-6 — MINOR — `check-no-silent-skips.mjs` prints `ok` on an empty report: an instrument with no positive control on its own universe
@@ -4715,7 +4735,7 @@ COMMIT: `E6-6: <one line>` + body (test name / sentence fixed) + Co-Authored-By 
 RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package suite at a time to a log file, Features.md + test-cases in the same commit, no AskUserQuestion, no docker compose.
 ```
 
-### B18 — Prose drift sweep — docblocks, catalogue markers, counts  ·  lane ANY  ·  session model **haiku**  ·  37 tasks  ·  ~5.5 h
+### B18 — Prose drift sweep — docblocks, catalogue markers, counts  ·  lane ANY  ·  session model **haiku**  ·  backend **deepseek**  ·  37 tasks  ·  ~5.5 h
 
 Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b18-prose-drift-sweep-docblocks-cata` · packages touched: @gisik-nokma/app-core, @gisik-nokma/domain, @gisik-nokma/editor, @gisik-nokma/rule-engine, @gisik-nokma/server, @gisik-nokma/sync-client, @gisik-nokma/ui, @gisik-nokma/web.
 
@@ -4762,7 +4782,7 @@ Worktree `/Users/kiro/my_projects/gisik-nokma-exec4` · branch `rel/b18-prose-dr
 #### T-E3-10  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 160
 
 ```
-TASK T-E3-10 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 160/231
+TASK T-E3-10 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 160/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:871, 60 lines — read the whole section first):
   14.2 — `E3-10` (r2) — MINOR — The arithmetic of a stated correctness invariant is stale by two in **both** numbers
@@ -4783,7 +4803,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-11  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 161
 
 ```
-TASK T-E3-11 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 161/231
+TASK T-E3-11 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 161/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1017, 41 lines — read the whole section first):
   14.6.1 — `E3-11` (r2) — MINOR — `Features.md` says the fixture suite holds **84**; it holds **86**
@@ -4804,7 +4824,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-12  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 162
 
 ```
-TASK T-E3-12 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 162/231
+TASK T-E3-12 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 162/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1059, 44 lines — read the whole section first):
   14.6.2 — `E3-12` (r2) — MINOR — "eleven plain-language checks" — there are **twelve**, and the twelfth is the section's own neighbouring feature
@@ -4825,7 +4845,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-13  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 163
 
 ```
-TASK T-E3-13 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 163/231
+TASK T-E3-13 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 163/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1104, 42 lines — read the whole section first):
   14.6.3 — `E3-13` (r2) — MINOR — A citation in `visible-where.ts` resolves and points at the wrong line
@@ -4846,7 +4866,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-16  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 164
 
 ```
-TASK T-E3-16 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 164/231
+TASK T-E3-16 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 164/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1549, 69 lines — read the whole section first):
   17.2 `E3-16` (r2) — **IMPORTANT (claimed)** — The roster-cut citation has drifted **twice**, and the files "corrected" to the new number are now stale in exactly the same way as the ones that were left alone
@@ -4867,7 +4887,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-17  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 165
 
 ```
-TASK T-E3-17 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 165/231
+TASK T-E3-17 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 165/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/sync-client
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1631, 66 lines — read the whole section first):
   18. `E3-17` (r2) — MINOR — A docblock that says "re-run the stated command before trusting either number" gives a total its own two bullets contradict
@@ -4888,7 +4908,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-18  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 166
 
 ```
-TASK T-E3-18 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 166/231
+TASK T-E3-18 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 166/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:1698, 114 lines — read the whole section first):
   19. `E3-18` (r2) — **MINOR — revised DOWN from Important at §34** — The two shipped `DataSource` implementations disagree about a dangling parent, and the offline one makes the existence claim case 6.68 was fixed to stop
@@ -4909,7 +4929,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-20  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 167
 
 ```
-TASK T-E3-20 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 167/231
+TASK T-E3-20 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 167/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2112, 64 lines — read the whole section first):
   25. `E3-20` (r2) — **IMPORTANT (claimed)** — Case 6.82 declares a rollup capability "cannot ship" and "ABSENT from the type"; it shipped, the field is in both types, and the code records *"case 6.82 closed"* while the catalogue line stands
@@ -4930,7 +4950,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-21  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 168
 
 ```
-TASK T-E3-21 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 168/231
+TASK T-E3-21 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 168/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2177, 59 lines — read the whole section first):
   26. `E3-21` (r2) — **IMPORTANT (claimed)** — Case 6.84 declares a cross-workspace parent link "reachable and unrefused" and "*no check compares them*"; two checks compare them, at both doors, with a named rule
@@ -4951,7 +4971,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-22  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 169
 
 ```
-TASK T-E3-22 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 169/231
+TASK T-E3-22 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 169/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2237, 64 lines — read the whole section first):
   27. `E3-22` (r2) — **IMPORTANT (claimed)** — Case 6.58's stated reproduction of a cycle uses `ticket.reparented`, which `hierarchy.cycle` now refuses — so the sequence it prints can no longer be performed through any door
@@ -4972,7 +4992,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-23  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 170
 
 ```
-TASK T-E3-23 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 170/231
+TASK T-E3-23 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 170/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2302, 58 lines — read the whole section first):
   28. `E3-23` (r2) — **IMPORTANT (claimed)** — Case 6.124 is ❌ with owner "Plan 11"; the code that closed it names the case by number and says so
@@ -4993,7 +5013,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-24  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 171
 
 ```
-TASK T-E3-24 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 171/231
+TASK T-E3-24 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 171/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2361, 59 lines — read the whole section first):
   29. `E3-24` (r2) — **IMPORTANT (claimed)** — Case 6.66's thesis is INVERTED: it says the parent placeholder ships "existence-versus-the-row, not existence-versus-title"; the shipped branch carries the title, and the table it says does not exist does
@@ -5014,7 +5034,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-25  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 172
 
 ```
-TASK T-E3-25 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 172/231
+TASK T-E3-25 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 172/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2421, 60 lines — read the whole section first):
   30. `E3-25` (r2) — **MINOR (claimed)** — Case 6.96 says `SyncItem` "has three members"; it has four — **and this completes the file**
@@ -5035,7 +5055,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-26  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 173
 
 ```
-TASK T-E3-26 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 173/231
+TASK T-E3-26 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 173/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:2992, 59 lines — read the whole section first):
   42. `E3-26` (r2) — **IMPORTANT (claimed)** — `Features.md` says "Nothing in the app links to any of them yet" and "`AppNav` … no settings entry"; the nav renders a Settings link and a `/settings` shell with a sidebar pointing at all of them
@@ -5056,7 +5076,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-27  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 174
 
 ```
-TASK T-E3-27 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 174/231
+TASK T-E3-27 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 174/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:3165, 70 lines — read the whole section first):
   45. `E3-27` (r2) — **IMPORTANT (claimed)** — Two files say `checkErrandTemplate` is *"not yet landed on this branch"*; it landed, the SEEDER CALLS IT as a throwing guard, and it has eleven cases
@@ -5077,7 +5097,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-28  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 175
 
 ```
-TASK T-E3-28 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 175/231
+TASK T-E3-28 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 175/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:3312, 68 lines — read the whole section first):
   48. `E3-28` (r2) — **IMPORTANT (claimed)** — Two documents count the offline-born ticket's doors as three and never name `getTicket`; the code's own comment says *"THE THIRD NAME WAS MISSING"* and the registry now has it
@@ -5098,7 +5118,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-29  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 176
 
 ```
-TASK T-E3-29 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 176/231
+TASK T-E3-29 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 176/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:3561, 44 lines — read the whole section first):
   53. r2 finding E3-29 — `Features.md` §5 says "eleven registered types"; the registry carries eighteen, and the five it omits are the soft-delete and closure pair
@@ -5117,7 +5137,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-30  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 177
 
 ```
-TASK T-E3-30 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 177/231
+TASK T-E3-30 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 177/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:4130, 41 lines — read the whole section first):
   65. `E3-30` (phase 2, HALF) — **IMPORTANT (claimed)** — Case 6.83 is ❌ asking for a measurement; the measurement exists, is named *"MEASURES case 6.83"* in the test, is recorded ✅ as case 7.78, and is cited by the code — since 2026-09-02
@@ -5138,7 +5158,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-31  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 178
 
 ```
-TASK T-E3-31 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 178/231
+TASK T-E3-31 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 178/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/rule-engine
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:4172, 50 lines — read the whole section first):
   66. `E3-31` (phase 2, HALF) — **MINOR (claimed)** — Case 6.57 conditions on *"if Plan 3 admits a reparent that crosses projects"*; Plan 3 refused it on 2026-08-31 at both doors, and no event can move a ticket's project at all
@@ -5159,7 +5179,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-33  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 179
 
 ```
-TASK T-E3-33 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 179/231
+TASK T-E3-33 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 179/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:4348, 25 lines — read the whole section first):
   69. `E3-33` (phase 2, HALF) — **MINOR (claimed)** — `proj-projects.ts:29` says `proj_ticket_types` *"does not exist yet"* and that its own position is *"immediately after `proj_workflows`"*; both became false 21 minutes after the sentence landed, and the file it says must move *"in the same commit"* did (15:35 IST)
@@ -5180,7 +5200,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-34  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 180
 
 ```
-TASK T-E3-34 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 180/231
+TASK T-E3-34 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 180/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:4413, 54 lines — read the whole section first):
   72. `E3-34` (phase 2, HALF) — **MINOR (claimed)** — `projections/tickets.ts:480-499` says *"nothing refuses a `ticket.assigned` … for a ticket that does not exist"* and cites a test that *"ingests two … against tickets that were never created, and they are committed"*; the test it cites had been rewritten 21 minutes earlier because the gate refuses exactly that, and its own comment says so (15:41 …
@@ -5201,7 +5221,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E3-9  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 181
 
 ```
-TASK T-E3-9 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 181/231
+TASK T-E3-9 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 181/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:827, 43 lines — read the whole section first):
   14.1 — `E3-9` (r2) — MINOR — A "thirteen fields" claim is false: the envelope schema has **eleven**
@@ -5222,7 +5242,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-12  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 183
 
 ```
-TASK T-E6-12 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 183/231
+TASK T-E6-12 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 183/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:996, 35 lines — read the whole section first):
   E6-12 — IMPORTANT — Two ❌ cases in `06-auth-visibility.md` declare guest admissions the product closed weeks ago, one of them security-relevant and with a named owner; a third declares "nothing rate-limits issuance" after the limiter shipped
@@ -5243,7 +5263,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-14  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 184
 
 ```
-TASK T-E6-14 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 184/231
+TASK T-E6-14 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 184/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/app-core
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1085, 42 lines — read the whole section first):
   E6-14 — MINOR — The delete toast's recorded reason for departing from the prototype ("this product has no ticket key") stopped being true thirteen minutes before it was written; the same file now reads the key for its own breadcrumb
@@ -5264,7 +5284,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-E6-25  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 187
 
 ```
-TASK T-E6-25 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 187/231
+TASK T-E6-25 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 187/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec6, docs/lanes/review-functionality-exec6.md:1643, 16 lines — read the whole section first):
   E6-25 — MINOR — The deploy directory tells the operator that a forged `X-Forwarded-For` still buys a private rate-limit bucket ("Plan 11 T2 (not yet on main)"), that `DATABASE_CA_CERT` "has no effect" and is "not yet in config.ts's zod schema", that the seed scripts are still to land, and (`.env.example`) that `SMTP_URL` does nothing until the SMTP sender lands and that "the other seven" config …
@@ -5283,7 +5303,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F1-fn  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 188
 
 ```
-TASK T-F1-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 188/231
+TASK T-F1-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 188/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:141, 58 lines — read the whole section first):
   F1 — IMPORTANT — An open-gap section still declares a closed security-relevant leak, with both supporting numbers stale and a named owner pointing at finished work
@@ -5304,7 +5324,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F3-fn  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 189
 
 ```
-TASK T-F3-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 189/231
+TASK T-F3-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 189/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:254, 52 lines — read the whole section first):
   F3 — IMPORTANT — **My own lane's §17 group** cites an artifact the owner has ruled is not the prototype, and every citation in it is off by one against the artifact that is
@@ -5325,7 +5345,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F6-fn  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 190
 
 ```
-TASK T-F6-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 190/231
+TASK T-F6-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 190/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/server
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:369, 48 lines — read the whole section first):
   F6 — LOW — The soft-delete enumeration's own counts do not reproduce from the command printed beside them
@@ -5346,7 +5366,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-F7-fn  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 191
 
 ```
-TASK T-F7-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 191/231
+TASK T-F7-fn — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 191/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec3, docs/lanes/review-functionality-exec3.md:418, 26 lines — read the whole section first):
   F7 — LOW — **My own lane's §17 block table** has one row and no rule for a lane with no allocation
@@ -5367,7 +5387,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-I3  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 192
 
 ```
-TASK T-I3 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 192/231
+TASK T-I3 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 192/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:141, 13 lines — read the whole section first):
   I3 — **IMPORTANT** — `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by the same docblock, two lines above it
@@ -5388,7 +5408,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-I4  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 193
 
 ```
-TASK T-I4 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 193/231
+TASK T-I4 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 193/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/ui
 FINDING (exec1, docs/lanes/review-ui-exec1.md:155, 11 lines — read the whole section first):
   I4 — **MINOR** — `tap-targets.ts` cites a line range that resolves and misleads
@@ -5409,7 +5429,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-I5  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 194
 
 ```
-TASK T-I5 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 194/231
+TASK T-I5 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 194/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:167, 14 lines — read the whole section first):
   I5 — **MINOR** — My own live handoff carries two position blocks that contradict each other, and the pointer that found it is itself stale
@@ -5430,7 +5450,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P25  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 195
 
 ```
-TASK T-P25 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 195/231
+TASK T-P25 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 195/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:678, 17 lines — read the whole section first):
   P25 — **MINOR** ⚠ **r2 NEW** — Three live files cite the docblock of a component that was deleted, and one of them is an instrument
@@ -5451,7 +5471,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P26  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 196
 
 ```
-TASK T-P26 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 196/231
+TASK T-P26 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 196/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: see files
 FINDING (exec1, docs/lanes/review-ui-exec1.md:696, 62 lines — read the whole section first):
   P26 — **IMPORTANT** ⚠ **r2 NEW** — The prototype-delta document is stale in BOTH of its halves: every numbered queue row is closed, and its per-screen gap claims no longer describe the product
@@ -5472,7 +5492,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P29  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 198
 
 ```
-TASK T-P29 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 198/231
+TASK T-P29 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 198/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/web
 FINDING (exec1, docs/lanes/review-ui-exec1.md:797, 24 lines — read the whole section first):
   P29 — **MINOR** ⚠ **r2 NEW** — The mock-only suite claims each stub carries its server `file:line`; two of ten carry the file and no line, and they are the two whose contracts changed
@@ -5493,7 +5513,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P32  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 200
 
 ```
-TASK T-P32 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 200/231
+TASK T-P32 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 200/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/editor
 FINDING (exec1, docs/lanes/review-ui-exec1.md:897, 21 lines — read the whole section first):
   P32 — **MINOR** ⚠ **r2 NEW** — Why a control is disabled is put in `title` ON the disabled button, where it cannot be reached
@@ -5514,7 +5534,7 @@ RULES: §0 of docs/lanes/release-2026-09-22-plan.md — never main, one package 
 #### T-P33  ·  haiku  ·  MINOR  ·  ~0.25 h  ·  rank 201
 
 ```
-TASK T-P33 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — effort ~0.25 h — judged MINOR — rank 201/231
+TASK T-P33 — batch B18 (Prose drift sweep — docblocks, catalogue markers, counts) — model haiku — backend deepseek — effort ~0.25 h — judged MINOR — rank 201/231
 Worktree: /Users/kiro/my_projects/gisik-nokma-exec4   Branch: the batch branch (§1)   Node: 22   Package: @gisik-nokma/domain
 FINDING (exec1, docs/lanes/review-ui-exec1.md:919, 21 lines — read the whole section first):
   P33 — **MINOR** ⚠ **r2 NEW** — The export draws a timestamp on every inbox row; the product draws none, and no client in the chain reads the field it would need
