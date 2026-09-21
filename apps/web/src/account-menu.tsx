@@ -4,6 +4,7 @@ import Link from 'next/link';
 import { usePathname, useRouter } from 'next/navigation';
 import { useCallback, useEffect, useId, useRef, useState } from 'react';
 import { Avatar } from '@gisik-nokma/ui';
+import { avatarNameOf, displayLabelOf } from './display-label.js';
 import { authClient } from './auth-client.js';
 import { useCurrentUser } from './providers.js';
 
@@ -127,6 +128,12 @@ export function AccountMenu() {
 
   if (user === null) return null;
 
+  // exec4 E4-33 — ONE reading of "what do we call this person", shared with
+  // `/workspaces`' heading. An empty label means NO label, and the two suffixes
+  // below are omitted for it rather than concatenated onto it.
+  const label = displayLabelOf(user);
+  const avatarName = avatarNameOf(user);
+
   return (
     <div className="gn-nav__account">
       <button
@@ -138,11 +145,21 @@ export function AccountMenu() {
         aria-controls={open ? menuId : undefined}
         /* The accessible name names the PERSON, because the visible content is
            a monogram and a button called "Account menu" would tell a screen
-           reader user less than the old `Sign out {name}` control did. */
-        aria-label={`Account menu for ${user.name}`}
+           reader user less than the old `Sign out {name}` control did.
+
+           exec4 E4-33: it names them with `displayLabelOf`, so a person created
+           by the default email sign-up — `name: ''` — is named by their address
+           rather than announced as "Account menu for ". The suffix is OMITTED
+           when there is no label at all, which is why this is a ternary and not
+           an interpolation: `Account menu for ` is the defect, and a person with
+           neither a name nor an address must not reproduce it. */
+        aria-label={label === '' ? 'Account menu' : `Account menu for ${label}`}
         onClick={() => setOpen((wasOpen) => !wasOpen)}
       >
-        <Avatar size="small" name={user.name} />
+        {/* The handle, or the email's LOCAL PART — never the empty string, which
+            is what drew the `?`. `initialsOf` still answers `?` for a person who
+            has neither, and that fallback is left alone. */}
+        <Avatar size="small" name={avatarName} />
       </button>
       {open ? (
         <div

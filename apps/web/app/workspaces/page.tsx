@@ -19,6 +19,7 @@ import {
   type CardViewer,
 } from '../../src/workspace-viewer.js';
 import { DocumentTitle } from '../../src/document-title.js';
+import { displayLabelOf } from '../../src/display-label.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -50,7 +51,15 @@ export default function WorkspacesPage() {
       <AppNav />
       <div className="gn-workspaces">
         <div className="gn-workspaces__head">
-          <h1 className="gn-page-title">Workspaces{user !== null ? ` — ${user.name}` : ''}</h1>
+          {/* exec4 E4-33: the suffix is emitted only when there IS a label.
+              This heading read `"Workspaces — "` for every person created by
+              the default email sign-up (`name: ''`), because it interpolated
+              `user.name` unconditionally. `displayLabelOf` answers the address
+              for them, and answers `''` for someone with neither — and a
+              heading must not end in an em dash for that person either. */}
+          <h1 className="gn-page-title">
+            Workspaces{user !== null && displayLabelOf(user) !== '' ? ` — ${displayLabelOf(user)}` : ''}
+          </h1>
           {/* `workspaces !== null` FIRST, and it stays load-bearing: a REFUSED
               read is also `null` here, and short-circuiting on this term before
               `.length` is what keeps a refusal from throwing instead of merely

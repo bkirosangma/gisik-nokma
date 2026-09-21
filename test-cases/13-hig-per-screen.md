@@ -350,6 +350,45 @@ rises on every route `AppNav` renders and 1 → 2 on `/privacy` and `/terms`. It
 `legal-chrome.tsx`'s own note (whose paragraph said *"the top bar and this row"* while the top bar was
 still unnamed — the correction names the half that was missing), and in the PR body, rather than absorbed.
 
+## The shell names a person who has no display name (exec4 E4-33, 2026-09-21) — case `13.1054`
+
+- **13.1054** ✅ The two labels every signed-in screen carries name the person even when the account has
+  no display name — the product's DEFAULT email sign-up, where magic-link sign-up creates `name: ''` and
+  the sign-in form asks for none. `/workspaces`' `<h1>` reads `Workspaces — accountant@e2e.gisik-nokma.local`
+  rather than the measured `Workspaces — `, the nav button reads
+  `Account menu for accountant@e2e.gisik-nokma.local` rather than `Account menu for `, and the monogram
+  draws `AC` rather than `?`. Each arm runs the SAME assertions against a named person first as its
+  positive control, because the defect is only visible in the difference between the two — and the
+  heading arm asserts the absence of a trailing em dash as well, so a regression that appends the address
+  somewhere else still fails. (`apps/web/test/display-label.test.tsx`)
+
+**The measurement.** Painted as the seeded guest `accountant@e2e.gisik-nokma.local`, `name = ''`:
+`h1.gn-page-title` → `"Workspaces — "`; `button.gn-nav__avatar-button` → `aria-label === "Account menu for "`,
+glyph `?`, `title=""`, `aria-label=""` on the avatar span. The signed-in owner paints
+`Workspaces — Kiro` / `Account menu for Kiro` / `KI` on the same elements.
+
+**One module, not a `||` at each site.** `apps/web/src/display-label.ts` holds `displayLabelOf` (name, else
+email, else `''`) and `avatarNameOf` (name, else the email's LOCAL PART — the domain is the same for
+everyone on a hosted service and would put the same letters in every monogram). **The contract that
+matters is that `''` means NO LABEL, and every caller omits its suffix for it** — which is why the h1 and
+the button are ternaries rather than interpolations, and why neither can reproduce the dangling
+punctuation for a person who has neither a name nor an address. `useCurrentUser` types `email` as
+`string | null`, so that case is reachable and not hypothetical.
+
+**Two things deliberately NOT changed, named rather than passed over.**
+
+1. **`initialsOf`'s `?` fallback stands.** A person with neither a name nor a usable address has no handle
+   to draw from, and `?` is its own documented answer (`packages/ui/src/components/avatar.tsx:19`). What
+   changed is that the caller stops FEEDING it an empty string.
+2. **The account menu's header still renders `{user.name}`.** It is a two-line block with the email on its
+   own line below, so a nameless person sees one line, not a dangling one — and routing it through
+   `displayLabelOf` would print the address TWICE, once bold and once muted, which is worse than the gap
+   it would close.
+
+**Not to be confused with two neighbours:** exec 5's E5-4 (the visibility editor's people picker) and
+E4-6 (provenance's raw-id fallback, where `provenance.ts` records a RULED decision to attribute rather
+than blank). This is the shell.
+
 ## Task 1 of the HIG per-screen plan (2026-09-08) — the four shared pieces every screen reuses
 
 - **13.288** ✅ `SegmentedControl` renders `role=tablist` (named by a required `aria-label`), one
