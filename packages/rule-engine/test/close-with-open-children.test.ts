@@ -6,7 +6,7 @@ import { REFUSAL_RULES } from '../src/refusal-rules.js';
 import { EPIC, STORY, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
 
 /**
- * E6-8 (release 2026-09-22, B12). Case 4.23 — a parent cannot enter a
+ * 4.55 — E6-8 (release 2026-09-22, B12). Case 4.23 — a parent cannot enter a
  * terminal state while any child is non-terminal — is held by the transition
  * door. Two republish doors walk around it without a transition: a kept
  * state promoted from `active` to `terminal`, and a dropped open state
@@ -54,7 +54,7 @@ const V2_MAPPED: PublishedWorkflowDef = {
   stateMapping: { doing: 'done' },
 };
 
-describe('E6-8: a parent may not be CLOSED over open children, however its terminal state was reached', () => {
+describe('4.55 E6-8: a parent may not be CLOSED over open children, however its terminal state was reached', () => {
   it('CONTROL: the transition door still refuses the parent entering terminal over the open child (4.23)', async () => {
     expect(await evaluateEvent(move(P, 'done'), buildMemoryContext([WF], parentDoingChildOpen))).toMatchObject({
       refused: true,

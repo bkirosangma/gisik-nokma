@@ -7,7 +7,7 @@ import { REFUSAL_RULES } from '../src/refusal-rules.js';
 import { EPIC, STORY, TASK, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
 
 /**
- * E3-19 (release 2026-09-22, B12). The parent-terminal invariant — "parents
+ * 4.54 — E3-19 (release 2026-09-22, B12). The parent-terminal invariant — "parents
  * cannot outrun children" — was guarded in ONE direction: `transition.ts`
  * refused a parent ENTERING terminal over open children (case 4.23) and said
  * nothing when a child LEFT terminal under a parent already finished, which
@@ -45,7 +45,7 @@ const TWO_TERMINAL: PublishedWorkflowDef = {
 /** P (story, root) with C (task) under it; C finished, then P finished — the only order 4.23 allows. */
 const parentFinishedOverFinishedChild = [...TYPES, created(P, 'story', null), created(C, 'task', P), move(C, 'done'), move(P, 'done')];
 
-describe('E3-19: a child may not leave a terminal state under a terminal parent', () => {
+describe('4.54 E3-19: a child may not leave a terminal state under a terminal parent', () => {
   it('refuses the child reopening under a finished parent, naming the parent and its state', async () => {
     const ctx = buildMemoryContext([WF], parentFinishedOverFinishedChild);
     // Sanity of the fixture: both sit in Done before the probe.
