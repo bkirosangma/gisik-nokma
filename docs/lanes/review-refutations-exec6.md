@@ -70,6 +70,10 @@ E6-8, E6-9, E6-11: all "hold") read; E3-25, E3-26, E3-27 re-measured below.
   `http-origin.ts:180-181`'s exclusion reasoning ("a workspace they can leave") assumes it, and Appendix Y measures
   that a member's and a guest's self-revocation are refused while the owner's revocation of the member commits
   (the control) and an admin's self-revocation commits (so "leaving" exists for admins only). With E3-14's forced join, the absence is what makes that join permanent — which is why it is Important.
+- **E6-14** — exec 3's examination (not a refutation) measured the headline's interval against the key's LEDGER half
+  (`ac18f2bc`, 13:04) where the WIRE half came at `277b5d22` (23:07). Conceded and narrowed in a dated
+  *Defence and correction* paragraph under E6-14 in the report (`a53a6929`); the Minor's basis — `:1588` reads the
+  key while `:296-306` says none exists — is what exec 3 itself confirms holds.
 - **E6-25** — "comments in a deploy file are not the product." Answer: filed Minor for exactly that reason; the
   class (a record declaring a closed gap open) is the one the judge priced in round 1 (E3-1) and exec 3 re-files
   six times this round (E3-22 … E3-27); two of the six sentences are security claims an operator acts on, and every
@@ -278,4 +282,5 @@ which. A projection kept "in case" is the rule the repo states for controls and 
 
 **Stamp:** written 2026-09-21 11:25 IST, E3-14 row amended 12:00 IST after E6-21; phase 1; branch heads as listed above.
 **Phase 2:** R6-1 filed 15:10 IST against `origin/exec5/review-ux` at `1641161d`; R6-2 filed 15:16 IST against
-`origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head; E6-26 (phase-2, half) filed 15:30 IST.
+`origin/exec2/review-ux-r2` at `778a6439` (same probe); R6-3 filed 15:20 IST against the same head; E6-26 (phase-2, half) filed 15:30 IST. **15:44 IST:** exec 5's file (`d3234320`) records R6-1 as CONCEDED
+(*"R6-1 was right about my absolute"*, E5-21 refiled narrower); E6-14 defence paragraph added to the report.
