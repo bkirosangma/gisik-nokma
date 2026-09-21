@@ -20,3 +20,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-V1 | done | ea000e4c | 13.1162 empty-board copy+glyph gating & shell wiring (RED 2 core / 1 web; 1728 + 636 green) |
 | T-V5 | done | ab79978e | 13.1163 contested arm via ticketLocation.locate (RED 2 / GREEN 638) |
 | T-E2-38 | done | af14c3f4 | 13.1164 archived chip on the project page (RED 1 / GREEN 640) |
+| T-E5-23 | done | 962eae8f | 13.1165 founder's empty home (RED 1 / GREEN 642) |
