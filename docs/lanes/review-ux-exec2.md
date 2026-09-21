@@ -1265,6 +1265,28 @@ shape this very effect uses for its second promise.
 `ticket-type-editor-screen.tsx:187-197` and `:240-251`. Both `Promise.all` call sites were read in full;
 neither has a second argument to `.then`, and neither has a `.catch`.
 
+**AND THE PRODUCT HAS ALREADY MET THIS EXACT FAILURE MODE, DOCUMENTED IT, AND GUARDED ONE SITE AGAINST IT —**
+**which is the strongest form this finding can take, and it came from completing the `/members` screen reach.**
+`apps/web/app/w/[state]/members/page.tsx:480-492` works through the identical hazard:
+
+> *"This product removed `Owner` from the options, and the two halves do not compose: a `Select` whose `value`
+> matches no option renders its PLACEHOLDER (`packages/ui/src/select/select.tsx:255`, `selected ?
+> selected.label : placeholder`), so an owner's cell would read `Select…` — **a cell that does not say what that
+> person's role is, on the screen whose whole subject is who holds what. A control that cannot state the value
+> it would change is the same failure as a control that cannot be honoured, one step quieter.**"*
+
+**And it guards it**: the render at `:510` is `adminGate.kind === 'admin' && isEditableRole(member.role) ?
+<Select …/> : <span className="gn-chip gn-members__role">{member.role}</span>` — **the owner's row takes the chip
+arm, so no `Select` is ever mounted over a value its own option list excludes.** The citation is accurate, too:
+`select.tsx:255` is exactly the line quoted.
+
+**So the product knows this failure mode, names its consequence in its own words (*"one step quieter"*), and
+guards the site where a person's ROLE is at stake — while (a) `new-ticket-dialog.tsx:97,280` mounts a `Select`
+over a `typeId` its option list can stop containing, and (c) `visibility-editor.tsx:237-238,379-414` does the
+same with `mode`/`userIds`.** That is not a house style with one lapse; it is a **documented rule applied at one
+site and not at two others**, which is why this finding is Important rather than Minor and why the remedy is
+already written down in the repository: guard the control on MEMBERSHIP IN THE LIST, as `isEditableRole` does,
+rather than on the seeded value's emptiness.
 **And the same app does it right, one file over** — which is what makes this an inconsistency rather than a
 house style. `apps/web/app/settings/page.tsx:277-284`, the Workspace settings tab, reads the identical hook
 and puts the arms in the correct order:
