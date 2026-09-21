@@ -4,6 +4,7 @@ import '@gisik-nokma/ui/ui.css';
 import '@gisik-nokma/editor/editor.css';
 import './globals.css';
 import { Providers } from '../src/providers.js';
+import { RouteAnnouncer } from '../src/route-announcer.js';
 
 export const metadata = { title: 'Gisik Nokma' };
 
@@ -42,6 +43,13 @@ export default function RootLayout({ children }: { children: ReactNode }) {
         <style dangerouslySetInnerHTML={{ __html: themeStylesheet() }} />
       </head>
       <body>
+        {/*
+          P18 — outside `Providers` deliberately. It reads the route and the
+          document, and nothing from the app's service seam; mounting it here
+          means a route change is announced on every page in the product,
+          including the pages that render no shell.
+        */}
+        <RouteAnnouncer />
         <Providers>{children}</Providers>
       </body>
     </html>
