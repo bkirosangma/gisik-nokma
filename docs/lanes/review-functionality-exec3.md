@@ -4335,8 +4335,9 @@ whole instrument.
 → `fc904f4a 2026-08-31`; `git log --since=2026-08-31T23:59 --format=%h -- …/check-permission.ts | wc -l` → 13 (16 in all). **Not run:** the sync test
 (it needs the test Postgres); the witness is cited from its assertion, opened at the line. **Control:** the falsifier is
 the grep the docblock's own reader would run — `grep -rn "'/v1/sync'" apps/server/src` → `sync-routes.ts:491` — and the
-same grep for the door the docblock calls CLOSED, `"'/v1/events'"`, → `routes/events.ts` (so the instrument finds the
-door it should and the docblock's first bullet is true while its third is not).
+same grep for the door the docblock calls CLOSED, `"'/v1/events'"`, → five lines in three files, the registration
+among them at `routes/events.ts:85` (so the instrument finds the door it should, and the docblock's first bullet is
+true while its third is not).
 
 **SEVERITY: Important (claimed), scored at half.** A security gate's own enumeration of its doors is wrong about
 one of three, in the direction that sends a reader to build a closure that exists.
