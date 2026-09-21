@@ -1463,3 +1463,97 @@ describe('GET /v1/me/work — backlog and closed (owner request, 2026-09-17)', (
     expect(shared).not.toContain(sharedClosedId);
   });
 });
+
+describe('GET /v1/me/work — a contested claim on a SOFT-DELETED ticket (round-1 F4, release batch B07)', () => {
+  /**
+   * `readContested` gates the title on `row.deleted_at === null && (await
+   * canSee(…))`. 7.217 constrains the `canSee` half; nothing constrained the
+   * `deleted_at` half — the finding measured the full server suite
+   * byte-identical with that conjunct removed (1727 passed / 0 failed), and
+   * 16.90(b) recorded it with the owner "whoever next picks up the
+   * contested-claim surface". This is that fixture.
+   *
+   * Two tickets, both the owner's own claims, both visible to the owner, one of
+   * them then soft-deleted. The LIVE sibling is the control inside the same
+   * case: its title is served by VALUE, so `null` on the deleted one is the
+   * conjunct answering and not a route that joins no title. And the
+   * before-delete read is taken first, so the delete is the only difference
+   * between the two answers.
+   *
+   * Placed LAST in the file on purpose: a soft-deleted ticket is absent from
+   * every group the cases above count, and this describe adds two rows to the
+   * shared world.
+   */
+  it('F4: the deleted ticket keeps its row and loses its title; the live sibling keeps both', async () => {
+    const doomedId = newUlid();
+    const liveId = newUlid();
+    const ws = { workspaceId: read.world.workspaceId, actorId: read.world.owner };
+    const contestOn = (ticketId: string): LedgerEvent =>
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'claim.contested',
+        payload: {
+          originalEvent: {
+            id: newUlid(),
+            workspaceId: read.world.workspaceId,
+            entity: { kind: 'ticket', id: ticketId },
+            type: 'ticket.transitioned',
+            version: 1,
+            payload: { toStateId: 'done' },
+            actorId: read.world.owner,
+            origin: 'web',
+            clientTime: '2026-08-20T09:00:00.000Z',
+          },
+          rule: 'require-field',
+          reason: 'A due date is required before this move.',
+        },
+      });
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: doomedId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: read.world.projectId, parentId: null, title: 'Contested, then deleted' },
+      }),
+      makeCommitted({
+        ...ws,
+        entity: { kind: 'ticket', id: liveId },
+        type: 'ticket.created',
+        payload: { typeId: 'task', projectId: read.world.projectId, parentId: null, title: 'Contested, still live' },
+      }),
+      contestOn(doomedId),
+      contestOn(liveId),
+    ]);
+
+    const titlesOf = async (): Promise<Map<string, string | null>> => {
+      const res = await read.app.inject({
+        method: 'GET',
+        url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+        headers: read.authOf('owner'),
+      });
+      expect(res.statusCode).toBe(200);
+      return new Map((res.json() as MyWorkResponse).contested.map((each) => [each.ticketId, each.title]));
+    };
+
+    // Before the delete: both rows, both titles, by VALUE.
+    const before = await titlesOf();
+    expect(before.get(doomedId)).toBe('Contested, then deleted');
+    expect(before.get(liveId)).toBe('Contested, still live');
+
+    await applyCommitted(db.pool, [
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: doomedId }, type: 'ticket.deleted', payload: {} }),
+    ]);
+    // The projection folded it — the flag is there for the route to read.
+    const head = await db.pool.query<{ deleted_at: Date | null }>('SELECT deleted_at FROM proj_tickets WHERE ticket_id = $1', [doomedId]);
+    expect(head.rows[0]?.deleted_at).not.toBeNull();
+
+    // After: the row survives (the claim is the viewer's own record) and the
+    // title does not (the ticket's content is gone from every view). The live
+    // sibling, read in the same answer, is unchanged.
+    const after = await titlesOf();
+    expect(after.has(doomedId)).toBe(true);
+    expect(after.get(doomedId)).toBeNull();
+    expect(after.get(liveId)).toBe('Contested, still live');
+  });
+});

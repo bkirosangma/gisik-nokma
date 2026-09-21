@@ -152,15 +152,21 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * — the file's own docblock says it is *"`LIVE_TICKET_WHERE`'s rule reaching the
  * one surface that cannot filter its row, so it is applied to the TITLE alone"*.
  *
- * **MEASURED SURVIVOR**: with the `row.deleted_at === null &&` conjunct removed,
- * 89 tests across 7 files stay green. The same invocation run against site 6
- * (`my-work.ts:141`) reports 18 failures — so the command CAN fail, and an edit
- * to that very file reaches the compiled artifact. Neither arm contains the word
- * `contested`, and `test/routes/my-work.test.ts` never exercises a deleted
- * ticket. Covering it needs a contested-claim fixture, which is a different
- * subsystem from anything this task builds.
- *
- * **Named owner: whoever next picks up the contested-claim surface.**
+ * **MEASURED SURVIVOR when this was written, WITNESSED since 2026-09-21** (round-1
+ * F4, release batch B07). Then: with the `row.deleted_at === null &&` conjunct
+ * removed, 89 tests across 7 files stayed green, while the same invocation run
+ * against site 6 (`my-work.ts:141`) reported 18 failures — the command could
+ * fail, and an edit to that file reached the compiled artifact; neither arm
+ * contained the word `contested`, and `test/routes/my-work.test.ts` never
+ * exercised a deleted ticket. Now: that suite's last case (case 17.124, "F4:
+ * the deleted ticket keeps its row and loses its title; the live sibling keeps
+ * both") contests two of the owner's own tickets, reads both titles by VALUE,
+ * soft-deletes one, and reads again — the row survives, the title is `null`,
+ * the live sibling is unchanged. Re-run of the same mutation against it:
+ * `Tests  1 failed | 24 passed (25)`, at `expected 'Contested, then deleted'
+ * to be null`. It is constrained by that case and by nothing in THIS file,
+ * which is why the paragraph stays: this file's table of sites says which arm
+ * covers each, and for this one the answer is neither arm.
  *
  * #### (c) `packages/app-core/src/replica/replica-data-source.ts` — the OFFLINE source's two gates
  *

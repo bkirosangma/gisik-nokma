@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.123`** |
+| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.124`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -199,3 +199,17 @@ in §12 because that section owns the replica.*
   the door half creates under / moves onto a deleted story (refused) and its live twin (committed), then
   restores one and creates under it. —
   (`packages/rule-engine/test/deleted-hierarchy.test.ts`, `apps/server/test/integration/soft-deleted-hierarchy.test.ts`)
+- **17.124** ✅ **A contested claim on a soft-deleted ticket keeps its row and loses its title; the live
+  contested sibling keeps both** (round-1 F4). `routes/my-work.ts` gates a contested claim's title on
+  `row.deleted_at === null && (await canSee(…))`; 7.217 constrained the `canSee` half and nothing
+  constrained the `deleted_at` half — the finding measured the full server suite byte-identical with it
+  removed, and 16.90(b) recorded the gap with the owner "whoever next picks up the contested-claim
+  surface". The fixture: two of the owner's own tickets, both contested, both titles read by VALUE before
+  the delete; one soft-deleted (the projection's `deleted_at` read back before the route is asked); after,
+  the deleted one's row is present with `title: null` and the live one is unchanged in the same answer —
+  so `null` is the conjunct answering, not a route that joins no title. GREEN on first run (the conjunct is
+  correct); RED by the finding's own mutation (`row.deleted_at === null &&` removed): `Tests 1 failed | 24
+  passed (25)` at `expected 'Contested, then deleted' to be null`, restored from a copy and verified. Placed
+  last in its file because a deleted ticket is absent from every group the cases above count. —
+  (`apps/server/test/routes/my-work.test.ts`, "F4: the deleted ticket keeps its row and loses its title; the
+  live sibling keeps both")
