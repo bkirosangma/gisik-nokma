@@ -14,6 +14,7 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | B13 | claimed | 2026-09-21 21:52 | /Users/kiro/my_projects/gisik-nokma-ds3 |
 | T-E5-2 | done | 049c8c60628a97ec697b3656f9878155223f48d1 | board.test.tsx 13.1177 x6; 2 mutations, distinct signatures |
 | T-E5-6 | done | 0f9005c603ec2931987c4dfc131c003a97315645 | ticket-sheet.test.tsx 13.1178 x6; 2 mutations (one SURVIVED first, case was vacuous, fixed) |
+| T-E5-43 | done | 13308826a93f325620e65fc873820f41fc42bd44 | project-calendar-timeline.test.tsx 13.1179 x3; 2 mutations, distinct signatures |
 
 **§13 id block for B13 (controller allocation, 2026-09-21 22:0x): `13.1177`–`13.1186`** — §13 ids are now per release batch like §17; the block table lands in `test-cases/13-hig-per-screen.md`. B13 mints §13 ids only from this block, and inside the block in order. **Spent: `13.1177` (T-E5-2). Next free: `13.1178`.** If `check-case-ids` ever reds on a collision with `main`, `main`'s ids never move — renumber OURS into the block. For any section with no block table, the next free id is the max over `origin/main` AND every `origin/rel/*` head, verified by union==sum.
 
