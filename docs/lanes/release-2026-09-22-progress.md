@@ -58,3 +58,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-12 | done | 15bcaba9 | prose-only: Features.md "eleven checks" dropped; reserved-id class added to the enumeration |
 | T-E3-13 | done | 01c9de90 | prose-only: visible-where.ts cites the fixture row by content, not by :88 |
 | T-E3-16 | done | c0606d63 | citation sweep: 11 live sites cite the roster-cut clause by its words (ui 57, app-core 25) |
+| T-E3-17 | done | c97c7f31 | prose-only: outbox docblock drops the derived total (sync-client 90) |
