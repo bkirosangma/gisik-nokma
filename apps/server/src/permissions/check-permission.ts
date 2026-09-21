@@ -528,9 +528,14 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
  * - **CLOSED:** `POST /v1/events`, which calls `ingestClientBatch` with the
  *   session `requireSession` resolved.
  * - **NOT CLOSED, by design:** direct `ingestBatch` — the internal append path.
- * - **NOT CLOSED, because it does not exist yet:** `POST /v1/sync` (Plan 10).
- *   **When it is built it must call `ingestClientBatch`**, or offline-originated
- *   events bypass this gate entirely.
+ * - **CLOSED:** `POST /v1/sync` (Plan 10 Batch A, landed 2026-09-04) —
+ *   `sync-service.ts` calls `ingestClientBatch` for the client's offline claim
+ *   (its `claim.contested` append is the server-origin exception above, through
+ *   `serverAppend`). Witnessed by `sync-route.test.ts`'s door test 12.102: an
+ *   offline claim wearing envelope-origin `server` is contested by this gate,
+ *   not committed. (E3-32 — this bullet previously read "does not exist yet"
+ *   after the route had existed, called this gate and been tested for 16 days;
+ *   `test/permissions/check-permission.test.ts` now asserts this text.)
  *
  * ## Do not fold this into `IngestDeps.gates`
  *
@@ -639,6 +644,26 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   // and it is a different question with a different answer — a project admin
   // runs their project's roster, not the workspace's door.
   if (env.type === 'membership.granted' || env.type === 'membership.revoked') {
+    // E6-21 — leaving is not membership MANAGEMENT, so it is not gated by
+    // isWorkspaceAdmin: any role may revoke their OWN membership. Two
+    // documents already assumed this was possible — http-origin.ts's docblock
+    // excludes the invite-accept door from the CSRF set because acceptance
+    // lands "in a workspace they can leave", and the export's privacy copy
+    // promises the same — while the gate below refused every self-revoke
+    // with WORKSPACE_MEMBERSHIP_REASON, same as anyone managing someone else.
+    // The sole-owner case is NOT re-guarded here: `rule-engine/checks/
+    // membership.ts`'s last-owner guard runs in the engine for every door,
+    // counts owners in the WORLD rather than trusting this gate's actor
+    // check, and already refuses the one shape that would leave the
+    // workspace ownerless — a self-revoke by role fails BOTH clauses of the
+    // condition below, so `parsed.data.userId === ctx.sessionUserId` reads it
+    // correctly regardless of the actor's role.
+    if (env.type === 'membership.revoked') {
+      const parsed = membershipRevokedPayload.safeParse(env.payload);
+      if (parsed.success && parsed.data.userId === ctx.sessionUserId) {
+        return null;
+      }
+    }
     if (!isWorkspaceAdmin) {
       return refuse(WORKSPACE_MEMBERSHIP_REASON);
     }

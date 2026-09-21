@@ -2805,3 +2805,18 @@ the native app learns the OS preference". The answer is `useColorScheme()` plus 
 > dark is NOT claimed here: that needs a device, and 12.396 asserts the declaration that makes it
 > possible rather than a rendered result.
 
+- **12.398** ✅ E3-32 — `check-permission.ts`'s own status list, above `SERVER_ORIGIN_REASON`, said
+  `POST /v1/sync` **"NOT CLOSED, because it does not exist yet"** for 16 days after the route had
+  existed (`999d4860`, 2026-09-04), called this gate (`sync-service.ts` → `ingestClientBatch`), and been
+  witnessed by this file's own door test, 12.102. A status list is prose; nothing reread it against
+  reality, because nothing could — a docblock is not an instrument until a test reads it back. Fixed to
+  **CLOSED**, naming 12.102 as the witness, and `check-permission.test.ts` now asserts the exact stale
+  bullet is gone (matched on `NOT CLOSED, because it`, not the bare phrase `does not exist yet`, which
+  also names an unrelated workspace-does-not-exist-yet check twice elsewhere in the same file — a
+  bare-substring assertion would have been satisfied by text this task never touched). RED against the
+  stale docblock, restored and reproduced: `Tests  1 failed | 1 passed | 9 skipped (11)`. GREEN at head:
+  `Tests  11 passed (11)`. Positive control in the same describe block: the file must still be read as
+  more than 10,000 characters and contain `SERVER_ORIGIN_REASON` and the sibling `NOT CLOSED, by design`
+  bullet, or a moved file or a typo'd path would pass the negative assertion for the wrong reason.
+  (`apps/server/test/permissions/check-permission.test.ts`)
+

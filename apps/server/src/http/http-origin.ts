@@ -147,6 +147,12 @@ export const FORBIDDEN_ORIGIN_BODY = { error: 'forbidden_origin' } as const;
  * causing a state change with an ambient credential, and this server's reads
  * change none. `GET /v1/sync/bootstrap` is the largest read here and is
  * rate-limited for that reason (`app.ts`), which is a different control.
+ *
+ * **`GET /v1/stream` is the one exception, and it is not in this set** (E6-15):
+ * `httpOriginRefused` checks it by NAME (`STREAM_ROUTE_URL`), for any method,
+ * because a WebSocket upgrade is exempt from the same-origin policy that makes
+ * every other `GET` here safe to leave unchecked — see that function's own
+ * comment.
  */
 export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   '/v1/events',
@@ -189,6 +195,14 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // whoever was mid-approval. A sibling PATH rather than a `deny` flag on
   // approve — see the route's own note for why that shape is refused.
   '/v1/mcp/device/deny',
+  // E3-14 — three UNRECORDED omissions found by the same measurement (the
+  // assembled route table, probed with a cookie-carrying forged-Origin
+  // request at every non-GET route) that first found the three above. Unlike
+  // the invite TOKEN accept and `PUT /v1/me/preferences` — excluded above by
+  // a recorded ruling this task does not revisit — nothing excludes these:
+  '/v1/me/notification-preferences',
+  '/v1/me/invitations/:inviteId/accept', // membership-granting, cookie-authenticated
+  '/v1/me/invitations/:inviteId/decline',
 ]);
 
 /**
@@ -220,7 +234,19 @@ export function normalizeOrigin(webOrigin: string): string {
  *
  * Returns `true` when the request must be REFUSED.
  */
-const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+// Exported so a test asserting "every mutating route in the real app is
+// covered" (E3-15) filters on the SAME set this file refuses by, rather than
+// a second, hand-copied literal that could drift from it unnoticed.
+export const MUTATING_METHODS: ReadonlySet<string> = new Set(['POST', 'PUT', 'PATCH', 'DELETE']);
+
+/**
+ * `/v1/stream`'s route pattern (`stream/routes.ts`) — checked by
+ * `httpOriginRefused` for ANY method, not just the four in `MUTATING_METHODS`
+ * above. See E6-15's comment on the check itself for why: a WebSocket upgrade
+ * is a GET, and this is the one GET route a forged cross-site request can
+ * still hijack something by reaching.
+ */
+export const STREAM_ROUTE_URL = '/v1/stream';
 
 export function httpOriginRefused(input: {
   method: string;
@@ -256,8 +282,22 @@ export function httpOriginRefused(input: {
   // decision has no maintainer** — nothing fails when it drifts — so the honest
   // form states the property (all-POST-when-widened) and leaves the arithmetic
   // to whoever next measures the set.
-  if (!MUTATING_METHODS.has(input.method)) return false;
   if (input.routeUrl === undefined) return false;
+  // E6-15 — the ONE non-mutating door this check covers, and covered by NAME
+  // rather than by widening `MUTATING_METHODS`. Opening `/v1/stream` changes
+  // no state, so it is not the CSRF this file otherwise refuses — it is
+  // cross-site WEBSOCKET HIJACKING: a cookie-carrying GET upgrade from a
+  // foreign page hands that page the victim's live event stream, same-origin
+  // policy notwithstanding, because a WebSocket handshake is exempt from it.
+  // `SameSite=Lax` does not close this either — a top-level GET navigation
+  // still attaches a `Lax` cookie, and an upgrade IS a GET. Checked before
+  // `requireSession` (this hook runs first in `app.ts`), so a forged-origin
+  // handshake never reaches the socket at all.
+  if (input.routeUrl === STREAM_ROUTE_URL) {
+    if (input.cookie === undefined) return false;
+    return input.origin !== input.expectedOrigin;
+  }
+  if (!MUTATING_METHODS.has(input.method)) return false;
   if (!HTTP_ORIGIN_PROTECTED_ROUTES.has(input.routeUrl)) return false;
   // No ambient credential, nothing to forge. A bearer client lands here.
   if (input.cookie === undefined) return false;

@@ -332,6 +332,50 @@ describe('ingestBatch', () => {
   });
 
   /**
+   * E6-18 — a U+0000 byte in a payload string answers `invalid` for that
+   * event, not a thrown 500 that aborts the whole batch. Postgres cannot
+   * carry a NUL byte in `text` or `jsonb`; `insertEvent` binds the payload
+   * into a `jsonb` column, so this reproduces the DEFECT — a real Postgres
+   * error escaping `ingestAll` unguarded, the exact shape `routes/events.ts`
+   * has no `try` around — measured RED before the fix, not assumed.
+   *
+   * Narrow scope, stated rather than implied: this closes the ONE mechanism
+   * named in the judge's line (`ingest-service.ts`'s unguarded rethrow) for
+   * ONE parameter class (a payload string, via `workspace.created`'s `name`).
+   * The reviewer's wider count — 23 parameters on 19 doors, including raw id
+   * PATH parameters that never reach `commitOne` at all (they 500 earlier, at
+   * a route-level query) — is not this test's claim and is not fixed here;
+   * see the commit body.
+   */
+  it('3.900 E6-18 a U+0000 byte in a payload string is answered invalid, not thrown as an unhandled 500', async () => {
+    const event = submittedWorkspaceCreated({ payload: { name: 'Evil\u0000name' } });
+    const results = await service().ingestBatch([event]);
+    expect(results[0]).toMatchObject({ status: 'invalid', eventId: event.id });
+    if (results[0]?.status === 'invalid') {
+      expect(results[0].message).toContain(event.id);
+    }
+    const ledger = await db.pool.query('SELECT count(*)::int AS n FROM events WHERE id = $1', [event.id]);
+    expect(ledger.rows[0]).toEqual({ n: 0 });
+  });
+
+  /**
+   * The control for the case above: the SAME batch's OTHER events still get
+   * judged rather than the whole batch aborting — the "poison claim the
+   * offline outbox retries forever" half of the finding. A batch-killing
+   * throw would leave the second event's status unreadable (the promise
+   * rejects before either result exists); this asserts both results exist
+   * and only the NUL one is `invalid`.
+   */
+  it('3.901 E6-18 control: a U+0000 event does not poison the rest of its batch', async () => {
+    const poisoned = submittedWorkspaceCreated({ payload: { name: 'Evil\u0000name' } });
+    const clean = submittedWorkspaceCreated();
+    const results = await service().ingestBatch([poisoned, clean]);
+    expect(results).toHaveLength(2);
+    expect(results[0]).toMatchObject({ status: 'invalid', eventId: poisoned.id });
+    expect(results[1]).toMatchObject({ status: 'committed', eventId: clean.id });
+  });
+
+  /**
    * 3.30 — A ROLLBACK that itself throws (dead connection) does not swallow or replace the original duplicate-event-id answer, which still lands unchanged.
    */
   it('planted defect: a ROLLBACK that throws cannot swallow the duplicate-event-id answer', async () => {

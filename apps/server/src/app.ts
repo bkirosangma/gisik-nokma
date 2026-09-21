@@ -1,6 +1,6 @@
 import cors from '@fastify/cors';
 import Fastify from 'fastify';
-import type { FastifyError, FastifyInstance, FastifyRequest } from 'fastify';
+import type { FastifyError, FastifyInstance, FastifyRequest, onRouteHookHandler } from 'fastify';
 import type { Pool } from 'pg';
 import { hstsHeaderFor } from './http/hsts.js';
 import { SECURITY_HEADERS } from './http/security-headers.js';
@@ -308,6 +308,13 @@ export function buildApp(
      * this suite's sixty-odd apps included, gets silence.
      */
     alerter?: ErrorAlerter;
+    /**
+     * TEST-ONLY (E3-15). Attached before any route is registered, so it
+     * observes every route this app actually serves — see the wiring's own
+     * comment, just below the `Fastify(...)` call, for why a hook added by a
+     * caller AFTER `buildApp` returns cannot do the same.
+     */
+    onRoute?: onRouteHookHandler;
   } = {},
 ): FastifyInstance {
   const app = Fastify({
@@ -365,6 +372,20 @@ export function buildApp(
     // Unknown keys are refused, not silently dropped: `additionalProperties: false` declares reject-intent; AJV's removeAdditional default would have silently stripped them instead.
     ajv: { customOptions: { coerceTypes: false, removeAdditional: false } },
   });
+
+  // E3-15 — a TEST-ONLY seam, wired before a single route is registered.
+  // `onRoute` fires at REGISTRATION time (`fastify@5.12.1`'s `lib/route.js`),
+  // and every root-level route below is registered SYNCHRONOUSLY as this
+  // function runs — a caller that received `app` back and attached its own
+  // `onRoute` hook would have already missed all of them; only the two
+  // routes declared inside a child `app.register(...)` scope (deferred to the
+  // `ready()` boot sequence) would still fire for it. `options.onRoute`,
+  // absent in every non-test caller, is therefore attached HERE, first, so a
+  // test can observe every route this app actually serves rather than a
+  // second, hand-maintained list of them.
+  if (options.onRoute) {
+    app.addHook('onRoute', options.onRoute);
+  }
 
   // A refusal explains itself; a breakage does not get to. Schema refusals
   // (FST_ERR_VALIDATION and every other 4xx) are the door's answer to a

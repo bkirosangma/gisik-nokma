@@ -16,8 +16,8 @@ file's then-highest id rather than renumbering, exactly as §13 records doing fo
 one exception a reader will otherwise trip on: **`14.100` is Task 5's manual end-to-end case**, minted
 out of band when a Task 5/Task 6 id collision was fixed. The `last_used` column added on the owner's
 2026-09-08 ruling therefore sits at `14.102–14.103`, not `14.100–14.101`. That collision was caught by
-`check-case-ids`, not by reading. **Next free: `14.112`** — recounted 2026-09-19 after the denial
-door took `14.104`–`14.111`.***
+`check-case-ids`, not by reading. `14.112`–`14.112b` are E6-16's (release plan B01, 2026-09-21). **Next
+free: `14.113`.***
 
 ## Task 1 — configuration (`packages/mcp-server`)
 
@@ -122,6 +122,8 @@ which is the door that requires identity, and therefore the door that needs CSRF
 - **14.109** ✅ Approve still posts to `/v1/mcp/device/approve` — the positive control proving the two doors really are two. — (`apps/web/test/mcp-authorize.test.tsx`)
 - **14.110** ✅ Both controls are disabled until a code is present, so neither can be pressed into an empty POST. — (`apps/web/test/mcp-authorize.test.tsx`)
 - **14.111** ✅ A refusal on DENY is rendered as a sentence naming BOTH possibilities ("not recognised … already been used"), and the form returns rather than sticking in a sending state. — (`apps/web/test/mcp-authorize.test.tsx`)
+- **14.112** ✅ E6-16 — an MCP token cannot approve a device code, not even its own successor. `requireSession` accepts either a real better-auth session or an MCP personal-access-token bearer, and nothing previously distinguished them, so a token could mint a SUCCESSOR device code that survives revoking the token that minted it — falsifying the consent page's "it lasts until you revoke it". Mints a real token by walking the flow once as a signed-in person, then uses THAT token (not the session bearer) to attempt approving a second code: `403 { error: 'mcp_token_may_not_decide_device_grant' }`. *Planted defect, run: reverting `require-session.ts`'s two `authKind` stamps and `mcp-device.ts`'s two refusal checks reddens 14.112 and 14.112b together — `expected 200 to be 403` on both, the approval and the exchange both succeeding through the forged authority. Restored, full suite green.* — (`apps/server/test/mcp/device-flow.test.ts`)
+- **14.112b** ✅ The mirror for DENY: an MCP token cannot deny a device code either, same refusal, same reason a forged deny is no less an act on someone else's authority than a forged approve. — (`apps/server/test/mcp/device-flow.test.ts`)
 
 *The accessible names on this screen are asserted **by string** (`getByRole('button', { name: 'Deny' })`), because `e2e-viewport`'s sweep counts `aria-label` ATTRIBUTES and cannot tell one name from another — and **neither accessible-names baseline carries a `/mcp/authorize` key** (measured 2026-09-19), so nothing else in the suite is watching these strings.*
 

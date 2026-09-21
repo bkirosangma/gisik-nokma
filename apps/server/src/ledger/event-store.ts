@@ -165,3 +165,20 @@ export function isUniqueViolation(error: unknown, constraint: string): boolean {
   const candidate = error as { code?: unknown; constraint?: unknown };
   return candidate.code === '23505' && candidate.constraint === constraint;
 }
+
+/**
+ * E6-18 — SQLSTATE `22P05`, "unsupported Unicode escape sequence": Postgres's
+ * `jsonb` refuses a U+0000 byte in a key or a value. MEASURED against this
+ * product's own Postgres (`SELECT $1::jsonb` with a NUL-carrying string) —
+ * this is `events.payload`'s column type, so any payload string a submitter
+ * can freely choose (a workspace name, a ticket title, a comment body) can
+ * raise this from inside the ingest transaction, unrelated to `constraint` and
+ * needing no disambiguation the way `isUniqueViolation` does.
+ */
+export function isInvalidUnicodeEscape(error: unknown): boolean {
+  if (typeof error !== 'object' || error === null) {
+    return false;
+  }
+  const candidate = error as { code?: unknown };
+  return candidate.code === '22P05';
+}
