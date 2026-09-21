@@ -281,6 +281,8 @@ Round 1's stated #1 boundary was *"NO signed-in route was measured at paint"*, b
 
 **BLAST RADIUS.** Every `Select` mount: the sheet's Assignee, the New-ticket `Type`/`Parent` comboboxes, `/members` Role and Channel, `/account`'s style and theme toggles, the ticket-type editor's Workflow picker, the builder's per-state Category. Round 1's P11 said the panel had never been measured; this is the measurement, and it fails on focus rather than on size (the options are `184×36`, above the 24 in-list floor).
 
+**THE CATALOGUE ALREADY NAMES THIS DEFECT — for two other components.** `test-cases/13-neomorphism-and-workspace-screens.md:1730-1731` (`13.420`, the account menu): *"Escape closes the menu AND returns focus to the trigger. The focus half is the load-bearing one: closing without it **strands focus at the document root**"*; `13-board-prototype-port.md:165-166` (`13.446`, the Filters sheet) is the same contract, mutation-verified. No case makes the claim for `Select`, and `Select` is the one that strands.
+
 **WHY IT IS WRONG.** WCAG 2.4.3 (Focus Order) and the ARIA listbox/select pattern both require focus to return to the control that opened the popup. On a sheet with ~37 focusables, landing on `body` means Tabbing from the nav again to get back.
 
 **WHAT WOULD HAVE BEEN BETTER.** Wrap `SelectPanel`'s content in `<FocusScope restoreFocus autoFocus>` (one import from `@react-aria/focus`), or call `triggerRef.current?.focus()` in the `onClose` passed to `useOverlay`.
