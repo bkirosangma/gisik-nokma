@@ -180,7 +180,11 @@ and the move is the case's own sentence — not filed), `checks/hierarchy.ts:125
 refused), `auth/auth.ts:318-345` (plugin defaults), `auth/social-providers.ts` (whole: a half-configured provider
 reads as OFF by its docblock's own rule), `visibility/rollup.ts` (whole; `proj_rollups` has no product reader —
 `getRollup` is called from tests only — and `rollup.ts:79-96` records why the cards do not read it; not filed),
-`projections/workflows.ts` (whole), `mcp-server/src/{config,
+`projections/workflows.ts` (whole), `gates/image-embed-gate.ts` (whole: embeds are scoped to the ticket the
+claim is about; `comment.added` is the only comment type in the vocabulary, so no edit door bypasses it),
+`attachments/sniff.ts` (whole: content-sniffed allowlist, no SVG/HTML, `nosniff` and `inline` only for images at
+`routes/attachments.ts:566-573`), `notifications/transport.ts` (whole), `notifications/store.ts:100-142` (keyset paging),
+`auth/routes.ts` (whole), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
 reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
@@ -243,21 +247,25 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 
 - `packages/rule-engine`: `memory-context.ts` (used, not reviewed), `refusal-rules.ts`, `checks/{rank,
   workflow-rebind,refusals,test-support}.ts`, `fixtures/harness.ts`,
-  `rules/{index,types}.ts`; `contests.ts` beyond `:45`.
+  `rules/{index,types}.ts`; `contests.ts` outside `:1-75`.
 - `packages/domain`: 30 of 41 files, including `entity-state.ts`, `ticket-state.ts` outside the reducer's event
-  cases (`:1-98`, `:200-496` — `foldTicketToWorkflowVersion` in particular, used by the probes and not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts`, `ist-day.ts`,
+  cases (`:1-98`, `:200-496` — `foldTicketToWorkflowVersion` in particular, used by the probes and not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts` outside `:100-180`, `ist-day.ts`,
   `doc-*.ts`, `simple-kanban.ts`, `stream-frames.ts`, `read-models.ts`, `notification*.ts`, `preferences.ts`.
-- `packages/sync-client`: `replica/replica.ts` outside the three arms named in §2.2 (≈1,200 lines), `storage/*`, `engine/sync-engine.ts` outside the
+- `packages/sync-client`: `replica/replica.ts` outside the ranges named in §2.2 (≈1,100 lines), `storage/*`, `engine/sync-engine.ts` outside the
   flush loop (bootstrap, subscribe, reconcile, `stall`).
 - `packages/mcp-server`: nothing left unread (`register.ts` skimmed; `session.ts`/`http-client.ts` grep only).
-- `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts`, `http.ts`
-  (grep only), `founding.ts`, `invites.ts`, `my-invitations.ts`, `notification-preferences.ts`,
-  `notifications.ts`; `replica/replica-data-source.ts` outside `:1388-1408`.
-- `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections other
-  than the three named; `read/` other than the two named; `sync/{sync-service,reconcile-route}.ts` beyond the cited
-  lines; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+- `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts` outside the two
+  ranges in §2.2, `http.ts` (grep only), `founding.ts`, `invites.ts`, `my-invitations.ts`,
+  `notification-preferences.ts`, `notifications.ts`; `replica/replica-data-source.ts` outside the five ranges
+  in §2.2 (≈1,150 lines, the `DataSourceQuery` methods other than `getTickets`/`getBoard`/`getTicket` among them).
+- `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections
+  `{rollups,proj-projects,proj-invites,search,ticket-comments,entity-heads,memberships-*}.ts` (six of the
+  registry's projections read whole; `rollups.ts` at the two cited lines only); `read/{restricted-parents,
+  workspace-counts,ticket-comments,workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
+  membership-roster,list-cards}.ts` beyond a grep; `sync/{sync-service,reconcile-route}.ts` beyond the cited
+  lines; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
-  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
+  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges; `alerts/`, `workspaces/`.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
   opened only at their `ds.query.*` call sites and the lines that render the result (E6-24).**
 - `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
