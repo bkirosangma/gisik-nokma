@@ -69,3 +69,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-26 | done | 332dd81e | Features.md settings bullet: nav entry landed; reachability measured via router.push |
 | T-E3-27 | done | 770d8b47 | checkErrandTemplate "not yet landed" corrected in both files (app-core 9 green) |
 | T-E3-28 | done | b2a3d3fb | offline-born omission set names getTicket as the third omitting door |
+| T-E3-29 | done | 5fdf77c2 | Features.md vocabulary bullet scoped to Plan 3; the eight later types named |
