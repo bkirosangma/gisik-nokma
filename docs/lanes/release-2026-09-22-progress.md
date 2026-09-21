@@ -33,3 +33,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-26 | done | 07d10ccabfd8eb35bd9caa8a9876b3d2bef644ec | ticket-list-css-binding.test.tsx (13.1151) 14/14; ui 420, app-core 1725, web 643; spacer bound + declarationsFor fixed; DENSE_IN_LIST half deferred |
 | T-E4-27 | done | 49b1106adfbc727f073ca29050f4ae7e5072cb04 | 13.1152 in authoring-routes + builder-route; ui 420, app-core 1725, web 647 |
 | T-E4-35 | done | 14cd0351eb79ce655980510bf954c0992ac61c73 | components.test.tsx (13.1153) 3/3; ui 423, web 647 |
+| T-E4-8 | done | 9a221814e44160834e77fc4e39f378c11333eace | editor-toolbar.test.tsx (13.1154) 13/13; editor 191, ui 423, web 647 |
