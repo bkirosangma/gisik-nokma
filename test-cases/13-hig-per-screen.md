@@ -212,6 +212,28 @@ the gate would have stayed 33/33.*
   `role=tab` per option, `aria-selected` true on exactly the chosen one, and calls `onChange` with the
   clicked value — the exact roles `.gn-view-tabs` carried, so replacing it registers no loss on 13.285.
   — (`packages/ui/test/components.test.tsx`)
+- **13.1051** ✅ `SegmentedControl` implements the tab keyboard model its roles promise. Declaring
+  `role="tablist"` / `role="tab"` / `aria-selected` tells assistive tech to announce "tab, 1 of 3" and
+  tells the person listening that the arrow keys move between tabs; none did. Measured by grep on the
+  component (`onKeyDown` / `Arrow` / `tabIndex` / `aria-controls` / `tabpanel` → nothing) and confirmed
+  with real key events: ArrowRight left focus on the same tab, and every tab was its own Tab stop, which
+  is the opposite of the pattern — one stop per tablist, arrows within it. Now: a roving `tabindex` with
+  exactly one tab at `0` and the rest at `-1`, ArrowRight/ArrowLeft moving focus and selection with
+  wraparound at both ends, and Home/End jumping to the first and last. Selection follows focus, which is
+  the pattern's automatic activation and what a single-choice segmented control means. **ArrowUp/ArrowDown
+  are deliberately NOT handled** — optional in the pattern, and claiming them would swallow vertical
+  scrolling on a control that sits inside scrolling pages. **`aria-controls`/`tabpanel` is deliberately
+  NOT added**, and that limit is the finding's own fork resolved rather than dodged: `SegmentedControl` is
+  generic and has seven render sites of two kinds — the sheet's *Details*/*History* and the help browser's
+  sections really do switch a panel in place, while the theme and style toggles, `/inbox` and `/sign-in`
+  switch a setting or a route — so the finding's first alternative (`aria-pressed` on a group of buttons,
+  needing no keyboard model at all) would misdescribe the panel-switching sites, and the second half needs
+  a `tabpanel` id no caller passes. Every case asserts focus as well as `aria-selected`, with the focus
+  control run first, so a component that never received focus cannot pass by having nothing to move.
+  Mutation-witnessed: dropping the roving `tabindex` alone reddens three of the four (one-tab-stop,
+  ArrowRight, Home/End) and leaves the ArrowLeft-wraparound case green, because that case asserts focus
+  and selection and not the tab-stop attribute — recorded as measured rather than rounded up. —
+  (`packages/ui/test/components.test.tsx`)
 - **13.289** ✅ A ghost button renders as fill plus an accent 600 label with **no painting border on either rule** — the modifier AND the base, because `button.tsx` always emits them together and a boundary reintroduced on the base would reach the screen while a modifier-only assertion stayed green.
   *The plan justified this case with "its 2.49:1 border was its only affordance". **That was true of the pre-#354 tree and is false now** — the border sweep removed it and the base `.gn-button` has carried `border: none` plus the fill, accent and weight ever since, so the new modifier rule is inert duplication that repairs nothing. Corrected here rather than left standing, because this file is read later as a record of what the tree used to be.*
   *And the guard the plan shipped could not have caught what it names: `not.toMatch(/border:\s*1px/)` sees only the shorthand, so **`border: 2px solid` beside a `border-color: transparent` passed green**, demonstrated. Widened to any border longhand that PAINTS — `-color` and `-radius` excluded because neither draws one, and `none`/`0` excluded because they are how a rule says there is no border, which the first draft of the regex forbade and went red against a correct file.*
