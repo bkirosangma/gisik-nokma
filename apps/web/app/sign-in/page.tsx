@@ -73,6 +73,25 @@ function webOriginCallback(path: string): string {
  */
 const DEFAULT_NEXT = '/workspaces';
 
+/**
+ * A refusal a PERSON can act on, where the door sent a validator's path.
+ *
+ * E5-33. Pressing "Send magic link" on an empty field painted
+ * `[body.email] Invalid email address` — better-call's own `[${validating}.${path}]`
+ * spelling, straight into the card's `role="alert"`. `required` and a real submit
+ * make that particular round trip unreachable, and this maps the message ITSELF so
+ * a malformed address ("abc") is answered the same way rather than re-exposed.
+ *
+ * ONLY the `[body.email]` shape is rewritten: every other refusal is the server's
+ * own words carried verbatim, which is the rule this page keeps everywhere else.
+ */
+function emailRefusalSentence(message: string | undefined): string | undefined {
+  if (message === undefined) return undefined;
+  return message.includes('[body.email]')
+    ? 'Enter the email address you signed up with.'
+    : message;
+}
+
 function samePathOnly(raw: string | null): string {
   if (raw === null || !raw.startsWith('/')) return DEFAULT_NEXT;
   // `//host` is protocol-relative; `/\host` is treated as `//host` by browsers.
@@ -351,6 +370,24 @@ function SignInForm() {
           </div>
         ) : (
           <div className="gn-sign-in__method">
+            {/* A FORM AROUND THE FIELD, not a bare button (E5-33). `<Button
+                onClick>` is not a submit, and the input had no `required`, so
+                nothing — not the browser and not this page — checked the field
+                before the request left: an empty press called
+                `magicLink({ email: '' })` and painted the validator's own path.
+                The input has to be INSIDE the form for `required` to bite at all,
+                which is why this wraps the label rather than only the button. */}
+            <form
+              className="gn-sign-in__method-form"
+              onSubmit={(event) => {
+                event.preventDefault();
+                void authClient.signIn
+                  .magicLink({ email, callbackURL: webOriginCallback(next) })
+                  .then(({ error: linkError }) =>
+                    linkError ? fail(emailRefusalSentence(linkError.message)) : setEmailSent(true),
+                  );
+              }}
+            >
             <label className="gn-field">
               <span className="gn-field__label">Email</span>
               <input
@@ -365,6 +402,10 @@ function SignInForm() {
                    ADDITION rather than a copy change — the shipped input had
                    no placeholder at all. */
                 placeholder="you@example.com"
+                /* E5-33 — the browser refuses an empty press LOCALLY. Without
+                   this the control sent `magicLink({ email: '' })`, round-tripped
+                   the server, and painted the validator's own path. */
+                required
                 value={email}
                 onChange={(event) => setEmail(event.target.value)}
               />
@@ -376,20 +417,12 @@ function SignInForm() {
                 <p className="gn-sign-in__hint">
                   We&rsquo;ll email you a link that signs you in. It expires in 15 minutes.
                 </p>
-                <Button
-                  variant="primary"
-                  onClick={() =>
-                    void authClient.signIn
-                      .magicLink({ email, callbackURL: webOriginCallback(next) })
-                      .then(({ error: linkError }) =>
-                        linkError ? fail(linkError.message) : setEmailSent(true),
-                      )
-                  }
-                >
+                <Button variant="primary" type="submit">
                   Send magic link
                 </Button>
               </>
             )}
+            </form>
           </div>
         )}
 
