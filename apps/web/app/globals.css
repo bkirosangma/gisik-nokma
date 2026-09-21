@@ -2536,6 +2536,24 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text);
 }
 
+/* E5-38 — the reader-facing DRAFT NOTICE at the top of both legal pages. Quiet on
+   purpose, and deliberately NOT `.gn-legal__flag` above: that one is the single
+   place a legal page raises its voice, and it earns it for the unresolved
+   append-only-history question. This one just states a fact about the
+   placeholders, so it takes the muted tone of the footer and the sunken surface
+   without the warning rule. */
+.gn-legal__draft {
+  margin-top: 1rem;
+  padding: 0.6rem 0.75rem;
+  border-radius: 0.4rem;
+  background: var(--gn-surface-sunken);
+  color: var(--gn-text-muted);
+}
+
+.gn-legal__draft .gn-legal__flag-label {
+  color: var(--gn-text);
+}
+
 .gn-legal__footer {
   max-width: 68ch;
   margin-top: 2.5rem;

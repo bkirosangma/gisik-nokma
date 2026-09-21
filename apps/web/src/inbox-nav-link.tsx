@@ -39,9 +39,13 @@ export const REFRESH_MS = 60_000;
  * asserted from a request that failed.
  *
  * Round 24 turned the visible count into a dot and moved the number into the
- * accessible name; `UnreadBadge` is untouched and still carries the count on
- * `/inbox` itself. This paragraph's promise is unchanged by that — it is about
- * the VALUE of `unread`, not about how it is drawn.
+ * accessible name. ⚠ CORRECTED 2026-09-21 (E2-25): this read "`UnreadBadge` is
+ * untouched and still carries the count on `/inbox` itself", and that is false
+ * on both halves — `UnreadBadge` is mounted NOWHERE (`apps/web/app/inbox/page.tsx`
+ * renders no count and no badge; measured across `apps/` and `packages/`, the
+ * component has zero production renders), so there is no screen that shows a
+ * numbered unread badge. This paragraph's promise is unchanged by that — it is
+ * about the VALUE of `unread`, not about how it is drawn.
  *
  * That promise is about a failed REFRESH and nothing else, and the wording is
  * narrow on purpose. It does NOT extend across a session ending: a count that

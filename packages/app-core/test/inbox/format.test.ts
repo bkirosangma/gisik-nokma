@@ -85,10 +85,21 @@ describe('11.84 the headline is the claim, attributed — never invented urgency
     expect(notificationHeadline(stranger, userName)).toBe('user_unknown assigned this to you');
   });
 
-  it('a contested claim names the rule that refused it', () => {
-    expect(notificationHeadline(notificationOf('contested-claim'), userName)).toBe(
-      'Your claim was contested — require-evidence',
+  it('a contested claim says so in words, and the RULE is named by the body not by its slug', () => {
+    // E5-35 — the headline read `… — require-evidence`, printing the engine's
+    // internal name where a person reads a sentence. The rule is still named on
+    // the row: the BODY under this headline is the engine's own `reason`,
+    // verbatim, which says what the rule wanted in the engine's words — the same
+    // division `11.86`'s exact-equality case protects.
+    const notification = notificationOf('contested-claim');
+    expect(notificationHeadline(notification, userName)).toBe('Your claim was contested');
+    expect(notificationHeadline(notification, userName)).not.toContain('require-evidence');
+    expect(notificationBody(notification)).toBe(
+      'This move must carry an attachment as evidence, and none was provided.',
     );
+    // The slug itself is still ON the payload, so nothing downstream lost it —
+    // this case is about what the ROW says, not about the wire.
+    expect((notification.payload as { rule: string }).rule).toBe('require-evidence');
   });
 
   it('a stale ticket says since when and who moved it there', () => {

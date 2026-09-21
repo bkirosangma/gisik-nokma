@@ -1,3 +1,4 @@
+import { AppNav } from '../../../src/app-nav.js';
 import { McpTokensScreen } from '../../../src/mcp-tokens-screen.js';
 import { documentTitleFor } from '../../../src/page-title.js';
 
@@ -31,6 +32,19 @@ export const metadata = { title: documentTitleFor('MCP tokens') };
 export default function McpTokensPage(): React.JSX.Element {
   return (
     <main id="gn-main" className="gn-shell gn-mcp-tokens">
+      {/*
+        E5-17 — THE BAR, so this is not a chrome-less orphan. It rendered no
+        `AppNav`, nothing in `apps/web/app` or `apps/web/src` linked to it, and
+        `mcp-tokens-screen.tsx`'s `returnTo` sends a signed-out person BACK here
+        after sign-in — so the one route a reader could only reach by typing, or
+        by being sent back to it, also had no way out. The route itself is KEPT
+        rather than redirected to `/account#connected-assistants`: this file's
+        docblock argues for it at length ("the owner named `/settings` as where
+        the tab should live, not that this URL should stop resolving"), and a
+        token revoke surface that resolves is a credential-control property and
+        not only a nicety.
+      */}
+      <AppNav />
       <McpTokensScreen />
     </main>
   );

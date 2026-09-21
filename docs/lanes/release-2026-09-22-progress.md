@@ -24,3 +24,31 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P23 | done | ffadbb08ea1234c2c9eddf41dba71205701b2e08 | select.test.tsx P23 x2 (mutation-witnessed) |
 | T-P9 | done | 303720e458759f5361298022f392db5ccebbf298 | components.test.tsx P9 x4 |
 | T-P8 | done | cf7ee59ab84197edd42fe884ef168ae5126348de | components.test.tsx P8 x4 |
+| B04 | claimed | 2026-09-21 18:41 | /Users/kiro/my_projects/gisik-nokma-ds3 |
+| T-E5-1 | done | c4175172 | prose-only: manual.md:664,666-668 + faq.md:307; check:help green |
+| T-E5-24 | done | a1b06370 | prose-only: manual.md rows a/b/d/e + faq.md; row c (delete) is T-E6-1 |
+| T-E6-1 | done | b36951f5 | app-core test/help 3 files/33 tests green; check:help green |
+| T-F1-ux | done | e33b7b8a | prose-only: manual nav/theme/card/comments/attachments/settings + faq; 11 sites |
+| T-E2-55 | done | 0f8fd1a9 | app-core ticket-sheet 110 tests green; notice moved above the list |
+| T-E5-38 | done | 7e1a791d | web legal 17 tests green; draft notice on both pages |
+| T-F5-ux | done | 28875a98 | founding lands on /w/<id>; founding.test 10 tests green |
+| T-F8-ux | done | c0ab3ff9 | prose-only: stale self-test counts removed from 15.13 |
+| T-E2-25 | done | eefcef71 | comment-only: 3 stale/false records corrected; mount-or-delete left to owner |
+| T-E2-27 | done | c65d27ea | app-core skew-and-status 13 tests green; unknown arm returns queue sentence |
+| T-E2-36 | done | 0f1ed7b7 | app-core ticket-sheet 111 tests green; reload on every answer |
+| T-E2-47 | done | e5f5bd7a | prose-only: sweep names four; editor 10 + app-core 111 tests green |
+| T-E4-34 | done | 61f90bc4 | app-core ticket-types 52 tests green; guest row says Open |
+| T-E2-54 | done | c9bd3942 | prose-only: shell-refusal inference narrowed; page-refusals 14 tests green |
+| T-E4-29 | done | baf2e833 | app-core ticket-types 53 tests green; issues name the field |
+| T-E5-17 | done | 02d97609 | mcp-tokens page mounts AppNav; 12 tests green |
+| T-E5-22 | done | 7815bcd6 | subtask form names the type; ticket-sheet 112 tests green |
+| T-E5-29 | done | e7f5f91f | dialog copy corrected; publish 20 tests green |
+| T-F6-ux | done | 8706da3c | prose-only: guest chip claim scoped; workspaces-cards 16 tests green |
+| T-E5-36 | done | 9de2d115 | projectCountLine(0) says "No projects yet"; 25 tests green |
+| T-E5-12 | done | 04ac1714 | account row counts live + names archived; 18 tests green |
+| T-E5-33 | done | cf064cfe | sign-in requires the email in a real form; 25 tests green |
+| T-E5-14 | done | ebb82030 | on-screen reorder note + tie-break; 54 tests green |
+| T-E5-35 | done | f75680b4 | inbox rows show WHEN + ticket; 67 tests green |
+| T-F7-ux | done | a7d5fd85 | epic band says rows; ticket-list 71 tests green |
+| T-E5-39 | blocked | - | remedy needs publishedAt/publishedBy ON THE READ: not reachable client-side (gateway has no workflow-events read; getWorkflow returns PublishedWorkflowDef = WorkflowDefinedPayload, which carries no instant/actor). Envelope has them and proj_workflows.published_workspace_seq makes the join possible, but serving them means a new read shape across apps/server/src/read/workflow-defs.ts + the route + the client mapper + the screen, on a type the whole workflow-builder shares. Plan allotted 0.3 h at haiku; this is not that. NOT done as a copy fix either: a sentence saying "no date recorded" would put a claim about the WIRE into the UI. |
+| T-E4-6 | done | abc431e2 | picker labels name||email||id; app-core views 550 tests green |

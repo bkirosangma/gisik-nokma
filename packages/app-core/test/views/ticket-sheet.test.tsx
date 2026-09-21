@@ -472,6 +472,69 @@ describe('TicketSheet — the transition round-trip', () => {
     expect(batch[1]!.payload).toEqual({ to: 'done' });
   });
 
+  it('E2-36 — a PARTLY committed move batch reloads BOTH reads behind the refusal', async () => {
+    const user = userEvent.setup();
+    const gated: WorkflowDef = {
+      ...WF_ERRAND,
+      transitions: WF_ERRAND.transitions.map((transition) =>
+        transition.from === 'doing' && transition.to === 'done'
+          ? { ...transition, rules: [{ kind: 'require-field', field: 'invoiceNo' }] }
+          : transition,
+      ),
+    };
+    const read = ticketRead();
+    let ticketReads = 0;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => {
+          ticketReads += 1;
+          return read;
+        },
+        getWorkflowDef: async () => gated,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      // The shape the dialog's own ordering creates on a refusal: the field
+      // claim the rule needs commits, and the move that needed it is turned away.
+      //
+      // ⚠ A committed `IngestResult` carries `seq` and `serverTime`, and this
+      // fake omitted both until the batch gate caught it. The suite could never
+      // have: vitest transpiles without typechecking, so the omission was
+      // invisible here and red at `tsconfig.typecheck.json`, which INCLUDES
+      // tests — the config `pnpm --filter @gisik-nokma/app-core typecheck` uses.
+      // The values mirror `helpers/fake-data-source.ts`'s own default.
+      (events) =>
+        events.map((event, at) =>
+          event.type === 'ticket.field_set'
+            ? {
+                status: 'committed' as const,
+                eventId: event.id,
+                seq: at + 1,
+                serverTime: '2026-08-20T09:00:00.000Z',
+              }
+            : {
+                status: 'refused' as const,
+                eventId: event.id,
+                rule: 'restrict-to',
+                reason: 'Only Anselma Marak may perform "Doing → Done" on this ticket.',
+              },
+        ),
+    );
+    renderSheet(read, source);
+    await waitFor(() => expect(screen.getByRole('button', { name: 'Move…' })).toBeInTheDocument());
+    const before = ticketReads;
+    await user.click(screen.getByRole('button', { name: 'Move…' }));
+    await user.click(screen.getByRole('button', { name: /Move to/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Done' }));
+    await user.type(screen.getByLabelText('invoiceNo (required before this transition)'), 'INV-7');
+    await user.click(screen.getByRole('button', { name: 'Move' }));
+    await screen.findByText(/restrict-to/);
+    // The refusal is on screen AND the sheet re-asked its read. Without the
+    // reload the sheet sits behind the refusal painted with the pre-move values
+    // while the server already holds the committed field claim.
+    expect(ticketReads).toBeGreaterThan(before);
+  });
+
   it("PLANTED DEFECT: when the server refuses, its reason renders verbatim — not the local preview's", async () => {
     const user = userEvent.setup();
     const read = ticketRead();
@@ -851,6 +914,24 @@ describe('TicketSheet — a truncated ledger says it is truncated', () => {
     expect(partial.textContent).toContain(`Showing the first ${HISTORY_PAGE_LIMIT} entries`);
     // And the entries are still all there: the notice is added, never a swap.
     expect(document.querySelectorAll('.gn-history__event')).toHaveLength(HISTORY_PAGE_LIMIT);
+  });
+
+  it('E2-55: a FULL page puts the notice ABOVE the list it is about', async () => {
+    const read = ticketRead();
+    const user = userEvent.setup();
+    renderSheet(read, sheetSource(read, page(HISTORY_PAGE_LIMIT)));
+    await settled();
+    await user.click(screen.getByRole('tab', { name: 'History' }));
+    const partial = await screen.findByText(/may go on past them/);
+    const list = document.querySelector('.gn-history');
+    expect(list).not.toBeNull();
+    // `DOCUMENT_POSITION_FOLLOWING` in this probe means the list comes AFTER the
+    // notice in document order. The help tells the reader the cap "says so at the
+    // top"; with the notice below 200 rendered rows, that sentence sends them
+    // past the one thing it is telling them to look for.
+    expect(
+      partial.compareDocumentPosition(list as Node) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
   });
 
   it('PLANTED DEFECT: a SHORT page says nothing of the kind — no invented "more"', async () => {
@@ -1764,6 +1845,29 @@ describe('F — the subtasks section', () => {
 
     expect(await screen.findByText('Mine')).toBeInTheDocument();
     expect(screen.queryByText('Somebody else’s')).toBeNull();
+  });
+
+  it('E5-22 the subtask form NAMES the type the child will take', async () => {
+    // An EPIC parent, which is the case the finding is about: the ladder here is
+    // epic(1), task(3), sub-task(4), so `legal` for an epic is `task` and
+    // `sub-task` — rule 1 takes the built-in `task`, and the Story rank that
+    // would sit between them is skipped. On the DEFAULT fixture (a `task`) the
+    // legal set is `sub-task` alone, which proves nothing about the rule.
+    const read = ticketRead({ ticket: ticketStateSeed({ typeId: 'epic' }), rollup: null });
+    const source = sheetSource(read, [], []);
+    renderSheet(read, source);
+    await settled();
+    // The type is `subtaskTypeFor`'s choice and the render used to say nothing
+    // about it.
+    const target = await screen.findByTestId('sheet-subtask-target');
+    expect(target.textContent).toBe('Adds a Task.');
+    // And the sentence names the SAME type the submission carries — asserted
+    // against the event rather than against a retyped literal, so the two cannot
+    // drift apart.
+    await userEvent.type(screen.getByTestId('sheet-subtask-title'), 'Book the venue');
+    await userEvent.click(screen.getByTestId('sheet-subtask-add'));
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(source.ingested[0]![0]!.payload).toMatchObject({ typeId: 'task' });
   });
 
   it('16.20 Add subtask sends ticket.created with THIS ticket as parent, the title AS TYPED, and start focus', async () => {

@@ -153,6 +153,16 @@ describe('the legal pages', () => {
    * and none of its text is in the render. Asserting only the render would pass
    * against a file whose warning somebody deleted; asserting only the source
    * would pass against a page that printed it.
+   *
+   * ⚠ A THIRD end was added by E5-38 (round-2 ruling, 2026-09-21), and it points
+   * the other way: a reader-facing DRAFT NOTICE must be IN the render. The
+   * owner's instruction above governs the MARKER — the words `BOILERPLATE`,
+   * `NOT REVIEWED BY A LAWYER` and `NOT LEGAL ADVICE` — and that half is
+   * unchanged. The ruling drew a narrower line: the sign-in screen binds a
+   * person's agreement to both documents while they still print bracketed
+   * placeholders, so the pages owe the reader a sentence saying so. Without the
+   * third assertion this test would pass against a page that told a reader
+   * nothing at all about its own draft state.
    */
   it('13.252 keep the "not reviewed by a lawyer" marker in the SOURCE and out of the RENDER', () => {
     const pages = [
@@ -176,6 +186,15 @@ describe('the legal pages', () => {
       );
       expect(rendered).not.toContain('BOILERPLATE');
       expect(rendered).not.toContain('NOT LEGAL ADVICE');
+
+      // E5-38 — the boundary has a SECOND half, and it is the opposite one. The
+      // internal marker stays in the comment; a reader-facing DRAFT NOTICE must
+      // reach the page, because the sign-in screen binds a person's agreement to
+      // this document while it still prints bracketed placeholders. Asserting
+      // only the three `not.toContain`s above would pass against a page that
+      // said nothing at all to a reader about its own draft state.
+      expect(rendered, `${file} must tell the reader it is a draft`).toContain('Draft notice.');
+      expect(rendered).toContain('The bracketed details below are not yet filled in.');
     }
   });
 
