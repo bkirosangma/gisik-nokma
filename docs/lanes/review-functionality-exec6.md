@@ -1038,7 +1038,7 @@ attacker page is required and the socket reads only what the victim may read; th
 
 ### E6-16 — IMPORTANT — An MCP token can approve a new device code, so one token mints a successor that survives its own revocation; the consent page's "It lasts until you revoke it" is false, and the same token mints admin invitations
 
-**WHAT.** `auth/require-session.ts:57-80` (the design note) and `:84-101` (`makeRequireSession`): every `requireSession` route accepts `Authorization: Bearer <mcp
+**WHAT.** `auth/require-session.ts:57-80` (the design note) and `:82-101` (`makeRequireSession`): every `requireSession` route accepts `Authorization: Bearer <mcp
 token>` as the user (`:95`, the fallback to `resolveMcpToken`). `POST /v1/mcp/device/approve` is a
 `requireSession` route (`routes/mcp-device.ts:83-105`). Measured through the doors (Appendix N; 1 file / 1 test
 passed):
@@ -1078,8 +1078,8 @@ branch answered and can stamp `request.authKind`. The same fence belongs on `DEL
 (a token revoking its siblings) and, arguably, on the invite mint. Then record `approved_via` on the device-code
 row so the token list can say *"approved by you, in the browser"* against *"approved by an assistant"*.
 
-**MEASUREMENT.** Appendix N, run from `apps/server`. Lines opened: `require-session.ts:57-80`, `:84-101`;
-`mcp-device.ts:83-105`, `:160-181`; `mcp/token-store.ts:64-85` (`approveDeviceCode`); `mcp/authorize/page.tsx:148-156`, `:178-183`;
+**MEASUREMENT.** Appendix N, run from `apps/server`. Lines opened: `require-session.ts:57-80`, `:82-101`;
+`mcp-device.ts:83-105`, `:160-181`; `mcp/token-store.ts:63-85` (`approveDeviceCode`); `mcp/authorize/page.tsx:148-156`, `:178-183`;
 `1788600000000_mcp-device-auth.sql:21`, `:31`; `McpAuthorize.dc.html:70-76`; export `:962`.
 
 **SEVERITY: Important.** A revocation that does not revoke, on the one credential the product hands to software,
