@@ -46,7 +46,7 @@ became the load-bearing measurement of my own Critical's defence.
 ## Defences
 
 Defences are written in `review-functionality-exec3.md` — a dated *DEFENCE* paragraph under `E3-14` (§14.7.1,
-15:14 IST) and §67 (15:25 IST) for the rest — and indexed here:
+15:14 IST) and §67 (15:20 IST) for the rest — and indexed here:
 
 | finding(s) | the attack answered | where |
 |---|---|---|

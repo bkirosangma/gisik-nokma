@@ -4211,7 +4211,7 @@ The recorded exclusions engaged; the warrant of one measured false at `check-per
 Critical's basis (`/v1/me/invitations/:inviteId/{accept,decline}`, unrecorded, no-preflight, appending membership
 events) unmoved; the frozen text's failure to cite `http-origin.ts:128-146` recorded as a correction.
 
-### 67.2 The documentary class — `E3-1`, `E3-9`–`E3-13`, `E3-16`, `E3-17`, `E3-20`–`E3-31` (15:25 IST)
+### 67.2 The documentary class — `E3-1`, `E3-9`–`E3-13`, `E3-16`, `E3-17`, `E3-20`–`E3-31` (15:20 IST)
 
 **The attack:** *"a stale sentence in a docblock, a catalogue line or `Features.md` is not a product defect."*
 **The answer, in the order a judge can verify it:**
@@ -4241,7 +4241,7 @@ events) unmoved; the frozen text's failure to cite `http-origin.ts:128-146` reco
    is to say the omission is the change history nobody wrote down. This report's own §64 is the same discipline
    applied to itself: a count that matched (twenty) hid two lines never classified.
 
-### 67.3 `E3-18` — the bound is the defence (15:25 IST)
+### 67.3 `E3-18` — the bound is the defence (15:20 IST)
 
 §34 already revised it to **Minor** and stated the trigger is corrupt data. Executor 6's row concurs (*"valid … a
 doubtful remedy is not a false finding"*) and adds the sharper reading, which I adopt rather than resist: on a
@@ -4252,14 +4252,14 @@ restricted parent would invent one"* → `parent = null`) and `replica-data-sour
 arm is the one that claims LESS"* → `{ kind: 'restricted' }`).
 Nothing in the finding depends on the remedy sentence.
 
-### 67.4 `E3-8` — filed Low, and the exposure is stated (15:25 IST)
+### 67.4 `E3-8` — filed Low, and the exposure is stated (15:20 IST)
 
 §13.1 says it is *"the one I would least defend"* and why: CI may have no database to point `check:db-tz` at.
 Its measurement reproduces (`grep -c "check-db-timezone\|check:db-tz" .github/workflows/ci.yml` → 0), its claim is
 only that one of nine checkers is unwired, and it was filed at the lowest severity. It is not withdrawn; if the judge
 finds a recorded reason for the omission that this lane's search missed, the finding says so itself.
 
-### 67.5 The claims exec 6 flagged in its §9 that are NOT findings — answered so the record is straight (15:25 IST)
+### 67.5 The claims exec 6 flagged in its §9 that are NOT findings — answered so the record is straight (15:20 IST)
 
 - *"§7.3, 54 registrations, 49 guarded, 5 public by design, at `e4baa425`"* — a positive-findings section, not a
   scored finding. **Re-counted at this branch's base (15:30 IST):** `grep -rnE "\b(app|instance)\.(get|post|put|patch|delete)\s*(<|\()"
