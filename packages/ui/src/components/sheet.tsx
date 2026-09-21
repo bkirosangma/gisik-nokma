@@ -1,4 +1,5 @@
-import { useEffect, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode } from 'react';
+import { FocusScope } from '@react-aria/focus';
 
 export type SheetProps = {
   open: boolean;
@@ -43,7 +44,21 @@ export type SheetProps = {
   titleSlot?: ReactNode;
 };
 
-/** A right-hand side panel with the same accessibility contract as Dialog. */
+/**
+ * A right-hand side panel with the same accessibility contract as Dialog —
+ * including, since P8, the containment half of it: `dialog.tsx`'s docblock
+ * carries the full reasoning (the measured leaks, the three-part remedy, and why
+ * focus lands on the panel rather than on its first focusable child), and this
+ * component applies the identical `FocusScope contain restoreFocus` plus the
+ * `focus()`-on-open effect. Read that docblock; this one records only what
+ * differs.
+ *
+ * What differs is the Escape guard below, and it does not interact with
+ * containment: a child that has already handled Escape keeps it
+ * (`event.defaultPrevented`), which is about WHO closes the sheet, not about
+ * where focus is when it does. The restore is the same either way, because
+ * `FocusScope` restores on unmount and both exits unmount the same subtree.
+ */
 export function Sheet({
   open,
   title,
@@ -53,6 +68,8 @@ export function Sheet({
   titleSlot,
   full = false,
 }: SheetProps) {
+  const panelRef = useRef<HTMLElement | null>(null);
+
   useEffect(() => {
     if (!open) return;
     const onKeyDown = (event: KeyboardEvent) => {
@@ -91,6 +108,12 @@ export function Sheet({
     return () => document.removeEventListener('keydown', onKeyDown);
   }, [open, onClose]);
 
+  // See `dialog.tsx`: focus enters the panel on open, keyed on `open` alone.
+  useEffect(() => {
+    if (!open) return;
+    panelRef.current?.focus();
+  }, [open]);
+
   if (!open) return null;
   return (
     <div
@@ -98,7 +121,10 @@ export function Sheet({
       data-testid="sheet-scrim"
       onClick={onClose}
     >
+      <FocusScope contain restoreFocus>
       <section
+        ref={panelRef}
+        tabIndex={-1}
         role="dialog"
         aria-modal="true"
         aria-label={title}
@@ -114,6 +140,7 @@ export function Sheet({
         </header>
         <div className={full ? 'gn-sheet__body gn-sheet__body--full' : 'gn-sheet__body'}>{children}</div>
       </section>
+      </FocusScope>
     </div>
   );
 }

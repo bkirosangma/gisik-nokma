@@ -26,7 +26,14 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **lane ds3 (batch B08)** | **`17.021`–`17.040`** (allocated by the controller 2026-09-21 21:0x, per live batch; the anchor PR carries the same table on `main`) — **minted: `17.021`–`17.028`**, the §16-owed properties recorded in the entries below — `17.021`–`17.023` are the comment thread's, `17.024`–`17.028` the ticket sheet's breadcrumb |
+| **release batch B08** (ds3, `rel/b08-ticket-sheet-crumbs-history-comm`) | **`17.021`–`17.040`** — allocated by the controller 2026-09-21 21:0x (cycle 46) when ds3 reported F3's §16 case OWED with §16 fully allocated; `17.021` is that case — **minted: `17.021`–`17.028`** (the §16-owed properties: `17.021`–`17.023` the comment thread's, `17.024`–`17.028` the ticket sheet's breadcrumb; recorded in the entries below) |
+| **release batch B06** (ds1, `rel/b06-new-ticket-and-move-dialogs`) | **`17.041`–`17.060`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B09** (ds5, `rel/b09-failure-states-on-the-web-reads-`) | **`17.061`–`17.080`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B01** (exec6, `rel/b01-server-doors-security-and-refusa`) | **`17.081`–`17.100`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B02** (exec2, `rel/b02-account-page-workflow-builder-dr`) | **`17.101`–`17.120`** — allocated 2026-09-21 21:0x (cycle 46) |
+| **release batch B07** (exec4, `rel/b07-soft-delete-integrity-engine-rep`) | **`17.121`–`17.140`** — allocated 2026-09-21 21:0x (cycle 46) |
+
+**⚠ 2026-09-21 (cycle 46): blocks are now per RELEASE BATCH (the branch that lands), not per lane session** — a lane runs several batches in one worktree tonight, and a block that follows the session would be shared by two branches landing in either order. **A batch that empties its block asks the controller for the next twenty; a later batch in the same lane gets its own row.** The rule this file already states applies unchanged: mint only from your own row, never from the tip, never from a neighbour's. (ds5 measured the alternative tonight in §10/§13, where three batches minting from "next free N" collided: `10.90` and `13.1050`–`13.1056` were minted twice.)
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own

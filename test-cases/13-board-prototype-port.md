@@ -165,6 +165,38 @@ reverted with a targeted edit (not `git checkout`), confirmed clean by re-runnin
 - **13.446** ✅ Escape closes the sheet and returns focus to the exact Filters button that opened it.
   Mutation-verified: deleting the focus-return line fails this exact
   assertion. — (`apps/web/test/filters-sheet.test.tsx`)
+- **13.1052** ✅ The two SHARED modal primitives, `Dialog` and `Sheet`, keep the contract 13.445/13.446
+  above states for the filters sheet. Both declared `aria-modal="true"` — a claim that everything outside
+  them is inert — while moving no focus, trapping none, and restoring none. Three measured consequences,
+  all painted on the running stack: focus stayed on the button that opened the dialog (still on *New
+  ticket* at 300 ms and at 1 800 ms, `closest('[role=dialog]')` → null); a real Tab walked straight out of
+  an open dialog into the page behind it; and Escape closed the dialog leaving focus on `<body>`. **The
+  leak is not inert in the product either** — `board.tsx:385-393` refuses a column action precisely because
+  it judges the interaction to have arrived "behind a modal — a keyboard-focus escape" (case 13.793), so a
+  workaround existed specifically for it. Now each primitive moves focus to the panel itself on open
+  (`tabIndex={-1}` on the panel rather than the first focusable inside it, so a screen reader announces the
+  dialog's own name on arrival rather than *"Close dialog"*, the exit), contains Tab within it, and returns
+  focus to the opener on close — via `@react-aria/focus`'s `FocusScope contain restoreFocus`, which
+  restores only once focus has actually been lost to `<body>`, so a close that left focus somewhere
+  deliberate is not overridden. Six cases, one per primitive per property plus the coupling case below;
+  each opens through a real button and asserts the control focus demonstrably LEFT before asserting where
+  it arrived, because "focus is inside the dialog" is vacuously true when the opener was never focused.
+  **And containment must not swallow a portalled popover's own focus.** A `Select` panel portals to
+  `document.body` — outside the panel in the DOM — so containment reads it as an escape and drags focus
+  back off the option row. That the product's pickers still work inside its dialogs is down to a coupling
+  between two rulings in this same batch, **measured rather than reasoned**: removing E4-17's `FocusScope`
+  from `SelectPanel` leaves `document.activeElement` on `button.gn-select__trigger` with the option row
+  never focused at all — the picker degrades silently inside every dialog — while with it focus lands on
+  `li.gn-select__option`. The mechanism is React Aria's scope TREE, not the DOM: the panel's `FocusScope`
+  is a child of the dialog's through React context, which crosses the portal, so `isElementInChildScope`
+  answers true and `contain` leaves it be. The case exists because that dependency is invisible from
+  either half — the panel's `FocusScope` reads as a redundant wrapper once the ring exists — and is the
+  wire between 10.90/E4-17 and this case. Mutation-witnessed: removing that `FocusScope` kills exactly
+  the two coupling cases and nothing else. — (`packages/ui/test/components.test.tsx`)
+
+  *Id note: `13.1047`–`13.1049` are reserved and unused in executor 1's block `13.1034`–`13.1049`;
+  `13.1050`–`13.1052` were minted by batch B05, which takes no allocated block and derives from the
+  maximum in use against `origin/main` instead. The next free id in this space is `13.1053`.*
 - **13.447** ✅ Checking a person row in the Assignee section narrows the board, shows the
   `assigneeIds` chip naming them, and the count reflects the real removal. — (`apps/web/test/filters-sheet.test.tsx`)
 - **13.448** ✅ Pressing a Type chip (`aria-pressed` toggles true) narrows the board, shows the
