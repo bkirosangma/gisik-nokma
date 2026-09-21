@@ -181,7 +181,19 @@ the one checker `F8` found has no automated invocation anywhere, so nothing woul
 | `E6-9` (exec 6, IMPORTANT) | that the invite form offers three channels while the door refuses two | **Both sides opened.** The form: `members/page.tsx:847-856` `<Select options={[{ value: 'email' }, { value: 'sms' }, { value: 'whatsapp' }]} aria-label="Channel" />`. The door: `packages/domain/src/events/invites.ts:70` `INVITE_CHANNELS = ['email', 'phone']`, `:73-74` the error map *"requires channel 'email' or 'phone'"*, `:115` `channel: inviteChannelSchema` | **holds** |
 | `E4-18` (exec 4, IMPORTANT) | that the Assignee picker renders a blank option for a member with no display name | `ticket-sheet.tsx:1672` `...people.map((member) => ({ value: member.id, label: member.name }))` — `member.name` **raw**, no `actorLabel`. ⚠ **I had already opened this exact line for `E5-4`**, so this is a second lane reaching the same site from a different direction | **holds** |
 
-**Thirty-seven checks across all five lanes. Thirty-seven held. My refutation count is zero.**
+
+| `I2` (exec 1, IMPORTANT) | that a committed artefact records a defect that was fixed later, with nothing saying which run produced it | The artefact: `e2e-stack/non-text-contrast-roster.json` records `"belowCount": 1` with `button.ticket-type-list__move` at **1.41** on `/settings/ticket-types`. The fix: that class now has **three selector blocks** — `ui.css:5836` (the rule), `:5851` (`:focus-visible`), `:5855` (`:disabled`) — against a comment at `:5677` recording that it *"had NO RULE OF ITS OWN — 0 hits for the class"* | **holds** — the artefact has not been regenerated |
+| `P15` (exec 1, MINOR) | that the repo's generated prototype copy is **one line offset** from the owner's export | **Measured at a shared landmark.** Repo copy `design-system/interactive/desktop.dc.html`: **4051 lines**, `const navDef` at **2437**. Owner's export `Gisik Nokma - Desktop.dc.html`: **4050 lines**, `const navDef` at **2436**. **Exactly one line, at the same construct** | **holds** |
+
+**Thirty-nine checks across all five lanes. Thirty-nine held. My refutation count is zero.**
+
+> **`P15` is worth a note for the shape of its own history, not only its measurement.** exec 1 filed it at
+> **IMPORTANT**, then read `design-system/interactive/support.js` and found that `sc-camel-*` is that runtime's
+> **own reversible encoding** (`:366-370` encodes, `:422-423` decodes) rather than a broken transform — so the
+> icons *do* draw, and they corrected their own finding **downward in the same round**, with the correction
+> now most of the finding's text. **A lane that downgrades its own claim after reading the mechanism is the
+> single most credible thing in any of these reports**, and it is why I checked the surviving claim rather
+> than the withdrawn one: the offset is real, exactly one line, at the landmark they would cite.
 
 > **`E6-9` is the brief's own named class, and the sharpest instance of it I have seen today:** *"A REFUSAL
 > THAT ARRIVES AFTER THE PRESS IS A DEFECT."* An admin picks `sms` or `whatsapp` — the two options that
