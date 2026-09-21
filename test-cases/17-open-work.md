@@ -41,6 +41,14 @@ allocation changes, change it HERE in the same action** — not only in a handof
 **When your block is empty, STOP AND ASK.** Do not mint from the tip and do not borrow a neighbour's —
 that is the rule whose breach made §13 go red twice.
 
+**A lane with NO ROW in that table must also STOP AND ASK — silence is not a licence.** The escape hatch
+above fires on a block that has RUN OUT, and it said nothing about a lane that was never given one: those
+are different states with the same remedy, and the second is the easier one to read past, because a table
+that does not name you looks like a table that does not constrain you. ⚠ **When §17 was opened this table
+had ONE row** (exec 3's), and the count is the half that did not survive — the table grew to seven rows at
+cycle 46. **The sentence is the half that did**, and it is written here because the next lane to arrive
+without an allocation will read this table rather than the cycle it was allocated in.
+
 ## §16's WINDOW — the grant was exercised, and the measurement behind it is recorded rather than tidied
 
 The controller's 2026-09-21 dispatch opens §17 on the standing order. ⚠ **A future lane measuring §16 for
