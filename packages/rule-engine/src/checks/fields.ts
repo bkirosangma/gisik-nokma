@@ -1,5 +1,5 @@
 import type { CustomFieldDef, EventEnvelope } from '@gisik-nokma/domain';
-import { dueDateValueSchema, isRealIstDay, ticketFieldSetPayload } from '@gisik-nokma/domain';
+import { PRIORITIES, dueDateValueSchema, isRealIstDay, prioritySchema, ticketFieldSetPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
@@ -69,12 +69,12 @@ function customFieldVerdict(field: CustomFieldDef, value: unknown): Accept | Ref
  * other, keeping the clearer's id and both clocks — except `title`: a ticket
  * always has one.
  *
- * Order: kind → payload → unknown ticket → the four built-ins → unknown type →
+ * Order: kind → payload → unknown ticket → the five built-ins → unknown type →
  * unknown field → clearing → kind fit. The built-ins are answered BEFORE the
  * type is resolved because they do not belong to the type: `title`,
- * `description`, `dueDate` and `startDate` ride this event on every ticket
- * whatever its type declares, and `ticketTypeDefSchema` refuses a custom field
- * that shadows one of their ids (`ticket-types.ts:43-48`). Refusing a title
+ * `description`, `dueDate`, `startDate` and `priority` ride this event on
+ * every ticket whatever its type declares, and `ticketTypeDefSchema` refuses a
+ * custom field that shadows one of their ids (`ticket-types.ts:43-48`). Refusing a title
  * change with "this ticket's type is not defined" would be a sentence about the
  * wrong noun — the defect class rulings P11, P12 and P13 closed three times in
  * this plan.
@@ -143,6 +143,15 @@ export async function checkTicketFieldSet(env: EventEnvelope, ctx: EngineContext
     return dueDateValueSchema.safeParse(value).success
       ? ACCEPT
       : refuse('field.type-mismatch', fieldKindRefusal(fieldName, 'a day in YYYY-MM-DD form (a note is optional)'));
+  }
+
+  // The fifth built-in (spec 2026-09-22): ALWAYS present, so `null` is refused the
+  // way a null title is, and the value is held to the ONE origin of the ladder.
+  if (p.fieldId === 'priority') {
+    if (value === null) return refuse('field.priority-required');
+    return prioritySchema.safeParse(value).success
+      ? ACCEPT
+      : refuse('field.type-mismatch', fieldKindRefusal('Priority', `one of ${PRIORITIES.join(', ').replace(/, (P\d)$/, ' or $1')}`));
   }
 
   // Now, and only now, is the ticket's own TYPE the subject: everything below

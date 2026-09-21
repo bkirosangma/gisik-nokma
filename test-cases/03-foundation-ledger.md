@@ -282,3 +282,7 @@ section follow the controller's rule, so the next free id after B16 is one past 
   `packages/domain/test/ticket-state.test.ts`
 - **3.966** ✅ A later `ticket.field_set` on `priority` replaces the birth claim and keeps the new actor and
   both new clocks. — `packages/domain/test/ticket-state.test.ts`
+- **3.967** ✅ `checkTicketFieldSet` accepts P1/P2/P3 on any ticket type — including one whose type is no
+  longer defined, since built-ins are answered before the type is resolved — refuses `null` as
+  `field.priority-required`, and refuses anything else (`'P4'`, a number) as a type mismatch naming the
+  three levels. — `packages/rule-engine/test/fields.test.ts`

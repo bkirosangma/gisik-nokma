@@ -78,6 +78,7 @@ export const REFUSALS = {
     'This move would put the ticket inside one of its own sub-items, making a loop. A ticket cannot contain itself.',
   'field.unknown': "This ticket's type has no such field. Add the field to the ticket type first.",
   'field.title-required': 'A ticket always has a title. Change the title instead of clearing it.',
+  'field.priority-required': 'A ticket always has a priority. Change it instead of clearing it.',
 } as const;
 
 export function rankRefusal(childTypeName: string, parentTypeName: string): string {
