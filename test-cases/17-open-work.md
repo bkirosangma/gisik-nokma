@@ -26,7 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
-| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`** |
+| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`–`17.123`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -172,3 +172,30 @@ in §12 because that section owns the replica.*
   the gate: `Tests 10 failed | 3 passed (13)`; GREEN: `Tests 13 passed (13)`. `fanout.ts`'s premise paragraph
   now says what the door enforces; `notifications/sweep.ts` is named as a producer, not the inbox read. —
   (`packages/rule-engine/test/live-ticket.test.ts`, `apps/server/test/integration/soft-deleted-writes.test.ts`)
+- **17.122** ✅ **A soft-deleted child is not open work: its parent closes over it, and a LIVE open sibling still
+  blocks with the ordinary sentence** (E6-4, transition half). `transition.ts`'s parent-terminal count now
+  carries `(child.deleted ?? null) === null` beside `stateCategory !== 'terminal'` — the live-only predicate
+  the projection's reader hands its callers and this caller never took, so the refusal named a count every
+  view reported as zero and, with no UI that emits `ticket.restored` past the undo toast, the parent could
+  never be finished from the product. Engine (`packages/rule-engine/test/deleted-hierarchy.test.ts`): P with
+  two open children, one deleted → refused "1 … is still open" (the live one, not the deleted one); both
+  deleted → accepted; none deleted → "2 … are still open" (so the accept is the flag being read, not the
+  invariant gone); deleted-then-restored counts again. Door
+  (`apps/server/test/integration/soft-deleted-hierarchy.test.ts`, `POST /v1/events`): the finding's own
+  sequence — create P/C, P → doing, delete C, `proj_tickets` counts 0 live open children, P → done COMMITS;
+  control P2 with a live open child refused "1 … is still open"; the same P2 closes once that child is done.
+  RED (engine): `Tests 4 failed | 2 passed (6)`, the count reading 2 for 1; RED (door): `Tests 3 failed | 1
+  passed (4)`, P → done refused. GREEN: `6 passed (6)` / `4 passed (4)`. —
+  (`packages/rule-engine/test/deleted-hierarchy.test.ts`, `apps/server/test/integration/soft-deleted-hierarchy.test.ts`)
+- **17.123** ✅ **A soft-deleted ticket is not a parent: `ticket.created` under one and `ticket.reparented`
+  onto one are refused `hierarchy.parent-deleted`, and the live twin takes the same child** (E6-4, hierarchy
+  half). Both parent-resolution sites in `checks/hierarchy.ts` refuse after tenancy (`unknown-parent` still
+  answers a foreign or absent id — there is no flag to read on nothing) and before anything about the
+  parent's shape; ahead of `cross-project` on purpose, because "pick a parent from the same project" would
+  send the actor after a ticket no view shows, and the ordering case pins it with the same foreign parent
+  live (→ `cross-project`) and deleted (→ `parent-deleted`). Reason: "The chosen parent ticket is deleted.
+  Restore it, or pick another parent." — not `unknown-parent`, whose sentence is false of a ticket that
+  exists. A restored parent takes children again. Engine and door halves in the same two files as 17.122;
+  the door half creates under / moves onto a deleted story (refused) and its live twin (committed), then
+  restores one and creates under it. —
+  (`packages/rule-engine/test/deleted-hierarchy.test.ts`, `apps/server/test/integration/soft-deleted-hierarchy.test.ts`)

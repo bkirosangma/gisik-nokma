@@ -122,6 +122,14 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
   // entity, never the parent the payload names.
   const parent = await getTicketState(ctx, p.parentId);
   if (!parent || parent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+  // A SOFT-DELETED parent is refused here, after tenancy and before anything
+  // about its shape (E6-4). The reader serves deleted rows by design and hands
+  // callers the live-only predicate; this is the create path taking it. Ahead
+  // of `cross-project` deliberately: "pick a parent from the same project"
+  // would send the actor after a ticket no view shows, and the deleted answer
+  // is the one they can act on. Same boundary read as `closed`: `deleted?` is
+  // optional on the domain type.
+  if ((parent.deleted ?? null) !== null) return refuse('hierarchy.parent-deleted');
   if (parent.projectId !== p.projectId) return refuse('hierarchy.cross-project');
 
   // The PARENT's type, and the parent is the subject of the refusal. This used
@@ -248,6 +256,11 @@ export async function checkTicketReparented(env: EventEnvelope, ctx: EngineConte
   // names.
   const newParent = await getTicketState(ctx, p.newParentId);
   if (!newParent || newParent.workspaceId !== env.workspaceId) return refuse('hierarchy.unknown-parent');
+  // The reparent path taking the same live-only predicate as the create path
+  // above (E6-4), in the same position: after tenancy, before the cycle walk
+  // and everything about the parent's shape. A move onto a deleted parent
+  // grafts LIVE work under a ticket that "stops appearing in views".
+  if ((newParent.deleted ?? null) !== null) return refuse('hierarchy.parent-deleted');
 
   // Is this ticket an ANCESTOR of its proposed parent? Walk up from the parent;
   // meeting ourselves means the move would put the ticket inside its own

@@ -54,6 +54,14 @@ export const REFUSALS = {
    */
   'hierarchy.unknown-parent': 'The chosen parent ticket does not exist in this workspace.',
   /**
+   * A parent that resolves and is soft-deleted (E6-4). Not `unknown-parent`:
+   * that sentence is false — the ticket exists, and the actor may well have
+   * held its id from before the delete — and not silently accepted, which put
+   * live work under a ticket that "stops appearing in views". The remedy names
+   * both things the actor can do; `restore` is the product's own undo.
+   */
+  'hierarchy.parent-deleted': 'The chosen parent ticket is deleted. Restore it, or pick another parent.',
+  /**
    * NOT `ticket.unknown-type`, which is the refusal this used to give and which
    * was false on every path that reached it: the ticket's OWN type resolved
    * twenty lines earlier, so "This ticket's type is not defined" sent the actor
