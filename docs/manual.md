@@ -373,8 +373,16 @@ This is the honest list. Each one is an absence, not a hidden button.
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and type into the title at the top
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
-- **You cannot delete a job.** If your stages include a "won't do" or "cancelled" stage, moving it
-  there is the nearest thing available.
+- **You can delete a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
+  absence finds the correction where they last saw it. Open the job and press **Delete** in the sheet's
+  footer. The job stops appearing in every view — boards, lists, search, My Work — and **its history is
+  kept**, because other events cite it. **Only a project admin may delete**, and the button is not hidden
+  from anybody: press it without the right and the server refuses, saying so. A **"… deleted · its
+  history is retained"** message follows with an **Undo** for about fifteen seconds, and that Undo is the
+  product's only route back — once it goes, no control anywhere restores the job.
+
+  If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
+  alternative.
 - **You cannot move a job to a different project.**
 
 > **The one place the product will take a field value from you — and what it will not take.**

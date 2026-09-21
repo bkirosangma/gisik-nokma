@@ -1956,13 +1956,68 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot delete a job."
+                      "text": "You can delete a job now."
                     },
                     {
                       "kind": "text",
-                      "text": " If your stages include a \"won't do\" or \"cancelled\" stage, moving it there is the nearest thing available."
+                      "text": " It is kept here, rather than deleted, so a reader who remembers it as an absence finds the correction where they last saw it. Open the job and press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "its history is kept"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", because other events cite it. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Only a project admin may delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and the button is not hidden from anybody: press it without the right and the server refuses, saying so. A "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "\"… deleted · its history is retained\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": " message follows with an "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Undo"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " for about fifteen seconds, and that Undo is the product's only route back — once it goes, no control anywhere restores the job."
                     }
-                  ],
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
                   [
                     {
                       "kind": "bold",
@@ -7774,7 +7829,31 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "No delete button or delete action was found anywhere. If your stages have a \"won't do\" or \"cancelled\" stage, moving it there is the nearest thing. Otherwise, assume it stays."
+                    "text": "Yes, if you are a project admin. Open the job and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "\"… deleted · its history is retained\""
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message follows with an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " for about fifteen seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the job. If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
                   }
                 ]
               }
@@ -10805,16 +10884,6 @@ export const HELP_CONTENT: HelpContent = [
                 {
                   "kind": "text",
                   "text": " Not written down anywhere."
-                }
-              ],
-              [
-                {
-                  "kind": "bold",
-                  "text": "Whether a job can be deleted."
-                },
-                {
-                  "kind": "text",
-                  "text": " No delete control was found. Whether one exists somewhere is unconfirmed."
                 }
               ],
               [

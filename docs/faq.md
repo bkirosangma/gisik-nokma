@@ -220,8 +220,12 @@ Yes. Open the job and type into the title at the top of the sheet. **Enter** or 
 **Escape** abandons the change.
 
 **Can I delete a job I created by mistake?**
-No delete button or delete action was found anywhere. If your stages have a "won't do" or "cancelled"
-stage, moving it there is the nearest thing. Otherwise, assume it stays.
+Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer. The job stops
+appearing in every view — boards, lists, search, My Work — and its history is kept, because other events
+cite it. A **"… deleted · its history is retained"** message follows with an **Undo** for about fifteen
+seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the
+job. If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
+alternative.
 
 **Can I move a job to a different project?**
 No. Parents have to be in the same project, and no way to move a job across projects was found.
@@ -983,8 +987,6 @@ That is a team that means it about not inventing facts, and it shows up everywhe
 Honest blanks. Nobody has an answer to these yet, and none of them is invented here.
 
 - **How long an emailed sign-in link stays valid.** Not written down anywhere.
-- **Whether a job can be deleted.** No delete control was found. Whether one exists somewhere is
-  unconfirmed.
 - **Whether a job can be moved to a different project.** No evidence either way.
 - **Whether a comment or description can be edited or deleted after posting.** The append-only design
   hints not; nothing confirms it.
