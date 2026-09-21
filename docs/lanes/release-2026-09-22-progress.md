@@ -13,3 +13,5 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-P8 | done | cf7ee59ab84197edd42fe884ef168ae5126348de | components.test.tsx P8 x4 |
 | B10 | claimed | 2026-09-21 21:23 | /Users/kiro/my_projects/gisik-nokma-ds1 |
 | T-E4-11 | done | c268647e6010169708a4a1744729f3244dbc0d28 | nav-phone-disclosure.test.ts (13.913) + app-nav.test.tsx (13.914); web 637/637 |
+| B10-ids | reserved | 2026-09-21 21:50 | case-id block 13.1054-13.1073 for batch B10 (verified free over all 25 catalogue files) |
+| T-E4-13 | done | bda4a02fa2910e8b126d288b1519cdbd91d44445 | new-ticket-dialog.test.tsx (13.1054); app-core 1722/1722 |
