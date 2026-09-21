@@ -3788,3 +3788,69 @@ and it holds, more strongly.** Corpus restricted to `*.test.ts(x)`/`*.spec.ts(x)
 **check-1 result holds for all 2,407**; and the sentence *"the check-row set was walked for the first time"* is
 true of the check-1 dimension and **one-third true of the check-4 dimension**. **Seven corrections to this
 report's own claims** (§17.1, §17.2, §14.4, §34, §52.5, §56.1, §57).
+
+## 58. Round 2 — §7's first checked claim, and the report's final state with its id ledger
+
+### 58.1 §7 (API, realtime & search) — opened, and its first claim checked clean
+
+§7 was the one section §51 recorded as opened with its claims unchecked: **895 lines, and by my own count only
+two bullets carry an explicit number-plus-noun** — the section is narrative, which is why the earlier "93
+candidate countable bullets" figure from a looser pattern is a count of bullets *containing* a number word, not
+claims making a count. The first is verified:
+
+**`Features.md:1030`** — `matchedIn`, the search result's matched-column field — says the route now computes it
+with *"**one `@@` per column** in a `CASE`: three `ts_headline` calls would answer the same question at three
+times the cost… the snippet three ways to disagree with the field"*, and that precedence is **title → description
+→ comment**, *"the order the weights already imply (A, B, C)"*. Read at `apps/server/src/routes/search.ts:193-198`:
+the `CASE` carries **exactly three** `WHEN … @@ ${tsquery}` arms — `to_tsvector(…, s.title)`, `… s.description)`,
+`… s.comments)` — returning `'title'`, `'description'`, `'comment'` **in that order**, and the `snippet` above it is
+the same three columns concatenated with `' — '`, which is the concatenation the bullet says threw the distinction
+away. **Every element of the claim — the count, the mechanism, the precedence and the reason for it — matches the
+source, and the route's own docblock states the same reasoning independently.** Verified clean.
+
+**The other candidate (`:1206`, *"10 mock, and a fourth code"*) is NOT checked**, and I am not going to read a
+fragment of it and rule: that is the error §56.1 and §57 record twice over.
+
+### 58.2 Final state
+
+| | |
+|---|---|
+| branch | `exec3/review-functionality-r2`, pushed, **no PR** |
+| report | `docs/lanes/review-functionality-exec3.md` — **71 sections**, 3,790 lines |
+| findings | **21 in round 2** — `E3-9` … `E3-29`, contiguous, no gaps |
+| severity | **1 Critical claimed · 11 Important claimed · 9 Minor** (§16, counts verified member-by-member) |
+| round-1 | **8 re-validated** (`E3-1` … `E3-8`), **none withdrawn** |
+| corrections to this report | **7**, all named §58.3 |
+| instrument defects in my method | **8**, each with the control that killed it |
+
+### 58.3 The seven corrections, and why they are the most useful part of this report
+
+`§17.1` three `Features.md` citations · `§17.2` my §7.2 `tickets.ts` citation · `§14.4`
+`check-no-silent-skips` does not refuse an empty universe (exec6's `E6-6` right, I was wrong) · `§34` my own
+`E3-18` revised **down** from Important to Minor · `§52.5` two check-rows I called truncated, whose continuation
+lines carry the citations · `§56.1` my §51 named **§8, which does not exist** · `§57` **§52's check-row set was
+one third of the real one**, extended and re-measured to 2,407.
+
+**Every one of the seven was found by re-measuring something I had already written down as a result.** Four of
+them were found by grepping for my own correction after writing it — which is what caught `§56.1`'s silent no-op
+replace, an edit that printed success and changed nothing. **The corrections and the eight instrument defects are
+the same defect class as every finding in `§16`:** a number or a citation that reads like a measurement and
+isn't one, until something is put through the same path as a control.
+
+### 58.4 Coverage, stated at the close — including what is not covered
+
+**Every one of `Features.md`'s fourteen real sections has been opened** (§51's table, corrected in place;
+**§8 does not exist**). Depth: **§4 fully audited · §3, §5, §6, §9, §11, §12, §13, §14 to a stated per-section
+depth · §1, §2, §7 and §10 opened with claims checked as recorded in §54–58.** The `test-cases/` check-row set —
+**2,407 rows across the catalogue's three id spellings** — is walked at **check-1 across all 2,407** and
+**check-4 across all 2,407**, both control-backed.
+
+**Still genuinely unasked, and named rather than implied:**
+- **`Features.md` §7's claims beyond the one above** — 895 lines, and the single checked claim is clean.
+- **63 of §3's 68 countable bullets**, and every candidate count in §5 beyond `E3-29`.
+- The check-rows' **🟡/🧪/🚫 families** (20 / 38 / 29 ids) are counted and separated but not read.
+- **`test-cases/README.md`'s legend**, and the ❌ set **outside my concern's own file**.
+- **Phase 2 refutations:** I have **no successful refutation to file.** Ten attacks on competing lanes' findings
+  were made and all ten failed; two of them changed this report (`E6-6` corrected a false claim of mine, `E6-11`
+  bounded §7.1). **That record stands as the honest result of the attempt**, and it is why
+  `docs/lanes/review-refutations-exec3.md` does not exist.
