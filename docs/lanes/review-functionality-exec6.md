@@ -1526,7 +1526,10 @@ its callers are those two shells. The two reads that drop the deleted ticket are
 `listTicketSummaries` → 5). Every `ds.query.*` call in the two shells, enumerated:
 `apps/mobile/src/screens/board-screen.tsx:26` and `:28` (`listTicketSummaries`, `searchOfflineCopy`),
 `apps/mobile/src/screens/ticket-screen.tsx:26` (`getTicketWithPending`), `apps/desktop/src/app.tsx:146`
-(`listTicketSummaries`, rendered at `:152-153` as `ticket-list__row`s). The phone's `FlatList`
+(`listTicketSummaries`, rendered at `:152-153` as `ticket-list__row`s). The phone's ticket screen's read,
+`getTicketWithPending`, is measured too: after the delete it still **serves** the deleted ticket (printed:
+`served`, keys `ticketId, confirmed, contests, pending`) — the server's detail door answers 404 for the same
+ticket (`read/live-ticket.ts:58`, case 16.96) — so a deleted ticket tapped from the phone's list opens. The phone's `FlatList`
 (`board-screen.tsx:56-59`) is fed by `listTicketSummaries` — so after a delete the deleted ticket is still a
 row on the phone's only ticket list, still a row on the desktop shell's list, and still a hit in the phone's
 search.
@@ -1550,7 +1553,17 @@ noticed: no replica test holds a deleted ticket.
 names seven server and web surfaces and no replica read; items 2 and 5 keep a deleted ticket's *contest* and
 *history* on purpose and say why, and neither reason (a claim is never redacted; the ledger is history) is a
 reason for a ticket list to carry it. The commit touched this file (36 lines) to add the two filters, so the
-replica was in scope, not deferred.
+replica was in scope, not deferred. **The nearest recorded item is case 16.90(c)** (`16-remaining-doors.md:923`),
+read in full: *"Plan 10's replica applies the same rule in TypeScript at `:947` … and `:980` … BOTH MEASURED
+SURVIVORS"* — its subject is that the two gates are unwitnessed by any test (remove either, 27/27 green), and its
+owner line (*"whoever next picks up Plan 10's replica reads"*) owns that coverage gap. It asserts, as a fact about
+the replica, that it *applies the same rule*; E6-24 is the measurement that three of its five reads do not. If
+the judge reads 16.90(c)'s owner line as owning every replica read, the argument against it is the commit's own
+two sentences above — the record says *owned later*, the commit that wrote the gates says *done here* ("every
+view-serving read", "the offline half of that one decision") — and a case that says the rule IS applied is not a
+record that it is missing. No case in `12-offline-sync-apps.md` names `listTicketSummaries`, `searchOfflineCopy`
+or `myWork` beside deletion (`grep -n -i` over the three names piped to `grep -i delet` → 0 lines; the same
+file carries 55 lines matching `delet` alone).
 
 **WHAT WOULD HAVE BEEN BETTER.** The same conjunct, `(state.deleted ?? null) === null`, in `listTicketSummaries`'
 loop (one line, `:798`) — which fixes `myWork` with it, since `myWork` is a filter over those summaries — and in
@@ -1561,7 +1574,10 @@ without answering the question.
 **MEASUREMENT.** Appendix AF, run from `packages/app-core` with `pnpm exec vitest run
 test/zz-exec6-probe-replica-deleted.test.ts --no-file-parallelism` (the file imports
 `../src/replica/replica-data-source.js` relatively — the same instrument F5 validated; `@gisik-nokma/sync-client`
-resolves to its `dist`, which was built at this sha before the run). Lines opened:
+resolves to its `dist`, and the dist was checked with a code-only needle rather than trusted:
+`grep -c "SELECT ticket_id FROM tickets WHERE workspace_id = ? ORDER BY ticket_id"
+packages/sync-client/dist/replica/replica.js` → 1, the `searchLocal` needle → 2, and the dist's mtime is later
+than `replica.ts`'s — so the unfiltered statements the probe exercised are the ones the source shows). Lines opened:
 `replica-data-source.ts:780-809`, `:872-886`, `:996`, `:1029`, `:1323-1340`; `replica.ts:1132-1152`,
 `:1186-1207`; `board-screen.tsx:15-40`, `:56-59`; `apps/desktop/src/app.tsx:140-153`; `git show 18d7e391 --
 packages/app-core/src/replica/replica-data-source.ts` (the whole diff: two hunks, both filters, nothing else);
@@ -1572,8 +1588,9 @@ client shells, one line from fixed, with the commit's own message as the specifi
 app — the deployed product — reads through the online mappers, which the server filters; the shells affected
 are the phone and desktop replicas. Not Minor: on the phone there is no other list, and a deleted ticket that
 stays a row there is the pre-feature behaviour under the feature's name. `myWork` is included for completeness
-and carries no product caller (`grep -rn "\.myWork(" apps packages/app-core/src` outside tests → none); the
-severity rests on `listTicketSummaries` and `searchOfflineCopy`. **The bound, stated:** both shells are minimal by
+and carries no product caller (`grep -rn "\.myWork(" apps/mobile/src apps/desktop/src apps/web/app
+packages/app-core/src` minus the data source → **0**, with `\.listTicketSummaries(` through the same pipe → 3 as the
+control); the severity rests on `listTicketSummaries` and `searchOfflineCopy`. **The bound, stated:** both shells are minimal by
 their own account — `apps/desktop/src/app.tsx:120-123`: *"Until [Plan 6's Board/List/ticket views] land, the shell
 renders the sync status strip and a minimal ticket list driven by `ds.query.listTicketSummaries`"* — so the two
 filtered reads are the ones those views will call when they mount on the replica, and the unfiltered one is the
@@ -6136,18 +6153,22 @@ describe('exec6 probe: which replica reads carry the soft-delete predicate', () 
     expect(after['listTicketSummaries (mobile board-screen, desktop app)']).toEqual(['DOOMED', 'live']);
     expect(after['myWork.assigned']).toEqual(['DOOMED', 'live']);
     expect(after['searchOfflineCopy (mobile board-screen)']).toEqual(['DOOMED', 'live']);
+    // the phone's ticket screen (ticket-screen.tsx:26): does it still open the deleted ticket?
+    const opened = await ds.query.getTicketWithPending(doomed);
+    console.log('getTicketWithPending(DOOMED) after delete:', opened === null ? 'null' : `served, title=${JSON.stringify((opened as { ticket?: { title?: unknown } }).ticket?.title ?? Object.keys(opened as object))}`);
   });
 });
 ```
 
 Run: `cd packages/app-core && pnpm exec vitest run test/zz-exec6-probe-replica-deleted.test.ts
---no-file-parallelism` (node v22.22.2). Output, the three printed lines and the summary:
+--no-file-parallelism` (node v22.22.2). Output, the four printed lines and the summary:
 
 ```
 BEFORE delete: {"getTickets (list)":["DOOMED","live"],"getBoard":["DOOMED","live"],"listTicketSummaries (mobile board-screen, desktop app)":["DOOMED","live"],"myWork.assigned":["DOOMED","live"],"searchOfflineCopy (mobile board-screen)":["DOOMED","live"]}
-doomed.deleted after fold: {"actorId":"01M31HZ9CT535BRZZSWY5X46Q5","at":"2026-08-20T00:00:00.000Z"}
+doomed.deleted after fold: {"actorId":"01M31JB3M8JHERCZJREC31GF49","at":"2026-08-20T00:00:00.000Z"}
 AFTER  delete: {"getTickets (list)":["live"],"getBoard":["live"],"listTicketSummaries (mobile board-screen, desktop app)":["DOOMED","live"],"myWork.assigned":["DOOMED","live"],"searchOfflineCopy (mobile board-screen)":["DOOMED","live"]}
- ✓ test/zz-exec6-probe-replica-deleted.test.ts (1 test) 16ms
+getTicketWithPending(DOOMED) after delete: served, title=["ticketId","confirmed","contests","pending"]
+ ✓ test/zz-exec6-probe-replica-deleted.test.ts (1 test) 17ms
  Test Files  1 passed (1)
       Tests  1 passed (1)
 ```
