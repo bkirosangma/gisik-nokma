@@ -26,6 +26,7 @@ never saw.
 | lane | block |
 |---|---|
 | **exec 3** | **`17.001`–`17.020`** (taken 2026-09-21 for the sheet's `Visibility` section styling) — **minted: `17.001`–`17.006`** |
+| **exec 4 / release batch B07** | **`17.121`–`17.140`** (controller allocation 2026-09-21 21:0x, for B07's soft-delete door cases — the batch's replica case is `12.399` in §12) — **minted: `17.121`** |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** A block is a longer-lived reading than a "next free
 N", but it still expires when the controller reallocates. **Re-read it before minting, and if your own
@@ -138,3 +139,36 @@ a peer rather than by the author of the check.
 `origin/main` has not moved is *true when written* and *false within two minutes*; the `git log
 origin/main..HEAD` check the handoff itself prescribes is **structurally blind to being BEHIND**, so
 nothing in this lane's own machinery could have caught it.
+
+## Release batch B07 — soft-delete integrity at the doors (2026-09-21, block `17.121`–`17.140`)
+
+*The release plan's B07 (`docs/lanes/release-2026-09-22-plan.md` §6): round-2 findings E6-2, E6-4, E6-11 and
+round-1 F2, F4, F5, all about one rule — a soft-deleted ticket "stops appearing in views" — reaching the
+WRITE doors and the reads the Delete commit missed. E6-24, the replica's three unfiltered reads, is `12.399`
+in §12 because that section owns the replica.*
+
+- **17.121** ✅ **The ingest door refuses every ordinary write against a soft-deleted ticket, and `ticket.assigned`
+  on one no longer manufactures an inbox notification pointing at a 404** (E6-2). One check ahead of
+  `evaluateEvent`'s dispatch — `checkTicketLive` in `checks/deletion.ts`, where the flag was already read —
+  refuses `deleted-ticket` ("This ticket is deleted; restore it first.") for an event filed against a ticket
+  that RESOLVES and is deleted; the exempt five are enumerated with a reason each (`ticket.deleted`,
+  `ticket.restored`, `ticket.created`, `claim.contested`, `claim.contested_resolved`), and a ticket that does
+  not resolve passes through UNCHANGED, because the server commits `ticket.assigned` for a never-created ticket
+  today and pins it (`DOOR_LEAVES_EXISTENCE_UNCHECKED`) — a second ruling this gate does not make. **Engine
+  half** (`packages/rule-engine/test/live-ticket.test.ts`, 23 cases): the gated thirteen and the exempt five
+  are asserted to be the WHOLE ticket-scoped vocabulary (read from `vocabulary.ts` as text, with the block
+  count as its control), each gated type is refused on the deleted twin and passes the gate on the live twin
+  in the same case, reachability through `evaluateEvent` for a type WITH a dispatch arm and one WITHOUT, a
+  restore re-opening the door, an unknown ticket passing, a stranger kind passing. Witnessed by mutation
+  (`if (false && …)` on the flag read → `Tests 14 failed | 9 passed (23)`, every kill at its own
+  `deleted-ticket` assertion). **Door half** (`apps/server/test/integration/soft-deleted-writes.test.ts`,
+  13 cases, through `POST /v1/events`): the finding's eight-event battery on the deleted twin refused
+  `deleted-ticket` and on the live twin committed — or, for `ticket.closed`/`ticket.ranked`, met the
+  workflow's own refusal, which pins that the gate is AHEAD of those rules rather than instead of them; the
+  deleted head untouched while the live twin's writes landed; the peer's inbox and the `notifications` table
+  holding an assignment for the live twin and none for the deleted one; a second delete still
+  `already-deleted`; and after `ticket.restored` the same `ticket.assigned` commits AND its notification is
+  delivered (the case waits for the fanout's row, which also drains it before the pool closes). RED before
+  the gate: `Tests 10 failed | 3 passed (13)`; GREEN: `Tests 13 passed (13)`. `fanout.ts`'s premise paragraph
+  now says what the door enforces; `notifications/sweep.ts` is named as a producer, not the inbox read. —
+  (`packages/rule-engine/test/live-ticket.test.ts`, `apps/server/test/integration/soft-deleted-writes.test.ts`)

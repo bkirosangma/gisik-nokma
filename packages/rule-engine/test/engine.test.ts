@@ -692,6 +692,7 @@ describe('REFUSAL_RULES', () => {
       closedTicket: 'closed-ticket',
       alreadyDeleted: 'already-deleted',
       notDeleted: 'not-deleted',
+      deletedTicket: 'deleted-ticket',
       rankRequiresBacklog: 'rank-requires-backlog',
       lastOwner: 'last-owner',
       grantOwnerRequiresOwner: 'grant-owner-requires-owner',
