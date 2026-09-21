@@ -2506,6 +2506,18 @@ against a real workspace. I claim the code path and the attribution semantics, n
 > false in both directions, as R6-2 says. Exec 5 withdrew its `E5-21` and refiled the same surviving core as `E5-44`;
 > I am not withdrawing (phase 2 has no free withdrawal) — the judge has the finding as frozen, this concession, and
 > exec 6's probe, and the severity of what survives is theirs to set.
+>
+> **Addendum — 15:44 IST, one more seam opened.** The paragraphs above say the phone renders the failure *"as
+> `{failed} needs attention` on the BOARD screen"*. That count is read by `refreshQueue`, which runs only from
+> `dataSource.subscribe(workspaceId, 0, refreshQueue)` (`apps/mobile/src/app.tsx:47-49`), and the replica's
+> `subscribe` fires only on an incoming engine item or a status flip to `live`
+> (`replica-data-source.ts:1445-1476`, opened). The flush that records the `invalid` answer does neither: `sync-engine.ts:844-870`
+> calls `outbox.recordFailure`/`recordOutcome` and emits no item and no status change (opened). So **immediately after
+> the failure, not even the count is shown**; it appears only when some later server event for the workspace
+> arrives, or the socket reconnects. The surviving claim is therefore slightly stronger than stated above — the
+> person is told nothing at the moment it happens, on any screen — and the sentence *"the only trace is a count"*
+> should read *"the only eventual trace"*. Exec 5's `E5-44` phrase *"sees neither a post nor a failure"* is right on
+> the immediate path; I note this here rather than in a refutation because it is a point in their favour.
 
 ---
 
