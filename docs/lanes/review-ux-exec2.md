@@ -1982,6 +1982,63 @@ the line they describe. **Severity: Important.**
 
 ---
 
+## R2.14 — NEW FINDING, BATCH 7
+
+### E2-40 (r2) — IMPORTANT · A `require-field` move previews as refused for ever, even after the person fills the field its own dialog asked for
+
+**WHAT.** `transition-dialog.tsx` renders an input for every field a `require-field` rule names
+(`:256`, `:401-406`), fails `blocked` until each is filled (`:260-262`, `:364`), and sends them into the
+submission (`:370-374`). The **preview** beside it is asked a different question:
+`:281-294` calls `precheckRef.current(toStateId, evidenceAttachmentId)` — **two arguments** — and the
+sheet's `precheck` is declared `(toStateId: string, evidenceAttachmentId?: string | null)`
+(`ticket-sheet.tsx:672-675`), building `payload = { to }` plus evidence and nothing else (`:681-684`).
+
+**WHY it is wrong — the engine reads the field from STATE, which the preview cannot have seen.**
+`packages/rule-engine/src/rules/require-field.ts:9` is
+`const value = input.ticket.fields[rule.field]?.value;` — the value comes from the **ticket state held by
+the evaluator**, not from the candidate's payload. On the real path that works because the sheet sends the
+field claims **first**, in one ordered batch (`ticket-sheet.tsx:712-719`, and the docblock at `:708-710`
+says exactly why: *"Field claims go FIRST and the transition last, in one ordered batch, so a
+`require-field` rule sees the value the dialog just collected"*). **The preview has no such batch** — it
+evaluates one candidate against the cached state — so for a field the ticket does not already carry, the
+preview's `input.ticket.fields[field]` is absent and `evaluateRequireField` returns
+`'This move needs the field "<field>" to be set first, and it is not.'`
+
+**And the control contradicts it, in the file, by design.** `:257-259` records that
+`fieldAlreadyClaimed` is *"the SAME predicate `moveOutcome`'s gate reads … extracted so the two never
+derive 'is this field already satisfied' two different ways"* — so the dialog deliberately mirrors the
+engine's semantics **for the gate**, clearing `blocked` the moment the person types. The result is a
+refusal sentence and an enabled primary control side by side, for every such move.
+
+**Relationship to a lane-5 finding, stated so the judge can see this is not a copy.** `E5-7` (exec 5)
+reports the same *shape* for **`require-comment`**: the candidate omits the comment, the effect's deps are
+`[toStateId, evidenceAttachmentId]`, typing enables Move. This finding is a **different rule kind on a
+different code path** — `require-field` is read from `input.ticket.fields`, not from the payload, and the
+value's home is the dialog's own field inputs rather than the comment box — which is why the fix differs
+(pass the collected `fieldValues` into the precheck as the batch does, or apply them to the evaluation
+input). I read `require-field.ts` and the precheck signature myself before filing it.
+
+**Reachability, stated exactly.** `require-field` is offered in the rule editor
+(`workflow-builder/ui/rule-editors/add-rule-menu.tsx:10` *"Require a field to be set"*,
+`require-field-editor.tsx`) — and **no seeded workflow carries one**: a walk of `apps/server/src` for
+`require-field` returns **0 hits**. So this is reachable by an admin authoring the rule, not out of the
+box. That is why it is Important and not Critical: the person meets it only where the feature is used,
+but where it is used it is permanent.
+
+**MEASUREMENT.** Opened: `transition-dialog.tsx:250-262` (the rules, `requiredFields`, `missingFields` and
+the shared predicate), `:281-294` (the preview call and its deps), `:360-364` (`blocked`), `:370-374` and
+`:401-406` (the submission and the inputs), `:477-481` (the rendered preview refusal);
+`ticket-sheet.tsx:672-692` (the `precheck` signature and payload), `:705-719`;
+`packages/rule-engine/src/rules/require-field.ts:5-18`; `apps/server/src` walked for `require-field` → 0.
+
+**Severity: Important.**
+
+---
+
+*Running total of round-2 new findings: `E2-20`–`E2-40` (21) — 11 Important, 10 Minor.*
+
+---
+
 # R2.11 — CANDIDATES I EXAMINED AND DID **NOT** FILE, WITH THE REASON
 
 A candidate I checked and rejected is worth recording: it costs the judge nothing, it shows the boundary
