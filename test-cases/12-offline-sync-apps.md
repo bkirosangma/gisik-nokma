@@ -2961,3 +2961,30 @@ reports through the same host-level surface as (b)/(c) instead.*
   refusal messages are non-empty. —
   (`apps/mobile/src/editor/editor-refusals.test.ts`)
 
+## Ruling P30 — the editor webview HTML has a freshness gate now (2026-09-21, B14)
+
+*`editor-html.generated.ts` is baked from `packages/editor`'s `build:webview` output by a script with
+no `--check` mode, so nothing in the gate noticed when it drifted behind the source — measured five
+`packages/editor/src` commits stale. `generate-editor-html.mjs --check` regenerates the content in
+memory and diffs it against what is checked in (the shape `scripts/help-content.mjs --check` already
+uses), wired into `@gisik-nokma/mobile`'s own `test` script. When the bundle has not been built yet
+(gitignored, absent on a checkout that has not run `build:webview`), `--check` warns and exits 0
+rather than failing every `pnpm test` that has not built the editor's webview bundle — it can only
+refuse a real staleness, not the bundle's absence. The checked-in file was regenerated against a real
+`build:webview` run as part of this ruling.*
+
+- 12.413 ✅ `checkFreshness` reports `no-bundle` when the built bundle does not exist, rather than
+  failing every test run that has not built it — RED confirmed against a pre-fix stub that always
+  answered `ok` (no check existed at all), GREEN after. —
+  (`apps/mobile/scripts/generate-editor-html.test.ts`)
+- 12.414 ✅ `checkFreshness` reports `stale` when the checked-in file does not match a regenerate of
+  the real bundle, and `ok` when it does — same RED→GREEN discipline as 12.413, plus the `--check`
+  CLI run as a real child process through all three states (`no-bundle`→exit 0, `stale`→exit 1 with
+  `STALE` in its output, `ok`→exit 0). —
+  (`apps/mobile/scripts/generate-editor-html.test.ts`)
+- 12.415 ✅ `package.json`'s `test` script runs `generate-editor-html.mjs --check` before `vitest run`,
+  chained with `&&` so a stale bundle stops the suite rather than running past it — the wiring
+  assertion, not a restatement of the check's own behaviour (the same shape 12.393 uses for the
+  dev-credential guard's wiring into `build`). —
+  (`apps/mobile/scripts/generate-editor-html.test.ts`)
+
