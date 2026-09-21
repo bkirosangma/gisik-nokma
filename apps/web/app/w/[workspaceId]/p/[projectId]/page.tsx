@@ -1767,14 +1767,24 @@ function ProjectBoard() {
      * Keyed on `rows === null`, NOT on `error !== null` — those are different facts
      * and only the first one is about parents.
      *
-     * `parentCandidates` above is built from `list.rows`. `list.error` is
+     * `parentCandidates` above is built from `list.rows`. `list.error` USED to be
      * `list.error ?? preferences.error` (`ticket-list.ts`'s `useTicketList`), so an
      * ordinary preferences 500 — or a `setPrefs` PUT the user triggered themselves —
-     * sets it while the rows sit there intact. Keyed on the error alone, this told a
+     * set it while the rows sat there intact. Keyed on the error alone, this told a
      * user that the tickets which could be a parent *"cannot be shown"*, and offered a
      * PREFERENCES failure as the reason, while the very same page could have listed
      * them. Two false sentences at once, and the state a stale parent could be
      * submitted from. Witnessed at 3.158.
+     *
+     * **⚠ AND THAT FOLD WAS THE ROOT OF E5-42 (fixed 2026-09-21), which this comment
+     * was the only place to record at the time.** This arm dodged the fold by keying
+     * on `rows === null` as well — but the four TAB arms below key on the field alone,
+     * so the same preferences failure painted *"The ticket list cannot be shown yet.
+     * HTTP … for /v1/me/preferences"* over intact rows on four of the five tabs. The
+     * fold is gone: `useTicketList` now returns `error: list.error` and a separate
+     * `prefsError` for the preferences half, which renders beside the column chooser.
+     * This arm's keying is unchanged and still right — it is simply no longer the only
+     * place in this file that knows the difference.
      *
      * Keyed on the rows it says only what it can see: either there are candidates or
      * there are not. The dialog refuses the stale parent independently
@@ -2573,6 +2583,7 @@ function ProjectBoard() {
                     prefs={list.prefs}
                     onPrefsChange={list.setPrefs}
                     prefsEditable={list.canSetPrefs}
+                    prefsError={list.prefsError}
                     labels={labels}
                     onOpenTicket={openTicket}
                     emptyCopy={
@@ -2729,6 +2740,7 @@ function ProjectBoard() {
                 // user's arrangements. Passed through, the controls are DISABLED in
                 // that window instead of accepting a click that does nothing.
                 prefsEditable={list.canSetPrefs}
+                prefsError={list.prefsError}
                 labels={labels}
                 onOpenTicket={openTicket}
                 /*

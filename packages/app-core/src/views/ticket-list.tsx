@@ -110,6 +110,15 @@ export type TicketListProps = {
    * merge into a document this client has not read — see `useTicketList`.
    */
   prefsEditable?: boolean;
+  /**
+   * A failure of the preferences read or save, or `null`/absent for none.
+   *
+   * Rendered BESIDE the column chooser rather than in the list's own refusal
+   * slot (E5-42, 2026-09-21): the rows are not what failed, and the person who
+   * most needs this sentence is the one who just clicked a column checkbox —
+   * `setPrefs` is what the chooser calls, so their own click can produce it.
+   */
+  prefsError?: string | null;
   labels: GroupLabels;
   onOpenTicket: (ticketId: string) => void;
   /**
@@ -290,6 +299,7 @@ export function TicketList({
   prefs,
   onPrefsChange,
   prefsEditable = true,
+  prefsError,
   labels,
   onOpenTicket,
   narrowing,
@@ -544,6 +554,28 @@ export function TicketList({
               </span>
             ) : null}
           </>
+        )}
+        {/*
+          THE PREFERENCE FAILURE, SAID WHERE IT HAPPENED (E5-42, 2026-09-21).
+
+          It used to be folded into the list's own `error` (`useTicketList`), and
+          every tab arm refuses on that field before it looks at `rows` — so a
+          failed `getPreferences`, or a failed save of "which columns to show",
+          painted "The ticket list cannot be shown yet. HTTP … for
+          /v1/me/preferences" over rows that had loaded perfectly. `setPrefs` is
+          what the chooser beside this sentence calls, so the person's own click
+          could produce it.
+
+          The transport's words are carried rather than paraphrased, the way the
+          rest of this product carries a server's refusal, and the sentence says
+          what did NOT happen — the arrangement was not saved — because the
+          alternative reading, that the arrangement WAS saved, is the one a
+          silent failure leaves a reader with.
+        */}
+        {prefsError === undefined || prefsError === null ? null : (
+          <span role="status" className="gn-list__prefs-error" data-testid="list-prefs-error">
+            Your column choice was not saved — {prefsError}
+          </span>
         )}
       </div>
 
@@ -1098,7 +1130,25 @@ export type TicketListState = {
   canSetPrefs: boolean;
   setPrefs: (next: ProjectViewPrefs) => void;
   currentUserId: string;
+  /**
+   * A failure of the TICKET READ, and nothing else (E5-42, 2026-09-21).
+   *
+   * It used to read `list.error ?? preferences.error`, which folded the
+   * preferences hook's error — set on a failed `getPreferences` AND on a failed
+   * `putPreferences` — into the same field. Every refusing tab arm keys on this
+   * field FIRST, before checking `rows`, so a column-preference read or save
+   * that failed painted *"The ticket list cannot be shown yet. HTTP … for
+   * /v1/me/preferences"* over rows that had loaded perfectly, on four of the
+   * five tabs. The two failures have different causes and different remedies,
+   * so they are different fields.
+   */
   error: string | null;
+  /**
+   * A failure of the PREFERENCES read or save, carried separately so it can be
+   * said where it happened — beside the column chooser — instead of taking the
+   * list down with it.
+   */
+  prefsError: string | null;
   reload: () => void;
 };
 
@@ -1222,7 +1272,8 @@ export function useTicketList(
     canSetPrefs: preferences.document !== null,
     setPrefs,
     currentUserId,
-    error: list.error ?? preferences.error,
+    error: list.error,
+    prefsError: preferences.error,
     reload: list.reload,
   };
 }
