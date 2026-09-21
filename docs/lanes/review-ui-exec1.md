@@ -14,6 +14,7 @@
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
 | **P16–P27** | — | **12 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important); an undeclared painted pair at 3.84:1 (P24, Important); three citations to a deleted component (P25, Minor); **the prototype-delta queue, re-derived row by row — 7 of 11 have shipped** (P26, Important); WCAG 1.4.10's 320px, untested because the suite's narrowest width is 390 (P27, Minor). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
+| **P28–P31** | — | **4 MORE new findings** | the mobile board row with no role, unlike its sibling (P28, Minor); two of ten mock stubs cite a file and no `line`, and they are the two whose contracts changed (P29, Minor); the mobile editor webview **two generated links behind**, both unguarded, with a documented remedy that would not work (P30, Important); **the top bar is an UNNAMED `navigation` landmark beside a named one on at least seven routes** (P31, Important) — the finding that came out of round 2's pass over `apps/web/app/*`'s 25 route bodies, round 1's largest named hole. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
 
@@ -73,11 +74,14 @@ Primary comparison file: **`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a07
 |---|---|---|
 | prototype comparison | 2 surfaces + the delta queue | **+ the `isMyWork` screen against the EXPORT at its own line numbers** (P17), and **the export-vs-repo-copy difference measured in full** (P15) |
 | styling-test family | not opened | **the CSS-scanning family's nine files, two scanners, and every content assertion in the four truncating ones** (P16) |
+| **`apps/web/app/*` route bodies** — round 1's **largest named hole** | named and not entered | **all 25 routing modules, in two passes** — a token sweep across the whole population (headings, landmarks, `metadata`, `autoFocus`, `aria-live`, positive `tabIndex`, `<img>`, `dangerouslySetInnerHTML`), then a full read of every module the sweep flagged and every module under 110 lines. **This is the pass P31 came out of**; the sweep's own three false leads are the ninth, tenth and eleventh near-misses, recorded as coverage rows in §5 |
+| **the nav population** | never enumerated | **every `<nav>` in product source, all nine, classified by whether it carries an accessible name** — the enumeration P31 rests on |
+| `AppNav` itself | rendered by 18 sites, never read | **read in full (397 lines)** — the most-rendered component in the product |
 | my own lands | — | **every finding re-checked for validity under §3 before adding anything**; two re-filed (P8, P13), one re-measured (I1) |
 
 **⛔ NOT REACHED — and this is the honest boundary, stated as a list:**
 1. **Painted DOM: the SIGNED-OUT half only, and no screenshots at all.** I ran the signed-out suite by hand (§0) and it gives painted measurements for **5 routes × 3 viewports** — `/help`, `/privacy`, `/terms`, `/sign-in`, the 404. **NO signed-in route was measured at paint**, so every finding about the board, the ticket sheet, the settings screens, the members page, the inbox and the desktop/mobile shells rests on *source and stylesheets*, which is weaker than a painted claim and I am not going to dress it up. **The reason is I2's:** taking the signed-in suite needs a stack serving *this* tree, and `:3001` serves a baked image that predates `main` (`981aa92b` measured `docker inspect gisik-nokma-dev-web-1` → zero mounts). So a run would have produced confident numbers about a different product — the same trap, one layer up. **No product file was modified and no screenshot was taken.**
-2. Not reviewed file-by-file: `apps/web/app/*` route bodies (25 modules); the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full; `sheet`/`toast`/`info-tip`/`table` grepped; `select/select.tsx` read for its structure, markup and sweep-visibility (it is built on React Aria — `useSelect`/`useComboBox`/`useListBox`/`useOption`/`HiddenSelect` — so its keyboard and role model comes from the library rather than from this repo, which is why P9's hand-rolled tabs stand out beside it). **Remaining largest hole: `apps/web/app/*`'s 25 route bodies.**
+2. **⚠ r2 NARROWED — the route-body hole is now closed at the level stated, and the level matters.** All 25 `apps/web/app/*` routing modules were reached in round 2 (see the coverage table above) — but **as a token sweep plus a read of the flagged and small ones, not as 9,425 lines read line-by-line.** The sweep's result is a clean bill on the structural axis, and I am not going to inflate it into "reviewed": it establishes that no route introduces a heading, landmark, focus, live-region, tabindex, image or `innerHTML` defect **of the kinds the sweep tests**, and nothing beyond those kinds. Not reviewed file-by-file: the ~55 `apps/web/test/*` files; `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`; `packages/editor`'s components beyond the class sweep; `apps/mobile`'s editor webview and both storage engines; `apps/desktop`'s Tauri config and storage; `apps/web/e2e/` (the mock-only suite). **`packages/ui` WAS read** — `button`, `card`, `chip`, `segmented-control`, `avatar`, `dialog`, `switch` in full; `sheet`/`toast`/`info-tip`/`table` grepped; `select/select.tsx` read for its structure, markup and sweep-visibility (it is built on React Aria — `useSelect`/`useComboBox`/`useListBox`/`useOption`/`HiddenSelect` — so its keyboard and role model comes from the library rather than from this repo, which is why P9's hand-rolled tabs stand out beside it). **Remaining largest hole after round 2: `packages/app-core/src/views/*` beyond `ticket-sheet`/`board`/`attachment-list`, and `apps/desktop`'s Tauri config and storage — neither of which round 2 entered.**
 3. Prototype comparison performed for **two** surfaces only (the ticket-sheet breadcrumb, the board empty states). The other ~20 prototype files were not compared.
 4. §16's 97 case ids were **not** each opened. `check:citations` was run (§7) and its limit is stated there; the breadcrumb cases `16.63`–`16.71` and `16.87` **were** read and are correctly updated for the state crumb's removal.
 
@@ -798,6 +802,37 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 ---
 
+### P31 — **IMPORTANT** ⚠ **r2 NEW** — The top bar renders as an UNNAMED `navigation` landmark beside a named one on at least seven routes
+
+**WHAT.** `AppNav` renders `<nav className="gn-nav">` with **no accessible name** (`apps/web/src/app-nav.tsx:232`), and `LegalNav` renders the identical `<nav className="gn-nav">`, also unnamed (`apps/web/src/legal-nav.tsx:68`). **Both of them co-render with a second, *labelled* `<nav>` on the same page**, so a screen-reader user who opens the landmark list meets two `navigation` regions and only one of them says what it is.
+
+**MEASUREMENT.**
+1. **Every `<nav>` in product source, exhaustively** — `grep -rn "<nav" --include="*.tsx" --include="*.ts" apps packages`, excluding tests and `dist`: **nine elements. Seven carry a name. Two do not.**
+   - **named:** `settings/page.tsx:180` *"Settings sections"* · `w/[workspaceId]/page.tsx:570` *"Workspace sections"* · `workflows/[workflowId]/page.tsx:80` and `…/history/page.tsx:39` *"Breadcrumb"* · `legal-chrome.tsx:115` *"On this page"* · `help-browser.tsx:511` (`aria-labelledby="gn-help-topics"`) · `ticket-sheet.tsx:1760` *"Ticket location"*.
+   - **unnamed: `app-nav.tsx:232` and `legal-nav.tsx:68`** — and these are the two that *share a page* with a named one.
+2. **Each co-render verified by opening both sites, not inferred from the grep.**
+   - `/settings` — `AppNav` at `app/settings/page.tsx:171`, sidebar at `:180`: **eight lines apart in one file.**
+   - `/w/<id>` — `AppNav` at `w/[workspaceId]/page.tsx:299`; `WorkspaceLinks`, which renders the `"Workspace sections"` nav at `:570`, invoked at **`:971` inside the same returned tree**.
+   - `/privacy`, `/terms` — `<LegalNav />` at `privacy/page.tsx:177`, `<LegalToc />` at `:187`.
+   - `/help` — `<AppNav />` at `help/page.tsx:19`, `<nav aria-labelledby="gn-help-topics">` at `help-browser.tsx:511`.
+   - the board with the sheet open — `AppNav` at `p/[projectId]/page.tsx:1796`, crumbs at `ticket-sheet.tsx:1760`.
+   - both workflow settings routes — `AppNav` plus the `"Breadcrumb"` nav.
+3. **A reproduction that does not read source:** the accessibility tree's landmark list on `/settings` reads *"navigation"*, then *"Settings sections"*.
+
+**WHY IT IS WRONG — AND THE ARGUMENT IS THIS REPOSITORY'S OWN, WRITTEN TEN LINES FROM WHERE IT IS NOT APPLIED.** `apps/web/src/legal-chrome.tsx:43-45`, of this exact pair:
+
+> *"First, the honest one: **this page now renders TWO `<nav>` landmarks — the top bar and this row — and ARIA's own guidance is that multiple navigation landmarks must be distinguishable.** 'On this page' says which is which."*
+
+**That sentence is correct, and it is why the TOC nav carries a label — but the "top bar" it names as the other half of the pair is the element left unnamed.** So the page satisfies the rule it wrote down for the newer of its two navs and not for the older one. **This is not a ruled divergence:** nothing anywhere rules that the bar should stay unnamed, and seven named navs against these two show the house convention is the opposite.
+
+**The consequence connects to a finding this report already made, which §3 says weighs more.** P13 measured that **the product has no skip link**, so a keyboard user Tabs the bar's six-to-nine links on every navigation. For a screen-reader user the landmark list is the bypass that remains — and on these routes it cannot distinguish the bar from the region beneath it. **That connection is measured, not asserted.**
+
+**WHAT WOULD HAVE BEEN BETTER.** One attribute each: `aria-label="Main"` on `app-nav.tsx:232`, `aria-label="Legal"` on `legal-nav.tsx:68` — using the house's own names for those two bars (`legal-nav.tsx:55` calls the legal one *"the chrome"*). **Plus a unit case asserting the label by string, the way `legal-chrome.tsx:56-57` records doing for the TOC** — because, as that same comment says, the ratchet *"cannot judge and does not claim to"* this.
+
+**SEVERITY: IMPORTANT (claimed).** Systemic rather than local — both chrome bars, seven routes — it violates a rule this repository wrote down itself, and its harm lands on the population with no alternative bypass. **A refuter can argue Minor**, on the ground that the landmark still resolves and the links stay reachable; severity is the judge's either way, and I would not contest that ruling.
+
+---
+
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
 
 | comparison | class | evidence |
@@ -867,7 +902,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 16**
+**IMPORTANT — 17**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -884,6 +919,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
 - `P26` ⚠ r2 — the prototype-delta document is stale in BOTH halves: **every numbered queue row is closed** and **two of five per-screen gap claims no longer describe the product**
 - `P30` ⚠ r2 — the mobile editor webview is two generated links behind and both links are unguarded
+- `P31` ⚠ r2 — the top bar is an UNNAMED `navigation` landmark beside a named one on at least seven routes
 
 **MINOR — 17**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
@@ -904,7 +940,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P28` ⚠ r2 — the mobile board's row is the one pressable of six with no accessibility role; its sibling sets one **(observation credited to the opposing lane; the census is the addition)**
 - `P29` ⚠ r2 — the mock suite says every stub carries its server `file:line`; two of ten carry the file only, and they are the two whose contracts drifted
 
-**Total 34.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 35.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
@@ -933,11 +969,12 @@ rows = re.findall(r'^- `([IP]\d+)`', md, re.M)                    # each summary
 assert Counter(sev for _, sev in ids)['MINOR'] == count_of_rows_under('**MINOR —')
 ```
 
-**✅ RUN AT THE END OF ROUND 2, AND EVERY CHECK PASSES.** Four cross-checks over the whole report at 31 findings:
-- **Each finding's own heading severity against the list it is placed under** — **31 findings, no mismatch**. This is the check that would have caught the error found and fixed earlier this round, where three IMPORTANT findings sat in the MINOR list under stale headers while every total still agreed.
-- **Bucket membership against the headers** — **1 / 15 / 15, matching**; and **no finding lacks a summary row**.
-- **The citation sweep** — **202 distinct `file:line` references, all 202 resolving inside their file and none beyond EOF.** The one file the sweep cannot resolve is the breadcrumb dispatch in `gisik-nokma-lanes/`, which is outside the repository and is named with its directory.
-- **Nothing was lost to the freeze** — comparing this report's headings against `origin/main`'s landed copy: **all 18 landed findings are still present**, and the count is now 31.
+**✅ RUN AT THE END OF ROUND 2, AND EVERY CHECK PASSES.** Four cross-checks over the whole report at **35 findings**:
+- **Each finding's own heading severity against the list it is placed under** — **35 findings, no mismatch**; the three severities agree **1 / 17 / 17, both directions, with an empty symmetric set difference**. This is the check that would have caught the error found and fixed earlier this round, where three IMPORTANT findings sat in the MINOR list under stale headers while every total still agreed.
+- **Bucket membership against the headers** — **1 / 17 / 17, matching**; and **no finding lacks a summary row**.
+- **⚠ THE CHECK ABOVE IS RUN WITH A REGEX THAT HANDLES THE COMPOUND SEVERITY, AND MY FIRST RUN TODAY DID NOT.** Its first version matched `\*\*(CRITICAL|IMPORTANT|MINOR)\*\*` — an exact closing `**` — and reported **33 headings against 35 rows**, with `P5` and `P8` "missing from the headings". Both headings are `**MINOR (product) / IMPORTANT (follow-on)**`, which the exact form cannot match. **The two ids it flagged are the two this report deliberately counts once under the product severity**, so a judge running the loose version would see a 2-finding discrepancy that does not exist. **The documented four-line check below is the loose form and is correct**; my re-implementation was not. **This is the fourth time this round that an instrument's PREMISE, not its arithmetic, was the fault** — and the first time it was this section's own check.
+- **The citation sweep** — **242 distinct `file:line` references, 233 resolving inside their file and ZERO beyond EOF.** **⚠ The 9 the sweep cannot resolve are all the sweep's fault, and they are the same fault as before with a third cause.** `page.tsx:781` (23 namesakes) and `store.ts:145` (3) are the known ambiguity; `CTL-DISPATCH-2026-09-20-breadcrumb-hierarchy.md` is outside the repository and named with its directory; and **the remaining six are the dynamic-route paths** — `w/[workspaceId]/page.tsx`, `p/[projectId]/page.tsx`, `workflows/[workflowId]/page.tsx`, `dist/index.js`. **Two independent bugs, both mine:** `[workspaceId]` is a **glob character class** to `git ls-files`, so it can never match the literal bracketed directory; and the sweep's universe is the repo root while **this report writes those citations relative to `apps/web/app/`** — a shorthand a reader resolves by context and a script cannot. **All nine were confirmed by opening the literal path.** So the honest statement of this instrument's limit is three-fold: **basename ambiguity, glob metacharacters in dynamic-route paths, and a shorthand root.** Every one of the nine is the sweep's, none is the report's.
+- **Nothing was lost to the freeze** — comparing this report's headings against `origin/main`'s landed copy: **all 18 landed findings are still present**, and the count is now 35.
 
 **⚠ AND A LIMITATION OF MY OWN SWEEP THAT FLAGGED THREE CITATIONS WHICH TURN OUT TO BE CORRECT — worth stating because the sweep is the instrument this section rests on.** Its fallback resolves a bare path by **basename**, so `members/page.tsx` matched a 383-line namesake and `routes/tickets.ts` matched a namesake with 562 lines. **Opened and checked: `members/page.tsx` is unique and 1002 lines, and `apps/server/src/routes/tickets.ts` is 965 lines** — the latter's `:617-619` is exactly `let cursor = state.parentId;`, the line P26's §5 correction cites. **So all three flags were the sweep's, not the report's.** **The rule the section already states applies to this instrument too: a path that is not fully qualified is not a citation, and the sweep that consumes one inherits its ambiguity.** The citations in this report that ARE fully qualified all resolve. **`members/page.tsx` is unique in this repository** (`find` → 1), the real file is **1002 lines**, and both cited ranges hold exactly what the findings say. **The instrument was wrong and the citations were right** — which is the fourth time this round that a measurement's premise, not its arithmetic, was the fault.
 
