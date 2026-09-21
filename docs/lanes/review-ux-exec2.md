@@ -2563,6 +2563,38 @@ unreachable throw, the viewport coverage that lives in the other suite, the Cale
 supplies, the clickable row, and the Load-more callback). **The last link is where the defects are not**,
 and checking it before filing is the only thing that has kept this report's error rate at zero claimed-and-
 wrong so far.
+## R2.17c — THE CATALOGUE, REACHED WHERE IT COULD BE CHECKED
+
+My round-1 §6 named *"the 13.x case catalogue id by id"* as unreached, and it is the largest item on the
+list — **2606 ids across 25 files**. It cannot be read id by id in a review of this size, so the honest
+reach is a **bounded** one, stated as such: I took the smallest catalogue file and tested the claim in it
+that is mechanically checkable.
+
+**`test-cases/17-open-work.md`** — six ids, `17.001`–`17.006`, all **✅**, all styling the visibility section.
+Four of the six are pure prototype-fidelity claims. **`17.005` is a scan**, and I re-ran it:
+
+> *"No `[data-style]` block forks the section, and **every selector this group asserts on is declared
+> exactly ONCE across BOTH stylesheets**."*
+
+**Result: no `[data-style]` fork exists for any `.gn-visibility*` selector** — every `[data-style="neo"]`
+block in `ui.css` names something else (`gn-chip`, `gn-board__column-empty-icon`, `fields-editor__row`,
+`gn-select__panel`, `ticket-type-list__*`, `workflow-builder-screen__name`, `gn-help__search-input`,
+`gn-segmented__item--on`, `gn-field__input`, `workflow-list__state`), and `globals.css` has six, none of them
+visibility. **The case holds.**
+
+⚠ **And one candidate died on the way, recorded because the near-miss is the useful part.** My first scan
+counted "a selector declared more than once" naively and flagged **`.gn-visibility__refusal` at `ui.css:2097`
+and `:2107`** — which looked like exactly the fork `17.005` denies. **It is not.** `:2096-2097` is a
+**shared selector list** (`.gn-visibility__lockout, .gn-visibility__refusal { … }`) carrying the common
+declarations, and `:2106`/`:2107` then give each its own tone (`inset 4px 0 0 var(--gn-warning)` /
+`var(--gn-danger)`) — the idiomatic shared-base-plus-variant pattern, not a duplicate. **A scan is only as
+good as its unit**, and mine counted rule-blocks where the case counts declarations. That is the same
+failure I have now made five times today with my own tooling, and the reason every check in this report
+names what it measured.
+
+**The boundary on this reach, stated plainly:** six ids of 2606, chosen because they were checkable —
+**0.2 % of the catalogue.** I am not claiming the catalogue is verified. I am claiming one of its scan
+claims was re-run and holds, and that the rest remains unreached.
 ## R2.18 — THE LAST UNREAD SCREENS, AND WHY I STOPPED HUNTING
 
 Two surfaces I had never opened — the **Calendar** (`calendar-view.tsx`, 514 lines) and the **Timeline**
