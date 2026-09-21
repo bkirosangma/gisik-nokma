@@ -1,4 +1,4 @@
-import { useRef, useState } from 'react';
+import { useEffect, useRef, useState } from 'react';
 import { DEEPEST_RANK } from '@gisik-nokma/domain';
 import { Button, Dialog, Select } from '@gisik-nokma/ui';
 
@@ -158,6 +158,29 @@ export function NewTicketDialog({
    * with NO root-legal type at all; see `defaultRootTypeFor`.
    */
   const [typeId, setTypeId] = useState(defaultRootTypeFor(typeOptions)?.id ?? '');
+  /**
+   * ⚠ THE SEED RUNS ONCE, AND THE LADDER'S IDENTITY LEGITIMATELY CHANGES UNDER
+   * IT (E2-33a, 2026-09-21).
+   *
+   * The caller mounts this dialog under `BUILTIN_TYPE_LADDER` while the type read
+   * is in flight and hands the workspace's own list over afterwards
+   * (`page.tsx`'s `typeOptions`) — and a `useState` initialiser runs once, so
+   * nothing re-read the new list. With the old id still in state the control
+   * keeps PAINTING it (react-aria's combo keeps its input text) while the
+   * offered options no longer contain it, and Create submitted an id off the
+   * list.
+   *
+   * The re-seed below is deliberately narrow: it fires ONLY when the standing id
+   * has LEFT the list, and it re-asks the same question the initial seed asked
+   * (`defaultRootTypeFor`). It never overwrites a choice the person can still
+   * make — re-seeding on every list change would silently replace a type someone
+   * had picked, which is the opposite defect (E5-16's own).
+   */
+  useEffect(() => {
+    if (typeId === '') return;
+    if (typeOptions.some((option) => option.id === typeId)) return;
+    setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
+  }, [typeOptions, typeId]);
   const [parentId, setParentId] = useState('');
   // Checked by default (spec §5.4), PER CHOSEN PARENT — Ruling 40 (coordinator,
   // fix round 1, 2026-09-17): the Parent picker's own `onChange` below resets
@@ -410,7 +433,18 @@ export function NewTicketDialog({
           // tells the person a request is already on the wire. A control that
           // looks pressable while it is not is the same lie in the other
           // direction.
-          disabled={title.trim() === '' || typeId === '' || submitting}
+          //
+          // The last term is MEMBERSHIP, not emptiness (E2-33a): `typeId === ''`
+          // is a string test, and it passes for an id the list no longer offers.
+          // The effect above re-seeds that case already, so this term is the
+          // belt to its braces — a payload may only ever carry a type the picker
+          // is offering, whatever a future seed does.
+          disabled={
+            title.trim() === '' ||
+            typeId === '' ||
+            !typeOptions.some((option) => option.id === typeId) ||
+            submitting
+          }
           onClick={create}
         >
           Create

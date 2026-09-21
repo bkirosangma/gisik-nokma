@@ -672,6 +672,94 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     });
   });
 
+  /**
+   * 3.191 (E2-33a) — THE GATE IS MEMBERSHIP, NOT EMPTINESS.
+   *
+   * The seed runs once and the caller legitimately SWAPS the ladder's identity:
+   * the dialog mounts under `BUILTIN_TYPE_LADDER` while the type read is in
+   * flight and gets the workspace's own list afterwards. `disabled` tested
+   * `typeId === ''` — a string test — so an id that is no longer IN the list
+   * still passed it. The `Select` resolves its label with
+   * `options.find(option => option.value === props.value) ?? null`
+   * (`packages/ui/src/select/select.tsx`), so the control draws the PLACEHOLDER
+   * — "no type chosen" — while `typeId` is non-empty and Create is enabled: the
+   * screen and the payload disagree, which is the one thing this component's
+   * docblock exists to refuse.
+   *
+   * Whether a product-founded workspace can reach it today is a separate
+   * question (its real list still holds the built-in ids, which the ladder
+   * seeds from) and V10's journey does not depend on the answer: a screen whose
+   * claim and whose payload are kept in agreement by a MEMBERSHIP test cannot
+   * drift when either side moves, and the emptiness test was the drift.
+   */
+  it('PLANTED DEFECT: a ladder swap cannot leave the screen saying "none chosen" while a type travels', () => {
+    const onCreate = vi.fn();
+    const { rerender } = render(
+      <NewTicketDialog
+        open
+        typeOptions={LADDER}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+
+    // The workspace's own ladder arrives and does not carry the type the seed
+    // chose. Nothing re-seeds (`useState` runs once), so `typeId` is now an id
+    // this list cannot resolve.
+    rerender(
+      <NewTicketDialog
+        open
+        typeOptions={[{ id: 'errand', name: 'Errand', rank: 3 }]}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    // The picker now OFFERS `Errand` and nothing else, and the standing id was
+    // not in it — so the re-seed asks the same question the initial seed did and
+    // the control paints the type the list actually carries.
+    expect(screen.getByLabelText('Type')).toHaveValue('Errand');
+    expect(screen.getByRole('button', { name: 'Create' })).toBeEnabled();
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Order the tent',
+      typeId: 'errand',
+      parentId: null,
+      start: 'backlog',
+    });
+  });
+
+  it('a re-seed never overwrites a type the picker still offers — only one that has LEFT the list', () => {
+    const onCreate = vi.fn();
+    const { rerender } = render(
+      <NewTicketDialog
+        open
+        typeOptions={LADDER}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+    // A list that still holds `task`, plus a new type. The standing choice is
+    // untouched — re-seeding on every list change would silently replace a type
+    // the person can still pick.
+    rerender(
+      <NewTicketDialog
+        open
+        typeOptions={[...LADDER, { id: 'errand', name: 'Errand', rank: 3 }]}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+  });
+
   it('a ladder with no root-legal type starts empty rather than picking one that needs a parent', () => {
     const onCreate = vi.fn();
     render(

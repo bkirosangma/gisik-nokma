@@ -9,6 +9,7 @@ import type { IngestResult, SubmittedEvent, WorkflowDef } from '@gisik-nokma/dom
 import { createClientStateCache } from '../../src/cache.js';
 import { SERVING_GAPS, ServingGapError } from '../../src/online/mappers.js';
 import { CreateTicketFlow } from '../../src/views/create-ticket-flow.js';
+import { ReopenDialog } from '../../src/views/reopen-dialog.js';
 import type { TicketRead } from '../../src/view-types.js';
 import { parentTerminalRefusal, rankRefusal } from '@gisik-nokma/rule-engine';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
@@ -865,5 +866,85 @@ describe('7.249 the fixture sentences are pinned to the producer they claim', ()
   // 7.251 — the rank reason in this file was a fabrication (test-cases/07); the pin below is that case's citation.
   it('7.249e the rank reason is byte-identical to rankRefusal("Task", "Sub-task")', () => {
     expect(RANK_REASON).toBe(rankRefusal('Task', 'Sub-task'));
+  });
+});
+
+/**
+ * 3.191 (E2-33b) — THE SAME ONCE-SEEDED CHOICE, AND HERE THE SCREEN LIES ABOUT IT.
+ *
+ * `ReopenDialog` seeds `toStateId` from `reopenStates[0]` once (`useState`) and
+ * guards its confirm on `toStateId === ''` — an emptiness test, not membership in
+ * the list being offered. `reopenStates` is set per ATTEMPT
+ * (`create-ticket-flow.tsx`), so a rerender can hand the mounted dialog a list
+ * that no longer holds the standing id. This `Select` is the NON-searchable
+ * variant, whose trigger renders `selected ? selected.label : placeholder` — so
+ * the button then reads `Select…` ("nothing chosen") while `toStateId` is
+ * non-empty and the confirm is ENABLED: the screen and the payload disagree in
+ * the one direction this product refuses by name.
+ *
+ * (The searchable variant does not show the placeholder — react-aria's combo
+ * keeps its input text — which is why (a)'s person-visible arm was withdrawn by
+ * its own author and this one was not.)
+ */
+describe('E2-33b the offer re-seeds when the states it offers change under it', () => {
+  const base = {
+    open: true,
+    parentTitle: 'Registrations',
+    parentStateName: 'Done',
+    refusal: { rule: 'hierarchy.parent-terminal', reason: 'Registrations is Done.' },
+    refusalOrigin: 'server' as const,
+    parentRefusal: null,
+    onCancel: vi.fn(),
+  };
+  const trigger = (): HTMLElement => screen.getByRole('button', { name: /Reopen to/ });
+
+  it('PLANTED DEFECT: a swap cannot leave the payload carrying a state the picker no longer offers', () => {
+    const onAccept = vi.fn();
+    const { rerender } = render(
+      <ReopenDialog {...base} reopenStates={[{ id: 'todo', name: 'To do' }]} onAccept={onAccept} />,
+    );
+    expect(trigger().textContent).toContain('To do');
+
+    // The attempt is replaced: the standing id is not in the new list.
+    rerender(
+      <ReopenDialog
+        {...base}
+        reopenStates={[
+          { id: 'doing', name: 'In progress' },
+          { id: 'waiting', name: 'Waiting on counterparty' },
+        ]}
+        onAccept={onAccept}
+      />,
+    );
+
+    // The control OFFERS `In progress` and paints it — it no longer says
+    // "nothing chosen" while carrying `todo`.
+    expect(trigger().textContent).toContain('In progress');
+    expect(trigger().textContent).not.toContain('Select…');
+
+    // …and what travels is what is shown.
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+    expect(onAccept).toHaveBeenCalledWith('doing');
+  });
+
+  it('a re-seed never overwrites a destination the picker still offers', () => {
+    const onAccept = vi.fn();
+    const { rerender } = render(
+      <ReopenDialog {...base} reopenStates={[{ id: 'todo', name: 'To do' }]} onAccept={onAccept} />,
+    );
+    expect(trigger().textContent).toContain('To do');
+    rerender(
+      <ReopenDialog
+        {...base}
+        reopenStates={[
+          { id: 'todo', name: 'To do' },
+          { id: 'doing', name: 'In progress' },
+        ]}
+        onAccept={onAccept}
+      />,
+    );
+    expect(trigger().textContent).toContain('To do');
+    fireEvent.click(screen.getByRole('button', { name: 'Reopen and proceed' }));
+    expect(onAccept).toHaveBeenCalledWith('todo');
   });
 });
