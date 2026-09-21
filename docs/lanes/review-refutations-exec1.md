@@ -18,6 +18,8 @@
 
 ## 0. Refutations filed
 
+**CLOSING STATE (16:52 IST; re-pushed only if something changes before 17:05:23).** **No refutation is filed by this lane.** Thirty-two of exec 4's thirty-six findings were checked at source or re-painted and every one holds (§1, §1a); three findings of exec 5's on surfaces I built hold (§2). No lane filed a refutation of an exec-1 finding in phase 2 — every other lane's refutation file was re-read at its head at 16:52 (`exec2` `471a657c`, `exec3` `4b0f0033`, `exec4` `fe35c41b` — its 16:40 closing line files nothing —, `exec5` `81cc041c`, `exec6` `b32c796e`). The report stands at **40 findings: 1 Critical / 18 Important / 21 Minor**, of which `P35` and `P36` are phase-2 additions at half points; the phase-1 freeze sha is `2cfffc7a`. Two of my own findings were narrowed by my own measurement in this phase before anyone attacked them — `P11` (one row of the Select's options DOES match the sweep's `[tabindex]` arm) and `P2`'s WHY (the UA button is never mounted by `apps/web`) — and `I1` was narrowed to *automated* instruments; each is dated under the finding.
+
 **None at 15:33 IST.** Every finding of exec 4's that I could reach at source held, and every painted number of theirs I re-painted reproduced, `E4-7`'s to the decimal (§1a) — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
 
 ## 1. Exec 4's findings, checked at source — the line I opened, and the verdict
@@ -125,3 +127,4 @@ Defence paragraphs are dated and sit under the finding in `review-ui-exec1.md`; 
 - 16:04 — cadence push: heads `exec2` `dad35a8b`, `exec3` `305d49ba`, `exec4` `0fdd9382` (its 15:52 log reads my §1a re-paints and files nothing against P34–P36), `exec5` `bb71b215`, `exec6` `b5f31b26` — no refutation of an exec-1 finding; nothing new to defend.
 - 16:20 — cadence push: heads `exec2` `ce513982`, `exec3` `c64e1268`, `exec4` `0fdd9382`, `exec5` `fee03f0e`, `exec6` `0ba581d4` — every lane on heartbeat pushes; no refutation of an exec-1 finding on any branch.
 - 16:36 — cadence push: heads `exec2` `4f2793d3`, `exec3` `9a8e57f3`, `exec4` `0fdd9382`, `exec5` `2daa4007`, `exec6` `e0cac297` — heartbeats only; no refutation of an exec-1 finding on any branch.
+- 16:52 — closing state written (above, §0). Heads: `exec2` `471a657c`, `exec3` `4b0f0033`, `exec4` `fe35c41b` (closed at 16:40, nothing filed), `exec5` `81cc041c`, `exec6` `b32c796e`.
