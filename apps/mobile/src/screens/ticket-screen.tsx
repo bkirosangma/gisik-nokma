@@ -10,25 +10,40 @@ import {
 import { IST_CLOCK_NOTE, newSubmittedEvent, plainTextToDoc, renderContestedClaimText } from '@gisik-nokma/domain';
 import { EDITOR_HTML } from '../editor/editor-html.generated.js';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
+import { loadTicket } from './ticket-read.js';
+import { buildCommentEvent, COMMENTING_AVAILABLE, COMMENTING_WITHHELD_MESSAGE } from './ticket-comment.js';
+import { queryWorkspaceMembers } from './mention-query.js';
 
 type EditorDoc = Exclude<EditorWebViewProps['initialDoc'], null>;
 
 type TicketWithPending = Awaited<ReturnType<ReplicaDataSource['query']['getTicketWithPending']>>;
 
-export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: string }) {
-  const { ds, ticketId } = props;
+export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: string; apiBase: string; token: string }) {
+  const { ds, ticketId, apiBase, token } = props;
   const [ticket, setTicket] = useState<TicketWithPending>(null);
   const [draft, setDraft] = useState<EditorDoc>(plainTextToDoc('') as EditorDoc);
   const [error, setError] = useState<string | null>(null);
+  const [readError, setReadError] = useState<string | null>(null);
 
   useEffect(() => {
     if (ds === null) return;
-    const refresh = (): void => void ds.query.getTicketWithPending(ticketId).then(setTicket);
+    const refresh = (): void => {
+      void loadTicket(ds, ticketId).then((result) => {
+        if (!result.ok) {
+          setReadError(result.error);
+          return;
+        }
+        setReadError(null);
+        setTicket(result.ticket);
+      });
+    };
     refresh();
     return ds.subscribe('', 0, refresh);
   }, [ds, ticketId]);
 
-  if (ds === null || ticket === null) return <Text>Opening…</Text>;
+  if (ds === null) return <Text>Opening…</Text>;
+  if (readError !== null) return <Text accessibilityRole="alert">{readError}</Text>;
+  if (ticket === null) return <Text>Opening…</Text>;
   const state = ticket.pending?.pending ?? ticket.confirmed;
   const openContests = ticket.contests.filter((c) => !c.resolved);
   const title = String((state?.fields.title?.value as string | undefined) ?? '');
@@ -36,20 +51,13 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
   const onComment = (): void => {
     if (state === null || state === undefined) return;
     setError(null);
+    // Interim, flagged by the plan this task adapts: the session user id is
+    // not wired up (no auth flow in this shell yet), so buildCommentEvent
+    // claims a placeholder that cannot resolve to any workspace member
+    // (E2-42) rather than guessing the ticket's assignee. Becomes the real
+    // signed-in user once Plan 6's session handling reaches this app.
     void ds
-      .ingest([
-        newSubmittedEvent({
-          workspaceId: state.workspaceId,
-          entity: { kind: 'ticket', id: ticketId },
-          type: 'comment.added',
-          payload: { body: draft },
-          // Interim, flagged by the plan this task adapts: the session user id
-          // is not wired up (no auth flow in this shell yet). Becomes the real
-          // signed-in user once Plan 6's session handling reaches this app.
-          actorId: state.assigneeId ?? 'me',
-          origin: 'mobile',
-        }),
-      ])
+      .ingest([buildCommentEvent({ workspaceId: state.workspaceId, ticketId, body: draft })])
       .catch((err: unknown) => {
         if (err instanceof OfflineAcceptError) return; // queued locally — the expected offline outcome
         setError(err instanceof Error ? err.message : 'comment refused');
@@ -121,9 +129,26 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
           <Button title="Discard" onPress={() => onDiscard(c)} />
         </View>
       ))}
-      <EditorWebView initialDoc={draft} onChange={setDraft} html={EDITOR_HTML} />
-      {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
-      <Button title="Comment" onPress={onComment} />
+      {COMMENTING_AVAILABLE ? (
+        <>
+          <EditorWebView
+            initialDoc={draft}
+            onChange={setDraft}
+            html={EDITOR_HTML}
+            onMentionQuery={(query) =>
+              queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })
+            }
+            onEditorError={setError}
+          />
+          {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
+          <Text accessibilityRole="text">
+            Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.
+          </Text>
+          <Button title="Comment" onPress={onComment} />
+        </>
+      ) : (
+        <Text accessibilityRole="text">{COMMENTING_WITHHELD_MESSAGE}</Text>
+      )}
     </ScrollView>
   );
 }

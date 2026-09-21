@@ -13,6 +13,8 @@ import {
   type TicketSummary,
 } from '@gisik-nokma/app-core';
 import { createTauriSqlStorage } from './storage/tauri-sql-storage.js';
+import { initReplica } from './init-replica.js';
+import { SIGNED_OUT_HINT } from './copy.js';
 
 // Dev configuration; Plan 11 owns real endpoints. Session/workspace selection
 // follows Plan 6's session handling once it lands (Open questions) — until
@@ -50,6 +52,7 @@ export function App() {
    * exactly where somebody stuck at that question ends up.
    */
   const [showHelp, setShowHelp] = useState(false);
+  const [initError, setInitError] = useState<string | null>(null);
   const workspaceId = useMemo(() => localStorage.getItem('gisik.workspaceId') ?? '', []);
   const token = useMemo(() => localStorage.getItem('gisik.token') ?? '', []);
 
@@ -58,17 +61,28 @@ export function App() {
     let disposed = false;
     let stop: (() => void) | undefined;
     void (async () => {
-      const storage = await createTauriSqlStorage();
-      const replica = await createReplica({ storage });
-      const outbox = createOutbox({ storage, replica });
-      const transport = createHttpTransport({ baseUrl: API_BASE, token });
-      const engine = createSyncEngine({ replica, outbox, transport });
       // DEVIATION beyond the plan text: createReplicaDataSource's real
       // ReplicaDataSourceDeps shape is { workspaceId, replica, outbox, engine,
       // storage } — the plan's snippet omitted workspaceId and storage, which
       // does not compile against packages/app-core/src/replica/replica-data-source.ts.
-      const dataSource = createReplicaDataSource({ workspaceId, replica, outbox, engine, storage });
+      const result = await initReplica(
+        { apiBase: API_BASE, token, workspaceId },
+        {
+          createStorage: createTauriSqlStorage,
+          createReplicaFn: createReplica,
+          createOutboxFn: createOutbox,
+          createHttpTransportFn: createHttpTransport,
+          createSyncEngineFn: createSyncEngine,
+          createReplicaDataSourceFn: createReplicaDataSource,
+        },
+      );
       if (disposed) return;
+      if (!result.ok) {
+        setInitError(result.error);
+        return;
+      }
+      const { dataSource, engine } = result;
+      setInitError(null);
       setDs(dataSource);
       const offStatus = engine.onStatus(setStatus);
       const refreshCounts = (): void => {
@@ -109,7 +123,7 @@ export function App() {
   if (workspaceId === '' || token === '') {
     return (
       <div className="app-shell">
-        <p className="app-signin-hint">Sign in on the web app, then paste your token in Settings (interim flow — see plan Open questions).</p>
+        <p className="app-signin-hint">{SIGNED_OUT_HINT}</p>
         {helpToggle}
         {showHelp ? <HelpBrowser /> : null}
       </div>
@@ -145,7 +159,13 @@ export function App() {
           desktop replica that answered "which day is this?" from the OS would
           put the same claim in a different cell from the server, and nothing
           would report the disagreement. */}
-      {ds === null ? <p>Opening local replica…</p> : <TicketList ds={ds} workspaceId={workspaceId} />}
+      {initError !== null ? (
+        <p role="alert">{initError}</p>
+      ) : ds === null ? (
+        <p>Opening local replica…</p>
+      ) : (
+        <TicketList ds={ds} workspaceId={workspaceId} />
+      )}
     </div>
   );
 }

@@ -2878,3 +2878,195 @@ holds a deleted ticket, which is why three reads with no gate at all went unnoti
   (`packages/app-core/test/replica/replica-deleted-reads.test.ts`, "E6-24: listTicketSummaries drops a
   soft-deleted ticket…", "E6-24: myWork.assigned drops it…", "E6-24: searchOfflineCopy drops it on the
   TITLE arm…", "E6-24: searchOfflineCopy drops it on the COMMENT arm too…")
+## Ruling E2-41 — a failed read is no longer drawn as a benign state (2026-09-21, B14)
+
+*`board-screen.tsx` and `ticket-screen.tsx` called
+their replica reads with no rejection arm — a failed read left the board silently empty and the ticket
+screen on "Opening…" forever, the same word it shows while genuinely still loading. Fixed by splitting
+the read into a sibling `.ts` (`board-read.ts`, `ticket-read.ts` — same reason 12.394's family gives:
+`vitest.config.ts` runs node-only and a `.tsx` importing `react-native` fails to parse there) whose
+async function catches the rejection and returns `{ok:false, error}` instead of letting it escape
+unheard.*
+
+*⚠ RENUMBERED 2026-09-21 22:1x: this block originally minted `12.398`/`12.399`. Both independently
+collided with a real declared case on another release branch before any of them had reached
+`origin/main` — `12.398` with B01's own `**12.398**` line, `12.399` with B07's own `**12.399**` line
+— main's numbering never moves once landed, so the later-reconciled branch renumbers. (B07's own
+text at the time names `12.398` as B01's, not its own claim; B16's text names `12.399` historically,
+not as its own claim either — checked against the LINE, not a same-page mention, after an earlier
+sweep over-read both as live claims and was corrected.) Recomputed as the max over `origin/main` and
+every `origin/rel/*` head (+1), verified `union == sum` with `node scripts/check-case-ids.mjs`:
+`12.398`→`12.409`, `12.399`→`12.410`. B14's own later mints in this file (`12.400`–`12.408`) did not
+collide and are unchanged.*
+
+- 12.409 ✅ `loadBoard` (`board-read.ts`) resolves `{ok:false, error}` instead of rejecting when
+  `listTicketSummaries` throws (the empty-query path) — RED confirmed against the pre-fix function
+  (an unhandled rejection), GREEN after. `BoardScreen` renders the message as
+  `<Text accessibilityRole="alert">` where the board used to just stay empty. —
+  (`apps/mobile/src/screens/board-read.test.ts`)
+- 12.410 ✅ `loadBoard` resolves `{ok:false, error}` instead of rejecting when `searchOfflineCopy`
+  throws (the search path) — same RED→GREEN discipline as 12.409, the sibling read. —
+  (`apps/mobile/src/screens/board-read.test.ts`)
+- 12.400 ✅ `loadTicket` (`ticket-read.ts`) resolves `{ok:false, error}` instead of rejecting when
+  `getTicketWithPending` throws — RED confirmed (unhandled rejection) against the pre-fix function,
+  GREEN after. `TicketScreen` now has three states instead of two: `ds === null` ("Opening…", app not
+  ready yet), `readError !== null` (the alert), `ticket === null` ("Opening…", genuinely still
+  loading) — the first fix's "no answer yet" vs "the answer failed" distinction the ruling asked for. —
+  (`apps/mobile/src/screens/ticket-read.test.ts`)
+
+## Ruling E2-42 — a phone comment's envelope never claims a real member's id (2026-09-21, B14)
+
+*`onComment` claimed `actorId: state.assigneeId ?? 'me'` — a real workspace member's id whenever the
+ticket had one, which is the envelope's claim of authorship (`packages/domain/src/submit.ts:4-7`). The
+sync door's actor-mismatch check refuses the claim whenever the device's bound identity is not that
+member, so the spoof never lands today, but the shape ships a path that CAN claim to be someone else.
+Fixed by extracting `buildCommentEvent` (`ticket-comment.ts`) so the envelope always claims
+`UNATTRIBUTED_ACTOR_ID = 'me'`, a placeholder `packages/domain`'s own `actorId: ulidString` check
+refuses rather than resolving — the function takes no assignee-shaped input, so there is nothing left
+to guess from.*
+
+- 12.401 ✅ `buildCommentEvent` always claims the non-resolvable placeholder — RED confirmed against a
+  pre-fix version that adopted a passed assignee id as `actorId` (real-member-01 was returned
+  unchanged); GREEN once the function stopped accepting an assignee-shaped input at all. Also asserts
+  the workspace/entity/type/payload/origin pass through unchanged. —
+  (`apps/mobile/src/screens/ticket-comment.test.ts`)
+
+## Ruling E5-44 — the Comment control is withheld, not just mis-attributed (2026-09-21, B14)
+
+*Since E2-42 (12.401) made `UNATTRIBUTED_ACTOR_ID` never a valid ULID, no phone comment can ever
+commit — `packages/domain`'s envelope validation refuses every one as `malformed-envelope`, terminal,
+no retry (`outbox.ts:406-412`), and the ticket screen never re-reads that outbox failure. There is no
+per-ticket condition left to gate on (the pre-fix code's "assigned to the commenter" case no longer
+exists), so `ticket-screen.tsx` withholds the editor and Comment button outright, replacing them with
+`COMMENTING_WITHHELD_MESSAGE`. `docs/manual.md`'s claim that "the phone app has a Comment button on a
+job and the website does not" is corrected to match, and the generated help module
+(`packages/app-core/src/help/content.generated.ts`) regenerated (`pnpm help:generate`; `pnpm
+check:help` green after).*
+
+- 12.408 ✅ `COMMENTING_AVAILABLE` is `false` and `COMMENTING_WITHHELD_MESSAGE` names the website as
+  the alternative — RED confirmed against a pre-fix state where the control stayed available with no
+  message; GREEN after. Also asserts `UNATTRIBUTED_ACTOR_ID` is never a valid ULID via the domain
+  package's own `isUlid`, the fact this ruling's withholding rests on. —
+  (`apps/mobile/src/screens/ticket-comment.test.ts`)
+
+## Ruling E2-43 — the desktop shell's own init catches its rejection now (2026-09-21, B14)
+
+*`App`'s init IIFE built the whole replica stack inside `void (async () => {...})()` with no `catch`,
+and `ds === null` gated the render forever, so any rejection in the four awaits (storage, replica,
+outbox/transport/engine, data source) left the shell on "Opening local replica…" with nothing on
+screen. Fixed by splitting the pipeline into `init-replica.ts`'s `initReplica`, injected with the real
+factories, returning `{ok:false, error}` instead of letting the rejection escape.*
+
+- 12.402 ✅ `initReplica` reports the failure instead of rejecting when the storage adapter fails to
+  open — RED confirmed against the pre-fix function (an unhandled rejection), GREEN after. `App`
+  renders the message as `<p role="alert">` in place of "Opening local replica…". —
+  (`apps/desktop/src/init-replica.test.ts`)
+- 12.403 ✅ `initReplica` reports the failure instead of rejecting when the replica fails to build
+  (bootstrap replay) — same RED→GREEN discipline as 12.402, the second of the four awaits. —
+  (`apps/desktop/src/init-replica.test.ts`)
+
+## Ruling E5-26 — the signed-out screen names no Settings form the app lacks (2026-09-21, B14)
+
+*The desktop shell's only first-run sentence sent a person to "paste your token in Settings" — a
+screen `apps/desktop` does not have (`grep -rni settings apps/desktop/src/app.tsx` found only this
+sentence) — for a token nothing issues (`grep -rn "gisik.token|gisik.workspaceId" apps/web` → 0 hits;
+`/mcp/tokens` never shows a token to copy). Fixed by replacing it with a plain, verifiable statement:
+`copy.ts`'s `SIGNED_OUT_HINT`.*
+
+- 12.407 ✅ `SIGNED_OUT_HINT` states plainly that sign-in is not available and names neither a
+  Settings screen nor a plan section the reader cannot open from here — RED confirmed against the
+  pre-fix sentence (contained "Settings" and a plan reference), GREEN after. —
+  (`apps/desktop/src/copy.test.ts`)
+
+## Ruling E2-48 — the phone shell's own init catches its rejection too (2026-09-21, B14)
+
+*The sibling of E2-43 on desktop: `App`'s init IIFE ran the same architecture
+(`createReplica → createOutbox → createSyncEngine → createReplicaDataSource`, then `setDs`, differing
+only in the storage adapter — `createOpSqliteStorage` here) with no `catch`, so a rejection left the
+board silently empty. Fixed the same way: `init-replica.ts`'s `initReplica`, returning
+`{ok:false, error}`; `BoardScreen` gained an `initError` prop rendered as
+`<Text accessibilityRole="alert">`.*
+
+- 12.404 ✅ `initReplica` (mobile) reports the failure instead of rejecting when storage fails to open
+  — RED confirmed against the pre-fix function (an unhandled rejection), GREEN after. —
+  (`apps/mobile/src/init-replica.test.ts`)
+- 12.405 ✅ `initReplica` (mobile) reports the failure instead of rejecting when the replica fails to
+  build — same RED→GREEN discipline as 12.404. —
+  (`apps/mobile/src/init-replica.test.ts`)
+
+## Ruling E2-52 — `@`-mention queries answer the real roster (2026-09-21, B14)
+
+*`ticket-screen.tsx` never passed `onMentionQuery` to `EditorWebView`, so every mention query fell
+through to the editor host's own `?? Promise.resolve([])` fallback and the popup stated "No people
+match" for every query, on every workspace — permanently and falsely empty. The replica has no roster
+to answer from (`ReplicaDataSource`'s own `MEMBERS_ABSENCES`, Plan 10's documented gap), so
+`queryWorkspaceMembers` (`mention-query.ts`) calls `GET /v1/workspaces/:id/members` directly with the
+phone's bearer token — the same endpoint the web sheet's `queryUsers` is backed by. A refused roster
+still resolves `[]` (not distinguished from "nobody matched" — that needs `packages/editor`'s own
+protocol widened, out of this task's package).*
+
+- 12.406 ✅ `queryWorkspaceMembers` resolves matching members from the roster endpoint,
+  bearer-authenticated, filtering case-insensitively by name — RED confirmed against a pre-fix stub
+  that never called the endpoint at all (always `[]`, the shape `onMentionQuery` being unwired
+  produces today); GREEN once it called the real door. Also covers the empty-query case (every
+  member) and the refused-door case (`[]`, not a throw). —
+  (`apps/mobile/src/screens/mention-query.test.ts`)
+
+## Ruling E2-49 — push registration's transport failure is a third value (2026-09-21, B14)
+
+*`register-push.ts`'s `fetch` at the registration POST was not inside any `try`/`catch` — the only
+one of the function's four return arms not wrapped — so a transport failure (offline, a dropped
+socket) rejected instead of returning `{registered:false, reason:…}` like every other arm. Fixed by
+wrapping the `fetch` and returning `reason:'unreachable'` on its catch, kept distinct from
+`'transport-unavailable'` (the 404 arm, an answer the server actually gave) per this product's
+standing rule that a refusal and a dropped connection are never the same word.*
+
+- 12.411 ✅ `registerPushToken` reports a transport failure as `{registered:false,
+  reason:'unreachable'}` instead of rejecting, and `'unreachable'` is asserted distinct from
+  `'transport-unavailable'` — RED confirmed against the pre-fix function (the fetch rejection
+  propagated unhandled), GREEN after. —
+  (`apps/mobile/src/push/register-push.test.ts`)
+
+## Ruling E2-53 — the editor host's three silent doors now report (2026-09-21, B14)
+
+*`editor-web-view.tsx` had no refusal vocabulary at all: (a) a parse failure on an inbound frame was
+dropped with no reply, (b) the `WebView` itself failing to load rendered a blank rectangle with no
+`onError`/`onHttpError`, and (c) `ready` never arriving waited forever with no timeout. All three now
+call a new `onEditorError` prop; `editor-refusals.ts` holds the messages and the pure timeout decision
+`readyTimedOut`. Door (a) does not widen the bridge protocol (no `HostToEditorMessage` kind is shaped
+for a generic refusal, and that is a `packages/editor` change outside this task's package) — it
+reports through the same host-level surface as (b)/(c) instead.*
+
+- 12.412 ✅ `readyTimedOut` is false once `ready` has been received regardless of elapsed time, false
+  before the timeout elapses, and true once it has with no `ready` — RED confirmed against a pre-fix
+  stub that always returned `false` (no timeout existed at all), GREEN after. Also asserts the three
+  refusal messages are non-empty. —
+  (`apps/mobile/src/editor/editor-refusals.test.ts`)
+
+## Ruling P30 — the editor webview HTML has a freshness gate now (2026-09-21, B14)
+
+*`editor-html.generated.ts` is baked from `packages/editor`'s `build:webview` output by a script with
+no `--check` mode, so nothing in the gate noticed when it drifted behind the source — measured five
+`packages/editor/src` commits stale. `generate-editor-html.mjs --check` regenerates the content in
+memory and diffs it against what is checked in (the shape `scripts/help-content.mjs --check` already
+uses), wired into `@gisik-nokma/mobile`'s own `test` script. When the bundle has not been built yet
+(gitignored, absent on a checkout that has not run `build:webview`), `--check` warns and exits 0
+rather than failing every `pnpm test` that has not built the editor's webview bundle — it can only
+refuse a real staleness, not the bundle's absence. The checked-in file was regenerated against a real
+`build:webview` run as part of this ruling.*
+
+- 12.413 ✅ `checkFreshness` reports `no-bundle` when the built bundle does not exist, rather than
+  failing every test run that has not built it — RED confirmed against a pre-fix stub that always
+  answered `ok` (no check existed at all), GREEN after. —
+  (`apps/mobile/scripts/generate-editor-html.test.ts`)
+- 12.414 ✅ `checkFreshness` reports `stale` when the checked-in file does not match a regenerate of
+  the real bundle, and `ok` when it does — same RED→GREEN discipline as 12.413, plus the `--check`
+  CLI run as a real child process through all three states (`no-bundle`→exit 0, `stale`→exit 1 with
+  `STALE` in its output, `ok`→exit 0). —
+  (`apps/mobile/scripts/generate-editor-html.test.ts`)
+- 12.415 ✅ `package.json`'s `test` script runs `generate-editor-html.mjs --check` before `vitest run`,
+  chained with `&&` so a stale bundle stops the suite rather than running past it — the wiring
+  assertion, not a restatement of the check's own behaviour (the same shape 12.393 uses for the
+  dev-credential guard's wiring into `build`). —
+  (`apps/mobile/scripts/generate-editor-html.test.ts`)
+

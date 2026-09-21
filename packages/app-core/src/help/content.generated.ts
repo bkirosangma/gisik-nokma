@@ -2103,7 +2103,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". A move carrying the \"require a comment\" rule still puts its own box on the Move dialog (§7) and records what you type on the move."
+                      "text": ". A move carrying the \"require a comment\" rule still puts its own box on the Move dialog (§7) and records what you type on the move. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "The phone app cannot leave one, for now"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — commenting from the phone needs a signed-in identity the phone shell does not have yet, so the control is withheld there rather than shipped in a shape that always fails silently (E5-44)."
                     }
                   ],
                   [
