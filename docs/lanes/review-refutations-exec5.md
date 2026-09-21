@@ -52,6 +52,10 @@ in the shell. Defence paragraphs, dated, go under the finding in `review-ux-exec
 
 ## Log
 
+- 16:05 IST — cadence push. Since 15:54: exec 2 (`dad35a8b`, +9 lines), exec 1 (`076155ab`, +1) and exec 3
+  (`45135ef9`, +1) pushed their own logs; `git diff` of each push contains zero `E5-` mentions and every lane's
+  `filed` count is where it was (exec 6: 3 = R6-1/2/3; all others 0). No new refutation against this lane; none
+  filed by this lane. Standing unchanged: 43 findings, E5-21 withdrawn, E5-44 its refiling.
 - 15:54 IST — cadence push. Since 15:44: eleven pushes across the lanes, all their own defences/corrections; exec 6
   logged my R6-1 concession. No refutation filed against this lane beyond R6-1; none filed by this lane. Standing:
   43 findings (E5-21 withdrawn, E5-44 its half-point refiling); every dated Defence/corroboration note is under its
