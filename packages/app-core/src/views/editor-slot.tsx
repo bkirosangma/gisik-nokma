@@ -121,6 +121,21 @@ export type EditorSlotProps = {
    * a contrary label to disagree with.
    */
   labelledBy?: string;
+  /**
+   * One sentence for the composer's footer, left of the submit control — the
+   * prototype's `cmtHint` slot (`desktop.dc.html:1329`). Optional and additive
+   * (spec 2026-09-22); the read-only `PlainTextEditorSlot` ignores it, as it
+   * ignores every capability field. In comment mode it REPLACES the Markdown
+   * hint (the prototype's comment composer has none); in description mode the
+   * Markdown hint keeps the slot and this field is not read.
+   *
+   * A SENTENCE, not a node: the field is a `string` on purpose. Handing a slot
+   * a `ReactNode` would make app-core's half of this twice-written contract
+   * depend on React's element type in a package whose contract is otherwise
+   * plain data, and the only thing any caller has ever wanted to put here is the
+   * prototype's own line of prose.
+   */
+  footerNote?: string;
   // Editor capabilities. All optional: the read-only default ignores every one
   // of them, and a read-only mount supplies none. The real editor requires them
   // for composing, and states the gap honestly when one is missing rather than

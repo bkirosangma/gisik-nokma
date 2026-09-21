@@ -16,7 +16,7 @@ leaving it outside, so the section was opened.
 | **exec 1** | `16.1`–`16.30`, **then `16.32`–`16.40`** (taken 2026-09-19 late for `/v1/search`), **then `16.61`–`16.71`** (the `3b` allocation, **NARROWED 2026-09-21 — see the reallocation note below**), **then `16.81`–`16.99`** (taken 2026-09-20 for the sheet prototype parity) — of which **`16.96`–`16.99` are MINTED 2026-09-20 for the attachments leak** and **`16.91`–`16.95` are MINTED 2026-09-20 for the Add-subtask affordance**. ⚠ **THE BLOCK `16.81`–`16.99` IS NOW FULLY SPENT**; exec 1's next free ids are `16.63`–`16.71` (of which only `16.61`–`16.62` are minted) |
 | **exec 2** | **`16.41`–`16.60`** (`16.31` spent on the evidence upload; `16.32`–`16.40` reallocated to exec 1) — ⚠ **`16.88`–`16.90` were minted from exec 1's block by the soft-delete lane on 2026-09-20, and its merged handoff records `16.88`–`16.99` as THAT lane's block**, which overlaps exec 1's. **The controller corrected the spent set (exec 1's next free is `16.91` — ⚠ **a reading SUPERSEDED by the reallocation note below**); the OVERLAP is flagged to the owner, not resolved here.** It is why the attachments lane minted from the TOP of the shared block instead of `16.91`: `16.91` is inside both claims and is the one id that can collide, and `exec2/comment-thread` was live in the tree at the time — **then `16.72`–`16.80`** (**REALLOCATED to exec 2 on 2026-09-21 — see the reallocation note below**), of which **`16.72`–`16.75` are MINTED 2026-09-21 for the comment thread** and **`16.76`–`16.80` are MINTED 2026-09-21 for the markdown-editing item** (the seeds parsed + `markdownLinks` on) — ⚠ **so exec 2's block is now FULLY SPENT and its next free ids are NOT `16.81`–`16.99` (exec 1's, fully spent too): it must be reallocated by the controller before the next mint** |
 | **priority built-in** (`docs/superpowers/plans/2026-09-22-priority-builtin.md`, #672) | **`16.100`–`16.109`** — the sheet's Priority editor and Start row (Task 7 of that plan); allocated 2026-09-22 against the catalogue tip `16.99`. ⚠ `16.100` also appears in this file's own prose above and in `17-open-work.md` as a WIDTH example, not a case — a line-head declaration is the only claim |
-| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block |
+| **sheet prototype parity** (`docs/superpowers/specs/2026-09-22-sheet-prototype-parity-design.md`, branch `owner/sheet-prototype-parity`) | **`16.110`–`16.129`** — allocated 2026-09-22 by the owner-side session, directly after the priority block. **Minted by lane B (`rel/sheet-parity-b`, the comments block): `16.126` and `16.128`.** ⚠ **`16.127` is RESERVED AND HELD**, not minted: it is *the posting sentence is handed to the composer as its footer note, and the thread draws no second copy*, and it cannot be written until the sheet's comment `EditorSlot` mount passes `footerNote` in `ticket-sheet.tsx` — the collision surface lane B is barred from. Its entry below is `❌` with that reason. **Next free: `16.129`.** |
 
 **✅ ANSWERED 2026-09-21 21:0x — THE PROPERTIES WERE MINTED IN §17, NOT HERE, AND THIS NOTE IS KEPT AS THE RECORD OF WHY (lane ds3 / batch B08).** The controller allocated `17.021`–`17.040` to this lane and directed the mint into `test-cases/17-open-work.md`; F3 is `17.021` and V4 is `17.022`, and each entry names **the §16 door it belongs to** (the comment thread, case `16.74`) so a reader arriving from this file's comments-thread section can find them. **§16 was not touched to mint them.** Original request follows, because a note that is deleted rather than discharged is how the next lane concludes the rule was never applied:
 
@@ -1313,3 +1313,57 @@ before, and the section keeps its `aria-label`.
 controls move into the popover unchanged, and read-only viewer chips appear under an explicit named
 audience. `docs/manual.md` §10 is rewritten to describe clicking the pill rather than a
 static section. — `packages/app-core/src/views/visibility-editor.tsx`, `packages/app-core/test/views/visibility-editor.test.tsx`, `packages/ui/src/ui.css`
+
+## The Comments heading takes the sheet's caption name, and the posting sentence's move is OWED (lane B, 2026-09-22) — cases `16.126`–`16.128`
+
+**This is HALF of Task 7 of the sheet-prototype-parity plan, and the half is split by a rule rather than by
+effort.** The task has two moves: give the Comments heading the sheet's shared caption class (`16.126`), and move
+the posting sentence out of the thread and into the composer's footer (`16.127`). The first is here; the second
+is HELD, and the reason is a measurement rather than a preference.
+
+**The measured fact that decided it.** Handing the sentence over is a one-line edit passing
+`footerNote="Posting records an event citing you."` at the sheet's comment `EditorSlot` mount in
+`ticket-sheet.tsx` — the file this lane is explicitly barred from touching, because the priority built-in lane
+and this plan's own tail lane both edit it. **Deleting the thread's hint paragraph WITHOUT that mount would lose
+the sentence from the product**, since nothing else draws it: the tail lane's Task 7 text expects
+`ticket-sheet-comments.test.tsx`'s pre-existing assertion at `:219` to keep passing while the stub editor draws
+`props.footerNote`, and `footerNote` is `undefined` until the mount passes it. So the deletion and the mount are
+ONE change and must land together. `16.127` is recorded `❌` with that reason rather than written as a case that
+could only assert the opposite of its own name.
+
+**The other half deserves its own paragraph because it changes nothing on screen, and saying so is the point.**
+`.gn-comments__heading`'s rule (`packages/ui/src/ui.css:6449`) already declares the whole eyebrow —
+`font-size: 0.8125rem`, `line-height: 1.125rem`, `text-transform: uppercase`, `letter-spacing: 0.6px`,
+`var(--gn-text-muted)` — and the shared `.gn-ticket-sheet__caption` rule the plan gives Task 4 is a transcription
+of exactly those declarations. **So this is a NAME being introduced and not a look being changed.** The shared
+class carries no rule until Task 4 lands, which is why `16.128` exists: a class asserted in the absence of a rule
+is a hook, and the thing a hook can be mistaken for is the look.
+
+**Two claims this change set had to correct, both caused by the OTHER lane's Task 2** (which gave
+`.editor-slot` and `.editor-slot__submit` their rules in `packages/editor/src/styles/editor.css`, closing a gap
+both files recorded as open): the paragraph above `ui.css`'s comment-thread block and the paragraph in
+`apps/web/e2e-viewport/type-scale.ts` both stated, as a measurement, that those two classes were unstyled and
+fell back to user-agent styling. Neither is true any more. Both are corrected in place, quoting the original
+claim, because a measurement that has gone false is a defect and not a footnote.
+
+### The case
+
+- **16.126** ✅ The Comments heading wears `gn-ticket-sheet__caption`, the name the sheet's `SUBTASKS` heading
+  will share once Task 4 hangs a rule on it. Read at the SHEET, through the real `CommentsThread` mount, because
+  the name is the sheet's caption contract and not the thread's private business.
+  `packages/app-core/test/views/ticket-sheet-comments.test.tsx`.
+- **16.127** ❌ **OWED — the posting sentence is handed to the composer as its `footerNote`, and the thread draws
+  no second copy.** HELD for the tail lane, which holds `ticket-sheet.tsx`: the mount passes
+  `footerNote="Posting records an event citing you."`, `comments-thread.tsx` deletes its hint paragraph and the
+  deviation comment above it, `ui.css` deletes `.gn-comments__hint` and reduces `.gn-comments__composer` to its
+  margin, and this case asserts `seen.notes` contains the sentence while the section shows it exactly once.
+  Writing it now would be writing a case that must fail. **The sentence is still drawn by the thread today, and
+  `comments-thread.test.tsx`'s "always with the prototype's sentence" case is therefore deliberately unchanged.**
+- **16.128** ✅ CONTROL — the heading ADOPTED the caption class; it was not RENAMED into it. Both class tokens
+  are asserted on the same element, plus its tag and its exact text so neither reading can be of some other node
+  starting with the word. `16.126`'s `toContain` passes just as happily over a heading whose own class was
+  dropped, and dropping it TODAY would leave the element with no effective style at all — the shared rule does
+  not exist yet. **The CSS half is deliberately not asserted here:** a case reading those declarations out of
+  `ui.css` would have to be rewritten when the tail lane folds them into the shared rule, and a case that exists
+  to be edited is a liability rather than a guard.
+  `packages/app-core/test/views/ticket-sheet-comments.test.tsx`.

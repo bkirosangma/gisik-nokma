@@ -359,6 +359,19 @@ export type TypeScale = {
    * user-agent styling. That is a real gap and it is recorded rather than
    * implied away; it is simply not this import's doing.
    *
+   * **⚠ THAT MEASUREMENT IS NOW FALSE AND IS LEFT IN PLACE WITH ITS CORRECTION
+   * BESIDE IT, because it is quoted rather than merely stated.** The grep above
+   * returned nothing until 2026-09-22, when Task 2 of the sheet-prototype-parity
+   * plan added `.editor-slot` and `.editor-slot__submit` rules to
+   * `packages/editor/src/styles/editor.css` — the composer's sunken chrome, and
+   * the accent-filled `Save description` / `Post` control at the 44-px floor. So
+   * the two classes no longer fall back to user-agent styling. **What this note
+   * was defending is unchanged and stays true:** the import of `editor.css` into
+   * this app is what makes the editor's CONTENT styled, and the chrome that
+   * arrived later arrived in that same stylesheet, by the package that owns the
+   * markup. `packages/ui/src/ui.css` styles neither class, deliberately, and
+   * carries the same correction above its comment-thread block.
+   *
    * **The equality above still holds,
    * and that was MEASURED rather than assumed:** that stylesheet declares
    * `font: inherit` in three rules (`.mention-popup__item`,

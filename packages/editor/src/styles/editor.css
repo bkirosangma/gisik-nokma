@@ -297,7 +297,32 @@
    background property (colour included) to its initial value, so it does the
    same job without writing a bare colour keyword, which this file's header
    forbids. `color: inherit` and not a token: a token is unreachable from here
-   and `currentColor` is the substitute this file already uses everywhere. */
+   and `currentColor` is the substitute this file already uses everywhere.
+
+   **⚠ THE LAST SENTENCE ABOVE WAS ALREADY FALSE, and this task is what makes it
+   matter.** The E4-8 block on `.ticket-editor__toolbar` (above) records the
+   measurement in the other direction: `apps/web/app/layout.tsx` imports
+   `ui.css` AND this file into one document, so every `--gn-*` role resolves
+   HERE, in the shell this product serves. *"A token is unreachable from here"*
+   describes a PACKAGE DEPENDENCY, which is real, and draws a DOCUMENT
+   conclusion, which is not. It is corrected rather than left because the
+   composer-chrome block at the foot of this file now paints `.editor-slot__submit`
+   — the very class this paragraph is about — from tokens, and a docblock
+   calling those tokens unreachable would be read as describing a rule it no
+   longer describes.
+
+   **THE GROUPED RESET ITSELF IS UNCHANGED, WITH `.editor-slot__submit` STILL IN
+   IT.** The obvious tidy — narrow the group to `.evidence-picker__cancel`, which
+   is the only name it was ever truly for — is refused, and the reason is a gate
+   and not a preference: `packages/ui/test/bare-control-coverage.test.ts`
+   (`13.1143`) reads THIS grouped rule by regex and requires `border: none`,
+   `background: none` and `padding: 0` on it, naming both classes. Removing one
+   name would redden a case this change does not own, and the ratchet this
+   repository keeps forbids editing such a case to suit a stylesheet edit. So the
+   submit control keeps its reset here and takes its full appearance from a
+   LATER rule, which wins on the cascade for every property the two share —
+   same specificity (one class each), so source order decides, and the chrome
+   block is last in the file. */
 .editor-slot__submit,
 .evidence-picker__cancel {
   border: none;
@@ -306,4 +331,100 @@
   font: inherit;
   color: inherit;
   cursor: pointer;
+}
+
+/* ── THE COMPOSER CHROME (spec 2026-09-22, sheet prototype parity).
+
+   Transcribed from the prototype's description box (`desktop.dc.html:1168-1173`)
+   and its comment box (`:1298-1331`), which draw ONE set of clothes for both
+   composers: a fill tray for the tools, a sunken field for the words, and a
+   footer row carrying a hint on the left and the submit control on the right.
+   The markup that wears these rules is `TicketEditorSlot`; the hint's own
+   position is asserted in `test/ticket-editor-slot.test.tsx` and the rules
+   themselves in `test/editor-css-binding.test.ts`.
+
+   ⚠ WHY `var(--gn-…)` IS LEGAL IN THIS FILE, since the header forbids colour
+   of every kind and a reader will ask. The E4-8 block further up settles it and
+   is not re-argued here: a `var(--gn-…)` REFERENCE is not a colour literal —
+   no hex, no colour function and no bare keyword — and the roles resolve at
+   runtime because `apps/web/app/layout.tsx` loads `ui.css` and this file into
+   one document. The header's third prohibition (a bare colour keyword, e.g. a
+   named fallback) is what decides the SHAPE of every rule below: a token or
+   nothing, never `transparent` as a stand-in.
+
+   ⚠ AND WHY THESE RULES ARE LAST IN THE FILE. `.editor-slot__submit` is still a
+   name in the grouped reset directly above, which the ui-side gate `13.1143`
+   pins by regex. This block is what gives the control its appearance, and it
+   wins on source order at equal specificity. Moving it above that reset would
+   silently restore the UA's grey fill on the product's primary control without
+   failing any test. */
+
+/* The wrapper is the chrome: the field's ground and shadow, with the tray and
+   the footer inside its corners. `overflow: hidden` is what lets the tray and
+   the footer sit square inside a rounded wrapper without needing radii of their
+   own on the two edges that meet it. */
+.editor-slot {
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+  overflow: hidden;
+}
+/* Inside the slot the strip is the TOP of one surface rather than a block
+   sitting under something: it loses the `margin-top: 1rem` that separates it
+   from the surrounding page and the top corners the wrapper now owns. */
+.editor-slot .ticket-editor__toolbar {
+  margin-top: 0;
+  border-radius: 0;
+}
+/* The prototype's field: taller than the bare editor's 4rem floor, and set at
+   the 17px/22px step the rest of the sheet's reading text uses. */
+.editor-slot .ticket-editor__content {
+  min-height: 6rem;
+  padding: 0.75rem 0.875rem;
+  font-size: 1.0625rem;
+  line-height: 1.375rem;
+}
+
+.editor-slot__footer {
+  display: flex;
+  gap: 0.625rem;
+  align-items: center;
+  padding: 0.5rem 0.625rem;
+  background: var(--gn-fill-quaternary);
+}
+/* The left of the footer is a SLOT, and an empty one must still hold its half
+   of the row: `flex: 1` is what keeps the submit control pinned right whether
+   the host supplied a sentence or not. The `margin: 0` is not tidying — the
+   slot is a `<p>` and the UA gives it a block margin that would break the row's
+   vertical centring. */
+.editor-slot__hint {
+  flex: 1;
+  margin: 0;
+  font-size: 0.75rem;
+  line-height: 1rem;
+  opacity: 0.7;
+}
+
+.editor-slot__submit {
+  /* 44px floor. The prototype draws 40 (`:1330`) and this product's own
+     tap-target rule is the floor that wins; `packages/ui/test/
+     tap-target-density.test.ts` is the instrument. */
+  min-height: 2.75rem;
+  padding: 0 1.125rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-accent);
+  color: var(--gn-accent-text);
+  box-shadow: var(--gn-shadow-raised);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.editor-slot__submit:disabled {
+  opacity: 0.55;
+  cursor: not-allowed;
+}
+.editor-slot__submit:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
 }
