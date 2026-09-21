@@ -1632,13 +1632,14 @@ Filters `:784-830`, History `:408-419`, invitations `:205-240`) · `docs/faq.md`
 
 ### 6.3 NOT reached, named
 
-1. **`apps/mobile` and `apps/desktop`** — of desktop I read only `app.tsx:14-135` (E5-26); of mobile only
-   `screens/ticket-screen.tsx:30-130` (E5-21) and `board-screen.tsx:40-60` (the status wording). The storage layers,
-   the help screens, the editor web view and every offline arm are unread.
-2. **The workflow builder as a person meets it** (canvas, inspector, history screen) — read its load arms as
-   positive controls for E5-15 and `publish-controls.tsx`, `state-mapping-dialog.tsx`, `workflow-history-screen.tsx` and `workflow-rebind-dialog.tsx`
-   in full (E5-28, E5-29, E5-39); the six inspector/panel files for their sentences. The canvas (`workflow-canvas.tsx`,
-   `state-node.tsx`, `transition-edge.tsx`) remains unread.
+1. **`apps/mobile` and `apps/desktop`** — of desktop I read only `app.tsx:14-135` (E5-26); of mobile
+   `screens/ticket-screen.tsx:30-130` (E5-21), `board-screen.tsx:40-60` (the status wording) and `help-screen.tsx:250-330`
+   (search with an honest empty state — no finding). The storage layers, the editor web view and every offline arm are
+   unread.
+2. **The workflow builder as a person meets it** — `workflow-builder-screen.tsx` (E5-41), `publish-controls.tsx`,
+   `state-mapping-dialog.tsx`, `workflow-history-screen.tsx`, `workflow-rebind-dialog.tsx`, `draft-store.ts:1-40,109`
+   read in full (E5-28, E5-29, E5-39, E5-41); the six inspector/panel files and the three canvas files for their
+   user-facing strings (none beyond two `aria-label`s). Not driven — authoring needs a session.
 3. **The comment thread, attachments door, subtask chain, close/reopen and delete/undo as END-TO-END FLOWS** — each
    needs a write against the owner's database. I read the code at the seams (E5-7, E5-9) and did not drive them.
 4. **Permissions as a member or guest** — I held only the owner's session. Every refusal path was reproduced by
