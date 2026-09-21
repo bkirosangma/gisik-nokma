@@ -18,7 +18,6 @@ import { ProfileSection } from '../../src/account/profile-section.js';
 import { WorkspacesSection } from '../../src/account/workspaces-section.js';
 import { authClient } from '../../src/auth-client.js';
 import { useAppServices } from '../../src/providers.js';
-import { DocumentTitle } from '../../src/document-title.js';
 
 /**
  * `/account` — the GLOBAL account screen: settings that follow a person
@@ -234,7 +233,6 @@ export default function AccountPage() {
 
   return (
     <main id="gn-main" className="gn-shell gn-account">
-      <DocumentTitle title="Account" />
       <AppNav />
       {/* `AppNav` stays OUTSIDE the column on purpose: the prototype centres a
           680px column of cards inside the content area, but the nav is a

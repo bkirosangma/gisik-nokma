@@ -4,7 +4,6 @@ import { useParams, useRouter } from 'next/navigation';
 import { WorkflowListScreen } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../src/authoring/builder-wiring.js';
-import { DocumentTitle } from '../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows` — the workflows this workspace has
@@ -22,7 +21,6 @@ export default function WorkflowsPage() {
   const base = `/w/${workspaceId}/settings/workflows`;
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Workflows" />
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">Workflows</h1>
       {wiring.kind !== 'ready' ? (

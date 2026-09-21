@@ -5,7 +5,6 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
 import { authClient } from '../../src/auth-client.js';
-import { DocumentTitle } from '../../src/document-title.js';
 
 type Method = 'phone' | 'email';
 
@@ -19,7 +18,6 @@ type Method = 'phone' | 'email';
 export default function SignInPage() {
   return (
     <>
-      <DocumentTitle title="Sign in" />
       <Suspense fallback={<main className="gn-shell gn-shell--centred" />}>
         <SignInForm />
       </Suspense>

@@ -1,4 +1,4 @@
-import { readFileSync, readdirSync, statSync } from 'node:fs';
+import { existsSync, readFileSync, readdirSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { render, waitFor } from '@testing-library/react';
@@ -99,10 +99,64 @@ describe('P12 the product names each view', () => {
     // same green below, and only this arm tells them apart.
     expect(routes.length).toBeGreaterThan(20);
 
+    // ⚠ THE RULE THIS ARM ENFORCES WAS TIGHTENED ON 2026-09-21, after a browser
+    // reading, and the tightening is the point: a `<DocumentTitle>` is NOT an
+    // acceptable title mechanism for a route whose topic is known at build time.
+    // It writes `document.title` from an effect, and React's head hydration
+    // repairs the `<title>` node 21 ms later — measured in the built app, the
+    // trace is in `src/document-title.tsx`. **The old arm passed on every one of
+    // those routes while not one of their tabs showed the right title.**
+    //
+    // So a route is now titled by whichever of these it can actually use:
+    //   - its own `metadata`/`generateMetadata` (`page.tsx` or `layout.tsx`), or
+    //   - a SIBLING `layout.tsx` exporting `metadata` (a segment layout is a
+    //     server component even when the page under it is `'use client'`), or
+    //   - `<DocumentTitle>`, which is correct ONLY where the topic resolves from
+    //     a READ — the workspace and project names land long after the repair.
     const undeclared = routes
       .filter((route) => !NO_VIEW_ROUTES.includes(route))
-      .filter((route) => declaredTitle(readFileSync(join(APP_DIR, route), 'utf8')) === null);
+      .filter((route) => {
+        const dir = dirname(route);
+        const own = readFileSync(join(APP_DIR, route), 'utf8');
+        if (declaredTitle(own) !== null) return false;
+        const sibling = join(APP_DIR, dir, 'layout.tsx');
+        return !existsSync(sibling) || declaredTitle(readFileSync(sibling, 'utf8')) === null;
+      });
     expect(undeclared, `routes with no title mechanism: ${undeclared.join(', ')}`).toEqual([]);
+  });
+
+  it('a client page names its title from a SERVER layout, never from <DocumentTitle> alone', () => {
+    // The discrimination the arm above cannot make on its own: a client page
+    // that reaches for `<DocumentTitle>` with a LITERAL topic is the measured
+    // failure, and it must carry a sibling layout instead. The two exceptions
+    // are named, and they are named because their titles come from a read.
+    const DYNAMIC_TITLE_ROUTES = new Set([
+      'w/[workspaceId]/page.tsx',
+      'w/[workspaceId]/p/[projectId]/page.tsx',
+    ]);
+
+    const racy: string[] = [];
+    for (const route of pageRoutes()) {
+      if (DYNAMIC_TITLE_ROUTES.has(route)) continue;
+      const source = readFileSync(join(APP_DIR, route), 'utf8');
+      if (declaredTitle(source) === 'DocumentTitle') racy.push(route);
+    }
+    expect(
+      racy,
+      `routes titling themselves from a client effect with a literal topic — the ` +
+        `effect loses to React's head hydration:\n${racy.join('\n')}`,
+    ).toEqual([]);
+
+    // And the two exceptions really are the dynamic ones: each must BOTH render
+    // `<DocumentTitle>` (for the resolved name) AND have a server layout (for
+    // the generic title shown until that read answers).
+    for (const route of DYNAMIC_TITLE_ROUTES) {
+      expect(pageRoutes()).toContain(route);
+      expect(declaredTitle(readFileSync(join(APP_DIR, route), 'utf8'))).toBe('DocumentTitle');
+      const sibling = join(APP_DIR, dirname(route), 'layout.tsx');
+      expect(existsSync(sibling), `${route} has no server layout for its generic title`).toBe(true);
+      expect(declaredTitle(readFileSync(sibling, 'utf8'))).toBe('metadata');
+    }
   });
 
   it('the excluded routes are still bare redirects, so the exclusion cannot hide a page', () => {
@@ -141,11 +195,27 @@ describe('P12 the product names each view', () => {
     // the view. A route whose topic is the product name is the old behaviour
     // wearing the new mechanism, and `documentTitleFor` would return it
     // unchanged — so it is caught here rather than by the suffix.
-    const topics = pageRoutes().flatMap((route) => {
-      const source = readFileSync(join(APP_DIR, route), 'utf8');
-      return [...source.matchAll(/<DocumentTitle\s+title=(?:"([^"]*)"|\{`([^`]*)`\})/g)].map(
-        (match) => ({ route, topic: match[1] ?? match[2] ?? '' }),
-      );
+    // ⚠ THE UNIVERSE MOVED WITH THE FIX, and this is the correction rather than
+    // a loosening: the literal topics used to live in `<DocumentTitle
+    // title="…">` elements and now live in the layouts' `metadata` —
+    // `documentTitleFor('Help')` — because that is the only mechanism that
+    // survives hydration. Reading only the old spelling found ZERO topics and
+    // reported it as `expected 0 to be greater than 10`, which is the positive
+    // control doing its job.
+    const sources = [
+      ...pageRoutes().map((route) => ({ route, file: join(APP_DIR, route) })),
+      ...pageRoutes()
+        .map((route) => ({ route, file: join(APP_DIR, dirname(route), 'layout.tsx') }))
+        .filter((entry) => existsSync(entry.file)),
+    ];
+    const topics = sources.flatMap(({ route, file }) => {
+      const source = readFileSync(file, 'utf8');
+      const fromElement = [...source.matchAll(/<DocumentTitle\s+title=(?:"([^"]*)"|\{`([^`]*)`\})/g)];
+      const fromFor = [...source.matchAll(/documentTitleFor\(\s*'([^']*)'\s*\)/g)];
+      return [
+        ...fromElement.map((m) => ({ route, topic: m[1] ?? m[2] ?? '' })),
+        ...fromFor.map((m) => ({ route, topic: m[1] ?? '' })),
+      ];
     });
     // POSITIVE CONTROL: the extraction found declarations at all.
     expect(topics.length).toBeGreaterThan(10);

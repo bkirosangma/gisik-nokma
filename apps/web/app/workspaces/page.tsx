@@ -18,7 +18,6 @@ import {
   viewerOf,
   type CardViewer,
 } from '../../src/workspace-viewer.js';
-import { DocumentTitle } from '../../src/document-title.js';
 import { displayLabelOf } from '../../src/display-label.js';
 
 export default function WorkspacesPage() {
@@ -47,7 +46,6 @@ export default function WorkspacesPage() {
 
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Workspaces" />
       <AppNav />
       <div className="gn-workspaces">
         <div className="gn-workspaces__head">

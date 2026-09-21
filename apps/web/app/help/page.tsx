@@ -2,7 +2,6 @@
 
 import { HelpBrowser } from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
-import { DocumentTitle } from '../../src/document-title.js';
 
 /**
  * `/help` — the manual and FAQ, in the product.
@@ -17,7 +16,6 @@ import { DocumentTitle } from '../../src/document-title.js';
 export default function HelpPage() {
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Help" />
       <AppNav />
       <HelpBrowser />
     </main>

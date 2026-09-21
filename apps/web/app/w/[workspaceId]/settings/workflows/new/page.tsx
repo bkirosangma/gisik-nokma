@@ -13,7 +13,6 @@ import {
 } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
-import { DocumentTitle } from '../../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows/new` — pick a template, then author.
@@ -46,7 +45,6 @@ export default function NewWorkflowPage() {
 
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="New workflow" />
       <AppNav workspaceId={workspaceId} />
       <h1 className="gn-page-title">New workflow</h1>
       {wiring.kind !== 'ready' ? (

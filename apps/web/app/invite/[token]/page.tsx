@@ -6,7 +6,6 @@ import { useEffect, useState } from 'react';
 import { Button, Card } from '@gisik-nokma/ui';
 import { InviteAcceptanceError, type InviteSummary } from '@gisik-nokma/app-core/online';
 import { useAppServices, useSessionStatus } from '../../../src/providers.js';
-import { DocumentTitle } from '../../../src/document-title.js';
 
 /**
  * `/invite/[token]` — where a link somebody was sent turns into a membership.
@@ -87,7 +86,6 @@ export default function InvitePage() {
 
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Invitation" />
       <h1 className="gn-page-title">Gisik Nokma</h1>
       <Card className="gn-invite">
         {invite === 'loading' ? (

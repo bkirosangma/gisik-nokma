@@ -16,7 +16,6 @@ import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expir
 import { useAppServices } from '../../src/providers.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { ticketSheetPath } from '../../src/ticket-location.js';
-import { DocumentTitle } from '../../src/document-title.js';
 
 /**
  * What an inbox with nothing in it says.
@@ -384,7 +383,6 @@ export default function InboxPage() {
 
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Inbox" />
       <AppNav />
       {/*
         The header ROW — title and filter beside each other, which is where the

@@ -217,15 +217,15 @@ must not be taken, so the first genuinely free id is the one after the block. **
 request for an allocated block, first recorded under `13.969`, is still open** — this task was dispatched
 without one, as that one was.
 
-- **13.1050** ✅ Every routing file under `app/` declares a title — Next's `metadata`/`generateMetadata`
-  on a server route, `<DocumentTitle>` on any route — and a `'use client'` route that leans on
-  `metadata` is caught, because that export is **silently IGNORED** in a client module and the page
-  keeps whatever the previous route left in `document.title`. The sweep walks `page.tsx` **and**
-  `not-found.tsx`, whose exclusion list (`app/page.tsx`, a bare `redirect`) is itself asserted to still
-  be a bare redirect so it cannot become a hiding place. Two further arms: every declared topic is
-  non-empty and none is the bare product name — the defect restated as a property — and a mounted
-  `<DocumentTitle>` really sets `document.title` and follows a topic that resolves late.
-  (`apps/web/test/document-title.test.tsx`)
+- **13.1050** ✅ Every routing file under `app/` is titled by a SERVER mechanism — its own
+  `metadata`/`generateMetadata`, or a SIBLING `layout.tsx` exporting `metadata`, which is a server
+  component even when the page under it is `'use client'`. A second arm reddens on any non-dynamic route
+  that titles itself from `<DocumentTitle>` with a literal topic, and a third pins the two dynamic
+  exceptions: each must render `<DocumentTitle>` for the resolved name AND carry a server layout for the
+  generic title shown meanwhile. A fourth arm keeps every declared topic non-empty and none the bare
+  product name. The sweep walks `page.tsx` **and** `not-found.tsx`, whose exclusion list
+  (`app/page.tsx`, a bare `redirect`) is itself asserted to still be a bare redirect so it cannot become
+  a hiding place. (`apps/web/test/document-title.test.tsx`)
 
 **The finding.** `app/layout.tsx` set `{ title: 'Gisik Nokma' }` and nothing else set a title, so
 `/sign-in`, `/inbox`, `/help`, a board, a ticket sheet, `/settings`, `/privacy`, `/terms` and the 404
@@ -234,18 +234,54 @@ speaks to exactly this shape: *"for web applications (single page applications) 
 dynamically, the title should also be changed dynamically to reflect the content or topic of the
 current view."*
 
-**Two mechanisms, one source for the format.** A `'use client'` route uses `<DocumentTitle>` (an
-effect; Next's `metadata` is not honoured in a client module); a server route uses
-`export const metadata`. Both read `documentTitleFor` from `src/page-title.ts`, so the two cannot
-disagree about what a title looks like. `apps/web/src/page-title.ts` carries no `'use client'` on
-purpose — a directive there would turn the helper into a client reference and break the server half.
+### ⚠ THE FIRST FIX SHIPPED IN THIS BATCH DID NOT WORK, AND THIS CASE PASSED THROUGHOUT IT
 
-⚠ **What is MEASURED and what is not.** The server half is measured in the real build output:
-`next build` → `.next/server/app/privacy.html` carries `<title>Privacy · Gisik Nokma</title>` and
-`terms.html` carries `Terms · Gisik Nokma`. **The client half's title is NOT in the prerendered HTML —
-measured, and expected**: the effect runs after hydration, so a browser reading of a client route
-post-hydration is **OWED** and is not claimed. jsdom witnesses the mechanism (the mounted component
-sets `document.title`); the sweep witnesses DECLARATION on every route, never execution.
+The first version gave each `'use client'` route a `<DocumentTitle>` whose effect writes `document.title`,
+and asserted only that the mechanism was DECLARED. **It lands on zero of those routes.** Traced in Chrome
+against the built app, with a forwarding `document.title` setter and a 20 ms poll of the real value:
+
+```
+  /sign-in   atMs  0  value ""                            ← no <title> yet
+             atMs 21  set   "Sign in · Gisik Nokma"       ← the effect
+             atMs 21  value "Sign in · Gisik Nokma"       ← it took
+             atMs 42  value "Gisik Nokma"                 ← REACT PUT IT BACK
+             finalTitle after 15 s: "Gisik Nokma"
+  /help      setter at 127 ms; finalTitle after 4 s: "Gisik Nokma"
+```
+
+The 42 ms repair **does not go through the `title` setter** — React mutates the `<title>` NODE while
+hydrating Next's `<head>`, repairing the text it finds changed under it. **The suite was green the whole
+time**, because a jsdom arm can see the mechanism and cannot see this.
+
+**Two replacements were tried and are MEASURED FAILURES**, recorded so neither is re-attempted (both in
+`src/document-title.tsx`): a `useSyncExternalStore` hydration gate (the write still landed at 21 ms —
+React repairs *after* hydration of the subtree, so no hydration signal precedes it), and returning
+`<title>` for React 19 to hoist (**three** `<title>` elements in the hydrated document; React does not
+deduplicate them and `document.title` reads the first, which is Next's — strictly worse).
+
+### What holds, and how it is measured
+
+**A SERVER route-segment `layout.tsx` exporting `metadata`.** A segment layout is a server component even
+when the page beneath it is `'use client'`, so the title is in the head **before any JavaScript runs** —
+which is what a Level A criterion actually asks for. `<DocumentTitle>` survives ONLY where the topic
+resolves from a READ (the workspace and project names), whose writes land long after the repair; each of
+those keeps a server layout for the generic title meanwhile.
+
+**MEASURED against the built app on lane port 3055** (`/tmp/b03-tp12-served-titles.log`):
+
+- **Served, every route own its own:** `/sign-in` → `Sign in · Gisik Nokma` · `/help` → `Help · Gisik
+  Nokma` · `/inbox` → `Inbox · Gisik Nokma` · `/account` → `Account · Gisik Nokma` · `/settings` →
+  `Settings · Gisik Nokma` · `/workspaces` → `Workspaces · Gisik Nokma` · `/privacy` → `Privacy · Gisik
+  Nokma` · `/terms` → `Terms · Gisik Nokma` · `/mcp/tokens` → `MCP tokens · Gisik Nokma` ·
+  `/definitely-not-a-route` → `Page not found · Gisik Nokma`.
+- **Post-hydration in Chrome, the reading this case previously OWED and has now PAID:** `/sign-in`,
+  `/help` and the 404 each have **exactly one `<title>`** (`titleElements: 1`), correct at the FIRST
+  sample and unchanged across 4–6 s of polling.
+- **That last one also proves Next honours `metadata` in `not-found.tsx`** — a file its own docs do not
+  list — which is why the 404 no longer needs the client component at all.
+
+`apps/web/src/page-title.ts` carries no `'use client'` on purpose: a directive there would turn the
+helper into a client reference and break the server half, which is now every route's half.
 
 ## The project view rail is a NAMED tablist (exec1 P19, 2026-09-21) — case `13.1051`
 

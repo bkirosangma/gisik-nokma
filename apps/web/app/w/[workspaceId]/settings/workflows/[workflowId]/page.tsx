@@ -7,7 +7,6 @@ import { WorkflowBuilderScreen, draftFromPublished, type WorkflowDraft } from '@
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../../../src/shell-refusal.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
-import { DocumentTitle } from '../../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/workflows/[workflowId]` — the published definition,
@@ -56,7 +55,6 @@ export default function EditWorkflowPage() {
 
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Workflow" />
       <AppNav workspaceId={workspaceId} />
       {/* The breadcrumb back to the workflow list. Two things make this the
           route's job rather than `WorkflowBuilderScreen`'s: routing is the one

@@ -4,7 +4,6 @@ import { useParams } from 'next/navigation';
 import { AppNav } from '../../../../../../src/app-nav.js';
 import { TicketTypeEditorPane } from '../../../../../../src/ticket-type-editor-pane.js';
 import { WiringNotReady, useBuilderWiring } from '../../../../../../src/authoring/builder-wiring.js';
-import { DocumentTitle } from '../../../../../../src/document-title.js';
 
 /**
  * `/w/[workspaceId]/settings/ticket-types/[typeId]` — one type, opened for
@@ -19,7 +18,6 @@ export default function EditTicketTypePage() {
   const base = `/w/${workspaceId}/settings/ticket-types`;
   return (
     <main id="gn-main" className="gn-shell">
-      <DocumentTitle title="Ticket type" />
       <AppNav workspaceId={workspaceId} />
       {wiring.kind !== 'ready' ? (
         <WiringNotReady wiring={wiring} />
