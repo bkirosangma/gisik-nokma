@@ -2798,7 +2798,7 @@ the native app learns the OS preference". The answer is `useColorScheme()` plus 
 
 ## Ruling E2-41 — a failed read is no longer drawn as a benign state (2026-09-21, B14)
 
-*Next free id at the top of this block: `12.401`. `board-screen.tsx` and `ticket-screen.tsx` called
+*`board-screen.tsx` and `ticket-screen.tsx` called
 their replica reads with no rejection arm — a failed read left the board silently empty and the ticket
 screen on "Opening…" forever, the same word it shows while genuinely still loading. Fixed by splitting
 the read into a sibling `.ts` (`board-read.ts`, `ticket-read.ts` — same reason 12.394's family gives:
@@ -2806,13 +2806,21 @@ the read into a sibling `.ts` (`board-read.ts`, `ticket-read.ts` — same reason
 async function catches the rejection and returns `{ok:false, error}` instead of letting it escape
 unheard.*
 
-- 12.398 ✅ `loadBoard` (`board-read.ts`) resolves `{ok:false, error}` instead of rejecting when
+*⚠ RENUMBERED 2026-09-21 22:1x: this block originally minted `12.398`/`12.399`. The controller
+measured both as independently re-minted on other release branches (`12.398` on B01 and B07,
+`12.399` on B07 and B16) before any of them had reached `origin/main` — main's numbering never
+moves once landed, so the later-reconciled branch renumbers. Recomputed as the max over
+`origin/main` and every `origin/rel/*` head (+1), verified `union == sum` with
+`node scripts/check-case-ids.mjs`: `12.398`→`12.409`, `12.399`→`12.410`. B14's own later mints in
+this file (`12.400`–`12.408`) did not collide and are unchanged.*
+
+- 12.409 ✅ `loadBoard` (`board-read.ts`) resolves `{ok:false, error}` instead of rejecting when
   `listTicketSummaries` throws (the empty-query path) — RED confirmed against the pre-fix function
   (an unhandled rejection), GREEN after. `BoardScreen` renders the message as
   `<Text accessibilityRole="alert">` where the board used to just stay empty. —
   (`apps/mobile/src/screens/board-read.test.ts`)
-- 12.399 ✅ `loadBoard` resolves `{ok:false, error}` instead of rejecting when `searchOfflineCopy`
-  throws (the search path) — same RED→GREEN discipline as 12.398, the sibling read. —
+- 12.410 ✅ `loadBoard` resolves `{ok:false, error}` instead of rejecting when `searchOfflineCopy`
+  throws (the search path) — same RED→GREEN discipline as 12.409, the sibling read. —
   (`apps/mobile/src/screens/board-read.test.ts`)
 - 12.400 ✅ `loadTicket` (`ticket-read.ts`) resolves `{ok:false, error}` instead of rejecting when
   `getTicketWithPending` throws — RED confirmed (unhandled rejection) against the pre-fix function,
