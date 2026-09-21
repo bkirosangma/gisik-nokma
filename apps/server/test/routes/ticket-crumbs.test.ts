@@ -200,7 +200,7 @@ describe('P3 the PARENT ref carries the parent’s own key', () => {
    * number would answer `CCSO-2` for a parent whose own position is 1 — and a
    * single-ticket fixture could not tell the two apart.
    */
-  it('the parent’s key is the parent’s own — its own POSITION, not the child’s', async () => {
+  it('17.027 / P3 the parent’s key is the parent’s own — its own POSITION, not the child’s', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const { userId, headers } = await signedIn();
@@ -330,7 +330,7 @@ describe('16.70 the grandparent is the nearest PROPER ancestor of EPIC rank', ()
    * this shape, because every `parentId` and every `epicId` in its fixtures come
    * from disjoint sets.
    */
-  it('E5-3 the direct parent IS the epic: both refs name the same ticket', async () => {
+  it('17.026 / E5-3 the direct parent IS the epic: both refs name the same ticket', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const { userId, headers } = await signedIn();

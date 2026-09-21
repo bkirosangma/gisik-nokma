@@ -3092,7 +3092,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
    * asserted the happy path would leave `null` and `undefined` indistinguishable
    * from a bug that drops the key.
    */
-  it('P3: a parent crumb shows the parent’s KEY, and the epic crumb stays title-only', async () => {
+  it('17.027 / P3: a parent crumb shows the parent’s KEY, and the epic crumb stays title-only', async () => {
     const read = ticketRead({
       parent: { kind: 'ticket', id: PARENT, title: 'Registrations', key: 'CCSO-9' },
       epic: { kind: 'ticket', id: EPIC, title: 'Open Questions', key: 'CCSO-7' },
@@ -3117,7 +3117,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     expect(screen.getByTestId('sheet-crumb-epic').textContent).toBe('Open Questions');
   });
 
-  it('P3: a parent key that could NOT be composed falls back to the title alone — never a half label', async () => {
+  it('17.027 / P3: a parent key that could NOT be composed falls back to the title alone — never a half label', async () => {
     // `null` is the ticket-number ruling's own absence: the number is derived
     // from the ledger's order, so a snapshot-bounded read composes no key, and a
     // key is not worth refusing the read over.
@@ -3134,7 +3134,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     expect(screen.getByTestId('sheet-crumb-parent').textContent).not.toMatch(/^\s/);
   });
 
-  it('P3: a parent ref that carries NO key field at all renders the title alone', async () => {
+  it('17.027 / P3: a parent ref that carries NO key field at all renders the title alone', async () => {
     // The third state: absent. A producer that does not carry a key for this ref
     // (the grandparent's ref is the one the product has) must read exactly like
     // `null` on screen, and neither may read as an empty crumb.
@@ -3147,7 +3147,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     expect(screen.getByTestId('sheet-crumb-parent').textContent).toBe('Registrations');
   });
 
-  it('E5-3: two restricted refs to the SAME ticket draw one crumb, not two', async () => {
+  it('17.026 / E5-3: two restricted refs to the SAME ticket draw one crumb, not two', async () => {
     const read = ticketRead({
       parent: { kind: 'restricted', id: PARENT },
       epic: { kind: 'restricted', id: PARENT },
@@ -3168,7 +3168,7 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
     expect(screen.getByTestId('sheet-crumb-parent')).toBeInTheDocument();
   });
 
-  it('E4-1: when the direct parent IS the epic, the ancestor is named ONCE', async () => {
+  it('17.024 / E4-1: when the direct parent IS the epic, the ancestor is named ONCE', async () => {
     // The one-hop shape: the epic IS the parent, same id, and the title the
     // server sends for both is the same row's title.
     const read = ticketRead({ epic: { kind: 'ticket', id: PARENT, title: 'Registrations' } });
