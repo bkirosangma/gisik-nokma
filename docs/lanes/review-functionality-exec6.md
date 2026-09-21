@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Eighteen findings — thirteen Important, five Minor — every one measured through a door the
+**No Critical claimed. Nineteen findings — thirteen Important, six Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
@@ -39,7 +39,7 @@ The second shape is **a record that describes a world the product has left**: th
 (E6-1); three ❌ cases declaring guest admissions that closed weeks ago (E6-12); a "named, not decided" residual
 whose own commit decided it (E6-11); a stale "no ticket key" premise beside a crumb that reads the key (E6-14);
 and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an
-unassigned open question since before its trigger shipped (E6-13). Two instrument gaps close the list (E6-6, E6-7).
+unassigned open question since before its trigger shipped (E6-13). Two instrument gaps and a due date that only has to look like one close the list (E6-6, E6-7, E6-19).
 
 The round-1 lane's coverage boundary was the map: every Important finding is in a package or on a path it said
 it did not reach, and none re-files anything it found. Two read sweeps — every read door as a non-member and as
@@ -1236,6 +1236,39 @@ parameters, answering 400 like their siblings. Neither is more than the refineme
 the product already has the guard and applies it to the less consequential fields. Not Critical: nothing is
 disclosed or lost, and every 500 is a rolled-back transaction.
 
+### E6-19 — MINOR — A due date only has to look like `YYYY-MM-DD`: `2026-02-30`, `2026-13-45` and `0000-00-00` commit, and the attention strip then says "Needed by 0000-00-00 — due within 7 days"
+
+**WHAT.** `packages/domain/src/ist-day.ts:27` `IST_DAY_REGEX = /^\d{4}-\d{2}-\d{2}$/` is the whole of what a due
+or start date must satisfy (`ticket-types.ts:179-181` `dueDateValueSchema`; `rule-engine/src/checks/fields.ts:39-42`
+for a custom `date` field, `:135-138` for `dueDate`/`startDate`). Measured through the door (Appendix W; 1 file /
+1 test passed):
+
+```
+field_set dueDate 2026-02-30 -> committed        field_set dueDate 2026-13-45 -> committed
+field_set dueDate 0000-00-00 -> committed        field_set dueDate 2026-09-22 -> committed (control)
+field_set dueDate 22-09-2026 -> refused field.type-mismatch ("Due date" needs a day in YYYY-MM-DD form)
+attention -> 200: due-soon "Needed by 2026-02-30 — due within 7 days." · due-soon "Needed by 0000-00-00 — due within 7 days." · (2026-13-45 absent)
+board -> 200; due dates served: 2026-02-30, 2026-13-45, 0000-00-00, 2026-09-22
+```
+
+**WHY it is wrong.** The door refuses the *shape* and accepts the *impossibility*. The attention read compares
+day strings lexicographically (`attention.ts:258` `if (due.date > horizon) continue;`), so `0000-00-00` is due-soon
+forever, `2026-13-45` is never due, and `2026-02-30` is due "within 7 days" of a day that does not exist; the
+notifications sweep's due-soon digest works over the same column with the same comparison, so the same three
+sentences reach the inbox and the mail. The product already distinguishes shape from existence for instants —
+`envelope.ts:96` `isRealCalendarDatetime` refuses a `clientTime` on a day that does not exist — and `ist-day.ts:47`
+reuses it for instants, while the day schema beside it does not.
+
+**WHAT WOULD HAVE BEEN BETTER.** One refinement on `IST_DAY_REGEX`'s users — parse the three fields, rebuild the
+string, compare (the same trick `isRealCalendarDatetime` uses) — so `2026-02-30` is refused with the sentence the
+door already has. Two lines in `ist-day.ts`, shared by the two checks and the two filter bounds.
+
+**MEASUREMENT.** Appendix W, run from `apps/server`. Lines opened: `ist-day.ts:27`, `:37-47`; `ticket-types.ts:179-181`;
+`fields.ts:39-42`, `:135-138`; `attention.ts:255-266`; `envelope.ts:96`.
+
+**SEVERITY: Minor.** Data quality with a user-visible sentence; no loss, no leak, and the client picker presumably
+never sends one — the API and MCP doors do.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1381,8 +1414,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **13** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18 |
-| Minor | **5** | E6-6, E6-7, E6-11, E6-14, E6-17 |
-| **total** | **18** | E6-1 … E6-18, no gaps in the numbering |
+| Minor | **6** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19 |
+| **total** | **19** | E6-1 … E6-19, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -4398,6 +4431,135 @@ describe('exec6 sweep: U+0000 on the remaining doors', () => {
       const res = await app.inject({ method: method as 'GET', url, headers, ...(payload === undefined ? {} : { payload }) });
       out.push(`${res.statusCode} ${label.padEnd(38)} ${res.body.slice(0, 90)}`);
     }
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix W — probe for E6-19 — impossible due dates
+
+File path in the tree: `apps/server/test/zz-exec6-probe-due.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-due.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: does the door accept a due date that is not a calendar day, and what does the attention read say about it?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: impossible due dates', () => {
+  it('records the door answer and the attention read', async () => {
+    const out: string[] = [];
+    const ids: Record<string, string> = {};
+    for (const [label, date] of [['feb-30', '2026-02-30'], ['month-13', '2026-13-45'], ['year-0', '0000-00-00'], ['control-real', '2026-09-22'], ['not-a-day', '22-09-2026']]) {
+      const id = newUlid(); ids[label] = id;
+      expect((await post(WS, { kind: 'ticket', id }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: `due ${label}` }, ownerId, ownerToken)).status).toBe('committed');
+      const r = await post(WS, { kind: 'ticket', id }, 'ticket.field_set', { fieldId: 'dueDate', value: { date } }, ownerId, ownerToken);
+      out.push(`field_set dueDate ${date.padEnd(11)} (${label.padEnd(12)}) -> ${r.status}${r.rule ? ` (${r.rule}: ${String(r.reason).slice(0, 70)})` : ''}`);
+    }
+    const att = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/attention`, headers: auth(ownerToken) });
+    const items = att.json<{ items: Array<{ kind: string; reason: string; card: { ticketId: string } }> }>().items;
+    out.push(`attention -> ${att.statusCode}; items: ${items.map((it) => `${it.kind} [${Object.entries(ids).find(([, v]) => v === it.card.ticketId)?.[0] ?? '?'}] "${it.reason}"`).join(' | ')}`);
+    const board = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/board`, headers: auth(ownerToken) });
+    const dues = [...board.body.matchAll(/"dueDate":\{"state":"claimed","claim":\{"date":"([^"]+)"/g)].map((m) => m[1]);
+    out.push(`board -> ${board.statusCode}; due dates served: ${dues.join(', ')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
