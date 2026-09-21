@@ -346,3 +346,73 @@ Their **painted** measurements — `[BROWSER]` sizes, contrast ratios, the ESC-w
 sequence — I cannot reproduce without a browser, and I do not claim to have. What I tested is the **source**
 clause each finding rests on, which is the part readable from here. A painted value could still be wrong;
 if the judge wants one checked, it needs a browser, not a second reading.
+
+---
+
+# PHASE 2 — THE CHECKS RUN AFTER THE BOUNDARY, AGAINST `origin/exec5/review-ux` @ `3b93b697`
+
+**Still no refutation, and this section exists because a closing block in my report claims it does**
+(§R2.22's tail: *"the file carries the checks"*). ⚠ **When I wrote that sentence the file did not carry
+them** — the checks were in this session's transcript and not yet here. **That is the
+claim-about-the-artifact-I-am-editing defect this repository has catalogued against me**, and the repair is
+to write the checks down before the claim stands, which is what this section is. **Three targets were
+opened. All three hold. Nothing is refuted, and I am not filing a refutation I cannot falsify.**
+
+## 1. `E5-13` (CRITICAL, exec 5) — **HOLDS**, and the check found the remedy is one line
+
+Read at `apps/web/app/account/page.tsx`, the branch's own lines:
+
+- **`:81`** verbatim: `notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }));`
+  — the failed read writes an *all-unmuted* document into state.
+- **`:74-80`**, the comment directly above it: *"the literal below merely renders every kind as on for this
+  visit, **without asserting that fact about the account**"* — the file disclaims the assertion, and the
+  next line makes it saveable.
+- **`:215-232`**, `toggleKind`: `if (prefs === null) return;` … `const muted = prefs.mutedKinds.includes(kind)`
+  … `void notificationPreferences.save(next).catch(() => { notificationPreferences.load().then(setPrefs); })`.
+  **It builds the whole document from `prefs` and PUTs it.** The gateway contract exec 5 cites
+  (`notification-preferences-gateway.ts:18-22`) is the premise that fails here.
+- ⚠ **One thing exec 5 did not name, and it strengthens the finding rather than weakening it:** the guard
+  **`if (prefs === null) return;` at `:216` already exists.** The component was built to refuse when the
+  preferences are unknown — and the failure handler at `:81` is what prevents `prefs` from ever *being*
+  null. **So the fix exec 5 asks for is already half-written in the file; only the handler needs to stop
+  guessing.** I record this because it is the cheapest possible confirmation that the finding describes a
+  real intended behaviour that a later line defeats, not a preference about how the page should behave.
+- ⚠ **And it corrects my own earlier call.** `§R2.11` recorded `:67` and `:91` as *"disclosed and hedged;
+  not defects"*. **That judgement was about the DISPLAY, and it did not reach the save path**: a hedged
+  empty list is honest on screen and is still what `toggleKind` reads to build a PUT. exec 5 found the half
+  my hedge-check was not looking at, and the finding is additive over my note rather than duplicating it.
+
+## 2. `E5-41` (CRITICAL, exec 5) — **HOLDS**: no leave guard and no persistence, measured by absence
+
+- `grep -rn 'beforeunload\|useUnsavedChanges\|unsaved\|hasUnsaved\|dirty'` over
+  `packages/app-core/src/workflow-builder`, `apps/web/src` and `apps/web/app` returns **three hits, none in
+  the builder**: `workspace-settings-form.tsx:249`, `:252`, `:435` (a `dirty` for a different form) and a
+  prose comment at `mcp-tokens-screen.tsx:114`. **No `beforeunload`, no route guard.**
+- `grep -rn 'localStorage\|sessionStorage\|persist'` over `packages/app-core/src/workflow-builder` returns
+  **0 matches** — **the draft is not persisted anywhere.**
+- So the finding's two mechanisms (no guard, no persistence) are both present as the *absence* of any
+  such code. **A finding whose claim is an absence is validated by exactly this measurement**, and I ran it
+  as a search for the counterexample rather than as a search for the defect.
+
+## 3. `E5-12` (MINOR, exec 5) — **HOLDS in substance**; the refutable-looking part is already in the finding
+
+This one I opened *looking for* a refutation, because it has the exact shape my own catalogue warns about —
+**two numbers that disagree until you pin their units** — and the tempting refutation is *"the two counts
+measure different things, so they are not the same fact and this is a false equivalence."* That refutation
+**fails on the finding's own text**: exec 5 names the unit difference *as its cause*
+(*"two units under one word: `/workspaces` counts live projects only… `/account` counts the whole array"*),
+so the finding is not that the numbers disagree but that **neither screen names its unit**. Measured:
+`apps/web/src/workspace-viewer.ts:127-130` — `projectCountLine(liveCount)` returns
+`"${liveCount} project(s)"` and names no unit; the archived half is a separate chip on that card only.
+**The `/account` half is unnamed with no chip beside it.** = **holds.**
+⚠ **The one part I cannot test:** exec 5's `[BROWSER]` measurement that the `/workspaces` card paints the
+chip `1 archived` beside the count. If that chip is there, that half is self-explaining and the finding is
+narrower than its headline. **I have not reproduced it and I am not calling the finding wrong for it** —
+this file's convention is that a painted value needs a browser, not a second reading.
+
+## WHAT I AM NOT DOING WITH THESE THREE
+
+**I am not filing a refutation on partial agreement**, and none of the three is falsified. A refutation
+requires the falsifying measurement; **a check that passes is a result for the author, not for me.** The
+honest form of this phase for a lane that finds nothing is the one filed above: the targets named, the lines
+opened, and the outcome.
