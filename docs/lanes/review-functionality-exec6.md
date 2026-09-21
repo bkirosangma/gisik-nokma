@@ -397,9 +397,9 @@ after 2→4: create a new root feature                       -> REFUSED hierarch
 ```
 
 **WHY it is wrong.** `child.rank > parent.rank` and `rank ≥ DEEPEST_RANK ⇒ has a parent` are invariants the
-engine enforces at **six** write sites (`hierarchy.ts` create ×2, reparent ×2 — read at the lines — and the
+engine enforces at **four** write sites (`hierarchy.ts` create ×2, reparent ×2 — read at the lines) whose
 refusal copy in `refusals.ts` says *"always belongs to a parent ticket"*, present tense, a claim about every
-ticket of the type). The type-definition door walks around all six: after a re-rank, the product holds a task
+ticket of the type). The type-definition door walks around all four: after a re-rank, the product holds a task
 under a feature it says a task cannot go under, and a root feature it says always has a parent. The user-facing
 dead end is concrete: drag `T` out of `F` and try to put it back — refused with a sentence that describes the
 placement it just came from. The editor's own copy (`rank.ts:38`, rendered at `ticket-type-editor-screen.tsx:594` as
@@ -410,16 +410,20 @@ placement it just came from. The editor's own copy (`rank.ts:38`, rendered at `t
 allowed, which this finding does not contest. It says nothing about tickets already placed under the old rank, and
 case `5.9` shows the project knows a re-rank changes the legality of existing placements (*"reparenting under a
 descendant after a rank re-definition made the loop rank-legal"*) — it guarded the cycle that a re-rank could
-newly permit and not the placements a re-rank newly forbids. No case in `05-tickets-hierarchy.md` and no docblock
-in `ticket-type.ts` or `hierarchy.ts` mentions existing tickets at re-rank time (`grep -nEi 'existing|re-?rank'`
-over both → the two cases above only).
+newly permit and not the placements a re-rank newly forbids. The check's own docblock says the same thing from
+the other side — `ticket-type.ts:52-55`: *"Custom types may re-rank — the reparent cycle check is load-bearing for
+exactly that case (design decision 6)"* — naming the cycle as the only consequence it guards. `grep -niE
+'existing|re-?rank'` over `ticket-type.ts` and `hierarchy.ts` finds that paragraph and the ruling-P12 notes on
+non-existent parents, nothing on existing placements; over `05-tickets-hierarchy.md` it finds 5.32 (re-pointing a
+type's *workflow* leaves existing tickets where they are — the owner's 2026-08-26 decision for the workflow half,
+with no rank counterpart) and 5.36.
 
 **WHAT WOULD HAVE BEEN BETTER.** The check has the context it needs: `ctx.getChildrenStates` and
 `ctx.getEntityState` already serve the hierarchy checks. Refuse a custom re-rank when any ticket of the type is
 in a position the new rank forbids — a child whose parent's rank is now `≥` the new rank, a parent whose child's
 rank is now `≤` it, or a root ticket when the new rank is `≥ DEEPEST_RANK` — with the count in the refusal
 (*"12 features would need a parent first"*). That keeps `5.36` (re-rankable when nothing is placed against it)
-and makes the six write-site invariants true of the ledger rather than of the door. A cheaper honest alternative
+and makes the four write-site invariants true of the ledger rather than of the door. A cheaper honest alternative
 is to record the decision that they are write-time-only and say so in the editor copy.
 
 **MEASUREMENT.** Appendix B, run from `packages/rule-engine` with `pnpm exec vitest run
@@ -429,7 +433,7 @@ path). Lines opened: `ticket-type.ts:50-64`; `hierarchy.ts:108`/`:228` (`type.ra
 `domain/src/ticket-types.ts:98` (`rank: z.number().int().min(1)` — no upper bound either) and `:136`
 (`DEEPEST_RANK = 4`); `test-cases/05-tickets-hierarchy.md:25` (5.9), `:52` (5.36).
 
-**SEVERITY: Important.** An invariant the product enforces loudly and in six places, with an admin-facing door
+**SEVERITY: Important.** An invariant the product enforces loudly and in four places, with an admin-facing door
 around all of them and a user-facing refusal that describes the state it is refusing to restore. Filed at
 Important rather than Critical because it needs an admin act and nothing is lost.
 
