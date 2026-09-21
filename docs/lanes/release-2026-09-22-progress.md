@@ -16,3 +16,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-33 | done | 6fbe6ecc | 13.1054 the shell names a nameless person from the email; one displayLabel module for both labels |
 | T-P13 | done | 151cf55d | 13.1055 skip link as the first focusable element + id=gn-main on all 23 route mains; measured in the prerendered HTML |
 | T-V6 | done | 20334cd2 | 13.1056 five Loading arms carry role="status" (count-pinned sweep + one rendered arm) |
+| T-P12 | done | d60abe1e | 13.1050 CORRECTION: the client effect lost to React head hydration (measured); replaced by a server layout per route segment |
