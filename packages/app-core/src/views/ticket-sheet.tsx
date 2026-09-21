@@ -1032,18 +1032,38 @@ export function TicketSheet({
    * reset in a `finally`, mirroring `board.tsx`'s `submitDirect`
    * (`:1029-1035`'s own docblock on why `finally` rather than after the
    * `await`): a REJECTED ingest must not leave Close/Reopen disabled forever,
-   * which resetting only on the happy path would do. The early `if
-   * (submitting) return` guards against a second click landing on the same
-   * render pass as the first, before React has re-rendered the `disabled`
-   * attribute onto the DOM (`userEvent`'s own await notwithstanding, this is
-   * belt-and-braces for a synchronous double-invoke, not the primary defence
-   * — the `disabled` attribute is).
+   * which resetting only on the happy path would do.
+   *
+   * ⚠ **THE `if (submitting) return` THAT STOOD AT THE TOP OF THIS FUNCTION IS
+   * GONE (ruling E2-31, 2026-09-21), and this paragraph is what the finding
+   * asked to put in its place.** It claimed to guard *"a second click landing on
+   * the same render pass as the first, before React has re-rendered the
+   * `disabled` attribute onto the DOM"* — and it **cannot** do that, because
+   * `submitting` is RENDER STATE: two calls in one render pass both close over
+   * the same pre-commit `false` and both get through. That is precisely the case
+   * render state is blind to. A guard whose stated purpose is unreachable is
+   * indistinguishable from a working one to every future reader, so it is
+   * removed rather than kept as belt-and-braces.
+   *
+   * **What actually holds is `disabled={submitting}`**, on both buttons
+   * (`:2154`, `:2159`): a second click in a real browser lands on a control
+   * React has already re-rendered, so this handler is never called at all. Case
+   * `13.1182` pins exactly that — two clicks with the first ingest held pending
+   * post ONE event — and deleting the `disabled` term reddens it.
+   *
+   * **And this is NOT the composer's defect wearing a different hat.** The
+   * measured precedent (`packages/editor/src/components/TicketEditorSlot.tsx`:
+   * *"MEASURED, two `comment.added` events for one comment"*) reached its
+   * handler from TWO sources — a Save button AND a blur/Enter commit — and the
+   * `disabled` landing on the field is what fired the second one. Close/Reopen
+   * has one source and no blur-commit, so copying that fix here would install a
+   * second guard that also cannot fire. The finding offers both remedies and
+   * names this one first; the reasoning above is why it is the one taken.
    */
   const submitTicketEvent = async (
     type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
     onCommitted: () => void,
   ): Promise<void> => {
-    if (submitting) return;
     setSubmitting(true);
     try {
       const event = make({

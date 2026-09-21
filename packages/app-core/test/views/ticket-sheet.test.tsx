@@ -3454,3 +3454,86 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
     expect(notice.textContent).not.toContain('Loading');
   });
 });
+
+/**
+ * 13.1182 — ruling E2-31: THE GUARD THAT ACTUALLY HOLDS.
+ *
+ * `submitTicketEvent` carried `if (submitting) return;` at its top, with a
+ * docblock claiming it guarded "a second click landing on the same render pass
+ * as the first, before React has re-rendered the `disabled` attribute onto the
+ * DOM". It could not: `submitting` is RENDER STATE, so two calls in one render
+ * pass both close over the same pre-commit `false`. A guard whose stated purpose
+ * is unreachable is indistinguishable from a working one to every reader, so the
+ * line is removed and the docblock now says what holds instead — **the
+ * `disabled` attribute**, on both buttons.
+ *
+ * This case pins that, and it is the reason removing the line is safe rather
+ * than merely tidy: with the first Close held pending, a SECOND click posts
+ * nothing. It is a real assertion about the surviving guard, not a restatement
+ * of the deleted one — deleting `disabled={submitting}` reddens it.
+ *
+ * **It is deliberately NOT the composer's `submittingRef` fix.** That precedent
+ * (`TicketEditorSlot.tsx`) reached its handler from TWO sources — a Save button
+ * and a blur/Enter commit — and the `disabled` landing on the field is what
+ * fired the second. Close/Reopen has one source and no blur-commit, so copying
+ * that fix here would install a second guard that also cannot fire.
+ */
+describe('13.1182 one Close in flight, and a second click that is not a click', () => {
+  function heldSource(read: TicketRead) {
+    /** Called to let the held ingest answer. */
+    let release: (() => void) | null = null;
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        new Promise((resolve) => {
+          release = () =>
+            resolve(
+              events.map((event) => ({
+                status: 'committed' as const,
+                eventId: event.id,
+                seq: 1,
+                serverTime: '2026-08-20T09:00:00.000Z',
+              })),
+            );
+        }),
+    );
+    return { source, release: () => release?.() };
+  }
+
+  it('13.1182 a second click while the first Close is in flight posts NOTHING', async () => {
+    const user = userEvent.setup();
+    const read = ticketRead({
+      ticket: ticketStateSeed({ stateId: 'done', stateCategory: 'terminal', closed: null }),
+    });
+    const { source, release } = heldSource(read);
+    renderSheet(read, source);
+    // NOT `settled()`: that waits for the DEFAULT ticket's provenance line
+    // ("marked Doing …"), and this fixture is terminal. The Close control is
+    // the better signal anyway — it only draws once the workflow has named the
+    // state's category, which is the read this case needs.
+    const close = (): HTMLElement => screen.getByRole('button', { name: 'Close' });
+    await waitFor(() => expect(close()).toBeInTheDocument());
+
+    await user.click(close());
+    // The first click's own `setSubmitting(true)` has re-rendered the control
+    // DISABLED. That attribute is the guard the finding's paragraph now names.
+    await waitFor(() => expect(close()).toBeDisabled());
+    expect(source.ingested).toHaveLength(1);
+
+    // A second click, dispatched while the first ingest is still unanswered.
+    // `disabled` is what stops it: without that attribute this click reaches
+    // the handler and posts a SECOND `ticket.closed`.
+    await user.click(close());
+    expect(source.ingested).toHaveLength(1);
+
+    release();
+    await waitFor(() => expect(close()).not.toBeDisabled());
+    // And the single event is the one the first click made.
+    expect(source.ingested[0]![0]!.type).toBe('ticket.closed');
+  });
+});
