@@ -197,10 +197,10 @@ eight files hold **1,120 ✅ · 33 ❌ · 11 🟡 · 5 🧪 · 22 🚫 · 8 unma
 with a second script whose regex matched a marker *anywhere* on the line; it printed 55 lines, of which 6 are ✅
 cases whose prose says "Was ❌" or carries a 🟡 mid-sentence (7.14, 7.241, 12.13, 12.16, 12.327, 12.328) — so
 the instruments disagree by exactly those six, and §1's is the one this paragraph counts by. **I read all 49
-❌/🟡/🧪 headlines** and measured **7** of them against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and
-6.84 (still true of the projection's own robustness; the door refuses both inputs, so not filed), and — from
+❌/🟡/🧪 headlines** and measured **8** of them against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and
+6.84 (still true of the projection's own robustness; the door refuses both inputs, so not filed), and 7.158 (🟡, measured still true: Appendix AE); and — from
 the ✅ set — 7.45 and 12.144 (sentences a new input falsifies: E6-10, E6-5) and 4.23 (bypassed: E6-8). Sample
-size: 5 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ ids one by one.**
+size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ ids one by one.**
 
 ### 2.3 Not reached — named rather than implied
 
@@ -1558,7 +1558,10 @@ what was looked at and found sound, not only what was found wrong.
   are** (Appendix AE; 1 file / 1 test passed): subscribed as a guest, `ticket.created` + `comment.added` +
   `ticket.transitioned` on an unnamed ticket produced **0 frames** and no title/comment bytes; a `visibility.set`
   naming the guest then delivered the ticket's whole history in order (`created, comment.added, transitioned,
-  visibility.set`). The stream half of the guest read sweep (Appendix Q), through `visible-events-for.ts`.
+  visibility.set`). The stream half of the guest read sweep (Appendix Q), through `visible-events-for.ts`. **And
+  case 7.158 🟡 is measured still true:** removing the guest from the list sent **no purge frame**, and a later
+  edit on the narrowed ticket sent **0 frames** and leaked nothing — the recorded gap (no purge, stale local copy)
+  holds exactly as its marker and owner line say, and the withholding half holds too.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -5781,7 +5784,8 @@ File path in the tree: `apps/server/test/zz-exec6-probe-guest-stream.test.ts`; r
 ```
 rtk proxy pnpm exec vitest run test/zz-exec6-probe-guest-stream.test.ts --no-file-parallelism
 ```
-Same prerequisites as Appendix A plus a free `127.0.0.1:3061`.
+Same prerequisites as Appendix A plus a free `127.0.0.1:3061`. The second half narrows the guest back out and
+watches for a purge (case 7.158).
 
 ```ts
 // EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
@@ -5880,7 +5884,7 @@ afterAll(async () => {
   await db.drop();
 });
 
-describe('exec6 probe: a guest live stream', () => {
+describe('exec6 probe: a guest live stream, narrowed', () => {
   it('records which frames a guest receives', async () => {
     const out: string[] = [];
     await app.listen({ port: 3061, host: '127.0.0.1' });
@@ -5903,6 +5907,17 @@ describe('exec6 probe: a guest live stream', () => {
     out.push(`frames while NOT named: ${unnamedFrames} (title/comment leaked: ${leakBefore})`);
     out.push(`frames after visibility.set names the guest: ${after.join(', ')}`);
     out.push(`title present in the stream now: ${stream.raw.some((r) => r.includes('GUEST-MUST-NOT-SEE'))}; comment present: ${stream.raw.some((r) => r.includes('SECRET-COMMENT'))}`);
+    // Now NARROW: remove the guest from the list. Does a purge frame arrive?
+    const n0 = stream.frames.length;
+    expect((await post(WS, { kind: 'ticket', id: T }, 'visibility.set', { ticketId: T, mode: 'explicit', userIds: [ownerId] }, ownerId, ownerToken)).status).toBe('committed');
+    await new Promise((r) => setTimeout(r, 600));
+    const narrowed = stream.frames.slice(n0).map((f) => { const j = f as Record<string, unknown>; const ev = (j['envelope'] ?? {}) as Record<string, unknown>; return `${String(j['type'])}${ev['type'] ? ':' + String(ev['type']) : ''}`; });
+    out.push(`frames after the guest is REMOVED from the list: [${narrowed.join(', ')}]   (7.158 says: no purge)`);
+    // And a later edit on T, which the guest may no longer see:
+    const n1 = stream.frames.length;
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.field_set', { fieldId: 'title', value: 'AFTER-NARROWING' }, ownerId, ownerToken)).status).toBe('committed');
+    await new Promise((r) => setTimeout(r, 600));
+    out.push(`frames after a later edit on the narrowed ticket: ${stream.frames.length - n1}; new title leaked: ${stream.raw.some((r) => r.includes('AFTER-NARROWING'))}`);
     await stream.close();
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
