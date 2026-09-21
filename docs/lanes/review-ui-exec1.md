@@ -417,6 +417,18 @@ ruleFor('.gn-sign-in {\n  border-radius: 3px;\n}', /(?<!__)\.gn-sign-in\s*\{/)  
 
 **AND THE FIX IS ALREADY IN THE REPO.** Five sibling files moved to a multi-line scanner that returns the whole rule body: `members-styling.test.ts:61-70` (`findIndex` on the selector, then to the matching `}`), and the same shape in `attention-styling.test.ts`, `settings-shell-tokens.test.ts`, `workspaces-invitation-banner.test.tsx` and `sign-in-neo-restyle.test.ts`. `members-styling.test.ts`'s own docblock gives the reason and names this file: *"`neo-card-radius.test.ts`'s single-line version truncates every rule in the members family, whose declaration each sit on their own line."* **So the migration happened, this file was named in the migration's rationale, and it was not migrated.**
 
+**⚠ I SWEPT EVERY NEGATIVE CONTENT ASSERTION IN THE FAMILY, WHICH IS THE OBVIOUS COUNTER-ARGUMENT TO THIS FINDING, AND IT DOES NOT HOLD.** The claim "a truncating scanner is unsafe for a negative assertion" is worth nothing if other files pair those two things too — so I looked for all of them:
+
+| file | its negative content assertion(s) | scanner | exposed? |
+|---|---|---|---|
+| `ui/test/attention-styling.test.ts:218` | `expect(rule).not.toContain('--gn-surface-raised')` | **multi** (single=0, multi=4) | no |
+| `settings-shell-tokens.test.ts:168-169` | `rule?.includes('--gn-fill-tertiary')` / `('--gn-text-accent')` → `false` | **multi** | no |
+| `workspaces-invitation-banner.test.tsx:372,376` | `rule?.includes('box-shadow')` / `('border-inline-start')` → `false` | **multi** | no |
+| `sign-in-neo-restyle.test.ts:55,69,100` | `not.toContain('var(--gn-accent)')` ×2; `rule?.includes('background')` → `false` | **multi** | no |
+| **`neo-card-radius.test.ts:55`** | **`rule?.includes('border-radius')` → `false`** | **single** (single=1, multi=0) | **YES** |
+
+**Five files have negative content assertions; four are safe because they use the multi-line scanner, and exactly one pairs a negative assertion with the truncating one.** So this is not a family-wide pattern and not a style preference — **it is the single file that was named in the migration's rationale and not migrated**, and the assertion that exposes it is the only one of its kind.
+
 **⚠ AND THE PRECONDITION, STATED SO THE CLAIM IS NOT INFLATED.** `.gn-sign-in`'s rule is **single-line today** (`globals.css:2081`), so the case currently passes **for the right reason** — I verified the rule body contains no `border-radius`. This is a latent hole, not a live false green: it needs the rule to be reformatted first. I file it Important rather than Critical on that basis, and record that the three siblings' equivalent holes are loud.
 
 **WHAT WOULD HAVE BEEN BETTER.** Use the multi-line scanner the five siblings share — or, better, put it in `test/helpers/` so there is one scanner rather than nine. `members-styling.test.ts:56-58` already records that no shared CSS-scan helper exists and that the shape is duplicated *"rather than imported"*, which is the condition that produced this asymmetry.
