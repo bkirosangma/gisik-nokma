@@ -173,7 +173,7 @@ ticket answers **404**.
    instant is a race … the soft-delete predicate belongs to the READS that render notifications
    (`notifications/sweep.ts` filters at the source)"*. Measured: there is no race — the delete committed *before*
    the assignment and the door still committed it; `canSee` is not "live" (the repo says so itself:
-   `visible-where.ts:135-136` *"A deleted ticket is still VISIBLE in the `canSee` sense"*); and `sweep.ts` is not
+   `visible-where.ts:137-138` *"A deleted ticket is still VISIBLE in the `canSee` sense"*); and `sweep.ts` is not
    the read that renders notifications — it is the due-soon/stale *producer*; the read is `store.ts:128` and it
    filters nothing.
 3. **The engine asks about `deleted` in exactly one file.** `grep -rn deleted packages/rule-engine/src` (code
@@ -181,7 +181,7 @@ ticket answers **404**.
    flag. Of the 34 registered event types, **18 are not dispatched by `evaluateEvent` at all** (set difference of
    `vocabulary.ts` registrations against `evaluate.ts` cases: `attachment.added comment.added invite.*
    project.* ticket.assigned ticket.collaborator_* visibility.set workspace.*`), and for the ticket-scoped ones
-   the only gate is `checkVisibilityPermission`'s `canSee` (`check-permission.ts:1046`). So a state change on a
+   the only gate is `checkVisibilityPermission`'s `canSee` (`check-permission.ts:1048`). So a state change on a
    ticket that *"stops appearing in views"* is applied where nobody can review it, its comment lands in a thread
    the comments door refuses to serve (case 16.72), and a `Restore` brings the ticket back in a state and with an
    assignee nobody saw set.
@@ -232,7 +232,7 @@ PROBE peer detail(deleted)=404
 PROBE proj_tickets row after writes: {"state_id":"doing","deleted_at":"2026-09-21T04:29:34.673Z","assignee_id":"<peer>"}
  Test Files  1 passed (1)   Tests  1 passed (1)
 ```
-Lines opened: `evaluate.ts:26-69` (dispatch, `default: return { refused: false }`), `check-permission.ts:1046`
+Lines opened: `evaluate.ts:26-69` (dispatch, `:67-68` `default: return { refused: false }`), `check-permission.ts:1048`
 (`canSee` gate), `can-see.ts:227-234` (reads `proj_visibility` only), `fanout.ts:101-107`, `:122`,
 `sweep.ts:175-177`, `store.ts:128-130`, `deletion.ts:64`/`:85`, `write-tools.ts:144`/`:163`/`:185`.
 Set difference: `grep -oE "^\s*type: '[^']+'" packages/domain/src/vocabulary.ts` (34) vs
