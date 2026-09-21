@@ -989,7 +989,7 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 - **"`/mcp/authorize` has no deny path"** (`prototype-delta` entry) — stale: `Deny` is painted (`[BROWSER]`). **Not a
   finding.**
 - **The workflow builder's read-only banner and the Workspace settings form's member arm** — both withhold with a
-  sentence (`read-only-banner.tsx:47-49`, `workspace-settings-form.tsx:442`). **The pattern done right; not findings.**
+  sentence (`read-only-banner.tsx:35-39`, `workspace-settings-form.tsx:442`). **The pattern done right; not findings.**
 
 ### 6.5 Stale figures I was handed, recounted
 
