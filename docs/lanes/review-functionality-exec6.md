@@ -111,9 +111,76 @@ semble hits are what put E6-2, E6-8 and E6-9 in files I would otherwise have rea
 files. What it could not do is answer a behavioural question ("does X refuse Y"); every one of those was
 answered by a probe (Appendices A–H).
 
-### 2.2 Reached
+### 2.2 Reached — named, with the method
+
+**Read line-by-line (code lines, comments skimmed):** `packages/rule-engine/src/` — `evaluate.ts`, `engine.ts`,
+`transition.ts`, `version-map.ts`, `workflow-defined.ts`, `checks/{hierarchy,membership,ticket-type,close,
+deletion,context-helpers}.ts`, `rules/{require-different-user,restrict-to,require-evidence,require-comment,
+require-field}.ts` (14 of 28 files). `packages/domain/src/` — `vocabulary.ts` (registrations), `validate-workflow.ts`,
+`workflow.ts:151-191`, `rank.ts`, `clock-skew.ts`, `events/{invites,workspace-settings,visibility,ticket-events}.ts`
+(schemas), `filter-spec.ts:115-170`, `ticket-types.ts:98-160` (10 of 41). `packages/sync-client/src/` —
+`outbox/outbox.ts` (whole), `engine/sync-engine.ts:844-972` (flush), `precheck/local-context.ts:120-160`,
+`net/http-transport.ts` (skimmed), `storage/*` (not opened) — 3 of 13. `packages/mcp-server/src/` —
+`tools/{write-tools,read-tools}.ts`, `token-cache.ts`, `http-client.ts`/`session.ts` (grep only) — 4 of 12.
+`packages/app-core/src/online/` — `mappers.ts:903-1001` (ingest results, filter spec), `online-data-source.ts:480-496`,
+`invites-admin.ts:30-41`; `replica/replica-data-source.ts:1388-1408` (ingest/flush) — the rest of the 1,500 lines
+not opened. `apps/server/src/` — `ingest/ingest-service.ts` (whole), `permissions/check-permission.ts` (the gate
+functions and the membership branches; ~400 of 1,342 lines), `visibility/can-see.ts` (whole), `projections/
+{tickets,proj-memberships,ticket-types}.ts` (the readers and `apply`), `routes/{list,builder-reads,invites,
+attachments,tickets,notifications,mcp-device}.ts` (the routes named in findings; not every handler),
+`read/{visible-where,restricted-parents}.ts`, `notifications/{fanout,sweep,store}.ts` (grep + the cited blocks),
+`auto-close/sweep.ts:176-206`, `sync/{sync-service,reconcile-route}.ts`, `stream/hub.ts:213-420`, `gates/
+evidence-gate.ts`, `auth/auth.ts:150-360` and `app.ts:477-612` (rate limits), `mcp/token-store.ts:1-80`,
+`tools/sweep-orphans.ts:100-125`, `attachments/sniff.ts:36-50`. `scripts/` — `check-case-ids.mjs` (header + regexes),
+`check-no-silent-skips.mjs` (whole), `check-skipif-coverage.mjs` (whole), `check-db-timezone.mjs` (whole),
+`check-migration-order.mjs:1-60`, `check-case-citations.mjs:1-40` — **6 of 9 read; `check-env-example`,
+`check-runbook-commands`, `check-task-ledger` run only** (all 9 were run green by exec 3; I re-ran `case-ids`,
+`case-citations`, `no-silent-skips` (with mutations), `db-timezone` against both live DBs).
+
+**Measured by probe** (Appendices A–K, 11 runs, every one 1 file / 1 test passed with its `console.log` lines
+in the log): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake; ghost ticket
+on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic header; guest doors.
+
+**Case ids:** every ✅ id in the eight core files is cited by name in a test (`check-case-citations` ratchet:
+0 uncited in each). Of the **44** ❌/🟡/🧪 ids in those files I read all 44 headlines (§1's table is their
+count) and measured **7** against the product: 6.51, 6.77, 6.123 (E6-12 — stale), 6.58 and 6.84 (still true of
+the projection's own robustness; the door refuses both inputs, so not filed), 7.45 and 12.144 (✅ cases whose
+sentence a new input falsifies — E6-10, E6-5), 4.23 (✅, bypassed — E6-8). Sample size: 7 gap ids of 44, 3 ✅
+ids of 1,155; **I did not walk the other 1,152 ✅ ids one by one.**
 
 ### 2.3 Not reached — named rather than implied
+
+- `packages/rule-engine`: `contests.ts`, `memory-context.ts` (used, not reviewed), `refusal-rules.ts`,
+  `checks/{fields,rank,workflow-rebind,refusals,test-support}.ts`, `fixtures/harness.ts`, `rules/{index,types}.ts`.
+- `packages/domain`: 31 of 41 files, including `entity-state.ts`, `ticket-state.ts` (the reducer — used by every
+  probe, not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts`, `ist-day.ts`,
+  `doc-*.ts`, `simple-kanban.ts`, `stream-frames.ts`, `read-models.ts`, `notification*.ts`, `preferences.ts`.
+- `packages/sync-client`: `replica/replica.ts` (1,312 lines), `storage/*`, `engine/sync-engine.ts` outside the
+  flush loop (bootstrap, subscribe, reconcile, `stall`).
+- `packages/mcp-server`: `device-login.ts`, `lazy-session.ts`, `login-prompt.ts`, `main.ts`, `config.ts`.
+- `packages/app-core/src/online/`: `mappers.ts` outside `:903-1001` (≈2,350 lines), `stream.ts`, `http.ts`
+  (grep only), `founding.ts`, `invites.ts`, `my-invitations.ts`, `notification-preferences.ts`,
+  `notifications.ts`; `replica/replica-data-source.ts` outside `:1388-1408`.
+- `apps/server/src`: 12 of 19 route modules not opened beyond a grep (`attention`, `auth-methods`, `board`,
+  `events`, `mcp-tokens`, `my-invitations`, `my-work`, `notification-preferences`, `preferences`, `search`,
+  `ticket-history`, `workspaces`); projections other than the three named; `read/` other than the two named;
+  `sync/{contest-coherence,contests-route,snapshot-*,stream-seq,sync-routes,ledger-deps}.ts`; `ledger/*`;
+  `ops/*`; `seed/*`; `auth/*` other than `auth.ts`; `tools/{sweep-invite-tokens,sweep-notifications,
+  sweep-user-preferences,verify-projections}.ts`; `visibility/{grant-backfill,rollup,visible-events-for,
+  visible-tickets}.ts` (rollup opened at `:258-266` only); `alerts/`, `workspaces/`.
+- **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`, no `apps/mobile`, no
+  `apps/desktop`.**
+- **No full server suite run**, deliberately (rules §4); every measurement is a single probe file, so
+  "the suite stays green with X mutated" is a sentence this report never says — exec 3 owns those.
+- **Migrations:** numbering and the dev DB's applied set (E6-7, Appendix E) only; no migration's SQL was read for
+  correctness, no `down` was run.
+- **The 18-site soft-delete sweep** — exec 3 §7.1 stands; I did not re-run it. I found predicate-**absent** view
+  statements instead (E6-11's walk), which that sweep cannot see by construction.
+- **Concurrency under real interleaving** (two clients racing the same entity) — reasoned from the lock order,
+  not exercised.
+- Time: this report was written between 09:42 and the phase-1 boundary; the reaching stopped where the clock
+  did, not where the universe ended.
+
 
 ---
 
@@ -899,6 +966,17 @@ the table.
 ---
 
 ## 8. COUNT OF FINDINGS BY SEVERITY — members named
+
+| severity | count | members |
+|---|---|---|
+| Critical | **0** | — |
+| Important | **9** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12 |
+| Minor | **3** | E6-6, E6-7, E6-11 |
+| **total** | **12** | E6-1 … E6-12, no gaps in the numbering |
+| unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
+
+Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
+commands the judge can re-run in under a minute each.
 
 ---
 
