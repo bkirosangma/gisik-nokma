@@ -24,3 +24,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E2-53 | done | 823dfc31 | editor-refusals.test.ts (12.412) |
 | T-E4-22 | done | 51ba5a47 | board-row-a11y.test.ts (13.1187) |
 | T-P28 | done | a45c5e95 | pressable-a11y-sweep.test.ts (13.1188) |
+| T-P30 | done | 41869c7d | generate-editor-html.test.ts (12.413, 12.414, 12.415) |
