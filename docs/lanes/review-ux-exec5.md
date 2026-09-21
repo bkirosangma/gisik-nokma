@@ -1611,6 +1611,35 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   `archived` — and E5-34 is what the bar does on that page), `E2-39` (`workflow-builder-screen.tsx:72`
   `listMembers().catch(() => [])`), `E2-40` (`rule-engine/src/rules/require-field.ts:9` reads `input.ticket.fields[rule.field]`, never the payload — opened). **No
   falsifying measurement found in any of them.**
+- **The two refutation files already pushed (read 12:42 IST):** `exec2/review-ux-r2:docs/lanes/review-refutations-exec2.md`
+  — *"THIS FILE CONTAINS NO REFUTATION"*; it opened E5-1, 2, 3, 4, 6, 7, 12, 13, 17, 21 against the lines and records each
+  as holding (E5-21 *"CORRECTED MY OWN E2-42"*). `exec6/review-functionality:docs/lanes/review-refutations-exec6.md` —
+  E5-13 *"Valid"*, E5-24 *"Both stand; independent duplicates"*; no refutations filed. **Nothing of mine is refuted, so
+  nothing is withdrawn.**
+
+### 6.7 Where this lane would DEFEND — the expected attack on each exposed finding, answered in advance
+
+- **E5-2 / E5-6 / E5-8 / E5-11 / E5-16 / E5-35** (category 3) — *"the divergence is recorded, so it is ruled."* Each
+  cites the record (WIRE GAP, "unbuilt door", "render-only", "no wire fields") and the common brief's sentence that
+  a record of a shortcut is not a ruling; each names the search that found no ruling.
+- **E5-9** — *"3,943 px is one ticket."* Scoped in the finding: the number is `CCSO-3`'s; the claim is the slot's
+  position relative to a scrolling footer, which is structural (`:1961` under the tabs, `:2612` at the end of the
+  body), and the ruling it argues against rests on the refusal being *seen*.
+- **E5-13** (Critical) — *"needs a failed read first."* Yes; the second reproduction (signed-out `/account`) shows
+  the arm is reached with no injection at all, and `exec2-V2` (accepted Critical) is the same class.
+- **E5-20** — *"you never pressed Escape."* Said in the finding; the mechanism is two `document` listeners with one
+  guard whose precondition the sibling never sets, and `16.86` proves the guard is real.
+- **E5-21 / E5-26** — *"the manual says both apps are early."* Yes; the finding is that it flags the wrong danger,
+  and the sentence at `:365` sends people to the phone for the one act the phone cannot complete.
+- **E5-25** — *"a 401 IS a transport-class failure."* The product's own file says otherwise: `expired-session.tsx` is
+  *"the ONE author of 'a 401 is not a refusal, it is a session that ended'"*, and it classifies reads only.
+- **E5-31** — *"Account is a legitimate global route."* For a session; the arm renders it only when `user === null`,
+  and the legal bar's sibling arm chose Sign in.
+- **E5-37** — *"you did not paint it."* Two independent docblocks establish the population, one *"confirmed in the
+  database"*; the operator is `??` on a value the product itself says is `''`.
+- **E5-38** (category 2, argued) — *"placeholders are deliberate (13.251)."* Not disputed; what is disputed is
+  hiding the draft status, and the page's own text defeats the reason given for hiding it.
+
 - Nothing I measured contradicts a landed exec 2 finding. **I have no refutation to file at this time**; if I find one
   in the remaining window it goes to `docs/lanes/review-refutations-exec5.md`.
 
