@@ -1740,6 +1740,10 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
   read.error === null`. So a deep link to a soft-deleted ticket (after the 15-s undo lapses) or to one the viewer may
   not see is a spinner that never stops. **I missed it and learned of it from exec 4's pushed report; I am not filing
   it**, on the same rule exec 2 applied to my E5-8 — filing after reading cannot be separated from copying.
+- exec 4's `E4-34` (a guest's five ticket-type rows keep the accessible name `Edit <type>` under the *"look, not
+  touch"* banner — `ticket-type-list-screen.tsx`, the row-as-door `aria-label`) — **checked and it HOLDS**, and it is
+  in MY permissions-as-experienced class: I read the banner (§6.4b) and called the pattern done right without
+  reading the rows beneath it. Learned from their report; not filed.
 - Round-2 siblings noted for the judge, all concurrent and independently measured on both sides: E4-1/E5-3 (epic crumb),
   E4-18/E5-4 (blank option), E4-19/E5-8 (history slug), E6-1/E5-24c (help says cannot delete), E2-20/E5-15,
   E2-22/E5-28, E2-23·E2-24/E5-13 (theirs: refused save + failed revert; mine: failed read → guessed PUT, captured),
