@@ -952,7 +952,8 @@ ticketRead.key ?? ticketRead.title;`, with `:1794` noting *"#595 shipped the com
 (the Delete PR, 13:17 IST) wrote *"has no ticket key"*, and the crumb's key composition shipped in `#595` after
 that. So the product now has two human names for a ticket in one component and uses the prototype's one for the
 crumb and the other for the toast, while the docblock says the first does not exist. The prototype's toast
-(export `Gisik Nokma - Desktop.dc.html`, sha `3d142d46`) names the key. Category 2 with a reason that no longer
+(export `Gisik Nokma - Desktop.dc.html`, sha `3d142d46`, `:3798`: `self.toast(sheet.id + " deleted \u00b7 its history is
+retained", …)`, where `sheet.id` is the seeded key — `id: "GN-1100"`, `"GN-1101"`, … in the same file) names the key. Category 2 with a reason that no longer
 holds; the docblock itself says *"Reversing this is one string in the host."*
 
 **WHAT WOULD HAVE BEEN BETTER.** Hand `onDeleted` the `key ?? title` the crumb already computes, and replace the
