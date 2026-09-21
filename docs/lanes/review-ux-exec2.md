@@ -1387,6 +1387,15 @@ must be corrected in the change that proves it wrong.
 each hit inspected for mount-vs-comment. Opened: `apps/desktop/src/app.tsx:18-26`;
 `apps/mobile/src/screens/board-screen.tsx:44-54`; `apps/mobile/src/screens/ticket-screen.tsx:72-80,106-114`.
 
+**HARDENED AFTER FILING — the direct counterexample search, because "mounted nowhere" is a global
+absence claim and one counterexample kills it.** My original measurement counted *mentions*; a component
+rendered through a spread or a renamed binding would have survived it. So I ran the specific test: a walk
+of **966 files** under `apps/` and `packages/` (tests included, for contrast), searching for the JSX render
+of each name (`<Name`, whitespace or `/` or `>` after it). **Every render found is in a test file:**
+`UnreadBadge` 13 (all in `app-core/test/inbox/*`), `SyncStatusBar` 6 (all in `app-core/test/*`),
+`ContestBanner` 6 (all in `app-core/test/*`), `ClockSkewBadge` 2 (both in `skew-and-status.test.tsx`),
+`SavedFiltersMenu` 1 (`saved-filters-menu.test.tsx:33`). **Zero production renders of any of the five.**
+The absence is now a searched-for counterexample rather than an inference from a count.
 **Source:** carried candidate (round-1 §2d). **Severity: Important** — as a product gap. ⚠ The `UnreadBadge`
 half is a **false record** as well: `inbox-nav-link.tsx:42-43` and `unread-badge.tsx:2` both state the badge
 *"still carries the count on `/inbox`"*, which is not true of any screen.
@@ -1524,6 +1533,12 @@ discarded. The sheet's own transport sentence is then unreachable by constructio
 sibling `submitTicketEvent` (`:1025-1030`, `setSubmitting(true)` + `finally`), and unlike
 `TicketEditorSlot`'s synchronously-set `submittingRef`. `TransitionDialog`'s own Move button is
 `disabled={blocked}` only.
+
+**HARDENED AFTER FILING.** "No latch" is an absence claim, so I searched for the counterexample rather than
+trusting the read: a scan of the function's whole body (`:711-746`) for `submitting`, `submittingRef`,
+`setSubmitting`, `useState` or `useRef` returns **0 lines**, and a scan of the file for its call site
+returns exactly one — `:2634` `onSubmit={(submission) => void submitTransition(submission)}`, the `void`
+that also discards the rejection.
 
 **WHY it is wrong.** Move is the product's primary transition action, and a dropped connection on it is
 **invisible**: no sentence, no state change, and the button still enabled — so the person cannot tell
