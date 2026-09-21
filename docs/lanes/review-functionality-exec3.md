@@ -2279,3 +2279,63 @@ read in full), `:53` and `:55` (the refine and its message), `:110` and `:139` (
 inside the same file and the same sweep:** five ❌ lines read at the same depth and **not filed** —
 `6.71` (:87), `6.125` (:203), `6.130` (:193), `6.53` (:95), `6.65` (:77) — each checked against the code and
 each still describing the product as it is. **Nine read, four stale, five live.**
+
+---
+
+## 29. `E3-24` (r2) — **IMPORTANT (claimed)** — Case 6.66's thesis is INVERTED: it says the parent placeholder ships "existence-versus-the-row, not existence-versus-title"; the shipped branch carries the title, and the table it says does not exist does
+
+**WHAT.** `test-cases/06-auth-visibility.md:82` — case **6.66**, still **❌**:
+
+> **The restricted-parent placeholder ships as existence-versus-the-row, not as
+> existence-versus-title.** … **No table on this branch stores a ticket title**: **`proj_tickets` does not
+> exist** (6.61), `proj_visibility`'s migration has no `title` column, and `proj_entity_heads` carries only
+> head positions. … So **the branch that ships is `{ kind: 'ticket', id, ticket }` versus
+> `{ kind: 'restricted', id }`**, and the plan's `expect(parent).not.toHaveProperty('title')` is
+> deliberately not written: **with no title anywhere in the system** it would pass for a reason unrelated
+> to the property it names.
+
+**WHY it is wrong — four particulars, each measured, and unlike the other four instances in this file
+every one of them is false:**
+
+| the case says | measured at this sha |
+|---|---|
+| "**`proj_tickets` does not exist** (6.61)" | It exists — `apps/server/migrations/1787961800000_proj-tickets.sql`, with `fields jsonb NOT NULL` at `:85` |
+| "**No table on this branch stores a ticket title**" | `proj_tickets.fields` does, and **its own column comment says so**: `COMMENT ON COLUMN proj_tickets.fields IS 'Every field claim on this ticket, each carrying its claimant and both clocks. **title arrives with creation.** …'` (`:101`) |
+| "the branch that ships is `{ kind: 'ticket', id, ticket }`" | **It carries a title.** `routes/tickets.ts:433-438` — `{ kind: 'ticket', id: parentRow.ticket_id, **title: titleOf(parentState)**, ticket: toTicketView(parentRow) }`. And the shipped type says the same: `ParentRef = \| { kind: 'ticket'; id: string; **title: string**; ticket: TicketView } \| …` |
+| "**with no title anywhere in the system** [the assertion] would pass for a reason unrelated to the property it names" | The premise is dead. **And the distinction the case says is missing IS the shipped design**: a visible parent answers with its title, a deleted or unreachable one answers `{ kind: 'restricted', id }` with no title (`tickets.ts:430-431`, `:441`, and the crumb walk's own arms). That is existence-versus-title, implemented |
+
+**THE THESIS IS BACKWARDS, not merely stale.** The case's headline is *"ships as
+existence-versus-the-row, not as existence-versus-title"*. **The product ships existence-versus-title** —
+which is the property the case was written to say was impossible — and the case has been telling every
+reader the opposite while sitting at ❌ with a *"Plan 3 Task 12 (the table), then whichever task re-states
+the contrast in its terms"* owner line.
+
+**WHY THIS ONE IS THE SHARPEST OF THE FIVE, stated plainly.** The other four are stale in a way a reader
+could survive: 6.82's half-landed capability, 6.84's answered question, 6.58's dead reproduction, 6.124's
+closed constraint — each leaves the reader with something true. **This one inverts a design decision.** A
+lane that picks up 6.66 sets out to make the parent placeholder expose existence-without-title, and the
+route already does it, so the work they do will either be a no-op or — worse, and this is the real risk — a
+"fix" that REMOVES the title from the visible branch to satisfy a case that says it should not be there.
+**An ❌ that misdescribes the direction of a deliberate design is the one shape of stale case that can
+actively cause harm rather than waste.**
+
+**THE FILE, AND THE RATE, which is now the datum.** This is the **fifth** stale ❌ line this report has
+measured in `06-auth-visibility.md`, after `E3-20` (6.82), `E3-21` (6.84), `E3-22` (6.58) and `E3-23`
+(6.124). **Of the ten ❌ lines in that file I have read at depth, five are stale and five hold** — the five
+that hold are `6.71`, `6.125`, `6.130`, `6.53`, `6.65`, each checked against the code and each still
+describing the product as it is. **`06-auth-visibility.md` is 20 ❌ lines, so roughly half the file's open
+declarations have not been re-read against the product by anyone.** The mechanism remains `E6-12`'s, and
+the rate is why I have filed five rather than one: this is not a stray line, it is a **systematically
+unmaintained artifact** and the count is the finding's strongest evidence.
+
+**SEVERITY: Important (claimed).** Same class as the other four, with the sharpest consequence: it is the
+only one whose staleness can cause a reader to REMOVE a shipped behaviour. Not Critical — nothing
+misbehaves today; the harm requires someone to act on it.
+
+**MEASUREMENT.** Lines opened: `06-auth-visibility.md:82` (full text); `routes/tickets.ts:433-438` (the
+shipped branch) and the `ParentRef` type above it; `1787961800000_proj-tickets.sql:85` and `:101` (the
+column and its comment); `read/ticket-cards.ts:206` (`titleOf` reading `row.fields['title']`). **Controls on
+the same file and sweep:** `6.71`, `6.125`, `6.130`, `6.53`, `6.65` read at the same depth and **not
+filed**; and `6.61` (`:73`) read and **not filed** because its observation still holds even though its
+stated reason ("that table does not exist") is dead — I am filing the four whose CLAIM is false, not every
+line whose reason has aged.
