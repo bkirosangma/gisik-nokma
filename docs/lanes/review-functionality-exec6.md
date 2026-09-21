@@ -455,7 +455,7 @@ create a migration is the plans' `pnpm --filter @gisik-nokma/server exec node-pg
 which stamps the wall clock. Measured at review time:
 
 ```
-node -e 'console.log(Date.now() < 1790000000000)'   → true   (now = 2026-09-21T04:5xZ; the window closes 14:13:20Z = 19:43 IST)
+node -e 'console.log(Date.now() < 1790000000000)'   → true   (now = 2026-09-21T04:46:45Z; the window closes 14:13:20Z = 19:43 IST)
 dev DB (54330, read-only): pgmigrations rows 32; last = 1790000000000_proj-ticket-comments @ 2026-09-21T02:50:18Z
 ```
 
