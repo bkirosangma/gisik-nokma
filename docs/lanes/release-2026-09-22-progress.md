@@ -74,3 +74,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E3-31 | done | 25b8d5b7 | case 6.57 struck: cross-project reparent refused at both doors (tickets-read 14 green) |
 | T-E3-33 | done | 571ef830 | proj-projects position paragraph corrected; index.ts had the true account (order 3 green) |
 | T-E3-34 | done | 4c0d25ae | assignment-fold docblock: the door refuses it (role-permission 48 green) |
+| T-E3-9 | done | e7d45076 | envelope field count named not counted; probe says eleven (domain 548 green) |
