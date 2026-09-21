@@ -583,3 +583,27 @@ test wrote, not that it shows the credential the CLI is holding.*
 > cover it. Declaring the new `textMuted` on `surfaceSunken` combination in `CONTRAST_PAIRS` was part
 > of the change: that list is self-declared enforcement, so a pair nobody lists is a pair nobody
 > checks, and shipping a new fg-on-bg without its row is the gap rather than a formality.
+
+## The revoke screen's READ: a failure is not an empty account — case `14.113` (E2-44, 2026-09-21)
+
+**The id is `14.113`, the next free ordinal in §14** (maximum in use `14.112`; measured with
+`git grep -hoE '14\.[0-9]{1,4}([^0-9]|$)'` over `test-cases/`, `docs/superpowers/plans/` and `docs/lanes/`,
+with `14.112` as a positive control in the same invocation — 1 hit, so the sweep can see ids at all).
+
+**The defect.** `McpTokensScreen`'s loader is `http.get('/v1/me/mcp-tokens').then(ok, () => setTokens([]))`.
+`[]` is not a neutral value here — it is exactly what the empty arm asserts over: *"No assistants are
+connected. One appears here after you approve it on the connect page."* A 500, a dropped connection or an
+unparseable body was therefore drawn as a confident statement about the person's account, on the one screen
+whose whole subject is which assistants still hold access, and the sentence it printed sent them to approve
+a second assistant they did not need.
+
+- **14.113** ✅ A rejected read renders a failure sentence and NEITHER the empty state nor the list —
+  asserted on the pair, because the absence is the half that matters: a screen rendering both would pass an
+  assertion on the sentence alone. A second case is the control, and it is what stops the fix from
+  over-reaching: an **answered** empty list still renders the empty state, so "no assistants" stays
+  reachable rather than being traded for a sentence that is never true. —
+  (`apps/web/test/mcp-tokens-page.test.tsx`)
+
+**The sentence carries the server's own words when it sent any** (`refusalText(cause.body)`, the same narrowing
+`revoke` and the rename path already use), and otherwise says what is true — that the read did not come back,
+that the list is unknown rather than empty, and the one recovery there is.
