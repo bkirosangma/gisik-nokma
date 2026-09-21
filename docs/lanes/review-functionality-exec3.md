@@ -3370,3 +3370,40 @@ least of mine — a deployment section, whose claims are about CI wiring and com
 and the wire. **The `test-cases/` ✅ set remains unasked and is the largest honestly-stated gap in this
 report**: 2,601 ids, of which I have enumerated every ❌ line in my concern's file and asked the ✅ set
 nothing, which is `E6-12`'s finding in the direction nobody has walked.
+
+---
+
+## 51. REACHING §13 — deployment and dogfooding, and with it every section of `Features.md`
+
+§50 named §13 as *"the ONE section never opened"*. **It is now reached, which means all fourteen sections have
+been opened and the audit's shape can be stated as a whole.** §13 is also the section least mine — its claims
+are about CI wiring, compose and the daemon rather than about the engine and the wire — which is why the depth
+here is four claims rather than §6's nine.
+
+| claim | measured |
+|---|---|
+| `:2489` — `backup-daemon-main.ts` *"calls `startScheduler` directly with **all five jobs**"* | **exact**: `scheduledJobs` (`:166-253`) holds five entries — `pg-dump`, `ledger-export`, `sweep-orphans`, `sweep-notifications`, `auto-close` — and `test/ops/backup-daemon-main.test.ts:63` asserts the same count in its describe name ✓ |
+| `:2872` — the responsive/contrast measurement is *"**two suites**, deliberately separate because the interesting pages sit on opposite sides of a sign-in"* | **holds**: `apps/web/e2e-viewport/` and `apps/web/e2e-stack/` are the pair, and the bullet names the first explicitly. **A third directory, `apps/web/e2e/`, exists** — and it is **not** part of this pair (older smoke/workflow-builder specs), so "two suites" is scoped correctly rather than under-counted ✓ |
+| `:2872` — the viewport suite *"runs the **five** signed-out routes across **three** real device viewports (390 / 768 / 1512)"* | **exact on both counts**: `viewports.ts`'s `UNAUTHED_ROUTES` has five entries (`/help`, `/privacy`, `/terms`, `/sign-in`, and a deliberate no-such-page probe), and `VIEWPORTS` declares widths **390, 768, 1512** — the same three the bullet names ✓ |
+| `:2908`-adjacent and §14's neighbours — the CI-facing claims | **read, not re-run.** §13's remaining ~500 lines are CI wiring, compose and runbook prose. **I did not re-run CI and did not open the workflows to verify them**, and `check:runbook` (green, §7.4) is the instrument that covers part of it |
+
+**THE AUDIT'S SHAPE, ALL FOURTEEN SECTIONS, WHICH IS WHAT THIS SECTION IS FOR.** Stated per section, because a
+summary cannot be checked by someone who was not here:
+
+| section | depth |
+|---|---|
+| **§4** (workflow engine & rule vocabulary) | **fully** — and it produced `E3-11` and `E3-12` in eighteen lines |
+| **§6** (server core) | 60 bullets read, **nine claims checked** — produced `E3-27` |
+| **§9** (editor, documents, attachments) | countable claims swept (one), **four checked** — all true; the section is descriptive |
+| **§11** (calendar & notifications) | **three checked** — all true |
+| **§12** (offline sync) | **two checked, one declined as another lane's ground** — produced `E3-28`; one claim recorded as read-but-UNVERIFIED |
+| **§13** (deployment) | **four checked** — all true; the remaining ~500 lines read, not verified |
+| **§14** (MCP server) | **three checked** — all true |
+| **§1, §2, §3, §5, §7, §8, §10** | **not opened** — seven sections |
+
+**SO "EVERY SECTION OPENED" IS TRUE AND "EVERY SECTION AUDITED" IS NOT, and the difference is the point of
+stating it this way.** Six sections were reached to a stated depth; seven were never opened at all; and the
+sections I did reach gave **three findings** (`E3-11`, `E3-12`, `E3-27`, `E3-28` across four — §4, §6, §12 two
+of them) against a much larger count of claims that hold exactly. **The yield is concentrated in sections whose
+bullets state counts and enumerations with nothing in code to check them against** — and the seven unopened
+sections are where anything of that shape would still be hiding.
