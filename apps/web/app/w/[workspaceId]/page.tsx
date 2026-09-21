@@ -625,6 +625,54 @@ function WorkspaceLinks({
   );
 }
 
+/**
+ * The id of the element the header's `<h1>` takes its name FROM — exec4 E4-5.
+ *
+ * ## The defect, and why the heading had to be named without moving the control
+ *
+ * The owner's ruling (2026-09-19: *"have the rename be there right on the header.
+ * THE CLICK TO RENAME."*) put a real `<button>` inside the `<h1>`, and the
+ * button's `aria-label` is `Rename {name}` so a page of identically-named
+ * controls can still be told apart. The consequence went unmeasured: in a REAL
+ * browser the heading inherits that name, so `/w/<id>`'s level-1 heading
+ * announced itself as `Rename Convenience Corner` — the heading named an ACTION
+ * while every other route's heading names its page (`/workspaces` →
+ * `Workspaces — …`, the board → `Shop operations`). Headings are the primary
+ * navigation structure for a screen-reader user, so this was filed IMPORTANT.
+ *
+ * **MEASURED, both shapes, in Chrome (not jsdom — see below).**
+ * `<h1><button aria-label="Rename X">X</button></h1>` renders as
+ * `heading "Rename Convenience Corner" level="1"`, reproducing the finding's own
+ * measurement. With `aria-labelledby` pointing at the `<span>` below, the same
+ * markup renders as `heading "Convenience Corner" level="1"` with
+ * `button "Rename Convenience Corner"` still its own node — the heading names
+ * the page and the control keeps its purpose.
+ *
+ * ## Why `aria-labelledby` rather than the finding's own remedy
+ *
+ * The reviewer proposed `<h1>Convenience Corner</h1>` beside an ADJACENT rename
+ * button. **That reverses a recorded owner ruling**, not just a comment: the
+ * catalogue (`test-cases/13-neomorphism-and-workspace-screens.md:2125`) records
+ * *"The separate `Rename` button is GONE … there is no longer a second control in
+ * this header"*, and case `13.969` pins it, one of its arms asserting the
+ * control's VISIBLE TEXT is the name. The reviewer's objection to naming the
+ * heading directly was that `<h1 aria-label="…">` *"hides the button's purpose"*
+ * — an objection `aria-labelledby` does not answer to, because it takes the
+ * name from the visible text and leaves the BUTTON's `aria-label` untouched.
+ * So this closes the measured defect and leaves the owner's shape standing; the
+ * two-element remedy is flagged for the owner rather than taken.
+ *
+ * ## jsdom does not reproduce this, and the package suite must not pretend it does
+ *
+ * `@testing-library`'s accessible-name computation answers `Convenience Corner`
+ * for the DEFECTIVE shape as well (measured; `dom-accessibility-api` diverges
+ * from Chrome on a labelled descendant of a name-from-content element). So no
+ * jsdom arm can witness this defect, and `workspace-home.test.tsx`'s case for it
+ * asserts the MECHANISM — that the heading's name source resolves to the visible
+ * workspace name — while the browser reading above is the outcome witness.
+ */
+const RENAME_NAME_ID = 'gn-workspace-home__name';
+
 function WorkspaceHome({
   workspace,
   busy,
@@ -753,11 +801,20 @@ function WorkspaceHome({
            * already focusable and already moved focus into the input; **that
            * property is preserved, not newly earned.**
            *
-           * The accessible name still carries the WORKSPACE (`Rename
+           * The BUTTON's accessible name still carries the WORKSPACE (`Rename
            * {name}`), for the reason the removed button's own comment gave: a
            * page of identically-named controls tells a screen-reader user
            * nothing about which one renames what. What the button SAYS visually
            * is the name itself, which is the point of the change.
+           *
+           * ⚠ **THE HEADING'S name is a DIFFERENT question and exec4 E4-5
+           * answered it**: the button's label reaches the `h1` in a real browser,
+           * so the page's level-1 heading announced itself as `Rename
+           * Convenience Corner`. `aria-labelledby` on the `h1`, pointing at the
+           * name span below, gives the heading the page's name while leaving the
+           * button's own label alone. `RENAME_NAME_ID` above carries the
+           * measurement and the reason the finding's own two-element remedy was
+           * not taken.
            */}
           {isAdmin && renaming ? (
             /* THE INPUT REPLACES THE NAME, IN PLACE — the owner's own words:
@@ -794,7 +851,7 @@ function WorkspaceHome({
               </Button>
             </form>
           ) : (
-            <h1 className="gn-page-title">
+            <h1 className="gn-page-title" aria-labelledby={isAdmin ? RENAME_NAME_ID : undefined}>
               {isAdmin ? (
                 <button
                   type="button"
@@ -806,7 +863,7 @@ function WorkspaceHome({
                     setRenaming(true);
                   }}
                 >
-                  {workspace.name}
+                  <span id={RENAME_NAME_ID}>{workspace.name}</span>
                 </button>
               ) : (
                 workspace.name

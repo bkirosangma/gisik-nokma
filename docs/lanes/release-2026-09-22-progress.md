@@ -5,3 +5,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | id | status | when / sha | note |
 |---|---|---|---|
 | B03 | claimed | 2026-09-21 18:42 | /Users/kiro/my_projects/gisik-nokma-ds1 |
+| T-E4-4 | done | 61e0e575 | 9.257 both composers named (editor slot) · 9.258 named through the app + dt Description (web) |
