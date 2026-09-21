@@ -389,7 +389,7 @@ GET /v1/me/work -> 200 … "contested":[{"ticketId":<the ticket>,"title":"first 
 ```
 
 The gate refuses the unknown ticket as *invisible* (`check-permission.ts:1048` runs before the engine, and
-`can-see.ts` answers unknown and invisible identically by design); `sync-service.ts:407-409` turns **every**
+`can-see.ts` answers unknown and invisible identically by design); `sync-service.ts:416-417` turns **every**
 refusal of a ticket-entity event on the sync door into a `claim.contested`; the outbox records the contest and
 clears the row (case 12.146). Net effect on the user's own screen: their second rename reverts, and **My Work shows
 an unresolved contest on their own ticket saying it is not visible to them**, filed two seconds before the ticket
@@ -417,7 +417,7 @@ And 12.144 should enqueue after a `recordFailure` and assert the batch is empty 
 **MEASUREMENT.** Appendix D (outbox, `packages/sync-client`, relative imports) and Appendix G (server doors,
 `apps/server`, shared test Postgres). Lines opened: `outbox.ts:333`, `:412`; `sync-engine.ts:845`, `:870`, `:897`,
 `:907`; `replica-data-source.ts:1404-1405`; `local-context.ts:126`; `check-permission.ts:1048`;
-`sync-service.ts:407-409`; `outbox.test.ts:119`, `:167`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
+`sync-service.ts:416-417`; `outbox.test.ts:119`, `:167`, `:201`, `:226`; `12-offline-sync-apps.md:905-907`.
 
 **SEVERITY: Important.** A user's edit reverts on their own screen and a false, unresolved contest appears against
 their own ticket, after a transient network error, on the headline offline path. Filed at Important rather than
