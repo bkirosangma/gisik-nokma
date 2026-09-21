@@ -314,7 +314,7 @@ and **ignores `marks` entirely**. Consequences, in the person's terms:
    *"renders a link as its text, not its href — the URL is never indexed"*. **A search decision has
    become a display decision, because one function serves both.**
 3. The description row in the same sheet renders the same kind of document **richly** — `editorSlot` is
-   `TicketEditorSlot` (`apps/web/.../page.tsx:2827`), a Tiptap `EditorContent` — so **the same document
+   `TicketEditorSlot` (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2827`), a Tiptap `EditorContent` — so **the same document
    type renders one way in the description and another way in the comment directly beneath it.**
 
 **WHAT WOULD HAVE BEEN BETTER.** Either render the thread through the read-only editor (as the
@@ -1211,6 +1211,12 @@ myself**. Status at this push:
 | workflow-builder: two screens stuck on "Loading…" for ever | ✅ **filed — `E2-20`** |
 | workflow-builder: rejected migration strands the editor | ✅ **filed — `E2-21`** |
 | workflow-builder: mapping dialog unmounted before the answer | ✅ **filed — `E2-22`** |
+| Passkeys "You have no passkeys yet." over a failed read | ✅ **filed — `E2-23`** |
+| Two account sections with no `error` prop + the unguarded revert read | ✅ **filed — `E2-24`** |
+| Five offline components mounted nowhere | ✅ **filed — `E2-25`** |
+| Single-row mark-read and its Undo fail silently | ✅ **filed — `E2-26`** |
+| Unrecognised sync status reports "Live" | ✅ **filed — `E2-27`** |
+| Bulk-close offline acceptance reported as "could not reach" | ✅ **filed — `E2-28`** |
 | `Dialog`: `aria-modal="true"` with no focus move, trap or return | ⏳ verifying (overlaps exec 1's `P8`, which the judge already ruled — see below) |
 | Comment carry-over across two different moves | ⏳ verifying |
 | Two `aria-modal` dialogs at once; one Escape closes both | ⏳ verifying |
@@ -1218,12 +1224,6 @@ myself**. Status at this push:
 | Sheet read arms carry no role | ⏳ verifying (partly covered by my own `E2-15`) |
 | `typeId`/`parentId`/`mode`/`toStateId` seeded once | ⏳ verifying |
 | Draft never cleared across a close | ⏳ verifying |
-| Passkeys "You have no passkeys yet." over a failed read | ⏳ verifying |
-| Two account sections with no `error` prop | ⏳ verifying |
-| Single-row mark-read and its Undo fail silently | ⏳ verifying |
-| Five offline components mounted nowhere | ⏳ verifying |
-| Unrecognised sync status reports "Live" | ⏳ verifying |
-| Bulk-close offline acceptance reported as "could not reach" | ⏳ verifying |
 | `M1`–`M9` (archived not disclosed; stale-data reload; no narrow rules; calendar throw; `aria-controls`; `AttachmentList`; history flattening; `PlainTextEditorSlot`; reopen seed) | ⏳ verifying |
 | `E2-20`'s two siblings from §2e (Move has no transport surface; partly-committed batch never reloads; Delete has no confirmation; the 15-second undo is the only way back; `if (submitting) return` cannot fire; `AttachmentListItem` has no caller) | ⏳ verifying |
 
@@ -1253,3 +1253,228 @@ not evidence.
 
 *executor 2 — UX, round 2. Phase 1 in progress. Branch `exec2/review-ux-r2`; pushed at each checkpoint.
 **No fix, no PR.***
+
+---
+
+# R2.7 — NEW FINDINGS, BATCH 2
+
+---
+
+### E2-23 (r2) — IMPORTANT · "You have no passkeys yet." is asserted over a read that failed
+
+**WHAT.** `apps/web/app/account/page.tsx:180` — `passkeyClient.list().then(setPasskeys, () => setPasskeys([]));`
+The rejection handler **collapses a failed read to an empty list**. The consumer then makes a claim about
+the account: `packages/app-core/src/account/passkeys-section.tsx:96-97`
+`{passkeys.length === 0 ? (<p>You have no passkeys yet.</p>) : …}`.
+
+**WHY it is wrong.** Two different facts — *this account has no passkeys* and *I could not find out* —
+are made one value, and the sentence drawn from it is about the person's **sign-in method**. A user with
+two enrolled passkeys who hits a failed or rate-limited list read is told, as a fact about their account,
+that they have none. That is alarming in a way a failed read is not: it invites them to re-enrol, and it
+undermines the one credential they were told to trust. The component already owns the correct arm — an
+`error` prop rendered as `role="alert"` at `:91-95` — and the collapse means the list failure **can never
+reach it**, while the add/remove failures do. The caller's own docblock names the collapse and defends it
+for a different reason (*"a no-op after touching a fingerprint sensor is indistinguishable from success"*,
+`:174-179`) — that reasoning is about a **write** the person just performed, and does not reach a passive
+list read.
+
+**WHAT WOULD HAVE BEEN BETTER.** Pass the failure as a fourth state so the section can say the list could
+not be read. The sibling on the same page already does exactly this: `sessions-section.tsx` renders the
+hedged *"No signed-in devices to show."* for the same input — two account lists, one hedged and one
+asserting.
+
+**MEASUREMENT.** Opened: `apps/web/app/account/page.tsx:174-181`; `passkeys-section.tsx:88-98` (the
+`error` arm at `:91-95` and the asserting empty arm at `:96-97`).
+
+**Source:** carried candidate (round-1 §2d). **Severity: Important** — agree with the sweep.
+
+---
+
+### E2-24 (r2) — IMPORTANT · A notification preference can end up showing a state the server never recorded, and no account section can say so
+
+**WHAT — two linked defects on `/account`.**
+
+**(a) The revert read has no rejection handler, so the optimistic flip can stand.**
+`apps/web/app/account/page.tsx:215-232`:
+```
+setPrefs(next);                                    // optimistic
+void notificationPreferences.save(next).catch(() => {
+  notificationPreferences.load().then(setPrefs);   // :228 — no rejection handler
+});
+```
+If the save is **refused** and the revert load **also fails**, `setPrefs` is never called again: the toggle
+stays visibly flipped on a preference the server never recorded, and the rejection at `:228` is unhandled.
+
+**(b) Neither section can express a refusal, so nothing could report it anyway.** `SessionsSectionProps`
+(`sessions-section.tsx:5-8`) and `NotificationsSectionProps` (`notifications-section.tsx:12-15`) have **no
+`error` field**, against `PasskeysSection`, which has one. So a section that wanted to say "that did not
+save" has no prop to say it through.
+The consequence is live on the adjacent control: `revokeSession` at `account/page.tsx:101-102` does
+`await sessionsClient.revoke(token);` and **reads neither the result nor a failure** — a refused "Sign out"
+re-lists unchanged and says nothing, because the section it belongs to has no error surface to receive one.
+
+**WHY it is wrong.** (a) is the brief's most expensive shape in its purest form: **the client showing a
+state the server declined**, with the truth reachable only by a reader who reloads and compares. A person
+who muted a notification kind believes they will not be notified. (b) is why neither section can be fixed
+by the page alone — the refusal has nowhere to land. The page holds the correct pattern 90 lines up, in
+`PasskeysSection`'s `role="alert"`.
+
+**WHAT WOULD HAVE BEEN BETTER.** (a) Give `:228`'s `load()` a rejection handler that at minimum stops the
+silence, and treat "save refused" as a rendered outcome rather than only a revert trigger. (b) Add the
+`error` prop to both section types — it is the same one-prop shape `PasskeysSection` already carries.
+
+**MEASUREMENT.** Opened: `account/page.tsx:94-105` (`revokeSession`, and where the result goes) and
+`:215-232` (`toggleKind`, both the optimistic write and the unguarded revert);
+`sessions-section.tsx:5-8`; `notifications-section.tsx:12-15`; `passkeys-section.tsx:9` for the contrast.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Important.** I am filing (a) and (b) as one
+finding because (b) is the reason (a) has no remedy; the sweep filed them as two.
+
+---
+
+### E2-25 (r2) — IMPORTANT · Five components written for offline and degraded states reach no screen, and the two shells that do show those states hand-copy them
+
+**WHAT.** Five exported components — the entire offline/degraded vocabulary this product built — are
+**mounted nowhere**, while two shells re-implement two of them by hand.
+
+| component | declaration · export | real mounts, outside tests |
+|---|---|---|
+| `UnreadBadge` | `inbox/unread-badge.tsx:65` · `index.ts:244` | **none** — 6 hits, all its own file, the barrel, and **comments** (`inbox-nav-link.tsx:42,119`, `online/notifications.ts:7`) |
+| `ClockSkewBadge` | `history/clock-skew-badge.tsx:36` · `index.ts:312` | **none** — 2 hits total |
+| `SavedFiltersMenu` | `preferences/saved-filters-menu.tsx:64` · `index.ts:267-268` | **none** — 5 hits, none a mount |
+| `SyncStatusBar` | `sync/sync-status-bar.tsx:68` · `index.ts:313` | **none on web** — mobile calls its *helper* (`board-screen.tsx:52`), not the component |
+| `ContestBanner` | `contests/contest-banner.tsx:25` · `index.ts:310` | **none on web** — mobile re-implements the block (`ticket-screen.tsx:107-114`) |
+
+**And the comment that keeps it that way is now false.** `apps/desktop/src/app.tsx:22-25` reads:
+
+> *"DEVIATION beyond the plan text: **SyncStatusBar and ContestBanner do not exist in
+> @gisik-nokma/app-core yet** (Plan 6 has not landed them) — the sync status is rendered here as plain
+> inline markup instead of a component that does not exist."*
+
+Both exist today — `sync/sync-status-bar.tsx` and `contests/contest-banner.tsx`, both exported from the
+barrel — so the justification for desktop's inline copy has expired and nothing re-checks it. Mobile does
+the same thing and says why: `ticket-screen.tsx:110` *"app-core's real ContestBanner uses the same
+function"*, and `board-screen.tsx:47-50` records that the `failed` wording is *"matched here by hand"*.
+
+**WHY it is wrong.** A whole class of state — offline, catching-up, revoked, clock-skewed, contested,
+unread-badged — is **written and unreachable**, so a person on the web meets none of it; and where a shell
+does show one, it shows a **hand-copy of wording that changes elsewhere**. The hand-copies are the part
+that compounds: `board-screen.tsx` says its `failed` wording is matched by hand precisely because the web
+component inlines it, which means any wording change now has to be made in a place with no test connecting
+it to the original. And the false comment on desktop is a licence the next reader will act on.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either mount the five where their states arise (the inbox badge is the
+cheapest and most visible — the nav already has the slot), or delete them and let the surviving spelling be
+the only one. A component that cannot be honoured is not carried "in case" — the repo states that rule for
+controls (`ticket-sheet.tsx:2596-2597`) and it applies unchanged to a component. And the desktop comment
+must be corrected in the change that proves it wrong.
+
+**MEASUREMENT.** 515 non-test source files under `apps/` and `packages/` walked; per-name hit lists above,
+each hit inspected for mount-vs-comment. Opened: `apps/desktop/src/app.tsx:18-26`;
+`apps/mobile/src/screens/board-screen.tsx:44-54`; `apps/mobile/src/screens/ticket-screen.tsx:72-80,106-114`.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Important** — as a product gap. ⚠ The `UnreadBadge`
+half is a **false record** as well: `inbox-nav-link.tsx:42-43` and `unread-badge.tsx:2` both state the badge
+*"still carries the count on `/inbox`"*, which is not true of any screen.
+
+---
+
+### E2-26 (r2) — MINOR · A single notification's read-state is reverted silently, where its bulk sibling speaks
+
+**WHAT.** `apps/web/app/inbox/page.tsx:269-279` — `markRead` flips the row optimistically and then
+`void gateway.markRead(id).catch(() => loadFirstPage());`. The undo path is the same:
+`:344-357`, `void gateway.setRead(ids, false).catch(() => loadFirstPage());`.
+The **bulk** path 60 lines up classifies the failure and says so: `:335-340`
+```
+.catch((cause) => { setBulkFailure(cause instanceof HttpError && cause.status === 400 ? BULK_REFUSED_COPY : BULK_UNREACHED_COPY); loadFirstPage(); });
+```
+
+**WHY it is wrong.** The reload is right and deliberate — the comment at `:331-334` argues it for both arms
+(*"the optimistic flip has to be reverted by the truth either way"*). What differs is the **silence**: on
+the single-row path a refused write means the row the person just watched turn read turns back, with no
+sentence anywhere. That is indistinguishable from the app losing their click, and it is the *more common*
+interaction of the two. The file's own docblock argues that a refusal must be rendered; the argument does
+not stop applying because the action was small.
+
+**WHAT WOULD HAVE BEEN BETTER.** The single-row catch reuses the same two sentences the bulk path already
+has — one fact, one vocabulary, no new copy.
+
+**MEASUREMENT.** Opened: `inbox/page.tsx:266-279` (the optimistic flip and the silent catch);
+`:330-341` (the speaking sibling); `:343-358` (the undo, same shape).
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor.** The sweep rated it Important; I lower it
+because the restored state is **correct** — only the explanation is missing.
+
+---
+
+### E2-27 (r2) — MINOR · An unrecognised sync status is reported as "Live", the healthiest word available
+
+**WHAT.** `packages/app-core/src/sync/sync-status-bar.tsx:11-17`:
+```
+export function syncStatusLabel(status: string, queued: number): string {
+  const claims = queued === 1 ? '1 claim waiting to send' : `${queued} claims waiting to send`;
+  if (status === 'offline') … ; if (status === 'catching-up') … ; if (status === 'connecting') … ;
+  return queued === 0 ? 'Live' : claims;
+}
+```
+`status` is deliberately widened to `string` so a host can pass `query.syncStatus` verbatim.
+
+**WHY it is wrong — and the docblock is the evidence.** `:5-9` defends the fallthrough: *"an unrecognised
+value falls through to the live sentence rather than throwing, which is the honest failure here: the queue
+depth is still true even when the connection word is not one this build knows."* The premise is right about
+the **queue** and wrong about what the arm **returns**: with `queued === 0` it returns **`'Live'`** — a
+*liveness* claim, not a queue claim. Every other arm refuses to invent a policy for a code it does not
+know; this one invents the most optimistic one, which is the direction where being wrong is not
+recoverable (a person who is told they are live will not check). The docblock's own reasoning points at the
+honest fallback: return the queue sentence, which is the part that is true.
+
+**WHAT WOULD HAVE BEEN BETTER.** Return the queue-only sentence on the unknown arm, or the status string
+verbatim (as `board-screen.tsx` already does for `failed`).
+
+**MEASUREMENT.** Opened: `sync-status-bar.tsx:1-17` (the docblock and the whole function);
+`apps/mobile/src/screens/board-screen.tsx:44-54` for the live call site (`syncStatusLabel(props.status,
+props.queued)`), which is where an unknown value would reach a person today.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor** — no case in the product passes an
+unrecognised status today; the defect is what the arm would do when one does.
+
+---
+
+### E2-28 (r2) — MINOR · A bulk close that was ACCEPTED and queued is reported as "We could not reach the server"
+
+**WHAT.** `packages/app-core/src/views/bulk-close-dialog.tsx:230-233` catches **every**
+rejection into one sentence:
+```
+} catch (cause) {
+  const message = cause instanceof Error ? cause.message : String(cause);
+  setTransportError(`We could not reach the server for this close — ${message}`);
+}
+```
+The replica's offline path throws a different fact entirely —
+`replica/replica-data-source.ts:1406` `if (results.some((r) => r.status === 'pending')) throw new
+OfflineAcceptError(results);` — whose message (`:123-136`) begins
+`` `${queued.length} claim(s) accepted for now an…` ``.
+
+**WHY it is wrong.** The rendered sentence is **self-contradictory**: it opens *"We could not reach the
+server"* and then appends a message saying the claims **were accepted for now and queued on this device**.
+The two facts Ruling 27/33 exists to keep apart — *never reached* and *accepted for later* — are one
+sentence, and the false half is the prefix the reader sees first. The templates are already distinct
+(`BULK_REFUSED_COPY` / `BULK_UNREACHED_COPY` exist in this file for the ingest arm), so the vocabulary is
+present; only this catch does not use it.
+
+**WHAT WOULD HAVE BEEN BETTER.** Classify `OfflineAcceptError` before the generic message, with its own
+sentence saying the closes are queued and will send when the device reconnects — and, if that state is
+reachable with the row list unchanged, say whether pressing again is safe. ⚠ **That last clause is
+reasoned, not measured:** I read `:224` (`setClosedIds` runs only on the non-throwing path, so a queued
+close leaves `closedIds` empty and the tickets still offered) but I did **not** trace what the dialog does
+with an already-queued ticket on a second press, so I am **not** alleging a duplicate. The copy
+contradiction is the finding.
+
+**MEASUREMENT.** Opened: `bulk-close-dialog.tsx:224-239`; `replica/replica-data-source.ts:95,123-136,1385,1406`.
+
+**Source:** carried candidate (round-1 §2d). **Severity: Minor.** The true half of the sentence is present,
+so the person is not left without information — they are left with a contradiction.
+
+---
+
+*Batch 2 filed. Running total of round-2 new findings: `E2-20`–`E2-28` (9) — 4 Important, 5 Minor.*
