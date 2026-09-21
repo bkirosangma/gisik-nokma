@@ -12,7 +12,7 @@
 | **I1** | CRITICAL, 14 days | **CRITICAL, re-measured at 15 days** | a day passed and a Critical carries 15 points of downside; re-ran the three commands. Unchanged. |
 | **P1** | IMPORTANT, seven controls | **IMPORTANT, SIX controls** ⚠ **r2 CORRECTION** | the `<Link>`-widened sweep's seventh member (`gn-nav__signin`) is **styled by `.gn-nav a`** — a DESCENDANT rule from an ancestor, which a sweep testing an element's own classes cannot see. Withdrawn; the other six re-checked against every `a`/`button` descendant selector in the three stylesheets and standing. |
 | **P15** | — | **MINOR — filed IMPORTANT, corrected DOWN in the same round** | filed as *"the repo's prototype copy is a broken camelCase transform whose icons do not draw"*. **The mechanism is false**: `support.js:365-370`/`:422-423` show `sc-camel-*` is the prototype runtime's own reversible encoding, so the copy renders. What survives is Minor and measured — a constant **one-line offset** against the export, with **71 files citing the copy by line**. **The round-2 brief hands all six lanes the same false inference.** |
-| **P16–P23** | — | **8 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important). |
+| **P16–P24** | — | **9 NEW findings** | the truncating-scanner negative assertion (P16, Important); the heading-level skip (P17, Minor); navigation announces nothing (P18, Important); the unnamed `tablist` (P19, Important); the calendar's missing grid semantics (P20, Minor); the description editor's unnamed content area (P21, Important); two unnamed `role="menu"` elements, one with a named twin (P22, Important); the searchable Select's removed focus outline (P23, Important); an undeclared painted pair at 3.84:1 (P24, Important). |
 | **§5** | — | **3 new clean-check rows** | every `<button>` named; every direct `.gn-button` sets `type`; the three style axes. |
 
 **Findings the round-1 report carried are otherwise unchanged and still stand**, re-checked for validity under §3 before anything new was added.
@@ -601,6 +601,26 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** A ring for the control, in the place the product already uses for this exact shape: `.gn-select__trigger--searchable:focus-within { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }` — `:focus-within` on the **div** is what matches when the inner input has focus, and `outline-offset: 1px` is `.gn-field__input`'s own value so the two branches look identical. One rule; and it is the same move `globals.css:1160-1164` already makes.
 
+### P24 — **IMPORTANT** ⚠ **r2 NEW** — A painted text colour measures 3.84:1 at 12.8px, and it is UNDECLARED, so the gate cannot see it
+
+**WHAT.** `ui.css:2736-2743` sets `.ticket-type-editor__issues { background: var(--gn-surface-sunken); font-size: 0.8rem; color: var(--gn-danger); }`. In `hig` and `minimal`, **both themes**, `danger` on `surfaceSunken` measures **3.84:1** (`hig/light`) and **4.19:1** (`hig/dark`). The text is **12.8px** — far below the large-text exemption — so **WCAG 2.2 §1.4.3 *Contrast (Minimum)* requires 4.5:1, and 3.84 does not meet it.** And the pair is **not in `CONTRAST_PAIRS`**, so `tokens.test.ts`'s enforcement loop never evaluates it.
+
+**MEASUREMENT — and this one needed a WRONG first answer thrown away, which is part of the finding.**
+- **The undeclared-pair sweep.** Every rule in `ui.css` that sets both `color: var(…)` and `background: var(…)` from tokens was extracted — **46 such rules against 34 declared pairs** — and 14 of them name a pair with no `CONTRAST_PAIRS` row.
+- **⚠ MY FIRST RATIO CALCULATION WAS MEANINGLESS AND I THREW IT OUT.** It treated the fills as opaque and reported `textMuted on fillTertiary` at **1.03:1** — near-invisible text in a shipped, reviewed product, which is not a plausible reading. **The premise was wrong: `fillTertiary` is `#273a631c`, an 8-digit ALPHA overlay**, not a colour. Compositing it over its surface changes the answer completely.
+- **Recomputed with alpha compositing, control `#000000` on `#ffffff` → 21.00 exactly.** Five of the six undeclared pairs I had flagged pass comfortably — `textAccent on fillTertiary` **4.54**, `textMuted on fillTertiary` **7.44**, `text on fillQuaternary` **9.32**, `text on fillSecondary` **7.06**, `text on fillTertiary` **8.75**. **`surfaceSunken` is opaque (`#e4d8cc`), so the composite is a no-op for this pair** and 3.84 stands.
+- **The declaration check.** `grep -nE "fg: '(danger|dangerText)'|bg: '(danger|dangerText)'"` over `tokens.ts` returns **exactly one row: `{ fg: 'dangerText', bg: 'danger', minimum: 4.5 }`** (`:1225`) — that is `dangerText` **on** `danger`, a filled badge. **There is no row for `danger` as a foreground on any surface.**
+- **The values, all six combinations:** `surfaceSunken` `#e4d8cc` (hig light) / `#2a3560` (hig dark) / `#f1eae3` (neo light) / `#1b2340` (neo dark); `danger` `#d70015` (hig, both themes) / `#9e2a20` (neo light) / `#ff6961` (neo dark). `hig` and `minimal` resolve identically.
+- **The element is reachable**, not dead: rendered by `packages/app-core/src/workflow-builder/ticket-types/ticket-type-editor-screen.tsx:373` as a `<ul>` of issues — the authoring screen's validation list, which is exactly the state a person is in when they need to read it.
+
+**WHY IT IS WRONG — and why the mechanism matters more than the instance.** Two things are true at once, and the second is the one worth keeping:
+1. **A real Level AA contrast failure on a reachable surface**, in two of three styles and both themes, on text small enough that no exemption applies.
+2. **The regime is one-directional, and this is the exact gap the repository documented.** `tokens.test.ts:88-101` loops `STYLE_NAMES × THEME_NAMES × CONTRAST_PAIRS` and asserts every **declared** pair meets its minimum — 34 pairs, all styles, all themes, a genuinely strong check. **Nothing asserts that the pairs the stylesheets actually PAINT are declared.** `tokens.ts:167` says a role without a declared pair is *"a colour with no guarantee"*, and `design-system/MASTER.md` §R1 records the consequence in as many words: adopting HIG separators verbatim *"would have ratified that defect… with the build still green, **because `CONTRAST_PAIRS` declares no `border` pair at all**"* — the same mechanism, which is how **17 of 24** bordered classes sat under 3:1 unnoticed. `border` and `focusRing` were added (`tokens.ts:1361-1363`), closing that *instance*. **This is a new instance of the same class, and the sweep above says it is the only one currently painting a failing ratio.**
+
+**⚠ WHAT I DID NOT DO, STATED SO THE CLAIM IS NOT INFLATED.** I did not render the element in a browser. The ratio is computed from `colorOf` for all six style/theme combinations with a control that reproduces 21.00 exactly, and the alpha handling is verified against real alpha values — but **a painted confirmation is not in this finding**, and the two premises it rests on are worth naming: that `surfaceSunken` is the effective backdrop (it is opaque and set as this rule's own `background`, which is the strong case), and that no ancestor paints over it.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either raise `danger`'s darkness in `hig`/`minimal`, or use `dangerText` on the sunken surface, or take the element off `surfaceSunken` — and **add `{ fg: 'danger', bg: 'surfaceSunken', minimum: 4.5 }` to `CONTRAST_PAIRS` either way**, so the pair is checked rather than merely fixed. The second half is the one that generalises: a sweep in the shape the extraction used here — every rule painting a token colour on a token surface, each pair required to appear in `CONTRAST_PAIRS` — is a **gate-able** check (it reads two files and needs no browser), and it is the instrument this regime has never had.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -657,7 +677,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 **CRITICAL — 1**
 - `I1` no browser-based UI instrument has executed anywhere since 2026-09-06, and the local gate structurally cannot run one
 
-**IMPORTANT — 13**
+**IMPORTANT — 14**
 - `I2` the `e2e-stack` contrast roster records a defect fixed eight hours later, with no provenance
 - `I3` `DENSE_IN_LIST`'s stated reason for excluding `.gn-my-work__title` is falsified by its own docblock
 - `P1` six interactive controls styled by no rule of their own (raw UA chrome) **(filed as seven; the seventh was refuted by an ancestor rule and withdrawn)**
@@ -668,6 +688,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P21` ⚠ r2 — the description editor's content area has no role and no accessible name
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
+- `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
 - `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
 - `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
 - `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
@@ -687,7 +708,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
 
-**Total 27.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 28.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
