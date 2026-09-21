@@ -22,7 +22,7 @@ a measurement it lacks is added, and where that happens the finding says so.
 
 ## 0. THE ONE-LINE ANSWER
 
-**No Critical claimed. Nineteen findings — thirteen Important, six Minor — every one measured through a door the
+**No Critical claimed. Twenty findings — thirteen Important, seven Minor — every one measured through a door the
 product ships, and the two I would put first are on the security surface:** a cookie plus a foreign `Origin` is
 refused on `POST /v1/events` and served the victim's whole visible ledger on `/v1/stream` (E6-15), and an MCP
 token can approve its own successor, so revoking it does not revoke it (E6-16).
@@ -39,7 +39,7 @@ The second shape is **a record that describes a world the product has left**: th
 (E6-1); three ❌ cases declaring guest admissions that closed weeks ago (E6-12); a "named, not decided" residual
 whose own commit decided it (E6-11); a stale "no ticket key" premise beside a crumb that reads the key (E6-14);
 and a release-gate instrument that reports drift on a correct database after an ordinary admin act, recorded as an
-unassigned open question since before its trigger shipped (E6-13). Two instrument gaps and a due date that only has to look like one close the list (E6-6, E6-7, E6-19).
+unassigned open question since before its trigger shipped (E6-13). Two instrument gaps, a due date that only has to look like one, and a blank-name rule applied to half its subjects close the list (E6-6, E6-7, E6-19, E6-20).
 
 The round-1 lane's coverage boundary was the map: every Important finding is in a package or on a path it said
 it did not reach, and none re-files anything it found. Two read sweeps — every read door as a non-member and as
@@ -1269,6 +1269,39 @@ door already has. Two lines in `ist-day.ts`, shared by the two checks and the tw
 **SEVERITY: Minor.** Data quality with a user-visible sentence; no loss, no leak, and the client picker presumably
 never sends one — the API and MCP doors do.
 
+### E6-20 — MINOR — Ruling P15 ("a name of only spaces names nothing") closed titles, workspace, project and invite names — and left workflow, state, ticket-type, field and option names at `min(1)`, so a single space is a valid board column
+
+**WHAT.** Through the door, with the P15 controls firing in the same run (Appendix X; 1 file / 1 test passed):
+
+```
+workflow.defined name " ", state names " " and "\t"           -> committed
+ticket-type.defined name " ", field name " ", option " "       -> committed
+control: project.created name " "  -> invalid (… must not be blank — a name of only spaces names nothing)
+control: ticket.created title " "  -> invalid (… must not be blank — a title of only spaces names nothing)
+GET workflows -> 200; a workflow named " " is listed: true      GET ticket-types -> 200; a type named " " is listed: true
+```
+
+**WHY it is wrong.** The rule is written down and applied by name: `domain/src/events/ticket-events.ts:18-24`
+(*"Ruling P15. `.min(1)` alone admits `'   '`, and a title of only spaces titles nothing while looking like a
+title everywhere it is displayed — a board, a breadcrumb, a notification …"*) and `membership.ts:39-42`
+(`displayName`, the same refinement, for workspace and project names) and `invites.ts:95` (address). The names
+that head a board column (`workflow.ts:8`, state `name`), a workflow (`:86`), a ticket type (`ticket-types.ts:96`),
+a custom field (`:78`) and a select option (`:79`, `options: z.array(z.string().min(1))`) are `min(1)` alone —
+the exact shape P15 says admits the defect. A state named `" "` is a column with no header on every board that
+uses the workflow; a select option `" "` is a choice with no label; and the builder's `validateWorkflowDef`
+(`validate-workflow.ts`) checks ids, reachability and terminals but never a name. The type editor and workflow
+builder may guard the field on the client (not measured — this lane's doors are the API and MCP); the door does
+not.
+
+**WHAT WOULD HAVE BEEN BETTER.** Export P15's refinement once (`displayName` already exists in `membership.ts`) and
+use it for the five name fields, so the refusal reads the same sentence everywhere.
+
+**MEASUREMENT.** Appendix X, run from `apps/server`. Lines opened: `ticket-events.ts:18-24`; `membership.ts:39-42`;
+`workflow.ts:8`, `:86`; `ticket-types.ts:78-79`, `:96`; `validate-workflow.ts` (no `name` check — read whole).
+
+**SEVERITY: Minor.** A recorded rule applied to some of its subjects; the consequence is a blank label, reachable
+from the API and MCP doors.
+
 ---
 
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
@@ -1414,8 +1447,8 @@ the table.
 |---|---|---|
 | Critical | **0** | — |
 | Important | **13** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18 |
-| Minor | **6** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19 |
-| **total** | **19** | E6-1 … E6-19, no gaps in the numbering |
+| Minor | **7** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20 |
+| **total** | **20** | E6-1 … E6-20, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -4560,6 +4593,132 @@ describe('exec6 probe: impossible due dates', () => {
     const board = await app.inject({ method: 'GET', url: `/v1/projects/${PRJ}/board`, headers: auth(ownerToken) });
     const dues = [...board.body.matchAll(/"dueDate":\{"state":"claimed","claim":\{"date":"([^"]+)"/g)].map((m) => m[1]);
     out.push(`board -> ${board.statusCode}; due dates served: ${dues.join(', ')}`);
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix X — probe for E6-20 — whitespace-only names
+
+File path in the tree: `apps/server/test/zz-exec6-probe-blank.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-blank.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: do blank (whitespace-only) names pass the workflow / state / type / field doors that P15 closed for titles and workspace names?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: whitespace-only names', () => {
+  it('records the door answer per name', async () => {
+    const out: string[] = [];
+    const say = (k: string, r: { status: string; rule?: string; reason?: string; code?: string; message?: string }) => out.push(`${k.padEnd(48)} -> ${r.status}${r.rule ?? r.code ? ` (${r.rule ?? r.code}: ${String(r.reason ?? r.message).slice(0, 80)})` : ''}`);
+    const wfId = newUlid();
+    say('workflow.defined name " ", state name " "', await post(WS, { kind: 'workflow', id: wfId }, 'workflow.defined', { id: wfId, version: 1, name: ' ', initialStateId: 'a', states: [{ id: 'a', name: ' ', category: 'open' }, { id: 'b', name: '\t', category: 'terminal' }], transitions: [{ from: 'a', to: 'b', rules: [] }] }, ownerId, ownerToken));
+    say('ticket-type.defined name " ", field name " ", option " "', await post(WS, { kind: 'ticket-type', id: newUlid() }, 'ticket-type.defined', { id: 'blank', name: ' ', icon: 'flag', rank: 2, workflowId: wfId, fields: [{ id: 'f1', name: ' ', type: 'select', options: [' '] }] }, ownerId, ownerToken));
+    say('control: project.created name " " (P15 applies)', await post(WS, { kind: 'project', id: newUlid() }, 'project.created', { name: ' ' }, ownerId, ownerToken));
+    say('control: ticket.created title " " (P15 applies)', await post(WS, { kind: 'ticket', id: newUlid() }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: ' ' }, ownerId, ownerToken));
+    const wfs = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/workflows`, headers: auth(ownerToken) });
+    out.push(`GET workflows -> ${wfs.statusCode}; a workflow whose name is a single space is listed: ${wfs.body.includes('"name":" "')}`);
+    const types = await app.inject({ method: 'GET', url: `/v1/workspaces/${WS}/ticket-types`, headers: auth(ownerToken) });
+    out.push(`GET ticket-types -> ${types.statusCode}; a type whose name is a single space is listed: ${types.body.includes('"name":" "')}`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
