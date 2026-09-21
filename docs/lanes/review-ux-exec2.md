@@ -3368,6 +3368,29 @@ route files** (`my-work.ts` calls it twice), which is the measured unit behind t
 **Source:** the case catalogue — my largest named gap, reached in two bounded bites (`17-open-work.md`'s
 `17.005` and this). **Severity: Minor** — a comment, but a verified disagreement between two documents, with
 the correct value already written down three files away.
+### E2-51 (r2) — MINOR · My own `13.761` still asserts an absence the product reversed, with a reason that is now false and a citation that points at a different case
+
+**WHAT.** `test-cases/13-second-wave-board-actions.md:49-58`, case **`13.761`** — one of seven ids I minted on 2026-09-18 for the members roster — says:
+
+> *"The case also pins **the ABSENCE of a per-row control: no `combobox`, no `button` inside the table**, because the prototype's role cell is a `<select>` under `canEditRole` … and **no route accepts a role change on this branch — a picker here would be a control that cannot be honoured.**"*
+
+**Three things are wrong with that, and only the first is a product fact.**
+
+1. **The absence is gone.** `apps/web/app/w/[workspaceId]/members/page.tsx:510-518` renders `<Select options={EDITABLE_ROLE_OPTIONS} value={member.role} onChange={(next) => changeRole(member, next)} aria-label={\`Role for ${label}\`} />` on every editable row, chipped otherwise.
+2. **The stated reason is false.** *"No route accepts a role change on this branch"* — `changeRole` (`:334-371`) submits `membership.granted` through `dataSource.ingest`, and the ingest door adjudicates it.
+3. **The citation is stale.** The case cites `apps/web/test/members-page.test.tsx:446`, which resolves to the **3.138 docblock** about a refused withdrawal; the test that covers this case is at **`:602`**.
+
+**AND THE TEST WAS FIXED WHILE THE PROSE WAS NOT — which is the finding, stated at its true size.** `members-page.test.tsx:616-631` records the re-point in its own comment: *"This case used to end with `queryByRole('combobox')`/`queryByRole('button')` both null — 'NO control per row' — and **that absence was a PROXY for the thing the case is actually about** … The proxy was true only while the guards Task 1 added did not exist, so it is **replaced by the property itself**, asserted in BOTH arms at once"* — the owner's row chips the wire token with no button, and the editable row announces `Role for Anselma Marak` and displays `member`. **So the coverage is real and current; what is stale is the sentence a reader uses to know what is covered.**
+
+**WHY it is wrong, without inflating it.** This is **not** the *"a case asserting a property the product has quietly stopped having"* defect — the test holds the right property. It is the narrower one underneath it: **the case TEXT is the scope contract**, and this text now denies a control the product ships and explains why it *could not* exist. A reader deciding whether the roster's role change is covered learns the opposite of the truth from the catalogue and the truth from the test. **I am filing my own because the brief puts my own work in scope and because I am the lane that wrote it** — and the citation rot (#3) is the kind this repository has already measured a population of, in the same file that records repairing them.
+
+**WHAT WOULD HAVE BEEN BETTER.** The same re-point the test got, applied to the case text: *"each row shows the wire's own token; a row the viewer may edit carries a control named for its person, and a row they may not chips the token instead"* — which is what the test asserts and what `E2-33`'s `isEditableRole` precedent guards. Plus the citation moved to `:602`.
+
+**MEASUREMENT.** Opened: `test-cases/13-second-wave-board-actions.md:49-58` (the case, in full);
+`apps/web/app/w/[workspaceId]/members/page.tsx:510-518` (the live control) and `:334-371` (`changeRole`);
+`apps/web/test/members-page.test.tsx:602-632` (the re-pointed test and its own account of the proxy) and `:446` (what the citation actually resolves to). Reached by sampling the catalogue's **judgement half** on my own block — the pass the controller directed and the one place the brief says my own work is in scope.
+
+**Severity: Minor** — no behaviour is wrong and the coverage exists; the case's description and one citation are. Filed because a scope contract that misdescribes itself is the artifact this file exists to keep honest.
 
 ---
 
