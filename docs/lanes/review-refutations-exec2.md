@@ -426,3 +426,69 @@ this file's convention is that a painted value needs a browser, not a second rea
 requires the falsifying measurement; **a check that passes is a result for the author, not for me.** The
 honest form of this phase for a lane that finds nothing is the one filed above: the targets named, the lines
 opened, and the outcome.
+
+---
+
+# PHASE 2 — 15:05:23 → 17:05:23 IST, on the Claude API (Opus), inheriting the lane
+
+**Opened 15:06 IST at `778a6439`** (the frozen phase-1 head). Everything above this line is the phase-1 work of the
+DeepSeek session; nothing in it is edited. This section is the phase-2 submission. It is being appended in pushes
+through the window; the stamp on each entry is the clock at writing, reconciled to the commit time.
+
+## REFUTATIONS FILED IN PHASE 2: NONE
+
+Every exec 5 finding I opened in this window **held** on the line I opened. I did not file a refutation I could not
+back, because a rejected one costs the target's points (rules §3), and after this pass three independent sweeps of
+exec 5's report — the phase-1 session above, exec 6's non-refutation table, and this one — have all returned null.
+
+| target (exec 5) | the clause I tried to falsify | what I opened | outcome |
+|---|---|---|---|
+| `E5-37` (Imp) | that `??` fires on `''` / that a `\|\|` site breaks the totality | `providers.tsx:176`, `:206`; corroborated at paint by `exec4-E4-33` with a seeded `name = ''` guest | **holds** |
+| `E5-35` (Min) | that any inbox renderer uses `createdAt` or the mention's `ticketTitle` | `inbox-view.tsx`, `inbox/page.tsx`, `format.ts:73-131` — `createdAt` 0 hits; `ticketTitle` used for assignment/date/stale, never mention | **holds** |
+| `E5-26` (Imp) | that a person can obtain a token the desktop's transport would accept | `require-session.ts:88-106` accepts an MCP PAT as bearer — but `mcp/authorize/page.tsx` is device-code: the token goes to the assistant's poll, never to the person; `mcp-tokens-screen.tsx` lists only; `gisik.token` 0 hits in `apps/web` | **holds** |
+| `E5-32` (Imp) | that any mechanism other than `?next=` returns a signed-out person | `expired-session.tsx:70-74` pushes bare `/sign-in`; `sign-in/page.tsx:74,156` reads only `?next=` (default `/workspaces`); no `returnTo`/storage | **holds** |
+| `E5-17` (Min) | that the delta doc's owner ruling (`:642`, MCP tokens moved to `/account`) makes it category 2 | the finding names that ruling and scopes to the route's chrome | **holds** as scoped |
+| `E5-25` (Imp) | that the count is nine and that a write path classifies a 401 | `grep 'could not reach the server'` → **9** sites; `isExpiredSession` fed by reads only; no `status === 401` on any write | **holds** |
+| `E5-5` (Imp) | that a view applies `collaboratorIds` | `docs/manual.md:826-828` says none does, in the product's own words | **holds** |
+| `E5-19` (Min) | that `ProfileSection` has a success arm | `profile-section.tsx:24-35` — `setError` on `error !== null`, nothing otherwise | **holds** |
+| `E5-23` (Min) | that the workspace home branches on `isAdmin` for the empty sentence | `w/[workspaceId]/page.tsx:883-887` — one sentence, one condition | **holds** |
+| `E5-16` (Imp) | that the default type is not rank 1 | painted `value="Epic"` in their browser; `new-ticket-dialog.tsx:97`; `BUILTIN_TICKET_TYPE_SEEDS` first = `epic` | **holds** |
+| `E5-40` (Imp) | that the "Owner: whoever next revisits" note is a ruling | it is an ownership assignment; the finding argues against the record anyway | **holds** |
+| `E5-9` (Imp) | that a footer-local refusal slot exists beside Delete | `serverRefusal` renders at `ticket-sheet.tsx:1961` only; the footer `:2611-2620` has no slot; `:2636` hands it to the Move dialog | **holds** |
+| `E5-10` (Imp) | that `markRead` / `undoMarkAllRead` render a sentence | `inbox/page.tsx:278`, `:357` — `.catch(() => loadFirstPage())` on both; only `markAllRead` speaks | **holds** (and consistent with my `E2-26`) |
+| `E5-44` (Imp, ½) | that "the person sees neither a post nor a failure" is absolute | `board-screen.tsx:53` renders `{failed} needs attention` — a count on the BOARD screen, no reason, no ticket. The ticket screen renders nothing (`ticket-screen.tsx:124-127`) | **not filed** — the count is on another screen and names nothing; a refutation on that word would be a technicality, and my own narrowed `E2-42` states the same bound |
+
+## WHAT I DID INSTEAD, AND WHY IT WAS THE BETTER USE OF THE WINDOW
+
+Exec 6's `R6-2` (15:16) and `R6-3` (15:20) landed against this lane mid-window, and both were **right**: one on the
+door (`/v1/sync`, not `/v1/events`), one on reachability (no shipped shell wires the source that can reach the
+catch). Both were the same failure — I had opened the handler and the producer and not the seam between them. So I
+applied that test to every round-2 finding of mine, and to the round-1 Importants, as its harshest critic. **Every
+correction is a dated Defence paragraph under the finding in `review-ux-exec2.md`**, never an edit to a frozen
+claim; each one names the line I opened today. In order of filing:
+
+| finding | what the re-opening found | outcome | commit |
+|---|---|---|---|
+| `E2-42` (Imp) | the title's *"recorded as the ASSIGNEE's words"* was already conceded in phase 1; my 15:12 defence then cited the `/v1/events` gate — **the wrong door** (`R6-2`). Re-measured: `/v1/sync` answers `invalid: actor-mismatch` (`sync-service.ts:321-327`); a self-assigned comment **commits**; the local precheck refuses nothing before the queue (`outbox.ts:307-315`, `submit.ts:9-30`) | **conceded and narrowed** to: comments on tickets not assigned to the commenter never post and the ticket screen says nothing | `f282f3e1`, `c3daab69` |
+| `E2-52` (Imp) | *"not a hidden announcement … everyone reads the false sentence"* is **false**: `.mention-popup__status` is screen-reader-only (`editor.css:50-62`, inlined into the phone's editor HTML); `mention-popup.ts:27-28` says so inside the range I cited | **sentence withdrawn**; sighted users meet an empty bordered box that never fills, screen-reader users the false count; mechanism and five links unchanged | `23848637` |
+| `E2-28` (Min) | `R6-3` re-run on all five measurements: `<BulkCloseDialog` is mounted by the web only, fed `createOnlineDataSource`, which contains `OfflineAcceptError` 0 times | **conceded**: the sentence has no path to a screen on this build | `d33281fe` |
+| `E2-45` (Imp) | the cause list *"offline, a 5xx, a dropped connection"* has one false member: under `@better-fetch/fetch@1.3.1` (opened) a non-2xx **resolves** `{ error }` (`:735-741`) and the `.then` pushes to `/sign-in` anyway; only a network failure rejects (`:628` unguarded, no `catchAllError`) | **5xx withdrawn from the rejection list**; the other arm stated as a correction, not filed | `1066d9fd` |
+| `E2-33` (Imp) | (a)'s consequence requires the seeded id to be absent from the real list; builtin ids are stable per workspace (`ticket-types.ts:138-159`, `bootstrap-workspace.ts:87`) so `'epic'` is always a member and no placeholder is drawn | **(a)'s person-visible consequence withdrawn**; (b)/(c) stand in the CONCURRENT class | `d370d830` |
+| `E2-36` (Min) | *"nothing re-read"* ignores the stream: commit → `onEventCommitted` → hub `send({type:'event'})` (`hub.ts:276,330-334`) → `stream.ts:91-99` → `use-live-query.ts:100-106` reload after 200 ms | **bounded** to the socket-down arm plus a one-debounce window | `c755f939`, `63fc637f` |
+| `E2-50` (Min) | *"four **other** routes"* is the list route's standpoint; list + four = the five `Features.md` names; the two documents agree | **withdrawn in substance** | `a59ce9b9` |
+| `E2-47` (Min) | *"the one apparent hit, `ticket-sheet.tsx:897`"* — no such hit; `:895-899` never names the symbol | **one sentence withdrawn**; zero-caller measurement re-run and stands | `2eb57c54` |
+
+**Re-opened and found to hold as filed** (line cited in the report re-read at `HEAD`): `E2-20` (plain effect, not
+stream-driven), `E2-21` (`data-source-gateway.ts:320-323` rethrows non-refusals; `void` at `:551`), `E2-22`,
+`E2-23` (`account/page.tsx:180`), `E2-25` (five components, 0 JSX mounts, with `<TransitionDialog` as the
+same-path control), `E2-27` (states its own bound), `E2-29`, `E2-30` (one emitter of `ticket.restored`; no MCP
+restore tool), `E2-31`, `E2-41`, `E2-43`, `E2-44` (`mcp-tokens-screen.tsx:123`), `E2-46` (pinned by the repo's
+own 9.95), `E2-48`, `E2-49`, `E2-51`, `E2-53`, `E2-54`; round-1 `V3`, `V7`, `V9`.
+
+**The method, stated so the judge can weigh it:** for each finding, one question — *does a shipped shell mount
+this component, with a wiring that can produce the state the finding describes, and does the line I quoted say
+what I said it says?* — answered by opening the mount, the source it is handed, and the quoted range. Eight
+findings failed some part of that test; nineteen passed. The eight are named above with the commit that records
+each, so the ledger can score them as the judge sees fit — I have not withdrawn any finding outright (phase 2 has
+no free withdrawal), but where a finding does not hold I have said so in its own body rather than leaving a peer
+to find it.
