@@ -1346,7 +1346,7 @@ nothing; `grep -n leav docs/manual.md docs/faq.md` → comments and defaults onl
 so the sentence can say *"You have left <workspace>"*. A `Leave` control on the workspace home and the account
 page is the UX lane's half; the door is this lane's.
 
-**MEASUREMENT.** Appendix Y, run from `apps/server`. Lines opened: `check-permission.ts:72` (`NOT_A_MEMBER_REASON`),
+**MEASUREMENT.** Appendix Y, run from `apps/server`. Lines opened: `check-permission.ts:81` (`WORKSPACE_MEMBERSHIP_REASON`),
 `:641-643`; `http-origin.ts:133-139`; export `:2133`; `privacy/page.tsx:150-158`; the three greps above.
 
 **SEVERITY: Important.** A person can be put into a workspace by an admin (or, per E3-14, by a forged request)
