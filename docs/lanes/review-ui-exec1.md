@@ -298,6 +298,8 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **Not measured:** whether the panel's rows would actually *fail* any floor. I did not open a panel in a browser (no browser ran, §2). **This finding is about coverage, not about a violation.**
 
+
+**⚠ Narrowing (phase 2, 2026-09-21 15:44 IST) — reason 2 is overstated by ONE row, measured by me, and I say so before a refuter does.** Instrument as P1's third defence paragraph; sheet open on `CCSO-6`, the *Assignee* `Select` opened by clicking its trigger. `[role=option]` → 3 `<li>` rows: *Unassigned* **184×36, `tabindex="0"`**, *Kiro* 184×36 `tabindex="-1"`, and an EMPTY row 184×12.8 `tabindex="-1"` (exec 4's `E4-18`). Tested each against the sweep's own selector list (`tap-targets.ts:268-280`, copied verbatim into `Element.matches`): **the focused row matches — through the `[tabindex]:not([tabindex="-1"])` arm**, because React Aria's `useOption` gives the focused option a roving `tabindex="0"`; the other two match no arm. So reason 2's sentence *"the rows match no arm of the tap-target selector"* is true of every row but the one that holds focus, and a sweep that DID open a listbox would see exactly one option per listbox and judge it at 44. **The WHAT is unchanged and rests on reason 1 alone**, which is intact: the listbox is portaled to `document.body` (measured: the open `[role=listbox]`'s `closest('[role=dialog]')` → null) and renders only while open, and no spec opens one. The severity claim is the judge's; I do not lower it myself, and I would not contest a ruling that the second reason counts for less than the finding gave it.
 ---
 
 ### P10 — **MINOR** — The accessible-name ratchet's unit is an attribute; its failure message claims a property of assistive tech
@@ -328,6 +330,8 @@ Under **§3** that is the shape a judge must look at hardest: *"the 'defect' is 
 
 **WHAT WOULD HAVE BEEN BETTER.** Either serve the parent's key (one field at `routes/tickets.ts:435`, one at `mappers.ts:1868-1872`, one in `ParentRef`) so the crumb can read as the prototype's — or record the divergence with the wire as its reason, in the dispatch's own idiom (*"a divergence the way the ticket-key spec recorded its own"*).
 
+
+**Painted (phase 2, 2026-09-21 15:44 IST), by me.** Same instrument; sheet open on `CCSO-6`, whose parent is the epic *Open questions*: the crumb bar's `.gn-ticket-sheet__crumb` texts are `SPAN Convenience Corner · SPAN Shop operations · BUTTON Open questions · BUTTON Open questions · SPAN CCSO-6` — the parent crumb is the title alone, no key; the export's `sheetCrumbs` pushes `p.id + " " + p.title` (`Gisik Nokma - Desktop.dc.html:3417`, re-opened this phase).
 ---
 
 ### P4 — **MINOR** — "the SAME plain span" is not the same span
