@@ -31,6 +31,21 @@ export type CreateTicketFlowProps = {
   /** See `NewTicketDialogProps.parentCandidatesNarrowing`. */
   parentCandidatesNarrowing?: string;
   onCreated: (ticketId: string) => void;
+  /**
+   * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
+   *
+   * The board's empty state has a "Create a ticket" button that renders only
+   * when `onCreateTicket` is passed down, and the shell had nothing to pass: this
+   * flow owns its dialog's open state and renders its own "New ticket" trigger,
+   * so no caller could open it from anywhere else. A shell that wants the empty
+   * board to open this dialog passes `open`/`onOpenChange` and drives it.
+   *
+   * OPTIONAL, the same precedent `BoardProps`' own optional props set: absent
+   * means the flow owns the state exactly as it did before these existed, so
+   * every existing mount reads unchanged.
+   */
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
 };
 
 type ReopenPrompt = {
@@ -135,8 +150,19 @@ export function CreateTicketFlow({
   parentCandidatesUnavailable,
   parentCandidatesNarrowing,
   onCreated,
+  open,
+  onOpenChange,
 }: CreateTicketFlowProps) {
-  const [dialogOpen, setDialogOpen] = useState(false);
+  // Controlled when the shell passes `open`, self-owned otherwise — and the
+  // internal state is ALWAYS written too, so a shell that starts controlling
+  // mid-session (or stops) cannot leave the two disagreeing about a dialog that
+  // is plainly on screen.
+  const [selfOpen, setSelfOpen] = useState(false);
+  const dialogOpen = open ?? selfOpen;
+  const setDialogOpen = (next: boolean): void => {
+    setSelfOpen(next);
+    onOpenChange?.(next);
+  };
   const [reopenPrompt, setReopenPrompt] = useState<ReopenPrompt | null>(null);
   const [parentRefusal, setParentRefusal] = useState<Refusal | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);

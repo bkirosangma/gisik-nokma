@@ -465,6 +465,19 @@ function ProjectBoard() {
    * landed, but a keyboard exit always leaves focus somewhere real.
    */
   const [filtersOpen, setFiltersOpen] = useState(false);
+  /**
+   * V1 (round-2 ruling, 2026-09-21) — the New-ticket flow's dialog, lifted so the
+   * BOARD'S empty state can open it.
+   *
+   * `Board`'s empty banner renders *"No tickets here yet — create one."* and a
+   * "Create a ticket" button that only appears when `onCreateTicket` is passed —
+   * and nothing in this app passed it, so the sentence instructed an action the
+   * page made impossible from where it was read. The control existed all along,
+   * three centimetres to the left in this header; what was missing was a way to
+   * open it from the banner, which is what `CreateTicketFlow`'s new
+   * `open`/`onOpenChange` props provide.
+   */
+  const [createOpen, setCreateOpen] = useState(false);
   const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeFilters = useCallback((returnFocus: boolean) => {
     setFiltersOpen(false);
@@ -1778,6 +1791,8 @@ function ProjectBoard() {
     return (
       <>
         <CreateTicketFlow
+          open={createOpen}
+          onOpenChange={setCreateOpen}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}
@@ -1797,6 +1812,19 @@ function ProjectBoard() {
       </>
     );
   })();
+
+  /**
+   * V1 — whether the `Board`'s empty state may offer its create button.
+   *
+   * Derived from the SAME two facts `createRegion` branches on to decide whether
+   * the flow is offered at all (a signed-in person, and types that did not
+   * refuse), read once here rather than re-tested at the board. The transient
+   * arms above — the session still loading, the list still loading — are
+   * deliberately NOT mirrored: they end on their own, the flow's own dialog
+   * opens as soon as it mounts, and a button that disappears for a second and
+   * returns is worse than one that opens a dialog a moment later.
+   */
+  const canCreate = session.kind === 'signed-in' && ticketTypes.error === null;
 
   return (
     <main className="gn-shell">
@@ -2461,6 +2489,18 @@ function ProjectBoard() {
                 <Board
                   board={boardNarrowing.view}
                   onOpenTicket={openTicket}
+                  /*
+                    V1 (round-2 ruling, 2026-09-21) — the empty state's create
+                    affordance, wired to the SAME `CreateTicketFlow` the header
+                    renders. Gated on the same conditions that control whether
+                    that flow is OFFERED at all: the flow is not rendered when
+                    the types read refused or the session is not signed in, so
+                    the banner must not offer a button in those states either —
+                    and `emitting`/`session` are read here rather than
+                    re-derived, so the two doors cannot disagree about when
+                    creation is available.
+                  */
+                  {...(canCreate ? { onCreateTicket: () => setCreateOpen(true) } : {})}
                   isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
                   /*
                     WHICH OF THE TWO EMPTY SENTENCES (owner ruling, 2026-09-20). True

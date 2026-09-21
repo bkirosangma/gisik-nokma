@@ -2389,3 +2389,30 @@ control itself looked exactly like the five sections around it that DO something
 applies it, or label it inline. The label was taken — the filter is real state the person can set and
 keep, and the board still prints its own strip for it, so withholding a working control would remove a
 capability to remove a sentence.
+
+## The empty board instructed an action it could not offer — case `13.1162` (V1, 2026-09-21)
+
+**Ids from B11's §13 block `13.1157`–`13.1166`** (controller, 2026-09-21 22:0x; see the E5-25 section
+above). `13.1162` is minted here.
+
+**The defect.** `Board`'s empty state renders `EMPTY_BOARD_COPY` = *"No tickets here yet — create one."*,
+and the "Create a ticket" button beneath it — and the per-column "Add a ticket" — render only when
+`onCreateTicket` is passed (`board.tsx:493-497`, `:762-764`). **No web caller passed it**: measured at the
+ruling, `grep -rn 'onCreateTicket=' apps/web/app apps/web/src` answered **0 across 63 files** while the
+string appears 18 times in `board.tsx`. So the board told the reader to create a ticket and the control
+that would let them was not drawn — and the empty column's `+` glyph, the one part of that state that
+reads as a control, painted with nothing behind it.
+
+- **13.1162** ✅ **Both arms, in both packages.** Unwired, the board states the situation
+  (*"No tickets here yet."*), offers no button and draws no `+` glyph; wired, it keeps the pinned sentence
+  and draws the banner button, the per-column button and the glyph. At the shell, an empty project's board
+  renders the pinned sentence and **its button opens the same New-ticket dialog the header's trigger
+  opens** — asserted by the Parent picker, a control that exists only inside it. —
+  (`packages/app-core/test/views/board.test.tsx`, `apps/web/test/project-create-gate.test.tsx`)
+
+**The shell wires it, and needed one small API to do so.** `CreateTicketFlow` owned its dialog's open
+state and rendered its own trigger, so nothing outside could open it; it now takes optional
+`open`/`onOpenChange` (absent ⇒ it owns the state exactly as before) and the project page lifts them, so
+the banner's button and the header's "New ticket" open the SAME dialog. `canCreate` gates the handler on
+the same two facts `createRegion` branches on — a signed-in person and types that did not refuse — so the
+two doors cannot disagree about when creation is available.
