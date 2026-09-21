@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 14:3x IST — findings E6-1 … E6-24 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:41 IST — findings E6-1 … E6-24 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -171,7 +171,8 @@ read the phone and desktop shells call, + Appendix AF) and `sync-client/src/repl
 (whole; the whole-ledger-in-memory ceiling is recorded as case 13.34, UTC scheduling is explicit — nothing filed),
 `tools/sweep-user-preferences.ts` (whole), `gates/evidence-gate.ts` (whole: the evidence id IS verified server-side
 against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
-every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts`, `workspaces/workspace-name.ts`, `read/workspace-counts.ts`, `alerts/error-alerter.ts` (whole:
+every filter value parameterised, `likePattern` escapes `\ % _`), `projections/{contested,proj-visibility,proj-invites,search}.ts` and `read/ticket-comments.ts`, `workspaces/workspace-name.ts`, `read/{workspace-counts,live-ticket,ticket-numbers,state-provenance,membership-roster}.ts`, `alerts/error-alerter.ts`,
+`workspaces/bootstrap-workspace.ts` (whole:
 resolution is refused for an unknown, wrong-ticket or already-resolved contest at `rule-engine/src/contests.ts:60-75`;
 the resolver's identity is not checked, which 12.204 records as *"attributed to whoever discarded"* — not filed),
 `read/{ticket-cards,visible-projects}.ts` (whole), `domain/src/prefix.ts:100-180` with `13.1024` (a derived project
@@ -265,10 +266,9 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections
   `{rollups,proj-projects,ticket-comments,entity-heads,workspace-settings,rebuild,registry,
   index}.ts` (of the 16 files in `projections/`, five read whole — `contested`, `proj-visibility`, `proj-invites`, `search`, `workflows` —
-  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{workflow-defs,ticket-numbers,live-ticket,state-provenance,assigned-provenance,
-  membership-roster,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  and three in part — `tickets`, `proj-memberships`, `ticket-types`; `rollups.ts` at the two cited lines only); `read/{workflow-defs,assigned-provenance,list-cards}.ts` beyond a grep; `sync/sync-service.ts:140-439`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts`, `routes.ts`, `social-providers.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
-  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges; `workspaces/bootstrap-workspace.ts`.
+  noted, not filed); `tools/sweep-notifications.ts`; `visibility/visible-events-for.ts` as code (exercised by Appendix AE, not read); `attachments/*` other than `sniff.ts`; `notifications/*` beyond the cited ranges.
 - **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
   opened only at their `ds.query.*` call sites and the lines that render the result (E6-24).**
 - `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
