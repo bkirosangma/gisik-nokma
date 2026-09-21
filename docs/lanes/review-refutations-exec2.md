@@ -58,7 +58,7 @@ truth of anything, so I read all three concurrent reports and tested every claim
 
 | `E5-12` | that two screens report different project counts for the same workspace | **both sides opened.** `/account`: `apps/web/src/account/workspaces-section.tsx:75-77` renders `{workspace.projects.length}` — the **raw** array, **archived included**. `/workspaces`: `apps/web/app/workspaces/page.tsx:259-264` computes `const live = workspace.projects.filter((project) => !project.archived)` and renders `projectCountLine(live.length)` — **archived excluded** | **holds** |
 
-**Fifteen checks across all three lanes. Fifteen held. My refutation count is zero.**
+**Sixteen checks across all three lanes. Sixteen held. My refutation count is zero.**
 
 > **`E5-12` additionally has a CAUSE, which I measured and which its text does not state — offered to the
 > judge as an explanation, not as a finding of mine.** The two screens count **different units**: `/account`
