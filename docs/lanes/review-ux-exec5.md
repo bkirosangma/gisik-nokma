@@ -1093,6 +1093,36 @@ product expects a locked-out person to reach.
 
 ---
 
+### E5-32 — IMPORTANT · The help promises a signed-out link to a job "remembers where you were headed"; every data page bounces to `/sign-in` with no `next=`, so the link is dropped — the invite link, the consent page and the settings shell all keep theirs `[BROWSER, devtools isolated context]` `[SOURCE]`
+
+**WHAT.** `docs/manual.md:109-110`: *"The same is true if you click a link (an invitation, or a link to a job) while
+signed out: it remembers where you were headed and sends you there afterwards."* Signed out, opening
+`/w/0TZSS5W6ATCTF2YBPMWGGP9JF5/p/0XB92YA4CGEBF9S285AH4SDXR1?ticket=0320JX4SK3KBJ616QP82T8WRJ2` — the shape every
+notification deep link and every pasted ticket link has — lands on **`/sign-in` with `hasNext: false`** (`[BROWSER]`,
+`location.pathname + location.search` → `/sign-in`). The bounce is `expired-session.tsx:70-74`:
+`if (expired) router.push('/sign-in');` — no `next`. It is the ONE author of the 401 redirect and is called by
+`/workspaces`, `/w/[workspaceId]`, `/w/…/my-work`, `/w/…/p/[projectId]` and `/inbox` (§6.1 grep), so **no data page
+keeps the destination**. Four other sites do: `invite/[token]/page.tsx:107` (`/sign-in?next=/invite/<token>`),
+`mcp/authorize/page.tsx:143`, `mcp-tokens-screen.tsx:223`, `authoring/builder-wiring.tsx:163` — and the sign-in page
+honours `?next=` (`sign-in/page.tsx:58`, constrained to a same-site path).
+
+**WHY.** The sentence is true of the invitation half and false of the job half — the recurring "true of one path,
+stated of the product" shape, on the exact case the manual chose as its example. The person who was sent a ticket
+link, signed in, and landed on the workspace list has lost the ticket they came for; the mechanism to keep it exists
+four files away and the bounce simply does not use it.
+
+**WHAT WOULD HAVE BEEN BETTER.** `router.push('/sign-in?next=' + encodeURIComponent(pathname + search))` in the hook
+— the same shape the four sibling sites use — or correct `docs/manual.md:109` to "an invitation".
+
+**MEASUREMENT.** `[BROWSER]` as above (second browser, no session, 390 px). `[SOURCE]` `expired-session.tsx:70-74`;
+`docs/manual.md:107-110`; the four `sign-in?next=` sites (`grep -rn 'sign-in?next=' apps/web` → 4, none in the hook);
+`sign-in/page.tsx:56-66`.
+
+**SEVERITY: Important** (claimed). The help states a behaviour the product lacks on the most common signed-out entry,
+and the person loses the link.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 Every comparison I made, against `EXPORT` (`Gisik Nokma - Desktop.dc.html`, sha256 `3d142d464a070b33…`), by the
@@ -1154,15 +1184,15 @@ close it.
 
 ## 5. COUNT BY SEVERITY, MEMBERS NAMED
 
-**31 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 31). By claimed severity, read from the
-heading text: **Critical 1 · Important 21 · Minor 9** (1 + 21 + 9 = 31).
+**32 findings** (`grep -c '^### E5-' docs/lanes/review-ux-exec5.md` → 32). By claimed severity, read from the
+heading text: **Critical 1 · Important 22 · Minor 9** (1 + 22 + 9 = 32).
 
 - **Critical (1):** E5-13
-- **Important (21):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31
+- **Important (22):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-10, E5-11, E5-15, E5-16, E5-20, E5-21, E5-24, E5-25, E5-26, E5-27, E5-28, E5-31, E5-32
 - **Minor (9):** E5-12, E5-14, E5-17, E5-18, E5-19, E5-22, E5-23, E5-29, E5-30
 
 **Browser-measured (`[BROWSER]` in the heading):** E5-1, E5-2, E5-3, E5-4, E5-5, E5-6, E5-7, E5-8, E5-9, E5-11,
-E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31 = 20 of 31. **Reproduced with an injected failure, zero server writes:** E5-13,
+E5-12, E5-13, E5-14, E5-15, E5-16, E5-17, E5-20 (pair observed), E5-22, E5-24, E5-31, E5-32 = 21 of 32. **Reproduced with an injected failure, zero server writes:** E5-13,
 E5-15. **Source-only:** E5-10, E5-18, E5-19, E5-21, E5-23, E5-25, E5-26, E5-27, E5-28, E5-29, E5-30.
 
 **Verifies an exec 2 §2d/§2e hypothesis with a measurement it lacked:** E5-10 (single-row mark-read), E5-13 (account
@@ -1198,7 +1228,7 @@ scope note) and the injected-403 refusal walks (below).
 **A second browser, for signed-out surfaces only (from ~11:20 IST).** The `chrome-devtools` MCP runs its own Chrome
 (no session cookie; I did not sign the owner's account in from it — that would write a session row into their
 stack). Its pages are visible and hydrate, and `emulate` gives a true 390×844 mobile viewport. Walked there,
-signed out, at 390 px: `/help`, `/account`, `/workspaces` (→ `/sign-in`), `/sign-in`. Findings from it: E5-31, and
+signed out, at 390 px: `/help`, `/account`, `/workspaces` (→ `/sign-in`), `/sign-in`. Findings from it: E5-31, E5-32, and
 E5-13's second reproduction. **NARROW VIEWPORT is therefore reached for the signed-out shell only**; every
 signed-in surface at phone width remains unmeasured by me (exec 4's E4-7/E4-9/E4-11 cover some of it).
 
@@ -1327,5 +1357,5 @@ community index (~60 lines) in place of `ls -R` over 1,269 files; the report's o
 ---
 
 *executor 5 — UX (Opus). **Report complete for phase 1 at the time of the last push** (see `git log
-origin/exec5/review-ux`). 31 findings — Critical 1 · Important 21 · Minor 9 — members named in §5. No PR opened, no
+origin/exec5/review-ux`). 32 findings — Critical 1 · Important 22 · Minor 9 — members named in §5. No PR opened, no
 file changed except this report. No AskUserQuestion, no Workflow, no subagent used.*
