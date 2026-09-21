@@ -801,7 +801,8 @@ control: POST migrate as owner -> HTTP 200 {"status":"migrated","count":2}
   rows and then says `refused`.
 - The route's own answer is the *"client believes what the server declined"* shape run backwards: the client is
   told nothing moved (`MigrationOutcome` `refused` carries no count) while the server has moved every ticket the
-  admin could see. The type-editor then displays a refusal and the type's tickets stay **split across two
+  admin could see. The type editor maps the outcome to `{ phase: 'refused', rule, reason }`
+  (`ticket-type-editor-screen.tsx:280-282`) — a report with no count — and the type's tickets stay **split across two
   workflows** — the state the migration exists to end (`ticket-type-editor-screen.tsx:462-474` talks of "the
   divergence is OVER for these tickets") — and the admin cannot finish: re-running refuses on the same invisible
   tickets. Only an owner, or an admin who first joins every project the type has tickets in, can complete it.
