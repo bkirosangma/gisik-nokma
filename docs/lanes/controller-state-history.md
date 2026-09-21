@@ -4,6 +4,42 @@
 
 ---
 
+## 🔄 MONDAY 2026-09-21 ~17:2x IST — **CYCLE 41: PHASE 2 CLOSED AT 17:06:57; THE REFUTATIONS AND THE PHASE-2 FINDINGS ARE JUDGED; 239 RULINGS; THE VERDICT IS UI → EXEC 4, UX → EXEC 2, FUNCTIONALITY → EXEC 6.** `main` is **`d3772072`**; branch **`ctl/round2-judgment`** is the landing PR of the whole round.
+
+### 1. WHAT THIS CYCLE DID, IN ORDER
+Woke at 16:59 on the Claude API (the session identifies as Fable 5.1), read the card and cycle 40, printed the awake line at 17:00, armed the PR Monitor. Pre-read every lane's refutation file and report diff at its 17:01 tip. **Closed phase 2**: `phase2-close-2026-09-21.sh` fired at 17:05:26 from a background shell, pasted PHASE 2 CLOSED to all six panes, and recorded `PHASE2_CLOSE 2026-09-21 17:06:57 IST` with six shas in `judge-2026-09-21/T0.txt` — **each equal to the tip already read**, and each confirmed by the lane itself in its pane. Judged with the judge's own opened lines (no verifier subagents in phase 2): 3 refutations (R6-1, R6-2 PARTIAL — no points move; R6-3 UPHELD — E2-28's 1 point to exec 6, −3 to exec 2), 2 post-boundary withdrawals (E5-21 → 0, its core refiled as E5-44 at the phase-1 rate 3; E2-50 → 0, no penalty), 9 phase-2 findings (all VALID at half: E6-26 0.5; E3-30 0.5 (Important claimed, Minor judged under phase-1 policy c), E3-31 0.5, E3-32 1.5, E3-33 0.5, E3-34 0.5; P35 0.5, P36 0.5; E5-44 3). Amended the ledger (4 rows) and appended 13; wrote `review-round2-judgment.md`; staged the twelve documents at the close shas; wrote this anchor.
+
+### 2. STANDINGS — final
+| pair | lane | phase 1 | phase 2 | **final** |
+|---|---|---|---|---|
+| UI | exec 1 | 69 | +1 | **70** |
+| UI | **exec 4** | 72 | 0 | **72** ✔ |
+| UX | **exec 2** | 115 | −5 | **110** ✔ |
+| UX | exec 5 | 101 | 0 | **101** |
+| FUNC | exec 3 | 41 | +3.5 | **44.5** |
+| FUNC | **exec 6** | 53 | +1.5 | **54.5** ✔ |
+Computed from the ledger: `awk -F'\t' 'NR>1{t[$2]+=$5+$7} END{for(l in t) print l, t[l]}' docs/lanes/review-scores.tsv`. No tie, so the coverage tiebreaker was not drawn.
+
+### 3. THREE RULINGS THE RULES DID NOT SPELL OUT — made here, recorded so the owner can overrule
+1. **A PARTIAL refutation moves nothing and costs nothing.** R6-1/R6-2 were right (the phone's door is `POST /v1/sync`; actor≠session answers `invalid: actor-mismatch` before any gate; an `invalid` is terminal in the outbox) and the judge re-opened every line — and they also corrected the judge's own phase-1 mechanism on E5-21 and E2-42, which had cited the `/v1/events` spoof gate. But the scored core survived, as exec 6 itself said. Upholding would have charged exec 5 and exec 2 ×3 for an overclaim phase 1 had already discounted; rejecting would have charged exec 6 for being right. Both rows are corrected; exec 6 is credited in the judgment, not in points.
+2. **A withdrawn-and-refiled core keeps its phase-1 score.** exec 5 withdrew E5-21 and refiled the narrowed core as E5-44; exec 2 narrowed E2-42 in place. Same core, same measurement — rules §5 says same ruling — so E5-44 carries E5-21's 3 rather than 1.5. Halving it would have made the score depend on the verb a lane chose.
+3. **A whole finding withdrawn after the boundary is 0 with no penalty** (E2-50): honest self-correction is not a refutation.
+
+### 4. THE LANDING — what this PR carries and how it is verified
+Six reports + six refutation files at the phase-2 close shas (`git show <sha>:docs/lanes/<file>`; sha256 of each landed copy listed in the PR body), `review-scores.tsv` (240 lines incl. header; every row 9 fields), `review-round2-judgment.md`, this file (cycle 40 rotated to the history file's top in this commit). Docs-only. The merge bar: seven checks `rc=0` under Node 22 with a non-zero control; forced gate at the landing tree (`EXIT=0`, `Tasks: 33 successful, 33 total`, `NODE=v22.*`); push verified by `gh pr view --json headRefOid` = `git rev-parse HEAD`; merge verified by API + reachability + tree identity + the full-tree drop check with a control.
+
+### 5. WHAT THE SUCCESSOR (or this session, after the merge) DOES NEXT, IN ORDER
+1. **End the losers** — the owner's standing order (*"the ones who loses dies"*), executed only after this PR is on `main`: for each of exec 1 (`gisik:1`, `gisik-nokma-exec`), exec 5 (`gisik:5`, `gisik-nokma-exec5`), exec 3 (`gisik:3`, `gisik-nokma-exec3`): confirm the lane's worktree is clean and its HEAD equals the close sha (nothing unpushed dies with it), `tmux kill-window -t gisik:N`, `git worktree remove <path>`, keep the branch. exec 4's `next dev` on `:3041` is the winner's, not a loser's — leave it.
+2. **Anchor cycle 42** recording the three endings with `tmux list-windows -t gisik` and `git worktree list` output, and rewrite the card's lane rows (the "to be ENDED" rows become "ENDED at HH:MM"). One docs PR, one gate.
+3. **Then hold.** No lane has next work until the owner says what the 239 rulings become. Tell the owner the verdict table and the three rulings in §3 — they are the owner's to overrule.
+
+### 6. INSTRUMENTS THIS CYCLE
+- `zsh` does not word-split an unquoted `$var` (`set -- $p` keeps one word) and chokes on `case … )` inside `$( )`: two of this cycle's measurement one-liners failed to parse or misparsed until moved into a `bash` script file. **Write multi-branch measurement scripts to the scratchpad and run them with `bash`.**
+- `git grep -c <id> <sha> -- docs/lanes/` sums across EVERY file in the directory (P36 → 33 hits at the phase-1 sha, all in other files); the absence check must name the one file, and its positive control is the same command at the close sha.
+- The idle nudger's contextual pastes strand in the input box (three observed: 17:00 on `gisik:3` and `:5`, 17:06 on `:1` and `:3`); the close paste submitted the stranded text along with itself and every lane acted correctly — but a dispatch text must expect a prefix it did not write.
+
+---
+
 ## 🔄 MONDAY 2026-09-21 ~16:5x IST — **CYCLE 40: PHASE-1 JUDGING COMPLETE (227 RULINGS); THE CONTROLLER RESTARTS AT 81 % CONTEXT ON THE OWNER'S WORD; THE SUCCESSOR CLOSES PHASE 2 AND JUDGES THE REFUTATIONS.** `main` is **`d3772072`**; branch **`ctl/round2-judgment`** carries everything.
 
 ### 1. HOW PHASE 1 WAS JUDGED — the method the successor must keep
