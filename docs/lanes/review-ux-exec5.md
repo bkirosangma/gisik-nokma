@@ -427,6 +427,115 @@ destructive control.
 
 ---
 
+### E5-10 — IMPORTANT · A single-row "mark read" and the bulk Undo fail SILENTLY — the exact first-version defect the bulk path's own docblock says it fixed `[SOURCE]` (verifies exec 2's §2e "single-row mark-read and its Undo failing silently", unmeasured there)
+
+**WHAT.** `apps/web/app/inbox/page.tsx:269-278` `markRead(id)`: optimistic flip, then `void
+gateway.markRead(id).catch(() => loadFirstPage());` — no sentence. `:344-357` `undoMarkAllRead()`: the same,
+`.catch(() => loadFirstPage())`. The bulk path `:300-340` renders `BULK_REFUSED_COPY` / `BULK_UNREACHED_COPY` and its
+docblock at `:319-333` records why: *"The first version of this catch reloaded and said NOTHING: a reader over the
+bound saw a click do nothing and the list snap back, with no sentence anywhere."*
+
+**WHY.** The fix was applied to `markAllRead` and not to its two siblings in the same file, so a person who taps one
+row's mark-read and is refused (404 on a row that is not theirs, or a dropped connection) sees the row flip and
+snap back with no explanation; the same for Undo. The docblock's sentence *"A REFUSAL IS RENDERED, NOT SWALLOWED"* is
+true of one of three paths.
+
+**WHAT WOULD HAVE BEEN BETTER.** The same status-split sentence on both catches — `BULK_UNREACHED_COPY`'s sibling for a
+row, and a one-line "could not undo" beside the toast.
+
+**MEASUREMENT.** `[SOURCE]` lines above opened. Not driven: the owner's inbox is empty (`[BROWSER]` `/inbox` →
+`EMPTY_INBOX_COPY`) and I will not mint notifications in the owner's database.
+
+**SEVERITY: Important** (claimed). A press that does nothing and says nothing, on the surface whose job is to tell
+people things.
+
+---
+
+### E5-11 — IMPORTANT · The invite form asks a person to type comma-separated project ULIDs; the export draws a picker of project names; the manual says the box "is not usable by a person" `[BROWSER]` `[SOURCE]` — category 3
+
+**WHAT.** `/w/…/members` → "Invite somebody" → `Projects (comma-separated ids, optional)`, a bare text input
+(`members/page.tsx:875-884`; `[BROWSER]` control list `INPUT:text` under that label). The export
+(`EXPORT:765-775`) draws `Project access` as a `<select>`: `All projects in this workspace` / `Only <project name>`
+per project. `docs/manual.md:236-240`: *"It asks for a comma-separated list of identifiers — long strings of letters
+and numbers that you would have to go and find from somewhere. **In practice this box is not usable by a person.**"*
+
+**WHY.** The names are one read away — the shell already has `use-workspace-projects.ts` and `GET /v1/me/workspaces`
+serves `projects[].{projectId,name}` (`[BROWSER]` wire above). The form's own docblock (`:721-741`) sets the rule that
+*"offering a choice the door will reject is a form that lies about what it can do"* and applies it to `owner` and to
+the guest arm — but not to a field whose only honest input is an identifier no screen shows. **Search for a
+ruling:** `docs/design/prototype-delta-2026-09-18.md` `isInviteAdmin` entry says *"guest hides the project field in
+both"* and nothing about the field's shape; `docs/hig-reconciliation-audit.md:177` lists the field as-built;
+`grep -rn 'comma-separated' Features.md test-cases/13-second-wave-roles-and-navigation.md test-cases/06-auth-visibility.md`
+→ no ruling.
+
+**WHAT WOULD HAVE BEEN BETTER.** The export's select, fed from the workspaces read the page already makes.
+
+**MEASUREMENT.** `[BROWSER]` members page controls; `[SOURCE]` `members/page.tsx:721-741`, `:875-884`;
+`EXPORT:765-775`; `docs/manual.md:229-240`.
+
+**SEVERITY: Important** (claimed). The manual's own verdict.
+
+**Observation, not scored:** the `Channel` select (`email`/`sms`/`whatsapp`) MATCHES the export (`EXPORT:753-755`),
+and the manual (`:229-234`) says the product sends by none of them — the link is shown once and sent by hand. A
+control matching the prototype is category 1; that it names three delivery channels for a product that delivers by
+none is noted for the judge without a claim.
+
+---
+
+### E5-12 — MINOR · The same workspace is "1 project" on `/workspaces` and "2 projects" on `/account` `[BROWSER]` `[SOURCE]`
+
+**WHAT.** `/workspaces` card for Convenience Corner: `1 project` + chip `1 archived` (`[BROWSER]`).
+`/account` → Your workspaces: `Convenience Corner · owner · 2 projects` (`[BROWSER]`). Wire: `GET /v1/me/workspaces`
+→ two projects, one `archived: true` (`[BROWSER]`).
+
+**WHY.** `workspaces/page.tsx:259-264` counts `live = projects.filter(p => !p.archived)` and renders
+`projectCountLine(live.length)`; `apps/web/src/account/workspaces-section.tsx:76-77` renders
+`workspace.projects.length`. Two units for one word.
+
+**WHAT WOULD HAVE BEEN BETTER.** One helper, or the account row saying `1 project · 1 archived`.
+
+**MEASUREMENT.** Lines above opened; both pages painted.
+
+**SEVERITY: Minor** (claimed).
+
+---
+
+### E5-13 — IMPORTANT · After a failed preferences read, `/account` paints all five notifications ON and one toggle PUTs a whole document built from that guess — silently overwriting whatever the person had muted `[BROWSER, reproduced with zero server writes]` `[SOURCE]` (verifies exec 2 §2e's "two account sections with no error prop", and goes further)
+
+**WHAT.** `account/page.tsx:81` `notificationPreferences.load().then(setPrefs, () => setPrefs({ mutedKinds: [] }))`.
+`toggleKind` (`:215-232`) builds `next` from `prefs.mutedKinds` and `save(next)` PUTs the WHOLE document — the
+gateway's contract (`notification-preferences-gateway.ts:18-22`): *"a PUT replaces it … A caller that wants to flip
+one kind reads the current value first (`load`) — exactly what `toggleKind` does."* On the failed-read path that
+premise is false: the "current value" is the page's guess.
+
+**Reproduction (no write reached the server).** On `/account`, `window.fetch` was wrapped so `GET
+/v1/me/notification-preferences` throws (`TypeError: simulated network failure`) and a `PUT` to it is captured and
+answered `200` locally. Client-side navigation to `/account` via `window.next.router.push`. Painted: five checkboxes,
+**all `checked: true`**, no `role="alert"`, no refusal text (`errorText: []`). One click on *"A ticket is assigned to
+you"* → captured `PUT /v1/me/notification-preferences` body **`{"mutedKinds":["assignment"]}`**. Had the person
+previously muted `mention` and `contest`, this body un-mutes both.
+
+**WHY.** The page's own comment (`:74-80`) says the literal *"merely renders every kind as on for this visit, without
+asserting that fact about the account"* — and then `toggleKind` asserts it to the server. The sessions section
+(`sessions-section.tsx:55-60`) hedges its empty sentence for the same collapsed read — *"this component cannot tell
+which"* — while a signed-in person always has at least the current session, so "No signed-in devices to show" on
+`/account` (`[BROWSER]`) can only be a failed read painted as an empty state. This is the brief's expensive shape
+inverted: the server ACCEPTS a claim the client invented.
+
+**WHAT WOULD HAVE BEEN BETTER.** Hold `prefs = null` on a failed read and render the five rows disabled with *"Your
+preferences could not be loaded"*; make `toggleKind` refuse to save unless the last `load` succeeded; same for
+sessions (`:91`).
+
+**MEASUREMENT.** `[BROWSER]` JS transcript above (`cap` array: `[{GET, blocked:true}, {PUT, body:"{\"mutedKinds\":[\"assignment\"]}"}]`).
+`[SOURCE]` `account/page.tsx:74-81`, `:91`, `:215-232`; `notification-preferences-gateway.ts:18-22`;
+`sessions-section.tsx:55-60`.
+
+**SEVERITY: Important** (claimed). A person's stored settings are overwritten by a default the product itself says it
+is not asserting. I considered Critical (data loss) and held at Important because the loss is a preference document,
+re-settable in five clicks once noticed — but it will not be noticed.
+
+---
+
 ## 3. THE PROTOTYPE — classified
 
 (filled in)
