@@ -1203,3 +1203,42 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
     expect(document.querySelector('.gn-board__column-empty-icon')).not.toBeNull();
   });
 });
+
+/**
+ * 13.1237-13.1238 — the priority badge (spec 2026-09-22).
+ *
+ * A small `P1`/`P2`/`P3` on the card's meta line, `title` attributed like the
+ * due label's, with `--p1` taking the danger tone. **P2 is the DEFAULT and is
+ * still DRAWN** — the value is a fact on every card, and a card without one is
+ * not a state this product has — so there is no absence arm to test and the
+ * `13.1238` case is the control that says so.
+ */
+describe('13.1237 the board card draws the priority badge; P1 carries the danger tone', () => {
+  const cardAt = (value: 'P1' | 'P2' | 'P3', ticketId: string) =>
+    boardCardSeed({ ticketId, priority: { value, claim: claim({ actorName: 'Kiro' }) } });
+
+  it('13.1237 P1 is drawn in the danger tone, with the claimant as its title', () => {
+    render(<Board board={errandBoard([cardAt('P1', 'p-one')])} onOpenTicket={() => {}} />);
+    const badge = screen.getByText('P1');
+    expect(badge.className).toContain('gn-board-card__priority');
+    expect(badge.className).toContain('gn-board-card__priority--p1');
+    // The attribution travels with the level, the same `'s claim` sentence the
+    // due label and every sheet claim line uses — a badge with no claimant
+    // would read as a fact the system established.
+    expect(badge).toHaveAttribute('title', "Kiro's claim");
+  });
+
+  it('13.1238 CONTROL — P2 and P3 are drawn WITHOUT the tone, and the badge is on EVERY card', () => {
+    render(
+      <Board
+        board={errandBoard([cardAt('P2', 'p-two'), cardAt('P3', 'p-three')])}
+        onOpenTicket={() => {}}
+      />,
+    );
+    expect(screen.getByText('P2').className).not.toContain('--p1');
+    expect(screen.getByText('P3').className).not.toContain('--p1');
+    // TWO badges for TWO cards — the positive half of "no absence arm", and the
+    // assertion that stops the case passing on a board that drew one card.
+    expect(screen.getAllByText(/^P[123]$/)).toHaveLength(2);
+  });
+});

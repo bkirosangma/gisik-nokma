@@ -2271,3 +2271,15 @@ number is never renumbered.
   reading `13.592` gives `start`). The chosen-P1 case is what separates "the draft travels" from "the door
   mints a constant": the two `13.592` cases assert the default, which a hard-coded `'P2'` satisfies
   perfectly. — `packages/app-core/test/views/reopen-flow.test.tsx`
+
+## Priority is a built-in — the board card badge (spec 2026-09-22, Task 9)
+
+- **13.1237** ✅ The board card draws the priority badge with the claimant as its `title` — the same
+  `'s claim` sentence the due label and every sheet claim line use — and `P1` carries
+  `gn-board-card__priority--p1`, the danger tone the late due label takes on the same measured pair. —
+  `packages/app-core/test/views/board.test.tsx`
+- **13.1238** ✅ CONTROL — `P2` and `P3` are drawn WITHOUT the tone, and the badge is on EVERY card: two
+  cards, two badges. **There is no absence arm to test** and that is the case's point — P2 is the birth
+  default, so a card without a level is not a state this product has; a one-armed assertion would be
+  satisfied by a tone that is always on and by one that is never on alike. —
+  `packages/app-core/test/views/board.test.tsx`
