@@ -446,7 +446,7 @@ curl -s http://localhost:3041/v1/me/workspaces      # → {"error":"unauthentica
 
 **PROTOTYPE.** `Desktop.dc.html:496-520` draws the calendar as `div`s too; it is a drawing, not an accessibility authority, and gives no ruling on semantics. No ruling found (`grep -rn "role=\"grid\"\|aria-label.*day\|calendar.*screen reader" packages/app-core/src/calendar docs` → nothing).
 
-**WHY IT IS WRONG.** WCAG 1.3.1 (Info and Relationships, Level A): the relationship "this ticket is due on the 5th" exists only in pixel geometry. A screen-reader user hears `31 1 2 3 4 5 6 … HSN digit count, button` and cannot tell which day the pill sits under; the start/end dates are `title` text, which touch users never see and most screen readers do not read on a button that already has a name. The same failure on the Timeline: bars are announced with no week.
+**WHY IT IS WRONG.** WCAG 1.3.1 (Info and Relationships, Level A): the relationship "this ticket is due on the 5th" exists only in pixel geometry. A screen-reader user hears `31 1 2 3 4 5 6 … HSN digit count, button` and cannot tell which day the pill sits under; the start/end dates are `title` text, which touch users never see and which assistive technology exposes inconsistently (as a description at best, never as part of the name). The same failure on the Timeline: bars are announced with no week.
 
 **WHAT WOULD HAVE BEEN BETTER.** The cheapest honest fix is in the *name*, not the structure: `aria-label={`${title} — due ${date}`}` on each item/bar (the `title` text already exists), and `<time dateTime>` or an `aria-label` with the full date on each day cell. The structural fix — `role="grid"` with `columnheader`/`gridcell`, or a `<table>` — is what the ARIA calendar pattern asks for and is a larger change.
 
