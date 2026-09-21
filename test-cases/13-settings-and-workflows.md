@@ -513,7 +513,12 @@ Red before the fix, green after, on the real trees.
   at one; an earlier draft asserted one and the run refused the fixture, so the fixture was corrected
   and not the check. Five known-good cases, including a hidden dotfile and a migration **removed** from
   the current directory — removal is explicitly not this rule, since a rename of a not-yet-applied
-  migration is legitimate and indistinguishable from this side.
+  migration is legitimate and indistinguishable from this side. **The below-max plant carries a second
+  required name beyond its own site** (E6-7): the refusal must also state the prefix convention
+  (`CONVENTION_SENTENCE`), which reddens this case if that record is deleted from the message — the
+  convention is otherwise written down nowhere a developer creating a migration would look. The
+  planted-defect count is unchanged at six; this adds a required name to an existing plant, not a
+  seventh plant.
 - ✅ **13.904 — the reader is under test, not only the comparison.** The fixtures are real
   **directories** read by the same `readdirSync` reader the real sweep uses, so the filter and the sort
   are witnessed rather than assumed. Dropping the `^\..*` ignore pattern reddens this case and 13.903

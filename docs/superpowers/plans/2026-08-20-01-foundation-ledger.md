@@ -1900,7 +1900,7 @@ Expected: `ready`.
 - [ ] **Step 2: Generate the migration file, then replace its contents**
 
 Run: `pnpm --filter @gisik-nokma/server exec node-pg-migrate create events-and-snapshots --migration-file-language sql --migrations-dir migrations`
-Expected: creates `apps/server/migrations/<timestamp>_events-and-snapshots.sql`. The generator owns the filename and any marker-comment format.
+Expected: creates `apps/server/migrations/<timestamp>_events-and-snapshots.sql`. The generator owns the filename and any marker-comment format. **The PREFIX is the exception, and this repo overwrites it** (recorded 2026-09-21, E6-7): the migrations here are hand-numbered on a counter stepped `1e8` ms (≈27.8 h) with the prefix rounded to a multiple of that unit, so the sequence can sit ahead of the wall clock and the generator's clock stamp then lands below a migration already applied. `pnpm check:migrations` refuses that by design and its message names the remedy; the rule and its measurements are the docblock of `scripts/check-migration-order.mjs`.
 
 The generated file contains an "Up" marker comment and a "Down" marker comment. Put this SQL under the Up marker and the Down SQL under the Down marker, deleting any placeholder content. (If the generated file has no marker comments, the whole file runs as Up — in that case use only the Up SQL and omit the Down section.)
 

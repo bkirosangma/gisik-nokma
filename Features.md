@@ -2904,8 +2904,14 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   pull request's own base** (`--base origin/${{ github.base_ref }}`), not `main`: review measured that a
   branch stacked on another branch which outranks it is **accepted** against `main` and refused against
   its real base, and that shape is used here — 14 of the last 400 merges were based on a non-main
-  branch. `scripts/check-migration-order.mjs`, `package.json`, `.github/workflows/ci.yml`, cases
-  13.902–13.906
+  branch. **The refusal names the convention it rests on, because nothing else did** (E6-7): the
+  migrations here are hand-numbered on a counter rather than stamped from the clock — each of the last 13
+  is a multiple of `1e8` ms and the gaps between neighbours are `1e8` (10 of the 12) or `2e8` — so the
+  sequence can sit ahead of the wall clock, and a stamp fresh from the generator the plans document lands
+  below the head and arrives at this refusal. The message states the convention and the remedy, and the
+  self-test pins that sentence as a required name of the below-max plant, so deleting the record reddens
+  the check rather than passing quietly. `scripts/check-migration-order.mjs`, `package.json`,
+  `.github/workflows/ci.yml`, cases 13.902–13.906
 
 ## 14. MCP server
 
