@@ -1511,7 +1511,8 @@ beside the column chooser as *"Your column choice was not saved — …"*, and k
 alone — the same correction the parent-picker comment already made.
 
 **MEASUREMENT.** `[SOURCE]` `ticket-list.tsx:1200-1227`; `use-preferences.ts:74-110`; `page.tsx:1745-1760`,
-`:2329`, `:2393`, `:2523`, `:2652`. Not driven (a session is needed to toggle a column; the mechanism is one `??`
+`:2329`, `:2393`, `:2523`, `:2652`. Population: a sweep for `error ?? ` / `.error ?? ` over `packages/app-core/src/views`,
+`apps/web/app` and `apps/web/src` finds **this one fold** (the other two hits pass an error to a prop named for it). Not driven (a session is needed to toggle a column; the mechanism is one `??`
 and four `!== null` checks, all opened). The reproduction for the judge: on the List tab, wrap `fetch` to answer
 `500` for `PUT /v1/me/preferences`, un-tick a column.
 
