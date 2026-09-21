@@ -84,3 +84,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-F7-fn | done | e4d6236a | §17: a lane with no row must STOP AND ASK (the count half was superseded) |
 | T-I3 | done | 0bc9919c | tap-targets: the my-work exclusion names its real reason (stack window) |
 | T-I4 | done | 95d09284 | tap-targets cites the ui.css sentence by its words, not by a wrong range |
+| T-I5 | done | 3fe7d95e | executor-state: the older id block points forward; two dupes resolved |
