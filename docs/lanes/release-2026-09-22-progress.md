@@ -22,3 +22,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | E2-41-renumber | done | 6b225ba6 | 12.398/12.399 -> 12.409/12.410 (collision with B01/B07/B16) |
 | T-E2-49 | done | 81f68561 | register-push.test.ts (12.411) |
 | T-E2-53 | done | 823dfc31 | editor-refusals.test.ts (12.412) |
+| T-E4-22 | done | 51ba5a47 | board-row-a11y.test.ts (13.1187) |
