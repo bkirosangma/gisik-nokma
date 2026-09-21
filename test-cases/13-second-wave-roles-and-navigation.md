@@ -1052,6 +1052,28 @@ is the loud failure over the quiet one. Re-seeding needs the hot stack, which th
 puts out of this session's reach. **Owner: whoever runs `e2e-stack` next.** One run settles it, and the red
 it prints says exactly what to commit.
 
+> ### RESOLVED 2026-09-22 (`rel/browser-findings`) — the sweep was run, and the residue was NOT a lost name
+>
+> **This owner was taken, and the run it asked for happened twice.** The deployed stack reads **64** on
+> `stack-phone-390|/p/:projectId` (the number the release run reddened at, `LOST ariaLabel: baseline 66, now
+> 64`) and the branch's own tree reads **65**; both were taken at 390 through `sweepAccessibleNames`' own
+> predicate, the second on a `next dev` from this lane's worktree with the session carried across.
+>
+> **The 66 → 65 reading this section is about is untouched by either run and stays unattributed** — it was
+> taken while the epic cards were still drawn and before P19/P31, so it is a third point on the line rather
+> than a step of the movement measured now. What the two runs DO settle is what to commit: the floor is now
+> `65`, and every unit between the baseline and that number is an element that LEFT or ARRIVED —
+> `4` with the two epic cards (`Registrations`, `Open questions`; the owner's 2026-09-20 ruling, `0cc3520d`),
+> `2` with `Main` (P31) and `Project view` (P19), `1` with this lane's project-item accessible name. **The
+> floor was lowered with the sweep run, in the direction that does not hide a loss, and with the members of
+> both sides named** — which is the condition this section set for ever lowering it.
+>
+> **One correction to the section above:** its point 2 reasoned that the `AttentionStrip`'s attribute kept
+> its name and so "the count did not move either way". That holds for the attribute, and the strip is not
+> rendered on this route today (it draws nothing when the attention list is empty) — so whether it
+> contributed to the baseline's 66 remains one of the things the two runs cannot see, because the DOM they
+> measure is the one that exists. It is named here rather than left as a closed question.
+
 Two other ratchets were checked in the same pass and are **unaffected**: `tap-target-baseline.json` holds a
 single key (`stack-phone-390|/my-work`) and does not baseline `/p/:projectId` at all, and
 `type-scale-baseline.json` records `0` for that route.

@@ -1259,3 +1259,53 @@ describe('E5-23 the empty workspace home speaks to whoever is actually reading i
     expect(screen.queryByText(/create the first one below/)).toBeNull();
   });
 });
+
+/**
+ * 13.1217 — the bar's project item and the project card's door do not share one
+ * accessible name, so "the project's link" is a UNIQUE query on this page.
+ *
+ * `e2e-stack/helpers/board.ts` asks for the seeded project with
+ * `getByRole('link', { name: 'Shop operations', exact: true })` and asserts
+ * `toHaveCount(1)` — deliberately, because that file's docblock records that a
+ * positional pick is how it measured the WRONG board once already. The deployed
+ * stack answered **2** (`measured 2026-09-22, the desktop viewport the stack
+ * suite runs at`): the card's door, which carries the project's name because it
+ * IS the project's row, and the bar's "last open project" item, which carried
+ * the same name because nothing had ever needed them to differ.
+ *
+ * **The fix is on the BAR's side, and this case is what holds the direction.**
+ * The card door's name is the project's — that is the identity every
+ * `within(card)` query in this file and the stack suite's exact-name query are
+ * built on. The bar item is a second, contextual door, so it is the one that
+ * says which it is. Renaming the card instead was rejected in the component's
+ * docblock for a measured reason: the exact-name query would then match the bar
+ * item, whose project is `routeProject ?? rememberedLive ?? live[0]` — a
+ * POSITION, and a silently different board on any database that sorts another
+ * project first.
+ *
+ * The assertion is the SAME QUERY the suite makes, over a render that carries
+ * both surfaces: `getAllByRole` (not `within(row)`) is what makes this a
+ * measurement of the page rather than of one card, and it is why the case fails
+ * on the pre-fix tree with two links rather than one.
+ */
+describe('13.1217 the bar’s project item and the card door do not share one name', () => {
+  it('names the door after the project, and the bar item after itself', async () => {
+    mount([[workspaceAs('member')]]);
+
+    // WAIT FOR BOTH SURFACES FIRST, on the two reads that carry them: the page's
+    // own list and `AppNav`'s project read. `getAllByRole` is a whole-page query,
+    // and one run before the bar has rendered would report ONE link whether or
+    // not the collision is there — the assertion below has to be made over the
+    // finished page or it is not about the page.
+    await screen.findByTestId('project-row-p1');
+    await screen.findByRole('link', { name: 'Shop operations, projects menu' });
+
+    // The door, pinned to the project's own name and its own href.
+    const door = within(row('p1')).getByRole('link', { name: 'Shop operations' });
+    expect(door).toHaveAttribute('href', `/w/${WORKSPACE}/p/p1`);
+
+    // THE WHOLE PAGE, not the row: exactly one link answers to the project's
+    // name, and it is the door. Two would be the defect this case exists for.
+    expect(screen.getAllByRole('link', { name: 'Shop operations' })).toEqual([door]);
+  });
+});

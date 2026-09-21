@@ -250,9 +250,42 @@ export function LastProjectNav({
         aria-expanded={open}
         aria-controls={open ? menuId : undefined}
         aria-current={pathname === projectHref ? 'page' : undefined}
-        // The home's card carries exactly this string for exactly this state —
-        // one convention for "this project is archived", two surfaces.
-        aria-label={shown.archived ? `${shown.name}, archived` : undefined}
+        /* ## The name says WHICH DOOR THIS IS, because the card's name is the
+         * ## project's and this item's would otherwise be a second copy of it
+         *
+         * The home's card carries the archived half of this string for exactly
+         * this state — one convention for "this project is archived", two
+         * surfaces. **The trailing `projects menu` is not that convention and is
+         * a different fix: it is what keeps the two doors distinguishable.**
+         *
+         * MEASURED on the deployed stack at the desktop viewport the stack suite
+         * runs at (2026-09-22): on `/w/0TZSS5W6ATCTF2YBPMWGGP9JF5` there are
+         * exactly TWO links to `/w/…/p/0XB92YA4CGEBF9S285AH4SDXR1` — this item
+         * (`a.gn-nav__project`, 148×44) and the project card's door
+         * (`a.gn-project-card__door`, 363×63) — and with no qualifier both carry
+         * the accessible name `Shop operations`.
+         * `getByRole('link', { name: 'Shop operations', exact: true }).count()`
+         * reads **2** at 1280×720 and 1 at 390 (where this item is behind the
+         * phone nav and out of the accessible tree). That count is why
+         * `e2e-stack/helpers/board.ts`'s `openSeededBoard` refused with "found no
+         * single project link".
+         *
+         * **The qualifier belongs HERE and not on the card.** The card door is
+         * the project list's own subject: its name is the project's, it is what
+         * `within(card).getByRole('link', …)` and every workspace-home case
+         * address, and the exact-name query the stack suite builds is aimed at
+         * it. This item is a SECOND, contextual door to the same project — the
+         * only surface where the bar names one — so it is the one that has to say
+         * which it is. The alternative was tried on paper and rejected: renaming
+         * the card would leave `{ name: 'Shop operations', exact: true }` matching
+         * THIS item, whose project is `routeProject ?? rememberedLive ?? live[0]`
+         * — a POSITION, which is the silent wrong-board pick that helper's own
+         * docblock exists to remove.
+         *
+         * The visible text is unchanged (`{shown.name}`, below): the owner asked
+         * for the last open project's NAME in the bar, and WCAG 2.5.3 wants the
+         * accessible name to contain the visible label, which this does. */
+        aria-label={`${shown.name}${shown.archived ? ', archived' : ''}, projects menu`}
         onFocus={() => {
           // See the docblock: exactly the focus call `close(true)` makes is
           // ignored, so Escape does not immediately reopen the menu.

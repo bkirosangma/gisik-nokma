@@ -17,6 +17,15 @@ html, body { margin: 0; padding: 0; }
   left: -9999px;
   top: 0;
   z-index: 60;
+  /* 44px is WCAG 2.5.5's floor for a standalone control, the one the viewport
+     suite's tap-target ratchet (13.287, apps/web/e2e-viewport/tap-targets.ts)
+     applies here. The padding alone rendered a 142×42 box — measured by that
+     suite against the release build on 2026-09-22 — so the height is pinned,
+     not left to the line box. The unfocused, off-screen box is what the probe
+     measures, so the floor sits on this rule and not on `:focus`. */
+  display: flex;
+  align-items: center;
+  min-height: 44px;
   padding: 0.6rem 1rem;
   border-radius: var(--gn-radius-control);
   background: var(--gn-surface-raised);
@@ -1873,10 +1882,33 @@ input, textarea, select { font-family: inherit; }
    state is a `data-open` attribute instead: the links are always in the
    document, always one Tab away, and always in the accessibility tree. */
 .gn-nav__more { display: contents; }
-.gn-nav__more-toggle { display: none; }
+
+/* ⚠ TWO CLASSES, AND THE SECOND ONE IS THE WHOLE FIX (E4-11, 2026-09-22).
+
+   This shipped as `.gn-nav__more-toggle { display: none; }` — (0,1,0) — and it
+   LOST to `.gn-nav a, .gn-nav button { display: inline-flex; … }` further down
+   this file, which is (0,1,1). So above 40rem the phone's `Menu` toggle was
+   PAINTED on the desktop bar, unstyled, while the arm that exists to show it had
+   not even applied. The owner's screenshot is that button.
+
+   **Source order only decides between EQUAL specificity**, which is why moving
+   this rule below the generic one would not have fixed it; `.gn-nav
+   .gn-nav__more-toggle` is (0,2,0) and beats (0,1,1) wherever the two sit. The
+   phone arm below carries the SAME two classes, so it still wins inside the
+   media query — equal specificity, later in the file.
+
+   No `!important`: this file has none for a layout property, and an override
+   flag is the wrong lever for a problem that is a specificity.
+
+   ⚠ THE TEST THAT SHOULD HAVE CAUGHT THIS WAS GREEN THROUGHOUT. Case 13.1137's
+   `'the toggle is painted nowhere above 40rem'` asserted that this rule's
+   DECLARATION reads `display: none` — which it did, and the browser painted the
+   button anyway. A scan of declarations is not a scan of the WINNING
+   declaration; `nav-phone-disclosure.test.ts` now resolves the cascade. */
+.gn-nav .gn-nav__more-toggle { display: none; }
 
 @media (max-width: 40rem) {
-  .gn-nav__more-toggle { display: inline-flex; align-items: center; }
+  .gn-nav .gn-nav__more-toggle { display: inline-flex; align-items: center; }
   .gn-nav__more { display: none; }
   .gn-nav__more[data-open="true"] {
     display: flex;
@@ -2035,9 +2067,12 @@ input, textarea, select { font-family: inherit; }
 /* Resting/hover treatment (owner spec, transcribed from
    `design-system/interactive/desktop.dc.html`'s `--label`/`--label2`/`--radius`
    vars — the same source `blue600`/`textAccent` already trace to). Scoped to
-   `<a>` only: the three `<button>` children (`StyleToggle`, `ThemeToggle`,
-   sign-out) keep their own `.gn-button` colour and radius, and only share the
-   tap-target sizing above.
+   `<a>` and to `.gn-nav__more-toggle`: the three `<button>` children
+   (`StyleToggle`, `ThemeToggle`, sign-out) keep their own `.gn-button` colour
+   and radius, and only share the tap-target sizing above. **The toggle is the
+   fourth button and the exception** — it carries no `.gn-button`, so nothing
+   else gave it a ground, a radius or a hover at all, and it is a peer of the
+   links it reveals rather than an action beside them (E4-11, 2026-09-22).
 
    `--label2` (the spec's resting-label colour, `rgba(32,43,73,0.78)`) has no
    primitive of its own in this palette — every hex here is a role in
@@ -2060,7 +2095,8 @@ input, textarea, select { font-family: inherit; }
    this to be pinned smaller instead of varying by style, matching the spec's
    own `--radius` var (constant across the prototype's styles too). Not a
    colour, so outside the token-discipline scanner's remit. */
-.gn-nav a {
+.gn-nav a,
+.gn-nav__more-toggle {
   border-radius: 0.375rem;
   padding-inline: 0.875rem;
   font-weight: 500;
@@ -2068,9 +2104,18 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
   text-decoration: none;
   transition: background .15s ease, color .15s ease;
+  /* A `<button>` brings chrome an `<a>` never had — a `ButtonFace` ground, an
+     outset border and a default cursor. `.gn-nav__more-toggle` is the one nav
+     button with no `.gn-button`, so nothing else clears them, and at 390 px it
+     painted as a grey OS control sitting in the link row (E4-11, 2026-09-22). */
+  background: transparent;
+  border: none;
+  cursor: pointer;
 }
 .gn-nav a:hover,
-.gn-nav a:focus-visible {
+.gn-nav a:focus-visible,
+.gn-nav__more-toggle:hover,
+.gn-nav__more-toggle:focus-visible {
   background: var(--gn-fill-quaternary);
   color: var(--gn-text);
 }

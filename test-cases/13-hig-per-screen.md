@@ -28,6 +28,7 @@ session would be shared by two branches landing in either order.
 | **B14** (`rel/b14-minimal-shells-phone-and-desktop`) | **`13.1187`–`13.1196`** |
 | **B16** (`rel/b16-outbox-ordering-projection-verif`) | **`13.1197`–`13.1206`** |
 | **B15** (`rel/b15-calendar-timeline-and-canvas-for`) | **`13.1207`–`13.1216`** — self-allocated by the B15 driver (exec6, 2026-09-21 23:3x); absent from the controller's 22:0x table, next free block after B16's `13.1206` |
+| **`rel/browser-findings`** (the release FIX lane, deepseek ds1) | **`13.1217`–`13.1226`** — self-allocated 2026-09-22 by the lane that fixes the five browser-suite release findings; absent from the controller's 22:0x table, next free block after B15's `13.1216`. Minted: `13.1217`, `13.1218`. |
 
 **⚠ THIS TABLE IS THE ALLOCATION, AND IT EXPIRES.** Re-read it before minting, and if your own
 allocation changes, change it HERE in the same action. **When your block is empty, STOP AND ASK.** Do
@@ -212,6 +213,15 @@ the gate would have stayed 33/33.*
   `aria-selected`, and the signed-out sweep sees none of it.* *(Both counts read 13 and 4 until
   2026-09-20 and were stale: recounted against `e2e-stack/accessible-names-baseline.json`'s own
   recorded values and re-measured on the live stack, which agree at 14 and 5.)*
+  **`/p/:projectId`'s `ariaLabel` floor moved `66 → 65` on 2026-09-22** (`rel/browser-findings`), and the
+  movement is attributed rather than absorbed: the sweep was run twice through the same predicate — on the
+  deployed stack at 390 (64, the number the release run reddened at) and on the branch's own tree (65) — and
+  every element of both counts is named in `Features.md`'s ratchet bullet and in the commit. Four instances
+  left with the two EPIC cards the owner ruled off the board (`0cc3520d`), two arrived with `Main` (P31) and
+  `Project view` (P19), and the branch's project-item name is the last. **The recorded `role` stays at 14
+  while the same run measures 15** — a rise is the direction this floor does not check, and it is recorded
+  rather than passed over. The count is also **data-bound (two per drawn card)**, which is the thing to know
+  before reading any future move on this key as a loss.
   **⚠ WHICH PAGE THIS CASE MEASURES WAS WRONG UNTIL 2026-09-20, and the repair is what gives the
   numbers their meaning.** `/p/:projectId` resolved its project as the FIRST project link on
   `/w/<id>` — a POSITION, not a project. The live dev database holds a second project (`gggg`,
@@ -902,3 +912,76 @@ against the actual pre-fix history before being replaced with the per-tag versio
   accessibilityRole>` must not mask. —
   (`apps/mobile/src/screens/pressable-a11y-sweep.test.ts`)
 
+## The bar's project item and the card door do not share one name (`rel/browser-findings`, 2026-09-22) — case `13.1217`
+
+- **13.1217** ✅ On a workspace home, **exactly one** link answers to the project's own name, and it is the
+  project card's door: `screen.getAllByRole('link', { name: 'Shop operations' })` equals `[door]` over the
+  finished page, with the door's `href` pinned to its own project. The bar's "last open project" item is
+  asserted to be RENDERED and to answer to `Shop operations, projects menu`, so the uniqueness above cannot
+  be satisfied by the item's absence. (`apps/web/test/workspace-home.test.tsx`; the item's own eleven cases
+  live in `apps/web/test/last-project-nav.test.tsx`.)
+
+**The finding, and the mechanism it did NOT have.** The release lane's browser run failed in
+`e2e-stack/helpers/board.ts:166` with `found no single project link named "Shop operations" … Projects
+rendered: ["Shop operations","Shop operations26 tickets3 blocked"]`, and the dispatch read that as ONE card
+holding two links (a title link, plus a card-level link whose name was the concatenated text). **Measured on
+the deployed stack at 1280×720, 2026-09-22: the card holds ONE link.** The two are
+`a.gn-nav__project` (148×44 — the bar's item, `aria-label` absent, named by its text) and
+`a.gn-project-card__door` (363×63 — the card, `aria-label="Shop operations"`). Both point at
+`/w/0TZSS5W6ATCTF2YBPMWGGP9JF5/p/0XB92YA4CGEBF9S285AH4SDXR1`, and
+`getByRole('link', { name: 'Shop operations', exact: true }).count()` reads **2** at desktop and **1** at
+390 (where the bar's item is behind the phone nav and out of the accessible tree) — so no jsdom case could
+have seen it either, since the item renders on every width there.
+
+**Why the qualifier is on the bar's side.** The card door's name is the project's: it is the row's identity,
+what every `within(card)` query in `workspace-home.test.tsx` and the stack suite's exact-name query address.
+The bar's item is a second, contextual door, so it is the one that says which it is. The rejected
+alternative is measured rather than argued: renaming the card makes the exact-name query match the BAR's
+item, whose project is `routeProject ?? rememberedLive ?? live[0]` — a POSITION, which is the silent
+wrong-board pick `helpers/board.ts`'s own docblock exists to remove.
+
+**One direction of this change is not covered by a test and is named rather than left implicit:** the bar
+item's name is not anything the accessible-name ratchet (`13.287`) can judge — it counts `aria-label`
+ATTRIBUTES, and this element had none before and has one now, so the count RISES there rather than falling.
+
+## The phone `Menu` toggle is not painted above 40rem (E4-11, `rel/browser-findings`, 2026-09-22) — case `13.1218`
+
+- **13.1218** ✅ The `Menu` toggle LOSES the cascade above 40rem and WINS it below, read as the WINNING
+  `display` rather than as a declaration. A matcher over tag/class compounds and descendant combinators
+  resolves the cascade over the unconditional rules (`none`) and over those PLUS the 40rem block's contents
+  (`inline-flex`); the competitor `.gn-nav button { display: inline-flex }` is asserted present in the same
+  case, and the mutation witness plants the PRE-FIX selector and requires the desktop reading to flip while
+  the phone one does not. (`apps/web/test/nav-phone-disclosure.test.ts`)
+
+**The defect, measured live on the deployed stack (`:3001`, main `9b7c38a9`) at 2026-09-22, signed in on
+`/w/0TZSS5W6ATCTF2YBPMWGGP9JF5`:**
+
+| viewport | present | computed `display` | box | ground | border | radius |
+|---|---|---|---|---|---|---|
+| 390 | yes | `flex` | 57×44 | `rgb(239,239,239)` | `outset 2px` | `0px` |
+| 1512 | **yes** | `flex` | **57×44** | `rgb(239,239,239)` | `outset 2px` | `0px` |
+| 1512 (fixed tree, `next dev` on `:3022`) | in DOM | **`none`** | **0×0** | transparent | none | 6px |
+
+The 1512 row is the owner's screenshot: the phone disclosure button painted on the desktop bar, as raw UA
+button chrome. Above 40rem `.gn-nav__more` is `display: contents` and the links it reveals are drawn
+directly, so the toggle is the only thing that should not be there.
+
+**The cause is specificity, not order.** `.gn-nav__more-toggle { display: none }` is (0,1,0);
+`.gn-nav a, .gn-nav button { display: inline-flex; … }` is (0,1,1) and wins wherever either rule sits —
+source order only decides between EQUAL specificity, which is why moving the rule later would not have
+fixed it. `.gn-nav .gn-nav__more-toggle` (0,2,0) is the fix, and the phone arm carries the same two classes
+so it still wins inside the media query (equal specificity, later in the file — which also means the PHONE
+arm was winning its tie before the fix, and the button looked right at 390 by luck, for exactly the defect
+the desktop arm shows).
+
+**The second half of the fix is at phone, where the button is meant to show.** It carried no `.gn-button`,
+so nothing gave it a ground, a radius or a hover: `background rgb(239,239,239)` and `border outset 2px` are
+the UA's own, and `cursor` was `default`. It now takes the same resting/hover treatment as the nav links it
+reveals (`background: transparent; border: none; cursor: pointer`, the shared radius and padding) — measured
+post-fix as `rgba(0,0,0,0)` / `none` / `6px` / `pointer`, 69×44.
+
+**⚠ THE CHECK THAT SHOULD HAVE CAUGHT IT WAS GREEN THROUGHOUT.** Case 13.1137's `'the toggle is painted
+nowhere above 40rem'` asserted that the rule's DECLARATION reads `display: none` — which it did, while the
+browser painted the button. A scan of declarations is not a scan of the WINNING declaration; the case now
+resolves the cascade, which is a strictly larger instrument over the same stylesheet. The old assertion is
+kept as a precondition inside it rather than deleted.

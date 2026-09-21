@@ -103,5 +103,40 @@
     "ariaSelected": 0,
     "ariaDescribedby": 0,
     "rawMatches": 54
+  },
+  "phone-320|/help": {
+    "ariaLabel": 2,
+    "role": 4,
+    "ariaSelected": 2,
+    "ariaDescribedby": 0,
+    "rawMatches": 1359
+  },
+  "phone-320|/privacy": {
+    "ariaLabel": 2,
+    "role": 1,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 135
+  },
+  "phone-320|/terms": {
+    "ariaLabel": 2,
+    "role": 1,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 135
+  },
+  "phone-320|/sign-in": {
+    "ariaLabel": 0,
+    "role": 1,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 63
+  },
+  "phone-320|/no-such-page-e2e-viewport-probe": {
+    "ariaLabel": 0,
+    "role": 1,
+    "ariaSelected": 0,
+    "ariaDescribedby": 0,
+    "rawMatches": 66
   }
 }

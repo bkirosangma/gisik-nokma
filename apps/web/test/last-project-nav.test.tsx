@@ -148,6 +148,23 @@ function renderNav(services: ReturnType<typeof stubServices>, workspaceId = 'ws_
   );
 }
 
+/**
+ * The item's ACCESSIBLE NAME, in one place.
+ *
+ * It is not the bare project name, and the qualifier is the point of it: on
+ * `/w/<workspaceId>` the project's own card door is a second link to the same
+ * project and carries the project's name exactly, so THIS item says which one it
+ * is. See `last-project-nav.tsx` for the measurement (2 exact matches at the
+ * desktop viewport the stack suite runs at, 1 at phone) and for why the
+ * qualifier belongs on this side rather than on the card.
+ *
+ * The dropdown's `menuitem`s are NOT qualified — they are the project names
+ * themselves, and nothing else on the page carries them.
+ */
+function itemName(name: string, archived = false): string {
+  return `${name}${archived ? ', archived' : ''}, projects menu`;
+}
+
 /** The item's own link — the one whose href is a project route. */
 function itemLink(): HTMLAnchorElement {
   return screen.getByRole('link', { name: /Beta|Gamma|Archived One/ }) as HTMLAnchorElement;
@@ -167,7 +184,7 @@ describe('LastProjectNav — the remembered project item', () => {
     rememberProject('p_gamma');
     renderNav(servicesFor([WS_1]));
 
-    const link = await screen.findByRole('link', { name: 'Gamma' });
+    const link = await screen.findByRole('link', { name: itemName('Gamma') });
     expect(link).toHaveAttribute('href', '/w/ws_1/p/p_gamma');
   });
 
@@ -184,9 +201,9 @@ describe('LastProjectNav — the remembered project item', () => {
   it('13.866 falls back to the first non-archived project in served order', async () => {
     renderNav(servicesFor([WS_1]));
 
-    const link = await screen.findByRole('link', { name: 'Beta' });
+    const link = await screen.findByRole('link', { name: itemName('Beta') });
     expect(link).toHaveAttribute('href', '/w/ws_1/p/p_beta');
-    expect(screen.queryByRole('link', { name: 'Archived One' })).toBeNull();
+    expect(screen.queryByRole('link', { name: itemName('Archived One', true) })).toBeNull();
   });
 
   /**
@@ -233,9 +250,9 @@ describe('LastProjectNav — the remembered project item', () => {
     rememberProject('p_arch');
     renderNav(servicesFor([WS_1]));
 
-    const link = await screen.findByRole('link', { name: 'Beta' });
+    const link = await screen.findByRole('link', { name: itemName('Beta') });
     expect(link).toHaveAttribute('href', '/w/ws_1/p/p_beta');
-    expect(screen.queryByRole('link', { name: 'Archived One' })).toBeNull();
+    expect(screen.queryByRole('link', { name: itemName('Archived One', true) })).toBeNull();
   });
 
   /**
@@ -250,7 +267,7 @@ describe('LastProjectNav — the remembered project item', () => {
     rememberProject('p_deleted');
     renderNav(servicesFor([WS_1]));
 
-    expect(await screen.findByRole('link', { name: 'Beta' })).toBeInTheDocument();
+    expect(await screen.findByRole('link', { name: itemName('Beta') })).toBeInTheDocument();
   });
 });
 
@@ -267,7 +284,7 @@ describe('LastProjectNav — the dropdown', () => {
   it('13.870 opens on hover and lists the non-archived projects in served order', async () => {
     rememberProject('p_gamma');
     renderNav(servicesFor([WS_1]));
-    await screen.findByRole('link', { name: 'Gamma' });
+    await screen.findByRole('link', { name: itemName('Gamma') });
 
     expect(screen.queryByRole('menu')).toBeNull();
 
@@ -295,7 +312,7 @@ describe('LastProjectNav — the dropdown', () => {
   it('13.871 opens on focus and closes on Escape', async () => {
     rememberProject('p_gamma');
     renderNav(servicesFor([WS_1]));
-    await screen.findByRole('link', { name: 'Gamma' });
+    await screen.findByRole('link', { name: itemName('Gamma') });
 
     await userEvent.tab();
 
@@ -322,7 +339,7 @@ describe('LastProjectNav — the dropdown', () => {
   it('13.872 remembers the project it opens, and seeds its tab', async () => {
     rememberProject('p_gamma');
     renderNav(servicesFor([WS_1]));
-    await screen.findByRole('link', { name: 'Gamma' });
+    await screen.findByRole('link', { name: itemName('Gamma') });
 
     // THE KEY IS REMOVED FIRST, and this line is the difference between a case
     // and a decoration. `rememberProject('p_gamma')` above writes exactly the
@@ -356,7 +373,7 @@ describe('LastProjectNav — the dropdown', () => {
   it('13.873 remembers the project chosen from the dropdown, not the one shown', async () => {
     rememberProject('p_gamma');
     renderNav(servicesFor([WS_1]));
-    await screen.findByRole('link', { name: 'Gamma' });
+    await screen.findByRole('link', { name: itemName('Gamma') });
 
     await userEvent.hover(itemLink());
     await userEvent.click(await screen.findByRole('menuitem', { name: 'Beta' }));
@@ -390,14 +407,14 @@ describe('E5-34 the item names the project you are actually on', () => {
     renderNav(servicesFor([WS_1]));
 
     // The name carries the state, exactly as `/workspaces`' card does it.
-    const trigger = await screen.findByRole('link', { name: 'Archived One, archived' });
+    const trigger = await screen.findByRole('link', { name: itemName('Archived One', true) });
     expect(trigger).toHaveAttribute('href', '/w/ws_1/p/p_arch');
     // The visible half of the same fact.
     expect(trigger).toHaveTextContent('Archived One');
     expect(trigger).toHaveTextContent('Archived');
     // And NOT the substitution this case exists for: `p_beta` is the first live
     // project in served order and was what the item named.
-    expect(screen.queryByRole('link', { name: 'Beta' })).toBeNull();
+    expect(screen.queryByRole('link', { name: itemName('Beta') })).toBeNull();
 
     // The dropdown is still live-only — the archived project is not offered as
     // somewhere to go.
@@ -411,7 +428,7 @@ describe('E5-34 the item names the project you are actually on', () => {
     currentParams = { projectId: 'p_gamma' };
     renderNav(servicesFor([WS_1]));
 
-    const trigger = await screen.findByRole('link', { name: 'Gamma' });
+    const trigger = await screen.findByRole('link', { name: itemName('Gamma') });
     expect(trigger).toHaveAttribute('href', '/w/ws_1/p/p_gamma');
     // No chip and no ", archived" — the badge is the state, not decoration.
     expect(trigger).not.toHaveTextContent('Archived');
