@@ -17,3 +17,4 @@ Read `docs/lanes/release-2026-09-22-plan.md` §0 first. Statuses: `claimed` (bat
 | T-E4-13 | done | bda4a02fa2910e8b126d288b1519cdbd91d44445 | new-ticket-dialog.test.tsx (13.1054); app-core 1722/1722 |
 | T-E4-14 | done | d94542ed2c1c1b7646cf23aecc0baeeed96b29b9 | components.test.tsx (13.1055); ui 399/399 |
 | T-E4-3 | done | 95b63f3cbe2932512d41094c83e67cc507e64bc4 | tap-target-density.test.ts (13.1056); ui 399/399, web 639/639; DENSE_IN_LIST clause (b) UNMET, recorded |
+| T-E4-7 | done | feeb1eb0364e039ff1d8a732e8f777693d9b2372 | components.test.tsx (13.1057); ui 402/402; not painted |
