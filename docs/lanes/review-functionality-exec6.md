@@ -2,7 +2,7 @@
 
 **Lane:** executor 6 (Opus 5) · **branch:** `exec6/review-functionality` · **base:** `origin/main`
 **Started:** 2026-09-21 09:42:10 IST (T0 recorded by the controller: 09:41:50 IST; phase 1 closes 15:41:50 IST, phase 2 closes 18:41:50 IST)
-**Last phase-1 edit:** 2026-09-21 13:0x IST — findings E6-1 … E6-21 and Appendices A–Y were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
+**Last phase-1 edit:** 2026-09-21 14:2x IST — findings E6-1 … E6-24 and Appendices A–AF were all written and pushed before the phase-1 boundary; the commit that carries this line is the one to read.
 **Every measurement in this report was taken at `a7b6292b78c50208e8055c9f8639b1e8dcf4caa0`**
 (`Merge pull request #630 from bkirosangma/ctl/cycle36-rotation`) in
 `/Users/kiro/my_projects/gisik-nokma-exec6`, with `node v22.22.2` in `PATH`, unless a finding says otherwise.
@@ -161,7 +161,16 @@ evidence-gate.ts`, `auth/auth.ts:150-360` and `apps/server/src/app.ts:477-612` (
 (`rateLimitKeyFor`, rightmost XFF entry — sound), `attachments/sniff.ts` (behaviour measured, Appendix U),
 `domain/src/{parse-event,ids,prefix,submit,registry}.ts` (whole, code lines), `routes/{events,auth-methods,
 preferences,notification-preferences}.ts` (whole), `visibility/visible-tickets.ts` (whole, + one probe), `sync/{stream-seq,ledger-deps}.ts` and
-`ledger/{event-store,snapshot-store}.ts` (the exported functions and every SQL statement), `mcp-server/src/{config,
+`ledger/{event-store,snapshot-store}.ts` (the exported functions and every SQL statement), **the replica's read
+surface** — `app-core/src/replica/replica-data-source.ts:780-830`, `:965-1035`, `:1145-1160`, `:1323-1370` (every
+read the phone and desktop shells call, + Appendix AF) and `sync-client/src/replica/replica.ts:1132-1215`
+(`getTicket`, `listTickets`, `listContests`, `searchLocal`), with the shells' call sites enumerated by
+`grep -rno "ds.query\.\w*" apps/mobile/src apps/desktop/src` (7 lines: `board-screen.tsx:26,28`,
+`ticket-screen.tsx:26`, `desktop/src/app.tsx:122,142,146`), `ops/{export-ledger,fetch-backup,pg-dump,object-sink}.ts`
+(whole; the whole-ledger-in-memory ceiling is recorded as case 13.34, UTC scheduling is explicit — nothing filed),
+`tools/sweep-user-preferences.ts` (whole), `gates/evidence-gate.ts` (whole: the evidence id IS verified server-side
+against `attachments` — the engine rule's string check is not the last word), `read/{compile-filter,fts}.ts` (whole:
+every filter value parameterised, `likePattern` escapes `\ % _`), `mcp-server/src/{config,
 device-login,lazy-session,main,login-prompt}.ts` (whole), `app-core/src/online/stream.ts:95-160`, `:273-324` (frame
 parsing and cursor advance), `sync-client/src/replica/replica.ts:1050-1103`, `:1254-1290` (purge, scope-revoked,
 reach-granted arms), **the five route modules previously grep-only, code lines whole** — `routes/{attention,board,
@@ -191,13 +200,13 @@ only — it refreshes on publish at `:285`, `:420`). `scripts/` — `check-case-
 mutation-tested** (all 9 were run green by exec 3; I re-ran `case-ids`,
 `case-citations`, `no-silent-skips` (with mutations), `db-timezone` against both live DBs).
 
-**Measured by probe** (Appendices A–AA — 27, every one a run that passed 1 file / 1 test with its `console.log`
-lines in the log; where a first attempt was corrected — A, L, M, T, Z — the appendix says what was wrong): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake and overlay
+**Measured by probe** (Appendices A–AF — 32; 31 of them a run that passed 1 file / 1 test with its `console.log`
+lines in the log, and Appendix E a read-only dev-database transaction; where a first attempt was corrected — A, L, M, T, Z — the appendix says what was wrong): writes on a deleted ticket; type re-rank; deleted children/parents; outbox overtake and overlay
 reversion; ghost ticket on both doors; invite channels; bulk rebind under an admin not on a project; deleted epic
 header; guest doors; the verifier after a re-bind; cross-site WebSocket; MCP token successor; non-member
 assignee; three full read-door sweeps (non-member, guest, member off the project); the provenance guards; two interleaving races; the stream and bootstrap after a delete; U+0000 on 19
 doors and 11 hostile payload shapes; the upload door; impossible due dates; blank names; leaving a workspace; an
-external person on an explicit list.
+external person on an explicit list; the replica's five reads after a delete.
 
 **Citations, resolved mechanically at the end (13:50 IST):** every backticked `file:line` or `file:a-b` in this
 report was extracted (280 distinct) and checked against the tree — the file must resolve to exactly one path under
@@ -222,7 +231,7 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 ### 2.3 Not reached — named rather than implied
 
 - `packages/rule-engine`: `memory-context.ts` (used, not reviewed), `refusal-rules.ts`, `checks/{rank,
-  workflow-rebind,refusals,test-support}.ts` (`fields.ts` read at `:116-130` only), `fixtures/harness.ts`,
+  workflow-rebind,refusals,test-support}.ts`, `fixtures/harness.ts`,
   `rules/{index,types}.ts`; `contests.ts` beyond `:45`.
 - `packages/domain`: 30 of 41 files, including `entity-state.ts`, `ticket-state.ts` outside the reducer's event
   cases (`:1-98`, `:200-496` — `foldTicketToWorkflowVersion` in particular, used by the probes and not read), `submit.ts`, `parse-event.ts`, `envelope.ts`, `ids.ts`, `prefix.ts`, `ist-day.ts`,
@@ -235,13 +244,12 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
   `notifications.ts`; `replica/replica-data-source.ts` outside `:1388-1408`.
 - `apps/server/src`: `mcp-tokens`, `my-invitations` and `search` route modules read in part only; projections other
   than the three named; `read/` other than the two named; `sync/{sync-service,reconcile-route}.ts` beyond the cited
-  lines; `ops/{export-ledger,fetch-backup,object-sink,pg-dump}.ts`; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
+  lines; `seed/*`; `http/{security-headers,hsts,rate-limit}.ts` beyond a grep; `auth/*` other than `auth.ts` and `synthetic-address.ts` (whose guard hides a synthetic
   address in rosters and is not consulted by the magic-link door — safe only because `.invalid` never resolves;
-  noted, not filed); `tools/{sweep-notifications,
-  sweep-user-preferences}.ts`; `visibility/{rollup,visible-events-for}.ts` as code (rollup opened at `:258-266`,
+  noted, not filed); `tools/sweep-notifications.ts`; `visibility/{rollup,visible-events-for}.ts` as code (rollup opened at `:258-266`,
   `:68-108`; visible-events-for exercised by Appendix AE, not read); `alerts/`, `workspaces/`.
-- **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`, no `apps/mobile`, no
-  `apps/desktop`.**
+- **No browser, no pixel, no `apps/web` beyond `members/page.tsx:720-856`; `apps/mobile` and `apps/desktop`
+  opened only at their `ds.query.*` call sites and the lines that render the result (E6-24).**
 - `apps/server/src/routes/`: every route module has now been both *called* (Appendices P/Q/Z hit all 23 read
   doors) and *opened as code* — all 19; three of them (`mcp-tokens`, `my-invitations`, `search`) in part only, and
   the large ones (`tickets`, `builder-reads`, `list`, `invites`, `attachments`) at the ranges §2.2 cites rather than whole.
@@ -250,7 +258,8 @@ size: 6 of 49 gap ids, 3 of 1,120 ✅ ids; **I did not walk the other 1,117 ✅ 
 - **Migrations:** numbering and the dev DB's applied set (E6-7, Appendix E) only; no migration's SQL was read for
   correctness, no `down` was run.
 - **The 18-site soft-delete sweep** — exec 3 §7.1 stands; I did not re-run it. I found predicate-**absent** view
-  statements instead (E6-11's walk), which that sweep cannot see by construction.
+  statements instead (E6-11's walk on the server; E6-24's on the replica, where the sweep's unit — SQL sites in
+  `apps/server` — never looked), which that sweep cannot see by construction.
 - **Concurrency under real interleaving** (two clients racing the same entity) — reasoned from the lock order,
   not exercised.
 - Time: this report was written between 09:42 and the phase-1 boundary; the reaching stopped where the clock
@@ -296,6 +305,7 @@ the line I opened) · **SEVERITY** (Critical / Important / Minor). Where I could
 | E6-21 | Important | A member or guest cannot leave a workspace; the export promises it; the CSRF exclusion assumes it | App. Y |
 | E6-22 | Minor | Export's "ticket-only access for someone outside the workspace": product has no such tier; naming accepted, inert | App. AA |
 | E6-23 | Minor | `BACKUP_TIME_UTC=25:00`/`99:99` accepted and scheduled elsewhere (99:99 → +4 days); `9:00` throws | script in the finding |
+| E6-24 | Important | Phone board / desktop list / phone search keep a soft-deleted ticket; the replica filter sits on the two reads the shells never call | App. AF |
 
 ### E6-1 — IMPORTANT — The in-app help tells the user a job cannot be deleted; the product ships `Delete`
 
@@ -1493,6 +1503,78 @@ the other.
 
 ---
 
+### E6-24 — IMPORTANT — The phone's board and the desktop's ticket list keep showing a soft-deleted ticket, and the phone's offline search still finds it: the Delete commit put its replica filter on the two reads those shells never call and on none of the three they do
+
+**WHAT.** Measured on the replica `DataSource` (probe in Appendix AF; 1 file / 1 test passed, with a
+positive control). One world, two tasks, one `ticket.deleted` applied through `replica.applyServerItem` (the
+fold sets `state.deleted = {actorId, at}` — printed), then the five view-serving reads of
+`packages/app-core/src/replica/replica-data-source.ts` before and after:
+
+```
+read                                                       before          after ticket.deleted
+getTickets (list)                                          DOOMED, live    live
+getBoard                                                   DOOMED, live    live
+listTicketSummaries  (mobile board-screen, desktop app)    DOOMED, live    DOOMED, live
+myWork.assigned                                            DOOMED, live    DOOMED, live
+searchOfflineCopy    (mobile board-screen)                 DOOMED, live    DOOMED, live
+```
+
+The two reads that drop the deleted ticket are the two `apps/mobile` and `apps/desktop` never call:
+`grep -rn "getBoard\|getTickets" apps/mobile/src apps/desktop/src` → **0** lines (control on the same path:
+`listTicketSummaries` → 5). Every `ds.query.*` call in the two shells, enumerated:
+`apps/mobile/src/screens/board-screen.tsx:26` and `:28` (`listTicketSummaries`, `searchOfflineCopy`),
+`apps/mobile/src/screens/ticket-screen.tsx:26` (`getTicketWithPending`), `apps/desktop/src/app.tsx:146`
+(`listTicketSummaries`, rendered at `:152-153` as `ticket-list__row`s). The phone's `FlatList`
+(`board-screen.tsx:56-59`) is fed by `listTicketSummaries` — so after a delete the deleted ticket is still a
+row on the phone's only ticket list, still a row on the desktop shell's list, and still a hit in the phone's
+search.
+
+**WHY it is wrong.** The Delete commit (`18d7e391`, 2026-09-20) states its own rule twice. Its message: *"a
+filter at every view-serving read"*. Its docblock on the replica list read
+(`replica-data-source.ts:872-886`): *"Mirrored from the server's own list read, which ANDs `LIVE_TICKET_WHERE`
+… — this is the offline half of that one decision."* The offline half was applied at `:996` (`getTickets`)
+and `:1029` (`getBoard`) and at no other read in the same file: `listTicketSummaries` (`:796-809`) walks
+`replica.listTickets` — `SELECT ticket_id FROM tickets WHERE workspace_id = ?`
+(`sync-client/src/replica/replica.ts:1143`) — and `summarise` (`:780-794`) reads eight fields of the state
+and not `deleted`; `myWork` (`:1323-1329`) filters those summaries by `assigneeId` only; `searchOfflineCopy`
+(`:1332-1340`) takes `replica.searchLocal`, whose title scan is `SELECT ticket_id, state FROM tickets WHERE
+workspace_id = ?` (`replica.ts:1189-1194`) with no flag read. The product's own sentence for the feature is
+the FAQ's *"The ticket stops appearing in views"* (quoted in the commit message), and the phone board is a
+view. Round 1's F5 (exec 3) measured that the two gates which DO exist are unwitnessed — mutating either
+leaves the replica suite 27/27 green — which is the reason three sibling reads with no gate at all were never
+noticed: no replica test holds a deleted ticket.
+
+**Not a ruled divergence.** The Delete PR's *NAMED, NOT COVERED* list (`executor-state-history.md:671-696`)
+names seven server and web surfaces and no replica read; items 2 and 5 keep a deleted ticket's *contest* and
+*history* on purpose and say why, and neither reason (a claim is never redacted; the ledger is history) is a
+reason for a ticket list to carry it. The commit touched this file (36 lines) to add the two filters, so the
+replica was in scope, not deferred.
+
+**WHAT WOULD HAVE BEEN BETTER.** The same conjunct, `(state.deleted ?? null) === null`, in `listTicketSummaries`'
+loop (one line, `:798`) — which fixes `myWork` with it, since `myWork` is a filter over those summaries — and in
+`searchLocal`'s title scan and comment-owner lookup (`replica.ts:1192-1195`, `:1205-1207`); plus the
+deleted-ticket fixture F5 asked for, asserting all five reads, so the next read added to this file cannot pass
+without answering the question.
+
+**MEASUREMENT.** Appendix AF, run from `packages/app-core` with `pnpm exec vitest run
+test/zz-exec6-probe-replica-deleted.test.ts --no-file-parallelism` (the file imports
+`../src/replica/replica-data-source.js` relatively — the same instrument F5 validated; `@gisik-nokma/sync-client`
+resolves to its `dist`, which was built at this sha before the run). Lines opened:
+`replica-data-source.ts:780-809`, `:872-886`, `:996`, `:1029`, `:1323-1340`; `replica.ts:1132-1152`,
+`:1186-1207`; `board-screen.tsx:15-40`, `:56-59`; `apps/desktop/src/app.tsx:140-153`; `git show 18d7e391 --
+packages/app-core/src/replica/replica-data-source.ts` (the whole diff: two hunks, both filters, nothing else);
+`executor-state-history.md:671-696`; `review-functionality-exec3.md:316-335` (F5).
+
+**SEVERITY: Important.** A feature's one promise ("stops appearing in views") broken on two of the three
+client shells, one line from fixed, with the commit's own message as the specification. Not Critical: the web
+app — the deployed product — reads through the online mappers, which the server filters; the shells affected
+are the phone and desktop replicas. Not Minor: on the phone there is no other list, and a deleted ticket that
+stays a row there is the pre-feature behaviour under the feature's name. `myWork` is included for completeness
+and carries no product caller (`grep -rn "\.myWork(" apps packages/app-core/src` outside tests → none); the
+severity rests on `listTicketSummaries` and `searchOfflineCopy`.
+
+---
+
 ## 5. POSITIVE FINDINGS — claims I tried to falsify and could not
 
 Each of these was a hypothesis I opened a file or ran a command to break. They are recorded so the judge can see
@@ -1699,9 +1781,9 @@ the table.
 | severity | count | members |
 |---|---|---|
 | Critical | **0** | — |
-| Important | **14** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18, E6-21 |
+| Important | **15** | E6-1, E6-2, E6-3, E6-4, E6-5, E6-8, E6-9, E6-10, E6-12, E6-13, E6-15, E6-16, E6-18, E6-21, E6-24 |
 | Minor | **9** | E6-6, E6-7, E6-11, E6-14, E6-17, E6-19, E6-20, E6-22, E6-23 |
-| **total** | **23** | E6-1 … E6-23, no gaps in the numbering |
+| **total** | **24** | E6-1 … E6-24, no gaps in the numbering |
 | unverified (0-point) items | 3 | the migrate route's stale pre-flight read under concurrency (§6), the online path's non-idempotent manual retry (§6), 6.123's "no bound on live credentials" half (E6-12) — each marked *unverified* where it appears and not counted above |
 
 Every Important finding above rests on a probe in Appendices A–K or on a printed line; the three Minors rest on
@@ -5943,4 +6025,122 @@ describe('exec6 probe: a guest live stream, narrowed', () => {
     expect(true).toBe(true);
   });
 });
+```
+
+
+### Appendix AF — the replica's five view-serving reads before and after `ticket.deleted` (E6-24)
+
+`packages/app-core/test/zz-exec6-probe-replica-deleted.test.ts` (never committed; copied out of the tree after the
+run). The world is the replica suite's own (`test/replica/replica-data-source.test.ts:60-200`) reduced to one
+workflow, two types and two tasks, both assigned to the viewer and moved to `doing` so that `getBoard` and
+`myWork` have something to carry.
+
+```ts
+import { describe, expect, it } from 'vitest';
+import { newSubmittedEvent, newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { createOutbox, createReplica, createSyncEngine, type BootstrapResponse, type SyncTransport } from '@gisik-nokma/sync-client';
+import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
+import { createReplicaDataSource } from '../src/replica/replica-data-source.js';
+
+const WS = newUlid();
+const PROJECT = newUlid();
+const USER_A = newUlid();
+const WF = newUlid();
+const TYPE_EPIC = newUlid();
+const TYPE_TASK = newUlid();
+const SERVER_TIME = '2026-08-20T00:00:00.000Z';
+const CLIENT_TIME = '2026-08-19T23:59:00.000Z';
+const wfV1 = {
+  id: WF, version: 1, name: 'Basic', initialStateId: 'todo',
+  states: [
+    { id: 'todo', name: 'To do', category: 'open' },
+    { id: 'doing', name: 'Doing', category: 'active', blocked: false },
+    { id: 'done', name: 'Done', category: 'terminal' },
+  ],
+  transitions: [{ from: '*', to: 'todo', rules: [] }, { from: '*', to: 'doing', rules: [] }, { from: '*', to: 'done', rules: [] }],
+};
+const epicType = { id: TYPE_EPIC, name: 'Epic', icon: 'flag', rank: 1, workflowId: WF, fields: [] };
+const taskType = { id: TYPE_TASK, name: 'Task', icon: 'check', rank: 3, workflowId: WF, fields: [] };
+let seqCounter = 0; let streamCounter = 0;
+function envelope(entity: { kind: 'ticket' | 'workflow' | 'ticket-type'; id: string }, type: string, payload: unknown, opts: { seq?: number } = {}): LedgerEvent {
+  seqCounter += 1; streamCounter += 1;
+  return { ...newSubmittedEvent({ workspaceId: WS, entity, type, payload, actorId: USER_A, origin: 'server', now: () => new Date(CLIENT_TIME) }), serverTime: SERVER_TIME, seq: opts.seq ?? seqCounter, workspaceSeq: streamCounter };
+}
+const idleTransport: SyncTransport = {
+  bootstrap: () => Promise.reject(new Error('offline')), sync: () => Promise.reject(new Error('offline')),
+  openStream: () => ({ close: () => undefined }), bootstrapTicket: () => Promise.reject(new Error('offline')), reconcile: () => Promise.reject(new Error('offline')),
+};
+
+describe('exec6 probe: which replica reads carry the soft-delete predicate', () => {
+  it('lists the five view-serving reads before and after ticket.deleted', async () => {
+    const storage = createBetterSqliteStorage();
+    const replica = await createReplica({ storage });
+    const bootstrap: BootstrapResponse = {
+      workspaceId: WS, me: { userId: USER_A, workspaceRole: 'member', projectIds: [PROJECT] }, streamSeq: 0,
+      definitions: [
+        envelope({ kind: 'workflow', id: WF }, 'workflow.defined', wfV1, { seq: 1 }),
+        envelope({ kind: 'ticket-type', id: TYPE_EPIC }, 'ticket-type.defined', epicType, { seq: 1 }),
+        envelope({ kind: 'ticket-type', id: TYPE_TASK }, 'ticket-type.defined', taskType, { seq: 1 }),
+      ],
+      tickets: [],
+    };
+    await replica.loadBootstrap(bootstrap);
+    const live = newUlid(); const doomed = newUlid();
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: live }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: 'Live gutter' }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: doomed }, 'ticket.created', { typeId: TYPE_TASK, projectId: PROJECT, parentId: null, title: 'Doomed gutter' }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: live }, 'ticket.transitioned', { to: 'doing' }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: doomed }, 'ticket.transitioned', { to: 'doing' }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: live }, 'ticket.assigned', { assigneeId: USER_A }));
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: doomed }, 'ticket.assigned', { assigneeId: USER_A }));
+    const outbox = createOutbox({ storage, replica });
+    const engine = createSyncEngine({ replica, outbox, transport: idleTransport });
+    const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
+
+    const read = async (): Promise<Record<string, string[]>> => {
+      const list = await ds.query.getTickets(PROJECT, {}, 'flat');
+      const board = await ds.query.getBoard(PROJECT);
+      const summaries = await ds.query.listTicketSummaries(WS);
+      const mine = await ds.query.myWork(WS, USER_A);
+      const search = await ds.query.searchOfflineCopy(WS, 'gutter');
+      const name = (id: string): string => (id === doomed ? 'DOOMED' : id === live ? 'live' : id);
+      return {
+        'getTickets (list)': list.rows.map((r: { ticketId: string }) => name(r.ticketId)).sort(),
+        'getBoard': board.groups.flatMap((g) => g.columns.flatMap((c) => c.cards.map((k) => name(k.ticketId)))).sort(),
+        'listTicketSummaries (mobile board-screen, desktop app)': summaries.map((s) => name(s.ticketId)).sort(),
+        'myWork.assigned': mine.assigned.map((s) => name(s.ticketId)).sort(),
+        'searchOfflineCopy (mobile board-screen)': search.hits.map((h) => name(h.ticketId)).sort(),
+      };
+    };
+    const before = await read();
+    console.log('BEFORE delete:', JSON.stringify(before));
+    // positive control: every read carries both tickets before the delete
+    for (const rows of Object.values(before)) expect(rows).toEqual(['DOOMED', 'live']);
+
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: doomed }, 'ticket.deleted', {}));
+    const state = (await replica.getTicket(doomed))!.confirmed as { deleted?: unknown };
+    console.log('doomed.deleted after fold:', JSON.stringify(state.deleted));
+    expect(state.deleted ?? null).not.toBeNull(); // the replica FOLDED the delete — the flag is there to read
+
+    const after = await read();
+    console.log('AFTER  delete:', JSON.stringify(after));
+    expect(after['getTickets (list)']).toEqual(['live']);
+    expect(after['getBoard']).toEqual(['live']);
+    // the three the Delete commit did not reach:
+    expect(after['listTicketSummaries (mobile board-screen, desktop app)']).toEqual(['DOOMED', 'live']);
+    expect(after['myWork.assigned']).toEqual(['DOOMED', 'live']);
+    expect(after['searchOfflineCopy (mobile board-screen)']).toEqual(['DOOMED', 'live']);
+  });
+});
+```
+
+Run: `cd packages/app-core && pnpm exec vitest run test/zz-exec6-probe-replica-deleted.test.ts
+--no-file-parallelism` (node v22.22.2). Output, the three printed lines and the summary:
+
+```
+BEFORE delete: {"getTickets (list)":["DOOMED","live"],"getBoard":["DOOMED","live"],"listTicketSummaries (mobile board-screen, desktop app)":["DOOMED","live"],"myWork.assigned":["DOOMED","live"],"searchOfflineCopy (mobile board-screen)":["DOOMED","live"]}
+doomed.deleted after fold: {"actorId":"01M31HZ9CT535BRZZSWY5X46Q5","at":"2026-08-20T00:00:00.000Z"}
+AFTER  delete: {"getTickets (list)":["live"],"getBoard":["live"],"listTicketSummaries (mobile board-screen, desktop app)":["DOOMED","live"],"myWork.assigned":["DOOMED","live"],"searchOfflineCopy (mobile board-screen)":["DOOMED","live"]}
+ ✓ test/zz-exec6-probe-replica-deleted.test.ts (1 test) 16ms
+ Test Files  1 passed (1)
+      Tests  1 passed (1)
 ```
