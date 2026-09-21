@@ -12,7 +12,8 @@
 
 ## Global Constraints
 
-- **Never commit or push to `main`.** Branch from `origin/main` AFTER the priority built-in PR (`docs/superpowers/plans/2026-09-22-priority-builtin.md`) has landed — both edit the same rows of `ticket-sheet.tsx`. Suggested branch `rel/sheet-prototype-parity`; the owner's spec/plan branch is `owner/sheet-prototype-parity`. One commit per task; PR `--base main`; the controller lands.
+- **Never commit or push to `main`.** Suggested branch `rel/sheet-prototype-parity`; the owner's spec/plan branch is `owner/sheet-prototype-parity`. One commit per task; PR `--base main`; the controller lands.
+- **Sequencing against the priority built-in work** (`docs/superpowers/plans/2026-09-22-priority-builtin.md`, running now): the two plans collide ONLY in `packages/app-core/src/views/ticket-sheet.tsx` and `test/views/ticket-sheet.test.tsx`. **Tasks 1, 2, 5 (the component, not its sheet mount) and 7 touch neither file and start immediately, on two lanes with no shared files** — lane A (claude-sonnet): T1 then T5; lane B (deepseek): T2 then T7. **Tasks 3, 4, 6, 8 and T5's one-line mount into `field-visibility` wait until the priority lane has pushed its Task 7 (the sheet's Priority editor and Start row), then rebase onto that commit and run on one lane.** Both lanes append CSS to `ui.css` in different sections; the controller merges.
 - **Node 22** for every run; paste `NODE=v22.*` beside every summary you cite.
 - **Build before suites:** `pnpm turbo run build` before any package's vitest, and again after editing `packages/ui` or `packages/editor` (app-core imports them by name through `dist`).
 - **Never pipe a test run into `head`.** `pnpm --filter <pkg> test > /tmp/parity-<lane>-<task>.log 2>&1; tail -25 <log>`.
@@ -527,6 +528,8 @@ Keep the `@media (max-width: 40rem)` collapse (`grid-template-columns: 1fr`; add
 ## Task 5: Visibility pill opens a menu; read-only viewer chips
 
 **Backend:** claude-sonnet (a 30-case suite moves into a portal; focus, refusal and lockout arms must all survive).
+
+**Split for parallel execution:** everything in this task except the sheet-side mount runs on lane A now. The mount — moving `<VisibilityEditor …/>` into the `field-visibility` row — is Task 4's job (it already lists that row) and happens after the rebase.
 
 **Files:**
 - Modify: `packages/app-core/src/views/visibility-editor.tsx:436-600`
