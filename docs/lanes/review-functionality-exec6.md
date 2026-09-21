@@ -32,7 +32,7 @@ writes on a soft-deleted ticket, one of them manufacturing a notification into a
 blocking its parent's close while the board shows zero (E6-4); a type re-rank and a workflow republish that leave
 hierarchies the engine then refuses to reproduce (E6-3, E6-8); a bulk migration refused part-way while the client
 is told nothing moved (E6-10); an offline edit turned into a false contest against the user's own ticket (E6-5);
-an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); one byte (U+0000) that 500s both write doors, misreports a
+an invite form offering channels the door refuses (E6-9); an assignment to a name that is not a person (E6-17); one byte (U+0000) that 500s twenty-three doors, misreports a
 batch and poisons the offline queue while the product's own guard for it sits unused (E6-18).
 
 The second shape is **a record that describes a world the product has left**: the in-app help denying `Delete`
@@ -1163,7 +1163,7 @@ user's role in `env.workspaceId` and refuse `null` (*"That person is not in this
 **SEVERITY: Minor.** Data integrity, not security: the claim is inert for the named non-person, and a member
 can re-assign. Filed because the door answers "committed" to a question it never asked.
 
-### E6-18 — IMPORTANT — A U+0000 byte in a title, a field value or a comment answers 500 at both write doors, commits the batch's earlier claims while reporting failure for all, and becomes a poison claim the offline outbox retries forever; four read doors 500 on the same byte in a query parameter
+### E6-18 — IMPORTANT — One byte (U+0000) answers 500 on twenty-three doors — every raw id parameter, the founding name, the invite address, the ticket payload strings — commits a batch's earlier claims while reporting failure for all, and becomes a poison claim the offline outbox retries forever; the doors that refine or hash their input first answer 400/404
 
 **WHAT.** Measured through the doors (Appendix T; 1 file / 1 test passed):
 
@@ -1178,6 +1178,14 @@ READ  312 malformed-query requests over 13 doors -> {"200":190,"400":96,"404":22
       /v1/projects/:PRJ/tickets?cursor=%00 · ?parentId=%00 · /v1/me/notifications?…&cursor=%00 · …/ticket-types/task/population?workflowId=%00
 UPLOAD POST /v1/attachments with ticketId 'a\u0000b' (multipart field) -> HTTP 500   (Appendix U; the same door refuses
       an empty file, text declared as PNG and HTML with 415, and stores a NUL or traversal FILENAME under its id with 201)
+OTHER DOORS, same byte (Appendix V):
+  500  POST /v1/workspaces {name}            500  POST …/invites {address}              500  POST /v1/sync/reconcile {heldIds[]} and {workspaceId}
+  500  POST …/migrate {toWorkflowId}         500  POST /v1/me/notifications/:id/read    500  POST /v1/me/notifications/read {ids[]}
+  500  POST /v1/mcp/device/approve {userCode} 500 DELETE /v1/me/mcp-tokens/:id          500  GET /v1/workspaces/:ws/tickets/:id
+  500  GET /v1/tickets/:id/history            500  GET /v1/attachments/:id               500  GET /v1/projects/:id/board
+  500  GET /v1/sync/bootstrap/ticket?ticketId=
+  — and the doors that refine or hash first: 400 PUT /v1/me/preferences (noNul) · 400 GET /v1/search?q= (noNul) ·
+    404 GET|POST /v1/invites/:token[/accept] (token hashed) · 404 POST /v1/mcp/device/token (hashed) · 404 …/migrate stateMap key
 ```
 
 Underlying Postgres answers, measured directly (Appendix T's header): `SELECT $1::text` with the byte →
@@ -1203,22 +1211,28 @@ exactly the `22P05` explanation, and applies it to filters, search terms and pre
 3. **A per-event `invalid` exists for exactly this and is not used.** `parseEvent` answers `invalid`
    (`ingest-service.ts:400-407`) for a malformed envelope; the payload schemas could refuse the byte there with
    `noNul`, which is the mechanism the product already chose for the same byte elsewhere.
-4. **The read doors 500 on a query string, and the upload door on a form field.** `cursor`, `parentId` and
-   `workflowId` are passed to Postgres as-is, and so is the multipart `ticketId` on `POST /v1/attachments`; the
-   same byte in `q` or `filter` is a 400, because those go through `searchTermSchema`/`filterSpecSchema`.
+4. **Every raw id parameter reaches Postgres unrefined.** The event envelope refuses a non-ULID `entity.id`
+   at the door (*"must be a ULID"*), but the route parameters `:id`, `:ticketId`, `:projectId`, the multipart
+   `ticketId`, the query strings `cursor`/`parentId`/`workflowId`/`ticketId`, and the body strings `name`,
+   `address`, `heldIds[]`, `toWorkflowId`, `ids[]`, `userCode` are used as-is; the same byte in `q`, `filter` or a
+   preferences document is a 400 because those go through `noNul`, and in an invite token or device code a 404
+   because those are hashed before the lookup. Twenty-three doors 500; the distinction is exactly whether the
+   string met a refinement before the first query.
 
-**WHAT WOULD HAVE BEEN BETTER.** `noNul` on the three ticket payload strings (and on `plainTextToDoc`'s input in
+**WHAT WOULD HAVE BEEN BETTER.** One ULID check on every id parameter at the route (the envelope already has
+the predicate; a 400 `invalid_id` before the first query), `noNul` on the three ticket payload strings (and on `plainTextToDoc`'s input in
 the MCP server, `write-tools.ts:163`, which is one way an agent hands the byte over), so the door answers
 `invalid` per event and the batch's other claims are judged; and a `hasNoNul` check on the three raw query
 parameters, answering 400 like their siblings. Neither is more than the refinement the domain already exports.
 
-**MEASUREMENT.** Appendices T and U, run from `apps/server`. Lines opened: `filter-spec.ts:45-51`; `ticket-events.ts:45-48`,
+**MEASUREMENT.** Appendices T, U and V, run from `apps/server`. Lines opened: `filter-spec.ts:45-51`; `ticket-events.ts:45-48`,
 `:98-103`, `:108`; `ingest-service.ts:361-386`, `:396-412`; `app.ts:50-52`, `:388`; `list.ts:558-559`;
 `notifications.ts:71`; `builder-reads.ts:726`; the `pg` probe in Appendix T's header (`22021` / `22P05`).
 
 **SEVERITY: Important.** One byte, pasteable from ordinary sources and passable by an agent, turns a claim into a
-500 that both misreports the batch and poisons the offline queue; the product already has the guard and applies it
-to the less consequential fields.
+500 that both misreports the batch and poisons the offline queue, and 500s twenty-three doors from a path segment;
+the product already has the guard and applies it to the less consequential fields. Not Critical: nothing is
+disclosed or lost, and every 500 is a rolled-back transaction.
 
 ---
 
@@ -4235,6 +4249,152 @@ describe('exec6 sweep: hostile inputs at the upload door', () => {
       const { payload, headers } = multipartBody(parts);
       const res = await app.inject({ method: 'POST', url: '/v1/attachments', payload, headers: { ...headers, ...auth(ownerToken) } });
       out.push(`${label.padEnd(30)} -> ${res.statusCode} ${res.body.slice(0, 110)}`);
+    }
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix V — probe for E6-18 (the remaining doors) — U+0000 in body and path parameters
+
+File path in the tree: `apps/server/test/zz-exec6-probe-nul-doors.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-nul-doors.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A. Output is the 21-row table quoted in E6-18 (14 × 500, 3 × 404 on hashed or
+looked-up tokens, 2 × 400 on refined strings, 2 × 404 on the migrate map key and the device code).
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question: which other doors answer 500 to a U+0000 byte in a body or path parameter?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 sweep: U+0000 on the remaining doors', () => {
+  it('records status per door', async () => {
+    const out: string[] = [];
+    const NUL = 'a\u0000b';
+    const wf = (await db.pool.query<{ workflow_id: string }>("SELECT workflow_id FROM proj_ticket_types WHERE workspace_id = $1 AND type_id = 'task'", [WS])).rows[0]!.workflow_id;
+    const cases: Array<[string, string, string, unknown, Record<string, string>]> = [
+      ['POST /v1/workspaces name NUL', 'POST', '/v1/workspaces', { name: NUL }, auth(ownerToken)],
+      ['POST invites address NUL', 'POST', `/v1/workspaces/${WS}/invites`, { address: `${NUL}@example.com`, channel: 'email', role: 'member' }, auth(ownerToken)],
+      ['POST reconcile heldIds NUL', 'POST', '/v1/sync/reconcile', { workspaceId: WS, heldIds: [NUL] }, auth(ownerToken)],
+      ['POST reconcile workspaceId NUL', 'POST', '/v1/sync/reconcile', { workspaceId: NUL, heldIds: [newUlid()] }, auth(ownerToken)],
+      ['POST migrate stateMap key NUL', 'POST', `/v1/workspaces/${WS}/ticket-types/task/migrate`, { fromWorkflowId: wf, toWorkflowId: newUlid(), stateMap: { [NUL]: 'todo' } }, auth(ownerToken)],
+      ['POST migrate toWorkflowId NUL', 'POST', `/v1/workspaces/${WS}/ticket-types/task/migrate`, { fromWorkflowId: wf, toWorkflowId: NUL, stateMap: { todo: 'todo' } }, auth(ownerToken)],
+      ['POST notifications/:id/read NUL id', 'POST', `/v1/me/notifications/${encodeURIComponent(NUL)}/read`, {}, auth(ownerToken)],
+      ['POST notifications/read ids NUL', 'POST', '/v1/me/notifications/read', { ids: [NUL], read: true }, auth(ownerToken)],
+      ['POST device/approve userCode NUL', 'POST', '/v1/mcp/device/approve', { userCode: NUL }, auth(ownerToken)],
+      ['POST device/token deviceCode NUL', 'POST', '/v1/mcp/device/token', { deviceCode: NUL }, {}],
+      ['GET invites/:token NUL', 'GET', `/v1/invites/${encodeURIComponent(NUL)}`, undefined, {}],
+      ['POST invites/:token/accept NUL', 'POST', `/v1/invites/${encodeURIComponent(NUL)}/accept`, {}, auth(ownerToken)],
+      ['POST me/invitations/:id/accept NUL', 'POST', `/v1/me/invitations/${encodeURIComponent(NUL)}/accept`, {}, auth(ownerToken)],
+      ['DELETE me/mcp-tokens/:id NUL', 'DELETE', `/v1/me/mcp-tokens/${encodeURIComponent(NUL)}`, undefined, auth(ownerToken)],
+      ['PUT me/preferences filter name NUL', 'PUT', '/v1/me/preferences?workspaceId=' + WS, { savedFilters: [{ id: 'x', name: NUL, filterSpec: {} }], listColumns: {}, grouping: {} }, auth(ownerToken)],
+      ['GET workspaces/:ws/tickets/:id NUL', 'GET', `/v1/workspaces/${WS}/tickets/${encodeURIComponent(NUL)}`, undefined, auth(ownerToken)],
+      ['GET tickets/:id/history NUL', 'GET', `/v1/tickets/${encodeURIComponent(NUL)}/history`, undefined, auth(ownerToken)],
+      ['GET attachments/:id NUL', 'GET', `/v1/attachments/${encodeURIComponent(NUL)}`, undefined, auth(ownerToken)],
+      ['GET projects/:id/board NUL', 'GET', `/v1/projects/${encodeURIComponent(NUL)}/board`, undefined, auth(ownerToken)],
+      ['GET search q NUL', 'GET', `/v1/search?workspaceId=${WS}&q=${encodeURIComponent(NUL)}`, undefined, auth(ownerToken)],
+      ['GET bootstrap/ticket ticketId NUL', 'GET', `/v1/sync/bootstrap/ticket?workspaceId=${WS}&ticketId=${encodeURIComponent(NUL)}`, undefined, auth(ownerToken)],
+    ];
+    for (const [label, method, url, payload, headers] of cases) {
+      const res = await app.inject({ method: method as 'GET', url, headers, ...(payload === undefined ? {} : { payload }) });
+      out.push(`${res.statusCode} ${label.padEnd(38)} ${res.body.slice(0, 90)}`);
     }
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
