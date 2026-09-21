@@ -3633,3 +3633,79 @@ bullet's decision not to state one is the reason neither is its defect.** Verifi
 CI bullet's self-disclosed scope, and this one — all five exact.** Six of the wrong numbers produced along the way
 were mine. **The remaining 63 candidate countable bullets in §3, and the whole of §1, §2, §7, §8 and §10, stay
 unchecked**, and that is where this report's coverage ends.
+
+## 56. Round 2 — §1, §2 and §10 opened, §8 does not exist, and one candidate I examined and did NOT file
+
+### 56.1 §8 does not exist, its absence is documented, and my own §51 named it in error — **correction 6 against this report**
+
+`Features.md`'s headings run 1–7, **9**, 12, 10, 11, 13, 14. **There is no §8**, and `test-cases/` has no
+`08-*` file. **My §51 listed §8 among the seven never-opened sections. It cannot be opened: it was never
+created.** Corrected in place there, and recorded here as the **sixth correction to this report's own claims**
+(§17.1, §17.2, §14.4, §34, §52.5 and this one).
+
+The gap is not drift — it is documented twice, with its reasoning, in `test-cases/README.md`. Line 17 carries a
+**dated correction (Plan 6 Task 16, 2026-09-02)** stating that §8 and `08-web-client.md` "are not created", that
+an earlier note's reason no longer states it correctly, and why: the coordination doc assigned Plan 6 → §8, but
+when Task 16 ran, **all 144 of the web client's live, gate-passing, cross-referenced cases already sat at
+`03-foundation-ledger.md` 3.1–3.144**, under ids every test file already cites. Migrating them would mean
+renumbering live ids — which the catalogue's own rule forbids — for no reader benefit, because the artefacts, the
+tests and the ids already agree. **Verified clean, and this is catalogue hygiene of exactly the kind E3-29 says
+§5:397 failed: the decision is recorded, the reasoning is recorded, and the earlier wrong reason is corrected
+in place rather than deleted.**
+
+### 56.2 §1 (reference base) — two counts, both exact
+
+- `:7` *"the generator with its **73 tests**"*: `reference/convenience-corner-tracker/tools/test_build_tracker.py`
+  holds **73 `def test_*` functions** (9 `TestCase` classes, 118 assertions). **MATCH.** My first pass reported
+  **0**, because I counted with a JS-shaped `test(`/`it(` pattern against a Python file — a seventh wrong number,
+  and the same blind-spelling failure as §54.1.
+- `:8` *"the **three** upstream documents"*: `reference/design-docs/` holds exactly three
+  (`2026-08-18-project-tracker-design.md`, `2026-08-19-tracker-calendar-design.md`,
+  `2026-08-19-tracker-calendar-view.md`). **MATCH.**
+
+### 56.3 §2 (product design) — "eleven task-by-task plans", correct, and my 26 was the wrong universe
+
+`:13` says *"**eleven** task-by-task plans covering the whole build, ledger through deployment and dogfooding."*
+`docs/superpowers/plans/` today holds **26** plan files — but the eleven are the founding `2026-08-20-00`
+through `-11` series, and the other fifteen are later plans (MCP, HIG, the backlog/closed waves, the shared
+select, the prototype ports). **The bullet's scope is the series, not the directory, and it is correct.** My 26
+was a count of a different thing wearing the same name — the fourth time this round that my universe, not the
+claim, was the error.
+
+### 56.4 §10 (workflow builder) — one claim already filed, one count examined and NOT filed
+
+- `:2350` is the bullet **`E3-26` already covers**: *"Nothing in the app links to any of them yet. `AppNav`
+  offers Workspaces and My Work and no settings entry"*, against a nav that renders a Settings link and a
+  `/settings` shell pointing at all six routes. **§10 is therefore not unexamined — one of its claims is an
+  Important finding filed in this round**, and the six routes it enumerates (`workflows`, `workflows/new`,
+  `workflows/[workflowId]`, `ticket-types`, `ticket-types/new`, `ticket-types/[typeId]`) are six.
+- `:2345` says *"publish disabled while any of the **eleven** issue codes stands."* `validate-workflow.ts`
+  defines **twelve** distinct codes — but only **eleven are pushed into the accumulating `issues` array**:
+  `no-states` is a bare `return [{ code: 'no-states', … }]` at `:15`, **before the `issues` array is even
+  declared**, so it is the only code that can stand in that case and can never co-occur with another. **Under the
+  reading "the codes that accumulate", eleven is exactly right; under "the codes the panel can show", it is
+  twelve.** I examined it and **did not file it**: the difference is one code, both readings are coherent, and
+  the reading that makes it a finding is not clearly stronger than the reading that makes it correct. **Filing an
+  ambiguous finding to pad a count is the thing this round penalises at triple, and the honest result here is
+  that the bullet is defensible as written.**
+
+### 56.5 Where coverage now stands — the final statement
+
+**Every one of `Features.md`'s fourteen real sections has now been opened.** Depth, per section, stated rather
+than summarised: **§4 fully audited; §3, §5, §6, §9, §11, §12, §13, §14 reached to a stated per-section depth;
+§1, §2 and §10 opened and their countable claims checked as recorded in §54–56.** The `test-cases/` ✅ set —
+**1,077 rows** — is walked at §52's check-1 and check-4 depth, which no earlier part of this report had done.
+
+**Final finding count: 21 new findings in round 2 — 1 Critical claimed, 11 Important claimed, 9 Minor** (§16,
+counts verified member-by-member), plus **8 round-1 findings re-validated with none withdrawn**. **Six
+corrections to this report's own claims** (§17.1 ×3, §17.2, §14.4, §34, §52.5, §56.1 — this line counts the
+§17.1 group as one) and **six instrument defects in my own method** (§15, §24.1, §52.2, §52.6, §54.2, §54.3),
+each recorded with the control that killed it. **Seven claims in the newly-opened sections were checked and are
+clean** — §3's four, §1's two, §2's one — against which I produced **seven wrong numbers of my own.** That ratio
+is the most useful thing in this section: **in the sections nobody had opened, the catalogue was right and my
+instruments were wrong, seven times for seven.** The claim that `Features.md` is stale where it counts is a claim
+about **§4 and §6 specifically**, tested there and not generalised here.
+
+**What remains genuinely unasked, named rather than implied:** `Features.md` §7 (895 lines, 93 candidate
+countable bullets) is opened but its claims are unchecked; **63 of §3's 68 countable bullets are unchecked**; and
+the ✅ set's 🟡/🧪/🚫 rows and `test-cases/README.md`'s legend were counted but not read.
