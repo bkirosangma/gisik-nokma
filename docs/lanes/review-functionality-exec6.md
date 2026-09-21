@@ -1488,6 +1488,12 @@ what was looked at and found sound, not only what was found wrong.
   instant check E6-19 wishes the day check had); client-supplied `serverTime`/`seq`/`workspaceSeq` are accepted and
   **overwritten** by the spread at `ingest-service.ts:176-177` (`{ ...submitted, serverTime, seq, workspaceSeq }`,
   server values last); a `clientTime` a year in the future commits (skew is advisory, `clock-skew.ts`).
+- **A revocation racing a burst of claims: no claim commits after it** (Appendix AC; three runs, each 1 file /
+  1 test passed). Thirty `comment.added` from the peer fired concurrently with the owner's `membership.revoked`
+  (15 before, 15 after, none awaited); in the ledger the revocation landed at `workspace_seq` 18 / 22 / 17 with
+  5 / 9 / 4 comments **before** it and **0 after** it in every run, the rest refused `permission.role`. This is
+  the property `ingest-service.ts:235-245` claims for reading the role through the transaction's `client`
+  under the workspace lock, exercised rather than read.
 - **The ingest pipeline's order is what the docblocks say.** `ingest-service.ts:164-360`: workspace lock →
   entity lock → entity↔workspace guard → permission gate (through the transaction's `client`, `:235-245`) →
   contest coherence → engine → server gates → append → refresh-on-publish → projections → COMMIT. Read at the
@@ -5416,6 +5422,146 @@ describe('exec6 sweep: provenance guards on both write doors', () => {
       try { const r = res.json<{ results?: Array<Record<string, unknown>> }>().results?.[0]; if (r) line += ` ${r['status']}${r['rule'] || r['code'] ? ` (${r['rule'] ?? r['code']}: ${String(r['reason'] ?? r['message']).slice(0, 70)})` : ''}`; else line += ' ' + res.body.slice(0, 90); } catch { line += ' ' + res.body.slice(0, 90); }
       out.push(`${door.padEnd(11)} ${label.padEnd(48)} -> ${line}`);
     }
+    console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
+    expect(true).toBe(true);
+  });
+});
+```
+
+### Appendix AC — the revocation race (positive finding, §5)
+
+File path in the tree: `apps/server/test/zz-exec6-probe-race.test.ts`; run from `apps/server`:
+
+```
+rtk proxy pnpm exec vitest run test/zz-exec6-probe-race.test.ts --no-file-parallelism
+```
+Same prerequisites as Appendix A. Non-deterministic by design (the interleaving is the pool's); three runs are
+quoted in §5.
+
+```ts
+// EXEC6 REVIEW PROBE — NOT A PRODUCT TEST. Deleted after the run; never committed.
+// Question (CONCURRENT): can a claim commit AFTER the claimant's membership was revoked, when the two interleave?
+import { afterAll, beforeAll, describe, expect, it } from 'vitest';
+import { membershipId, newUlid } from '@gisik-nokma/domain';
+import type { FastifyInstance } from 'fastify';
+import { buildTestApp } from './helpers/app.js';
+import { createTestDatabase, type TestDatabase } from './helpers/db.js';
+import { signInWithPhone } from './helpers/session.js';
+
+let db: TestDatabase;
+let app: FastifyInstance;
+let ownerToken = '';
+let ownerId = '';
+let peerToken = '';
+let peerId = '';
+let WS = '';
+let PRJ = '';
+let LIVE = '';
+let DELETED = '';
+
+function auth(token: string) {
+  return { authorization: `Bearer ${token}` };
+}
+
+async function post(
+  workspaceId: string,
+  entity: { kind: string; id: string },
+  type: string,
+  payload: unknown,
+  actorId: string,
+  token: string,
+): Promise<{ status: string; rule?: string; reason?: string }> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: auth(token),
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity,
+          type,
+          version: 1,
+          payload,
+          actorId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  const results = res.json<{ results: Array<{ status: string; rule?: string; reason?: string }> }>().results;
+  return results[0]!;
+}
+
+function doc(text: string) {
+  return { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text }] }] };
+}
+
+beforeAll(async () => {
+  db = await createTestDatabase();
+  const built = buildTestApp(db);
+  app = built.app;
+  await app.ready();
+  const owner = await signInWithPhone(app, built.otp, '+919000000601');
+  ownerToken = owner.token;
+  ownerId = owner.userId;
+  const peer = await signInWithPhone(app, built.otp, '+919000000602');
+  peerToken = peer.token;
+  peerId = peer.userId;
+
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/workspaces',
+    headers: auth(ownerToken),
+    payload: { name: 'Exec6 probe' },
+  });
+  expect(res.statusCode, res.body).toBe(201);
+  WS = res.json<{ workspaceId: string }>().workspaceId;
+
+  // The peer joins as a member through the door.
+  const grant = await post(WS, { kind: 'membership', id: membershipId(WS, peerId) }, 'membership.granted', { userId: peerId, role: 'member' }, ownerId, ownerToken);
+  expect(grant.status, JSON.stringify(grant)).toBe('committed');
+
+  PRJ = newUlid();
+  expect((await post(WS, { kind: 'project', id: PRJ }, 'project.created', { name: 'P' }, ownerId, ownerToken)).status).toBe('committed');
+  for (const uid of [ownerId, peerId]) {
+    expect((await post(WS, { kind: 'project', id: PRJ }, 'project.member_added', { userId: uid, projectAdmin: uid === ownerId }, ownerId, ownerToken)).status).toBe('committed');
+  }
+});
+
+afterAll(async () => {
+  await app.close();
+  await db.drop();
+});
+
+describe('exec6 probe: revocation racing a burst of claims', () => {
+  it('records whether any claim commits after the revocation', async () => {
+    const out: string[] = [];
+    const T = newUlid();
+    expect((await post(WS, { kind: 'ticket', id: T }, 'ticket.created', { typeId: 'task', projectId: PRJ, parentId: null, title: 'race' }, ownerId, ownerToken)).status).toBe('committed');
+    const N = 30;
+    const ids = Array.from({ length: N }, () => newUlid());
+    const comment = (k: number) => app.inject({ method: 'POST', url: '/v1/events', headers: auth(peerToken), payload: { events: [{ id: ids[k], workspaceId: WS, entity: { kind: 'ticket', id: T }, type: 'comment.added', version: 1, payload: { body: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: `c${k}` }] }] } }, actorId: peerId, origin: 'web', clientTime: new Date().toISOString() }] } });
+    const revokeId = newUlid();
+    const revoke = () => app.inject({ method: 'POST', url: '/v1/events', headers: auth(ownerToken), payload: { events: [{ id: revokeId, workspaceId: WS, entity: { kind: 'membership', id: membershipId(WS, peerId) }, type: 'membership.revoked', version: 1, payload: { userId: peerId }, actorId: ownerId, origin: 'web', clientTime: new Date().toISOString() }] } });
+    // Fire the first half, then the revocation, then the second half — all without awaiting in between.
+    const firsts = ids.slice(0, N / 2).map((_, k) => comment(k));
+    const rev = revoke();
+    const seconds = ids.slice(N / 2).map((_, k) => comment(k + N / 2));
+    const all = await Promise.all([...firsts, rev, ...seconds]);
+    const results = all.map((r) => r.json<{ results: Array<{ status: string; rule?: string }> }>().results[0]!);
+    const revRes = results[N / 2]!;
+    out.push(`revocation -> ${revRes.status}`);
+    const committed = results.filter((r, k) => k !== N / 2 && r.status === 'committed').length;
+    const refused = results.filter((r, k) => k !== N / 2 && r.status === 'refused').length;
+    out.push(`comments: ${committed} committed, ${refused} refused (${[...new Set(results.filter((r) => r.status === 'refused').map((r) => r.rule))].join(',')})`);
+    const rows = await db.pool.query<{ id: string; workspace_seq: number; type: string }>('SELECT id, workspace_seq, type FROM events WHERE id = ANY($1) ORDER BY workspace_seq', [[...ids, revokeId]]);
+    const revSeq = rows.rows.find((r) => r.id === revokeId)?.workspace_seq ?? -1;
+    const after = rows.rows.filter((r) => r.type === 'comment.added' && r.workspace_seq > revSeq).length;
+    const before = rows.rows.filter((r) => r.type === 'comment.added' && r.workspace_seq < revSeq).length;
+    out.push(`ledger: revocation at workspace_seq ${revSeq}; comments committed BEFORE it: ${before}; comments committed AFTER it: ${after}   ← must be 0`);
     console.log('PROBE\n' + out.map((l) => '  ' + l).join('\n'));
     expect(true).toBe(true);
   });
