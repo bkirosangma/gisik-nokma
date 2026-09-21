@@ -918,6 +918,23 @@ export function TicketSheet({
    * has no wiring for the event at all. So the code to make a claim existed and
    * was never reachable from a screen; this mount is where it becomes reachable.
    *
+   * ⚠ **THE SWEEP NAMED THREE AND MISSED A FOURTH — E2-47, corrected here.** This
+   * paragraph is the record of what is wired and what is not, so an omission from
+   * it is the one kind of error it cannot afford: a reader who counted three
+   * unwired exports and stopped had no way to learn that
+   * `transitionRequiresEvidence` (`packages/editor/src/attachments/require-evidence.ts:61`,
+   * exported at `packages/editor/src/index.ts:66`) was a fourth. Re-measured
+   * 2026-09-21 over `apps/` and `packages/`, excluding `dist/` and tests: its
+   * mentions are its own declaration, the barrel line and one test file — **zero
+   * production callers**, where the control symbol `assembleTicketCards` returns
+   * 52. So the count is FOUR, and the fourth is named rather than deleted: its
+   * four cases (9.107–9.110) pin the real exact-versus-from-any precedence of
+   * `require-evidence` matching, and deleting the symbol would strike them and
+   * take that knowledge with it. The finding offered "export it or delete it";
+   * keeping it is the branch that loses nothing, and its docblock now carries the
+   * structural reason no caller can exist (see there) instead of the invitation
+   * the finding objected to.
+   *
    * ⚠ **AND THE PAYLOAD IS COMPOSED A SECOND TIME HERE, which is a divergence
    * worth naming rather than hiding.** `composeUploadAttachmentAdded` does
    * exactly this job, and app-core **cannot import it**: the dependency runs
