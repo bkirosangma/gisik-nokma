@@ -231,7 +231,8 @@ first answer about moving work.
 bits.push(di.label)` and colours it `di.late ? "var(--danger)" : "var(--label2)"` (`:2504`). The product's card
 (`board.tsx:1029-1063`) renders title, an optional avatar, a `pending`/`reopened` chip, a rollup, and a `who · when`
 fold. **No key. No due date. No lateness.** Ticket `CCSO-3` is due `14 Sep 2026` (sheet `Due` row, `[BROWSER]`);
-today is `21 Sep 2026`; its board card is indistinguishable from an undated one — its meta div is literally empty
+the measurement was taken on `2026-09-21` (`date` on the box, and the report's start line); its board card is
+indistinguishable from an undated one — its meta div is literally empty
 (`<div class="gn-board-card__meta"></div>`, `[BROWSER]`).
 
 **WHY.** Lateness IS a product concept: `my-work.tsx` renders *"Overdue by N days"*, the List has a `dueDate` column
