@@ -1889,6 +1889,21 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__field dt { color: var(--gn-text-muted); }
 .gn-ticket-sheet__field dd { margin: 0; display: flex; flex-direction: column; gap: 0.15rem; }
 .gn-ticket-sheet__claim { color: var(--gn-text-muted); font-size: 0.8rem; }
+/* Ruling E5-6 (2026-09-21) — the Due row's date editor. SIZING ONLY: the box
+   itself (border, radius, fill, focus ring, and the 2.75rem floor) is
+   `.gn-field__input`'s, shared with every other field on this sheet rather than
+   re-declared here — the same shape `.fields-editor__name` documents, and for
+   the same measured reason: `components.test.tsx`'s `rule()` helper takes the
+   FIRST `{selector} {` text match, so a selector merely ENDING in
+   `.gn-field__input` would shadow the real base rule and make other cases read
+   this body instead. So the two classes are composed in `ticket-sheet.tsx` and
+   this selector names neither of them.
+
+   `align-self: start` because the export's row draws the control inline at its
+   own width (`desktop.dc.html:1202`), where `.gn-ticket-sheet__field dd` is a
+   flex COLUMN whose default `stretch` would run a date input the full width of
+   the sheet. */
+.gn-ticket-sheet__due-input { align-self: start; }
 /* Three states of the History tab, three renderings. `__history-error` is NOT
    `__refusal`: getTicketHistory answers, so a rejection is a failure that may
    retry, not a permanent serving gap. */

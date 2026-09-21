@@ -487,6 +487,23 @@ export function TicketSheet({
    */
   const titleSubmittingRef = useRef(false);
   /**
+   * RULING E5-6 (2026-09-21) — the Due row's EDITOR, which until this ruling
+   * was the product's clearest example of a fact it acts on and cannot accept.
+   *
+   * The state is the title control's, one row down and for the same reasons:
+   * `dueDraft === null` MEANS "not editing" rather than travelling beside a
+   * flag, `dueSaving` drives `disabled`, and `dueSubmittingRef` is the
+   * synchronous re-entrancy guard `submitDueDate`'s docblock explains — a REF,
+   * because `disabled` is what makes a browser blur the field and fire a second
+   * commit out of the first one's own `onBlur`.
+   *
+   * The draft holds the input's own value, an IST day (`YYYY-MM-DD`) or the
+   * empty string a cleared `type="date"` reports — never the formatted label.
+   */
+  const [dueDraft, setDueDraft] = useState<string | null>(null);
+  const [dueSaving, setDueSaving] = useState(false);
+  const dueSubmittingRef = useRef(false);
+  /**
    * Ruling 32 (fix round 1, 2026-09-17) — the double-submit latch for
    * Close/Reopen, mirroring `board.tsx`'s `MoveArrows.submitting`
    * (`:956`/`:1029-1035`'s own docblock on why `finally`). Without it a
@@ -1168,6 +1185,87 @@ export function TicketSheet({
     }
   };
 
+  /**
+   * RULING E5-6 — the due date's WRITE, and the door the product already had.
+   *
+   * ## What was wrong, and why this is the remedy rather than a second record
+   *
+   * Every surface in this product READS a due date — My Work's overdue count,
+   * the List's due column, the Calendar, the Timeline, the due-soon
+   * notification — and until this ruling no surface could SET one. The door was
+   * recorded as unbuilt (`test-cases/16-remaining-doors.md`, Door G) with a
+   * named owner, so the deferral was known; what the ruling holds is that a
+   * RECORD is not a RULING, and the person in the product was never told, since
+   * only `docs/manual.md` said it. The write path was never the missing half:
+   * `ticket.field_set` has carried `dueDate` since the built-ins were
+   * registered (`ticket-events.ts`'s payload docblock names
+   * `title/description/dueDate/startDate`, and a due date value "is always
+   * `{ date, note? }` — a claim").
+   *
+   * ## The shape is the export's, transcribed rather than invented
+   *
+   * `desktop.dc.html:3599` is the whole of the behaviour: *"const v =
+   * e.target.value; … patch(sheet.id, { due: v || null }, v ? 'Due date
+   * claimed' : 'Due date cleared', true)"* — an EMPTIED input CLEARS the claim,
+   * which is `value: null` on this event. So the payload is `null` for the
+   * empty string and `{ date: next }` otherwise, and there is no third state to
+   * invent.
+   *
+   * ## The two guards `submitTitle` has, and for the same measured reasons
+   *
+   * An UNCHANGED value is not a claim, and this event is append-only: a no-op
+   * commit would put a ledger line in the ticket's history saying somebody
+   * claimed the date it already carried. And `dueSubmittingRef` is set
+   * SYNCHRONOUSLY before the first `await` — a REF and not the `dueSaving`
+   * state, which is render state and useless as a re-entrancy guard: two
+   * commits in one React batch both read the pre-commit `false`, and the
+   * `disabled` that lands on the field makes a real browser blur it, firing
+   * `onBlur` into a second commit while the first is still awaiting.
+   *
+   * A REFUSED answer keeps the draft on screen beside the refusal, exactly as
+   * `submitTitle` does — clearing it would hand the reader back the old date
+   * next to a sentence refusing the new one, with their entry gone.
+   */
+  const submitDueDate = async (next: string): Promise<void> => {
+    if (next === (dueDate?.date ?? '')) {
+      setDueDraft(null);
+      return;
+    }
+    if (dueSubmittingRef.current) return;
+    dueSubmittingRef.current = true;
+    setDueSaving(true);
+    try {
+      const event = make({
+        workspaceId,
+        entity: { kind: 'ticket', id: ticketId },
+        type: 'ticket.field_set',
+        // `''` is the clearing claim, never an empty-string date: the export's
+        // own `v || null`, and the shape this event's door docblock names.
+        payload: { fieldId: 'dueDate', value: next === '' ? null : { date: next } },
+      });
+      const results = await dataSource.ingest([event]);
+      const result = results[0];
+      if (result === undefined) {
+        setServerRefusal(null);
+        setTransportError('The server did not answer this change.');
+        return;
+      }
+      if (result.status === 'committed') {
+        setServerRefusal(null);
+        setTransportError(null);
+        setDueDraft(null);
+        read.reload();
+        history.reload();
+        return;
+      }
+      if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
+      else setServerRefusal({ rule: result.code, reason: result.message });
+    } finally {
+      dueSubmittingRef.current = false;
+      setDueSaving(false);
+    }
+  };
+
   /** Close/Reopen: the ticket's own state moved, so both reads are re-asked. */
   const closeOrReopen = (type: 'ticket.closed' | 'ticket.reopened'): Promise<void> =>
     submitTicketEvent(type, () => {
@@ -1232,14 +1330,24 @@ export function TicketSheet({
    *   row says so plainly when it does not rather than implying the ticket
    *   carries a priority of zero.
    *
-   * ## ⚠ Two of the prototype's three rows are EDITORS there, and that is a
-   * ## separate door — this row builds the READ
+   * ## ⚠ Two of the prototype's three rows are EDITORS there — and since
+   * ## ruling E5-6, so is one of them here
    *
    * `desktop.dc.html:1192-1205` draws Priority as a segmented control whose
    * options carry `on-click` handlers, and Due as an `<input type="date">`. Only
-   * **Type** is read-only there (`<span>{{ sheetType }}</span>`). The dispatch's
-   * scope is *the three ROWS … not editing them*, so this is the read half, and
-   * the editors are named as an unbuilt door in the PR body and the catalogue.
+   * **Type** is read-only there (`<span>{{ sheetType }}</span>`).
+   *
+   * **DUE IS NOW AN EDITOR IN THIS PRODUCT TOO (ruling E5-6, 2026-09-21)** —
+   * see `submitDueDate` and the row's own comment. This paragraph used to say
+   * the dispatch's scope was *"the three ROWS … not editing them"*, that this
+   * was therefore the read half, and that the editors were "named as an unbuilt
+   * door in the PR body and the catalogue"; the first clause was true of the
+   * dispatch it describes, and the conclusion drawn from it was the defect
+   * E5-6 names — a due date every other surface READS, computes lateness from
+   * and notifies about could not be SET anywhere, and the deferral was recorded
+   * rather than ruled. **Priority is still that unbuilt door** and is still
+   * recorded as one; the sentence above is kept rather than deleted because it
+   * is the record of why the read half shipped alone in the first place.
    *
    * ## The absent-value copy is the prototype's own
    *
@@ -2350,22 +2458,68 @@ export function TicketSheet({
             <div className="gn-ticket-sheet__field" data-testid="field-due">
               <dt>Due</dt>
               <dd>
+                {/*
+                  THE EDITOR (ruling E5-6, 2026-09-21), transcribed from the
+                  export's own row (`desktop.dc.html:1200-1203`): an
+                  `<input type="date">` followed by a note line. `value` is the
+                  draft OR the claimed day, never a second piece of state — the
+                  same `titleDraft` shape one row up — and it is the ISO day
+                  (`2026-08-30`), never `formatDate`'s label, because that is
+                  what a `type="date"` input holds and what the event carries.
+                  `onBlur` commits, `Enter` commits, `Escape` abandons the
+                  draft without closing the sheet; there is no Save button
+                  because the export has none.
+
+                  ⚠ **WHAT THIS REPLACED, AND WHY THE OLD ASSERTION MOVED.** The
+                  row used to render `formatDate(due.date)` — *"30 Aug 2026"* —
+                  as read-only text. Case 16.24 pinned that spelling as one of
+                  its "both halves"; the export's row has no such span, so the
+                  case was amended rather than left asserting a rendering this
+                  door replaces. The CLAIM line below is unchanged and still
+                  carries the attribution the old sentence carried.
+                */}
+                <input
+                  className="gn-field__input gn-ticket-sheet__due-input"
+                  type="date"
+                  aria-label="Due date"
+                  value={dueDraft ?? dueDate?.date ?? ''}
+                  disabled={dueSaving}
+                  onChange={(event) => setDueDraft(event.target.value)}
+                  onBlur={() => {
+                    if (dueDraft !== null) void submitDueDate(dueDraft);
+                  }}
+                  onKeyDown={(event) => {
+                    if (event.key === 'Enter') {
+                      event.preventDefault();
+                      if (dueDraft !== null) void submitDueDate(dueDraft);
+                      return;
+                    }
+                    if (event.key === 'Escape') {
+                      // `preventDefault` is LOAD-BEARING here for the reason
+                      // the title field's own Escape branch records: `Sheet`
+                      // registers a DOCUMENT-level Escape that closes it, so an
+                      // unconsumed Escape would close the sheet and make
+                      // "abandon the draft" true of an input being unmounted.
+                      event.preventDefault();
+                      setDueDraft(null);
+                    }
+                  }}
+                />
                 {/* The prototype's own sentence for this absence
-                    (`desktop.dc.html:2853`), transcribed rather than re-worded:
-                    an unclaimed date is not an empty one. */}
+                    (`desktop.dc.html:1203`, via `sheetDueNote`'s
+                    `: "No date claimed"` arm), transcribed rather than
+                    re-worded: an unclaimed date is not an empty one. It is the
+                    NOTE LINE the export puts under the same input. */}
                 {dueDate === null ? (
                   <span className="gn-ticket-sheet__absent">No date claimed</span>
                 ) : (
-                  <>
-                    <span>{formatDate(dueDate.date)}</span>
-                    {/* The SAME wording every other field row on this sheet uses
-                        (`set by … on …`), because one surface with two
-                        provenance phrasings is the drift this file's claim-line
-                        comment exists to prevent. The ABSENT copy stays the
-                        prototype's ("No date claimed") — that sentence is about
-                        the DATE, and the claim line is about the ACTOR. */}
-                    <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
-                  </>
+                  /* The SAME wording every other field row on this sheet uses
+                     (`set by … on …`), because one surface with two
+                     provenance phrasings is the drift this file's claim-line
+                     comment exists to prevent. The ABSENT copy stays the
+                     prototype's ("No date claimed") — that sentence is about
+                     the DATE, and the claim line is about the ACTOR. */
+                  <span className="gn-ticket-sheet__claim">{`set by ${nameOf(dueDate.actorId)} on ${formatDate(dueDate.serverTime)}`}</span>
                 )}
               </dd>
             </div>

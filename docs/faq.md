@@ -195,13 +195,15 @@ is on, the Inbox tells you when you have been assigned something, My Work is bui
 list can group by it.
 
 **Can I set a due date?**
-**No control does it.** The calendar and timeline are built entirely around claimed dates and the
-"due soon" list depends on them, and nothing offers to claim one.
+**Yes — on the website's job panel.** Open a job and its **Due** row is a date box: pick a day and it
+is claimed under your name, with the row reading back who set it and when. **Clear the box to take the
+claim off** — that is recorded as a clearing rather than as a blank date. The calendar, the timeline,
+the list's due column and the "due soon" notice all read the same claim, so the date you set here is
+the date those screens show.
 
-There is one place that accepts a typed field value, and it will not give you a due date. If an admin
-puts a **"Require a field to be set"** rule on one of your moves, the Move dialog puts a plain typing
-box on screen for that field and will not let the move through until you fill it in. That is the only
-place in the product that takes a field value from a person.
+There is also a place that accepts a TYPED field value, and it works differently. If an admin puts a
+**"Require a field to be set"** rule on one of your moves, the Move dialog puts a plain typing box on
+screen for that field and will not let the move through until you fill it in.
 
 **The built-in due date and start date will not go in that box.** They expect a day *and* an optional
 note about it, together, and a single typing box cannot produce that. You get refused with something
@@ -212,7 +214,8 @@ Calendar and Timeline, labelled with your field's name — but a custom date nev
 the calendar (that still needs the two built-in dates), and the "due soon" list and Inbox message only
 ever look at the built-in due date. So it will put a day on a calendar and it will not chase anybody.
 
-Worth knowing about. Not a substitute for a due date.
+Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how
+you set the built-in due date.
 
 **Can I rename a job?**
 No control was found for it.

@@ -282,14 +282,26 @@ handlers, and Due as an `<input type="date">` **with a note line**; only Type is
 **this is the read half** and the editors are named as an unbuilt door. `16.29` asserts the read-only
 half, the same way `16.22` ASSERTED F's chip absence.
 
+**✅ THE DUE HALF OF THAT DOOR IS NOW BUILT — ruling E5-6 (release 2026-09-22, batch B13).** The record
+above is kept rather than deleted because it is what the ruling overrode: every surface in this product
+READS a due date — My Work's overdue count, the List's due column, the Calendar, the Timeline, the
+due-soon notification — and until E5-6 none could SET one, so the fact was visible in four places and
+claimable in none. The job panel's **Due** row is now a date box mirroring the export's own
+(`desktop.dc.html:3599`: `{ due: v || null }` — an emptied control CLEARS the claim, which is
+`value: null` on `ticket.field_set`). **PRIORITY IS STILL THE UNBUILT DOOR** and is still the read half
+only; `16.29` was amended to pin that SPLIT rather than the uniform absence it used to pin, which is
+the outcome its own suite docblock asked for (*"16.29 asserts the READ-ONLY half so that making them
+editable later is a decision rather than a drift"*). The editor's write behaviour is **`13.1178`**.
+
 - **16.23** ✅ All three rows are drawn **ALWAYS**, even on a ticket claiming none of them — the state this task exists to end. Each absence carries its own sentence.
-- **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps.
+- **16.24** ✅ Due renders the claimed day **and** its claim line — a value is never a standing property, the rule every other row on this sheet keeps. **AMENDED BY E5-6:** the day half used to be `getByText('30 Aug 2026')` over a read-only span; the export's row draws a date input and no such span, so it is now asserted as that control's VALUE (`toHaveValue('2026-08-30')`). The "both halves" substance is unchanged.
 - **16.25** ✅ Type renders the **NAME from the workspace ladder**, not the raw id.
 - **16.26** ✅ Type **falls back to the id** when the ladder does not hold it — the control for 16.25, without which a hard-coded name would pass.
 - **16.27** ✅ Priority renders the claim when the ticket carries one: it is a CONVENTION, so the claimed case arrives by the ticket carrying the field, exactly as a custom field would.
-- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice.
-- **16.29** ✅ The three rows are **READ-ONLY**: no `input`, `select` or `button` inside any of them.
+- **16.28** ✅ **No second row for a field that now has its own** — `dueDate` is skipped by the generic field loop, so one claim is not drawn twice. **AMENDED BY E5-6:** the "one node, not two" assertion read `getAllByText('30 Aug 2026')` with a length of 1; the day is no longer loose text on this sheet, so the same property is now asserted on the nodes the row draws — ONE date control, and NO second rendering of the day as text.
+- **16.29** ✅ The rows are **READ-ONLY except the one E5-6 made an editor**: Priority and Type carry no `input`, `select` or `button`, and Due's own editor is asserted POSITIVELY so the case cannot pass by the control silently disappearing.
 - **16.30** ✅ They are drawn in the prototype's **order** — Assignee, Priority, Due, Type — compared by document position, not by markup index.
+- **13.1178** ✅ **The Due row's WRITE (ruling E5-6, 2026-09-21)** — the door this record's Due half was. Committing a changed day submits exactly one `ticket.field_set` carrying `{ fieldId: 'dueDate', value: { date } }`; **clearing the box submits `value: null`** — the clearing claim, which is the export's own reading of an emptied control (`desktop.dc.html:3599`, `{ due: v || null }`), never `{ date: '' }`; and Enter commits the draft exactly as the title field's own Enter does. The id is from **B13's allocated §13 block (13.1177–13.1186)**, not from this file's 16.x series, because §13 ids became per-release-batch — the case still lives here, beside the Door G record it belongs to. **Two controls, because the write path has two ways to be wrong and one of them was, measured:** an **UNCHANGED** day sends nothing at all (this event is append-only, so a commit of the value the ticket already has would put a history line in the ticket claiming a date nobody touched), and a ticket claiming **NO** date can still be given its **first** one — the arm the defect was loudest in, since a ticket born without a due date could never acquire one before this ruling. **⚠ THE UNCHANGED CONTROL WAS VACUOUS ON ITS FIRST WRITING AND THE MUTATION WITNESS FOUND IT:** it made ONE `change` to the value the input already held, which fires no React `onChange` at all, so the draft stayed `null`, `onBlur`'s `dueDraft !== null` gate short-circuited, `submitDueDate` was never called, and the case **passed against a `submitDueDate` with its no-op guard deleted**. It now makes TWO real changes — out to a different day and back — and a THIRD case exists purely as its precondition, proving the same two-change dance reaches the write when the final value differs. **Mutation-witnessed with two distinct signatures:** dropping the clearing arm reddens the clearing case alone (`Tests 1 failed | 113 passed`), and deleting the no-op guard reddens the unchanged case alone (`Tests 1 failed | 114 passed`). — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
 
 **Mutation witnesses, run and recorded rather than predicted.** Dropping `dueDate` from the generic
 loop's exclusion reddens **16.28 alone** (a second row for one claim). Removing the Type row's `??
@@ -308,7 +320,7 @@ sentence is about the DATE and the claim line is about the ACTOR.
 
 ### What is NOT covered
 
-- **The two editors are NOT built.** Priority and Due are read-only rows here; making them editable — Priority as a segmented control, Due as a date input with its note line — is a separate door, named and not taken. `16.29` asserts the absence rather than describing it.
+- **The DUE editor was not built HERE, and is built now (ruling E5-6).** This bullet used to read *"the two editors are NOT built. Priority and Due are read-only rows here"*. **Due is no longer read-only** — the job panel's Due row is a date box, mirroring the export's own (`desktop.dc.html:1199-1203`, and `:3599` for the clearing semantics), asserted by `13.1178`; `16.24`, `16.28` and `16.29` were amended in that change set rather than left pinning a rendering the door replaces. **Priority is STILL not built** and remains a read-only row — Priority as a segmented control is a separate door, named and not taken, and `16.29` still asserts that absence rather than describing it.
 - **The CSS is not measured.** jsdom loads no stylesheet.
 - **`pendingFieldIds` is empty.** `ClientStateCache` exposes no pending surface (measured), so the Due row does not badge an in-flight claim. The sheet's other field rows do not badge one either — this is stated because an empty list is a value, not a placeholder.
 ## Door — `/v1/search`: `matchedIn` becomes derivable (executor 1, 2026-09-19) — cases `16.32`–`16.37`

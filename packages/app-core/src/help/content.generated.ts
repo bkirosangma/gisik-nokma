@@ -90,11 +90,11 @@ export const HELP_CONTENT: HelpContent = [
               [
                 {
                   "kind": "bold",
-                  "text": "You can put a job on a person only on the website — and you cannot set a due date anywhere."
+                  "text": "You can put a job on a person only on the website."
                 },
                 {
                   "kind": "text",
-                  "text": " The website's job panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. Due dates have no control on any screen. (§5)"
+                  "text": " The website's job panel has an \"Assignee\" picker. The phone and desktop apps have no Assignee row at all, so there you can neither see who a job is on nor set it. (§5)"
                 }
               ],
               [
@@ -1751,7 +1751,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "two things"
+                    "text": "three things"
                   },
                   {
                     "kind": "text",
@@ -1790,6 +1790,24 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " — the \"Who can see this\" section. (§10)"
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Set or clear its due date"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row's date box. Clearing the box takes the claim off rather than claiming a blank date. (§5)"
+                    }
                   ]
                 ]
               },
@@ -1798,7 +1816,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Everything else on that panel is there to read, not to change. You will see the title, the current stage, the assignee, any fields, and the description — all of them showing who claimed the value and when, and none of them editable."
+                    "text": "Everything else on that panel is there to read rather than to change: the current stage, the type, the priority and the other field rows all show who claimed the value and when. Four rows are real controls — the title box at the top, the \"Assignee\" picker, the description box, and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " date box."
                   }
                 ]
               }
@@ -1858,11 +1884,27 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "bold",
-                      "text": "You cannot set a due date or a start date."
+                      "text": "You cannot set a start date."
                     },
                     {
                       "kind": "text",
-                      "text": " (See the box below for the one thing that comes close, and why it is not a substitute.)"
+                      "text": " (See the box below for the one thing that comes close, and why it is not a substitute.) "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "A due date is no longer on this list"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — see the row above for the precedent — because the website can now set one: the job panel's "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " row is a date box, and clearing it takes the claim off."
                     }
                   ],
                   [
@@ -7572,11 +7614,27 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "No control does it."
+                    "text": "Yes — on the website's job panel."
                   },
                   {
                     "kind": "text",
-                    "text": " The calendar and timeline are built entirely around claimed dates and the \"due soon\" list depends on them, and nothing offers to claim one."
+                    "text": " Open a job and its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " row is a date box: pick a day and it is claimed under your name, with the row reading back who set it and when. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Clear the box to take the claim off"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — that is recorded as a clearing rather than as a blank date. The calendar, the timeline, the list's due column and the \"due soon\" notice all read the same claim, so the date you set here is the date those screens show."
                   }
                 ]
               },
@@ -7585,7 +7643,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "There is one place that accepts a typed field value, and it will not give you a due date. If an admin puts a "
+                    "text": "There is also a place that accepts a TYPED field value, and it works differently. If an admin puts a "
                   },
                   {
                     "kind": "bold",
@@ -7593,7 +7651,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " rule on one of your moves, the Move dialog puts a plain typing box on screen for that field and will not let the move through until you fill it in. That is the only place in the product that takes a field value from a person."
+                    "text": " rule on one of your moves, the Move dialog puts a plain typing box on screen for that field and will not let the move through until you fill it in."
                   }
                 ]
               },
@@ -7648,7 +7706,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Worth knowing about. Not a substitute for a due date."
+                    "text": "Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how you set the built-in due date."
                   }
                 ]
               }

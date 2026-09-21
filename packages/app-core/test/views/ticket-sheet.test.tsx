@@ -1,4 +1,4 @@
-import { act, cleanup, render, screen, waitFor, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
@@ -169,8 +169,11 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(within(titleRow).getByText('File the GST return')).toBeInTheDocument();
     const dueDateRow = screen.getByTestId('field-due');
     expect(within(dueDateRow).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
-    // The due DAY CLAIM renders as claimed, through the one renderer.
-    expect(within(dueDateRow).getByText('30 Aug 2026')).toBeInTheDocument();
+    // The due DAY CLAIM renders as claimed — as the editor's own VALUE since
+    // ruling E5-6, which is the ISO day a `type="date"` input holds. This
+    // assertion used to read `getByText('30 Aug 2026')` over a read-only span
+    // the ruling replaced; the claim line above is unchanged.
+    expect(within(dueDateRow).getByLabelText('Due date')).toHaveValue('2026-08-30');
   });
 
   it('PLANTED DEFECT: a nameless actor is attributed by id — never blank, never "system"', async () => {
@@ -2200,6 +2203,16 @@ describe('the `Subtask of {parent}` chip', () => {
  * **And two of the prototype's three are EDITORS there, which is a separate
  * door.** `16.29` asserts the READ-ONLY half so that making them editable later
  * is a decision rather than a drift — the same shape as F's `16.22`.
+ *
+ * **THAT DECISION WAS TAKEN FOR DUE (ruling E5-6, 2026-09-21), and `16.29` now
+ * pins the split rather than the uniform absence.** The record above is kept
+ * because it is what made the change a decision on the record instead of a
+ * drift: every surface in this product READS a due date — My Work's overdue
+ * count, the List's due column, the Calendar, the Timeline, the due-soon
+ * notification — and none could set one, while the deferral lived in a
+ * catalogue record and the manual rather than in front of the person. The
+ * editor's own write behaviour is `13.1178`. **Priority is STILL that unbuilt
+ * door** and `16.29` still asserts it as an absence.
  */
 /**
  * SHEET PROTOTYPE PARITY, 2026-09-20 — cases `16.81`–`16.99`.
@@ -2338,7 +2351,15 @@ describe('G — Priority, Due and Type as rows', () => {
     // BOTH, in one case: a row that drew the day without the claim would be a
     // standing property rather than a claim, which is the rule every other row
     // on this sheet keeps.
-    expect(within(row).getByText('30 Aug 2026')).toBeInTheDocument();
+    //
+    // ⚠ AMENDED BY RULING E5-6 (2026-09-21). The day half used to be
+    // `getByText('30 Aug 2026')` over a read-only span. The export's row draws
+    // an `<input type="date">` and no such span (`desktop.dc.html:1200-1203`),
+    // so the day now renders as that control's value — the ISO day, which is
+    // what a `type="date"` holds and what the event carries. The "both halves"
+    // assertion is unchanged in substance: the day is still drawn, and the
+    // attribution still travels with it.
+    expect(within(row).getByLabelText('Due date')).toHaveValue('2026-08-30');
     expect(within(row).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
     // And the absence copy is NOT present, so the two arms are distinguished.
     expect(within(row).queryByText('No date claimed')).toBeNull();
@@ -2402,24 +2423,182 @@ describe('G — Priority, Due and Type as rows', () => {
     expect(screen.getByTestId('field-due')).toBeInTheDocument();
     expect(screen.queryByTestId('field-dueDate')).toBeNull();
     // And one node, not two: the date appears exactly once on the sheet.
-    expect(screen.getAllByText('30 Aug 2026')).toHaveLength(1);
+    //
+    // ⚠ AMENDED BY RULING E5-6. This read `getAllByText('30 Aug 2026')` and
+    // asserted a length of 1. The due day is no longer loose text on this sheet
+    // at all — it is the editor's value (see 16.24) — so the same "one node,
+    // not two" property is asserted on the nodes the row actually draws: ONE
+    // date control, and NO second rendering of the day as text, which is the
+    // second row's signature.
+    expect(screen.getAllByLabelText('Due date')).toHaveLength(1);
+    expect(screen.queryByText('30 Aug 2026')).toBeNull();
   });
 
-  it('16.29 the three rows are READ-ONLY — the prototype’s editors are a separate door', async () => {
+  it('16.29 the rows are READ-ONLY except the one ruling E5-6 made an editor', async () => {
     // The prototype draws Priority as a segmented control with click handlers
     // and Due as an `<input type="date">` (`desktop.dc.html:1192-1205`); only
-    // Type is read-only there. The dispatch's scope is the ROWS, not editing
-    // them — so this asserts the absence, the same way `16.22` does for F's
-    // chip. Without it, "read-only" is a claim nobody checked.
+    // Type is read-only there.
+    //
+    // ⚠ AMENDED BY RULING E5-6 (2026-09-21), and this is the amendment the
+    // case's own suite docblock asked for: it said 16.29 "asserts the READ-ONLY
+    // half so that making them editable later is a decision rather than a
+    // drift". The decision was taken — `apps/web` could read a due date in four
+    // places and set it in none — so **Due now HAS an editor and Priority does
+    // not**, and this case pins both halves of that split rather than the
+    // uniform absence it used to pin. The loop that used to run over all three
+    // rows would now fail on `field-due`, which is exactly the reddening the
+    // docblock wanted: it forced this to be a decision on the record.
     renderSheet(ticketRead());
     await settled();
 
-    for (const id of ['field-priority', 'field-due', 'field-type']) {
+    // DUE — the editor, asserted POSITIVELY so the case cannot pass by the
+    // control silently disappearing.
+    expect(screen.getByTestId('field-due').querySelector('input')).not.toBeNull();
+
+    // PRIORITY and TYPE — still read-only, asserted as an absence, the same way
+    // `16.22` does for F's chip. Without it, "read-only" is a claim nobody
+    // checked.
+    for (const id of ['field-priority', 'field-type']) {
       const row = screen.getByTestId(id);
       expect(row.querySelector('input'), id).toBeNull();
       expect(row.querySelector('select'), id).toBeNull();
       expect(row.querySelector('button'), id).toBeNull();
     }
+  });
+
+  /**
+   * 13.1178 — ruling E5-6: the Due row's WRITE. The row this batch's sibling
+   * case `13.1177` put a due date on the board's card; this one is the door
+   * that lets a person put one there in the first place.
+   *
+   * The payload shape is asserted with `toEqual`, never `toMatchObject`, for
+   * the reason the description door's own case gives: the envelope must carry
+   * EXACTLY the composition, so a sheet that re-spelled the fieldId, dropped
+   * `value`, or sent `{ date: '' }` where the export sends `null` would be a
+   * different claim about the ledger.
+   *
+   * `fireEvent.change` rather than `userEvent.type`: a `type="date"` control's
+   * value is set wholesale (a date is not typed glyph by glyph in jsdom), and
+   * the commit path under test is the SAME one either way — the row commits on
+   * `onBlur`/Enter, not on change.
+   */
+  describe('13.1178 the Due row accepts a date, and clears one', () => {
+    const dueInput = (): HTMLElement => screen.getByLabelText('Due date');
+
+    it('13.1178 committing a changed date submits one ticket.field_set carrying that day', async () => {
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-09-14' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.type).toBe('ticket.field_set');
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-09-14' },
+      });
+    });
+
+    it('13.1178 CONTROL — the two-change dance below reaches the write, proved with a DIFFERENT final value', async () => {
+      // ⚠ THIS CASE EXISTS BECAUSE THE ONE BELOW WAS VACUOUS, and the mutation
+      // witness is what found it. The unchanged-value control first read a
+      // single `change` to the value the input ALREADY held, then a blur. A
+      // single change to an identical value fires no React `onChange` at all,
+      // so the draft stayed `null`, `onBlur`'s own `dueDraft !== null` gate
+      // short-circuited, and `submitDueDate` was never called — **the case
+      // passed against a `submitDueDate` with its no-op guard deleted
+      // (`Tests 114 passed`), so it was asserting nothing.**
+      //
+      // This is the precondition that makes the next case mean something: the
+      // SAME two changes with a final value that DIFFERS must reach the write.
+      // If this case fails, the next one's zero is silence rather than the
+      // guard.
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-08-30' } });
+      fireEvent.change(dueInput(), { target: { value: '2026-09-14' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-09-14' },
+      });
+    });
+
+    it('13.1178 CONTROL — an UNCHANGED date sends nothing at all', async () => {
+      // The no-op guard `submitTitle` also carries, and the ledger reason it
+      // carries it: this event is append-only, so a commit of the value the
+      // ticket already has would put a history line in the ticket saying
+      // somebody claimed the date they did not touch.
+      //
+      // The draft is made genuinely non-null in TWO REAL changes — out to a
+      // different day, then back to the claimed one — for the measured reason
+      // the case above records. That leaves `dueDraft` set to the claimed day
+      // with the field otherwise untouched, so the guard is the ONLY thing that
+      // can keep the ingest away, and deleting it reddens this case.
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-09-14' } });
+      fireEvent.change(dueInput(), { target: { value: '2026-08-30' } });
+      fireEvent.blur(dueInput());
+      await settled();
+      expect(source.ingested).toHaveLength(0);
+    });
+
+    it('13.1178 clearing the input submits value null — the clearing claim, not an empty date', async () => {
+      // The export's own reading of an emptied control (`desktop.dc.html:3599`:
+      // `{ due: v || null }`, noted "Due date cleared"), and the shape this
+      // event's door docblock names for a cleared field.
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({ fieldId: 'dueDate', value: null });
+    });
+
+    it('13.1178 CONTROL — a ticket claiming NO date can still be given its first one', async () => {
+      // The dateless arm is the one the defect is loudest in: before this
+      // ruling a ticket born without a due date could never acquire one, so
+      // this is the case that proves the editor is not merely an amend path.
+      const source = renderSheet(
+        ticketRead({
+          ticket: ticketStateSeed({
+            fields: {
+              title: {
+                value: 'File the GST return',
+                actorId: 'user_kiro',
+                clientTime: '2026-08-18T07:59:00.000Z',
+                serverTime: '2026-08-18T08:00:00.000Z',
+              },
+            },
+          }),
+        }),
+      );
+      await settled();
+      // The absence sentence is still drawn beside the empty control — the
+      // prototype's own copy, and the whole point of the row before this case.
+      expect(screen.getByTestId('field-due').textContent).toContain('No date claimed');
+      expect(dueInput()).toHaveValue('');
+      fireEvent.change(dueInput(), { target: { value: '2026-10-02' } });
+      fireEvent.blur(dueInput());
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-10-02' },
+      });
+    });
+
+    it('13.1178 Enter commits the draft, exactly as the title field’s own Enter does', async () => {
+      const source = renderSheet(ticketRead());
+      await settled();
+      fireEvent.change(dueInput(), { target: { value: '2026-12-01' } });
+      fireEvent.keyDown(dueInput(), { key: 'Enter' });
+      await waitFor(() => expect(source.ingested).toHaveLength(1));
+      expect(source.ingested[0]![0]!.payload).toEqual({
+        fieldId: 'dueDate',
+        value: { date: '2026-12-01' },
+      });
+    });
   });
 
   it('16.30 draws them in the prototype’s order: Assignee, Priority, Due, Type', async () => {
