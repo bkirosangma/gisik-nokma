@@ -162,6 +162,10 @@ export function TicketTypeEditorScreen(props: {
   const canAuthor = canAuthorRole(props.session.role);
   const [def, setDef] = useState<TicketTypeDef>(() => props.initialDef ?? freshDef());
   const [context, setContext] = useState<{ workflows: PublishedWorkflowDef[]; types: TicketTypeDef[] } | null>(null);
+  // A read that REJECTED, told apart from one still in flight (E2-20). The
+  // `context === null` gate below cannot make that distinction on its own, so a
+  // rejected `Promise.all` was drawn as "Loading ticket types…" for ever.
+  const [loadFailed, setLoadFailed] = useState(false);
   const [save, setSave] = useState<SavePhase>({ phase: 'idle' });
   const [population, setPopulation] = useState<Population>(null);
   const [rebind, setRebind] = useState<RebindPhase>({ phase: 'undecided' });
@@ -186,11 +190,18 @@ export function TicketTypeEditorScreen(props: {
 
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([gateway.listWorkflows(workspaceId), gateway.listTicketTypes(workspaceId)]).then(
-      ([workflows, types]) => {
+    setLoadFailed(false);
+    void Promise.all([gateway.listWorkflows(workspaceId), gateway.listTicketTypes(workspaceId)])
+      .then(([workflows, types]) => {
         if (!cancelled) setContext({ workflows, types });
-      },
-    );
+      })
+      // Without this arm a rejected read left `context` null, which the gate below
+      // draws as "Loading ticket types…" — an error reported as a load that never
+      // ends. The sentence is the one the sibling screens use
+      // (`workflow-list-screen.tsx:198`, `workflow-builder-screen.tsx:88`).
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
     return () => {
       cancelled = true;
     };
@@ -236,6 +247,19 @@ export function TicketTypeEditorScreen(props: {
       onSave={() => void onSave()}
     />
   );
+
+  // The error arm comes BEFORE the loading gate — the order `settings/page.tsx:277-284`
+  // records. The header renders here too, for the reason the loading arm's own note
+  // gives: it is the row that says WHICH type the person was editing, and dropping it
+  // at the moment the read fails is the one moment that question matters.
+  if (loadFailed) {
+    return (
+      <section className="ticket-type-editor">
+        {header}
+        <p className="ticket-type-editor__load-error">Could not load ticket types — reload to try again.</p>
+      </section>
+    );
+  }
 
   // The header renders in the LOADING arm too, and that is not cosmetic: the pane
   // used to draw the name and Cancel from its own fetch while this screen showed

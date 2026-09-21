@@ -1417,3 +1417,37 @@ second argument — it compiled, because an implementation may take fewer parame
 driven through it would have passed against a page that sent no filter. It now **applies the filter
 BEFORE cutting the page**, mirroring `store.ts`, where the filter joins the WHERE and therefore narrows
 what the cursor walks. (`packages/app-core/test/inbox/fake-gateway.ts`)
+
+## The two ticket-type screens report a rejected read instead of loading for ever — cases `13.1050`–`13.1051` (E2-20, 2026-09-21)
+
+**The id block is `13.1050`–`13.1051`, the next free ordinals in §13 when this lane recounted** (the
+maximum in use was `13.1049`, the tail of executor 1's reserved `13.1034`–`13.1049`; measured with
+`git grep -hoE '13\.[0-9]{3,4}([^0-9]|$)'` over `test-cases/`, `docs/superpowers/plans/` and
+`docs/lanes/`, with `13.1044` as a positive control in the same invocation — 9 hits, so the sweep can
+see ids at all). The cases sit in this part-file because the screens do.
+
+**The defect.** Both screens load their whole environment through one `Promise.all` and gate every
+render on the loaded value being non-null. Neither call had a second argument to `.then`, and neither
+had a `.catch`, so a rejection left the gate's condition true and the screen drew
+`Loading ticket types…` — an error reported as a load that never ends, with no sentence and no
+recovery named. **The list screen already said this in its own words, about the wrong promise:** its
+counts read is deliberately a separate promise with its own handler, and the docblock beside it named
+*"leave the screen on "Loading ticket types…" for ever"* as the thing that separation prevents — while
+the `Promise.all` that sentence talks about carried the hazard unguarded.
+
+**What the cases assert, and why the pair of assertions.** Each case asserts the error sentence is
+present **and** the loading sentence is absent. Either alone passes over a screen that renders both,
+and a reader cannot tell those two states apart — which is the whole defect, so a case that could not
+tell them apart would not be a case.
+
+- **13.1050** ✅ A rejected `listTicketTypes` on the list screen renders *"Could not load ticket types —
+  reload to try again."* and no `Loading ticket types…`. The gateway is the shared fake with that one
+  read replaced by a rejection, so the assertion is over the arm and not over a hand-built screen. —
+  (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+- **13.1051** ✅ The editor screen says the same sentence on a rejected `listWorkflows`, and **keeps its
+  header** — the `type-editor-header` row naming the type under edit, which case `13.924` already holds
+  for the loading arm for the same reason. — (`packages/app-core/test/ticket-types/ticket-types.test.tsx`)
+
+**The error arm comes before the loading gate** on both screens, the order
+`apps/web/app/settings/page.tsx:277-284` records — a failure and a read still in flight are different
+states, and the loading sentence is the one that cannot tell them apart.

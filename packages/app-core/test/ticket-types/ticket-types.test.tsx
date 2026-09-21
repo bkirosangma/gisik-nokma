@@ -1614,3 +1614,62 @@ describe('TicketTypeEditorScreen — the five NOT-ported items (Task 5b)', () =>
     expect(CUSTOM_FIELD_KINDS).toContain(saved.fields[0]?.type);
   });
 });
+
+describe('A rejected ticket-type read is an error, not an eternal load (E2-20)', () => {
+  const task = builtins.find((builtin) => builtin.id === 'task')!;
+
+  /**
+   * 13.1050 — E2-20. The `Promise.all` at the top of the list screen's effect had
+   * no rejection arm, and the screen gated its whole render on the loaded state, so
+   * a rejected read was drawn as `Loading ticket types…` on a screen that would
+   * never load. The file's own docblock at the SIBLING promise names that exact
+   * failure — *"leave the screen on "Loading ticket types…" for ever"* — while
+   * leaving it present in the `Promise.all` the sentence talks about.
+   *
+   * Asserted on the pair that makes the fix real: the error sentence is present
+   * AND the loading sentence is gone. Either alone passes on a screen that renders
+   * both — and a reader cannot tell the two apart, which is the whole defect.
+   */
+  it('13.1050 a rejected ticket-type read renders the load-error sentence, never “Loading ticket types…” for ever', async () => {
+    const gateway = {
+      ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+      listTicketTypes: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/ticket-types')),
+    };
+    render(
+      <TicketTypeListScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        onOpen={() => {}}
+        onNew={() => {}}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+  });
+
+  /**
+   * 13.1051 — E2-20, the editor half. Same missing arm, same gate. The header is
+   * asserted here for the reason case 13.924 records for the loading arm: the pane
+   * draws the name and Cancel from its own fetch, and an error arm that dropped the
+   * header would blank the row it belongs to at the moment a person needs to see
+   * which type they were editing.
+   */
+  it('13.1051 the editor screen says the same thing on a rejected read, and keeps its header', async () => {
+    const gateway = {
+      ...createFakeGateway({ workflows: [kanbanPublished], ticketTypes: builtins }),
+      listWorkflows: () => Promise.reject(new Error('HTTP 500 for /v1/workspaces/ws/workflows')),
+    };
+    render(
+      <TicketTypeEditorScreen
+        workspaceId={newUlid()}
+        session={adminSession}
+        gateway={gateway}
+        initialDef={task}
+      />,
+    );
+    expect(await screen.findByText('Could not load ticket types — reload to try again.')).toBeTruthy();
+    expect(screen.queryByText('Loading ticket types…')).toBeNull();
+    expect(screen.getByTestId('type-editor-header')).toBeTruthy();
+  });
+});

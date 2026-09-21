@@ -142,6 +142,11 @@ export function TicketTypeListScreen(props: {
   const [types, setTypes] = useState<TicketTypeDef[] | null>(null);
   // Workflow names for the meta line.
   const [workflows, setWorkflows] = useState<PublishedWorkflowDef[] | null>(null);
+  // A read that REJECTED — distinct from a read still in flight, which is what
+  // `types === null` alone says. The two were one state until E2-20: a rejected
+  // `Promise.all` left both halves null, so the gate below drew an error as a load
+  // that never ends.
+  const [loadFailed, setLoadFailed] = useState(false);
   /**
    * Every type's OWN ticket count, or `'unavailable'`.
    *
@@ -172,17 +177,26 @@ export function TicketTypeListScreen(props: {
   const { gateway, workspaceId } = props;
   useEffect(() => {
     let cancelled = false;
-    void Promise.all([gateway.listTicketTypes(workspaceId), gateway.listWorkflows(workspaceId)]).then(
-      ([loadedTypes, loadedWorkflows]) => {
+    setLoadFailed(false);
+    void Promise.all([gateway.listTicketTypes(workspaceId), gateway.listWorkflows(workspaceId)])
+      .then(([loadedTypes, loadedWorkflows]) => {
         if (cancelled) return;
         setTypes(loadedTypes);
         setWorkflows(loadedWorkflows);
-      },
-    );
+      })
+      // Without this arm a rejected read left both `types` and `workflows` null,
+      // which the gate below draws as "Loading ticket types…" — an error reported
+      // as a load that never ends, on the two screens the help corpus calls the
+      // ones that make the product yours. The sentence is the one every sibling
+      // data screen in this package already uses (`workflow-list-screen.tsx:198`,
+      // `workflow-builder-screen.tsx:88`), and it names the one recovery there is.
+      .catch(() => {
+        if (!cancelled) setLoadFailed(true);
+      });
     // A SEPARATE promise, and its own rejection handler. Folded into the
-    // `Promise.all` above, a failed count would reject the whole tuple and
-    // leave the screen on "Loading ticket types…" for ever — the counts are
-    // one segment of one meta line and must not be able to take the list down.
+    // `Promise.all` above, a failed count would reject the whole tuple and take
+    // the LIST down to the load-error arm for a failed count — the counts are one
+    // segment of one meta line and must not be able to take the list down.
     void gateway.getTicketCountsByType(workspaceId).then(
       (counts) => {
         if (!cancelled) setTicketCounts(counts);
@@ -196,6 +210,12 @@ export function TicketTypeListScreen(props: {
     };
   }, [gateway, workspaceId]);
 
+  // The error arm goes BEFORE the loading gate, the order `settings/page.tsx:277-284`
+  // records: a failed read and a read still in flight are different states, and a
+  // reader who sees the loading sentence cannot tell them apart.
+  if (loadFailed) {
+    return <p className="ticket-type-list__load-error">Could not load ticket types — reload to try again.</p>;
+  }
   if (types === null || workflows === null) return <p className="ticket-type-list__loading">Loading ticket types…</p>;
   // The narrowed array, named once. `types` is still `TicketTypeDef[] | null` to
   // TypeScript INSIDE the two closures below — the early return narrows it for
