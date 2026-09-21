@@ -192,7 +192,8 @@ today is `21 Sep 2026`; its board card is indistinguishable from an undated one 
 
 **WHY.** Lateness IS a product concept: `my-work.tsx` renders *"Overdue by N days"*, the List has a `dueDate` column
 (`ticket-list.tsx:39`, `:1027-1059`), the Calendar and Timeline are built on it, and `Features.md:1135` sends "Due
-soon" notifications. The Board is the DEFAULT view (`docs/manual.md:2027` *"The board is the default view"*) and the
+soon" notifications. The Board is the DEFAULT view (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:193` *"The default stays
+`'board'`"*, `:212` `useState<ProjectTab>(DEFAULT_PROJECT_TAB)`; the export's own help says the same at `EXPORT:2027`) and the
 only view where the fact is invisible. The recorded reason is a **WIRE GAP** — `docs/design/prototype-delta-2026-09-18.md:526`:
 *"`{{ t.meta }}` … have **no wire fields** — WIRE GAP: `BoardCard` … is `{ticketId, title, typeId, assignee,
 stateProvenance, cause, rollup, pending}` with no `chips` array and no `meta` string."* The common brief §3: *"the
@@ -361,6 +362,68 @@ the field's requirement (*"This move needs a comment"*) and not as a refusal.
 
 **SEVERITY: Important** (claimed). The product tells a person something untrue about itself beside the control it
 contradicts — the file's own words for the sibling defect.
+
+---
+
+### E5-8 — IMPORTANT · The History tab prints raw event names — `ticket.field_set` three times in a row — and never says WHAT changed; the export narrates every row `[BROWSER]` `[SOURCE]` — category 3
+
+**WHAT.** `CCSO-3`'s History tab reads, in order: `ticket.created · Kiro · from web · claimed (device clock) 6 Sep
+2026, 14:46 IST · recorded (server) 6 Sep 2026, 14:46 IST`, then `ticket.field_set` ×3 with identical clocks, then
+`ticket.transitioned`, `visibility.set` ×2, `ticket.transitioned` (`[BROWSER]`, tab panel text). Nothing on any row
+says which field was set, to what, or which state the ticket moved to. The export's rows (`EXPORT:3733-3737`) are
+sentences: *"Created as Errand"*, *"Assigned to Anselma Marak"*, *"State set to Doing"*, *"Conflicting claim recorded
+on iphone-02"*.
+
+**WHY.** `docs/manual.md:408-410`: *"Every change ever made to that job, in order, each one saying who did it and
+when."* — true, and it is all it says; a person cannot learn WHAT from this tab. The wire already carries what a
+sentence needs: `TicketHistoryEvent.payload: unknown` (`view-types.ts:538-548`), served by `routes/tickets.ts:701`
+(`SELECT … type, version, payload …`). The renderer prints `{event.type}` (`history-list.tsx:45`) and discards the
+payload. **Search for a ruling:** `history-list.tsx:5-31` rules the two CLOCKS (*"Nothing is summarised into one
+'time'"*) and the actor fallback — not the sentence; `docs/hig-reconciliation-audit.md:571` rules only that the tab's
+three loading arms must not be simplified; case `5.19` pins the ENDPOINT serving unsummarised; no case pins the raw
+type as the row's text (`grep -rn 'gn-history__type' test-cases/` → 0; the only test reads the types as a list,
+`history-list.test.tsx:109`). The divergence from the export has no ruling I could find.
+
+**WHAT WOULD HAVE BEEN BETTER.** Narrate from `type` + `payload` (*"Due set to 14 Sep 2026"*, *"Moved to In
+progress"*, *"Visibility set to project"*) with the raw type kept as a secondary label; keep both clocks exactly as
+they are.
+
+**MEASUREMENT.** `[BROWSER]` History tab text above. `[SOURCE]` `history-list.tsx:36-60`; `view-types.ts:538-548`;
+`EXPORT:3733-3737`; `docs/manual.md:408-419`.
+
+**SEVERITY: Important** (claimed). The tab exists to answer "what happened to this ticket" and cannot.
+
+---
+
+### E5-9 — IMPORTANT · A refused Delete answers five screens above the button that was pressed `[BROWSER]` `[SOURCE]` — and this is the measured consequence the ruling on "offered to everyone" did not weigh
+
+**WHAT.** `Delete` sits in the sheet's footer (`ticket-sheet.tsx:2612-2621`), `position: static` at the END of the
+scrolling body. Its refusal renders in the shared answer slot (`:1961-1965`, `gn-refusal--server`) directly under the
+tab bar. `[BROWSER]` measured on `CCSO-3`: `.gn-sheet__body` is the scroll container, `clientHeight 756`,
+`scrollHeight 4036`; the footer's top is **3,943 px below the tab bar**. A person scrolls to the bottom, presses
+Delete, is refused, and the answer lands ~5 viewports above them.
+
+**WHY.** The docblock at `:1192-1200` RULES that Delete is offered to every viewer: *"this control is NOT hidden for
+anyone, deliberately … so a non-admin who presses Delete gets the engine's own refusal in `gn-refusal--server` rather
+than a button that silently is not there. A hidden control cannot explain itself."* The ruling's justification is
+that the refusal explains itself — and geometrically it cannot, because the slot and the control are at opposite ends
+of a four-thousand-pixel body. `role="alert"` reaches assistive technology only. The slot was deliberately moved ABOVE
+the tabs (`:1925-1940`) so a title refusal is visible from either tab — the same reasoning ("an answer that is
+invisible … is the failure the three-slot split exists to prevent") applies to scroll position and was not applied.
+Connected: the product's OWN sibling doctrine for New-ticket and (since today) the subtask form — *"asks before it
+offers, and withholds itself rather than assert an absence"* (my brief; the board's *"Preparing the New ticket form…"*
+`[BROWSER]`) — asks the door first. Delete does not, and its ruling rests on a refusal the person will not see.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either render Delete's refusal beside Delete (a footer-local slot, as
+`TransitionDialog` has its own), or ask `check-permission`'s check 6 before offering — the New-ticket precedent — and
+withhold with a sentence. The no-confirmation shape MATCHES the export (`EXPORT:3794-3799`: filter + undo toast) and
+is not part of this finding.
+
+**MEASUREMENT.** `[BROWSER]` JS: `{scrollContainer: "gn-sheet__body", scrollH: 4036, clientH: 756, footerPosition:
+"static", footerOffsetFromTabs: 3942.8}`. `[SOURCE]` `:1192-1200`, `:1961-1965`, `:2612-2621`, `:1925-1940` opened.
+
+**SEVERITY: Important** (claimed). A refusal after the press, out of view — the brief's named shape, on the
+destructive control.
 
 ---
 
