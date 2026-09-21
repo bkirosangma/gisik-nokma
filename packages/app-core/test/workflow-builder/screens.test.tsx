@@ -115,7 +115,7 @@ describe('WorkflowBuilderScreen', () => {
   });
 
   /**
-   * 10.90 — RULING E5-41, CRITICAL. Before this ruling the draft lived only in
+   * 10.93 — RULING E5-41, CRITICAL. Before this ruling the draft lived only in
    * the mounted screen's React state (`useState(() => createDraftStore(...))`)
    * and nowhere else, so any navigation away — the nav bar, the breadcrumb, the
    * browser's back button — unmounted the screen and discarded every edited
@@ -124,7 +124,7 @@ describe('WorkflowBuilderScreen', () => {
    * the SAME workspace and the SAME draft id (an edit route re-fetches the
    * identical published def on every visit).
    */
-  it('10.90 recovers an edited draft after the screen unmounts and remounts, from this same tab', async () => {
+  it('10.93 recovers an edited draft after the screen unmounts and remounts, from this same tab', async () => {
     const workspaceId = newUlid();
     const draft = draftFromTemplate(kanban);
     const user = userEvent.setup();
@@ -159,7 +159,7 @@ describe('WorkflowBuilderScreen', () => {
     );
   });
 
-  it('10.90 a published draft clears its own recovery slot, so a later visit does not resurrect a stale pre-publish version', async () => {
+  it('10.93 a published draft clears its own recovery slot, so a later visit does not resurrect a stale pre-publish version', async () => {
     const workspaceId = newUlid();
     const draft = draftFromTemplate(kanban);
     const gateway = createFakeGateway();
