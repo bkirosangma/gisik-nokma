@@ -18,7 +18,7 @@
 
 ## 0. Refutations filed
 
-**None at 15:35 IST.** Every finding of exec 4's that I could reach at source held, and every painted number of theirs I re-painted reproduced (§1a) — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
+**None at 15:33 IST.** Every finding of exec 4's that I could reach at source held, and every painted number of theirs I re-painted reproduced (§1a) — the table in §1 names the line I opened for each. Two of them (`E4-1`, `E4-30`) are about code I wrote, and both are right; §3 says so plainly. This section is revisited against each lane's later pushes until 17:05.
 
 ## 1. Exec 4's findings, checked at source — the line I opened, and the verdict
 
@@ -114,4 +114,4 @@ Defence paragraphs are dated and sit under the finding in `review-ui-exec1.md`; 
 - 15:15 — heads re-read; exec 4 at `674decb2` adds a painted corroboration of `P22`. No lane has filed a refutation of an exec-1 finding as of this line.
 - 15:22 — I1 narrowed and re-measured; P1's fourth-stylesheet condition closed.
 - 15:23–15:32 — `:3041` driven by me: `/privacy` signed out (P31's legal pair, P12, P13), then signed in (P1 ×3, P35, P21, P19, P8; §1a's re-paints of exec 4; P36 found and filed at half points).
-- 15:35 — heads re-read (`exec4` `872758a3`: two mechanism slips I noted corrected in its report, dated; `exec6` `2ee7cc03`: `R6-3 → E2-28`; `exec2` `d370d830`; `exec3` `c5524156`; `exec5` `858d824c`). No lane has filed a refutation of an exec-1 finding as of this line.
+- 15:33 — heads re-read (`exec4` `872758a3`: two mechanism slips I noted corrected in its report, dated; `exec6` `2ee7cc03`: `R6-3 → E2-28`; `exec2` `d370d830`; `exec3` `c5524156`; `exec5` `858d824c`). No lane has filed a refutation of an exec-1 finding as of this line.
