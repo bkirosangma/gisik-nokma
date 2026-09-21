@@ -31,9 +31,21 @@ gate_dry() { ( cd "$gr" && "$HERE/ctl" gate "$(/usr/bin/git rev-parse HEAD)" --r
 check "gate: branch containing origin/main proceeds to DRY" 'gate_dry | tail -1 | grep -q "^OK gate dry-run"'
 other=$(mktemp -d); rm -rf "$other"; /usr/bin/git clone -q "$bare" "$other" && ( cd "$other" && /usr/bin/git checkout -q main && /usr/bin/git commit -q --allow-empty -m "main moved elsewhere" && /usr/bin/git push -q origin main )
 check "gate: local origin/main still stale before the verb runs" '[ "$(cd "$gr" && /usr/bin/git rev-parse origin/main)" = "$(cd "$gr" && /usr/bin/git rev-parse main)" ]'
-check "gate: main moved past the branch (seen only by fetching) → refuses, names the remedy" 'out=$(gate_dry); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "is not an ancestor of HEAD.*merge origin/main"'
+check "gate: main moved past the branch (seen only by fetching) → refuses, names the remedy" 'out=$(gate_dry); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "is not an ancestor of HEAD.*Remedy: git merge --no-edit origin/main && git push, then re-run ctl gate"'
 ( cd "$gr" && /usr/bin/git merge -q --no-edit origin/main )
 check "gate: after merging origin/main → proceeds again" 'gate_dry | tail -1 | grep -q "^OK gate dry-run"'
+# check-pr.py: the merge of origin/main that gate now requires is not a task commit; a non-merge non-ruling subject still fails.
+cb=$(mktemp -d); /usr/bin/git init -q --bare "$cb"
+cr=$(mktemp -d); ( cd "$cr" && /usr/bin/git init -q . && /usr/bin/git symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes && printf '#### T-X1 — a task\n' > plan.md && printf '| T-X1 | done | abc | note |\n' > docs/lanes/release-2026-09-22-progress.md && echo one > docs/x.md && /usr/bin/git add -A && /usr/bin/git commit -q -m base && /usr/bin/git remote add origin "$cb" && /usr/bin/git push -q -u origin main && /usr/bin/git checkout -q -b feat && echo two > docs/x.md && /usr/bin/git commit -q -am "X1: change x" )
+co=$(mktemp -d); rm -rf "$co"; /usr/bin/git clone -q "$cb" "$co" && ( cd "$co" && /usr/bin/git checkout -q main && echo moved > moved.md && /usr/bin/git add moved.md && /usr/bin/git commit -q -m "main moved" && /usr/bin/git push -q origin main )
+( cd "$cr" && /usr/bin/git fetch -q origin && /usr/bin/git merge -q --no-edit origin/main )
+printf 'no logs here\n' > "$cr/body.md"
+checkpr() { ( cd "$cr" && python3 "$HERE/verbs/check-pr.py" "$cr" plan.md docs/lanes/release-2026-09-22-progress.md "$cr/body.md" 2>&1 ); }
+check "check-pr: merge commit is on the branch" '[ "$(cd "$cr" && /usr/bin/git log --merges --format=%s origin/main..HEAD | grep -c Merge)" -eq 1 ]'
+check "check-pr: one task commit + the merge of origin/main passes" 'out=$(checkpr); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 1 files, 0 failures"'
+( cd "$cr" && echo three > docs/x.md && /usr/bin/git commit -q -am "oops: not a ruling id" )
+check "check-pr: a non-merge commit without a ruling id still fails" 'out=$(checkpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "commit subject does not start with a ruling id in the plan: .oops"'
+rm -rf "$cb" "$cr" "$co"
 rm -rf "$bare" "$gr" "$other"
 # Pane delivery helpers against a fake tmux on PATH: it records every call, answers display-message with $FAKE_MODE,
 # counts the Enters it receives, and its capture-pane shows a real multi-line box until $FAKE_NEEDS Enters have

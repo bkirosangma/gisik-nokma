@@ -18,7 +18,7 @@ sha="$head"
 # wrong reason. An offline fetch is reported, not hidden, and the local ref decides.
 /usr/bin/git fetch -q origin main 2>/dev/null || echo "WARN gate: fetch of origin/main failed — ancestry checked against the local ref"
 main_sha="$(/usr/bin/git rev-parse origin/main 2>/dev/null)" || ctl_fail gate "no origin/main in this repo"
-/usr/bin/git merge-base --is-ancestor "$main_sha" "$head" || ctl_fail gate "origin/main ${main_sha:0:12} is not an ancestor of HEAD ${head:0:12} — a --merge landing would produce a tree this gate never saw; merge origin/main into the branch (git merge --no-edit origin/main), then re-gate"
+/usr/bin/git merge-base --is-ancestor "$main_sha" "$head" || ctl_fail gate "origin/main ${main_sha:0:12} is not an ancestor of HEAD ${head:0:12} — a --merge landing would produce a tree this gate never saw. Remedy: git merge --no-edit origin/main && git push, then re-run ctl gate on the NEW head: scripts/ctl/ctl gate \$(git rev-parse HEAD) (merge, never rebase: PR bodies cite lane commits by sha)"
 work="$(ctl_log_dir)/gate-lock"; mkdir -p "$work"; cp docs/lanes/gate-lock/*.sh "$work/"; chmod +x "$work"/*.sh
 log="$(ctl_log gate)"; console="$log.console"
 if [ "$CTL_DRY_RUN" = 1 ]; then echo "DRY: GATE_REPO=$CTL_REPO bash $work/gate.sh $log > $console"; ctl_ok gate "dry-run"; fi

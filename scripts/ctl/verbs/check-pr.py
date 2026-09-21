@@ -9,7 +9,9 @@ def ruling_id(subject):
     m = re.match(r'([A-Z]+\d*-?\d+)\b', subject); return m.group(1) if m else None
 fails = []
 files = [f for f in git('diff', '--name-only', 'origin/main...HEAD').split('\n') if f]
-subjects = [s for s in git('log', '--format=%s', 'origin/main..HEAD').split('\n') if s]
+# A branch satisfies the gate's "contains origin/main" by MERGING origin/main (never rebasing: PR bodies and DONE reports
+# cite lane commits by sha), so the merge commit's subject is not a task and is not held to the ruling-id rule.
+subjects = [s for s in git('log', '--no-merges', '--format=%s', 'origin/main..HEAD').split('\n') if s]
 tasks = []
 for s in subjects:
     rid = ruling_id(s)
