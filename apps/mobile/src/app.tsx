@@ -107,7 +107,14 @@ export function App() {
         */}
         <Stack.Screen name="Help" component={HelpScreen} options={{ title: 'Manual & FAQ' }} />
         <Stack.Screen name="Ticket">
-          {({ route }) => <TicketScreen ds={ds} ticketId={(route.params as { ticketId: string }).ticketId} />}
+          {({ route }) => (
+            <TicketScreen
+              ds={ds}
+              ticketId={(route.params as { ticketId: string }).ticketId}
+              apiBase={API_BASE}
+              token={TOKEN}
+            />
+          )}
         </Stack.Screen>
       </Stack.Navigator>
     </NavigationContainer>

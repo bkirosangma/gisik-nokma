@@ -2870,3 +2870,21 @@ board silently empty. Fixed the same way: `init-replica.ts`'s `initReplica`, ret
   build — same RED→GREEN discipline as 12.404. —
   (`apps/mobile/src/init-replica.test.ts`)
 
+## Ruling E2-52 — `@`-mention queries answer the real roster (2026-09-21, B14)
+
+*`ticket-screen.tsx` never passed `onMentionQuery` to `EditorWebView`, so every mention query fell
+through to the editor host's own `?? Promise.resolve([])` fallback and the popup stated "No people
+match" for every query, on every workspace — permanently and falsely empty. The replica has no roster
+to answer from (`ReplicaDataSource`'s own `MEMBERS_ABSENCES`, Plan 10's documented gap), so
+`queryWorkspaceMembers` (`mention-query.ts`) calls `GET /v1/workspaces/:id/members` directly with the
+phone's bearer token — the same endpoint the web sheet's `queryUsers` is backed by. A refused roster
+still resolves `[]` (not distinguished from "nobody matched" — that needs `packages/editor`'s own
+protocol widened, out of this task's package).*
+
+- 12.406 ✅ `queryWorkspaceMembers` resolves matching members from the roster endpoint,
+  bearer-authenticated, filtering case-insensitively by name — RED confirmed against a pre-fix stub
+  that never called the endpoint at all (always `[]`, the shape `onMentionQuery` being unwired
+  produces today); GREEN once it called the real door. Also covers the empty-query case (every
+  member) and the refused-door case (`[]`, not a throw). —
+  (`apps/mobile/src/screens/mention-query.test.ts`)
+

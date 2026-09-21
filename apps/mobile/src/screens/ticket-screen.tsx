@@ -12,13 +12,14 @@ import { EDITOR_HTML } from '../editor/editor-html.generated.js';
 import { EditorWebView, type EditorWebViewProps } from '../editor/editor-web-view.js';
 import { loadTicket } from './ticket-read.js';
 import { buildCommentEvent } from './ticket-comment.js';
+import { queryWorkspaceMembers } from './mention-query.js';
 
 type EditorDoc = Exclude<EditorWebViewProps['initialDoc'], null>;
 
 type TicketWithPending = Awaited<ReturnType<ReplicaDataSource['query']['getTicketWithPending']>>;
 
-export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: string }) {
-  const { ds, ticketId } = props;
+export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: string; apiBase: string; token: string }) {
+  const { ds, ticketId, apiBase, token } = props;
   const [ticket, setTicket] = useState<TicketWithPending>(null);
   const [draft, setDraft] = useState<EditorDoc>(plainTextToDoc('') as EditorDoc);
   const [error, setError] = useState<string | null>(null);
@@ -128,7 +129,12 @@ export function TicketScreen(props: { ds: ReplicaDataSource | null; ticketId: st
           <Button title="Discard" onPress={() => onDiscard(c)} />
         </View>
       ))}
-      <EditorWebView initialDoc={draft} onChange={setDraft} html={EDITOR_HTML} />
+      <EditorWebView
+        initialDoc={draft}
+        onChange={setDraft}
+        html={EDITOR_HTML}
+        onMentionQuery={(query) => queryWorkspaceMembers({ apiBase, token, workspaceId: state?.workspaceId ?? '', query })}
+      />
       {error !== null ? <Text accessibilityRole="alert">{error}</Text> : null}
       <Text accessibilityRole="text">
         Comments from the phone are not attributed to you yet — sign-in for the phone is still interim.
