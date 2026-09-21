@@ -621,6 +621,24 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 **WHAT WOULD HAVE BEEN BETTER.** Either raise `danger`'s darkness in `hig`/`minimal`, or use `dangerText` on the sunken surface, or take the element off `surfaceSunken` — and **add `{ fg: 'danger', bg: 'surfaceSunken', minimum: 4.5 }` to `CONTRAST_PAIRS` either way**, so the pair is checked rather than merely fixed. The second half is the one that generalises: a sweep in the shape the extraction used here — every rule painting a token colour on a token surface, each pair required to appear in `CONTRAST_PAIRS` — is a **gate-able** check (it reads two files and needs no browser), and it is the instrument this regime has never had.
 
+### P25 — **MINOR** ⚠ **r2 NEW** — Three live files cite the docblock of a component that was deleted, and one of them is an instrument
+
+**WHAT.** `apps/web/src/back-button.tsx` no longer exists. Three files in the product still cite its docblock — including `apps/web/e2e-viewport/viewports.ts`, which the viewport suite loads.
+
+**MEASUREMENT.**
+- `find . -name 'back-button*' -not -path '*/node_modules/*' -not -path '*/.next/*'` → **no matches**. The file is gone, not moved.
+- Deleted by **`17c8345c`** — *"Step 2c-2: the catalogue and Features.md, **and the dead component the port orphaned**"* — a commit whose own subject says the removal was deliberate.
+- **Three live citations, each read at its line:**
+  1. `apps/web/src/legal-nav.tsx:28` (product source): *"these pages are reached from the sign-in card's legal line (`back-button.tsx`'s own docblock)"*. **The reasoning this sentence defers to is in a deleted file** — the reader cannot follow it, and the sentence that survives is the conclusion with its argument gone.
+  2. `apps/web/e2e-viewport/viewports.ts:167` (**the viewport suite's own route/floor module**): *"neither `apps/web/app/privacy/page.tsx`, `apps/web/app/terms/page.tsx` nor `apps/web/src/back-button.tsx` was touched by that task, **so the Back control's presence and accessible name on both routes is unaffected**"*. This is the sharpest of the three: a live instrument's docblock is **arguing for a conclusion about a control that the deletion removed**, in a file a reader opens to understand those routes' floors.
+  3. `apps/web/test/not-found-and-legal.test.tsx:217`: *"see `back-button.tsx`'s docblock: these pages are reached from the sign-in card"*.
+
+**WHY IT IS WRONG.** This is the family I4 names — *a citation that cannot resolve* — and it is worth one finding rather than none because of **where the third one sits**: `viewports.ts` is not prose about prose, it is the module the viewport suite reads to know which routes it sweeps. **Its paragraph's whole purpose is to justify a floor, and the justification now rests on a file that does not exist and a control that does not either.**
+
+**⚠ AND IT IS THE SAME CLASS I HAD FOUR TIMES IN MY OWN REPORT.** Round 1's citation sweep found four unresolvable references in this document (P15-era, fixed), and I4 found one in `tap-targets.ts`. **That makes this at least the third artefact in this repository carrying citations its reader cannot follow**, which is a pattern worth naming rather than three accidents: nothing checks that a `file` named in prose still exists, and the checks that do exist read *line numbers* or *case ids*, not paths.
+
+**WHAT WOULD HAVE BEEN BETTER.** Name the *reason* rather than the file — *"these pages are reached from the sign-in card's legal line, and the fallback link points at the same route, so a reader with no history still has a destination"* — which is what all three sentences actually mean and needs no file to resolve. Or keep a one-line tombstone in `legal-nav.tsx`'s own docblock recording that `BackButton` was removed and why, since that file *is* the chrome those pages now use.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -686,15 +704,15 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P9` `SegmentedControl` carries ARIA tab semantics with none of the tab keyboard model, in 7 places
 - `P11` the `Select` panel is outside every sweep's population, for two independent reasons
 - `P12` every screen in the product has the same document title (WCAG 2.4.2, Level A)
+- `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
+- `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
+- `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
 - `P21` ⚠ r2 — the description editor's content area has no role and no accessible name
 - `P22` ⚠ r2 — two `role="menu"` elements have no accessible name; one has a named twin in the same bar
 - `P23` ⚠ r2 — the searchable Select removes its input's focus outline and replaces it with nothing (WCAG 2.4.7, Level AA)
 - `P24` ⚠ r2 — a painted text colour measures 3.84:1 at 12.8px and is UNDECLARED, so the gate cannot see it
-- `P16` ⚠ r2 — `neo-card-radius.test.ts` asserts a declaration is ABSENT through a truncating scanner, so it cannot fail
-- `P18` ⚠ r2 — a client-side navigation announces nothing: no title change, no focus move, no live region
-- `P19` ⚠ r2 — the project page's view switcher is an unnamed `tablist`; the sheet's identical one was fixed
 
-**MINOR — 13**
+**MINOR — 14**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -708,8 +726,9 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P15` ⚠ r2 — the repo's prototype copy is a broken camelCase transform of the export, cited by line in 71 files
 - `P17` ⚠ r2 — `/my-work`'s outline skips level 2, and nothing measures heading level or order
 - `P20` ⚠ r2 — the month grid and week columns carry no grid/table semantics, so day↔weekday is lost to AT
+- `P25` ⚠ r2 — three live files cite the docblock of a deleted component, one of them an instrument
 
-**Total 28.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
+**Total 29.** `raised` and `sum by severity` agree by enumeration above. ⚠ **Two ids carry two severities on purpose and are each counted once.** `P8` — **MINOR as a product finding, IMPORTANT as a follow-on**: the gap is recorded in the product with a named follow-on, so it is not a discovery, but its remedy exists in-repo and tested on a less-used surface, and a workaround for the focus leak already ships (`13.793`). `P5` is **MINOR as a product** finding (the form works and the owner's `or` clause is arguably satisfied) and **IMPORTANT as a record** finding (an owner instruction is neither satisfied nor recorded, and the override said to stop and report). **It is counted under MINOR**, so the sum stays honest rather than double-counting one finding to inflate the Important row.
 
 ---
 
@@ -739,6 +758,8 @@ assert Counter(sev for _, sev in ids)['MINOR'] == count_of_rows_under('**MINOR �
 ```
 
 **✅ RUN AT THE END OF ROUND 2, AND IT PASSES.** Two cross-checks over the whole report: (1) each finding's own heading severity against the list it is placed under — **26 findings, heading and placement agree for every one**; and (2) the three bucket sizes against their headers — **1 / 12 / 13, matching**. A third sweep over the citations found **160 distinct `file:line` references, 159 resolving inside their file and none beyond EOF**, the one remainder being the breadcrumb dispatch in `gisik-nokma-lanes/` which is outside the repository and is named with its directory. **Every number in this section was produced by a command, not recalled.**
+
+**⚠ AND THE ERROR HAS A CAUSE WORTH NAMING, because it recurred FIVE times in this round.** Every occurrence came from the same habit: **adding a summary row by anchoring on an existing row's text** — `s.replace("- `P10` …", "- `P25` …\n- `P10` …")` — which puts the new row wherever that anchor happens to live. Twice the anchor was in the wrong list and three times the header was stale, and **the totals agreed every single time.** **The fix is not care, it is construction: §8 is now REBUILT from each finding's own heading** — read the severity off `### P25 — **MINOR** —`, group, emit — so a row cannot land anywhere but under its own severity. **The habit was the defect; the rebuild removes the opportunity for it.**
 
 **Compare MEMBERSHIP, not size.** The report's §8 now groups by each finding's *own heading*, so the two cannot disagree, and the check above is the one the judge can run.
 
