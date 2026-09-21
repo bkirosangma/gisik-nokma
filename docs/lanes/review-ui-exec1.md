@@ -872,6 +872,8 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 
 **Defence (phase 2, 2026-09-21 15:23 IST) — the legal pair PAINTED, by me, in this phase.** Bullet 3 above names an accessibility-tree reading without naming its instrument, and a refuter could call it an asserted measurement; so here is one with the instrument named. `http://localhost:3041/privacy` (exec 4's `next dev` of the byte-identical product tree, opened in a fresh isolated browser context via the Chrome DevTools MCP, signed out, 1200 px): `document.querySelectorAll('nav')` → **2**; the first is `nav.gn-nav` with `aria-label` **null** and `aria-labelledby` **null** (1200×70), the second is `nav.gn-legal__toc` with `aria-label` **"On this page"** (726×148). The a11y-tree snapshot (`take_snapshot`) lists, in order: `navigation` (no name) → `heading "Privacy Policy" level=1` → … → `navigation "On this page"`. That is the finding's WHAT for the `LegalNav` half, painted. The `AppNav` half (`/settings`, `/w/<id>`, `/help`, the board) is signed-in and I did not paint it in this phase; its source lines (`app-nav.tsx:232`, `settings/page.tsx:180`) were re-opened and read as cited. Same paint, an aside for the judge: on this route the unnamed bar sits INSIDE the `main` landmark (tree: `main` → `navigation`), so a landmark list offers `main` and then two `navigation`s, one nameless.
+
+**Defence, second paragraph (phase 2, 2026-09-21 15:31 IST) — the `AppNav` half painted too, signed in.** Same instrument as P1's third defence paragraph. `/settings?workspaceId=…`: `nav` × 2 → `gn-nav` `aria-label` **null**, `gn-settings__sidebar` **"Settings sections"**. `/w/<id>`: `nav` × 2 → `gn-nav` **null**, `gn-workspace-home__links` **"Workspace sections"**. `/settings/workflows` (a11y tree): `navigation` with no name, containing the seven shell links and the account menu. Both bars, both routes named in the WHAT, painted by me.
 ---
 
 ### P32 — **MINOR** ⚠ **r2 NEW** — Why a control is disabled is put in `title` ON the disabled button, where it cannot be reached
@@ -963,6 +965,22 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 
 
 **Painted (phase 2, 2026-09-21 15:27 IST), by me, after the finding was filed — recorded because the finding said it was not.** Same instrument as P1's third defence paragraph; project page, *Timeline* tab: `button.gn-timeline__nav` × 3 — *‹Earlier* **81.9×33.6**, *Today* **66.7×33.6**, *Later›* **73.7×33.6** — each `border: 2px outset rgb(0,0,0)` over the rule's own `background rgb(241,234,227)`, `border-radius 6px`, `padding 3.2px 9.6px`, `color rgb(32,43,73)`; the sibling `button.gn-timeline__bar` in the same paint → `border: 0px none`. The rendered height the finding declined to estimate is **33.6 px**. Exec 4's `E4-15` paints the same values.
+---
+
+### P36 — **MINOR** ⚠ **r2 NEW — PHASE 2 (filed 15:31 IST, after the freeze; scores at HALF per rules §2)** — Two settings routes paint the same word as the page's `h1` and, 6 px under it, as the screen's `h2`: `Workflows / Workflows`, `Ticket types / Ticket types` — the export draws `Settings` over the section title
+
+**WHAT.** `/w/<id>/settings/workflows` renders `<h1 class="gn-page-title">Workflows</h1>` (`apps/web/app/w/[workspaceId]/settings/workflows/page.tsx:25`) and then mounts `WorkflowListScreen`, whose header is `<h2 className="workflow-list__title">Workflows</h2>` (`packages/app-core/src/workflow-builder/ui/workflow-list-screen.tsx:206`). `/w/<id>/settings/ticket-types` does the same: `page.tsx:20` `<h1 class="gn-page-title">Ticket types</h1>` over `ticket-type-list-screen.tsx:334` `<h2 className="ticket-type-list__title">Ticket types</h2>`.
+
+**MEASUREMENT — painted, by me** (instrument as P1's third defence paragraph: `:3041`, byte-identical product tree, signed in, 1200 px). `/settings/workflows`: `h1,h2,h3` in order → **`H1 "Workflows"` (34 px), `H2 "Workflows"` (16 px)**, and the `h2`'s top is **6.4 px** below the `h1`'s bottom. `/settings/ticket-types`: **`H1 "Ticket types"` (34 px), `H2 "Ticket types"` (20 px)**, gap **6.4 px**. The a11y-tree snapshot of the workflows route (`take_snapshot`) lists `heading "Workflows" level="1"` immediately followed by `heading "Workflows" level="2"`. **Control, same instrument:** `/settings?workspaceId=…` — the settings SHELL — paints `H1 "Settings"`, `H2 "Ticket types"`: the shell does what the export does, and only the two dedicated routes double.
+
+**PROTOTYPE.** `Gisik Nokma - Desktop.dc.html` (sha `3d142d46…`): the settings shell's `<h1>` is **`Settings`** (`:802`), and the section titles are `<h2 …>Workflows</h2>` (`:843`) and `<h2 …>Ticket types</h2>` (`:819`), both `font-size:20px;line-height:25px;font-weight:600`. So the `h2`s are the export's, transcribed (the screen's own comment at `workflow-list-screen.tsx:207-208` says the subtitle sentence beneath is *"the prototype's own sentence (`:845`)"*); the `h1` that repeats them is the route's, and the export has no route that draws the section name at level 1. **Category 3 — DIVERGES WITH NO RULING FOUND.** The route's docblock (`workflows/page.tsx:8-16`) says *"thin by design: session in, gateway out, screen from app-core"* and nothing about the heading; `grep -rniE 'h1.*twice|twice.*h1|page-title.*workflows|double.*heading|heading.*double' docs test-cases Features.md packages/app-core/src/workflow-builder/ui apps/web/app/w` → no ruling (two unrelated hits about `aria-label` double-naming and a v2 definition). **A second, smaller divergence on the same line, at source:** `.workflow-list__title` is `font-size: 1rem` (`ui.css:5256`, 16 px painted) where its sibling `.ticket-type-list__title` is `1.25rem` (`:2599`, 20 px) and the export draws both at 20 px — the two transcriptions of the same export rule disagree with each other.
+
+**WHY IT IS WRONG.** A heading outline is read as a table of contents; `Workflows › Workflows` announces a section named after its own page, twice, six pixels apart — the reader gets a level with no new information, and the visual page carries a 34-px title with a 16-px echo directly under it. It is the same class as **P17** (`/my-work` skips level 2 — an outline nobody measures) and exec 4's `E4-24`: nothing in the product asserts a heading outline, so a duplicated level survives exactly as a skipped one does.
+
+**WHAT WOULD HAVE BEEN BETTER.** Either the export's shape — `h1 Settings` on the dedicated routes too, with the screen's `h2` naming the section — or drop the screen's `h2` when the route already names it (the `/settings` shell shows the two can coexist when the words differ). And one line in the heading sweep P17 asks for, asserting no two adjacent headings share their text.
+
+**SEVERITY: MINOR.** Two routes, cosmetic and outline-level; nothing hidden or unreachable.
+
 ---
 
 ## 5. MATCHES, AND RULED DIVERGENCES I CHECKED (listed so this is not a list of defects)
@@ -1057,7 +1075,7 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P31` ⚠ r2 — the top bar is an UNNAMED `navigation` landmark beside a named one on at least seven routes
 - `P34` ⚠ r2 — FOUR of the project page's five views sit outside the tap-target ratchet's population, because the ratchet visits routes and the views are tabs
 
-**MINOR — 20**
+**MINOR — 21**
 - `I4` `tap-targets.ts` cites `ui.css:1606-1616` for a sentence that is at `:1662`
 - `I5` my own handoff carries two contradicting position blocks; the pointer that found it is itself stale
 - `P3` the parent crumb cannot show the parent's key; the prototype's does; no ruling found
@@ -1078,8 +1096,9 @@ with a docblock explaining that *"The focus ring goes on the STRETCHED layer, no
 - `P32` ⚠ r2 — why a control is disabled is put in `title` ON the disabled button, where a keyboard or screen-reader user cannot reach it
 - `P33` ⚠ r2 — the export draws a timestamp on every inbox row; the product draws none, and no client in the chain reads `createdAt`
 - `P35` ⚠ r2 **phase 2, half points** — the timeline's three nav buttons have a rule with no `border`, so they keep the UA's outset bevel; P1's sweep is structurally blind to a missing property inside an existing rule
+- `P36` ⚠ r2 **phase 2, half points** — `/settings/workflows` and `/settings/ticket-types` paint the same word as `h1` and, 6 px under it, `h2`; the export draws `Settings` over the section title (painted, both routes)
 
-**Total 39** (38 at the 15:05:23 phase-1 freeze; `P35` added in phase 2 at half points). `raised` and `sum by severity` agree by enumeration above.
+**Total 40** (38 at the 15:05:23 phase-1 freeze; `P35` and `P36` added in phase 2 at half points). `raised` and `sum by severity` agree by enumeration above.
 
 
 ## 9. THE CLAIM I AM LEAST SURE OF
