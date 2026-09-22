@@ -1,4 +1,4 @@
-# ▣ RESTART CARD — the ONLY mandatory read at wake. Rewritten at every anchor, in the anchor's own commit. Last rewritten **2026-09-22 05:11 IST** at `origin/main` **`bc432c46`** (#676) by the cycle-49 controller, on branch `ctl/cycle49-anchor`. (Cycle 45 ran on Fable — its last cycle; the loop moved to Sonnet.)
+# ▣ RESTART CARD — the ONLY mandatory read at wake. Rewritten at every anchor, in the anchor's own commit. Last rewritten **2026-09-22 06:02 IST** at `origin/main` **`0d83bfff`** (#678) by the cycle-50 controller, on branch `ctl/cycle50-anchor`. (Cycle 45 ran on Fable — its last cycle; the loop moved to Sonnet.)
 
 > **Why this card exists (owner, 2026-09-21: *"the restart takes too long"*).** The brief used to order *"read `controller-state.md` in full"* plus all three executor handoffs — measured at **3.16 MB / ~34,000 lines ≈ 790k tokens** before a controller's first word. **A restarting controller reads THIS CARD and the NEWEST cycle entry below it, prints a one-line awake report to the owner, and re-measures §1. Nothing else is mandatory.** Older cycles live in **`docs/lanes/controller-state-history.md`** (open one by heading: `grep -n "CYCLE 3[0-9]" docs/lanes/controller-state-history.md`) and only when the card or the newest cycle points you at it. Each executor handoff `<name>.md` pairs with `<name>-history.md`; read a handoff's TOP BLOCK only, and only for a lane you are about to merge or dispatch.
 > ⚠ **The card is a reading that expires.** Every number in §1 is re-measured before it is repeated; if the card and the newest cycle disagree, the newest cycle wins and the card is stale — fix the card in the next anchor. **Whoever writes cycle N+1 moves cycle N to the TOP of the history file in the same commit.**
@@ -6,7 +6,7 @@
 ## §1 LIVE ANCHORS — re-measure each before repeating it
 | anchor | value at last rewrite | re-measure with |
 |---|---|---|
-| `origin/main` | `bc432c46` (#676) | `git fetch && git rev-parse origin/main` |
+| `origin/main` | `0d83bfff` (#678) | `git fetch && git rev-parse origin/main` |
 | open PRs | **0** | `gh pr list --state open --json number,headRefOid,mergeable` + a `--state merged --limit 2` control on the same path |
 | ledger | **323 done / 0 in-flight / 1 todo** — `ctl-scripts 16` flipped to `done 649 54f391f4` in this PR (Task 16 complete: hook installed, refusal demonstrated, anchor landed). The release plan's 231 tasks are tracked in `docs/lanes/release-2026-09-22-progress.md`, not here | `pnpm check:tasks` under Node 22 |
 | controller seat | `gisik:0`, **Claude API — OPUS (`opus-5[1m]`)**; the owner moved it to Fable at 22:4x and back to Opus at 22:5x. Launcher default is still `EXECUTOR_MODEL=sonnet`; a Sonnet successor hands rulings to Opus by `ctl-self-restart.sh 3 opus` | status line; `/tmp/ctl-self-restart.log` |
@@ -17,10 +17,10 @@
 | limit resumer | ON (`com.kiro.claude-limit-resumer`); its live-pane delivery is now two `paste-buffer` pastes, not `send-keys` | `~/.claude/scripts/limit-resumer.log` |
 | cron | NONE. The phase-2 close ran from a background shell of the cycle-41 session (`close-at-1705.log`) | `CronList` |
 | watchers | none needed — no lane runs; re-arm the two (branch heads; panes for `DONE B[0-9]+ —` anywhere in a line, ghost text stripped) when lanes are launched again | — |
-| dev stack | owner's; built images from the PRIMARY checkout; server-1 image 1a5b0099e503 created 2026-09-21T23:35; web-1 image 132d1fa1fe54 created 2026-09-21T23:36 | `docker ps`; `docker inspect` |
+| dev stack | owner's; built images from the PRIMARY checkout; server-1 image 9655d3cb3987 created 2026-09-22T00:30; web-1 image b0dc8d89d0db created 2026-09-22T00:31 | `docker ps`; `docker inspect` |
 | primary checkout | `/Users/kiro/my_projects/gisik-nokma` on `main` at `18dcc683`, clean — `ctl land` fast-forwards it | `git -C … status --porcelain; git rev-parse HEAD` |
 | graphify | code layer rebuilt by the PostToolUse hook through the day (last 21:07 IST); copied into the six lane worktrees earlier (`graphify-out/`, gitignored) | `stat graphify-out/GRAPH_REPORT.md` |
-| controller worktree | `/Users/kiro/my_projects/gisik-nokma-ctl` — on `ctl/cycle49-anchor` | `git -C … status` |
+| controller worktree | `/Users/kiro/my_projects/gisik-nokma-ctl` — on `ctl/cycle50-anchor` | `git -C … status` |
 
 ## §2 WHAT IS IN FORCE — the plan is landed; the release cut is next
 No lane runs. **`main` `18dcc683` carries all 231 tasks.** The controller's next acts, in order (cycle 47 §2): `ctl rebuild` from `main`; the browser suites locally against :3001 (`apps/web`: `pnpm test:e2e:stack`, `pnpm test:e2e:viewport`) with results recorded in cycle 48; then the post-release tasks as their own gated PRs through forks. Landing discipline that survives: a PR merges only through `ctl checks` + `ctl gate` + `ctl land` with tree identity verified; `check-pr.py` is a report, the reviewer pass is a fork's judgment (owner, 23:2x); multi-PR waves land as one gated union.
@@ -48,58 +48,17 @@ Briefs and launchers: `/Users/kiro/my_projects/gisik-nokma-lanes/` — round 2: 
 
 > ⚠ **ROTATED 2026-09-21 (owner: *"do the rotation, one docs PR"*).** This file holds the **restart card and the NEWEST cycle only**. Every earlier cycle (35 and below) and the 2026-09-18 topology block live in **`docs/lanes/controller-state-history.md`**, byte-for-byte, newest first. Open one by heading: `grep -n "CYCLE 3[0-9]" docs/lanes/controller-state-history.md`. **The rule from now on: when an anchor writes cycle N+1, it moves cycle N to the TOP of the history file (directly under its header) in the same commit.** A `<name>.md` handoff always pairs with `<name>-history.md`.
 
-## 🔄 2026-09-22 05:11 IST — **CYCLE 49: Morning report: priority built-in and sheet-parity both landed, dev-DB repaired, holding for the owner** `main` is **`bc432c46`**; windows: 0:main 1:lane1 2:lane2 3:lane3 .
+## 🔄 2026-09-22 06:02 IST — **CYCLE 50: Addendum: lane 1 ended, nudger retargeted, two more real fixes landed** `main` is **`0d83bfff`**; windows: 0:main 1:lane1 2:lane2 3:lane3 .
 
-### 1. THE MORNING REPORT — everything from the overnight standing order (03:25 IST → 05:1x IST)
+### 1. ADDENDUM TO CYCLE 49 — owner instruction, 2026-09-22 ~05:2x IST
 
-**Owner's overnight order (2026-09-22 ~03:25 IST): run without intervention till morning, both dispatches (priority-built-in, sheet prototype parity) landed, the dev-DB write pre-approved contingent on Task 11's first count reading zero. It does.** All six PRs opened this session are MERGED, zero open.
+Owner (relayed): *"end lane 1 (it is sweeping under the nudger with nothing left to do) and note that gisik:2 and gisik:3 are bare shells the nudger keeps typing 'continue' into — retarget or stop the nudger for those windows. No ruling needed."*
 
-| PR | State | What |
-|---|---|---|
-| #671 | MERGED → `476d027d` | Five local-browser-suite release findings |
-| #672 | MERGED → `5de12392` | Priority built-in spec + plan (docs), with a controller case-id correction |
-| #673 | MERGED → `a9a67a14` | Cycle 48 anchor |
-| #674 | MERGED → `4fe13499` | Sheet-prototype-parity spec + plan (docs), amended for the two-lane split |
-| #675 | MERGED → `5f97c073` | **Priority becomes a built-in ticket field** — all 11 tasks + 3 post-scope fixes |
-| #676 | MERGED → `bc432c46` | **Ticket sheet takes the prototype's order and editor chrome** — all 8 tasks, 3 lanes, 1 mutation-found bug fixed |
+- **Lane 1 ended** (`/exit`, clean). Before ending it, found it had kept sweeping post-DONE (nudged by the idle nudger, still targeting the stale `gisik:1-6` list) and had pushed **three more commits** to the now-closed `rel/priority-builtin` branch — genuine finds, not busywork: a first-match selector-shadowing hazard the lane's own Task 7 introduced plus the real CSS layout bug it was hiding (`3.974`), and a test-coverage-gap fix for case `16.30` that turned out to be already superseded by the sheet-parity tail lane's own rewrite of the same case (verified: diff against the current tree was empty, dropped rather than force-applied). The first two landed as **PR #678 → `0d83bfff`**. `ctl checks` 8/8, gate `EXIT=0`/`33 successful`, `app-core` 1933 tests, `ui` **429** (428 + `3.974`) — all green.
+- **The idle nudger's target list was stale** (`gisik:1,2,3,4,5,6`, a six-lane topology that no longer exists) and was pasting "continue" into bare idle shells at `gisik:2`/`gisik:3` (and would have kept doing so at `gisik:1` too). Cleared to empty in `~/.claude/scripts/com.kiro.claude-idle-nudger.plist` and reloaded (`launchctl bootout` + `bootstrap`) — confirmed empty via `launchctl print`. **The next controller that dispatches a real lane must set `IDLE_NUDGER_TARGETS` back to that lane's window(s)**, or the nudger will silently do nothing for it.
+- **Final dev-stack sha after this addendum's rebuild: `0d83bfff4f0b`** — images fresh, server healthy, sign-in configured.
+- All worktrees and windows are now idle/clean; `gh pr list --state open` is empty.
 
-`main` is now `bc432c46aca8d234dad88729a190e48a5c3e254f`.
-
-**The parity ratchet (owner's own request — both counts):** `ticket-sheet.test.tsx` **140 → 161** `it(` (0 dropped). `visibility-editor.test.tsx` **30 → 35** `it(` (0 dropped). Every pre-existing case in both files passes with only the plan's enumerated mechanical edits.
-
-**Task 11's three numbers (dev database, port 54330):**
-1. Hand-made ticket types with a custom field id `"priority"`: **0** — the owner's held exception did not trigger; landing proceeded.
-2. `proj_tickets` rows missing the priority claim, before repair: **27**. `verify:projections` detector agreed exactly: `DRIFT DETECTED — proj_tickets: 27 row(s) missing from live`.
-3. After `ctl rebuild` (new `main`) + `pnpm --filter @gisik-nokma/server rebuild:projection proj_tickets`: the same count reads **0**, spot-checked against a specific ticket's row (`priority: {"value": "P2", ...}` now present). `verify:projections` no longer reports `proj_tickets` at all — clean for that projection specifically.
-
-**Dev-stack sha after the final `ctl rebuild`:** `bc432c46aca8` — images fresh, server healthy, `/healthz` 200 on :3000, web :3001 307, sign-in configured.
-
-**The closing browser-suite run (local, against the fully rebuilt stack):** viewport suite **41 passed / 0 failed / 3 skipped** — fully green, unchanged from the mid-cycle run. Stack suite **7 passed / 1 failed** — the SAME pre-existing, unrelated finding as mid-cycle (see §3.4): a missing tap-target baseline for `stack-phone-390|/p/:projectId` that likely cascades to ~9 more routes in the same test loop once seeded. Confirmed stable and NOT caused by tonight's landings (both suites re-run before and after, identical result on this specific failure).
-
-### 2. WHAT DID NOT FINISH, AND WHY
-
-1. **The stack suite's tap-target baseline gap is unresolved, by choice.** `apps/web/e2e-stack/tap-target-baseline.json` has exactly one key (`stack-phone-390|/my-work`) against ~11 routes the suite's own loop tests; the loop throws at the first missing key and never reaches the rest, so the true scope (how many of the ~10 remaining routes are clean vs. genuinely broken) is unmeasured. This predates tonight's work and is outside both owner rulings' scope — recorded as a release finding for the owner to scope, not silently seeded.
-2. **The stray uncommitted file, `apps/web/e2e-stack/non-text-contrast-roster.json`, is still uncommitted.** Confirmed multiple times tonight: not the owner's, not ds1's, not any lane's — a real, valid point-in-time contrast measurement (headSha, treeWasClean, provenance all check out) taken against an earlier `main` (`9b7c38a9`), now stale relative to `bc432c46`. Harmless (worked around via `git stash`/`pop` around every `ctl` operation needing a clean primary — six times tonight), but worth a deliberate decision next session: commit it as a historical measurement, or regenerate fresh and commit that.
-3. **Post-release tasks from cycle 48 §2 (T-E6-26 drop `proj_rollups`, `ctl_node22` prepend-first, `check-pr.py` docblock, a viewport-suite case for "phone-only control visible at desktop") were superseded by the two owner rulings and never dispatched.** Not forgotten — deliberately deprioritized under the standing order's explicit work queue, which named only the priority and parity work. Still open, undispatched.
-4. **Two documented plan-vs-reality gaps, left as prose, not fixed:** the priority plan's Task 2 Step 3 (an impossible CSS-reset removal, worked around — see §3.3) and the parity plan's Task 5 text ("delete `.gn-visibility__heading`", impossible — case `17.002` reads it and throws if absent). Neither blocks anything; both are now correctly described in-repo instead of silently mismatched.
-5. **`docs/product-coverage-map.md:146`** ("five groupings") attributes its number to an external persona document not in this repo — flagged by the priority lane, deliberately not corrected (nothing in this repo can verify or falsify that document's own count).
-
-### 3. INSTRUMENTS THIS CYCLE (new since cycle 48)
-
-1. **A `rebuild:projection` run through a stale `dist` is a silent no-op dressed as success.** The primary checkout's `packages/domain/dist` was 3 days stale (from 2026-09-19, zero `DEFAULT_PRIORITY` occurrences) when Task 11's first repair attempt ran — `tsx` resolves `@gisik-nokma/domain` by package name through that `dist`, so the ledger replayed under the OLD reducer, exit 0, "rebuilt … in 256 ms", and the missing-claim count stayed at 27. Caught only by a spot-check of one ticket's row content after the "successful" repair, not by the exit code. **The primary checkout needs its own `pnpm install` + `pnpm turbo run build` before any script that imports a workspace package by name is trusted there** — a worktree having been built is not evidence the primary has.
-2. **A same-session's own controller merge can look like someone else's mutation from inside a live lane.** The tail lane noticed its file count and test count jumped between its own commits (`app-core 1925 → 1933` after adding only one case) and correctly traced it to the controller's `git merge origin/main` landing mid-turn, rather than assuming its own measurement was wrong — verified the merge didn't touch its files, re-ran its mutations on the confirmed merged tree, and only then committed. Good practice, worth normalizing: **a lane should always confirm which tree a number was measured on before reporting it**, including tonight's own "measurement is about the tree you stand in" lesson recurring in a new shape.
-3. **A mutation that passes can be evidence of a second defect, not of safety.** The tail lane's real find: an off-by-one in the sheet's field-row tint index was masked because the ONE existing test of the constant it lived in exercised a fixture that never reached the buggy code path, and two independent mutations of the constant (7→6, 7→8) both stayed green — not because the constant was unconstrained, but because both mutations coincidentally compensated for the same off-by-one one position over. Fixed properly (`OWN_ROW_FIELD_IDS` filter, counts rendered rows only) with a new fixture that actually exercises the loop; both mutation directions now correctly kill only the new case.
-4. **`ctl lanes` and ad hoc completion-monitors share the same bare-`402` false-positive**: `scripts/ctl/verbs/lanes.sh`'s error grep (`'API Error[^|]{0,40}|402|Insufficient…'`) matches a CSS diff's line number as readily as a real DeepSeek balance error — reproduced twice tonight (once on the controller's own pane, once on a lane doing routine CSS work). Not fixed tonight (low priority, understood and worked around by reading the pane directly); worth a real fix (`\b402\b` near "API Error" or "Insufficient", not bare).
-5. **A `git merge` (not `git -C <path> merge`) run from the controller's own shell is refused by the ctl-scripts-only hook even when targeting a non-primary worktree** — the hook reads the Bash tool's registered `cwd` (the controller's own directory), not an inline `cd` inside the command string, so `cd <worktree> && git merge …` looks exactly like a primary-checkout merge to the hook. Use `git -C <worktree> merge …` for anything the hook should evaluate against that worktree, not the session's cwd.
-6. **Backend-specific lane launches (a `--model` override on the Anthropic path) go through a small standalone script, not `ctl restart`** — `exec-claude.sh`'s anthropic branch defaults to `--model opus` unless `EXECUTOR_MODEL` is set in its own process environment, and `ctl restart` doesn't parametrize this. Two lanes tonight (priority-builtin's Sonnet phase, sheet-parity Lane A) launched via a small kill/create/paste script with `EXECUTOR_MODEL=sonnet GISIK_EXECUTOR_BACKEND=anthropic` set inline — matching the pattern already established for DeepSeek dispatches. **Avoid `set -euo pipefail` across a `tmux list-panes | head` capture of a window that may not exist** — the pipeline's failure aborts the whole script before `new-window` ever runs (measured once tonight; recovered by isolating each tmux call).
-
-### 4. AWAITING THE OWNER
-
-1. **The stack suite's tap-target baseline gap** (§2.1) — how far it actually extends (10 more routes untested) and whether to seed it now or treat it as a separate, scoped task.
-2. **The stray `non-text-contrast-roster.json` file** (§2.2) — commit as a historical measurement, regenerate fresh, or discard.
-3. **Post-release tasks from cycle 48** (§2.3) — still queued, never started; the owner's call on priority relative to whatever comes next.
-4. The CI runner (unchanged, ~10 days out per the original estimate from cycle 47).
-
-**Nothing further will be dispatched. Holding per the standing order until the owner reads this.**
+**Holding again, unchanged from cycle 49's close.**
 
 ---
