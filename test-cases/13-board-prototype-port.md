@@ -2423,3 +2423,14 @@ contract across a boundary was run at Node v22.22.2 and is green — `packages/e
   rather than twice (both rules carrying it would double the gap to 48px). Selector patterns are anchored
   `^\.gn-project__head\s*\{` so neither name can report the other's body. —
   `apps/web/test/project-page-head.test.tsx`
+
+- **13.1305** ✅ The view rail (`tablist` named `Project view`) carries the class `gn-project__rail` **and
+  still `gn-segmented`** — the shared component appends a caller's class rather than substituting it, and
+  every `.gn-segmented` selector in the repo (plus the 3.974 shadowing guard) reads that base class. —
+  `apps/web/test/project-page-head.test.tsx`
+- **13.1306** ✅ The opt-out is pinned where it lives: `apps/web/app/globals.css` declares
+  `.gn-project__rail` with `align-self: flex-start` and `flex-wrap: wrap`, and
+  `.gn-project__rail .gn-segmented__item` with `flex: none`; **control in the same case** —
+  `packages/ui/src/ui.css`'s own `.gn-segmented__item` rule still declares `flex: 1`, so a fix that
+  edited the SHARED rule would be caught here rather than by `/sign-in` and `/inbox` breaking silently. —
+  `apps/web/test/project-page-head.test.tsx`

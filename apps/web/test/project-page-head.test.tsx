@@ -10,7 +10,7 @@ import { ruleFor } from './helpers/css-rule-scan.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
- * 13.1302–13.1304 — THE PROJECT HEAD ROW (owner request 2026-09-22).
+ * 13.1302–13.1306 — THE PROJECT HEAD ROW (owner request 2026-09-22).
  *
  * The owner put the prototype's project header beside the build's and asked for
  * the build's *"project header and controls area"* arranged *"more like the
@@ -70,6 +70,15 @@ const TEST_DIR = dirname(fileURLToPath(import.meta.url));
  * — the same choice `members-styling.test.ts:52` makes for its own family.
  */
 const UI_CSS = readFileSync(resolve(TEST_DIR, '../../../packages/ui/src/ui.css'), 'utf8');
+/**
+ * The stylesheet the RAIL's opt-out rules live in (13.1305–13.1306). Deliberately
+ * NOT `ui.css`: `packages/ui/test/components.test.tsx:548` resolves a rule with a
+ * FIRST-MATCH substring regex over `ui.css`, so a descendant selector ending in
+ * `.gn-segmented__item {` placed anywhere in that file could become the rule
+ * `13.1153` reads. `globals.css` is outside that helper's universe — the same
+ * reason `.gn-legal__head .gn-segmented` already lives here (`:2400-2401`).
+ */
+const GLOBALS_CSS = readFileSync(resolve(TEST_DIR, '../app/globals.css'), 'utf8');
 
 beforeEach(() => {
   clearWorkspaceNameCache();
@@ -226,5 +235,80 @@ describe('13.1304 the head row and the identity column are styled as the prototy
     // Both margins on both rules would double the gap to 48px, which is the
     // defect this arm exists to catch. `.gn-project__head` now owns it.
     expect(header).not.toMatch(/margin-top/);
+  });
+});
+
+/**
+ * 13.1305–13.1306 — THE RAIL IS CONTENT-SIZED AT THE LEFT (owner, 2026-09-22).
+ *
+ * The owner's screenshot showed the view rail's five tabs *spread across the
+ * whole width*. The cause is structural, not cosmetic: `page.tsx` renders
+ * `<SegmentedControl>` as a direct child of the `.gn-project` COLUMN
+ * (`ui.css:5597`), so the track fills that column, and
+ * `.gn-segmented__item { flex: 1 }` (`ui.css:5344-5368`) then spreads the five
+ * tabs evenly over the full width.
+ *
+ * The prototype does not do that: its rail is an `inline-flex` track
+ * (`desktop.dc.html:339`) — content-sized, the tabs as wide as their labels
+ * plus padding. The precedent for opting one call site out of the shared
+ * control's fill is the legal pages, which already do it page-scoped in
+ * `globals.css` (`.gn-legal__head .gn-segmented { flex: none }`, `:2400-2401`).
+ *
+ * **Why `globals.css` and not `ui.css`.** `packages/ui/test/components.test.tsx`
+ * resolves a rule body with a FIRST-MATCH SUBSTRING regex over `ui.css`
+ * (`:548`), so a descendant selector ending in `.gn-segmented__item {` written
+ * anywhere in that file can become the rule its `13.1153` cases read — a
+ * silent, order-dependent hijack of another suite's witness. `globals.css` is
+ * outside that helper's universe, exactly like the legal precedent.
+ *
+ * **The shared control is NOT changed.** `.gn-segmented__item` keeps `flex: 1`
+ * so every container-filling site (`/sign-in`, `/inbox`) still shares its row;
+ * the board alone opts out through `.gn-project__rail`.
+ */
+describe('13.1305 the rail is content-sized at the left of its row', () => {
+  it('13.1305 the tablist carries `gn-project__rail` and still `gn-segmented`', async () => {
+    render(
+      <Providers services={world(false)}>
+        <ProjectPage />
+      </Providers>,
+    );
+    // Settled on the search box, so the rail is read off a mounted page.
+    await screen.findByRole('searchbox', { name: 'Search the board' });
+
+    const rail = screen.getByRole('tablist', { name: 'Project view' });
+    expect(rail.classList.contains('gn-project__rail')).toBe(true);
+    // The shared component APPENDS a caller's class rather than substituting it
+    // (`segmented-control.tsx:123`), so the base class must still be present:
+    // every `.gn-segmented` selector — and the 3.974 shadowing guard that reads
+    // the track's own rule — depends on it.
+    expect(rail.classList.contains('gn-segmented')).toBe(true);
+  });
+});
+
+describe('13.1306 the rail opts out in globals.css, leaving the shared item alone', () => {
+  it('13.1306 pins the two opt-out rules — and the shared rule they do NOT touch', () => {
+    // The track shrinks to fit its parent column (the prototype's `inline-flex`)
+    // instead of filling it, and may wrap rather than overflow at phone width,
+    // where five tabs at `padding: 0 1rem` no longer fit on one line.
+    const track = ruleFor(GLOBALS_CSS, /^\.gn-project__rail\s*\{/);
+    expect(track).toBeDefined();
+    expect(track).toMatch(/align-self:\s*flex-start/);
+    expect(track).toMatch(/flex-wrap:\s*wrap/);
+
+    // The items stop sharing a width the track no longer has. Without this they
+    // keep `flex: 1` and would still distribute free space — but with
+    // `align-self: flex-start` there is none to distribute, so the visible fix
+    // is the track's, and this rule is what makes the two consistent.
+    const item = ruleFor(GLOBALS_CSS, /^\.gn-project__rail \.gn-segmented__item\s*\{/);
+    expect(item).toBeDefined();
+    expect(item).toMatch(/flex:\s*none/);
+
+    // CONTROL, in the SAME `it` — the shared rule is untouched. A `.gn-segmented__item`
+    // rewritten to `flex: none` in `ui.css` would satisfy every assertion above
+    // while breaking `/sign-in` and `/inbox`, whose rails DO fill their rows;
+    // this arm is what tells "the board opted out" from "the control changed".
+    const shared = ruleFor(UI_CSS, /^\.gn-segmented__item\s*\{/);
+    expect(shared).toBeDefined();
+    expect(shared).toMatch(/flex:\s*1/);
   });
 });

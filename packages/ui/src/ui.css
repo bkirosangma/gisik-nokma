@@ -5352,8 +5352,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      `/inbox`, where `div.gn-inbox__header` is `justify-content: space-between`
      and the track is therefore content-sized: the *All* tab painted **31×44**
      while *Unread* took 64 and *Mentions* 78, i.e. the width of the word. On
-     the board the same class paints 92×44 and is unchanged by this, because
-     that track already fills its row and `flex: 1` distributes the extra.
+     the board the same class painted 92×44 and was unchanged by this, because
+     that track filled its row and `flex: 1` distributed the extra — **no longer
+     true since 2026-09-22**: the board's rail is content-sized at the left of
+     its row as the prototype draws it, so `flex: 1` has nothing to share there
+     either. That is the board opting out through `.gn-project__rail` in
+     `apps/web/app/globals.css`; this rule is unchanged and still distributes
+     for every container-filling site (`/sign-in`, `/inbox`).
 
      1rem is the prototype's own `padding:0 16px` on a segment. */
   padding: 0 1rem;

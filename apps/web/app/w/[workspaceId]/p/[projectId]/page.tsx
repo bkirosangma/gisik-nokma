@@ -2296,6 +2296,21 @@ function ProjectBoard() {
 
               The rail's ORDER — Backlog first — now lives with the options
               themselves (`PROJECT_VIEW_OPTIONS`), not in this JSX.
+
+              **`gn-project__rail` (owner, 2026-09-22).** The rail is now
+              content-sized at the LEFT of its row, as the prototype draws it
+              (`desktop.dc.html:339`: an `inline-flex` track, the tabs as wide as
+              their labels). Its props are otherwise unchanged and no accessible
+              name moved. Until this class existed, the rail rendered as a direct
+              child of the `.gn-project` COLUMN, so the track filled that column
+              and `.gn-segmented__item`'s `flex: 1` spread the five tabs across
+              the whole width. The opt-out rules live in `globals.css` — NOT
+              beside `.gn-project__*` in `ui.css`, because
+              `packages/ui/test/components.test.tsx` resolves a rule with a
+              first-match substring regex over `ui.css` and a descendant selector
+              ending in `.gn-segmented__item {` there could become the body its
+              `13.1153` cases read. `rel/project-head-prototype`, cases
+              `13.1305`–`13.1306`.
             */}
             <SegmentedControl
               // exec1 P19: the rail carried `role="tablist"` and NO accessible
@@ -2307,6 +2322,18 @@ function ProjectBoard() {
               // sheet's tablist, which is what made this page's version a
               // standing outlier.
               aria-label="Project view"
+              // owner, 2026-09-22: the rail is content-sized at the left of its
+              // row, as the prototype draws it (`desktop.dc.html:339`, an
+              // `inline-flex` track). Rendered as a direct child of the
+              // `.gn-project` COLUMN, the track fills that column and
+              // `.gn-segmented__item`'s `flex: 1` spreads the five tabs across
+              // the whole width — the spread in the owner's screenshot. The
+              // shared component APPENDS this class (`segmented-control.tsx:123`),
+              // so `gn-segmented` and every selector reading it are unchanged;
+              // the opt-out rules live in `globals.css`, not `ui.css`, for the
+              // first-match reason `apps/web/test/project-page-head.test.tsx`
+              // records.
+              className="gn-project__rail"
               options={PROJECT_VIEW_OPTIONS}
               value={view}
               onChange={setView}
