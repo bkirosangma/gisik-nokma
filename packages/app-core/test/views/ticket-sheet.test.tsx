@@ -4600,6 +4600,201 @@ describe('TicketSheet — the location breadcrumb (16.87)', () => {
   });
 
   /**
+   * 13.1317 — THE WORKSPACE AND THE PROJECT ARE CLICKABLE FROM THE BREADCRUMB.
+   *
+   * The owner, one screenshot of this bar: *"the workspace and the project
+   * should also be clickable from the breadcrumb."* Until this case the parent
+   * crumb was a control and the two crumbs ABOVE it were plain text.
+   *
+   * **They are LINKS and not buttons, and that is the whole shape of the
+   * change.** An ancestor crumb is a `<button>` because opening it needs a
+   * server lookup first (`page.tsx`'s `openParentTicket` → `ticketLocation.locate`).
+   * The workspace and the project are LOCATIONS the host already knows —
+   * `/w/<workspaceId>` and `/w/<workspaceId>/p/<projectId>` — and a location is
+   * an `<a>`: middle-click, open-in-new-tab and copy-link-address come for free,
+   * which a button cannot give. The host supplies the href and how to route it
+   * (`workspaceHref`/`projectHref`/`onNavigate`), because `packages/app-core` is
+   * framework-neutral and cannot import Next's `Link` — it already renders bare
+   * `<a href>` for attachments (`attachment-list.tsx:93`).
+   *
+   * **The arms are asserted as ONE case with a control, not two cases**, because
+   * the property is a CONDITIONAL: a crumb is a link when the host can honour
+   * one and plain text when it cannot — the same rule the ancestor crumbs
+   * already follow (*"a control that cannot be honoured is the failure this repo
+   * refuses by name"*). Two sibling `it`s would let a version that made every
+   * crumb a link unconditionally report green on the positive arm while the
+   * control, in its own test, explained nothing.
+   */
+  it('13.1317 the workspace and the project crumbs are LINKS when the host supplies hrefs', async () => {
+    const WORKSPACE_HREF = `/w/${WS}`;
+    const PROJECT_HREF = `/w/${WS}/p/proj_1`;
+
+    // ARM ONE — the host can route, so both crumbs are links.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      workspaceHref: WORKSPACE_HREF,
+      projectHref: PROJECT_HREF,
+    });
+    await settled();
+
+    const nav = screen.getByRole('navigation', { name: 'Ticket location' });
+    // Queried by ROLE and NAME, which is what a reader meets: a link exists is
+    // findable by its accessible name. The name a location's link carries is its
+    // own text, so nothing here needs an `aria-label` — and adding one would
+    // move the accessible-names ratchet (`Features.md`'s floor) for a control
+    // that has a name already.
+    const workspaceLink = within(nav).getByRole('link', { name: 'Convenience Corner' });
+    expect(workspaceLink).toHaveAttribute('href', WORKSPACE_HREF);
+    const projectLink = within(nav).getByRole('link', { name: 'Shop operations' });
+    expect(projectLink).toHaveAttribute('href', PROJECT_HREF);
+    // The modifier the ink rides on, asserted on the class rather than on
+    // paint: jsdom loads no stylesheet, so the ink itself is `13.1319`'s
+    // subject and it reads the CSS source.
+    expect(workspaceLink).toHaveClass('gn-ticket-sheet__crumb--link');
+    expect(projectLink).toHaveClass('gn-ticket-sheet__crumb--link');
+    expect(screen.getByTestId('sheet-crumb-workspace')).toBe(workspaceLink);
+    expect(screen.getByTestId('sheet-crumb-project')).toBe(projectLink);
+    // AND THE TICKET'S OWN CRUMB IS STILL NOT ONE. There is nowhere further to
+    // go from here, so turning it into a link as part of "make the crumbs
+    // clickable" would invent a destination.
+    expect(within(nav).queryByRole('link', { name: 'CCSO-1183' })).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-ticket').tagName).toBe('SPAN');
+
+    cleanup();
+
+    // ARM TWO — THE CONTROL. A host that cannot route passes no hrefs, and the
+    // names must still arrive: the crumb degrades to today's plain span rather
+    // than vanishing, exactly as the callback-less ancestor crumb does. Without
+    // this arm a version that rendered `<a href={undefined}>` unconditionally
+    // would pass everything above.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+    });
+    await settled();
+
+    const navAlone = screen.getByRole('navigation', { name: 'Ticket location' });
+    expect(within(navAlone).queryByRole('link')).toBeNull();
+    expect(screen.getByTestId('sheet-crumb-workspace').tagName).toBe('SPAN');
+    expect(screen.getByTestId('sheet-crumb-project').tagName).toBe('SPAN');
+    expect(crumbTexts()).toEqual([
+      'Convenience Corner',
+      'Shop operations',
+      'Registrations',
+      'CCSO-1183',
+    ]);
+  });
+
+  /**
+   * 13.1318 — A PLAIN LEFT CLICK ROUTES CLIENT-SIDE; A MODIFIED OR MIDDLE CLICK
+   * IS LEFT TO THE BROWSER.
+   *
+   * This is the entire reason the two crumbs are `<a>` elements rather than
+   * buttons, and it is the half a caller cannot get from `href` alone: the
+   * component renders a bare anchor, and the HOST decides whether a click
+   * becomes an in-app navigation (`onNavigate`) or the browser's own.
+   *
+   * ## How `defaultPrevented` is read, and why at `document`
+   *
+   * A real `MouseEvent` is dispatched at the anchor and the flag is read off the
+   * event itself — this file's sibling case for `TicketList`'s dragover records
+   * why (`fireEvent` cannot report a cancellation that never happened). The
+   * listener that reads it sits on `document`, which is an ANCESTOR of the
+   * container React delegates to, so it runs AFTER the component's handler and
+   * reads the event itself, never a handler having run. The mechanism is the
+   * one this file's sibling case for `TicketList`'s dragover records: that case
+   * is green under `fireEvent` whether or not the component cancels, so the flag
+   * off the dispatched event is the only instrument that can tell "consumed"
+   * from "merely handled".
+   *
+   * ⚠ **`cancelable: true` IS LOAD-BEARING.** `preventDefault` is a no-op on a
+   * non-cancelable event, so without it the positive arm below would read
+   * `false` while the component was perfectly correct — a red for the fixture's
+   * reason.
+   *
+   * ⚠ **`href` IS TAKEN OFF THE ELEMENT BEFORE THE CLICKS, AND THAT IS THE
+   * FIXTURE, NOT A SUBTLETY.** An un-cancelled click on an `<a href>` sends
+   * jsdom to a navigation it cannot perform, and this case dispatches such a
+   * click on purpose three times — the modified and middle arms and the
+   * no-callback arm are precisely the ones the component must leave alone — so
+   * without this the run prints three `Not implemented: navigation` stack
+   * traces that read like failures in a log. An anchor with no `href` has no
+   * activation behaviour at all, so nothing is attempted. **What is measured is
+   * untouched:** the attribute was real and was asserted while it was still
+   * there (below, and again in `13.1317`), React's `onClick` comes off the prop
+   * and not off the attribute, and `defaultPrevented` is a fact about the event
+   * object.
+   */
+  it('13.1318 a plain left click routes client-side; a modified or middle click is left to the browser', async () => {
+    const WORKSPACE_HREF = `/w/${WS}`;
+    const PROJECT_HREF = `/w/${WS}/p/proj_1`;
+    const onNavigate = vi.fn();
+
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      workspaceHref: WORKSPACE_HREF,
+      projectHref: PROJECT_HREF,
+      onNavigate,
+    });
+    await settled();
+
+    const projectLink = screen.getByTestId('sheet-crumb-project');
+    expect(projectLink).toHaveAttribute('href', PROJECT_HREF);
+    projectLink.removeAttribute('href');
+    const click = (init: MouseEventInit): MouseEvent => {
+      const event = new MouseEvent('click', { bubbles: true, cancelable: true, ...init });
+      projectLink.dispatchEvent(event);
+      return event;
+    };
+
+    // ARM ONE — a plain left click. It DOES route, it routes to THIS crumb's
+    // href (asserted on the argument, because a handler bound to the workspace
+    // href for both crumbs would satisfy "the handler ran"), and the default is
+    // consumed so the browser does not also navigate.
+    expect(click({ button: 0 }).defaultPrevented).toBe(true);
+    expect(onNavigate).toHaveBeenCalledTimes(1);
+    expect(onNavigate).toHaveBeenCalledWith(PROJECT_HREF);
+
+    // CONTROL — a modified left click is the reader asking for a new tab, a
+    // window or a download. The component must NOT route it, and must leave the
+    // default to the browser: either half alone is wrong (routing without
+    // leaving the default alone navigates twice; consuming without routing does
+    // nothing at all).
+    onNavigate.mockClear();
+    expect(click({ button: 0, metaKey: true }).defaultPrevented).toBe(false);
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    // CONTROL — a non-primary button. Middle click is the other standard way to
+    // open a background tab, and `event.button !== 0` is the guard that catches
+    // it rather than the modifier list.
+    expect(click({ button: 1 }).defaultPrevented).toBe(false);
+    expect(onNavigate).not.toHaveBeenCalled();
+
+    cleanup();
+
+    // CONTROL — hrefs but NO `onNavigate`: the anchor navigates NATIVELY, so the
+    // default must be left alone. This is the arm a component that
+    // unconditionally called `preventDefault` would fail, and it is the reason
+    // `preventDefault` sits INSIDE the callback test rather than before it.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      workspaceName: 'Convenience Corner',
+      projectName: 'Shop operations',
+      workspaceHref: WORKSPACE_HREF,
+      projectHref: PROJECT_HREF,
+    });
+    await settled();
+
+    const nativeLink = screen.getByTestId('sheet-crumb-project');
+    expect(nativeLink).toHaveAttribute('href', PROJECT_HREF);
+    nativeLink.removeAttribute('href');
+    const nativeEvent = new MouseEvent('click', { bubbles: true, cancelable: true, button: 0 });
+    nativeLink.dispatchEvent(nativeEvent);
+    expect(nativeEvent.defaultPrevented).toBe(false);
+  });
+
+  /**
    * 16.67 — THE PARENT INDICATOR RENDERS THE BADGE, IN THE UPPER POSITION, AND
    * THE SUBTASKS HEAD NO LONGER RENDERS A SECOND COPY.
    *

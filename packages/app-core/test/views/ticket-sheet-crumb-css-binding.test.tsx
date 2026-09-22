@@ -147,6 +147,51 @@ describe('17.025 / E4-30 — the crumb arms take three different inks', () => {
     expect(declared(link, 'padding')).toBe('0');
     expect(declared(link, 'font')).toBe('inherit');
   });
+
+  /**
+   * 13.1319 — THE LOCATION ARM WEARS THE SAME INK, ON ITS OWN RULE.
+   *
+   * The workspace and the project crumbs became `<a>` elements (owner request,
+   * 2026-09-22), and the rule above is `button.gn-ticket-sheet__crumb--link` —
+   * element-qualified, so it paints none of them. **The defect this case exists
+   * to prevent is not "no ink at all"**: `apps/web/app/globals.css:73` is
+   * `a { color: var(--gn-text-accent) }`, so in the running product an anchor
+   * would pick the accent up anyway and a missing rule would be invisible on the
+   * web surface — while every host that loads `packages/ui` without that global
+   * gets a differently-inked breadcrumb. This suite reads the STYLESHEET, which
+   * is the only place the arm's own treatment can be asserted.
+   *
+   * ⚠ **`text-decoration` IS THE DECLARATION THAT WOULD ACTUALLY BE MISSED.**
+   * The global link rule sets `color` and nothing else, so an unset
+   * `text-decoration` leaves the UA's underline standing and the two crumbs
+   * become the product's only underlined breadcrumb. `toBeNull()` in the control
+   * below is what shows the reader would have seen it.
+   *
+   * **THE CONTROL IS IN THE SAME `it` AND IT IS THE BUTTON'S BODY**, because the
+   * plausible wrong move is to satisfy this by widening the existing rule into
+   * `button.…, a.…` — which would also drop the button's `border`/`background`/
+   * `padding`/`cursor`/`font` resets onto an element that needs none of them, and
+   * would break `:81`'s exact-string pin. A sibling test could not see that: the
+   * button's own assertions live above and would still pass on the widened rule.
+   */
+  it('13.1319 the location arm takes the same accent ink on a rule of its own', () => {
+    const location = ruleBody(UI_CSS, 'a.gn-ticket-sheet__crumb--link');
+    expect(declared(location, 'color')).toBe('var(--gn-text-accent)');
+    expect(declared(location, 'text-decoration')).toBe('none');
+
+    // THE CONTROL — the button arm is UNCHANGED, and the reading is that the two
+    // are two rules rather than one widened list. `cursor` is asserted because
+    // it is the declaration the button needs and a location must not carry: an
+    // `<a href>` is already a pointer.
+    expect(declared(link, 'color')).toBe('var(--gn-text-accent)');
+    expect(declared(link, 'border')).toBe('none');
+    expect(declared(link, 'cursor')).toBe('pointer');
+    expect(declared(location, 'cursor')).toBeNull();
+    // The two bodies are DIFFERENT rules over different element names — a
+    // selector list would have made this read the whole list.
+    expect(location).not.toBe(link);
+    expect(location).not.toContain('button');
+  });
 });
 
 /**
