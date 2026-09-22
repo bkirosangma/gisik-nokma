@@ -50,6 +50,8 @@ MUTATIONS = [
     ("caret-glyphs-deleted", CSS,
      ".gn-board__workflow-caret::after { content: '▸'; }",
      ".gn-board__workflow-caret::after { content: none; }", []),
+    ("default-ignores-emptiness", BOARD,
+     "board.groups.length > 1 && groupIsEmpty(group)", "board.groups.length > 1", []),
     ("rail-id-disagrees-with-aria-controls", BOARD,
      '<div className="gn-board__rail" id={railId} hidden={!expanded}>',
      '<div className="gn-board__rail" id={`${railId}-other`} hidden={!expanded}>', []),
@@ -91,10 +93,10 @@ def suite_counts(log: str) -> str:
 
 
 def main():
-    only = sys.argv[1] if len(sys.argv) > 1 else None
+    only = [w for w in sys.argv[1].split(",") if w] if len(sys.argv) > 1 else None
     out = []
     for name, path, old, new, extra in MUTATIONS:
-        if only and only not in name:
+        if only and not any(w in name for w in only):
             continue
         text = path.read_text(encoding="utf-8")
         if text.count(old) != 1:

@@ -648,6 +648,70 @@ describe('13.1416 a group the PERSON collapsed stays collapsed when work arrives
       projects: { prj_00000000000000000000000001: { 'wf-onboarding@1': false } },
     });
   });
+
+  it('a group the person collapsed, that then EMPTIED and refilled, is still collapsed', async () => {
+    // ⚠ THIS ARM EXISTS BECAUSE A MUTATION ROUND FOUND THE ONE ABOVE INSUFFICIENT,
+    // and the reason is worth stating: the case above never lets the group become
+    // EMPTY, so it never becomes "collapsed by the default" either — which means
+    // the auto-expand rule's `previous` guard alone already keeps it shut, and
+    // dropping the `Object.hasOwn(groupChoices, key)` term leaves that case GREEN.
+    // Measured: that mutation survived against the case above (20/20).
+    //
+    // The sequence below is the only one in which the term is load-bearing, and it
+    // is a sequence a board reaches in ordinary use — collapse a column's worth of
+    // work by hand, move the last ticket out, then move one back in:
+    //
+    //   non-empty ──person collapses──▶ collapsed ──empties──▶ collapsed-by-DEFAULT
+    //              ──a ticket arrives──▶ non-empty again
+    //
+    // At the last step the group WAS collapsed by the default on the previous
+    // render (so the `previous` guard is satisfied) AND carries a person's `false`
+    // (so the hasOwn term is the only thing standing between the rule and undoing
+    // their choice). Without it the group reopens, which is exactly the hazard the
+    // owner named: *"if your stored shape cannot tell collapsed by the default
+    // from collapsed deliberately by a person, say so and propose one that can,
+    // rather than letting the auto-expand silently undo a manual collapse."*
+    const user = userEvent.setup();
+    const current = (columns: BoardColumn[]) =>
+      boardOf([
+        group('wf-errand', 'Errand', [column('To do', [boardCardSeed({ ticketId: 'tk_a' })]), column('Done')]),
+        group('wf-onboarding', 'Onboarding', columns),
+      ]);
+
+    const { container, rerender } = render(
+      <Board board={current([column('Intake', [boardCardSeed({ ticketId: 'tk_b' })]), column('Review')])} onOpenTicket={() => {}} currentUserId={CURRENT_USER} />,
+    );
+    // Control, first: the group STARTS expanded and non-empty, so every collapse
+    // below is one the person made.
+    expect(railOf(container, 'Onboarding').hasAttribute('hidden')).toBe(false);
+
+    await user.click(toggleFor('Onboarding'));
+    expect(railOf(container, 'Onboarding').hasAttribute('hidden')).toBe(true);
+
+    // It empties — so from this render on it is ALSO collapsed by the default,
+    // and the auto-expand rule's transition guard is armed.
+    rerender(<Board board={current([column('Intake'), column('Review')])} onOpenTicket={() => {}} currentUserId={CURRENT_USER} />);
+    expect(railOf(container, 'Onboarding').hasAttribute('hidden')).toBe(true);
+
+    // A ticket arrives. Both of the rule's other terms now point at OPENING it.
+    rerender(
+      <Board
+        board={current([column('Intake', [boardCardSeed({ ticketId: 'tk_c' })]), column('Review')])}
+        onOpenTicket={() => {}}
+        currentUserId={CURRENT_USER}
+      />,
+    );
+
+    expect(
+      railOf(container, 'Onboarding').hasAttribute('hidden'),
+      'the group reopened over a person’s own collapse, because the store could not tell the two apart',
+    ).toBe(true);
+    expect(toggleFor('Onboarding').getAttribute('aria-expanded')).toBe('false');
+    // And the new work is still reachable by the person, one click away — the
+    // choice is respected, not a trap.
+    await user.click(toggleFor('Onboarding'));
+    expect(screen.queryByRole('region', { name: 'Intake' })).not.toBeNull();
+  });
 });
 
 describe('13.1417 the caret is drawn, never typed — the accessible name is the workflow', () => {
