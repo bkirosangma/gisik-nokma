@@ -609,6 +609,53 @@ describe('13.1151 the List row controls meet the 24px in-list floor', () => {
 });
 
 /**
+ * 13.1341 — the Key cell's own rule (owner request 2026-09-22: *"on the left of
+ * the title, add the ticket key column"*).
+ *
+ * The rule is what MAKES the column read as an identifier rather than as a
+ * second title, and every one of its three declarations is load-bearing in a
+ * direction a component test cannot see: colour is the board's own muted key
+ * ink (`13.1280`'s `.gn-board-card__key`), `nowrap` keeps `CCSO-12` from
+ * breaking across a line, and `tabular-nums` is what lets the numbers line up
+ * down the column — the thing a person scans a key column FOR.
+ *
+ * The component half is asserted beside it, in the same shape the tray's
+ * `hidden` attribute is pinned above: a declaration is only half the fact, and a
+ * rule for a class no element carries is a style that has quietly stopped
+ * applying. The class-parity case in this file would catch that eventually, but
+ * it reports it as one line of a set difference; this says which class moved.
+ */
+describe('13.1341 the Key cell is muted identifier ink, and the component draws the class it names', () => {
+  it('the rule declares the muted token, no literal colour, and a single-line tabular key', () => {
+    const declarations = declarationsFor(CSS, '.gn-list__key');
+    expect(declarations).not.toBeNull();
+    expect(declarations).toContain('color: var(--gn-text-muted)');
+    expect(declarations).toContain('white-space: nowrap');
+    expect(declarations).toContain('font-variant-numeric: tabular-nums');
+    // NO LITERAL INK. `--gn-text-muted` is the board's own key colour and the
+    // only one this column may use; a hex or an `rgb()` here would be a second
+    // answer to a question the token layer already answers, and it is the
+    // failure mode a `toContain` above cannot see (a rule can carry the token
+    // AND a literal, and only the literal would win where it is more specific).
+    expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+  });
+
+  it('and the component really draws that class, off the row it belongs to', () => {
+    const { container } = render(
+      <TicketList
+        rows={[listRowSeed({ ticketId: 'k1', title: 'Has a key', key: 'CCSO-7' })]}
+        currentUserId="me"
+        prefs={DEFAULT_VIEW_PREFS}
+        onPrefsChange={vi.fn()}
+        labels={LABELS}
+        onOpenTicket={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.gn-list__key')?.textContent).toBe('CCSO-7');
+  });
+});
+
+/**
  * Case `13.1346` — "Group by is two lines" is ONE layout fact with two halves, and
  * neither half alone fixes it.
  *

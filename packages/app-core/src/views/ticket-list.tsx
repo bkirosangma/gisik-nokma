@@ -964,6 +964,37 @@ function ListTable({
             ),
           },
         ]),
+    // The Key column (owner request 2026-09-22, the List tab: *"on the left of
+    // the title, add the ticket key column"*). It is a FIXED column like Title
+    // and not a chosen one: it has no `ListColumnId` (the union in
+    // `view-types.ts`), it is not in `AVAILABLE_COLUMNS`, and it is never
+    // persisted — so no stored `columns` array can omit it and the tray offers
+    // no chip for it. It sits immediately before `title` and therefore after
+    // the optional checkbox column, which is what "left of the title" means on
+    // every mount.
+    //
+    // `?? '—'`, and both halves of that are deliberate. An em dash rather than
+    // an empty cell: a blank reads as "this cell did not render", while the
+    // dash is what this file already draws for an absent value — the progress
+    // cell with no rollup (`ListCell`'s `progress` arm) and a custom field with
+    // no claim (its default arm). It is deliberately NOT the due cell's answer:
+    // that one NAMES its absence (`No date claimed`, 13.667), because a dash
+    // beside an attributed-claims column would read as a claim about the record
+    // this view cannot make.
+    //
+    // And never `node.row.ticketId`: the null means the ledger holds no prefix,
+    // not that the key IS the id — printing an internal ULID where a person
+    // expects the workspace's identifier is the specific wrong answer case
+    // 13.1339 names.
+    {
+      id: 'key',
+      header: 'Key',
+      headerClassName: 'gn-list__table-header',
+      cellClassName: 'gn-list__table-cell--data',
+      cell: (node: ListRowNode) => (
+        <span className="gn-list__key">{node.row.key ?? '—'}</span>
+      ),
+    },
     {
       id: 'title',
       header: 'Title',
