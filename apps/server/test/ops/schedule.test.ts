@@ -313,6 +313,35 @@ describe('startScheduler', () => {
     vi.useRealTimers();
     vi.restoreAllMocks();
   });
+  /**
+   * 13.1282 — GO-LIVE DAY, 2026-09-22: the backup worker's first production
+   * boot logged `TimeoutOverflowWarning: 2592000000 does not fit into a 32-bit
+   * signed integer … Timeout duration was set to 1` and ran the monthly orphan
+   * sweep in a tight loop. Node clamps any `setTimeout` above 2^31-1 ms
+   * (~24.8 days) to 1 ms; the sweep's `delayMs` is 30 days. The scheduler now
+   * arms in chunks no longer than the cap and re-arms until the full delay has
+   * elapsed. Asserted on the ARGUMENT handed to `setTimeout` — fake timers do
+   * not clamp, so the run count alone could not see the defect.
+   */
+  it('13.1282 a delay beyond the 32-bit timer cap is chunked, never handed to setTimeout whole, and fires only when the whole delay has elapsed', async () => {
+    const THIRTY_DAYS = 30 * 24 * 60 * 60 * 1000;
+    const CAP = 2_147_483_647;
+    const spy = vi.spyOn(globalThis, 'setTimeout');
+    const run = vi.fn().mockResolvedValue(undefined);
+    const scheduler = startScheduler([{ name: 'sweep', run, delayMs: () => THIRTY_DAYS }], { notify: vi.fn() });
+    try {
+      for (const call of spy.mock.calls) {
+        expect(call[1], 'every setTimeout delay is within the 32-bit cap').toBeLessThanOrEqual(CAP);
+      }
+      await vi.advanceTimersByTimeAsync(CAP);
+      expect(run, 'not yet — 24.8 days is not 30').not.toHaveBeenCalled();
+      await vi.advanceTimersByTimeAsync(THIRTY_DAYS - CAP);
+      expect(run).toHaveBeenCalledTimes(1);
+      for (const call of spy.mock.calls) expect(call[1]).toBeLessThanOrEqual(CAP);
+    } finally {
+      scheduler.stop();
+    }
+  });
 
   it('arms every job synchronously at construction — N jobs means N timers before any delay elapses', () => {
     const jobs: ScheduledJob[] = [
