@@ -375,24 +375,74 @@
   margin-top: 0;
   border-radius: 0;
 }
-/* The prototype's field: taller than the bare editor's 4rem floor, and set at
-   the 17px/22px step the rest of the sheet's reading text uses. */
+/* The prototype's field: the typing area IS the box, set at the 17px/22px step
+   the rest of the sheet's reading text uses.
+
+   ⚠ TWO MEASURED DEFECTS, both left by the change that put the field class on
+   this node (owner, 2026-09-22, screenshot against the prototype):
+
+   1. THE EDITABLE NODE WAS ONE LINE TALL INSIDE A TALLER BOX. This rule set a
+      `min-height` and a `padding`, and no stylesheet in the repo styles
+      `.ProseMirror` at all — so Tiptap's contenteditable stopped at its own one
+      line of text (measured: body 605×96, `.ProseMirror` 577×22). Every pixel
+      below that line was dead: ProseMirror positions the caret from a click's
+      own coordinates, so a click under the text placed nothing, and the field
+      looked like a box containing a line rather than a box you type in. The
+      body is now a column flex container and the child takes the rest, via the
+      `>` rule below.
+   2. TWO FOCUS RINGS. This body paints the product's ring on `:focus-within`;
+      the focused contenteditable ALSO painted the browser's own default
+      (`outline: auto 1px rgb(0, 95, 204)` — measured), which is the inner
+      rectangle the owner saw around the placeholder. The child rule removes it,
+      and the `:focus-within` rule below is why that removal is legal rather
+      than a WCAG 2.4.7 violation — the pairing E4-21 in `packages/ui` argues for
+      the searchable Select and case 13.1313 pins here.
+
+   GEOMETRY ONLY. The ground, the border (hig/minimal) and the sunken shadow
+   (neo) are `.gn-field__input`'s — the class the content node now wears — so
+   they are declared ONCE, in `ui.css`, for this body and for
+   `#gn-new-project-name` alike (owner, 2026-09-22). The wrapper above used to
+   carry a ground of its own; it went transparent in the same change so the
+   field is the body and not the block around it. Square corners because the
+   wrapper owns the radius and clips the tray and footer to it. */
 .editor-slot .ticket-editor__content {
-  /* GEOMETRY ONLY. The ground, the border (hig/minimal) and the sunken shadow
-     (neo) are `.gn-field__input`'s — the class the content node now wears —
-     so they are declared ONCE, in `ui.css`, for this body and for
-     `#gn-new-project-name` alike (owner, 2026-09-22). The wrapper above used
-     to carry a ground of its own; it went transparent in the same change so
-     the field is the body and not the block around it. Square corners because
-     the wrapper owns the radius and clips the tray and footer to it. */
   border-radius: 0;
-  min-height: 6rem;
+  /* 8.375rem = 134px = the prototype's description textarea (`rows="5"` at
+     17px/22px with 12px vertical padding, `desktop.dc.html:1171`), under this
+     product's global `* { box-sizing: border-box }`. */
+  min-height: 8.375rem;
   padding: 0.75rem 0.875rem;
   font-size: 1.0625rem;
   line-height: 1.375rem;
+  display: flex;
+  flex-direction: column;
+  /* The whole box is the typing area now, so the whole box says so. */
+  cursor: text;
+}
+/* The comment composer's own box: the prototype's `rows="3"` at the same 17/22
+   with 11px vertical padding (`desktop.dc.html:1314`) → 3 × 22 + 22 = 88px.
+   AFTER the rule above, because the two selectors have equal specificity and
+   only source order decides between them. The comment composer has three rows
+   and no description to fill, and a five-row box under every comment would be
+   the description's height borrowed for the wrong surface. */
+.editor-slot--comment .ticket-editor__content {
+  min-height: 5.5rem;
+}
+/* THE FILL. The editable node is the body's only child, so it takes every pixel
+   the box has left after the padding: a click anywhere in the field — not just
+   on the one line the text occupies — now places the caret, because there is no
+   longer anywhere in the box that is not the editable node.
+
+   AND THE UA RING GOES. A focused contenteditable paints the browser's own
+   outline; ours is on the body's `:focus-within` immediately below, and one
+   field owes exactly one ring. */
+.editor-slot .ticket-editor__content > .ProseMirror {
+  flex: 1 1 auto;
+  outline: none;
 }
 /* The input's focus ring, on the body: the editable node is `.ProseMirror`
-   INSIDE this element, so `:focus-within` is what fires when a person types. */
+   INSIDE this element, so `:focus-within` is what fires when a person types —
+   and it is THE ring now that the child above has had the UA's removed. */
 .editor-slot .ticket-editor__content:focus-within {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: -2px;

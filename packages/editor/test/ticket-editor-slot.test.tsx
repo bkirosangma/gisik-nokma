@@ -739,3 +739,56 @@ describe('13.1276 the typing area is a field', () => {
     expect(filled.container.querySelector('.is-editor-empty')).toBeNull();
   });
 });
+
+/**
+ * 13.1315 — THE SLOT SAYS WHICH COMPOSER IT IS, AND THE FILL RULE'S `>` REALLY
+ * MATCHES (owner, 2026-09-22).
+ *
+ * Two halves, and the second is the control.
+ *
+ * The mode modifier is what the comment field's shorter height keys on
+ * (13.1314's `.editor-slot--comment` rule): the CSS can only scope that rule if
+ * the root carries the word. `isComment` already existed in the component, so
+ * this is a class on the root and nothing else.
+ *
+ * The control is the DOM shape the stylesheet depends on. The fill rule is
+ * written `.editor-slot .ticket-editor__content > .ProseMirror`, and a `>` in a
+ * stylesheet is invisible to a text scan — the rule can exist, be spelled
+ * correctly, and match nothing. `EditorContent` is what decides the shape:
+ * Tiptap appends `editor.view.dom` into the wrapper node it renders, so the
+ * contenteditable is a DIRECT child. Assert `parentElement`, not `closest`, so
+ * an intermediate wrapper appearing (a change in Tiptap, or an editor mounted
+ * through a different component) reddens here instead of silently leaving the
+ * field half-height again.
+ */
+describe('13.1315 the slot names its mode and the fill rule can match', () => {
+  it('13.1315 the root carries editor-slot--comment in comment mode and editor-slot--description in description mode, and .ProseMirror is the DIRECT child of the content node in both', async () => {
+    for (const mode of ['comment', 'description'] as const) {
+      const { view } = await mountSlot(makeProps({ mode }));
+      try {
+        const root = view.container.firstElementChild as HTMLElement;
+        expect(root.classList.contains('editor-slot')).toBe(true);
+        expect(root.classList.contains(`editor-slot--${mode}`)).toBe(true);
+        // The OTHER mode's modifier must not be there either: a root carrying
+        // both (the natural result of writing the ternary as `&&`, or of adding
+        // the class unconditionally) would let the comment height win in
+        // description mode on source order alone, and the two `contains` above
+        // would still pass.
+        expect(
+          root.classList.contains(mode === 'comment' ? 'editor-slot--description' : 'editor-slot--comment'),
+        ).toBe(false);
+        // CONTROL: the `>` in `.editor-slot .ticket-editor__content > .ProseMirror`.
+        const prose = view.container.querySelector('.ProseMirror') as HTMLElement;
+        const body = view.container.querySelector('.ticket-editor__content') as HTMLElement;
+        expect(prose.parentElement).toBe(body);
+        // And the body has exactly that one child, which is what the fill rule's
+        // own comment claims ("the whole box is the editable node"): a second
+        // flex item would be a band of the field that is not the typing area,
+        // and every assertion above would still hold over it.
+        expect(body.children).toHaveLength(1);
+      } finally {
+        view.unmount();
+      }
+    }
+  });
+});

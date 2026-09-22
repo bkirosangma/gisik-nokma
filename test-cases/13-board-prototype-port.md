@@ -2356,8 +2356,9 @@ to mention someone" were configured and never painted. The content node now wear
 its own class, the wrapper is transparent, and the placeholder is drawn in the input's muted ink.
 `packages/editor/src/components/TicketEditor.tsx`, `packages/editor/src/styles/editor.css`.
 
-- **13.1275** ✅ `editor.css`: the slot body rule declares geometry only (`border-radius: 0`, `min-height: 6rem`)
-  and NO `background`/`box-shadow`; the wrapper declares neither either and keeps `overflow: hidden`; the
+- **13.1275** ✅ `editor.css`: the slot body rule declares geometry only (`border-radius: 0`, `min-height: 8.375rem`
+  — the prototype's own `rows="5"` box, raised from `6rem` by the owner follow-up below) and NO
+  `background`/`box-shadow`; the wrapper declares neither either and keeps `overflow: hidden`; the
   placeholder rule draws `attr(data-placeholder)` in `var(--gn-text-muted)` with `pointer-events: none`; a
   `:focus-within` ring is declared on the body. Read from comment-stripped CSS.
   `packages/editor/test/editor-css-binding.test.ts`.
@@ -2460,3 +2461,58 @@ contract across a boundary was run at Node v22.22.2 and is green — `packages/e
   `packages/ui/src/ui.css`'s own `.gn-segmented__item` rule still declares `flex: 1`, so a fix that
   edited the SHARED rule would be caught here rather than by `/sign-in` and `/inbox` breaking silently. —
   `apps/web/test/project-page-head.test.tsx`
+
+### Follow-up (owner, 2026-09-22): the editable node fills the field — cases `13.1312`–`13.1315`
+
+Owner: *"on focus, it's like this [two rings: one around the whole field, one around just the placeholder
+line]. and the actual text area is just that area where the placeholder is. [prototype] something like
+this."* Two defects, both left by the change that put `gn-field__input` on the composer's body (cases
+`13.1275`–`13.1277`):
+
+1. **The editable node was one line tall inside a taller box.** `.editor-slot .ticket-editor__content`
+   declared a `min-height` and a `padding`, and NO stylesheet in the repo styles `.ProseMirror` at all, so
+   Tiptap's contenteditable stopped at its own single line (measured at `5b26f70d`: body 605×96,
+   `.ProseMirror` 577×22). Every pixel below that line was dead — ProseMirror positions the caret from the
+   click's own coordinates, so a click under the text placed nothing. The body is now `display: flex;
+   flex-direction: column` and the child takes the rest, which is what makes the whole box the typing area.
+2. **Two focus rings.** The body paints the product's `:focus-within` ring; the focused contenteditable
+   ALSO painted the UA's own (`outline: auto 1px rgb(0, 95, 204)` — measured), the inner rectangle in the
+   owner's screenshot. The child now declares `outline: none`, and the body's ring is why that is legal —
+   the pairing E4-21 (`packages/ui/test/components.test.tsx`) argues for the searchable Select's wrapper,
+   and `13.1313` asserts both halves in one case so neither can be dropped alone.
+
+The heights are the prototype's own numbers, not invented: the description textarea is `rows="5"` at
+17px/22px with `padding:12px 14px` (`design-system/interactive/desktop.dc.html:1171`) → 5 × 22 + 24 = 134px
+= `8.375rem`, and the comment textarea is `rows="3"` at the same step with `padding:11px 14px` (`:1314`) →
+3 × 22 + 22 = 88px = `5.5rem`; both include the padding because the product's global
+`* { box-sizing: border-box }` (`apps/web/app/globals.css:5`) makes `min-height` the border-box height.
+`packages/editor/src/components/TicketEditorSlot.tsx`, `packages/editor/src/styles/editor.css`.
+
+- **13.1312** ✅ The body declares `display: flex` and `flex-direction: column` and
+  `.editor-slot .ticket-editor__content > .ProseMirror` declares `flex: 1 1 auto`; **control in the same
+  case** — the body still declares `padding: 0.75rem 0.875rem`, so the fill cannot have come from a box
+  that dropped its inset. Read from comment-stripped CSS.
+  `packages/editor/test/editor-css-binding.test.ts`.
+- **13.1313** ✅ The child rule declares `outline: none` AND, **control in the same case**, the body's
+  `:focus-within` ring is still declared (the same regex `13.1275` reads). This is the E4-21 arm: removing
+  an inner control's `outline` is the product deleting WCAG 2.2 §2.4.7's focus indicator unless the wrapper
+  paints one, so the suppression and its replacement live in one assertion — the inner `outline: none`
+  cannot survive the wrapper's ring going away without this case reddening.
+  `packages/editor/test/editor-css-binding.test.ts`.
+- **13.1314** ✅ The heights, with their derivation in the case comment: the body declares
+  `min-height: 8.375rem` and `.editor-slot--comment .ticket-editor__content` declares `min-height: 5.5rem`
+  (the prototype's `rows="5"` and `rows="3"` boxes at 17px/22px under `border-box`); **control in the same
+  case** — the two values must differ, so a comment selector typo'd into the body rule cannot read as two
+  heights. `packages/editor/test/editor-css-binding.test.ts`.
+- **13.1315** ✅ Every slot root carries `editor-slot` plus `editor-slot--comment` in comment mode and
+  `editor-slot--description` in description mode — and NOT the other mode's modifier; **control in the same
+  case** — in both modes `.ProseMirror` is the DIRECT child of `.ticket-editor__content`
+  (`parentElement`), because the `>` in the fill rule is invisible to a text scan: the rule can exist, be
+  spelled correctly, and match nothing. `packages/editor/test/ticket-editor-slot.test.tsx`.
+
+**Deliberately NOT in scope:** the prototype's `resize: vertical` grip on the same textareas. Adopting it
+needs `overflow: auto` on the body, which turns a box that GROWS with its content into one that SCROLLS
+inside a five-row window — a behaviour change to the editor the owner did not ask for. The owner asked for
+the box to be the typing area and for one ring; a grip is neither.
+
+**`13.1316` is allocated to this lane and NOT minted** (the controller's block is `13.1312`–`13.1316`).
