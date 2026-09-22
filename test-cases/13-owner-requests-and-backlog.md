@@ -2566,3 +2566,41 @@ would move the accessible-names ratchet for a control that already has a name.
   wanted, so the option cannot be hard-coded — and the PARENT crumb is still a `button`, because it is the
   one crumb in this bar that cannot be an address: opening it needs a server lookup first. The fixture
   carries a parent for exactly that arm. — (`apps/web/test/sheet-crumb-links.test.tsx`)
+## Opening or closing the ticket sheet does not scroll the page (owner request, 2026-09-22)
+
+**The owner measured it in the running app, twice over:** *"currently, opening a ticket, in the board
+and on the list, the page gets scrolled to the top. it should not scroll."*
+
+**The cause was measured, not theorised.** The ticket sheet is not a route — it is a `?ticket=` query
+parameter on the project page the reader is already standing on — and every door into it was a
+`router.push(url)` with **no options** (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`).
+`router.push`'s `options.scroll` defaults to `true`, which scrolls the window to the top on every
+navigation, including one that only adds or removes `?ticket=` on the page under the reader. In the dev
+stack at `3fcd94ff`, on the List tab with the document scrolled to `scrollY` 600: a click on a row →
+`0`, sheet open; Close → `0` again. In the same run `window.next.router.push(sameUrl, { scroll: false })`
+held `600` on both, and a control default push returned to `0`.
+
+**Three doors, and only two of them get the blanket.** `openTicket` (every tab's row and card — board,
+list, backlog, calendar, timeline all land here) and `closeTicket` both stay on this page, so both push
+`{ scroll: false }`. `openParentTicket` is the third and genuinely different: a parent may live in
+ANOTHER project, and then the reader really is leaving the page and the top of the new one is where
+they belong — so its options are the EXPRESSION `{ scroll: location.projectId !== projectId }`.
+
+**jsdom has no layout and does not scroll**, so no render can witness a `scrollY`; the thing that was
+wrong is the SHAPE OF THE ARGUMENT LIST, and that is what these cases assert. In every one of them the
+positive control is `toHaveBeenCalledWith(url, { scroll: … })` rather than `toHaveBeenCalled()` or
+`expect.anything()` for the options — either of those passes on the shipped one-argument call and would
+report a fix that is not there. All three were run RED first against the unchanged page: `push` was
+called exactly once, with the correct URL, and with **one** argument.
+
+- **13.1322** ✅ The List tab's row door (`button.gn-list__open`, the title button) pushes
+  `/w/<ws>/p/<project>?ticket=<ticket>` with `{ scroll: false }`, and pushes EXACTLY ONCE.
+- **13.1323** ✅ The sheet's own Close control (`aria-label` `Close sheet`) pushes the bare
+  `/w/<ws>/p/<project>` with `{ scroll: false }`. The case mounts with `ticket=` in the query so the
+  sheet is really open — the same fixture shape `13.1180` uses.
+- **13.1324** ✅ The parent crumb (`sheet-crumb-parent`) pushes
+  `/w/<ws>/p/<project>?ticket=<parent>` with `{ scroll: false }` when the stubbed `ticketLocation.locate`
+  places the parent in THIS project, and `/w/<ws>/p/<other>?ticket=<parent>` with `{ scroll: true }` when
+  it places it in ANOTHER. **Both arms are in the SAME case, not sibling `it`s**: a blanket
+  `{ scroll: false }` on `openParentTicket` passes the first arm, and a sibling case would let that
+  variant report green on the arm that matters. — (`apps/web/test/sheet-no-scroll.test.tsx`)

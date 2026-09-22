@@ -1273,9 +1273,19 @@ function ProjectBoard() {
         ? []
         : dataSource.query.getTicketAttachments(workspaceId, openTicketId),
   );
+  /*
+    `{ scroll: false }` ON BOTH OF THESE, and it is not a nicety: the sheet is a
+    `?ticket=` query on the page the reader is ALREADY on, so a navigation that
+    stays on the page must not move it. `router.push`'s `scroll` defaults to
+    `true`, which is why opening a ticket threw the reader back to the top of a
+    list they had scrolled (owner, 2026-09-22: *"the page gets scrolled to the
+    top. it should not scroll"*). `openParentTicket` below is the one door this
+    does NOT blanket — see its own note.
+  */
   const openTicket = (ticketId: string) =>
-    router.push(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`);
-  const closeTicket = () => router.push(`/w/${workspaceId}/p/${projectId}`);
+    router.push(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`, { scroll: false });
+  const closeTicket = () =>
+    router.push(`/w/${workspaceId}/p/${projectId}`, { scroll: false });
   /**
    * Opening the ticket the sheet's `Subtask of {parent}` chip names.
    *
@@ -1308,7 +1318,17 @@ function ProjectBoard() {
           });
           return;
         }
-        router.push(ticketSheetPath(location, ticketId));
+        /*
+          THE ONE DOOR THAT KEEPS THE DEFAULT. The parent may sit in ANOTHER
+          project, and then the reader is leaving the page and the top of the new
+          one is where they belong; when it sits in THIS project the sheet is
+          again a `?ticket=` query on the page under them and the scroll must not
+          move. A blanket `{ scroll: false }` would strand them mid-page on a
+          project they have just arrived at.
+        */
+        router.push(ticketSheetPath(location, ticketId), {
+          scroll: location.projectId !== projectId,
+        });
       },
       (cause: unknown) => {
         setParentOpenNotice({
