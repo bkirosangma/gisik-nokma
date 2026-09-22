@@ -2550,3 +2550,19 @@ would move the accessible-names ratchet for a control that already has a name.
   existing rule into `button.…, a.…`, which would drop the button's resets onto an anchor and leave
   `ticket-sheet-crumb-css-binding.test.tsx`'s exact-string pin reading a prefix of a longer selector.
   — (`packages/app-core/test/views/ticket-sheet-crumb-css-binding.test.tsx`)
+- **13.1320** ✅ **AT THE CALL SITE**, which is the half no component test can hold: the sheet accepts
+  `workspaceHref`/`projectHref`/`onNavigate` all along, and a page that never passes them is this
+  repository's signature failure in its client-side form (*a mocked contract is the thing that excuses the
+  server from existing*) — the same shape as `uploadEvidence`, which the sheet had accepted since it was
+  written while this very mount never passed it. The REAL page is rendered, a REAL ticket opened, and the
+  bar read: both crumbs are links named after the served workspace and project, with hrefs
+  `/w/<workspaceId>` and `/w/<workspaceId>/p/<projectId>`. Clicking the PROJECT crumb calls the mocked
+  `router.push` with `/w/<workspaceId>/p/<projectId>` — the sheet-closing path `closeTicket` pushes — and
+  with **`{ scroll: false }`**, because that is the page the reader is already on and Next 15's
+  `router.push` scrolls to the top by default (the owner's report; the sibling lane fixing
+  `openTicket`/`closeTicket` measured it in the running app: `scrollY` 600 → 0 on a default push, 600 → 600
+  with the option). **Two controls in the same `it`**: clicking the WORKSPACE crumb calls
+  `push('/w/<workspaceId>', { scroll: true })` — it leaves for a different page, where the default is
+  wanted, so the option cannot be hard-coded — and the PARENT crumb is still a `button`, because it is the
+  one crumb in this bar that cannot be an address: opening it needs a server lookup first. The fixture
+  carries a parent for exactly that arm. — (`apps/web/test/sheet-crumb-links.test.tsx`)
