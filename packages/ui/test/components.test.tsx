@@ -1020,6 +1020,117 @@ describe('E4-21 — the searchable Select paints a focus ring', () => {
 });
 
 /**
+ * Case `13.1344` — the raised appearance's own rule, and the first-match trap
+ * that this case had to MEASURE rather than assume.
+ *
+ * The owner asked for the grouping dropdown to be *"a raised style instead"* and
+ * the raised coat in this product is `background: var(--gn-surface-raised);
+ * box-shadow: var(--gn-shadow-raised)` (`.gn-card`). Asserting that the raised
+ * selector declares those two is the stylesheet half.
+ *
+ * ⚠ THE CONTROL THAT WAS PLANNED FOR THIS CASE COULD NOT PASS, AND THE REASON IS
+ * A MEASUREMENT. The plan was to control with `rule('.gn-select__trigger')` still
+ * declaring `justify-content: space-between`. `rule()` is `UI_CSS.match(...)`, a
+ * FIRST-MATCH scan with no anchors, and the first place in this file where the
+ * literal `.gn-select__trigger {` appears is NOT the base rule at `:3032` — it is
+ * the list-scoped `.gn-list__control .gn-select__trigger` at `:1419`, whose body
+ * is `padding: 0 0.625rem; font-size: 0.9375rem; font-weight: 600`. So the
+ * planned control would have asserted `space-between` against a rule that has
+ * never declared it, and would have failed against a tree where nothing was
+ * wrong. Measured directly against the shipped stylesheet before writing either
+ * assertion, and pinned below as what this reader ACTUALLY returns, so a reader
+ * that starts answering for a different rule goes red here.
+ *
+ * The base rule is therefore reached the only way that can reach it — a
+ * line-anchored scan, the same shape `apps/web`'s `declarationsFor` uses — and
+ * the thing that matters about it (the raised coat is additive, not a
+ * replacement) is asserted there.
+ */
+describe('13.1344 the raised appearance declares the raised coat', () => {
+  /** The body of the rule whose selector is EXACTLY `selector`, or null. Line-anchored. */
+  const anchoredRule = (selector: string): string | null => {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&');
+    const m = UI_CSS.match(new RegExp(`^${escaped}\\s*\\{([^}]*)\\}`, 'm'));
+    return m ? (m[1] ?? null) : null;
+  };
+
+  it('13.1344 the raised modifier paints surface-raised with the raised shadow, and leaves the base rule alone', () => {
+    const raised = rule('.gn-select__trigger--raised');
+    expect(raised, `.gn-select__trigger--raised body: ${raised}`).toMatch(
+      /background:\s*var\(--gn-surface-raised\)/,
+    );
+    expect(raised, `.gn-select__trigger--raised body: ${raised}`).toMatch(
+      /box-shadow:\s*var\(--gn-shadow-raised\)/,
+    );
+    // The raised pill sits on a bordered field class; `hig`/`minimal` still carry
+    // 13.291's border, and a visible one on top of a raised shadow is two
+    // boundaries for one edge.
+    expect(raised).toMatch(/border-color:\s*transparent/);
+
+    // CONTROL, in this same `it` — what the UNANCHORED reader returns for the bare
+    // name, asserted as the measurement above. This is the arm that distinguishes
+    // "the raised rule was read" from "the first `.gn-select__trigger`-prefixed
+    // rule in the file was read and happened to match".
+    const firstMatchForBaseName = rule('.gn-select__trigger');
+    expect(
+      firstMatchForBaseName,
+      `rule('.gn-select__trigger') resolved to: ${firstMatchForBaseName}`,
+    ).not.toBe(raised);
+    expect(firstMatchForBaseName).toMatch(/padding:\s*0 0\.625rem/);
+    expect(firstMatchForBaseName).not.toMatch(/--gn-surface-raised/);
+
+    // CONTROL, second half — and this is the one the plan was reaching for. The
+    // BASE rule, read by its anchor: still the layout the raised coat rides on, and
+    // still the shape that makes the coat ADDITIVE rather than a replacement.
+    const base = anchoredRule('.gn-select__trigger');
+    expect(base, 'no line-anchored `.gn-select__trigger {` rule').not.toBeNull();
+    expect(base).toMatch(/justify-content:\s*space-between/);
+    expect(base).toMatch(/width:\s*100%/);
+    expect(base).not.toMatch(/--gn-surface-raised/);
+
+    // The other stylesheet, same invocation: `apps/web/app/layout.tsx` imports
+    // `ui.css` and then `globals.css`, so a rule appended there wins at equal
+    // specificity and would fork the raised coat away from this one. Positive
+    // control first, on the file that MUST match.
+    expect(
+      UI_CSS.includes('.gn-select__trigger--raised'),
+      'the scan cannot see .gn-select__trigger--raised in ui.css, where it is declared — it is reading nothing',
+    ).toBe(true);
+    expect(
+      GLOBALS_CSS.includes('.gn-select__trigger--raised'),
+      'globals.css re-declares .gn-select__trigger--raised, which wins over ui.css by source order',
+    ).toBe(false);
+
+    // CONTROL, third half — THE ORDERING THE COAT DEPENDS ON. The modifier and
+    // `[data-style="neo"] .gn-field__input` are BOTH `(0,2,0)`, so at equal
+    // specificity the cascade is decided by source order and nothing else. The
+    // raised rule therefore has to come AFTER the override it beats; move it back
+    // up to the `.gn-select__trigger` block it belongs to and the pill silently
+    // repaints sunken under `neo` — the shipped default — with every other case
+    // in this repo still green. Asserted as an index comparison.
+    //
+    // ⚠ COMMENTS ARE STRIPPED FIRST, and that is not tidiness. The override's
+    // own selector text is NAMED IN PROSE earlier in this stylesheet (the field
+    // section's docblock reasons about it by name), so a raw `indexOf` over
+    // `UI_CSS` finds the COMMENT, not the rule — and a check that reads prose is
+    // a check that keeps passing when the rule it is about is deleted. Only real
+    // declaration text is compared.
+    const declarationsOnly = UI_CSS.replace(/\/\*[\s\S]*?\*\//g, '');
+    const raisedAt = declarationsOnly.indexOf('.gn-select__trigger.gn-select__trigger--raised');
+    const neoFieldAt = declarationsOnly.indexOf('[data-style="neo"] .gn-field__input');
+    expect(
+      neoFieldAt,
+      'the neo field override is not in ui.css as declaration text — this comparison is reading nothing',
+    ).toBeGreaterThan(-1);
+    expect(
+      raisedAt,
+      'the raised coat is not in ui.css as declaration text — this comparison is reading nothing',
+    ).toBeGreaterThan(-1);
+    expect(raisedAt).toBeGreaterThan(neoFieldAt);
+  });
+});
+
+/**
  * Case 13.464 — board-prototype-port Task 6, Ruling 17 (coordinator, 2026-09-16).
  *
  * `.gn-board-card`'s own literal `border-radius: 0.75rem` (12px) had the SAME

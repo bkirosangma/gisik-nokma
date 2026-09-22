@@ -26,3 +26,21 @@ export function SearchIcon({ size = 16 }: { size?: number }) {
     </svg>
   );
 }
+
+/**
+ * The dropdown affordance on a single non-searchable `Select` (case 13.1342).
+ *
+ * Same shape as the three above — 16px, `stroke="currentColor"`, `aria-hidden` —
+ * so the trigger's glyph obeys the control it sits in rather than carrying a
+ * colour of its own. `aria-hidden` is load-bearing rather than decorative: the
+ * chevron is a sibling of the trigger's value element, and an unlabelled graphic
+ * inside a button is text the accessible-name computation would otherwise see.
+ */
+export function ChevronDownIcon({ size = 16 }: { size?: number }) {
+  return (
+    <svg width={size} height={size} viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2}
+      strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+      <path d="m6 9 6 6 6-6" />
+    </svg>
+  );
+}
