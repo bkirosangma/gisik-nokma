@@ -230,6 +230,12 @@ function renderFlow(
       currentUserId="user_kiro"
       typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
       parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations' }]}
+      // The roster the Assignee picker offers (owner request 2026-09-23). Empty
+      // here: no case in this file is about the assignee, and `[]` leaves the
+      // picker offering "Unassigned" alone, which is the draft's default — so
+      // every `ticket.created` below carries `assigneeId: null`, exactly as it
+      // did before the member existed.
+      assigneeCandidates={[]}
       onCreated={onCreated}
     />,
   );

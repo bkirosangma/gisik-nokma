@@ -2935,3 +2935,140 @@ permission rules, not only the dialog.*
   as well as the read, since the write is the half that throws here. `configurable: true` plus a `finally`
   restore, because leaving a throwing stub in place would poison every later case in the file. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+*The rest of block `13.1351`–`13.1380`: the description and the assignee. **`13.1360` and `13.1361` are
+UNUSED** — the payload-shape cases and the engine's field-kind parity were folded into `13.1358`/
+`13.1359` and into `13.1364` rather than split out, and ids are never renumbered, so they stay empty.*
+
+- **13.1358** ✅ A ticket's BIRTH description is a CLAIM on head state, attributed to the creator and the
+  creation clocks — or there is NO `description` key at all. The two halves are one case because they are
+  one decision: the reducer spreads the claim in only when the member is present, so
+  `Object.keys(state.fields)` is the assertion, not a value. A `claim(null, env)` for the absent member
+  would answer *"has anybody described this?"* YES for every ticket nobody described, and name the person
+  who filed it as the one who set an empty description — `ticket-sheet.tsx` reads that key's PRESENCE
+  (`descriptionClaim === undefined`) to choose between "no description yet" and "set by X on DATE".
+  Controls in the same case: the title and priority claims are written beside it (so the absence is one
+  key and not a fold that wrote nothing), the value is the DOCUMENT and not a projection of it, and a v1
+  `ticket.created` carrying neither new member still folds. Payload half: `description` is optional, is
+  held to the SAME `z.record` shape `ticketFieldSetPayload` demands of the field_set door — a string
+  REDDENS rather than reaching head state as a value the edit door would then refuse to replace — and an
+  explicit `null` is REFUSED, because at birth absent is the one spelling of none. —
+  (`packages/domain/test/ticket-state.test.ts`, `packages/domain/test/ticket-events.test.ts`)
+- **13.1359** ✅ A ticket's BIRTH ASSIGNEE lands on `state.assigneeId`; absent or explicit `null` leaves
+  it `null`, which is what every pre-existing `ticket.created` meant (the reducer hard-coded `null` there
+  before the member existed). The CONTROL pinning `null`-equals-absent is deliberate: the client OMITS
+  the member rather than sending `null`, and a future schema that refused `null` would have to change
+  that case on purpose rather than drift. `assigneeId` is `z.string().min(1).nullable()`, so an
+  EMPTY-STRING assignee — a named person who is nobody — is refused at the door, exactly as
+  `ticketAssignedPayload` refuses it. Payload round-trips are asserted through `parseEvent`, which
+  compares the PARSED payload to what was submitted, so a member the schema stripped would redden rather
+  than vanish. —
+  (`packages/domain/test/ticket-state.test.ts`, `packages/domain/test/ticket-events.test.ts`)
+- **13.1362** ✅ **THE BIRTH ASSIGNEE IS HELD TO THE SAME NAMED-PERSON RULE `ticket.assigned` IS** — a
+  `ticket.created` naming somebody with no role in the workspace is refused
+  `permission.role` / *"That person is not in this workspace."*, asserted as the WHOLE refusal object
+  because this module reports `permission.role` from four places and the actor here really is on the
+  project, so nothing else could have fired. **PLANTED DEFECT — measured before the fix:** the identical
+  name arriving on a `ticket.created` was `committed` while `ticket.assigned` refused it, because the
+  E6-17 lookup ran AFTER `canSee` and `ticket.created` returns before that block (there is no ticket to
+  see yet). The lookup is now ONE function called from both branches; writing it a second time inside
+  the `ticket.created` branch would have been two spellings of one rule, free to drift. The read side
+  would have served the typo as an assignee NAME (`roster.get(id) ?? id`), matched it in the list's
+  `assigneeId` filter, and made a `groupBy=assignee` column for it. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+- **13.1363** ✅ CONTROL for `13.1362`, in the same `describe` and its own `it` so the refusal cannot pass
+  against a build that refuses every birth assignee: a REAL member is admitted, and BOTH spellings of
+  nobody are admitted too (`null`, and the member omitted entirely) — without those two arms the fix
+  would have made the dialog's default, Unassigned, unsubmittable. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+- **13.1364** ✅ A ticket's BIRTH description reaches `proj_search.description`, **and reaches `tsv`** —
+  the second half is what an exact-column assertion cannot show, since a value written to the right place
+  but never indexed would satisfy the first. **Measured before the fix:** the `ticket.created` branch
+  inserted `(ticket_id, workspace_id, project_id, title)` and nothing else, so a description composed at
+  creation lived in head state and the sheet while the search column kept the table's own default — the
+  person found the ticket by its title and not by the words they had just typed. The extraction is the
+  `ticket.field_set` branch's own `docToPlainText` call, so the two doors cannot disagree about what a
+  description is as search text. Controls: the title still matches (the row exists and is indexed at
+  all), and a ticket born with NO description gets `''` rather than the string `'undefined'` or `'null'`
+  indexed instead. **In its own FILE rather than in `search.test.ts`**, whose docblock makes case order
+  part of its fixture and two of whose read-only cases assert the table's exact row count — a case that
+  ADDS rows would have forced edits to assertions belonging to cases about something else. —
+  (`apps/server/test/projections/search-birth-description.test.ts`)
+- **13.1365** ✅ The create dialog mounts the description composer from its `editorSlot` prop as a
+  `'description'` composer — empty (`doc: null`), editable, scoped to the caller's workspace, carrying a
+  REAL ULID for a ticket that does not exist yet, and with NO `submit` wired (there is nowhere to submit
+  to; Create is the one act). All renders are required to agree on the SCOPE, because a slot whose mode
+  or workspace changed between renders is a composer re-mounting under the person mid-typing. A document
+  the slot reports travels in the draft as `description`, **under the id the slot was scoped to** — the
+  scoping invariant, without which a dialog that showed the composer one id and created the ticket under
+  another would satisfy every other assertion here. The composer test doubles as the seam's proof: it
+  drives a FAKE slot, because what belongs to app-core is the contract and what belongs to
+  `packages/editor` is that package's own suite. Second half, in `packages/editor`: `onChange` carries
+  the document as it is typed and NOT before anything is typed (`TicketEditor` wires it to ProseMirror's
+  `onUpdate`), so a host can read "never reported" as "no description"; and it is the DOCUMENT, not a
+  plain-text projection, because the field_set door refuses a string. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`,
+  `packages/editor/test/ticket-editor-slot.test.tsx`)
+- **13.1365b** ✅ `submitSlot: 'none'` omits the slot's own submit control and KEEPS THE FOOTER, which
+  also carries the hint sentence — asserted on the footer rather than by counting children, since the
+  hint is a sibling the button's removal must not take with it. The composer is still editable, so "no
+  button" cannot be satisfied by a slot that rendered nothing. **Control in the SAME `it`** (a control in
+  a sibling case proves nothing about this one): the same mount WITHOUT the prop still draws the button,
+  so the case cannot pass against a component that lost its submit control for every mount. The prop is
+  seam-only on `TicketEditorSlotProps`, the `editorRef` precedent — it is a fact about mounting THAT
+  component, and the shared contract cannot carry it. —
+  (`packages/editor/test/ticket-editor-slot.test.tsx`)
+- **13.1366** ✅ An EMPTY description is OMITTED from the draft — the KEY is absent, not a document that
+  renders to nothing. The key set is the assertion, because `description: undefined` satisfies a
+  `toEqual` against an absent key. The decision is `docToPlainText(...).length === 0`, the domain's one
+  total projection, so an untouched composer (which reports nothing at all) and one emptied back to
+  nothing take the SAME arm. CONTROL in the same describe: with no `editorSlot` at all the dialog still
+  works and sends no description — without it, "an empty document is omitted" passes against a dialog
+  that omitted descriptions entirely. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1367** ✅ The Assignee picker offers **"Unassigned" plus the caller's roster**, and omitting it is
+  the default: `null` travels, not absent and not `''`, because `ticketCreatedPayload.assigneeId` is
+  nullable and `TicketState.assigneeId` is `string | null`, so `null` is the one spelling of nobody the
+  whole chain agrees on. "Unassigned" is an OPTION and not the absence of one — a picker with no way back
+  to it cannot un-assign. A chosen person travels as their id, asserted after reading the trigger back so
+  the label the person sees and the value the payload carries are both pinned. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1368** ✅ An UNREAD roster is STATED, and the draft carries `assigneeId: null` rather than a wrong
+  one — the discipline `parentCandidatesUnavailable` established one field over: an empty picker asserts
+  *nobody in this workspace can be assigned*, which is a claim made from a read that never answered, and
+  inside a modal the sentence that would correct it is on the page behind. The caller's own reason
+  travels VERBATIM and unparaphrased, so a person can tell a refusal from a read still in flight.
+  Enforced at the SUBMIT site as well as by hiding the picker, because the prop can arrive after a
+  selection has been made and hiding a control does not clear the state behind it (3.157's own
+  invariant). —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1369** ✅ **CREATING A TICKET OPENS IT** — measured before anything was written, because the
+  wiring was already present end to end and the ask read as a missing feature only because NOTHING
+  PINNED IT: an unpinned path is one refactor away from being a missing one, and the two are
+  indistinguishable by looking at the app. The case runs the ROUTED page (not the sheet mounted
+  directly): a real create through the real dialog reaches `router.push`, and the id it pushes is read
+  back off the `ticket.created` envelope that was actually ingested — so the URL cannot name a ticket
+  other than the one the ledger received, which a shape check could not tell. Then the sheet is opened
+  from that param and its title is read off `gn-ticket-sheet__title-input`, the sheet's own title
+  CONTROL; `getByText` would FAIL against a perfectly open sheet, measured, and that is recorded because
+  it is the mistake this case's first draft made. CONTROL, in its own `it`: with no `?ticket=` param no
+  sheet renders, asserted after the page has certainly loaded, so the arm above is not reading a page
+  that always shows one. **⚠ THIS WITNESSES THE CLIENT HALF ONLY.** `getTicket` is stubbed, so "the sheet
+  answered" means "the sheet renders when its read answers" — it says NOTHING about whether a read
+  against a live server, issued moments after the create, sees the row. That is the question the owner's
+  separately-reported live-update defect asks, and this case must not be read as evidence about it
+  either way. —
+  (`apps/web/test/new-ticket-opens-sheet.test.tsx`)
+- **13.1370** ✅ A person chosen BEFORE the roster was withheld does not reach the draft — 3.157's
+  defect, one field over. The transition is the thing: the picker works, a person is chosen, and THEN
+  the read fails, so React state survives while the control that set it stops rendering. **This needed
+  its OWN case, measured rather than tidy:** `13.1368` sets `assigneeCandidatesUnavailable` from the
+  FIRST render, so its picker is never usable and `assigneeId` is still `UNASSIGNED` at Create — it
+  exercises the `UNASSIGNED` arm and nothing else. **Mutation (dropping the
+  `assigneeCandidatesUnavailable !== undefined` term from the submit boundary) left all 39 cases in the
+  file GREEN**, i.e. the submit-site check was covered by no test at all while looking covered; with
+  this case it reddens exactly here and nowhere else. Asserted on the DRAFT and not the screen, because
+  the sentence was already correct and the payload was what contradicted it. Control in the same `it`:
+  the picker is opened and used first, since a case that started withheld could never build the state
+  this defect needs. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)

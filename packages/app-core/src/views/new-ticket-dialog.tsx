@@ -1,7 +1,25 @@
-import { useEffect, useRef, useState } from 'react';
-import { DEFAULT_PRIORITY, DEEPEST_RANK, PRIORITIES, type Priority } from '@gisik-nokma/domain';
+import { createElement, useEffect, useRef, useState } from 'react';
+import {
+  DEFAULT_PRIORITY,
+  DEEPEST_RANK,
+  PRIORITIES,
+  docToPlainText,
+  newUlid,
+  type Priority,
+} from '@gisik-nokma/domain';
 import { Button, Dialog, SegmentedControl, Select, Switch } from '@gisik-nokma/ui';
 import { readNewTicketStart, rememberNewTicketStart } from '../preferences/new-ticket-start.js';
+import type { EditorSlotComponent } from './editor-slot.js';
+
+/**
+ * The Assignee picker's row for nobody, spelled as an OPTION VALUE rather than
+ * as the absence of one — `ticket-sheet.tsx`'s own constant for its own picker,
+ * restated rather than imported because it is declared inside that component's
+ * body. `null` cannot be a `Select` value (`select.tsx` treats a nullish value
+ * as "nothing chosen" and would render the placeholder), and "Unassigned" has to
+ * be selectable BACK, not merely the state a fresh picker happens to be in.
+ */
+const UNASSIGNED = '__unassigned__';
 
 /**
  * A ticket type as this dialog is handed it: the label to paint, and the RANK
@@ -45,9 +63,73 @@ export function defaultRootTypeFor(ladder: readonly TypeOption[]): TypeOption | 
 }
 
 export type NewTicketDraft = {
+  /**
+   * The id the created ticket will carry — minted by THIS dialog when it opens,
+   * and not by the flow (owner request 2026-09-23).
+   *
+   * ## Why the draft owns the entity's id
+   *
+   * The description composer is mounted from `editorSlot`, whose contract takes
+   * a `ticketId`, and the create dialog is the one mount in the product where the
+   * ticket does not exist yet. The alternatives were both worse: a fabricated id
+   * would be a value the editor is handed and that is simply false, and omitting
+   * the composer would drop the owner's ask. Minting it here makes every value
+   * the composer receives TRUE — this IS the id `ticket.created` will carry,
+   * because the flow writes the payload with what the draft says.
+   *
+   * ## The safety property that comes with it, measured rather than assumed
+   *
+   * The flow used to mint `newUlid()` PER CALL, and V10's docblock leans on that:
+   * two presses that somehow escaped the dialog's `submittingRef` were two
+   * distinct ids, i.e. two tickets in an append-only ledger. **With the id minted
+   * per OPEN, the same escape is refused instead of filed.**
+   * `packages/rule-engine/src/checks/hierarchy.ts:80` is
+   * `if ((await getTicketState(ctx, env.entity.id)) !== null) return
+   * refuse('ticket.already-exists')`, and its own docblock says why the door
+   * exists at all: the reducer folds `ticket.created` unconditionally, so an
+   * ACCEPTED second create does not error and does not merge — **it resets the
+   * fold**, erasing the ticket's status, collaborators, field claims and
+   * transition log. A duplicate whose id was already taken therefore lands on a
+   * refusal, not on a wrecked ticket. The ref guard is still the first line; this
+   * makes the second line an error instead of silent duplication.
+   *
+   * A fresh ULID per OPEN, never once per dialog instance: the same id reused
+   * for a second ticket would be refused by exactly the rule above, so a
+   * long-lived dialog would become unable to create anything after its first
+   * success.
+   */
+  ticketId: string;
   title: string;
   typeId: string;
   parentId: string | null;
+  /**
+   * The description, as the composer reported it — a rich-text DOCUMENT, the same
+   * value `ticket.field_set` carries under `fieldId: 'description'`.
+   *
+   * OPTIONAL, and ABSENT MEANS THE TICKET HAS NO DESCRIPTION. This is the one
+   * member here that may legitimately be absent, and the asymmetry with `start`
+   * and `priority` is the honest one rather than a lapse: those two always HAVE a
+   * value (a ticket is always born somewhere and always at some priority, so the
+   * control is preselected and the absence rules on the wire exist only for
+   * events older than the fields), while a ticket genuinely may have nothing
+   * written in it. `ticketCreatedPayload.description` is optional for the same
+   * reason, and the flow tests the KEY's presence rather than a value.
+   *
+   * A DOCUMENT or absent, never an empty document and never a string: the caller
+   * decides presence, and `docToPlainText` is what it decides with.
+   */
+  description?: unknown;
+  /**
+   * Who the ticket is assigned to at birth, or `null` for nobody.
+   *
+   * REQUIRED, and that mirrors `parentId` rather than `description`: "nobody" is
+   * a real, chosen state with a control position of its own ("Unassigned" is the
+   * picker's opening value), so there is always an answer and the draft always
+   * carries one. `ticketCreatedPayload.assigneeId` is nullable for that reason,
+   * and `TicketState.assigneeId` is `string | null` — `null` is the one spelling
+   * of nobody the whole chain agrees on.
+   */
+  assigneeId: string | null;
   /**
    * Where the ticket is born (backlog/closed spec §5.4, 2026-09-17; condition
    * LIFTED by the owner 2026-09-23): whatever the "Starts in the backlog?"
@@ -150,6 +232,62 @@ export type NewTicketDialogProps = {
    */
   parentCandidatesNarrowing?: string;
   /**
+   * The workspace this ticket is being filed in. Used by ONE thing: the
+   * description composer's own scope, since `EditorSlotProps.workspaceId` is
+   * contract-required and a mentions query is workspace-scoped by the time the
+   * slot's closure is built. Required even when no `editorSlot` is supplied —
+   * the fact is true of every mount, and an optional prop that only some callers
+   * need is the shape that compiles while silently unset.
+   */
+  workspaceId: string;
+  /**
+   * The description composer, or absent for a dialog without one.
+   *
+   * **The seam `TicketSheet` already takes, for the same reason:** app-core must
+   * never learn what a ProseMirror document is (amendment 12), so the real
+   * editor lives in `packages/editor` and `apps/web` — the one app that depends
+   * on both — passes it in. This component renders whatever it is handed and
+   * only ever holds the document as `unknown`.
+   *
+   * ⚠ **The slot's own submit control must be suppressed by the CALLER**, and
+   * that is not this component's business to enforce: `TicketEditorSlot`'s
+   * `submitSlot: 'none'` lives on that package's seam-only props, and app-core
+   * cannot name it. A slot mounted here without it would draw a second "Submit"
+   * inside the create form — one that would send a `field_set` for a ticket that
+   * does not exist yet. `apps/web` supplies the wrapper that asks for it.
+   *
+   * No `submit` is passed, deliberately: this mount has nowhere to submit to, so
+   * the composer reports through `onChange` and Create is the one act.
+   */
+  editorSlot?: EditorSlotComponent;
+  /**
+   * Who may be assigned at birth. The CALLER's roster, exactly as
+   * `parentCandidates` is the caller's list — this component derives nothing and
+   * reads no roster of its own.
+   *
+   * `{id, name}` rather than the sheet's `Actor`, because a picker option needs
+   * a label and nothing else: the caller has already resolved the display name
+   * through `memberLabel` (name → email → id) at the one place that knows the
+   * whole `Actor` shape, so a nameless member is offered by their address and
+   * never as a blank row.
+   */
+  assigneeCandidates: ReadonlyArray<{ id: string; name: string }>;
+  /**
+   * Why the roster could not be read, when it could not be — the same
+   * distinction, and for the same reason, as `parentCandidatesUnavailable` one
+   * field over.
+   *
+   * An EMPTY picker asserts *nobody in this workspace can be assigned to this
+   * ticket*, which is a claim about the workspace made from a read that never
+   * answered; inside a modal, the sentence that would correct it is on the page
+   * behind. When set, the picker is replaced by this reason and the draft leaves
+   * with `assigneeId: null` — which is what the ticket would have been anyway —
+   * **enforced at the SUBMIT site, not by hiding the picker**, because this prop
+   * can arrive after a selection has been made and hiding a control does not
+   * clear the state behind it (3.157's own invariant).
+   */
+  assigneeCandidatesUnavailable?: string;
+  /**
    * The claim, handed up. May be ASYNCHRONOUS, and the dialog waits on it: that
    * returning promise is the only thing that can tell the Create control when
    * the attempt has settled, and without that this dialog cannot state the
@@ -178,10 +316,14 @@ export type NewTicketDialogProps = {
 export function NewTicketDialog({
   open,
   userId,
+  workspaceId,
   typeOptions,
   parentCandidates,
   parentCandidatesUnavailable,
   parentCandidatesNarrowing,
+  editorSlot,
+  assigneeCandidates,
+  assigneeCandidatesUnavailable,
   onCreate,
   onClose,
 }: NewTicketDialogProps) {
@@ -278,6 +420,11 @@ export function NewTicketDialog({
     // `readNewTicketStart` refuses a record belonging to another user, and the
     // refusal can only happen if it is asked again.
     setStartInBacklog(readNewTicketStart(userId) === 'backlog');
+    // The rest of the draft (owner request 2026-09-23). A NEW id with them: the
+    // previous ticket's id already resolves, and reusing it would be refused.
+    setDraftTicketId(newUlid());
+    setDescription(undefined);
+    setAssigneeId(UNASSIGNED);
     // Priority is reset with the rest (spec 2026-09-22): "empty on OPEN" is the
     // rule, and a priority left at the previous draft's level is the same
     // stale-draft defect E2-37 names, one field over.
@@ -316,6 +463,38 @@ export function NewTicketDialog({
    * position, not to be an answer.
    */
   const [startInBacklog, setStartInBacklog] = useState(true);
+  /**
+   * The id the ticket will carry. Re-minted on every OPEN, with the rest of the
+   * draft (E2-37's rule, one field over) — and re-minted rather than kept, or the
+   * second ticket created from one dialog session would name an id that already
+   * resolves and be refused `ticket.already-exists`.
+   *
+   * Minted HERE rather than in the flow because the description composer needs it
+   * before anything is created. See `NewTicketDraft.ticketId` for the full
+   * argument and for the safety property the move buys.
+   */
+  const [draftTicketId, setDraftTicketId] = useState(() => newUlid());
+  /**
+   * The description as the composer last reported it, or `undefined` for one
+   * nobody has typed into.
+   *
+   * `undefined` is not "an empty document" and the difference is load-bearing:
+   * `TicketEditor` wires `onChange` to ProseMirror's `onUpdate` and to nothing
+   * else, so an untouched composer reports NOTHING — and a composer emptied back
+   * to nothing reports an empty document. Both must leave the draft without a
+   * `description` key, so the distinction is collapsed at the SUBMIT boundary by
+   * `docToPlainText`'s length rather than here, where only one of the two arms
+   * would be visible.
+   */
+  const [description, setDescription] = useState<unknown>(undefined);
+  /**
+   * The chosen assignee, with `UNASSIGNED` as the control's row for nobody —
+   * the same idiom `ticket-sheet.tsx` uses for its own picker, and for the same
+   * reason: the `Select` speaks option values, and "nobody" has to be one of them
+   * rather than the absence of a selection, so a person can choose it BACK after
+   * naming someone.
+   */
+  const [assigneeId, setAssigneeId] = useState<string>(UNASSIGNED);
 
   // The SAME "no usable parent" test the submit boundary below already makes
   // for `parentId` — reused, not re-derived, so the two can never disagree
@@ -342,9 +521,21 @@ export function NewTicketDialog({
    * seen.
    *
    * THE COST IS NOT COSMETIC. `onCreate` reaches `create-ticket-flow.tsx`, which
-   * mints `entity: { kind: 'ticket', id: newUlid() }` PER CALL: two presses are
-   * two distinct `ticket.created` events with two distinct ids — two tickets, in
-   * an append-only ledger that cannot take either back.
+   * writes a `ticket.created` into an append-only ledger that cannot take
+   * anything back.
+   *
+   * ⚠ **This paragraph said the id was minted PER CALL and is corrected as of
+   * 2026-09-23**, when the draft began carrying the id (owner request: the
+   * description composer needs one before the ticket exists). The old text —
+   * *"which mints `entity: { kind: 'ticket', id: newUlid() }` PER CALL: two
+   * presses are two distinct `ticket.created` events with two distinct ids"* —
+   * is no longer what happens, and leaving it would have been a docblock
+   * describing a previous build. **What replaces it is a WEAKER cost, and the
+   * guard is still the thing that prevents it:** a second escape now names an id
+   * that already resolves, so `checks/hierarchy.ts:80` refuses it
+   * `ticket.already-exists` rather than filing a second ticket. The ref remains
+   * the first line of defence — the door is the second, and it is an error
+   * rather than silent duplication.
    */
   const submittingRef = useRef(false);
   const [submitting, setSubmitting] = useState(false);
@@ -360,6 +551,7 @@ export function NewTicketDialog({
     // where it surfaced before rather than becoming a silent no-op here.
     void Promise.resolve(
       onCreate({
+        ticketId: draftTicketId,
         title,
         typeId,
         // `parentCandidatesUnavailable` is checked HERE and not only where the
@@ -386,6 +578,23 @@ export function NewTicketDialog({
         // not for this client. The control is preselected, so this is always a
         // level the person could see.
         priority,
+        // The description, OMITTED when it renders to nothing (owner request
+        // 2026-09-23). `docToPlainText` is the decision, and it is the domain's
+        // one projection — total, so `undefined`, a clearing `null` and an empty
+        // document all answer `''` and all take the same arm. This is the
+        // "a comment that renders to nothing adds NOTHING" rule
+        // (`projections/search.ts`) applied one layer up: an empty description is
+        // a claim nobody made, and `ticket.created`'s member is optional with
+        // absent meaning exactly that.
+        ...(docToPlainText(description).length === 0 ? {} : { description }),
+        // REQUIRED, and `null` for the Unassigned row. The availability check is
+        // made HERE as well as where the picker is drawn, for the reason the
+        // parent one is: this prop can arrive AFTER a selection, and hiding a
+        // control does not clear the state behind it (3.157).
+        assigneeId:
+          assigneeCandidatesUnavailable !== undefined || assigneeId === UNASSIGNED
+            ? null
+            : assigneeId,
       }),
     ).finally(() => {
       submittingRef.current = false;
@@ -496,6 +705,49 @@ export function NewTicketDialog({
           aria-label="Priority"
         />
       </div>
+      {/*
+        THE DESCRIPTION (owner request 2026-09-23) — the prototype's own place
+        for it (`desktop.dc.html:1617`, between Priority and the Column/Assignee
+        row), and the prototype's own caption.
+
+        A `<div>` and not a `<label>`, for the reason the Priority field above
+        records: a `<label>` wrapping the composer would absorb the whole editing
+        surface into the LABEL's text and give the field a computed name made of
+        its content. The composer takes its own accessible name from the slot
+        (`TicketEditorSlot` derives it from `mode`), so nothing here needs to say
+        it — and this `<span>` is a CAPTION for a sighted reader, deliberately not
+        wired as a label, because the slot's own name is `Description` already and
+        two names for one control is one too many.
+
+        Absent slot, absent field: a caller with no editor gets the form it had
+        before this task rather than a caption over nothing.
+      */}
+      {editorSlot === undefined ? null : (
+        <div className="gn-new-ticket__field">
+          <span>Description</span>
+          {/*
+            `createElement` rather than JSX: `editorSlot` is a VALUE of a
+            component type, not a component name, and JSX requires a
+            capitalized identifier or a member expression for that. This is
+            the same call `TicketSheet` makes for its own `editorSlot`.
+
+            No `submit`, deliberately. `onChange` is the only channel this mount
+            uses — the ticket does not exist until Create is pressed, so there is
+            nothing to submit to — and `TicketEditorSlot`'s own button is
+            suppressed by the caller's wrapper (`submitSlot: 'none'`), which
+            this component cannot ask for and must not be handed a control it
+            cannot describe.
+          */}
+          {createElement(editorSlot, {
+            mode: 'description',
+            doc: null,
+            readOnly: false,
+            workspaceId,
+            ticketId: draftTicketId,
+            onChange: setDescription,
+          })}
+        </div>
+      )}
       <label className="gn-new-ticket__field">
         Parent
         {parentCandidatesUnavailable === undefined ? (
@@ -606,6 +858,54 @@ export function NewTicketDialog({
         test and the reset-on-every-parent-selection that Ruling 40 added — went
         with the condition, and neither is left computed and unused here.
       */}
+      {/*
+        THE ASSIGNEE (owner request 2026-09-23), after Parent — the slot the
+        prototype gives it (`desktop.dc.html:1633`, the Column/Assignee row,
+        whose "Column" half this dialog does not have; a ticket's state is the
+        workflow's business at birth, and `start` above is the one question about
+        it that belongs here).
+
+        A `<label>` like Title/Type/Parent, and unlike the two fields above it: it
+        wraps a text CONTROL whose accessible name comes from the shared
+        `Select`'s own `aria-label`, so wrapping it costs nothing — the same
+        arrangement Parent already uses.
+      */}
+      <label className="gn-new-ticket__field">
+        Assignee
+        {assigneeCandidatesUnavailable === undefined ? (
+          <Select
+            options={[
+              // "Unassigned" is an OPTION and not the absence of one, exactly as
+              // "None (project root)" is above: a ticket is born with nobody on
+              // it, that is a real state the control must be able to SHOW, and a
+              // picker with no way back to it cannot un-assign.
+              { value: UNASSIGNED, label: 'Unassigned' },
+              // `memberLabel` has already been applied by the caller — a
+              // nameless member arrives as their address, then their id, never
+              // as a blank option (ruling E4-18 / E5-4, and the 2026-09-22
+              // owner request for the address step).
+              ...assigneeCandidates.map((person) => ({
+                value: person.id,
+                label: person.name,
+              })),
+            ]}
+            value={assigneeId}
+            onChange={setAssigneeId}
+            searchable
+            aria-label="Assignee"
+          />
+        ) : (
+          // The sentence replaces the control, and the DRAFT is what makes this
+          // honest: `create()` reads the same prop before emitting `assigneeId`,
+          // so a selection made before the roster's read failed never travels.
+          // Stated here rather than relied on, because it is the half that a
+          // screen-only assertion cannot see (3.157's own lesson).
+          <p role="status" className="gn-new-ticket__assignee-unavailable">
+            This ticket will be created with nobody assigned: the roster of people who could be
+            assigned cannot be shown. {assigneeCandidatesUnavailable}
+          </p>
+        )}
+      </label>
       <div className="gn-new-ticket__actions">
         <Button onClick={onClose}>Cancel</Button>
         <Button

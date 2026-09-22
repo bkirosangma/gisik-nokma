@@ -8,6 +8,7 @@ import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { NEW_TICKET_START_KEY } from '../../src/preferences/new-ticket-start.js';
+import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import { NewTicketDialog, defaultRootTypeFor } from '../../src/views/new-ticket-dialog.js';
 
 /**
@@ -101,6 +102,8 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         parentCandidatesNarrowing="tickets in progress"
@@ -142,6 +145,8 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         onCreate={vi.fn()}
@@ -177,6 +182,8 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
     const onCreate = vi.fn();
     const props = {
       userId: 'usr_ada',
+      workspaceId: 'ws_1',
+      assigneeCandidates: [],
       open: true,
       typeOptions: TYPES,
       parentCandidates: CANDIDATES,
@@ -252,6 +259,15 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -274,6 +290,15 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 });
@@ -309,6 +334,8 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         onCreate={onCreate}
@@ -338,6 +365,15 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -373,6 +409,15 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 });
@@ -422,6 +467,8 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       <NewTicketDialog
         open
         userId={userId}
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         onCreate={onCreate}
@@ -507,6 +554,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       parentId: null,
       start: 'focus',
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -525,6 +581,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       parentId: null,
       start: 'backlog',
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -544,6 +609,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -565,6 +639,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       parentId: 'parent_focus',
       start: 'focus',
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -590,6 +673,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       parentId: 'parent_focus',
       start: 'backlog',
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -616,6 +708,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -663,6 +764,15 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
       parentId: 'parent_focus_2',
       start: 'focus',
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 });
@@ -687,8 +797,10 @@ describe('13.1355–13.1357 the backlog answer is remembered, per user', () => {
 
   const props = (userId: string) => ({
     userId,
+    workspaceId: 'ws_1',
     typeOptions: TYPES,
     parentCandidates: [],
+    assigneeCandidates: [],
     onCreate: vi.fn(),
     onClose: () => undefined,
   });
@@ -804,6 +916,8 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={TYPES}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -901,7 +1015,14 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
  */
 describe('E2-37 a reopened New-ticket dialog is EMPTY', () => {
   const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
-  const props = { userId: 'usr_ada', typeOptions: TYPES, parentCandidates: [], onClose: () => undefined };
+  const props = {
+    userId: 'usr_ada',
+    workspaceId: 'ws_1',
+    typeOptions: TYPES,
+    parentCandidates: [],
+    assigneeCandidates: [],
+    onClose: () => undefined,
+  };
 
   it('PLANTED DEFECT: reopening offers no title, and Create is disabled again', () => {
     const onCreate = vi.fn();
@@ -976,6 +1097,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={LADDER}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -998,6 +1121,15 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -1027,6 +1159,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={LADDER}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -1044,6 +1178,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={[{ id: 'errand', name: 'Errand', rank: 3 }]}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -1065,6 +1201,15 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       // the middle — the wire's absence-means-P2 rule is for events older than
       // the field, not for this client.
       priority: 'P2',
+      // The two members this task added to the draft (owner request
+      // 2026-09-23). `ticketId` is minted per OPEN, so it cannot be an
+      // exact literal — `expect.any(String)` is the one hole this file's
+      // whole-draft style takes, and 13.1359 pins the SHAPE at its own
+      // case. `assigneeId` is exact: nobody is assigned unless the picker
+      // says otherwise. `description` is deliberately NOT here — it is
+      // absent, and an absent key is what 13.1366 asserts.
+      ticketId: expect.any(String),
+      assigneeId: null,
     });
   });
 
@@ -1074,6 +1219,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={LADDER}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -1088,6 +1235,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={[...LADDER, { id: 'errand', name: 'Errand', rank: 3 }]}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -1103,6 +1252,8 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={[{ id: 'sub-task', name: 'Sub-task', rank: 4 }]}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -1150,6 +1301,8 @@ describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () 
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
         parentCandidates={[]}
         onCreate={vi.fn()}
@@ -1197,6 +1350,8 @@ describe('13.1234 the new-ticket dialog offers P1/P2/P3, preselected at P2', () 
       <NewTicketDialog
         open
         userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
         typeOptions={CHOICES}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -1242,5 +1397,310 @@ describe('13.1234 the new-ticket dialog offers P1/P2/P3, preselected at P2', () 
     // describes above — a full `toEqual` here would be a second copy of them
     // that could drift.
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ priority: 'P1' }));
+  });
+});
+
+/**
+ * 13.1365–13.1368 — THE DIALOG SETS A DESCRIPTION AND AN ASSIGNEE AT BIRTH
+ * (owner request 2026-09-23).
+ *
+ * ## The description goes through the SEAM, and the fake here is the point
+ *
+ * `NewTicketDialog` must not learn what a ProseMirror document is (amendment
+ * 12), so the composer arrives as the `editorSlot` prop — the same seam
+ * `TicketSheet` takes — and `apps/web` supplies the real `TicketEditorSlot`.
+ * These cases therefore drive a FAKE slot: what belongs to app-core is the
+ * CONTRACT (which mode, what it does with a reported document, what it sends),
+ * and what belongs to `packages/editor` is covered by that package's own suite.
+ * Using the real editor here would test the editor twice and the seam not at all.
+ *
+ * ## The two options the brief called the task's main decision
+ *
+ * The events say how the values reach the ledger: a description is a
+ * `ticket.field_set` claim on `fieldId: 'description'` whose value is a
+ * DOCUMENT, and an assignee is `ticket.assigned`. `ticket.created` carries
+ * neither, so the choice was (a) additive optional members — the `priority`
+ * precedent, creation stays atomic — or (b) follow-up events, which reuse the
+ * canonical write paths but leave a ticket that exists without the description
+ * someone typed if the second event is refused. **(a) was taken**, and these
+ * cases pin the client's half of it.
+ */
+const DOC = {
+  type: 'doc',
+  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'the laminate is peeling' }] }],
+};
+
+/** A slot that RECORDS the props app-core handed it and can report a document on demand. */
+function fakeSlot(reported: unknown) {
+  const seen: Array<Record<string, unknown>> = [];
+  const slot: EditorSlotComponent = (props) => {
+    seen.push(props as unknown as Record<string, unknown>);
+    return (
+      <button type="button" onClick={() => props.onChange?.(reported)}>
+        type the description
+      </button>
+    );
+  };
+  return { slot, seen };
+}
+
+describe('13.1365 the dialog composes a description through the editorSlot seam', () => {
+  const renderDialog = (onCreate: ReturnType<typeof vi.fn>, reported: unknown = DOC) => {
+    const { slot, seen } = fakeSlot(reported);
+    render(
+      <NewTicketDialog
+        open
+        userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        parentCandidates={[]}
+        editorSlot={slot}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    return seen;
+  };
+
+  it('13.1365 mounts the slot as a DESCRIPTION composer, empty, editable, scoped — and never read-only', () => {
+    const seen = renderDialog(vi.fn());
+    // The slot renders on EVERY render of the dialog, and the "empty on OPEN"
+    // effect guarantees at least two — the mount, then the commit that seeds the
+    // draft. So this reads the SETTLED render (`at(-1)`) rather than asserting a
+    // render count, which would be a claim about React rather than about this
+    // component. What must hold across all of them is the SCOPE: a slot whose
+    // mode or workspace changed between renders would be a composer
+    // re-mounting under the person mid-typing.
+    expect(seen.length).toBeGreaterThan(0);
+    const props = seen.at(-1)!;
+    for (const earlier of seen) {
+      expect(earlier['mode']).toBe('description');
+      expect(earlier['workspaceId']).toBe('ws_1');
+      expect(earlier['readOnly']).toBe(false);
+    }
+    // The mode discriminator, asserted because it is what makes the composer's
+    // accessible name and its row count right: mounting `'comment'` here would
+    // put a three-row comment box in the create form.
+    expect(props['mode']).toBe('description');
+    // `doc: null`, not the current draft: the ticket does not exist, so there is
+    // nothing to open on. It is also what makes the composer start empty rather
+    // than inheriting whatever a previous draft put in a surviving instance.
+    expect(props['doc']).toBeNull();
+    expect(props['readOnly']).toBe(false);
+    expect(props['workspaceId']).toBe('ws_1');
+    // A REAL id, and asserted as a ULID rather than as "some string": this is
+    // the id `ticket.created` will carry, so the composer's own ledger-scoped
+    // capabilities (uploads, if a later task wires one) name the ticket they
+    // were always going to name.
+    expect(String(props['ticketId'])).toMatch(/^[0-9A-HJKMNP-TV-Z]{26}$/);
+    // No `submit`, deliberately: this mount has nowhere to submit to. The slot
+    // reports through `onChange` and the DIALOG's Create is the one act.
+    expect(props['submit']).toBeUndefined();
+  });
+
+  it('13.1365 a document the slot reports travels in the draft as `description`, under the id the slot was scoped to', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    const seen = renderDialog(onCreate);
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    await user.click(screen.getByRole('button', { name: 'type the description' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ description: DOC }));
+
+    // ⚠ THE SCOPING INVARIANT, and it is the stronger half of this case: the id
+    // the composer was shown is the id the create WRITES. Measured across the
+    // two renders (`at(-1)`, the settled one) because the open effect re-mints
+    // as part of the "empty on OPEN" reset, so an earlier render legitimately
+    // carries the previous draft's id.
+    //
+    // Without this, a dialog that showed the composer one id and created the
+    // ticket under another would satisfy every other assertion here — and on a
+    // mount that DOES wire uploads (a later task, or the RN bridge the contract
+    // names) that difference is an attachment filed against a ticket nobody
+    // created.
+    const draft = onCreate.mock.calls[0]?.[0] as { ticketId: string };
+    expect(seen.at(-1)?.['ticketId']).toBe(draft.ticketId);
+  });
+
+  it('13.1366 an EMPTY document is OMITTED from the draft — the key is absent, not an empty doc', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    // A composer the person typed nothing into reports nothing at all
+    // (`TicketEditor` wires `onChange` to ProseMirror's `onUpdate`), so this
+    // walks BOTH ways to an empty description: never reported, and reported as
+    // an empty document. They must land identically, because the wire's
+    // `description` is optional with absent meaning none, and a claim nobody
+    // made is what invariant 4 forbids.
+    renderDialog(onCreate, { type: 'doc', content: [] });
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    await user.click(screen.getByRole('button', { name: 'type the description' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    const draft = onCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+    // The KEY SET, not a value: `description: undefined` would satisfy a
+    // `toEqual` against an absent key, and the payload builder tests for the
+    // key's presence to decide whether to send the member.
+    expect(Object.keys(draft)).not.toContain('description');
+  });
+
+  it('13.1366 CONTROL: with NO editorSlot at all the dialog still works, and sends no description', async () => {
+    // The prop is OPTIONAL — a caller without an editor gets the form it had
+    // before this task, not a broken one. Without this arm, "an empty document
+    // is omitted" passes against a dialog that omitted descriptions entirely.
+    const onCreate = vi.fn();
+    render(
+      <NewTicketDialog
+        open
+        userId="usr_ada"
+        workspaceId="ws_1"
+        assigneeCandidates={[]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        parentCandidates={[]}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    const draft = onCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(Object.keys(draft)).not.toContain('description');
+    expect(draft['title']).toBe('Order the tent');
+  });
+});
+
+describe('13.1367 the dialog names an assignee, and the roster it offers is the caller’s', () => {
+  const PEOPLE = [
+    { id: 'user_anselma', name: 'Anselma Marak' },
+    { id: 'user_balti', name: 'Balti Sangma' },
+  ];
+
+  const renderDialog = (onCreate = vi.fn(), unavailable?: string) => {
+    render(
+      <NewTicketDialog
+        open
+        userId="usr_ada"
+        workspaceId="ws_1"
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        parentCandidates={[]}
+        assigneeCandidates={PEOPLE}
+        {...(unavailable === undefined ? {} : { assigneeCandidatesUnavailable: unavailable })}
+        onCreate={onCreate}
+        onClose={() => undefined}
+      />,
+    );
+    return onCreate;
+  };
+
+  it('13.1367 offers "Unassigned" plus the roster, and omitting it is the DEFAULT', () => {
+    const onCreate = renderDialog();
+    const picker = screen.getByRole('combobox', { name: 'Assignee' });
+    // The unassigned arm is the picker's OPENING VALUE, because a ticket is born
+    // with nobody on it unless someone says otherwise — and it is an OPTION
+    // rather than the absence of one, so a person can choose it back.
+    expect(picker).toHaveValue('Unassigned');
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    // `null`, not absent and not `''`: `ticket.created`'s `assigneeId` is
+    // nullable and `TicketState.assigneeId` is `string | null`, so null is the
+    // one spelling of "nobody" the whole chain agrees on.
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: null }));
+  });
+
+  it('13.1367 a chosen person travels in the draft as `assigneeId`', async () => {
+    const user = userEvent.setup();
+    const onCreate = renderDialog();
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+
+    const picker = screen.getByRole('combobox', { name: 'Assignee' });
+    await user.click(picker);
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Balti Sangma' }),
+    );
+    expect(picker).toHaveValue('Balti Sangma');
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: 'user_balti' }));
+  });
+
+  it('13.1368 an UNREAD roster is stated, and the draft carries no assignee rather than a wrong one', () => {
+    // The same discipline `parentCandidatesUnavailable` established one field
+    // over: an empty picker would assert "this workspace has nobody to assign",
+    // which is a claim from a read that never answered. The sentence replaces
+    // the control and the draft says nobody, which is what the ticket would
+    // have been anyway.
+    const onCreate = renderDialog(vi.fn(), 'HTTP 500 for /v1/workspaces/ws_1/members');
+    expect(screen.queryByRole('combobox', { name: 'Assignee' })).toBeNull();
+    expect(screen.getByText(/nobody assigned/)).toBeInTheDocument();
+    // The caller's OWN reason travels verbatim, unparaphrased — the same
+    // discipline the parent picker's unavailable arm follows. A dialog that
+    // swallowed it would leave the person with a sentence about a roster and no
+    // way to tell a refusal from a read still in flight.
+    expect(screen.getByText(/HTTP 500 for \/v1\/workspaces\/ws_1\/members/)).toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: null }));
+  });
+
+  /**
+   * 13.1370 — **A PERSON CHOSEN BEFORE THE ROSTER WENT AWAY MUST NOT REACH THE DRAFT.**
+   *
+   * This is 3.157's own defect, one field over, and it needed its OWN case for a
+   * reason that is measured rather than tidy: `13.1368` sets
+   * `assigneeCandidatesUnavailable` from the FIRST render, so the picker is never
+   * usable and `assigneeId` is still `UNASSIGNED` when Create is pressed — it
+   * exercises `assigneeId === UNASSIGNED` and nothing else. **Dropping the
+   * `assigneeCandidatesUnavailable !== undefined` term from the submit boundary
+   * left all 39 cases in this file GREEN** (mutation measured 2026-09-23), i.e.
+   * the submit-site check was covered by no test at all while looking covered.
+   *
+   * The transition is the thing: the picker works, a person is chosen, and THEN
+   * the read fails. React state does not clear because the control that set it
+   * stopped rendering, so a dialog that read only the control would submit an
+   * assignee it had just told the person it would not use.
+   */
+  it('13.1370 a person chosen BEFORE the roster was withheld does not reach the draft', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    const props = {
+      open: true,
+      userId: 'usr_ada',
+      workspaceId: 'ws_1',
+      typeOptions: [{ id: 'task', name: 'Task', rank: 3 }],
+      parentCandidates: [],
+      assigneeCandidates: PEOPLE,
+      onCreate,
+      onClose: () => undefined,
+    };
+    const { rerender } = render(<NewTicketDialog {...props} />);
+
+    // The picker must really be usable to be used — a case that started in the
+    // withheld state could never build the state this defect needs, which is
+    // exactly why 13.1368 cannot see it.
+    await user.click(screen.getByRole('combobox', { name: 'Assignee' }));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Balti Sangma' }),
+    );
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+
+    // The roster goes away underneath the OPEN dialog, with the choice standing.
+    rerender(
+      <NewTicketDialog
+        {...props}
+        assigneeCandidatesUnavailable="HTTP 500 for /v1/workspaces/ws_1/members"
+      />,
+    );
+    expect(screen.queryByRole('combobox', { name: 'Assignee' })).toBeNull();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    // `null`, and asserted on the DRAFT — the sentence on screen was already
+    // correct, so a case reading the screen would have passed against the defect
+    // (3.157's own lesson, which is why it is repeated here rather than cited).
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: null }));
   });
 });

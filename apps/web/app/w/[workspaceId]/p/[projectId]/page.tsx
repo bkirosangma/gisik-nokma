@@ -51,6 +51,7 @@ import {
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
+import { NewTicketDescriptionSlot } from '../../../../../src/new-ticket-description-slot.js';
 import { BacklogRankControls, submitRank } from '../../../../../src/backlog-rank-controls.js';
 import {
   buildFilterChips,
@@ -1447,6 +1448,52 @@ function ProjectBoard() {
   }, [members.data]);
 
   /**
+   * The Assignee picker's options for the New-ticket dialog (owner request
+   * 2026-09-23) — resolved off the roster this page ALREADY reads for `nameOf`,
+   * so nothing new is fetched and there is no second notion of who is in the
+   * workspace to keep in step.
+   *
+   * `memberLabel` and not `member.name`, for the reason `nameOf` records two
+   * lines up: `member.name` is the empty string for the magic-link population,
+   * and `''` is not nullish, so a blank name survives a `??` fallback and paints
+   * an EMPTY option — a hole on screen rather than a degradation. `memberLabel`
+   * answers name → email → id, so a nameless member with a real address is
+   * offered by their address and only a member with neither by their id.
+   *
+   * A picker option is a person, so `actorLabel` is deliberately NOT used: the
+   * system-actor override belongs to CLAIMS, not to a roster row — the same
+   * reason `ticket-sheet.tsx`'s own picker has its own label.
+   */
+  const assigneeCandidates = (members.data ?? []).map((member) => ({
+    id: member.id,
+    name: memberLabel(member),
+  }));
+
+  /**
+   * Why the dialog must NOT offer the roster — or `null` when it must.
+   *
+   * ⚠ **`members.data === null` is one of the two reasons, and that is the whole
+   * point of this variable.** A pending read and a refused one are different
+   * facts (the page's own filter panel says so: `membersError` / `members ===
+   * null` / an empty roster are three arms), but they agree on the thing that
+   * matters here: neither is evidence that this workspace has nobody in it.
+   * Handing the dialog `assigneeCandidates={[]}` in either case would render a
+   * picker whose only option is "Unassigned" — a control that ASSERTS nobody can
+   * be assigned, from a read that has not answered. That is the same lie
+   * `ticket-sheet.tsx` fixed for its own picker (`members={members.data ?? []}`,
+   * #530), one screen over.
+   *
+   * The empty-roster case is NOT here on purpose: `data` being an EMPTY ARRAY is
+   * a real answer, and the picker legitimately offers only "Unassigned" then.
+   */
+  const membersRefusal =
+    members.error !== null
+      ? members.error
+      : members.data === null
+        ? 'The workspace roster has not loaded yet.'
+        : null;
+
+  /**
    * THE ONE PLACE THIS SHELL DECIDES WHICH DAY IS TODAY.
    *
    * Computed once per render and handed to both views as a prop, because neither
@@ -2051,6 +2098,13 @@ function ProjectBoard() {
           parentCandidates={parentCandidates}
           {...(activeOnly ? { parentCandidatesNarrowing: 'tickets in progress' } : {})}
           {...parentsUnavailable}
+          // The description composer (owner request 2026-09-23). `TicketEditorSlot`
+          // wrapped to suppress its own submit control — see
+          // `src/new-ticket-description-slot.tsx` for why that is this app's job
+          // rather than app-core's.
+          editorSlot={NewTicketDescriptionSlot}
+          assigneeCandidates={assigneeCandidates}
+          {...(membersRefusal === null ? {} : { assigneeCandidatesUnavailable: membersRefusal })}
           onCreated={openTicket}
         />
         {ticketTypes.data === null ? (

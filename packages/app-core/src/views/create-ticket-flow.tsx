@@ -13,6 +13,7 @@ import {
 import { PARENT_TERMINAL_RULE, precheckEvent } from '../precheck.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type { TicketRead } from '../view-types.js';
+import type { EditorSlotComponent } from './editor-slot.js';
 import { NewTicketDialog, type NewTicketDraft, type TypeOption } from './new-ticket-dialog.js';
 import { ReopenDialog, type RefusalOrigin } from './reopen-dialog.js';
 
@@ -31,6 +32,12 @@ export type CreateTicketFlowProps = {
   parentCandidatesUnavailable?: string;
   /** See `NewTicketDialogProps.parentCandidatesNarrowing`. */
   parentCandidatesNarrowing?: string;
+  /** See `NewTicketDialogProps.editorSlot` — this flow only passes it through. */
+  editorSlot?: EditorSlotComponent;
+  /** See `NewTicketDialogProps.assigneeCandidates` — this flow only passes it through. */
+  assigneeCandidates: ReadonlyArray<{ id: string; name: string }>;
+  /** See `NewTicketDialogProps.assigneeCandidatesUnavailable`. */
+  assigneeCandidatesUnavailable?: string;
   onCreated: (ticketId: string) => void;
   /**
    * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
@@ -150,6 +157,9 @@ export function CreateTicketFlow({
   parentCandidates,
   parentCandidatesUnavailable,
   parentCandidatesNarrowing,
+  editorSlot,
+  assigneeCandidates,
+  assigneeCandidatesUnavailable,
   onCreated,
   open,
   onOpenChange,
@@ -236,7 +246,25 @@ export function CreateTicketFlow({
     clearAnswers();
     const childEvent = make({
       workspaceId,
-      entity: { kind: 'ticket', id: newUlid() },
+      /**
+       * ⚠ THE ID COMES FROM THE DRAFT, and this line used to be
+       * `id: newUlid()` (owner request 2026-09-23).
+       *
+       * The description composer needs a `ticketId` BEFORE anything is created —
+       * it is mounted inside the dialog, and the ticket it describes does not
+       * exist until this call — so the DIALOG mints it on open and the draft
+       * carries it here. `NewTicketDraft.ticketId` has the full argument,
+       * including what the move buys: a duplicate create that somehow escapes the
+       * dialog's `submittingRef` is now refused `ticket.already-exists`
+       * (`packages/rule-engine/src/checks/hierarchy.ts:80`) instead of filing a
+       * second ticket, because the second claim names an id that already
+       * resolves.
+       *
+       * **What this line must NOT become is a second, independent mint.** The
+       * whole point is that one id is chosen per draft and every consumer of it
+       * — the composer, the payload, and `onCreated` below — names the same one.
+       */
+      entity: { kind: 'ticket', id: draft.ticketId },
       type: 'ticket.created',
       payload: {
         typeId: draft.typeId,
@@ -255,6 +283,24 @@ export function CreateTicketFlow({
         // absence-means-P2 fallback. `NewTicketDraft.priority` is itself
         // required, so an omission upstream is a compile error.
         priority: draft.priority,
+        // The birth description (owner request 2026-09-23), OMITTED when the
+        // draft has none — which is the one member here that is spread rather
+        // than named, and for the opposite reason to `start` and `priority`
+        // directly above. Those two are always SENT because a ticket always has
+        // a value; a ticket may genuinely have no description, so
+        // `ticketCreatedPayload.description` is optional with absent meaning
+        // exactly that, and the DIALOG has already made the emptiness decision
+        // (`docToPlainText(...).length === 0`). Spreading is what keeps this a
+        // KEY decision at one place: `description: undefined` would satisfy a
+        // `toEqual` and put a key on the payload that says nothing.
+        ...(draft.description === undefined ? {} : { description: draft.description }),
+        // The birth assignee, or `null` for nobody — ALWAYS sent, like `start`
+        // and `priority` and for their reason: `NewTicketDraft.assigneeId` is
+        // required, "Unassigned" is a real position of the picker, and `null` is
+        // the one spelling of nobody the chain agrees on. The permission door
+        // holds a named person to the same membership rule `ticket.assigned` is
+        // held to, so this member is not a way around it.
+        assigneeId: draft.assigneeId,
       },
     });
 
@@ -413,10 +459,14 @@ export function CreateTicketFlow({
         // and writes the record itself, because it is the thing that knows WHEN
         // the person answered.
         userId={currentUserId}
+        workspaceId={workspaceId}
         typeOptions={typeOptions}
         parentCandidates={parentCandidates}
         parentCandidatesUnavailable={parentCandidatesUnavailable}
         parentCandidatesNarrowing={parentCandidatesNarrowing}
+        editorSlot={editorSlot}
+        assigneeCandidates={assigneeCandidates}
+        assigneeCandidatesUnavailable={assigneeCandidatesUnavailable}
         onCreate={(draft) => {
           void create(draft).catch(report);
         }}
