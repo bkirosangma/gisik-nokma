@@ -354,11 +354,23 @@ export function createStreamSubscriber(deps: StreamDeps) {
       // about the CONNECTION (a malformed client frame, say) and belongs to
       // everyone. A frame for a workspace nobody holds is a crossed stream: drop
       // it rather than move a cursor by a number that means nothing here.
-      if (frame.type !== 'event' && frame.workspaceId === null) {
+      // Read the workspace ONCE and branch on the answer. The first draft tested
+      // `frame.type !== 'event' && frame.workspaceId === null` and then derived the
+      // id below, which is the same logic and does not TYPECHECK: narrowing a
+      // property of one arm of a union does not survive into a later ternary over
+      // that union, so `workspaceId` stayed `string | null` and `rooms.get` refused
+      // it. It cost a broken build rather than a broken behaviour, and only because
+      // the build ran before the edit — `vitest` strips types without checking them,
+      // so 1967 green tests said nothing about it.
+      const workspaceId = frame.type === 'event' ? frame.envelope.workspaceId : frame.workspaceId;
+      if (workspaceId === null) {
+        // A connection-level frame — a malformed client frame, say — names no
+        // workspace and belongs to everyone listening.
         for (const room of [...rooms.values()]) deliver(room, frame);
         return;
       }
-      const workspaceId = frame.type === 'event' ? frame.envelope.workspaceId : frame.workspaceId;
+      // A frame for a workspace nobody holds is a crossed stream: drop it rather
+      // than move a cursor by a number that means nothing here.
       const room = rooms.get(workspaceId);
       if (room === undefined) return;
       deliver(room, frame);
