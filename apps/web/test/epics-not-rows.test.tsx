@@ -142,6 +142,7 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     // Ruling E5-2 made this REQUIRED on `BoardCard`; `null` is "this ticket
     // claims no date", the same default `boardCardSeed` uses.
     dueDate: null,
+    key: null,
     // REQUIRED since spec 2026-09-22; see the same member on `row()` above.
     priority: {
       value: 'P2',

@@ -6,10 +6,13 @@ import type {
   TicketDueDate,
   TicketRollup,
 } from '@gisik-nokma/domain';
-import { PRIORITIES, prioritySchema } from '@gisik-nokma/domain';
+import { PRIORITIES, prioritySchema, ticketKey } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { rollupFor } from '../visibility/rollup.js';
+import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 import { stateProvenanceFor } from './state-provenance.js';
+import { ticketNumbers } from './ticket-numbers.js';
+import { projectPrefixesInWorkspace } from './visible-projects.js';
 
 /** The snake_case row shape every read query selects (alias `t`). */
 export type ProjTicketRow = {
@@ -149,6 +152,7 @@ export async function assembleTicketCards(
     db,
     rows.map((r) => r.ticket_id),
   );
+  const keys = await cardKeysFor(db, rows);
   const cards: TicketCard[] = [];
 
   for (const row of rows) {
@@ -183,6 +187,7 @@ export async function assembleTicketCards(
       collaboratorIds: row.collaborator_ids,
       title: titleOf(row),
       dueDate: dueDateOf(row),
+      key: keys.get(row.ticket_id) ?? null,
       priority: priorityOf(row),
       fields: row.fields,
       stateProvenance: prov,
@@ -283,4 +288,48 @@ function priorityOf(row: ProjTicketRow): PriorityClaim {
     );
   }
   return { value: parsed.data, actorId: claim.actorId, clientTime: claim.clientTime, serverTime: claim.serverTime };
+}
+
+/**
+ * `<workspace prefix><project prefix>-<number>`, or `null` when ANY of the three
+ * is missing — never a partial key. The same rule the single-ticket route
+ * applies to the parent crumb (`routes/tickets.ts`, `parentKey`).
+ */
+export function composeCardKey(
+  workspacePrefix: string | null,
+  projectPrefix: string | null | undefined,
+  number: number | null | undefined,
+): string | null {
+  if (workspacePrefix === null || projectPrefix === null || projectPrefix === undefined) return null;
+  if (number === null || number === undefined) return null;
+  return ticketKey(workspacePrefix, projectPrefix, number);
+}
+
+/**
+ * The keys for one batch of rows (owner, 2026-09-22: the board card shows its
+ * key like the prototype). Three reads PER WORKSPACE in the batch — the
+ * identity for the workspace prefix, the project prefixes, the ticket numbers
+ * over exactly these ids — the three the single-ticket route already makes for
+ * one ticket, batched. My Work is the one caller whose rows span workspaces,
+ * which is why this groups by `workspace_id` instead of assuming one.
+ */
+async function cardKeysFor(db: Queryable, rows: readonly ProjTicketRow[]): Promise<Map<string, string | null>> {
+  const byWorkspace = new Map<string, ProjTicketRow[]>();
+  for (const row of rows) {
+    const bucket = byWorkspace.get(row.workspace_id) ?? [];
+    bucket.push(row);
+    byWorkspace.set(row.workspace_id, bucket);
+  }
+  const keys = new Map<string, string | null>();
+  for (const [workspaceId, bucket] of byWorkspace) {
+    const [identity, prefixes, numbers] = await Promise.all([
+      workspaceIdentityFromLedger(db, workspaceId),
+      projectPrefixesInWorkspace(db, workspaceId),
+      ticketNumbers(db, workspaceId, bucket.map((r) => r.ticket_id)),
+    ]);
+    for (const row of bucket) {
+      keys.set(row.ticket_id, composeCardKey(identity.prefix, prefixes.get(row.project_id), numbers.get(row.ticket_id)));
+    }
+  }
+  return keys;
 }
