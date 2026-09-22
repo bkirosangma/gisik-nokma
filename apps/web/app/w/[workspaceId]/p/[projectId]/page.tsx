@@ -2299,7 +2299,7 @@ function ProjectBoard() {
 
               **`gn-project__rail` (owner, 2026-09-22).** The rail is now
               content-sized at the LEFT of its row, as the prototype draws it
-              (`desktop.dc.html:339`: an `inline-flex` track, the tabs as wide as
+              (`desktop.dc.html:340`: an `inline-flex` track, the tabs as wide as
               their labels). Its props are otherwise unchanged and no accessible
               name moved. Until this class existed, the rail rendered as a direct
               child of the `.gn-project` COLUMN, so the track filled that column
@@ -2323,7 +2323,7 @@ function ProjectBoard() {
               // standing outlier.
               aria-label="Project view"
               // owner, 2026-09-22: the rail is content-sized at the left of its
-              // row, as the prototype draws it (`desktop.dc.html:339`, an
+              // row, as the prototype draws it (`desktop.dc.html:340`, an
               // `inline-flex` track). Rendered as a direct child of the
               // `.gn-project` COLUMN, the track fills that column and
               // `.gn-segmented__item`'s `flex: 1` spreads the five tabs across

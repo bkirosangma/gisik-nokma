@@ -1821,7 +1821,7 @@ describe('13.1153 the segmented item carries the prototype\'s horizontal padding
     // ⚠ This comment used to read *"on the board this class paints 92×44 and
     // must keep doing so"*. That is FALSE since 2026-09-22, on the owner's
     // instruction: the board's rail is content-sized at the left of its row, as
-    // the prototype draws it (`desktop.dc.html:339`, an `inline-flex` track).
+    // the prototype draws it (`desktop.dc.html:340`, an `inline-flex` track).
     // The ASSERTION is unchanged and still correct — the shared rule keeps
     // `flex: 1`; what changed is that the board now opts out of it through
     // `.gn-project__rail` in `apps/web/app/globals.css`, beside the legal

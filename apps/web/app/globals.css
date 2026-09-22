@@ -2404,9 +2404,9 @@ input, textarea, select { font-family: inherit; }
    left of its row — the same opt-out the legal head above makes, for the same
    reason, and written HERE for the same reason too.
 
-   The prototype's rail is an `inline-flex` track (`desktop.dc.html:339`), so its
+   The prototype's rail is an `inline-flex` track (`desktop.dc.html:340`), so its
    tabs are as wide as their labels plus padding. Rendered as a direct child of
-   the `.gn-project` COLUMN (`ui.css:5597`), the track fills that column and the
+   the `.gn-project` COLUMN (`ui.css:5602`), the track fills that column and the
    shared `.gn-segmented__item`'s `flex: 1` then spreads the five tabs evenly
    across the full width — which is the spread the owner put beside the
    prototype's screenshot. `align-self: flex-start` shrinks the track to fit;
@@ -2414,7 +2414,7 @@ input, textarea, select { font-family: inherit; }
 
    `flex-wrap: wrap` so five tabs that no longer fit one line WRAP at phone width
    instead of overflowing the page. The items already carry `padding: 0 1rem`
-   (E4-35, `ui.css:5356`), so a content-sized tab is its label plus 2rem, and the
+   (E4-35, `ui.css:5364`), so a content-sized tab is its label plus 2rem, and the
    shared rule's `min-height: 2.75rem` tap floor still holds.
 
    **Why not beside `.gn-project__*` in `ui.css`:** `packages/ui/test/components.test.tsx`

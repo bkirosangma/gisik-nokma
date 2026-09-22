@@ -263,12 +263,12 @@ describe('13.1304 the head row and the identity column are styled as the prototy
  * The owner's screenshot showed the view rail's five tabs *spread across the
  * whole width*. The cause is structural, not cosmetic: `page.tsx` renders
  * `<SegmentedControl>` as a direct child of the `.gn-project` COLUMN
- * (`ui.css:5597`), so the track fills that column, and
+ * (`ui.css:5602`), so the track fills that column, and
  * `.gn-segmented__item { flex: 1 }` (`ui.css:5344-5368`) then spreads the five
  * tabs evenly over the full width.
  *
  * The prototype does not do that: its rail is an `inline-flex` track
- * (`desktop.dc.html:339`) — content-sized, the tabs as wide as their labels
+ * (`desktop.dc.html:340`) — content-sized, the tabs as wide as their labels
  * plus padding. The precedent for opting one call site out of the shared
  * control's fill is the legal pages, which already do it page-scoped in
  * `globals.css` (`.gn-legal__head .gn-segmented { flex: none }`, `:2400-2401`).
