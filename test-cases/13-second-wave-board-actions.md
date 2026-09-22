@@ -1331,8 +1331,8 @@ that expires; a block is the only form that stays true.
   the summary sentence — compared with `compareDocumentPosition` MASKED to `DOCUMENT_POSITION_FOLLOWING`
   and checked against that constant, never against truthiness, since `PRECEDING` is also non-zero and the
   sloppy form of this assertion is green in both directions — and absent, renders nothing.
-  **Citations:** `packages/app-core/src/views/ticket-list.tsx:228` (the `selection` prop), `:250`
-  (`controls`), `:482` (the slot's render), `:846` (the leading column),
+  **Citations:** `packages/app-core/src/views/ticket-list.tsx:260` (the `selection` prop), `:295`
+  (`controls`), `:610` (the slot's render), `:937` (the leading column),
   `packages/app-core/test/views/ticket-list.test.tsx:1080`
 
 - ✅ **13.648 — `Close selected (N)`: the gate, the batch, and the clear.** Spec §8.3's own sentence —
@@ -1424,6 +1424,20 @@ untracked path), each guarded by a replacement count of exactly 1.**
    summary sentence", and the component's docblock was corrected to say that and to record the survival —
    spec §8.3 says only "in the list's control row", so the position among the arrangement controls is a
    freedom this task deliberately does not freeze.
+   **⚠ THIS SURVIVAL NO LONGER DESCRIBES THE PRODUCT (2026-09-22).** It is a true record of THIS task's
+   tip and it is left standing as one — a surviving mutation is worth more than a killed one, and the
+   fact that the freedom was measured is what made spending it a decision rather than an accident. The
+   owner's request of 2026-09-22 (*"move the close button to the right"*) then spent it:
+   `rel/list-bulk-close-arm` pinned the END so the slot can carry `margin-left: auto`, in two halves that
+   need each other — **13.1327** reads the DOM (the wrapper is the row's last element child) and
+   **13.1328** reads the declaration out of `ui.css`.
+   **THE INVERSE MUTATION WAS RE-RUN, not inferred.** Moving the slot back to immediately after the
+   summary AND dropping the wrapper reddens the two cases above and NOT 13.647: `13.1327` fails on
+   `expect(end).not.toBeNull()` (the line that is the whole of the END pin), and `13.671`'s CSS-side
+   direction fails because `.gn-list__controls-end` is then a styled class nothing renders — the union
+   check working as designed. **13.647 passing under it is the measured proof that this task never froze
+   the position**: "after the summary" holds on both sides of the move, and the ordering that case pins
+   is a different, weaker fact than the one this request pins.
 
 ---
 

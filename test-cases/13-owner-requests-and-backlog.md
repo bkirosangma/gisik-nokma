@@ -2604,3 +2604,66 @@ called exactly once, with the correct URL, and with **one** argument.
   it places it in ANOTHER. **Both arms are in the SAME case, not sibling `it`s**: a blanket
   `{ scroll: false }` on `openParentTicket` passes the first arm, and a sibling case would let that
   variant report green on the arm that matters. — (`apps/web/test/sheet-no-scroll.test.tsx`)
+
+---
+
+## The bulk close arms the selection (owner request, 2026-09-22) — ids `13.1327`–`13.1336`
+
+**The owner's two sentences, one screenshot, and the design they settled on.** *"move the close button to
+the right. and it should be named bulk close."* and *"The select checkbox should not always appear. it
+should appear once bulk close button is clicked. once clicked, the text should change to confirm close
+(N), where N is the number of tickets selected. but the button should be disabled. with a small red x on
+the right to cancel the bulk close action. once tickets are selected, and if the tickets are eligible for
+the bulk close, only then should the confirm close button be enabled."*
+
+**What that changes, in one line each.** The checkbox column stops being a permanent feature of the List
+and becomes the state of an ARMED MODE: a signed-in viewer sees the row checkboxes only between pressing
+`Bulk close` and either cancelling or completing a close. The action's label follows the mode —
+`Bulk close` when idle, `Confirm close (N)` while armed — the confirm control is disabled until the
+selection is eligible (`canBulkClose`, unchanged: every selected row terminal and not closed), and a ✕
+with `aria-label` `Cancel bulk close` sits to its right.
+
+**What did NOT change, and is the reason the existing cases only gained steps.** `canBulkClose` itself,
+the snapshot taken at confirm-click time, the swap guard around an open dialog, the refusal display on a
+partial close, and the clear-through-`reloadListClearingSelection` are all untouched. 13.648, 13.649,
+13.794 and 13.795 keep their ids, their substance and their negative arms; what they gained is the
+arming click before their checkboxes exist, and a rename of the control they press.
+
+**The arming click CLEARS the selection before setting the mode** (`setSelectedIds(new Set())` then
+`setBulkArmed(true)`), which is what makes 13.1332's re-arm read `Confirm close (0)` a fact about the
+set rather than about the checkboxes having been hidden — the two are indistinguishable on screen, and
+only one of them is the behaviour.
+
+**A completed bulk close ends the mode; cancelling the DIALOG does not.** `reloadListClearingSelection`
+now also clears `bulkArmed`, so the run that completes a close takes the checkboxes away with it. The
+dialog's own `onClose` still does not reload and still does not clear — that asymmetry is old (the
+wrapper's docblock records it), and the request gives it a second visible half.
+
+**The button's position is now pinned, and it was not before.** 13.647 pinned only "after the summary
+sentence"; mutation 7 in `13-second-wave-board-actions.md` moved the slot to the END of the controls row
+and **all 71 cases stayed green**, recorded there as a deliberate freedom because spec §8.3 says only "in
+the list's control row". *"move the close button to the right"* spends that freedom, and it is spent in
+two halves that need each other: **13.1327** reads the DOM and **13.1328** reads `ui.css`.
+
+- **13.1327** ✅ `controls` renders inside `.gn-list__controls-end`, and that wrapper is the row's LAST
+  element child. The case measures "last" against a row that has something else in it — the
+  `ControlledList` fixture's default prefs draw the origin note — so the assertion is not trivially true
+  of a row with a single child. Its control arm, in the same `it`: with no `controls` prop there is no
+  `.gn-list__controls-end` element at all. — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1328** ✅ `.gn-list__controls-end` declares `margin-left: auto`, read out of `ui.css` by the
+  css-binding file's own `declarationsFor`. **Both halves in one shape**: the row's own rule is read in
+  the same case and must read as `display: flex` with NO `margin-left: auto` — the two selectors are one
+  string extending the other, and a reader that answered with the row's body would satisfy any assertion
+  loose enough to be written about "a rule exists". — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
+
+**Mutation witnesses, both run against this lane's tree and both restored (verified by sha256 of the
+mutated file before and after).**
+
+- **`margin-left: auto` dropped from `.gn-list__controls-end`** → **13.1328 red and nothing else**
+  (1 failed / 89 passed across the two files). This is the declaration half on its own: the DOM is
+  untouched and 13.1327 stays green, which is why the two cases are not one case.
+- **The slot moved back to immediately after the summary, wrapper dropped** (the inverse of mutation 7
+  above) → **13.1327 red, and 13.671's CSS-side direction red with it** (2 failed / 88 passed):
+  `.gn-list__controls-end` becomes a styled class nothing renders, which is exactly the defect that
+  direction exists to find. **13.647 passes under it**, measured rather than assumed — the proof that
+  the END was a freedom until this request spent it.

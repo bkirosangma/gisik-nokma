@@ -204,7 +204,15 @@ const ALL_COLUMNS: ListColumnId[] = ['status', 'assignee', 'dueDate', 'progress'
  *   because the alternative — leaving it out — would redden the CSS-side case
  *   below for a class that IS rendered in the product, one package up. Named
  *   here rather than silently satisfied, since a reader of the union deserves to
- *   know which of its members the component is not the author of.
+ *   know which of its members the component is not the author of. **THREE
+ *   since 2026-09-22** — `__bulk` and `__bulk-cancel` joined it when the bulk
+ *   close became an armed mode (`Bulk close` → `Confirm close (N)` + a ✕), and
+ *   the fifth render reproduces the whole group for the same reason. The
+ *   `__controls-end` WRAPPER around them is NOT reproduced and does not need to
+ *   be: that one this component draws itself. It is present in exactly ONE of
+ *   the renders below — the fourth entry of the array in `renderEverything`,
+ *   the only one that passes `controls` — which is enough for the union, since
+ *   the union is a union and a class appearing once is a class that renders.
  */
 const ROWS: ListRow[] = [
   listRowSeed({ ticketId: 'epicA', title: 'Registrations', typeId: 'epic', typeRank: 1 }),
@@ -297,14 +305,21 @@ function renderEverything(): HTMLElement {
     listOf({ rows: [], narrowing: 'stateCategories: active', emptyCopy: 'Nothing here.' }),
     // The fifth render (second wave Task 11) — the only one that draws the
     // checkbox cell, and the only one that reproduces the caller's own control
-    // in the `controls` slot. See the fixture docblock for why `__bulk-close` is
-    // a member of this union that the component does not author.
+    // in the `controls` slot. See the fixture docblock for why `__bulk-close`,
+    // `__bulk` and `__bulk-cancel` are members of this union that the component
+    // does not author, and why the `__controls-end` wrapper — which this
+    // component DOES author — needs no reproduction here.
     listOf({
       selection: { selected: new Set<string>(), onToggle: vi.fn() },
       controls: (
-        <button type="button" className="gn-list__bulk-close">
-          Close selected (0)
-        </button>
+        <span className="gn-list__bulk">
+          <button type="button" className="gn-list__bulk-close">
+            Confirm close (0)
+          </button>
+          <button type="button" className="gn-list__bulk-cancel" aria-label="Cancel bulk close">
+            ×
+          </button>
+        </span>
       ),
     }),
   ]) {
@@ -605,5 +620,46 @@ describe('13.1151 the List row controls meet the 24px in-list floor', () => {
     // And the real stylesheet still reads as the fixed one, in the same
     // function, so the plant above cannot have replaced anything.
     expect(floorsOf(CSS).caretMin).toBe(24);
+  });
+});
+
+/**
+ * Case `13.1328` — the caller's slot is pinned to the row's TRAILING EDGE by
+ * one declaration, and the declaration is read out of `ui.css`.
+ *
+ * The owner's request (2026-09-22) is *"move the close button to the right"*,
+ * and the whole of "to the right" is `margin-left: auto` on the wrapper
+ * `.gn-list__controls-end` that `ticket-list.tsx` now renders around the
+ * `controls` slot. Its sibling 13.1327 reads the DOM — the wrapper is the
+ * row's last child — and neither half is the other: a component that renders
+ * the wrapper in the right place with no rule behind it, and a rule whose
+ * class the component never writes, are two different ways for the button to
+ * sit on the left with every suite green.
+ *
+ * THE SELECTOR IS THE STRING ITS NEIGHBOUR EXTENDS, which is why this case
+ * measures the two apart rather than asserting a rule "exists": the row's own
+ * rule is `.gn-list__controls` (ui.css:1365) and a reader that answered with
+ * its body would find `display: flex` and satisfy any assertion loose enough
+ * to be written about "a rule". `declarationsFor`'s line-start anchor is what
+ * keeps them separate — `.gn-list__controls-end {` does not match
+ * `^\.gn-list__controls\s*\{` — and that is asserted here in the same
+ * invocation rather than trusted, the way this file's own planted-input case
+ * does for its scanners.
+ */
+describe('13.1328 the caller’s slot is anchored to the row’s trailing edge', () => {
+  it('`.gn-list__controls-end` declares `margin-left: auto`, and the rule it extends does not', () => {
+    const end = declarationsFor(CSS, '.gn-list__controls-end');
+    expect(end, '`.gn-list__controls-end` has no rule of its own in ui.css').not.toBeNull();
+    expect(end).toMatch(/margin-left:\s*auto/);
+
+    // Both halves in one shape: the row's own rule is really read, and it is
+    // NOT the rule above. Without this, a future edit that gave the ROW
+    // `margin-left: auto` would leave the assertion above green while every
+    // child of the row — the summary, the grouping control, the origin note —
+    // was shoved right along with the caller's button.
+    const row = declarationsFor(CSS, '.gn-list__controls');
+    expect(row, '`.gn-list__controls` has no rule of its own in ui.css').not.toBeNull();
+    expect(row).toMatch(/display:\s*flex/);
+    expect(row).not.toMatch(/margin-left:\s*auto/);
   });
 });
