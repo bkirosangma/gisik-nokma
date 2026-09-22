@@ -3204,3 +3204,122 @@ app, not by any suite, and both are recorded here with what the suites failed to
   frame-by-frame measurement above, re-taken on the rebuilt stack. **An automated arm is owed** and is
   writable in jsdom — render, toggle the switch, assert the New ticket button is still in the document —
   which would have caught this without a browser. — (controller measurement; no test file yet)
+
+## The board's workflow group is a disclosure (owner request, 2026-09-23) — ids `13.1406`–`13.1420`
+
+Owner: *"in the board, the workflow is collapsible. if the workflow has no tickets in it, it is shown
+collapsed by default."* Cases live in `packages/app-core/test/views/board-workflow-collapse.test.tsx`;
+the control's CSS is pinned by `13.1418` in that same file, which reads `packages/ui/src/ui.css`.
+
+**⚠ THE REQUEST'S PREMISE WAS FALSE, AND THAT IS THE FIRST THING THIS SECTION RECORDS.** The sentence
+above reads as though the group were already collapsible and only its default needed changing. Measured
+at the commit the branch is cut from (`45091f08`), it was neither: `board.tsx` rendered a bare
+`<h2 class="gn-board__workflow">`, only where a board had MORE THAN ONE workflow group, and the columns
+below it always rendered. So this block bought a new control, a new default AND a new store — not a
+default change.
+
+**TWO OWNER RULINGS ARRIVED MID-FLIGHT AND BOTH MOVED THE WORK.** They are recorded here because the
+cases answer to them rather than to the original brief:
+
+1. **Single workflow → UNCOLLAPSED, including when empty.** *"A lone workflow group starts expanded,
+   including when it is empty… The group is still collapsible — the control exists and the person may
+   collapse it by hand. Only the DEFAULT is pinned here."* Whether a lone workflow grew a heading was
+   left to the implementer **provided it ended up with something to click**, so the heading's old
+   `groups.length > 1` gate is GONE and every group is named and collapsible (`13.1412`, `13.1420`).
+2. **The choice PERSISTS — first as a server preference, then corrected to `localStorage`.**
+   *"by persist i didnt mean to database/server. only on the local storage, clientside."* The first
+   reading sent the work at `ProjectViewPrefs` and the server-owned `.strict()` document; that was
+   backed out unstarted, and `packages/app-core/src/preferences/workflow-collapse.ts` is the store,
+   following `new-ticket-start.ts`'s shape (keyed by user, `''` reads and writes nothing, `try`/`catch`
+   around the accessor AND the parse, a default that survives every failure).
+3. **A collapsed group that stops being empty AUTO-EXPANDS, and that expansion persists** (`13.1415`),
+   while a collapse a PERSON made is never undone by it (`13.1416`).
+
+**THE STORED SHAPE, AND WHY IT IS NOT THE OBVIOUS ONE.** The record holds ONLY the groups a person
+chose — `{userId, projects: {<projectId>: {"<workflowId>@<version>": boolean}}}`, `true` expanded,
+`false` collapsed. A group with NO entry has no choice recorded and its state is derived from the group
+itself. That absence is the whole reason the auto-expand rule is safe: it fires only for a group that is
+collapsed *by the default* (absent) and never for one collapsed *deliberately* (`false`), which is the
+distinction the owner asked to be answered explicitly rather than papered over. Keying is by user (a
+shared laptop must not inherit the previous person's collapse) AND by project (two projects can hold the
+same workflow at the same version, so a user-only key would share one collapsed set between two boards).
+
+- **13.1406** ✅ **EVERY GROUP HEADING IS A DISCLOSURE BUTTON CARRYING `aria-expanded`.** The tag is
+  asserted, not only the attribute: a `div` with a click handler would carry `aria-expanded` and still
+  not be a control. The button lives INSIDE the `<h2>` (the WAI-ARIA disclosure pattern), which is why
+  `heading-outline.test.ts` still counts exactly one heading of this family in the file.
+- **13.1407** ✅ **AN EMPTY GROUP STARTS COLLAPSED** — its rail carries `hidden` and its columns are gone
+  from the accessibility tree. The control arm is the sibling non-empty group, read through the SAME
+  `queryByRole('region', …)` in the same case, so a query that simply never matched cannot read as a pass.
+- **13.1408** ✅ **A NON-EMPTY GROUP STARTS EXPANDED**, both groups of a two-workflow board, both
+  directions of the same query — so "everything is visible" cannot be satisfied by a `hidden` attribute
+  that is never written at all.
+- **13.1409** ✅ **COLLAPSED HIDES THE COLUMNS, NOT MERELY THE CARDS.** The per-column `Add a ticket`
+  count goes 3 → 1 across the collapse, and the survivor is asserted to live in the SIBLING's rail. The
+  load-bearing probe is a button ROLE query: this environment measures `getAllByText` as still finding
+  text inside a `hidden` subtree, so a case counting `EMPTY_COLUMN_COPY` would pass over a collapsed
+  group (recorded at the assertion itself rather than left as an unwritten trap).
+- **13.1410** ✅ **A PERSON CAN COLLAPSE A NON-EMPTY GROUP**, and its card goes with it: `listitem` count
+  2 → 1, with the surviving column and the sibling rail asserted untouched.
+- **13.1411** ✅ **THE DISCLOSURE IS KEYBOARD-REACHABLE AND -OPERABLE.** Tabbing reaches it (a bounded
+  loop stopping on success, so the button is not pinned to a tab index) and Enter then Space each flip it.
+- **13.1412** ✅ **A LONE WORKFLOW GETS A HEADING AND A WORKING TOGGLE** — the widened half of the
+  ruling. The heading did not render at all for one group before this branch.
+- **13.1413** ✅ **A LONE EMPTY WORKFLOW STILL SHOWS SOMETHING TO ACT ON** (two arms). The trap the
+  ruling names: an empty group collapsed by default on a single-workflow board would hide the columns,
+  their `Add a ticket` and the board's own sentence — every door off the page. The second arm holds the
+  other half of the ruling apart from the first: the person MAY collapse it by hand, and then the
+  heading and the sentence are what remain, by their own choice.
+- **13.1414** ✅ **THE CHOICE IS REMEMBERED, PER USER AND PER PROJECT** (four arms). Survives a real
+  unmount/remount with the record read back WHOLE (the user id is what the key's shape is for); another
+  user's record is refused *with the control that the same bytes DO answer for the user they name*;
+  another project's record is refused the same way; and a record this build does not recognise — a
+  `"yes"` for a boolean — answers the default, while a signed-out board (`''`, the shell's sentinel)
+  writes nothing at all.
+- **13.1415** ✅ **A GROUP NOBODY COLLAPSED REVEALS NEW WORK.** A card arriving in an empty-default
+  collapsed group opens it AND writes the expansion through, so a reload cannot put the new work back
+  behind a heading.
+- **13.1416** ✅ **A COLLAPSE THE PERSON MADE IS NOT UNDONE BY AN ARRIVAL.** The group stays collapsed
+  and the STORE IS UNCHANGED — asserted by comparing the whole record before and after, so the refusal
+  to reopen is a refusal to WRITE rather than a write the render ignored.
+- **13.1417** ✅ **THE CARET IS DRAWN, NEVER TYPED.** Each toggle's `textContent` is exactly the workflow
+  name and no `▸`/`▾` appears anywhere on the board, so the accessible name cannot pick up a direction
+  glyph — the defect `.gn-list__columns-caret`'s own rule exists to avoid.
+- **13.1418** ✅ **THE ATTRIBUTES THE STYLESHEET KEYS ON ARE THE ONES THE COMPONENT WRITES.** Reads
+  `[aria-expanded]` and `[hidden]` out of the `.gn-board__workflow*`/`.gn-board__rail*` rules (comments
+  stripped first) and requires the rendered board to write both — the two halves `13.671` gave the List's
+  tray. It also carries the extractor's own positive control, and it is the reason
+  `.gn-board__rail[hidden]` exists in `ui.css`: the rail is `display: flex`, so without that rule the
+  attribute would be decorative and the group visibly open.
+- **13.1419** ✅ **THE HOOK-OWNING PATH COLLAPSES WITH THE SAME RULES.** With `moves` wired,
+  `BoardGroupWithMoves` forwards the state one level down to `BoardGroupSection`; a prop added on the
+  plain path and forgotten on this one would leave the two boards disagreeing with every read-only case
+  above still green.
+- **13.1420** ✅ **A LONE GROUP RESTS EXPANDED EVEN WHEN EMPTY.** The default, asserted separately from
+  `13.1412`'s control (which proves the toggle exists and works, so this cannot pass by virtue of a board
+  that never collapsed anything) — and with its own control in the same case: the identical fixture with
+  a SECOND group added IS collapsed by the empty-group rule.
+
+**Mutation witnesses, each run rather than reasoned** (post-commit, restored after each):
+
+- `defaultCollapsed`'s `board.groups.length > 1` term dropped → `13.1420` reddens (a lone empty group
+  collapses); `13.1413`, `13.1412` and `13.469` redden with it.
+- `groupIsEmpty` replaced by `() => false` → `13.1407`, `13.1409`, `13.1415`, `13.1419` redden; `13.1408`
+  and `13.1420` stay green, which is correct and is why the empty-default arms have their own cases.
+- the `hidden` attribute dropped from the rail → `13.1407`, `13.1409`, `13.1410`, `13.1412`, `13.1420`.
+- `aria-expanded={expanded}` replaced by `aria-expanded={true}` → `13.1406`, `13.1410`, `13.1416`,
+  `13.1418`.
+- the auto-expand effect's `!Object.hasOwn(groupChoices, key)` term dropped → `13.1416` reddens and
+  `13.1415` stays green: the two arms of the reconciliation.
+- the effect's `previous` guard dropped → `13.1415` still passes, and the WRITE becomes per-render;
+  recorded as a surviving-mutation honest note, since only the store's write count can see it (owed).
+- the caret element replaced by a typed `▸` in the button's text node → `13.1417`.
+- `currentUserId` ignored (always read/written as `''`) → `13.1414`'s arms.
+- the `hidden` guard on the toggle removed (`hidden={false}`) → `13.1418` reads the attribute selector
+  with no writer, and `13.1409`'s collapse arms go red.
+
+**One case elsewhere was AMENDED, and the amendment is a behaviour change rather than a repair.**
+`apps/web/test/board-narrowing.test.tsx` `13.469` asserted that a one-workflow board renders NO level-2
+heading, using that absence as a cross-confirmation that its fixture carries one workflow. The heading
+now renders for a lone workflow by design, so the witness was replaced with a stronger one — exactly ONE
+group heading, naming that workflow — rather than deleted; the fact the line exists for is unchanged.

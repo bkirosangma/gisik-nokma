@@ -28,6 +28,12 @@ import type {
 } from '../view-types.js';
 import { arrowTargets } from './board-arrows.js';
 import { moveOutcome } from './board-moves.js';
+import {
+  NO_COLLAPSE_CHOICES,
+  readWorkflowCollapse,
+  rememberWorkflowCollapse,
+  type WorkflowCollapseChoices,
+} from '../preferences/workflow-collapse.js';
 import { BulkCloseDialog, type BulkCloseTicket } from './bulk-close-dialog.js';
 import { formatRollup } from './rollup-text.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
@@ -142,6 +148,29 @@ export type BoardProps = {
    * disagree with the Calendar and Timeline tabs about which day it is.
    */
   today?: string;
+  /**
+   * WHO is looking, for the ONE thing on this board that is remembered locally
+   * (`preferences/workflow-collapse.ts`): which workflow groups they have
+   * collapsed or expanded by hand.
+   *
+   * OPTIONAL, the SAME precedent `onCreateTicket`, `isNarrowed`, `epicsHidden`
+   * and `today` set above, and here the absence is a decision rather than a
+   * gap: **no person, no memory.** A mount that passes nothing reads no stored
+   * record and writes none, which is what the storage module's own
+   * signed-out sentinel (`''`) already means — so a mount with nobody attached
+   * behaves exactly as this component did before the collapse existed, rather
+   * than remembering a choice for whoever opens the board next.
+   *
+   * ⚠ **WHY `Board` IS HANDED THIS RATHER THAN TAKING IT FROM `moves`.** The
+   * `moves` capability carries a `currentUserId` too, and reading it from there
+   * would have been one prop cheaper — and wrong. It is present only on the
+   * movable path, so the memory would then work on a board with move arrows
+   * wired and silently not on the read-only one: two boards that look identical
+   * and remember different things. This is the same shape `arrows`/`onDropCard`/
+   * `bulkCloseFor` already take, where absence tracks a CAPABILITY; here the
+   * capability is the session, and the session is not the move arrows.
+   */
+  currentUserId?: string;
 };
 
 /**
@@ -340,7 +369,7 @@ export const DRAG_TICKET_FORMAT = 'text/plain';
  *
  * Held by `Board`, not by each `BoardGroupWithMoves`, so a drag that starts
  * in one workflow group and ends on a column belonging to a DIFFERENT group
- * (a mixed-workflow board, `groupCount > 1`) still finds the dragged card's
+ * (a mixed-workflow board, more than one group) still finds the dragged card's
  * real registration — `attemptMove`'s own closure already carries that
  * card's TRUE workflow and `fromStateId`, so `moveOutcome` there correctly
  * names the alternatives from the ticket's OWN workflow rather than doing
@@ -357,6 +386,46 @@ export const DRAG_TICKET_FORMAT = 'text/plain';
 type MoveRegistry = Map<string, (toStateId: string) => void>;
 
 /**
+ * Does this workflow group hold a ticket anywhere?
+ *
+ * Asked of the GROUP'S OWN DATA — the `BoardColumn.cards` arrays `Board` was
+ * handed — and never of the DOM. A `querySelectorAll` over rendered cards would
+ * answer a different question with the same words ("no tickets in it"): it
+ * would report a group as empty on the render where its columns are collapsed
+ * for any other reason, which is the first render of every group that starts
+ * collapsed. The view is the authority on what the group holds; the rendering
+ * is what this decides.
+ *
+ * A group with NO columns answers `true` — `.every` over an empty array — and
+ * that is the right answer rather than a degenerate one: a group declaring no
+ * states holds no tickets, so it is exactly the case the owner's rule is
+ * about, and `board.test.tsx`'s mixed-workflow fixture has one.
+ */
+function groupIsEmpty(group: BoardGroup): boolean {
+  return group.columns.every((column) => column.cards.length === 0);
+}
+
+/**
+ * The key a group's collapse choice is stored under. Exactly the key `Board`
+ * gives the group in its own `.map()` — one group, one key, so a board that
+ * re-fetches and re-orders its groups keeps each group's choice with the group
+ * rather than with a position.
+ */
+function groupKey(group: BoardGroup): string {
+  return `${group.workflowId}@${group.workflowVersion}`;
+}
+
+/**
+ * `useLayoutEffect` in the browser, `useEffect` where there is no `document`.
+ *
+ * The standard alias, and it is here for the two reasons `Board`'s hydration
+ * effect gives at length: the board is server-rendered, so a layout effect would
+ * make React warn during SSR, and the memory it applies must land BEFORE the
+ * first paint or an empty group is drawn open and then jumps shut.
+ */
+const useHydrationLayoutEffect = typeof document === 'undefined' ? useEffect : useLayoutEffect;
+
+/**
  * Columns are exactly the attached workflow's states — empty ones render too,
  * and a project mixing workflows gets one group per workflow, because merging
  * column sets would invent columns no definition declares (spec §7).
@@ -366,7 +435,7 @@ type MoveRegistry = Map<string, (toStateId: string) => void>;
  * workflow or several. A grouping that drops a card is a filter wearing a
  * grouping's name, and the ticket it dropped is gone with nothing saying so.
  */
-export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today }: BoardProps) {
+export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHidden, moves, today, currentUserId }: BoardProps) {
   /**
    * The shared drop registry (`MoveRegistry`'s own docblock above) —
    * created HERE, unconditionally, before any early return, because React's
@@ -380,6 +449,15 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
   const moveRegistryRef = useRef<MoveRegistry>(new Map());
 
   /**
+   * What the LAST run of the auto-expand effect saw, per group: `true` where the
+   * group was collapsed by its own default (empty, on a board with more than one
+   * workflow). A ref rather than state, deliberately — this is bookkeeping about
+   * a previous render, and putting it in state would make the rule's own memory
+   * a second render with its own effects.
+   */
+  const collapseWasDefaultRef = useRef<Map<string, boolean>>(new Map());
+
+  /**
    * THE COLUMN-LEVEL BULK CLOSE (`Close all (N)`, spec §8.3's Board bullet,
    * second wave Task 10). `null` = no opening; otherwise the tickets THAT
    * OPENING is about, snapshotted at click time so a later board reload cannot
@@ -391,6 +469,175 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
    * before the main JSX.
    */
   const [bulkClose, setBulkClose] = useState<BulkCloseTicket[] | null>(null);
+
+  /**
+   * THE WORKFLOW GROUPS' COLLAPSE CHOICES (owner request, 2026-09-23: *"in the
+   * board, the workflow is collapsible. if the workflow has no tickets in it,
+   * it is shown collapsed by default."*). The value is the state the person
+   * CHOSE for that group — `true` expanded, `false` collapsed — keyed by
+   * `groupKey`.
+   *
+   * ## What is held, and what is deliberately absent
+   *
+   * ONLY the choices a person made. A group nobody has touched has no entry
+   * here at all, and its state is DERIVED from the group itself: an empty group
+   * on a board with more than one workflow rests collapsed, everything else
+   * rests expanded. The two are kept apart on purpose, and the reason is one
+   * case — an EMPTY group that a ticket arrives in. A default collapse is not a
+   * decision, so the arrival wins and the group opens, revealing the new work; a
+   * collapse the person clicked IS a decision, so it holds, and the ticket waits
+   * behind a heading they can open. Seeding this record with every group's
+   * resolved state instead would erase the difference and force ONE answer onto
+   * both, and either answer would be wrong for the other case (cases `13.1415`
+   * and `13.1416` are the two arms).
+   *
+   * ## It is persisted, and to `localStorage` — not to the server
+   *
+   * `preferences/workflow-collapse.ts` owns the memory; this holds what it
+   * returned and writes back through it. **The server is deliberately not
+   * involved**: `ProjectViewPrefs` is a versioned, `.strict()`, server-owned
+   * per-user document shared by the List and the Board, and an earlier reading
+   * of this request sent the collapse there. The owner corrected it — *"by
+   * persist i didnt mean to database/server. only on the local storage,
+   * clientside"* — and the correction is worth stating rather than only
+   * obeying: a collapse is one person's arrangement of one screen, needs no
+   * other device, and replays on no replica, which is the same argument
+   * amendment 14 makes one level up for view preferences as a whole.
+   *
+   * Declared HERE, above the `board.groups.length === 0` early return below,
+   * for the Rule of Hooks reason `moveRegistryRef`'s own docblock gives.
+   */
+  const [groupChoices, setGroupChoices] = useState<WorkflowCollapseChoices>(NO_COLLAPSE_CHOICES);
+
+  /**
+   * Reads the memory ONCE per project, and the two choices here are both about
+   * the fact that this tree is server-rendered:
+   *
+   *   - **NOT a `useState` initialiser.** `window` is not there on the server, so
+   *     the server would answer the default and the browser's FIRST render would
+   *     answer the stored record — two different trees, and React hydrating one
+   *     against the other.
+   *   - **NOT a passive `useEffect`.** Passive effects run after the browser may
+   *     have painted, so an empty group would be drawn open and then jump shut,
+   *     which is the flicker defect class case `13.1385` records on this very
+   *     page. A LAYOUT effect runs before paint, so the first paint already
+   *     shows what the person will keep looking at.
+   *
+   * `useHydrationLayoutEffect` is `useEffect` where there is no `window`, for
+   * the ordinary reason: React warns about a layout effect during SSR and this
+   * one has nothing to do there anyway.
+   *
+   * `currentUserId` is `undefined` on a mount with no session wired, and `''` is
+   * this shell's signed-out sentinel; the storage module answers the default for
+   * both and writes for neither, so a board with no person attached reads and
+   * remembers nothing rather than remembering it for whoever comes next.
+   */
+  useHydrationLayoutEffect(() => {
+    setGroupChoices(readWorkflowCollapse(currentUserId ?? '', board.projectId));
+  }, [currentUserId, board.projectId]);
+
+  /**
+   * Is this group collapsed BY ITS DEFAULT — i.e. by the owner's rule and not by
+   * anybody's choice?
+   *
+   * TWO terms, and the second one is the newer ruling's. An empty group rests
+   * collapsed only where there is another workflow to distinguish it from: the
+   * owner's answer on 2026-09-23 was *"single workflow → UNCOLLAPSED, including
+   * when it is empty"*, because a lone empty workflow collapsed would be a board
+   * showing a heading and nothing else, hiding the per-column `Add a ticket`
+   * buttons that are the only thing to act on there. A LONE group is therefore
+   * never collapsed by default — and note that this is about the DEFAULT only:
+   * a person may collapse a lone workflow by hand, and case `13.1413` holds both
+   * halves of that apart.
+   *
+   * It reads the group's own `cards` and never the DOM, and it needs no
+   * `useMemo`: it is two array reads per group.
+   */
+  const defaultCollapsed = (group: BoardGroup): boolean =>
+    board.groups.length > 1 && groupIsEmpty(group);
+
+  /** The state ONE group is shown in: the person's choice first, the default second. */
+  const expandedFor = (group: BoardGroup): boolean =>
+    groupChoices[groupKey(group)] ?? !defaultCollapsed(group);
+
+  /**
+   * Records the person's OPPOSITE choice for one group and writes it through.
+   *
+   * The next value is built from `expandedFor` — the same expression the render
+   * reads — rather than from a second derivation, so a toggle can never disagree
+   * with what was on screen when it was clicked.
+   */
+  const toggleGroup = (group: BoardGroup): void => {
+    const next = { ...groupChoices, [groupKey(group)]: !expandedFor(group) };
+    setGroupChoices(next);
+    rememberWorkflowCollapse(currentUserId ?? '', board.projectId, next);
+  };
+
+  /**
+   * The auto-expand rule (owner ruling, 2026-09-23): *"when a ticket arrives in
+   * a group that is collapsed-because-empty, the group expands itself, and that
+   * expansion is written through like any other."*
+   *
+   * ## One shot, and the guard is the point
+   *
+   * This is a TRANSITION rule, not a rule about a state: the condition it fires
+   * on stops holding the moment it fires, because the group it opens is no
+   * longer empty. Two guards hold that independently, and both are needed —
+   * `previous` is what the last effect run SAW (so a re-read of the same board,
+   * which a stream frame triggers constantly, cannot re-fire), and the
+   * `Object.hasOwn` term is what the write itself leaves behind (the adopted
+   * `true` is now a choice, so the group is out of this rule for good). Without
+   * the first, every frame of the stream would call `localStorage.setItem`; a
+   * write storm against a synchronous, main-thread store is the same defect the
+   * server-door version of this rule would have had, without the network to
+   * slow it down.
+   *
+   * ## It cannot undo a person's collapse, and the SHAPE is what guarantees it
+   *
+   * The `Object.hasOwn(groupChoices, key)` term is not a second opinion about
+   * emptiness — it is the reconciliation the ruling asked for by name: *"if your
+   * stored shape cannot tell collapsed by the default from collapsed
+   * deliberately by a person, say so and propose one that can."* The shape does
+   * tell them apart, because `groupChoices` holds ONLY choices: a group absent
+   * from it was never collapsed by anybody, and a group present with `false` was.
+   * So a deliberate collapse has a key here and this rule never touches it,
+   * while an empty-default collapse has none and is exactly what the rule is
+   * for. A shape that stored resolved states would have erased the difference
+   * and this rule would have silently reopened a group the person had shut.
+   *
+   * ## A lone group is out of scope by construction
+   *
+   * `defaultCollapsed` already requires `groups.length > 1`, and the rule reads
+   * that same predicate rather than re-deriving emptiness: a lone group is never
+   * collapsed by default, so a ticket arriving in one is not a transition this
+   * rule has anything to say about.
+   */
+  useEffect(() => {
+    const previous = collapseWasDefaultRef.current;
+    const next = new Map<string, boolean>();
+    let adopted: WorkflowCollapseChoices | null = null;
+
+    for (const group of board.groups) {
+      const key = groupKey(group);
+      const wasCollapsedByDefault = previous.get(key) === true;
+      next.set(key, defaultCollapsed(group));
+      if (
+        wasCollapsedByDefault &&
+        !groupIsEmpty(group) &&
+        !Object.hasOwn(groupChoices, key)
+      ) {
+        adopted = { ...(adopted ?? groupChoices), [key]: true };
+      }
+    }
+
+    collapseWasDefaultRef.current = next;
+    if (adopted === null) return;
+    setGroupChoices(adopted);
+    rememberWorkflowCollapse(currentUserId ?? '', board.projectId, adopted);
+    // `groupChoices` is a dependency and not a stale capture: the adopt branch
+    // reads it, and the effect must see the version the render it ran under saw.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [board, groupChoices, currentUserId]);
 
   /**
    * Opens the dialog on ONE column's cards, in the column's own render order —
@@ -582,7 +829,13 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
     <div className="gn-board">
       {emptyBanner}
       {board.groups.map((group) => {
-        const key = `${group.workflowId}@${group.workflowVersion}`;
+        const key = groupKey(group);
+        /**
+         * The group's state on this render: the person's choice if they made
+         * one, and otherwise the default derived from the group's own data —
+         * `expandedFor`'s own docblock carries why the two are kept apart.
+         */
+        const expanded = expandedFor(group);
         // TWO PATHS, not a prop threaded through one component — see
         // `BoardGroupWithMoves`'s own docblock for why: it calls a hook
         // (`useLiveQuery`) to fetch this group's `WorkflowDef`, and a hook
@@ -594,7 +847,8 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
           <BoardGroupWithMoves
             key={key}
             group={group}
-            groupCount={board.groups.length}
+            expanded={expanded}
+            onToggleWorkflow={() => toggleGroup(group)}
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             moves={moves}
@@ -606,7 +860,8 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
           <BoardGroupSection
             key={key}
             group={group}
-            groupCount={board.groups.length}
+            expanded={expanded}
+            onToggleWorkflow={() => toggleGroup(group)}
             onOpenTicket={onOpenTicket}
             onCreateTicket={onCreateTicket}
             arrows={null}
@@ -654,7 +909,8 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
  */
 function BoardGroupSection({
   group,
-  groupCount,
+  expanded,
+  onToggleWorkflow,
   onOpenTicket,
   onCreateTicket,
   arrows,
@@ -663,7 +919,16 @@ function BoardGroupSection({
   today,
 }: {
   group: BoardGroup;
-  groupCount: number;
+  /**
+   * Whether this group's columns are on screen. OWNED BY `Board` and threaded
+   * through unchanged — this component stays hook-free (`BoardGroupSection`
+   * vs. `BoardGroupWithMoves`'s own docblock), so the state cannot live here,
+   * and it must not: the default depends on emptiness, and the two paths below
+   * would then each have to derive it.
+   */
+  expanded: boolean;
+  /** The person's opposite choice. `Board`'s `toggleGroup` owns what that means. */
+  onToggleWorkflow: () => void;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: () => void;
   arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
@@ -693,10 +958,82 @@ function BoardGroupSection({
   /** `Board`'s own `today`, threaded through unchanged — see its prop docblock. */
   today?: string;
 }) {
+  /**
+   * The rail's id, which the heading's button points at with `aria-controls`.
+   * Built from the group's own identity rather than from an index, so a
+   * re-ordered board cannot leave a button pointing at a sibling's rail.
+   */
+  const railId = `board-rail-${group.workflowId}-${group.workflowVersion}`;
+  /**
+   * ⚠ DECISION 1 OF 3, MADE HERE: **every group gets a heading, a lone workflow
+   * included** — so a lone workflow has something to click.
+   *
+   * The heading used to render only where a board had more than one workflow
+   * group, and that gate is GONE rather than moved. The owner's ruling on
+   * 2026-09-23 is that the group is
+   * collapsible even when it is the only one (*"whether a lone workflow now
+   * grows a heading where it had none is still yours, but it must end up with
+   * something to click, since it is collapsible"*), and the heading IS the
+   * control: the alternative was a second control beside an unnamed column set,
+   * with its own label and its own idiom, for a workflow the board would then
+   * never name. One idiom serves both cases, and the lone workflow gains the
+   * name it never had.
+   *
+   * ⚠ **WHAT THE DEFAULT IS, AND WHAT IT IS NOT.** Widening the gate does NOT
+   * widen the empty-group rule: a lone group rests EXPANDED even when it is
+   * empty (`Board`'s `defaultCollapsed` carries the two-term default and why).
+   * The trap the brief named — a project with one workflow and no tickets
+   * collapsing to a heading over nothing — is answered there rather than here,
+   * and it is answered TWICE over: this component renders the columns whenever
+   * `expanded` is true, and `Board` never derives `false` for a lone group.
+   *
+   * The heading is still a disclosure, so it is still a `<button>` inside the
+   * `<h2>` — the WAI-ARIA pattern, and this file still renders exactly ONE
+   * heading of the workflow family, which `heading-outline.test.ts` counts in
+   * the raw source. ⚠ That count is over the FILE, comments included, so this
+   * docblock must not spell the heading tag and its class together — the prose
+   * would be counted as a second heading and the case would read it as one.
+   */
   return (
     <section className="gn-board__group">
-      {groupCount > 1 ? <h2 className="gn-board__workflow">{group.workflowName}</h2> : null}
-      <div className="gn-board__rail">
+      <h2 className="gn-board__workflow">
+          {/*
+            A real `<button>`, not a clickable heading: `aria-expanded` on a
+            plain element is a claim nothing implements, and this repo's own
+            precedent for the control is `.gn-list__columns-toggle`, a
+            `<button>` pairing `aria-expanded` with a caret DRAWN through a
+            `::after` on a separate element so the accessible name stays exactly
+            the heading's text (`.gn-board__workflow-caret`, ui.css). A glyph
+            typed into this button's own text node would put "▸ Onboarding" in
+            the accessible name — the defect that rule exists to avoid, and
+            case `13.1417`.
+          */}
+          <button
+            type="button"
+            className="gn-board__workflow-toggle"
+            aria-expanded={expanded}
+            aria-controls={railId}
+            onClick={onToggleWorkflow}
+          >
+            <span className="gn-board__workflow-caret" aria-hidden="true" />
+            {group.workflowName}
+          </button>
+      </h2>
+      {/*
+        `hidden`, and the attribute is only half of it: `ui.css` carries
+        `.gn-board__rail[hidden]` because this rail is `display: flex`, and an
+        author rule outranks the UA sheet's own `hidden` — without it the tray
+        is permanently open and the attribute is decorative. That pair is
+        asserted as a pair (`13.1418`), which is the shape case `13.671` gave
+        the List's tray.
+
+        Collapsed hides the RAIL, which is the whole point of the control: the
+        request was to reclaim the row, so a state that hid the cards and left
+        four empty columns standing would not answer it. Hiding the rail takes
+        the columns, their per-column empty copy and their `Add a ticket` with
+        it (`13.1409`).
+      */}
+      <div className="gn-board__rail" id={railId} hidden={!expanded}>
         {group.columns.map((column) => (
           <section
             key={column.stateId}
@@ -854,7 +1191,8 @@ function BoardGroupSection({
  */
 function BoardGroupWithMoves({
   group,
-  groupCount,
+  expanded,
+  onToggleWorkflow,
   onOpenTicket,
   onCreateTicket,
   moves,
@@ -863,7 +1201,19 @@ function BoardGroupWithMoves({
   today,
 }: {
   group: BoardGroup;
-  groupCount: number;
+  /**
+   * Decision 2 — the collapse state, OWNED BY `Board` and forwarded straight
+   * through to `BoardGroupSection`. Forwarded rather than derived here for the
+   * reason the split itself exists: this half owns a hook (`useLiveQuery`) and
+   * the other half owns the markup, so a group's collapse must not depend on
+   * which of the two paths rendered it. Adding a prop to `Board`'s call sites
+   * and forgetting this one leaves the read-only board collapsing and the
+   * movable one not — nothing in either file would say so, and case `13.1419`
+   * is the arm that catches it.
+   */
+  expanded: boolean;
+  /** See the prop of the same name on `BoardGroupSection`. */
+  onToggleWorkflow: () => void;
   onOpenTicket: (ticketId: string) => void;
   onCreateTicket?: () => void;
   moves: BoardMoveCapability;
@@ -927,7 +1277,8 @@ function BoardGroupWithMoves({
   return (
     <BoardGroupSection
       group={group}
-      groupCount={groupCount}
+      expanded={expanded}
+      onToggleWorkflow={onToggleWorkflow}
       onOpenTicket={onOpenTicket}
       onCreateTicket={onCreateTicket}
       arrows={

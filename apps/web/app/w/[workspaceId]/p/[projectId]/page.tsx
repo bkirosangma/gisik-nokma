@@ -2286,11 +2286,16 @@ function ProjectBoard() {
                   `board.data !== null`: a project with zero or exactly one
                   workflow offers no real choice — "All workflows" and that one
                   workflow's name would render the identical board — so the
-                  control would be a picker between one thing and itself. This
-                  mirrors `Board`'s OWN gate for the identical judgment one
-                  level down (`board.tsx`: `board.groups.length > 1 ? <h3
-                  className="gn-board__workflow">` — the workflow name itself
-                  only renders once there is more than one to distinguish).
+                  control would be a picker between one thing and itself.
+                  ⚠ **AMENDED 2026-09-23: this no longer "mirrors a gate in
+                  `Board` one level down", because that gate is gone.** The
+                  board's group heading used to render only where a board had
+                  more than one workflow group, and the owner's collapse ruling
+                  removed that condition — a workflow group is collapsible even
+                  when it is the only one, so it always has a heading to click.
+                  The reason THIS control is still gated is its own and does not
+                  depend on the other: a picker whose only option is the thing
+                  already on screen is a control with nothing to do.
                   Deliberately reading `board.data.groups` here rather than
                   `boardNarrowing.view.groups`: the latter is ALREADY narrowed
                   by `workflowFilter`, so once a person picks a specific
@@ -3003,6 +3008,17 @@ function ProjectBoard() {
                 <Board
                   board={boardNarrowing.view}
                   onOpenTicket={openTicket}
+                  /*
+                    WHO the board remembers its collapse choices for. The
+                    record is `localStorage`, keyed by this id and the
+                    project — see `preferences/workflow-collapse.ts`. `''`
+                    when signed out (`currentUserId`'s own declaration above
+                    names the sentinel), and the storage module reads and
+                    writes nothing for it, so a signed-out board shows
+                    defaults and remembers nothing rather than remembering it
+                    for whoever signs in next on this machine.
+                  */
+                  currentUserId={currentUserId}
                   /*
                     V1 (round-2 ruling, 2026-09-21) — the empty state's create
                     affordance, wired to the SAME `CreateTicketFlow` the header

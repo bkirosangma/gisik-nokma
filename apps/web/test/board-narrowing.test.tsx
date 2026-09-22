@@ -798,11 +798,22 @@ describe('13.469 the picker does not render where it offers no real choice', () 
     renderProjectPage({ groups: [defaultWorkflow] });
     await screen.findByText('Default lane card one');
 
-    // Mirrors `Board`'s own identical judgment one level down: the group
-    // heading (`board.groups.length > 1 ? <h3>…`) is also absent here —
-    // checked as a cross-confirmation that this fixture really does carry
-    // only one workflow, not merely trusted from the fixture's own shape.
-    expect(screen.queryByRole('heading', { level: 2 })).not.toBeInTheDocument();
+    // ⚠ AMENDED 2026-09-23, and the amendment is a behaviour change rather than
+    // a repair. This line used to assert that the board rendered NO level-2
+    // heading, mirroring `Board`'s own `groups.length > 1` gate one level down
+    // as a cross-confirmation that this fixture really carries one workflow.
+    // That gate is GONE: the owner ruled (2026-09-23) that a workflow group is
+    // collapsible even when it is the only one, *"so it must end up with
+    // something to click"* — and the heading IS the control, so a lone workflow
+    // now renders one, expanded by default.
+    //
+    // The FACT this line is here for is unchanged, so the witness is replaced
+    // with a stronger one rather than dropped: exactly ONE group heading, naming
+    // the one workflow. Absence could only ever say "no heading"; a count says
+    // how many workflows the board drew, which is the fact the combobox
+    // assertion beneath it rests on.
+    expect(screen.getAllByRole('heading', { level: 2 })).toHaveLength(1);
+    expect(screen.getByRole('heading', { level: 2, name: 'Default' })).toBeInTheDocument();
     expect(screen.queryByRole('combobox', { name: /workflow/i })).not.toBeInTheDocument();
   });
 });
