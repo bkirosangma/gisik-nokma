@@ -1383,15 +1383,41 @@ a.gn-ticket-sheet__crumb--link {
   color: var(--gn-text-muted);
   font-size: 0.9375rem;
 }
+/* ── ONE LINE, and this rule plus the `width: auto` below are the whole of it
+   (owner request 2026-09-22, cases 13.1345/13.1346).
+
+   The owner photographed `Group` over `by`. The cause is this row: `.gn-list__control`
+   is an `inline-flex` row holding a label and the shared `Select`, the trigger is
+   `width: 100%`, so the trigger took the width and the LABEL — the only
+   shrinkable item left — wrapped. Neither half fixes it alone: `nowrap` on a
+   label that is still the shrinkable item overflows instead of wrapping, and a
+   content-sized trigger still lets a wrapping label break.
+
+   `flex: none` therefore takes the label out of the shrink, and `white-space:
+   nowrap` states the one-line intent the owner asked for rather than leaving it
+   to be inferred from a width. The `nowrap` is not belt-and-braces: at narrow
+   widths — the phone widths `apps/web/e2e-viewport/` walks — the row is exactly
+   where a label gets squeezed, and the owner's screenshot IS that squeeze. */
+.gn-list__control-label {
+  white-space: nowrap;
+  flex: none;
+}
 /* The `Group by` trigger, and the ONE rule in this restyle that is scoped
    rather than declared. The shared `Select` renders its single-select trigger
    as `button.gn-select__trigger.gn-field__input` (`packages/ui/src/select/
-   select.tsx:254`), so the prototype's own three metric values
+   select.tsx`), so the prototype's own three metric values
    (`desktop.dc.html:409`: `min-height:36px;padding:0 10px;font-size:15px;
    font-weight:600`) can only be reached by overriding the shared field class
    in place. Scoping to `.gn-list__control` is what keeps that override from
    becoming a second, quieter definition of what a field looks like: every
    other `.gn-field__input` in the product is untouched.
+
+   `width: auto` is the second half of the one-line fix: the shared rule's
+   `width: 100%` is right for every other Select in the product and wrong for
+   this one, whose whole row is a label plus a control that should size to its
+   own value. `13.1346` asserts BOTH halves — the base rule still saying
+   `width: 100%`, and this rule overriding it — because an override of a
+   declaration that no longer exists reads identically to one that works.
 
    TWO DELIBERATE OMISSIONS, both of them already-recorded decisions this rule
    is not allowed to reopen:
@@ -1409,7 +1435,12 @@ a.gn-ticket-sheet__crumb--link {
      `.gn-board-card__move:557-561`): raising a `ctlBg` control to neo's raised
      shadow is not something one task settles on one control. It is left out
      here for the same reason those three leave it out, not because the
-     prototype omitted it.
+     prototype omitted it. **The raised pill this control now wears does NOT
+     reopen that decision and is not it:** it comes from the shared component's
+     own `appearance` option (owner request 2026-09-22), it paints
+     `--gn-surface-raised`/`--gn-shadow-raised` — the pair `.gn-card` already
+     uses — rather than raising a `ctlBg` control to neo's raised shadow, and
+     every call site other than this one still gets the sunken default.
 
    `min-height` also DIVERGES from the prototype's `36px` and stays at the
    shared rule's `2.75rem` (44px) — the same tap-target floor
@@ -1417,6 +1448,7 @@ a.gn-ticket-sheet__crumb--link {
    reason. The trigger's own metric line is omitted entirely rather than
    restated at 44px, so it keeps inheriting whatever that floor becomes. */
 .gn-list__control .gn-select__trigger {
+  width: auto;
   padding: 0 0.625rem;
   font-size: 0.9375rem;
   font-weight: 600;

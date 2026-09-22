@@ -2670,3 +2670,20 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   tie-break the coat depends on, measured on comment-stripped text; and `globals.css`, which
   `apps/web/app/layout.tsx` imports after `ui.css` and which would win at equal specificity, not
   re-declaring the class. — (`packages/ui/test/components.test.tsx`)
+- **13.1345** ✅ The `Group by` text is a `gn-list__control-label` span whose `textContent` is exactly
+  `Group by`, and the grouping control's own trigger carries `gn-select__trigger--raised` AND
+  `gn-field__input` (the raised coat is additive — the field class is where the 44px floor comes from).
+  Controls in the same `it`: the label and the trigger are SIBLINGS in one `.gn-list__control` — the
+  class must be on the element holding the words, and on the label rather than the trigger or the row —
+  and the row contains EXACTLY ONE raised trigger, so the raise belongs to this control rather than
+  having become the component's default (that default is owned by `13.1343`). — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1346** ✅ `.gn-list__control-label` declares `white-space: nowrap` AND `flex: none`, and
+  `.gn-list__control .gn-select__trigger` declares `width: auto`. **Neither half is asserted alone**:
+  `nowrap` on a label that is still the shrinkable item overflows instead of wrapping, and a
+  content-sized trigger still lets a wrapping label break — the owner's `Group` / `by` is reachable with
+  either one missing. Control: the shared base rule still declares `width: 100%`, so the scoped `auto` is
+  an OVERRIDE of a declaration that exists rather than one that appeared from nowhere — an override of a
+  deleted declaration reads identically to one that works. Control 2: the two readers returned two
+  different bodies, which is the line-anchoring (`declarationsFor`) doing the job it exists for.
+  **jsdom has no layout engine**, so this case asserts the declarations and NOT a line box — the paint is
+  the controller's measurement, not a number invented here. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)

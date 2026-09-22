@@ -1264,6 +1264,57 @@ describe('13.659 Group by keeps its accessible name and exactly its six keys', (
   });
 });
 
+/**
+ * Case `13.1345` — OWNER REQUEST 2026-09-22: *"group by is currently 2 line. make
+ * it one line."* (two screenshots: before, `Group` over `by`; after, `Group by`
+ * on one line with a raised `epic` pill beside it.)
+ *
+ * The DOM half of the fix, and the half a jsdom render CAN witness: the label is
+ * a span carrying its own class, and the grouping control's trigger carries the
+ * raised modifier. The two CSS declarations those class names resolve to are a
+ * separate case (`13.1346`, in `ticket-list-css-binding.test.tsx`) because jsdom
+ * has no layout engine — no render here can measure a line box, and a case that
+ * claimed to would be asserting a number it had made up.
+ */
+describe('13.1345 Group by is one line: a labelled span beside a raised trigger', () => {
+  it('the `Group by` text is a `gn-list__control-label` span, and its Select is the raised one', () => {
+    const { container } = render(<ControlledList />);
+
+    const label = container.querySelector('.gn-list__control-label');
+    expect(
+      label,
+      'no `.gn-list__control-label` in the List — the `Group by` text is still a bare <span>, which is the half of the two-line bug that wraps.',
+    ).not.toBeNull();
+    // The class must have landed on the element holding the WORDS. A class on an
+    // empty wrapper would satisfy the query above and fix nothing.
+    expect(label?.textContent).toBe('Group by');
+
+    const trigger = screen.getByRole('button', { name: /Group by/ });
+    expect(trigger).toHaveClass('gn-select__trigger--raised');
+    // Same additive contract as the ui suite's own case: the field class is where
+    // this control's 44px tap floor comes from, so the raised coat must not have
+    // traded it away.
+    expect(trigger).toHaveClass('gn-field__input');
+
+    // CONTROL (a), in this same `it`: the label and the trigger are SIBLINGS in
+    // ONE `.gn-list__control`. Putting `gn-list__control-label` on the trigger, or
+    // on the row rather than the label, satisfies both assertions above while the
+    // `Group by` text stays a bare wrapping span — which is the defect.
+    expect(label?.contains(trigger)).toBe(false);
+    expect(trigger.contains(label as Node)).toBe(false);
+    expect(label?.parentElement).toBe(trigger.parentElement);
+    expect(trigger.parentElement?.classList.contains('gn-list__control')).toBe(true);
+
+    // CONTROL (b), same `it`: the raise belongs to the GROUPING control, not to
+    // this List's trigger-generation in general. The Columns toggle is the other
+    // button in this row and is not a Select at all — if a future edit put
+    // `appearance="raised"` on the shared component's default, this is the arm
+    // that would still be green, so it is named as what it is rather than relied
+    // on. The component-level default is owned by `13.1343`.
+    expect(container.querySelectorAll('.gn-list__control .gn-select__trigger--raised')).toHaveLength(1);
+  });
+});
+
 describe('13.660 the tray renders six chips, each with its own accessible name and checked state', () => {
   it('six checkboxes, named for their columns, checked exactly where the preferences say', async () => {
     const user = userEvent.setup();
