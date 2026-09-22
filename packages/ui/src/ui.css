@@ -1163,6 +1163,13 @@ button.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
+/* The prototype's meta line under the chips (`desktop.dc.html:2496-2504`), key first
+   (owner, 2026-09-22). One muted 13px run — `GN-1101 · 19 Oct 2026` — in the ink the
+   due label already wears, so the two halves read as one sentence; the late tone on
+   the due half stays its own. */
+.gn-board-card__meta-line { margin: 0.25rem 0 0; font-size: 0.8rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-board-card__key { color: var(--gn-text-muted); }
+.gn-board-card__meta-sep { color: var(--gn-text-muted); }
 /* Spec 2026-09-22: every card carries a priority, and P1 takes the SAME ink the
    late due label uses — the pair measured in the block above, on the same
    ground, clearing 4.5 in all six style×theme combinations. P2 is the default

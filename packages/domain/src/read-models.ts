@@ -204,6 +204,16 @@ export type TicketCard = {
   title: string;
   dueDate: TicketDueDate;
   priority: PriorityClaim;
+  /**
+   * The ticket's key — `<workspace prefix><project prefix>-<number>`, the same
+   * composition the single-ticket read makes for its crumb (`ticketKey`,
+   * `packages/domain/src/prefix.ts`) — or `null` when the ledger holds no
+   * workspace prefix, no project prefix, or no number for this ticket. REQUIRED
+   * on the wire (owner, 2026-09-22: "in the board, i want the ticket keys to be
+   * shown like in the prototype"), so every producer has to say; `null` is a
+   * fact about the ledger, never a placeholder to be dressed as a key.
+   */
+  key: string | null;
   fields: Record<string, FieldClaim>;
   stateProvenance: StateProvenance;
   rollup: TicketRollup | null;

@@ -83,6 +83,9 @@ export function boardCardSeed(overrides: Partial<BoardCard> = {}): BoardCard {
     // default, attributed to the same seeded claimant every other provenance
     // here names. A case that wants another level passes one.
     priority: { value: 'P2', claim: claim() },
+    // Spec 2026-09-22: `null` is "the ledger holds no prefix" — the offline replica's
+    // own answer. A case that wants a key passes one.
+    key: null,
     pending: false,
     ...overrides,
   };

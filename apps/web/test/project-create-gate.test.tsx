@@ -117,6 +117,7 @@ const BOARD: BoardView = {
               // below).
               priority: { value: 'P2', claim: PROVENANCE },
               cause: null,
+              key: null,
               rollup: null,
               pending: false,
             },

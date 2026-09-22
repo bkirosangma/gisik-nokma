@@ -337,6 +337,12 @@ function expectedCard(over: {
     collaboratorIds: [],
     title: over.title,
     dueDate: { state: 'never-claimed' },
+    // The card's key (owner, 2026-09-22), composed by the real assembler on the far
+    // side of the real doors: `RT` is the workspace derivation the `/v1/workspaces`
+    // read below asserts by name, `SF` is `derivePrefix('Shop floor')`, and the
+    // number is the ticket's position in the ledger — the parent was created
+    // first, the child second, and nothing else in this file mints a ticket.
+    key: over.ticketId === parentId ? 'RTSF-1' : over.ticketId === childId ? 'RTSF-2' : null,
     // The birth priority (spec 2026-09-22): every ticket in this file is created
     // with no explicit priority, so it is P2, attributed like the title claim.
     priority: {

@@ -113,6 +113,8 @@ const BOARD_WITH_DONE = {
               priority: { value: 'P2' as const, claim: PROVENANCE_387 },
               cause: null,
               rollup: null,
+              // Spec 2026-09-22: `null` is "the ledger holds no prefix".
+              key: null,
               pending: false,
             },
           ],
