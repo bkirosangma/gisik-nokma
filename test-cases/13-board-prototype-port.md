@@ -2344,6 +2344,29 @@ tokens, and the E4-8 block above it already measured why they resolve.
   `min-height` (a body that swallowed the file would report one, since the submit rule does declare it) and
   both extracted bodies are shorter than a tenth of the file, so 13.1272's assertions cannot be satisfied by
   the file merely containing the strings. It runs FIRST in its suite, so an assertion above it cannot mask it.
+
+### Follow-up (owner, 2026-09-22): the typing area is the field — cases `13.1275`–`13.1277`
+
+Owner: *"check this input: gn-new-project-name. description, and comment text area should also follow the
+same style."* That input is `.gn-field__input`. The parity chrome had put the ground and shadow on the
+`.editor-slot` WRAPPER, so the typing area itself wore no field treatment — no border under `hig`/`minimal`
+— and the Tiptap placeholder had no rule in any stylesheet (zero hits for `data-placeholder` /
+`is-editor-empty` in `ui.css`, `editor.css`, `globals.css`), so "No description yet" and "Add a comment — @
+to mention someone" were configured and never painted. The content node now wears `gn-field__input` beside
+its own class, the wrapper is transparent, and the placeholder is drawn in the input's muted ink.
+`packages/editor/src/components/TicketEditor.tsx`, `packages/editor/src/styles/editor.css`.
+
+- **13.1275** ✅ `editor.css`: the slot body rule declares geometry only (`border-radius: 0`, `min-height: 6rem`)
+  and NO `background`/`box-shadow`; the wrapper declares neither either and keeps `overflow: hidden`; the
+  placeholder rule draws `attr(data-placeholder)` in `var(--gn-text-muted)` with `pointer-events: none`; a
+  `:focus-within` ring is declared on the body. Read from comment-stripped CSS.
+  `packages/editor/test/editor-css-binding.test.ts`.
+- **13.1276** ✅ The content node carries `gn-field__input` beside `ticket-editor__content`, in comment mode
+  and in description mode. `packages/editor/test/ticket-editor-slot.test.tsx`.
+- **13.1277** ✅ CONTROL — an EMPTY editor exposes its placeholder as `data-placeholder` on an
+  `is-editor-empty` paragraph, and a FILLED editor has no such paragraph. This case passed BEFORE the
+  change (the attribute was always there), which is what shows the defect was paint, not data.
+  `packages/editor/test/ticket-editor-slot.test.tsx`.
   `packages/editor/test/editor-css-binding.test.ts`.
 
 **This entry also carries the `Features.md` change**, in the same commit: §9's `<EditorSlot>` bullet now

@@ -196,7 +196,13 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
           toolbar of commands that would each be refused is chrome for a door
           that is shut. */}
       <EditorToolbar editor={editor} editable={editable} />
-      <EditorContent editor={editor} className="ticket-editor__content" />
+      {/* `gn-field__input` beside the editor's own class (owner, 2026-09-22: the
+          description and comment areas follow `#gn-new-project-name`). The coat
+          — fill and 1px border under `hig`/`minimal`, borderless sunken surface
+          under `neo` — comes from `ui.css`'s ONE rule pair for that class, so
+          this typing area and every text input in the product change together.
+          The slot scopes only the geometry (`editor.css`). */}
+      <EditorContent editor={editor} className="ticket-editor__content gn-field__input" />
       {/* The prototype's hint line, BELOW the field (`:1173`) and outside the
           strip, so the two keep the prototype's geometry rather than being one
           block. Gated with the strip and for the same reason: it explains what
