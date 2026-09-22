@@ -386,3 +386,38 @@ Still a specific red, just for the neighbouring reason.)*
   resolved after all and 8 s or more would mean the watchdog fired instead of the loop draining —
   `shutdown.test.ts`, `test/fixtures/sync-throw-close-hook.ts`
 
+
+## The dev stack's branch source (owner, 2026-09-23)
+
+Ids minted from the §13 tip, not from a release block: the 2026-09-22 batch blocks (`13.1057`–`13.1206`)
+are spent, and the high-water mark was `13.1346` when these were written. It was recounted with
+`scripts/check-case-ids.mjs`'s OWN declaration regexes rather than a bare grep — a bare `13\.[0-9]+` sweep
+returns this catalogue's two documented truncation traps, `13.9999` and `13.632866`, and minting from the
+larger of those would have put these cases six hundred thousand ids past the tip.
+
+All four are 🧪: the acceptance is a hand-run `ctl rebuild --dry-run` against a checkout standing on the
+branch under test. Nothing automated brings the dev stack up — `Features.md` already says that of this
+bucket. The arms below were each run on 2026-09-23 against a scratch checkout named by `GISIK_PRIMARY`,
+and each case records what its own run printed.
+
+- 13.1347 🧪 `ctl rebuild` builds the stack from the branch the primary checkout stands on, not from `main`.
+  On a clean checkout on `release/2026-09-99` the dry-run prints `DRY: git pull --ff-only origin
+  release/2026-09-99` then `OK rebuild dry-run on release/2026-09-99`, exit 0 — the pulled ref and the OK
+  line BOTH name the release branch, which is what makes the built tree the release branch's tree.
+  `scripts/ctl/verbs/rebuild.sh`
+- 13.1348 🧪 CONTROL for 13.1347 — a task branch is refused, so 13.1347 cannot be green merely because the
+  guard accepts anything. On `feat/some-task`, exit 1 with `FAIL rebuild primary checkout is on
+  'feat/some-task' — the stack is built from main or release/* only, never a task branch`. The refusal
+  NAMES the branch it rejected, which is what distinguishes it from a guard that fires on every input.
+  `scripts/ctl/verbs/rebuild.sh`
+- 13.1349 🧪 CONTROL for 13.1347 — a detached HEAD is refused with its own message, because
+  `git branch --show-current` returns EMPTY there and an empty string must not fall through the
+  `main|release/*` case as if it matched. Exit 1, `FAIL rebuild primary checkout is on a detached HEAD`.
+  This earned its own arm the hard way: the first run of these cases detached the scratch checkout through
+  a failed setup line, and the `main` arm then silently re-tested detachment while appearing to be the
+  `main` arm — a setup failure that reads exactly like a result if only the exit code is read.
+  `scripts/ctl/verbs/rebuild.sh`
+- 13.1350 🧪 REGRESSION arm — `main` is still accepted after the change: `DRY: git pull --ff-only origin
+  main` then `OK rebuild dry-run on main`, exit 0. Without this arm a guard that had been narrowed to
+  `release/*` alone would look identical to the intended one across every other case in this section.
+  `scripts/ctl/verbs/rebuild.sh`

@@ -2845,13 +2845,25 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   travelling through the web container's proxy and being answered by the server, live — nothing
   automated brings the stack up and makes that round trip; it is a hand-run case. `docker-compose.dev.yml`,
   `apps/server/test/deploy/compose-dev-contract.test.ts`
-- ⚙️ **The dev stack serves BUILT images, rebuilt on every merge to `main`** — `pnpm dev:stack` brings it
+- ⚙️ **The dev stack serves BUILT images, rebuilt from the branch the primary checkout stands on** —
+  `pnpm dev:stack` brings it
   up, `pnpm dev:stack:rebuild` rebuilds and brings it up. The stack is `docker-compose.dev.yml` **alone**:
   `web` on :3001, `server` on :3000, real Postgres on 54330, MinIO, Mailpit. **There is no bind-mounted
-  source and no watcher**, so the served code equals `main` exactly as of the last build. It is run from
+  source and no watcher**, so the served code equals that branch exactly as of the last build. It is run from
   `/Users/kiro/my_projects/gisik-nokma` — the MAIN folder — because the images bake `SERVER_ORIGIN` and
   `NEXT_PUBLIC_SERVER_URL` as BUILD args and `next build` serialises them into `.next`: **an image is a
   snapshot of the tree it was built from.**
+  **WHICH BRANCH — amended 2026-09-23 by owner instruction** (*"on the next rebuild launch the dev stack from
+  the release branch so that I can verify"*): the stack follows the primary checkout's **current branch**,
+  now a `release/<date>` branch rather than `main` — a merge to `main` deploys to production, so work
+  integrates on the release branch and a stack pinned to `main` would serve code nobody is working on.
+  `ctl rebuild` reads `git branch --show-current` and pulls THAT branch, accepting `main` or `release/*` and
+  refusing a task branch or a detached HEAD (`scripts/ctl/verbs/rebuild.sh`). **This does not loosen the
+  2026-09-19 "main folder" instruction quoted below: that named the FOLDER** — the only checkout holding
+  `.env` and the baked build args, where a worktree compose resolves the secrets to `""` and silently turns
+  sign-in OFF — **not the `main` BRANCH.** The folder is still fixed; only the branch it stands on moved.
+  The evidence limit: no sha is baked into the image, so the branch and sha in `ctl rebuild`'s OK line are
+  read from git HEAD at build time — nothing inside a running container can be asked which tree it came from.
   **The rebuild rule is the load-bearing part, and its failure shape is this repo's recorded
   stale-serving class.** Merge to `main` and skip `pnpm dev:stack:rebuild`, and the app keeps serving the
   PREVIOUS build while `/healthz` answers 200, both containers are `Up`, and `:3001` returns its usual
