@@ -230,6 +230,18 @@ export interface SeedTicketArgs {
   title?: string;
   createdBy?: string;
   /**
+   * A BIRTH assignee, named inside `ticket.created` and backed by NO
+   * `ticket.assigned` event — the shape the New ticket dialog's Assignee picker
+   * produces since 2026-09-23.
+   *
+   * Deliberately separate from `assigneeId`, which writes the follow-up event.
+   * Until this existed the fixture could only build the second shape, which is
+   * exactly why every read door passed its own tests and then answered HTTP 500
+   * on a real birth-assigned ticket: no test could construct the world that
+   * breaks them. See `read/assigned-provenance.ts`'s correction block.
+   */
+  birthAssigneeId?: string;
+  /**
    * The `proj_tickets` head row's `state_category`. Defaults to `'open'`, which
    * is what every caller got before this parameter existed, so adding it changes
    * no fixture that does not ask.
@@ -339,6 +351,13 @@ export async function seedTicket(pool: Pool, args: SeedTicketArgs): Promise<void
       projectId: args.projectId,
       parentId: args.parentId ?? null,
       title: args.title ?? `Ticket ${args.ticketId}`,
+      // A BIRTH assignee — named in `ticket.created` itself, with NO
+      // `ticket.assigned` behind it. This is the shape the New ticket dialog's
+      // Assignee picker produces, and it is deliberately a different argument
+      // from `assigneeId` below: that one writes the separate event, and a
+      // fixture that could only produce that shape is why every read door passed
+      // its tests while 500-ing on a real birth-assigned ticket.
+      ...(args.birthAssigneeId === undefined ? {} : { assigneeId: args.birthAssigneeId }),
     },
     actorId: args.createdBy ?? SEED_ACTOR,
   });
@@ -418,7 +437,10 @@ async function insertTicketHead(
       args.stateId ?? SEED_STATE_ID,
       args.stateCategory ?? 'open',
       // The COLUMN half of an assignment; the ledger half is appended above.
-      args.assigneeId ?? null,
+      // A BIRTH assignee lands in the same column with no follow-up event behind
+      // it, which is precisely the world the read doors must survive — so the
+      // two arguments converge here and diverge only in what they append.
+      args.assigneeId ?? args.birthAssigneeId ?? null,
       JSON.stringify([]),
       JSON.stringify({
         title: {

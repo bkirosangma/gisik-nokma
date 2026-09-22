@@ -3161,3 +3161,46 @@ UNUSED** — the payload-shape cases and the engine's field-kind parity were fol
   the picker is opened and used first, since a case that started withheld could never build the state
   this defect needs. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+## Two defects the owner found in the release branch before it shipped (2026-09-23)
+
+Ids `13.1384`–`13.1385`, minted from the §13 tip (`13.1383`). Both were found by the owner USING the
+app, not by any suite, and both are recorded here with what the suites failed to ask.
+
+- **13.1384** ✅ **A TICKET ASSIGNED AT BIRTH READS BACK.** The New ticket dialog's Assignee picker names
+  the person inside `ticket.created` and appends no `ticket.assigned`. `assignedProvenanceFor` queried
+  `type = 'ticket.assigned'` alone, so a birth-assigned ticket had an `assignee_id` in `proj_tickets` and
+  no claim behind it — which `assembleListCards` and `readTicket` are both built to read as "the
+  projection and the ledger disagree" and to THROW on. Measured live: **HTTP 500** on
+  `GET /v1/projects/:id/tickets` (taking out the List, Calendar, Timeline and Backlog tabs of the whole
+  project) and on `GET /v1/workspaces/:ws/tickets/:id` (taking out the sheet). One such ticket broke the
+  project for everyone who could see it.
+  The fix is a PREDICATE where the exclusion was: a `ticket.created` joins the candidates only when its
+  payload names somebody, so a birth with no assignee still contributes nothing and the original
+  argument — never attribute "nobody is assigned" to the creator — is preserved rather than traded away.
+  **Why nothing caught it:** `seedTicket`'s `assigneeId` writes the separate `ticket.assigned`, so the
+  fixture could only build the shape that already worked. `birthAssigneeId` builds the other one and
+  exists for this case. **Post-fix mutation:** reverting the predicate to `type = 'ticket.assigned'`
+  reddens this case and leaves the other 14 in the file green.
+  **Known gap, named rather than papered over:** the LIST door is not directly asserted — this seeded
+  world answers 404 on that route before reaching the provenance check, so an arm there would pass with
+  the fix reverted. Both doors resolve through the same `assignedProvenanceFor`. A direct list-door case
+  needs `seedWorkflowDef` and is owed. — (`apps/server/test/routes/tickets-read.test.ts`)
+- **13.1385** 🧪 **THE PROJECT HEADER DOES NOT FLICKER WHEN THE SCOPE SWITCH IS TOGGLED.** Owner:
+  *"the project header still has a flicker during transition."* Measured by sampling
+  `getBoundingClientRect()` on every animation frame across the toggle: the header went
+  `684.4×44.0` → **`797.2×55.2`** → `684.4×44.0` over three frames, ~40 ms, while the rail and the note
+  row did not move at all. The child that changed was the last one: `gn-button--primary@116×44` — the
+  New ticket button — replaced by `gn-new-ticket__gate@229×23`, its "Preparing the New ticket form…"
+  fallback, and back.
+  Cause: the gate tested `list.rows === null`, `rows` is nulled on every query-KEY change, and the list's
+  key carries the filter. So a re-read retracted the button. Not a CSS transition — there are none on
+  these rules. **Pre-existing**: the identical condition is on `main`, so neither the reserved scope row
+  nor the New-ticket work introduced it.
+  Fix: `LiveQueryResult.hasAnswered` — a LIFETIME flag the key-change effect deliberately does not reset
+  — surfaced as `TicketListState.rowsHaveAnswered`, and the gate asks that instead. An error counts as an
+  answer, so a failing read cannot hold the control hostage forever.
+  🧪 because the defect is a transient LAYOUT state and jsdom applies no layout; the acceptance is the
+  frame-by-frame measurement above, re-taken on the rebuilt stack. **An automated arm is owed** and is
+  writable in jsdom — render, toggle the switch, assert the New ticket button is still in the document —
+  which would have caught this without a browser. — (controller measurement; no test file yet)

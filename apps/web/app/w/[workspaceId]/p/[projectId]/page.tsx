@@ -2045,7 +2045,22 @@ function ProjectBoard() {
     }
     // The list refusing no longer withholds the form — it withholds only the
     // parent picker, which project-root creation never needed.
-    if (session.kind === 'loading' || (list.rows === null && list.error === null)) {
+    // ⚠ `rowsHaveAnswered`, NOT `rows === null` — owner report 2026-09-23, "the
+    // project header still has a flicker during transition", and the flicker was
+    // this line. `rows` is nulled on every KEY change, and the list's key carries
+    // the filter, so toggling *Only tickets in progress* retracted the New ticket
+    // BUTTON and put this gate in its place until the refetch landed. The gate is
+    // a differently-sized element (229×23 against the button's 116×44), so the
+    // header's flex row resized and snapped back — measured at ~40 ms across
+    // three animation frames, with the rail and the note row not moving at all.
+    //
+    // The question this gate asks is "has the list ever been answerable", not
+    // "does it have rows for the current filter". The second is what `rows` says
+    // and it is the wrong question for deciding whether a CONTROL exists: a
+    // re-read is not a reason to take the button away. The comment two lines
+    // below was already half of this argument — a list REFUSAL stopped
+    // withholding the form — and a list RELOAD is the other half.
+    if (session.kind === 'loading' || (!list.rowsHaveAnswered && list.error === null)) {
       return (
         <p role="status" className="gn-new-ticket__gate">
           Preparing the New ticket form…
