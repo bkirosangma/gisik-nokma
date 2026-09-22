@@ -814,8 +814,9 @@ duplicated:
 - **Per-project `autoCloseAfterDays` override** — spec §9's own first entry; the setting is
   workspace-scoped and a project-level override needs a project settings surface that does not exist.
 - **Ranking under grouping/nesting is DISPLAY-ONLY** — plan ruling R2; the rank order is flat.
-- **The Board's `Close all (N)` and the List's `Close selected (N)` share one dialog, one batch and one
-  path, but carry NO keyboard shortcut.**
+- **The Board's `Close all (N)` and the List's bulk close share one dialog, one batch and one
+  path, but carry NO keyboard shortcut.** (The List's own control is `Bulk close` unarmed and
+  `Confirm close (N)` armed since the owner's request of 2026-09-22; the board's label is unchanged.)
 - **`ListRow.closed.actorName` is still the core plan's follow-on**, and this wave makes it also name
   `Auto-close` — but only through `provenance.ts`'s `actorLabel`. The system actor has no `users` row and
   no membership, so any reader joining the roster for a name renders it blank.

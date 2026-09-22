@@ -259,25 +259,38 @@ export type TicketListProps = {
    */
   selection?: { selected: ReadonlySet<string>; onToggle: (ticketId: string) => void };
   /**
-   * A slot for the caller's own control, rendered in `.gn-list__controls`
-   * immediately AFTER the summary sentence (and after its narrowing note).
+   * A slot for the caller's own control, rendered in `.gn-list__controls` at
+   * the END of the row, inside a `.gn-list__controls-end` wrapper this
+   * component draws only when the slot is defined.
    *
-   * OPTIONAL, and absence renders nothing at all. Task 11's `Close selected
-   * (N)` is the first consumer; the slot exists rather than a `bulkClose` prop
-   * because what the action SAYS and when it is enabled are the caller's
-   * (see `selection` above), and a component that took the tickets and a
-   * callback would be re-deriving a decision it cannot see.
+   * OPTIONAL, and absence renders nothing at all — not the wrapper, not the
+   * fragment inside it. The bulk close is the first consumer; the slot exists
+   * rather than a `bulkClose` prop because what the action SAYS and when it is
+   * enabled are the caller's (see `selection` above), and a component that took
+   * the tickets and a callback would be re-deriving a decision it cannot see.
    *
-   * Placed AFTER the summary sentence — and that ordering is the whole of what
-   * is pinned: 13.647 asserts the control follows `list-summary`, and a
-   * mutation that hoists the slot above it reddens that case and nothing else.
-   * Its position among the arrangement controls that follow (grouping,
-   * columns, origin) is deliberately NOT pinned, because nothing decides it —
-   * spec §8.3 says only "in the list's control row", and a test that froze the
-   * exact index would be measuring a choice the spec left open. Measured, not
-   * assumed: moving the slot to the END of the row leaves all 71 cases in
-   * `ticket-list.test.tsx` green, which is the honest characterisation of that
-   * freedom rather than a gap.
+   * TWO ORDERING FACTS, and they were separate things until 2026-09-22.
+   *
+   * 1. **After the summary sentence.** 13.647 asserts the control follows
+   *    `list-summary` via `compareDocumentPosition`, and a mutation that hoists
+   *    the slot above it reddens that case and nothing else.
+   * 2. **At the row's trailing edge.** This began as a deliberate freedom:
+   *    spec §8.3 says only "in the list's control row", so the position among
+   *    the arrangement controls was left unpinned, and the freedom was
+   *    MEASURED rather than assumed — mutation 7 in
+   *    `test-cases/13-second-wave-board-actions.md` moved the slot to the end
+   *    of the row and all 71 cases in `ticket-list.test.tsx` stayed green,
+   *    which is what was recorded. **The owner's request of 2026-09-22
+   *    (*"move the close button to the right"*) spends that freedom**, so the
+   *    position is now pinned in two halves that need each other: 13.1327
+   *    reads the DOM (the wrapper is the row's last element child) and 13.1328
+   *    reads `ui.css` (`margin-left: auto`, and the row's own rule is not the
+   *    one carrying it).
+   *
+   * The wrapper is not decoration: `margin-left: auto` has to sit on an
+   * element the caller does not own, because the caller's own node is the
+   * button and a caller that had to pass `style` would be styling this
+   * component's row for it.
    */
   controls?: ReactNode;
 };
@@ -510,10 +523,6 @@ export function TicketList({
             narrowed to {narrowing} — not the whole project
           </span>
         )}
-        {/* The caller's own control (Task 11) — see `controls`' own docblock for
-            why it sits after the summary sentence and before the arrangement
-            controls, and why its absence renders nothing at all. */}
-        {controls ?? null}
         {/* Owner request 2026-09-22: `Group by` was rendering as `Group` over
             `by`, and the dropdown was a bare field. Three things fix it and all
             three are needed:
@@ -620,6 +629,10 @@ export function TicketList({
             Your column choice was not saved — {prefsError}
           </span>
         )}
+        {/* The caller's own control — see `controls`' own docblock for why it
+            sits at the row's TRAILING EDGE, in a wrapper of its own, and why
+            its absence renders no wrapper and nothing else either. */}
+        {controls === undefined ? null : <div className="gn-list__controls-end">{controls}</div>}
       </div>
 
       {/*

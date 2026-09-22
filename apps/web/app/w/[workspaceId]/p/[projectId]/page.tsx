@@ -39,7 +39,15 @@ import {
   writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
 import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
-import { Avatar, Chip, SegmentedControl, Switch, Toast, type SegmentedOption } from '@gisik-nokma/ui';
+import {
+  Avatar,
+  Chip,
+  RemoveIcon,
+  SegmentedControl,
+  Switch,
+  Toast,
+  type SegmentedOption,
+} from '@gisik-nokma/ui';
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
@@ -828,11 +836,34 @@ function ProjectBoard() {
    * THE LIST'S ROW SELECTION, AND THE ONE BULK-CLOSE OPENING IT CAN HAVE
    * (second wave Task 11, spec §8.3's List bullet).
    *
-   * ## The two pieces of state are deliberately SEPARATE, and that is the fix
+   * ## The state is deliberately SEPARATE, in three pieces, and that is the fix
    *
    * `selectedIds` is the person's live selection. `pendingClose` is the
    * SNAPSHOT of the tickets one opening of `BulkCloseDialog` is about, and it
-   * is `null` exactly when no dialog is up.
+   * is `null` exactly when no dialog is up. `bulkArmed` is whether the mode is
+   * on at all — the third piece arrived with the owner's request of
+   * 2026-09-22, and it is SEPARATE from the selection rather than derived from
+   * it for the same reason the first two are separate: an empty armed selection
+   * and an unarmed one are different states that would otherwise share one
+   * representation, and the armed one is what draws the column.
+   *
+   * ## The mode (owner request, 2026-09-22)
+   *
+   * *"The select checkbox should not always appear. it should appear once bulk
+   * close button is clicked … with a small red x on the right to cancel."* The
+   * checkbox column is therefore a consequence of the mode and not a permanent
+   * feature of the List: `selection` is spread into `TicketList` only while
+   * `bulkArmed`, so the column's presence and its absence are the same switch
+   * and cannot disagree. **An armed List is the only one that passes
+   * `selection` at all**, and a SIGNED-OUT viewer never does: `bulkArmed` is
+   * gated behind `session.kind === 'signed-in'` in the same spread, so the
+   * arming button does not exist for them and the mode is unreachable
+   * (13.649, whose evidence is now the BUTTON rather than the column).
+   *
+   * **The arming click clears the selection before it arms.** Without that, a
+   * second arming would show the previous run's ticks; with it, 13.1332's
+   * `Confirm close (0)` after a Cancel is a fact about the set rather than
+   * about the column having been hidden, and those two are the same pixels.
    *
    * **The plan's text is INSUFFICIENT here rather than wrong, and an independent
    * review corrected an earlier draft of this very paragraph for overstating
@@ -884,9 +915,19 @@ function ProjectBoard() {
    * ticket on another tab. Keyed on the CALL, a re-ask this client makes for
    * the reason the selection exists is what resets the claim.
    *
+   * **The mode ends with that same reload, and this is the one asymmetry the
+   * request gave a second visible half.** A close that COMPLETED has nothing
+   * left to select for, so `reloadListClearingSelection` disarms as well as
+   * clears — the checkboxes leave with the selection. Cancelling the ✕ is the
+   * person's own undo and disarms directly.
+   *
    * The wrapper is not used by the dialog's `onClose`: dismissing an opening
    * changes nothing about the list, and a Cancel that also threw the selection
-   * away would be the surface tidying up after the person.
+   * away would be the surface tidying up after the person. **It does not disarm
+   * either, and that is the same argument one step further**: the ✕ and the
+   * dialog's Cancel are different acts — one leaves the mode, the other leaves
+   * the report — and 13.1333 holds both halves in one case precisely so that a
+   * page which disarmed on either would be red on the other.
    *
    * ## What the control is enabled on
    *
@@ -910,6 +951,7 @@ function ProjectBoard() {
    * review round.
    */
   const [selectedIds, setSelectedIds] = useState<ReadonlySet<string>>(() => new Set());
+  const [bulkArmed, setBulkArmed] = useState(false);
   const [pendingClose, setPendingClose] = useState<BulkCloseTicket[] | null>(null);
   const listSelectedRows = (listNarrowing?.rows ?? []).filter((row) => selectedIds.has(row.ticketId));
   const canBulkClose =
@@ -919,6 +961,12 @@ function ProjectBoard() {
   /** The page's own reload of the list, with the selection's claim on it retired — see the docblock above. */
   const reloadListClearingSelection = useCallback(() => {
     setSelectedIds(new Set());
+    // …and the MODE with it (owner request, 2026-09-22): a close that completed
+    // ends the arming, so the checkbox column leaves with the selection it was
+    // there to make. Cancelling the DIALOG does not come through here and so
+    // does not disarm — see the docblock above for why those two are different
+    // acts, and 13.1333 for both halves in one case.
+    setBulkArmed(false);
     list.reload();
   }, [list.reload]);
 
@@ -3101,9 +3149,11 @@ function ProjectBoard() {
                   which tells the person about their permissions when the truth
                   is that this browser never said who they were. Omitted
                   entirely rather than passed inert, so a signed-out viewer gets
-                  no checkbox column at all (13.649).
+                  neither the column NOR the arming button (13.649) — and since
+                  2026-09-22 the BUTTON is the evidence for that, because a
+                  signed-in viewer also has no column until they arm.
                 */
-                {...(session.kind === 'signed-in'
+                {...(session.kind === 'signed-in' && bulkArmed
                   ? {
                       selection: {
                         selected: selectedIds,
@@ -3115,44 +3165,102 @@ function ProjectBoard() {
                             return next;
                           }),
                       },
-                      controls: (
-                        <button
-                          type="button"
-                          className="gn-list__bulk-close"
-                          disabled={!canBulkClose}
-                          /*
-                            THE SNAPSHOT, and the guard, in one write. `current
-                            ?? …` is 13.795's refusal: `BulkCloseDialog`'s reset
-                            is an effect keyed on `open`, so writing a second
-                            selection into a non-null `pendingClose` swaps the
-                            dialog's `tickets` with no transition, and the
-                            previous opening's `closedIds`/`failures` survive
-                            against a list they do not describe. The reachable
-                            path is a keyboard one (`Dialog` ships no focus trap
-                            or portal — recorded as a named follow-on on the
-                            shared component, not repaired from here); jsdom
-                            does not hit-test the scrim, so the case drives it
-                            with an ordinary click.
+                    }
+                  : {})}
+                {...(session.kind === 'signed-in'
+                  ? {
+                      /*
+                        THE BULK-CLOSE MODE, ONE ACTION WEARING TWO LABELS
+                        (owner request, 2026-09-22). Not armed: `Bulk close`,
+                        enabled, which clears whatever selection the last run
+                        left and arms. Armed: `Confirm close (N)` — the same
+                        control, gated on `canBulkClose` — with a 44px ✕ beside
+                        it whose accessible name is `Cancel bulk close`.
 
-                            `.map` over the ROWS, not over the set: the order is
-                            the list's own, which is the order the dialog lists
-                            the titles in, and the batch is built in that order —
-                            the core's Ruling 37 shape, where position i of the
-                            answer describes position i of the request.
-                          */
-                          onClick={() =>
-                            setPendingClose(
-                              (current) =>
-                                current ??
-                                listSelectedRows.map((row) => ({
-                                  ticketId: row.ticketId,
-                                  title: row.title,
-                                })),
-                            )
-                          }
-                        >
-                          {`Close selected (${listSelectedRows.length})`}
-                        </button>
+                        THE ARMING CLICK CLEARS FIRST. Without
+                        `setSelectedIds(new Set())` a second arming would show
+                        the previous run's ticks, and 13.1332's `Confirm close
+                        (0)` after a cancel could not tell "the set was cleared"
+                        from "the column was hidden" — the two are the same
+                        pixels, so the clear has to happen where the mode does.
+                      */
+                      controls: (
+                        <span className="gn-list__bulk">
+                          {bulkArmed ? (
+                            <>
+                              <button
+                                type="button"
+                                className="gn-list__bulk-close"
+                                disabled={!canBulkClose}
+                                /*
+                                  THE SNAPSHOT, and the guard, in one write.
+                                  `current ?? …` is 13.795's refusal:
+                                  `BulkCloseDialog`'s reset is an effect keyed
+                                  on `open`, so writing a second selection into a
+                                  non-null `pendingClose` swaps the dialog's
+                                  `tickets` with no transition, and the previous
+                                  opening's `closedIds`/`failures` survive
+                                  against a list they do not describe. The
+                                  reachable path is a keyboard one (`Dialog`
+                                  ships no focus trap or portal — recorded as a
+                                  named follow-on on the shared component, not
+                                  repaired from here); jsdom does not hit-test
+                                  the scrim, so the case drives it with an
+                                  ordinary click.
+
+                                  `.map` over the ROWS, not over the set: the
+                                  order is the list's own, which is the order
+                                  the dialog lists the titles in, and the batch
+                                  is built in that order — the core's Ruling 37
+                                  shape, where position i of the answer
+                                  describes position i of the request.
+                                */
+                                onClick={() =>
+                                  setPendingClose(
+                                    (current) =>
+                                      current ??
+                                      listSelectedRows.map((row) => ({
+                                        ticketId: row.ticketId,
+                                        title: row.title,
+                                      })),
+                                  )
+                                }
+                              >
+                                {`Confirm close (${listSelectedRows.length})`}
+                              </button>
+                              <button
+                                type="button"
+                                className="gn-list__bulk-cancel"
+                                aria-label="Cancel bulk close"
+                                /*
+                                  THE GLYPH CARRIES NO NAME. `RemoveIcon` is an
+                                  `aria-hidden` SVG, so the button's accessible
+                                  name is exactly the `aria-label` above —
+                                  asserted, because the alternative (the ✕ as
+                                  text) would put "×" in front of a screen
+                                  reader's "Cancel bulk close".
+                                */
+                                onClick={() => {
+                                  setBulkArmed(false);
+                                  setSelectedIds(new Set());
+                                }}
+                              >
+                                <RemoveIcon />
+                              </button>
+                            </>
+                          ) : (
+                            <button
+                              type="button"
+                              className="gn-list__bulk-close"
+                              onClick={() => {
+                                setSelectedIds(new Set());
+                                setBulkArmed(true);
+                              }}
+                            >
+                              Bulk close
+                            </button>
+                          )}
+                        </span>
                       ),
                     }
                   : {})}

@@ -27,9 +27,10 @@ type Failure = { ticketId: string; title: string; reason: string };
 /**
  * One dialog, N `ticket.closed` in ONE ingest batch (backlog/closed spec §8.3,
  * 2026-09-17 second wave, Task 9). The two bulk surfaces that consume it —
- * Task 10's `Close all (N)` on a terminal board column, Task 11's
- * `Close selected (N)` in the list — differ only in how they choose the
- * tickets; the write, the reporting and the refusal handling are here, once.
+ * Task 10's `Close all (N)` on a terminal board column, Task 11's bulk close in
+ * the list — `Confirm close (N)` since the owner's request of 2026-09-22, which
+ * made it the armed half of a two-label action — differ only in how they choose
+ * the tickets; the write, the reporting and the refusal handling are here, once.
  *
  * ## Why one batch, when the spec also says "one event per ticket"
  *

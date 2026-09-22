@@ -2605,6 +2605,126 @@ called exactly once, with the correct URL, and with **one** argument.
   `{ scroll: false }` on `openParentTicket` passes the first arm, and a sibling case would let that
   variant report green on the arm that matters. — (`apps/web/test/sheet-no-scroll.test.tsx`)
 
+---
+
+## The bulk close arms the selection (owner request, 2026-09-22) — ids `13.1327`–`13.1336`
+
+**The owner's two sentences, one screenshot, and the design they settled on.** *"move the close button to
+the right. and it should be named bulk close."* and *"The select checkbox should not always appear. it
+should appear once bulk close button is clicked. once clicked, the text should change to confirm close
+(N), where N is the number of tickets selected. but the button should be disabled. with a small red x on
+the right to cancel the bulk close action. once tickets are selected, and if the tickets are eligible for
+the bulk close, only then should the confirm close button be enabled."*
+
+**What that changes, in one line each.** The checkbox column stops being a permanent feature of the List
+and becomes the state of an ARMED MODE: a signed-in viewer sees the row checkboxes only between pressing
+`Bulk close` and either cancelling or completing a close. The action's label follows the mode —
+`Bulk close` when idle, `Confirm close (N)` while armed — the confirm control is disabled until the
+selection is eligible (`canBulkClose`, unchanged: every selected row terminal and not closed), and a ✕
+with `aria-label` `Cancel bulk close` sits to its right.
+
+**What did NOT change, and is the reason the existing cases only gained steps.** `canBulkClose` itself,
+the snapshot taken at confirm-click time, the swap guard around an open dialog, the refusal display on a
+partial close, and the clear-through-`reloadListClearingSelection` are all untouched. 13.648, 13.649,
+13.794 and 13.795 keep their ids, their substance and their negative arms; what they gained is the
+arming click before their checkboxes exist, and a rename of the control they press.
+
+**The arming click CLEARS the selection before setting the mode** (`setSelectedIds(new Set())` then
+`setBulkArmed(true)`), which is what makes 13.1332's re-arm read `Confirm close (0)` a fact about the
+set rather than about the checkboxes having been hidden — the two are indistinguishable on screen, and
+only one of them is the behaviour.
+
+**A completed bulk close ends the mode; cancelling the DIALOG does not.** `reloadListClearingSelection`
+now also clears `bulkArmed`, so the run that completes a close takes the checkboxes away with it. The
+dialog's own `onClose` still does not reload and still does not clear — that asymmetry is old (the
+wrapper's docblock records it), and the request gives it a second visible half.
+
+**The button's position is now pinned, and it was not before.** 13.647 pinned only "after the summary
+sentence"; mutation 7 in `13-second-wave-board-actions.md` moved the slot to the END of the controls row
+and **all 71 cases stayed green**, recorded there as a deliberate freedom because spec §8.3 says only "in
+the list's control row". *"move the close button to the right"* spends that freedom, and it is spent in
+two halves that need each other: **13.1327** reads the DOM and **13.1328** reads `ui.css`.
+
+- **13.1327** ✅ `controls` renders inside `.gn-list__controls-end`, and that wrapper is the row's LAST
+  element child. The case measures "last" against a row that has something else in it — the
+  `ControlledList` fixture's default prefs draw the origin note — so the assertion is not trivially true
+  of a row with a single child. Its control arm, in the same `it`: with no `controls` prop there is no
+  `.gn-list__controls-end` element at all. — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1328** ✅ `.gn-list__controls-end` declares `margin-left: auto`, read out of `ui.css` by the
+  css-binding file's own `declarationsFor`. **Both halves in one shape**: the row's own rule is read in
+  the same case and must read as `display: flex` with NO `margin-left: auto` — the two selectors are one
+  string extending the other, and a reader that answered with the row's body would satisfy any assertion
+  loose enough to be written about "a rule exists". — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
+
+**Mutation witnesses, both run against this lane's tree and both restored (verified by sha256 of the
+mutated file before and after).**
+
+- **`margin-left: auto` dropped from `.gn-list__controls-end`** → **13.1328 red and nothing else**
+  (1 failed / 89 passed across the two files). This is the declaration half on its own: the DOM is
+  untouched and 13.1327 stays green, which is why the two cases are not one case.
+- **The slot moved back to immediately after the summary, wrapper dropped** (the inverse of mutation 7
+  above) → **13.1327 red, and 13.671's CSS-side direction red with it** (2 failed / 88 passed):
+  `.gn-list__controls-end` becomes a styled class nothing renders, which is exactly the defect that
+  direction exists to find. **13.647 passes under it**, measured rather than assumed — the proof that
+  the END was a freedom until this request spent it.
+
+### The armed mode — ids `13.1329`–`13.1333`
+
+**The checkbox column is the STATE of the mode, not a feature of the List.** `selection` is spread into
+`TicketList` only while `bulkArmed`, so its presence and its absence are the same switch, and every case
+below reads the mode through the COLUMN **and** through the LABEL — either alone passes on a page that
+did only one of the two (boxes with a `Bulk close` label, or a `Confirm close (N)` label over a table
+with nothing to tick).
+
+**Every checkbox read is scoped to `{ name: /^Select / }`, and that is a measurement.** An unfiltered
+`queryAllByRole('checkbox')` on this page is never empty: the page's own "active only" `Switch` is a real
+`<input class="gn-switch" type="checkbox">`. An earlier draft asserted the unfiltered query was empty and
+cited `ticket-list.test.tsx`'s 13.647 control arm as precedent — **and that precedent is about the
+COMPONENT, not the page**: `TicketList` alone has no `Switch`, so its unfiltered query is empty and
+always was. A probe that rendered the List unarmed found exactly one `gn-switch` input.
+
+- **13.1329** ✅ Before arming: the rows are on screen (the positive control), `Bulk close` is **enabled**,
+  there is no row-select checkbox at all, and neither `Confirm close (…)` nor `Cancel bulk close` exists.
+  — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1330** ✅ The arming click draws the column and changes the label: one `Select <title>` box per row,
+  in the rows' own order (asserted against the fixture's three titles rather than `> 0`, so a column that
+  drew one box per SECTION is red rather than merely non-empty), `Confirm close (0)` **disabled**,
+  `Cancel bulk close` present, and `Bulk close` gone — one control, two labels. — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1331** ✅ The gate's two terms, either alone passing on a control enabled too often: ONE eligible
+  row enables `Confirm close (1)`; adding the CLOSED terminal row gives `Confirm close (2)` **disabled**
+  (control, same `it`); unticking returns it to enabled; and a `Doing` row is terminal's negative. The
+  label keeps counting the ticked rows while disabled. — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1332** ✅ `Cancel bulk close` with two rows ticked returns the action to `Bulk close`, takes the
+  checkboxes with it, and re-arming reads **`Confirm close (0)`** — the selection was CLEARED, not hidden.
+  The re-arm is the only thing that can tell those apart: with the column gone, the two look identical.
+  — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1333** ✅ A COMPLETED close ends the mode — dialog gone, checkboxes gone, `Bulk close` back — and
+  the CONTROL ARM IS FIRST in the same `it`, because an assertion placed above a control masks it: the
+  DIALOG's own `Cancel`, on the same armed selection, leaves the mode armed with `Confirm close (2)` and
+  both boxes still ticked. A page that disarmed on either act would be red on the other.
+  — (`apps/web/test/list-bulk-close.test.tsx`)
+
+**Mutation witnesses (Task 2), each run against this lane's tree and restored — the page's sha256 was
+checked before and after every one.** All three are reported as they landed, including the ones that
+reddened more than the case they were aimed at: a mutation's blast radius is a measurement, and the
+structural neighbours it takes with it are the expected shape for a change to a shared expression.
+
+- **(a) `selection` spread regardless of `bulkArmed`** → **5 failed / 5 passed**: 13.1329 (the case it was
+  aimed at — the column exists before the arming click), plus 13.648 case 2, 13.794, 13.1332 and 13.1333,
+  every one of which asserts the column's ABSENCE after a disarm. 13.1330/13.1331 stay green under it,
+  which is the honest characterisation of the mutation: it removes the arming's only visible effect, not
+  the label or the gate.
+- **(b) Confirm's `disabled` reads `listSelectedRows.length === 0` instead of `canBulkClose`** →
+  **2 failed / 8 passed**: 13.1331 (the case aimed at) and 13.648 case 1. Both are the gate's cases, and
+  nothing else reads eligibility — which is what makes 13.1331's two negatives load-bearing rather than
+  decorative.
+- **(c) `setBulkArmed(false)` dropped from `reloadListClearingSelection`** → **3 failed / 7 passed**:
+  13.1333 (the case aimed at — the completion stops ending the mode), and 13.648 case 2 and 13.794, the
+  two other cases that read the post-reload state. 13.1332 stays green, and should: it drives the ✕,
+  which disarms directly and never goes through the wrapper.
+
+---
+
 ## The ticket key column, left of the title (owner request, 2026-09-22)
 
 **The owner's third item, from the List tab screenshot:** *"on the left of the title, add the ticket

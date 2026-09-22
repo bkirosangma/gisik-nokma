@@ -1315,11 +1315,15 @@ a.gn-ticket-sheet__crumb--link {
    distinct — this button sits in `.gn-board__column-header`, not in a card —
    and like it, only the METRICS are shared.
    Second wave Task 11 (backlog/closed spec §8.3, 2026-09-18) — the same body
-   once more, for the List's `Close selected (N)`, which sits in the list's own
+   once more, for the List's bulk close, which sits in the list's own
    `.gn-list__controls` row rather than in a row or a card header. Fourth
    member of the set, and the third time the DOCUMENT is the reason: this
    control is beside the summary sentence, not inside a table row, so
-   `.gn-row-action` would be true of the metrics and false of the DOM. */
+   `.gn-row-action` would be true of the metrics and false of the DOM. It wears
+   the SAME class under both of its labels — `Bulk close` unarmed and
+   `Confirm close (N)` armed (owner request, 2026-09-22) — because it is one
+   control whose text changes, and a second class would be a second set of
+   metrics to keep in step. */
 .gn-board-card__close,
 .gn-row-action,
 .gn-board__column-action,
@@ -1363,6 +1367,48 @@ a.gn-ticket-sheet__crumb--link {
 /* "Controls row" (`desktop.dc.html:406`): `display:flex;gap:14px;
    align-items:center;flex-wrap:wrap`. */
 .gn-list__controls { display: flex; align-items: center; gap: 0.875rem; flex-wrap: wrap; }
+/* THE CALLER'S SLOT, PINNED TO THE ROW'S TRAILING EDGE (owner request,
+   2026-09-22: *"move the close button to the right"*). `margin-left: auto` on
+   a flex item is the whole of "to the right": it absorbs every pixel of free
+   space to the item's left, so the slot — and everything after it — lands
+   against the row's right edge however many arrangement controls precede it.
+   `inline-flex` so the three controls the bulk-close flow puts inside share
+   one baseline and one inner `gap`, which is why the wrapper is a box and not
+   a bare fragment.
+   The position is no longer a freedom: it was measured as one (mutation 7,
+   `test-cases/13-second-wave-board-actions.md` — moving the slot to the end
+   of the row left all 71 cases green, and the docblock recorded the survival
+   rather than freezing a choice spec §8.3 left open). This request spends it,
+   and 13.1327/13.1328 are the two halves that now hold it. */
+.gn-list__controls-end { margin-left: auto; display: inline-flex; align-items: center; gap: 0.5rem; }
+/* The bulk-close flow's own group (owner request 2026-09-22: one action that
+   arms the selection, then `Confirm close (N)` and a cancel ✕). It sits INSIDE
+   `.gn-list__controls-end` and exists only to hold the button and its ✕ on one
+   line with a tighter gap than the row's. */
+.gn-list__bulk { display: inline-flex; align-items: center; gap: 0.25rem; }
+/* THE CANCEL ✕ — a 12px glyph inside a 2.75rem SQUARE, and the two numbers are
+   different on purpose. `min-width`/`min-height` carry WCAG 2.5.5's 44px
+   tap-target floor (`tap-targets.ts`'s STANDALONE_FLOOR_PX, the floor every
+   control that is not declared in `DENSE_IN_LIST` is judged at); the glyph
+   stays 12px because a 44px ✕ would read as a primary action beside the button
+   it cancels. This control is NOT in `DENSE_IN_LIST` and must not be: the List
+   tab is behind a click and no sweep's tap pass reaches it, and the table's
+   own protocol says an entry whose route no sweep visits does not belong —
+   the same reason `.gn-list__select input[type='checkbox']` is named there as
+   deliberately absent. */
+.gn-list__bulk-cancel {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  background: transparent;
+  color: var(--gn-danger);
+  cursor: pointer;
+  border-radius: var(--gn-radius-control);
+}
+.gn-list__bulk-cancel:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: -2px; }
 /* The count sentence (`:407`): `font-size:15px;line-height:20px;margin:0;
    color:var(--label2)`. It is a `<span>` in this component (`ticket-list.tsx`)
    rather than the prototype's `<p>`, so the `margin:0` has nothing to undo and

@@ -1181,8 +1181,16 @@ describe('13.596 emptyCopy renders only when a caller passes one, over a zero-ro
 /**
  * 13.647 — the two `TicketList` additions Task 11 needs, and neither of them
  * exclusive to the List tab: a leading row-checkbox column (`selection`) the
- * `Close selected (N)` surface reads, and a slot for a caller's own control
- * (`controls`) in the controls row it already renders.
+ * bulk close reads, and a slot for a caller's own control (`controls`) in the
+ * controls row it already renders.
+ *
+ * **The strings this file's `controls` fixtures pass are ARBITRARY, and the one
+ * below (`Close selected (0)`) is now HISTORICAL**: the product's own caller
+ * says `Bulk close` / `Confirm close (N)` since the owner's request of
+ * 2026-09-22. It is left as written because nothing in this case is about what
+ * the caller writes — `TicketList` neither knows nor cares — and rewording it
+ * would look like a claim about the surface. The product's own label is held in
+ * `apps/web/test/list-bulk-close.test.tsx`, not here.
  *
  * `selection` is a CONTROLLED pair, not a starting value: `selected` is the
  * truth and `onToggle` reports the gesture upward, the same shape `prefs`/
@@ -1294,6 +1302,42 @@ describe('13.647 the selection checkbox column and the controls slot (packages/a
 
     rerender(<ControlledList rows={[OPEN_ROW]} initial={chose([], 'flat')} />);
     expect(screen.queryByRole('button', { name: 'Close selected (0)' })).not.toBeInTheDocument();
+  });
+
+  it('13.1327 `controls` sits at the END of the controls row, inside a wrapper that exists only when it does', () => {
+    // The owner's words (2026-09-22): *"move the close button to the right."*
+    // The slot was AFTER THE SUMMARY and its position among the arrangement
+    // controls was deliberately unpinned — measured, not assumed: mutation 7 in
+    // `test-cases/13-second-wave-board-actions.md` moved it to the end of the
+    // row and **all 71 cases stayed green**. That freedom is what this request
+    // spends, so the position is asserted here and the sentence recording the
+    // freedom was corrected in the same change.
+    const { rerender } = render(
+      <ControlledList
+        rows={[OPEN_ROW]}
+        controls={<button type="button">Bulk close</button>}
+      />,
+    );
+    const controlsRow = document.querySelector('.gn-list__controls') as HTMLElement;
+    const end = controlsRow.querySelector('.gn-list__controls-end');
+    expect(end).not.toBeNull();
+    const button = screen.getByRole('button', { name: 'Bulk close' });
+    expect(end).toContainElement(button);
+
+    // THE END IS MEASURED AGAINST A ROW THAT HAS SOMETHING ELSE IN IT.
+    // `ControlledList`'s own default prefs are `DEFAULT_VIEW_PREFS`, so the
+    // origin note really is on screen: `controlsRow.lastElementChild` is then a
+    // discriminating read (the wrapper is genuinely trailing) rather than a
+    // trivially-true one about a row with a single child.
+    expect(
+      controlsRow.querySelector('[data-testid="list-prefs-origin"]'),
+      'the fixture draws no origin note — "last child" would prove nothing',
+    ).not.toBeNull();
+    expect(controlsRow.lastElementChild).toBe(end);
+
+    rerender(<ControlledList rows={[OPEN_ROW]} />);
+    expect(document.querySelector('.gn-list__controls-end')).toBeNull();
+    expect(screen.queryByRole('button', { name: 'Bulk close' })).not.toBeInTheDocument();
   });
 });
 
