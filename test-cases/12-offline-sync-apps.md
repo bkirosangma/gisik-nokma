@@ -3070,3 +3070,39 @@ refuse a real staleness, not the bundle's absence. The checked-in file was regen
   dev-credential guard's wiring into `build`). —
   (`apps/mobile/scripts/generate-editor-html.test.ts`)
 
+
+## One connection per client — the live-update defect (owner report, 2026-09-23)
+
+Ids `12.962`–`12.968`, minted from the §12 tip (high-water was `12.961`, recounted with
+`scripts/check-case-ids.mjs`'s own declaration regexes, not a bare grep).
+
+Measured against the running dev stack before any of these existed: a board page opened **six** sockets
+within 3 ms; the server caps sockets at **eight per user**; over the cap the upgrade is refused with
+**HTTP 429**, which reaches the browser as `close` code **1006** with no close frame and no server-side
+error log; the client backed off and retried into the same refusal — **205 `/v1/stream` requests, 160 of
+them 429** over forty minutes. With no established socket the debounced re-read never fired, so a newly
+created ticket appeared only after a manual page load.
+
+- 12.962 ✅ two `subscribe()` calls on one subscriber open **one** socket. Red before the fix with
+  "expected [ …(2) ] to have a length of 1 but got 2" — `stream.test.ts`
+- 12.963 ✅ CONTROL — two SEPARATE `createStreamSubscriber` instances open two sockets, so the sharing is
+  per client and not a module-scope memo that would break the second shell to construct a client. This arm
+  passed BEFORE the fix as well as after, which is its job: it is the one that fails if the fix over-shares
+  — `stream.test.ts`
+- 12.964 ✅ two listeners on the SAME workspace send **one** `subscribe` frame and both receive the event.
+  One frame because the hub refuses a duplicate subscribe on one connection and there is no unsubscribe
+  frame. Red before the fix: only the first listener saw it — `stream.test.ts`
+- 12.965 ✅ two workspaces share the socket, send two `subscribe` frames, and their frames do not cross:
+  a `caught-up` for `ws_2` reaches `ws_2`'s listener and not `ws_1`'s. Red before: one frame, not two —
+  `stream.test.ts`
+- 12.966 ✅ dropping one of two listeners keeps the socket open for the other. Red before the fix
+  ("expected true to be false"): each listener owned its own socket, so one leaving closed one —
+  `stream.test.ts`
+- 12.967 ✅ dropping the LAST listener closes the socket. **This arm passed before the fix too, and
+  vacuously** — with one socket per subscription, stopping both closed both. After the fix it is the only
+  case asserting the shared connection's lifetime, which is why it is kept rather than deleted —
+  `stream.test.ts`
+- 12.968 ✅ a reconnect resumes from the highest seq seen, not from the original `afterSeq`: after a
+  `caught-up` at 41 and a drop, the new connection's `subscribe` frame carries `afterSeq: 41`. Also passed
+  before the fix — it pins the cursor semantics THROUGH the rewrite, which moved the cursor from a
+  per-subscription local to a per-room field and could have silently reset it — `stream.test.ts`
