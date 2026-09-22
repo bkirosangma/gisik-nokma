@@ -576,6 +576,10 @@ function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, st
     priority: mapPriority(record['priority'], `${path}.priority`, roster),
     // `pending` is client-side truth: set only between submit and the server's
     // answer, so anything off the wire is settled by definition.
+    // `null` is the truth ("no prefix in the ledger") and survives; an ABSENT
+    // key is a body the server does not send since 2026-09-22 and `asString`
+    // refuses it, so a forgotten field cannot pass as a prefix-less workspace.
+    key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
     pending: false,
   };
 }

@@ -2367,6 +2367,32 @@ its own class, the wrapper is transparent, and the placeholder is drawn in the i
   `is-editor-empty` paragraph, and a FILLED editor has no such paragraph. This case passed BEFORE the
   change (the attribute was always there), which is what shows the defect was paint, not data.
   `packages/editor/test/ticket-editor-slot.test.tsx`.
+
+### Follow-up (owner, 2026-09-22): the board card carries its key — cases `13.1278`–`13.1281`
+
+Owner: *"in the board, i want the ticket keys to be shown like in the prototype"* (`GN-1101 · Due 19 Oct`,
+`desktop.dc.html:2496-2504`). `BoardCard`'s own docblock recorded the gap: the wire carried no key, and a
+card had nothing to compose one from. `TicketCard.key: string | null` now travels on every card-building
+route, composed by `assembleTicketCards` from the three ledger facts the single-ticket read already uses for
+its crumb — workspace prefix, project prefix, per-project number — batched per workspace; `null` when any is
+missing, never a partial key. The offline replica answers `null` (it holds no prefixes). The card draws a
+meta line under the chips, key first, then the due label with its late tone; the due half keeps the product's
+one date formatter rather than the prototype's `Due 19 Oct` (ruling E5-2). The list row gets no key here.
+`apps/server/src/read/ticket-cards.ts`, `packages/domain/src/read-models.ts`,
+`packages/app-core/src/{view-types.ts,online/mappers.ts,replica/replica-data-source.ts,views/board.tsx}`.
+
+- **13.1278** ✅ Every card carries the key the single-ticket route would compose for it: in the read scenario
+  (no entered prefixes) two consecutively created tickets read `CCRE-n` and `CCRE-(n+1)`, equal to
+  `ticketKey('CC', 'RE', number)` with the number read back through `ticketNumbers`.
+  `apps/server/test/read/ticket-cards.test.ts`.
+- **13.1279** ✅ `composeCardKey` answers `null` when the workspace prefix, the project prefix or the number is
+  missing, and the full key only when all three are present. `apps/server/test/read/ticket-cards.test.ts`.
+- **13.1280** ✅ `mapBoardView` carries the key, keeps `null`, and REFUSES an absent key as a mapping error
+  naming `.key`. `packages/app-core/test/online/mappers.test.ts`.
+- **13.1281** ✅ The card's meta line reads `KEY · <due>` with the key first and the due span keeping its class;
+  CONTROL — a `null` key draws the due label alone with no separator; CONTROL — a key with no due date draws
+  the key alone. `packages/app-core/test/views/board.test.tsx`. The real-door round trip asserts `RTSF-1` /
+  `RTSF-2` on the attention and board bodies (`apps/server/test/integration/real-door-round-trip.test.ts`).
   `packages/editor/test/editor-css-binding.test.ts`.
 
 **This entry also carries the `Features.md` change**, in the same commit: §9's `<EditorSlot>` bullet now

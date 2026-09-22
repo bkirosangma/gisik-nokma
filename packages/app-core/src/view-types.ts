@@ -265,11 +265,23 @@ export type BoardCard = {
    * crumb and not this card's route: `TicketCard` carries no workspace prefix,
    * no project prefix and no per-project number, so a `BoardCard` has nothing
    * to compose one from. Drawing a key here would mean inventing it, so the
-   * due label was built and the key left as a recorded gap.
+   * due label was built and the key left as a recorded gap — **closed on
+   * 2026-09-22; see `key` below.**
    */
   dueDate: { date: string; claim: ClaimProvenance } | null;
   /** ALWAYS present (spec 2026-09-22): the mapper and the replica THROW rather than default. */
   priority: PriorityView;
+  /**
+   * The ticket's key (`GN-1101`), or `null`. **THE GAP THE `dueDate` DOCBLOCK ABOVE
+   * RECORDED IS CLOSED (owner, 2026-09-22):** `TicketCard.key` now travels on the
+   * wire, composed by `assembleTicketCards` from the same three ledger facts the
+   * single-ticket read uses for its crumb. `null` is the ledger holding no
+   * prefix — and the offline replica's own answer, since it holds no prefixes
+   * and inventing one would be a key nobody minted. The card draws the key
+   * first in its meta line, then the due label (`board.tsx`); a `null` key
+   * draws no separator and no placeholder.
+   */
+  key: string | null;
   /** True only between submit and the server's answer (web is online-only). */
   pending: boolean;
 };

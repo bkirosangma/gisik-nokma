@@ -2348,3 +2348,39 @@ on `rows === null` as well, and its docblock recorded that a preferences 500 was
 failure — witnessed at `3.158`. That comment was the only record of the fold's blast radius, and the four
 tab arms beside it did not share its guard. The fold is gone now, so the guard is no longer the only
 place in the file that knows the difference; its own note is kept and extended rather than deleted.
+
+## The project card's actions strip is the button's size (owner request, 2026-09-22)
+
+**The owner measured it, one screenshot, no theory.** On the workspace home the project card's Archive
+button container `div.gn-project-card__actions` measures **362.66 × 44** while the button inside it is
+about **186** wide: *"it has this wide empty space there, which gets in the way of clicking the card.
+Make the container size be the same as the button size."*
+
+**The empty space is a hole in the card's click target, and that is what makes it a defect rather than a
+tidiness complaint.** `.gn-project-card` is a column flex container, so its default
+`align-items: stretch` widens every child to the card's inner width — and this strip is the ONE child
+also raised above the door's stretched `::after` (`position: relative; z-index: 1`, added so the
+transparent overlay would stop covering Archive/Restore). The two together mean the strip's whole box
+sits OVER the door, not under it: the pointer between the button and the card's right edge hits the
+strip, so the card neither lights nor navigates there. Every non-button pixel of the strip is a dead
+zone, and the card's clickable area is a rectangle with a 176px hole in it.
+
+**The fix is one declaration, and it names the mechanism rather than working around it.** `align-self:
+flex-start` on `.gn-project-card__actions` makes the strip shrink-to-fit — exactly its content (the one
+button, or several plus the `gap`) at the card's left edge, still pinned to the bottom by
+`margin-top: auto`, still wrapping via `flex-wrap` if its content ever exceeds the card width. A
+`width: fit-content` would also work and was rejected for that reason: it fights the parent's `stretch`
+instead of stating what it wants. `pointer-events: none` was rejected too — it would leave the strip
+misreporting its own box to devtools and to anyone reading the CSS, and the owner asked for the
+container to change size.
+
+- **13.1297** ✅ The strip declares `align-self: flex-start`, and **the lift survived it**. The control
+  arm is asserted in the SAME case, not a sibling `it`: it requires the rule to still declare
+  `position: relative` and `z-index: 1`, because the shrink is only a fix while the strip also stays
+  above the door — a "fix" that bought the width by dropping the lift would put the overlay back over
+  Archive/Restore and eat the click on exactly the pixels this change rescues. A separate case would let
+  that variant report green on the arm that matters. Read as SOURCE, not rendered, for 13.408's reason:
+  these component tests never load the real stylesheet into jsdom, so no render here could observe a
+  flex stretch, and the claim is a single declaration. The selector is ANCHORED (`^`) because three
+  further rules in `globals.css` begin `.gn-project-card__actions ` — an unanchored match finds one of
+  those on a later line first, the first-match landmine `3.974` records. — (`apps/web/test/workspace-home.test.tsx`)

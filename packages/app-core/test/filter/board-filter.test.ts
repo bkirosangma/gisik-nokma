@@ -9,7 +9,7 @@ const card: BoardCard = {
   assignee: { id: 'u1', name: 'Ada' },
   // ClaimProvenance is an OBJECT (`view-types.ts:85-90`), not a string.
   stateProvenance: { actorId: 'u1', actorName: 'Ada', clientTime: '', serverTime: '' },
-  cause: null, rollup: null, pending: false,
+  cause: null, rollup: null, pending: false, key: null,
   // Ruling E5-2 made this REQUIRED on `BoardCard`. `null` here for the same
   // reason the sibling `boardCardSeed` uses it: this ticket claims no date,
   // and the board predicate has no due axis to narrow by anyway (13.434).

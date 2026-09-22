@@ -1,7 +1,9 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { newUlid, type LedgerEvent } from '@gisik-nokma/domain';
+import { newUlid, ticketKey, type LedgerEvent } from '@gisik-nokma/domain';
+import { ticketNumbers } from '../../src/read/ticket-numbers.js';
 import {
   assembleTicketCards,
+  composeCardKey,
   fetchTicketRows,
   type ProjTicketRow,
 } from '../../src/read/ticket-cards.js';
@@ -676,5 +678,40 @@ describe('assembleTicketCards', () => {
       actorId: world.member,
       at: closeEvent.serverTime,
     });
+  });
+  /**
+   * 13.1278 — THE CARD CARRIES ITS KEY (owner, 2026-09-22: "in the board, i want the
+   * ticket keys to be shown like in the prototype"). The single-ticket route already
+   * composed `<workspace prefix><project prefix>-<number>` for the crumb and the
+   * parent ref; the card assembler never did, and `BoardCard` recorded the gap by
+   * name. The scenario's world has NO entered prefixes, so both halves are the
+   * DERIVED ones (`derivePrefix('Convenience Corner')` = `CC`,
+   * `derivePrefix('Registrations')` = `RE`) — which is the arm a real workspace
+   * founded before the prefix field lands in.
+   */
+  it('13.1278 every card carries the key the single-ticket route would compose for it', async () => {
+    const a = newUlid();
+    const b = newUlid();
+    await applyCommitted(db.pool, [
+      created({ id: a, actorId: world.owner }),
+      created({ id: b, actorId: world.owner }),
+    ]);
+    const rows = await fetchTicketRows(db.pool, [a, b]);
+    const cards = await assembleTicketCards(db.pool, world.owner, rows);
+    const numbers = await ticketNumbers(db.pool, world.workspaceId, [a, b]);
+    const byId = new Map(cards.map((c) => [c.ticketId, c]));
+    expect(byId.get(a)?.key).toBe(ticketKey('CC', 'RE', numbers.get(a)!));
+    expect(byId.get(b)?.key).toBe(ticketKey('CC', 'RE', numbers.get(b)!));
+    // Two tickets created in order carry consecutive numbers — the key is the
+    // ledger's position, not an id fragment.
+    expect(numbers.get(b)! - numbers.get(a)!).toBe(1);
+    expect(byId.get(a)?.key).toMatch(/^CCRE-\d+$/);
+  });
+
+  it('13.1279 the composer answers null when ANY of the three facts is missing, and never a partial key', () => {
+    expect(composeCardKey('CC', 'RE', 7)).toBe('CCRE-7');
+    expect(composeCardKey(null, 'RE', 7)).toBeNull();
+    expect(composeCardKey('CC', null, 7)).toBeNull();
+    expect(composeCardKey('CC', 'RE', undefined)).toBeNull();
   });
 });
