@@ -3204,3 +3204,99 @@ app, not by any suite, and both are recorded here with what the suites failed to
   frame-by-frame measurement above, re-taken on the rebuilt stack. **An automated arm is owed** and is
   writable in jsdom — render, toggle the switch, assert the New ticket button is still in the document —
   which would have caught this without a browser. — (controller measurement; no test file yet)
+
+## Opening a ticket from My Work opens the sheet THERE (owner request, 2026-09-23)
+
+Owner: *"opening a ticket from my work should open the sheet on the my work page, not redirect to the
+project page."* Ids `13.1391`–`13.1401`, from this branch's block (`task/my-work-sheet-in-place`,
+allocated in `13-hig-per-screen.md`).
+
+Until this change every title button on `/w/:ws/my-work` pushed
+`/w/:ws/p/:projectId?ticket=…` and the reader arrived on the project page — a board they had not asked
+for — with the sheet open over it. The page now mounts its own `TicketSheet`, driven by a `?ticket=`
+param **on its own route**, and the click keeps the reader where they were.
+
+**Three decisions the change had to make, recorded because they are visible in the assertions below:**
+
+1. **The open ticket lives in the URL, not in component state.** A param survives a reload and is
+   shareable as a link; `useState` is neither. `13.1392` is the arm that only a param can pass — it
+   loads the page with the param already set and asserts the sheet is there, which a state-based
+   version fails on its first render.
+2. **`MyWork`'s `onOpenTicket` signature is unchanged.** The view still takes one
+   `(ticketId: string) => void` and knows nothing about what opening means; what changed is what the
+   PAGE does with the id.
+3. **The sheet's project-scoped props come from the OPEN TICKET.** My Work spans projects, so there is
+   no page-level project to read: the project is recovered from the rows the page already holds
+   (`assigned`/`inTransit`/`shared`, and every `AttentionItem` — the strip is mounted here) or, for a
+   ticket no section carries, asked of `TicketLocator` — the same one-shot gateway the inbox uses.
+   **A ticket the server will not place says so and mounts nothing**; it is not redirected somewhere
+   plausible, and no fallback project is guessed.
+
+- **13.1391** ✅ **A CLICK ON A MY WORK ROW OPENS THE SHEET ON THE MY WORK PAGE.** One push, to
+  `/w/:ws/my-work?ticket=<id>` with `{ scroll: false }` — asserted as `toHaveBeenCalledTimes(1)` plus a
+  negative on any `/p/` path, because the defect is a SECOND push to the project page — and the sheet is
+  then in the document with the clicked ticket's title, with My Work's own heading still on screen.
+  —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1392** ✅ **THE PARAM IS THE STATE: a page loaded on `?ticket=` mounts the sheet with NO
+  navigation at all.** A reload — or a link somebody sent — reaches the same sheet, and the page pushes
+  nothing on mount (a page that pushed would fight the back button). **Post-commit mutation:** replacing
+  the param read with `useState` (`const openTicketId = useState<string | null>(null)[0]`) reddens this
+  case and `13.1391`'s second half, and leaves the other eight in the file green.
+  —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1393** ✅ **CONTROL for `13.1391`: with no `?ticket=` param the page renders NO sheet at all.**
+  Its own case rather than an arm, because "the sheet opened" would otherwise also be satisfied by a page
+  that mounts a sheet unconditionally — a different bug from the one the owner reported, and one that
+  would delete the page's subject. **Mutation:** dropping the `openTicketId !== null` term from the
+  mount gate reddens exactly here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1394** ✅ **THE SHEET IS TOLD THE OPEN TICKET'S PROJECT, not the page's first row.** Two rows in
+  two projects, the second one clicked: the project crumb is an ADDRESS, so the assertion is the href
+  (`/w/:ws/p/<the open ticket's project>`) *and* the absence of the other row's project — a resolver
+  that fell through to the first list passes the href check while failing the absence. **Mutation:**
+  resolving the project from the first work item instead of the open ticket reddens here and nowhere
+  else in the file. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1395** ✅ **CLOSING THE SHEET IS THE PARAM'S REMOVAL, and it stays on My Work**: one push, to
+  `/w/:ws/my-work` with no param and `{ scroll: false }` — not to the project page, which is where a
+  close would have to go if the sheet were living somewhere else. **Mutation:** making `onClose` a no-op
+  reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1396** ✅ **THE OPEN TICKET'S FILES ARE KEYED PER TICKET.** Swapping `?ticket=` in place — which
+  on this page happens without leaving the page, because the sheet's parent chip does exactly that —
+  re-asks `getTicketAttachments` per id, draws the second ticket's file and **not** the first's. The
+  measured half is the read count (`[<first>, <second>]`), because a DOM that happened to lose the old
+  entry could also be an accident of timing. **Mutation:** keying the read on a constant
+  (`'attachments'` instead of `` `${id}:attachments` ``) reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1397** ✅ **THE SHEET'S `Subtask of {parent}` CHIP OPENS THE PARENT HERE.** The chip is a BUTTON
+  only because this mount passes `onOpenTicket` — with none, the sheet renders the plain pill — so "the
+  chip is a control" is itself the assertion that the prop is wired, and the parent, which is in no
+  section of this page's view, is then placed by the locator with its crumb carrying the located
+  project. **Mutation:** dropping `onOpenTicket` from the mount reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1398** ✅ **THE ATTENTION STRIP'S ROWS OPEN HERE TOO, WITHOUT ASKING THE SERVER.** The strip is
+  mounted on this page and shares its `openTicket`, and its rows carry a `projectId`, so a click is
+  placed from data already in hand. The assertion is the locator NEVER being asked — with a locator
+  fixture that answers `null`, a resolver that had to ask would open nothing. **Mutation:** removing the
+  attention-row lookup reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1399** ✅ **AN ENDED SESSION MOUNTS NO SHEET.** With both reads answering 401 and `?ticket=` set,
+  the page draws the expired-session notice, mounts no dialog, and **asks nobody where the ticket is** —
+  the page's own `!expired` term, which is new code on this mount and would otherwise fire a locate at a
+  server that answers 401, painting an error about the wrong thing over the message that matters.
+  **Mutation:** dropping `!expired` from the mount gate reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1400** ✅ **A DELETION MADE FROM MY WORK LEAVES THE VIEW.** The sheet's footer Delete is driven
+  for real (two presses since E2-35), the `ticket.deleted` is committed, and then BOTH of the page's
+  reads are re-asked — the correction must not depend on the workspace stream, which is the defect the
+  project page's own handler records. **Mutation:** emptying `onDeleted` reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1401** ❌ **OWED: a deletion made from My Work offers no toast and no Undo.** The project page's
+  deletion narration is a one-slot toast plus a durable-undo strip built on that page's own state
+  (`p/[projectId]/page.tsx:540`), and this task explicitly excludes extracting that machinery; an Undo
+  offered by a page that does not hold the ticket's project is a control the page could not honour. So
+  the row leaves the view and nothing is promised — which is honest but is a capability gap on a new
+  surface, recorded rather than left to be discovered. —
+  (no test file; the gap is the absence of one)
