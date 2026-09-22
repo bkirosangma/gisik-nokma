@@ -361,6 +361,49 @@ export type TicketSheetProps = {
    */
   workspaceName?: string | null;
   projectName?: string | null;
+  /**
+   * WHERE THE WORKSPACE AND THE PROJECT CRUMBS GO (owner request, 2026-09-22:
+   * *"the workspace and the project should also be clickable from the
+   * breadcrumb"*).
+   *
+   * ## They are LINKS, and that is why the host supplies an href rather than a callback
+   *
+   * The ancestor crumbs above take `onOpenTicket` — a callback, because opening
+   * one needs a SERVER LOOKUP first (`page.tsx`'s `openParentTicket` asks
+   * `ticketLocation.locate`, since a parent may sit in another project). The
+   * workspace and the project are LOCATIONS the host already knows, and a
+   * location is an `<a href>`: middle-click, open-in-new-tab and
+   * copy-link-address are the browser's, which no callback can give.
+   *
+   * **`app-core` cannot import Next's `Link`** — this package is
+   * framework-neutral and already renders bare `<a href>` for an attachment
+   * (`attachment-list.tsx:93`) — so the anchor is rendered here and the HOST
+   * decides whether a click becomes an in-app navigation, through `onNavigate`.
+   *
+   * ## Absent means the crumb stays PLAIN TEXT, which is today's markup
+   *
+   * The same rule the callback-less ancestor crumb follows, recorded at
+   * `ancestorCrumb`: *"a control that cannot be honoured is the failure this
+   * repo refuses by name."* A host that has no route to push (a test harness, a
+   * read-only embed) passes nothing and still gets the two names — it does not
+   * get an anchor pointing nowhere.
+   */
+  workspaceHref?: string;
+  /** See `workspaceHref`; the project crumb's destination. */
+  projectHref?: string;
+  /**
+   * The host's client-side router, if it has one. Called with the href of the
+   * crumb clicked, AFTER `event.preventDefault()` — so a plain left click
+   * routes in-app while a modified click (`metaKey`/`ctrlKey`/`shiftKey`/
+   * `altKey`) and a non-primary button are left to the browser, which is the
+   * whole reason these crumbs are anchors.
+   *
+   * **Absent means the anchor navigates NATIVELY**, and the default is not
+   * consumed. That is the right arm for a host that renders the sheet inside a
+   * plain document rather than an app shell, and it is asserted rather than
+   * assumed.
+   */
+  onNavigate?: (href: string) => void;
 };
 
 /**
@@ -517,6 +560,9 @@ export function TicketSheet({
   onDeleted,
   workspaceName,
   projectName,
+  workspaceHref,
+  projectHref,
+  onNavigate,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
@@ -2353,6 +2399,68 @@ export function TicketSheet({
     );
 
   /**
+   * THE WORKSPACE AND THE PROJECT CRUMBS — a LOCATION each, so a LINK each
+   * (owner request, 2026-09-22).
+   *
+   * `ancestorCrumb` above draws a `<button>` when it can be honoured, because
+   * opening an ancestor needs a server lookup first. These two need none: the
+   * host already knows `/w/<workspaceId>` and `/w/<workspaceId>/p/<projectId>`,
+   * and a known address is an `<a href>` — which is what buys middle-click, new
+   * tab and copy-link-address. With no `href` the crumb is today's plain span,
+   * the same degradation `ancestorCrumb` makes with no callback.
+   *
+   * ## The click is the host's, and only a PLAIN LEFT click is intercepted
+   *
+   * `onNavigate` absent → the anchor navigates natively and nothing is
+   * consumed. Present → a plain left click is prevented and routed in-app, and
+   * everything else is left alone deliberately:
+   *
+   *   - the four modifier keys are the reader asking for a new tab, a new
+   *     window or a download — routing in-app would silently replace that with
+   *     the navigation they did not ask for;
+   *   - `event.button !== 0` is the middle click, the other standard way to open
+   *     a background tab. It is a SEPARATE guard from the modifier list because
+   *     a middle click carries no modifier at all;
+   *   - `event.defaultPrevented` is a control higher up the tree having already
+   *     decided this click, and `Sheet` registers document-level handlers —
+   *     consuming the event a second time would be this crumb overriding an
+   *     answer it does not own.
+   */
+  const locationCrumb = (
+    label: string,
+    href: string | undefined,
+    testId: string,
+  ): ReactElement =>
+    href === undefined ? (
+      <span className="gn-ticket-sheet__crumb" data-testid={testId}>
+        {label}
+      </span>
+    ) : (
+      <a
+        className="gn-ticket-sheet__crumb gn-ticket-sheet__crumb--link"
+        href={href}
+        data-testid={testId}
+        onClick={(event) => {
+          if (onNavigate === undefined) return;
+          if (
+            event.defaultPrevented ||
+            event.button !== 0 ||
+            event.metaKey ||
+            event.ctrlKey ||
+            event.shiftKey ||
+            event.altKey
+          ) {
+            return;
+          }
+          event.preventDefault();
+          onNavigate(href);
+        }}
+      >
+        {label}
+      </a>
+    );
+
+  /**
    * THE LAST CRUMB — the ticket's own identifier, PLAIN and bold.
    *
    * The owner: *"should show the ticket key"*. `ticketRead.key` is that key, or
@@ -2553,14 +2661,24 @@ export function TicketSheet({
             from the MIDDLE, and a breadcrumb that skips a level states a
             hierarchy the product does not have. A crumb list is a PATH or it is
             nothing, so it is drawn whole or not at all.
+
+            ⚠ AND THE TWO CRUMBS THIS NAV OPENS WITH ARE NO LONGER PLAIN TEXT
+            (owner request, 2026-09-22: *"the workspace and the project should
+            also be clickable from the breadcrumb"*). They were
+            `<span className="gn-ticket-sheet__crumb">`, and this sentence is the
+            correction rather than a footnote: `locationCrumb` above draws each
+            as an `<a>` when its host passed an href, and as exactly the plain
+            span it has always been when it did not. **The gate on the two NAMES
+            is unchanged** — an href does not make a name, and a caller that
+            passed hrefs with no names still gets no nav at all.
           */}
           {workspaceCrumb !== null && projectCrumb !== null ? (
             <nav className="gn-ticket-sheet__crumbs" aria-label="Ticket location">
-              <span className="gn-ticket-sheet__crumb">{workspaceCrumb}</span>
+              {locationCrumb(workspaceCrumb, workspaceHref, 'sheet-crumb-workspace')}
               <span className="gn-ticket-sheet__crumb-sep" aria-hidden="true">
                 ›
               </span>
-              <span className="gn-ticket-sheet__crumb">{projectCrumb}</span>
+              {locationCrumb(projectCrumb, projectHref, 'sheet-crumb-project')}
               {/* THE ANCESTORS, in the authority's order and under its own
                   conditionals (`desktop.dc.html:3410-3419`): the grandparent
                   only when there is one, the parent only when there is one.

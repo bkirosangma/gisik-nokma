@@ -696,6 +696,34 @@ button.gn-ticket-sheet__crumb--link {
   color: var(--gn-text-accent);
 }
 
+/* THE SAME CRUMB AS A LOCATION RATHER THAN A CONTROL (owner request,
+   2026-09-22: *"the workspace and the project should also be clickable from the
+   breadcrumb"*). The workspace and the project are addresses, so their crumbs
+   are `<a>` elements and the rule above — element-qualified on `button` —
+   paints none of them.
+
+   **TWO RULES AND NOT ONE SELECTOR LIST**, which is the only subtle thing here:
+   `packages/app-core/test/views/ticket-sheet-crumb-css-binding.test.tsx:81`
+   pins the button's rule by the EXACT string `button.gn-ticket-sheet__crumb--link`
+   through an `indexOf`, so widening it to `button.…, a.…` would leave that pin
+   searching for a prefix of a longer selector and reading the wrong body.
+
+   `var(--gn-text-accent)` is the same ROLE 17.025 settled for the button arm —
+   a crumb that goes somewhere is painted in the text-accent ink, and `accent`
+   is not text-safe (see `.gn-button`'s note at `:89`).
+
+   `text-decoration: none` is load-bearing rather than tidy: the UA underlines
+   every anchor, and nothing resets it — `apps/web/app/globals.css:73` is the
+   global link rule and it sets `color` only. Without this line the two crumbs
+   would be the product's only underlined breadcrumb. It is spelled out here
+   rather than left to a global for the reason the button rule spells out its
+   own `border` and `background`: this rule should read as the whole treatment
+   of the arm. */
+a.gn-ticket-sheet__crumb--link {
+  color: var(--gn-text-accent);
+  text-decoration: none;
+}
+
 /* ── P1: THE CONTROLS THAT NEVER JOINED THIS CONVENTION (2026-09-21).
 
    Round 2's P1 swept every static `className` on a
