@@ -3,6 +3,7 @@ import { VISIBILITY_MODES, type VisibilityMode, type IngestResult } from '@gisik
 import { Button, Popover } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDateTime } from '../provenance.js';
+import { memberLabel } from '../member-label.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type { ClaimProvenance, ResolvedVisibilityMode, RosterMember, TicketVisibility } from '../view-types.js';
 
@@ -137,9 +138,11 @@ export type VisibilityEditorProps = {
    * in practice.
    *
    * `RosterMember[]` rather than `Actor[]` since E4-6: the picker labels through
-   * `pickerLabel` below, whose second fallback is the EMAIL, and `Actor` carries
-   * none. The two provenance sites still go through `actorLabel`, which needs
-   * only `id` and `name`.
+   * `memberLabel`, whose second fallback is the EMAIL, and `Actor` carries none.
+   * The two provenance sites still go through `actorLabel`, which needs only
+   * `id` and `name` — and which is what puts the system-actor step in front of
+   * the same fallback chain, so the two are one rule applied twice rather than
+   * two rules kept apart.
    */
   members: RosterMember[];
   /**
@@ -612,7 +615,29 @@ export function VisibilityEditor({
                       checked={userIds.includes(member.id)}
                       onChange={() => toggle(member.id)}
                     />
-                    {pickerLabel(member)}
+                    {/* A ROSTER MEMBER'S LABEL IN THE PICKER, through the shared
+                        `memberLabel` — the same function that names a person
+                        everywhere else, and from Task 4 on the same function the
+                        roster JOIN's value is built with, so a person's row and
+                        their claim line cannot disagree.
+
+                        E4-6 is why this is not `actorLabel(member.id,
+                        member.name)`: that fallback is the raw id, which is right
+                        for PROVENANCE ("never blank, never a fabricated
+                        'system'") and wrong for a CHOOSER. A member whose display
+                        name is empty was offered as
+                        `01M1V035TASFV2G9WPWFV9QDVW`; the dev roster ships exactly
+                        that row (`accountant@e2e.gisik-nokma.local`, `name = ''`),
+                        so it is a shape the product really meets rather than a
+                        fixture's invention.
+
+                        `actorLabel` is NOT gone and is not the same job: it is
+                        still what `:242` and `:350` render this screen's claims
+                        through, because it checks `SYSTEM_ACTOR_NAMES` FIRST — a
+                        step a picker must never take, and one auto-close must
+                        never lose. It keeps no email step of its own; the email
+                        reaches it through the join, not through this call. */}
+                    {memberLabel(member)}
                   </label>
                 ))
               )}
@@ -728,27 +753,3 @@ function standingSentence(claim: VisibilityClaim, nameOf: (userId: string) => st
   return RESOLVED_MODE_LABELS[claim.resolvedMode];
 }
 
-/**
- * A ROSTER MEMBER'S LABEL IN THE PICKER: `name || email || id`.
- *
- * E4-6. The picker rendered `actorLabel(member.id, member.name)`, and
- * `actorLabel`'s fallback is the raw id — which is right for PROVENANCE ("never
- * blank, never a fabricated 'system'") and wrong for a CHOOSER. A member whose
- * display name is empty was therefore offered as
- * `01M1V035TASFV2G9WPWFV9QDVW`; the dev roster ships exactly that row
- * (`accountant@e2e.gisik-nokma.local`, `name = ''`), so it is a shape the product
- * really meets rather than a fixture's invention.
- *
- * The two jobs are different and are kept different, which is why `actorLabel` is
- * untouched and still used at `:242` and `:350` for the claims this screen
- * ATTRIBUTES. A claim must name its actor; a checkbox must be recognisable by a
- * person choosing it, and an email is a better handle than a ULID while an id is
- * still better than a blank box.
- */
-function pickerLabel(member: RosterMember): string {
-  const name = member.name.trim();
-  if (name.length > 0) return name;
-  const email = member.email?.trim();
-  if (email !== undefined && email.length > 0) return email;
-  return member.id;
-}

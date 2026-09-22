@@ -2389,3 +2389,15 @@ instead of off a parameter.
   between pages would name one person two ways inside a single view. Counted on the roster calls, with
   the ticket-page count asserted beside it so "once" cannot be satisfied by a walk that stopped early. —
   (`packages/app-core/test/online/online-data-source.test.ts`)
+
+The other half of the owner's sentence — *"if name is empty/blank, show the email"*. That rule existed
+as two PRIVATE copies (`memberLabel` in the members page, `pickerLabel` in the visibility editor) with
+the same order spelled twice, free to drift; everything else read `member.name` raw or went through
+`actorLabel`, which has no email step at all.
+
+- **13.1291** ✅ ONE `memberLabel`, and the four arms of its order in one `describe`: a named member is
+  named by their name; a BLANK name falls to the email; a blank name AND blank address falls to the id;
+  and a member with no name and no `email` KEY also falls to the id. The first arm is the control — a
+  function returning the id for everybody would pass the other three. The third and fourth arms are
+  different shapes of input reaching the same floor (blank versus absent), which is the distinction the
+  server's own withholding draws. — (`packages/app-core/test/member-label.test.ts`)

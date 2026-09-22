@@ -4,7 +4,12 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Card, Select } from '@gisik-nokma/ui';
 import { INVITE_CHANNELS, membershipId } from '@gisik-nokma/domain';
-import { formatDateTime, makeSubmittedFactory, type RosterMember } from '@gisik-nokma/app-core';
+import {
+  formatDateTime,
+  makeSubmittedFactory,
+  memberLabel,
+  type RosterMember,
+} from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
 import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
@@ -676,59 +681,6 @@ function initialOf(name: string): string {
   // whitespace (`'  Kiro'`) took the space as its initial and rendered a BLANK
   // disc. The monogram renders a name, and leading whitespace is not part of one.
   return Array.from(name.trimStart())[0]?.toUpperCase() ?? '';
-}
-
-/**
- * The label a person is shown and named by — **resolved exactly once per row.**
- *
- * The owner's instruction: *"on the member's page, member list, if the name is
- * absent, show the email instead."*
- *
- * ## Why this is a function and not three inline expressions
- *
- * It WAS three inline `member.name` reads — the monogram, the name cell, and the
- * role control's `aria-label` — and they all broke together for the same
- * population. better-auth's magic-link plugin creates a user with
- * `name: name || ""` and our sign-in page sends no name
- * (`app/sign-in/page.tsx`), so **an email sign-up has `name === ''`**: the cell
- * rendered empty, the disc rendered blank, and the control announced
- * `"Role for "` — an accessible name that identifies nobody. Three reads of one
- * possibly-empty string is how the cell and the accessible name come to
- * disagree; one resolved label cannot.
- *
- * ## The fallback order, and why the address is second rather than only
- *
- * `name` → `email` → `id`, the last being the convention this client already
- * uses for an actor it cannot name (`actorLabel`, and `actorOf`'s synthesised
- * `{id, name: id}`) — "the id is a fact the server sent".
- *
- * The address is RARELY the second step in practice, and that is the point:
- * `email` is absent only for a phone-only sign-up, and those rows have the phone
- * itself as their `displayName` (`auth.ts`'s `getTempName`), so they never reach
- * the fallback at all. **The two populations the product CREATES do not
- * overlap** — which is why carrying a real address here discloses nothing the
- * roster does not already show, and why the server can withhold the synthetic
- * one at no cost.
- *
- * **The overlap is a fact about what this product MINTS, not an invariant, and
- * the difference is reachable.** better-auth's magic-link request schema is
- * `z.email()`, whose pattern ACCEPTS `fake@phone.gisik-nokma.invalid` (measured),
- * and the sign-in page passes the address straight through. A person who signs in
- * by magic link on the synthetic domain gets `name === ''` AND a withheld
- * address, so the third step below is what names them. The consequence is benign
- * — the id is a fact the server sent — but the step is not unreachable, and an
- * earlier version of this paragraph said it was.
- *
- * Blank strings are treated as ABSENT at both steps rather than rendered: a
- * whitespace-only name is not a name, and an empty address is not an address.
- * The third step is here so that a row with neither degrades to the id rather
- * than to an empty cell and a nameless control.
- */
-function memberLabel(member: RosterMember): string {
-  if (member.name.trim() !== '') return member.name;
-  const email = member.email?.trim() ?? '';
-  if (email !== '') return email;
-  return member.id;
 }
 
 /**
