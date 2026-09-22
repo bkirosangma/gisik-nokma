@@ -653,6 +653,20 @@ export function boardWorkspaceId(raw: unknown): string {
 }
 
 /**
+ * The workspace the LIST body names — the same join, one route over.
+ *
+ * `ListResponse.workspaceId` is REQUIRED (`packages/domain/src/read-models.ts`),
+ * so an absent key is a body this client cannot read rather than one it should
+ * degrade around: `asString` refuses it by NAME, beside the sibling
+ * `boardWorkspaceId`, which is what makes a route that stopped sending the field
+ * a one-line failure here instead of every assignee in the list quietly
+ * rendering as a ULID again.
+ */
+export function listWorkspaceId(raw: unknown): string {
+  return asString(asRecord(raw, 'list')['workspaceId'], 'list.workspaceId');
+}
+
+/**
  * `GET /v1/tickets/:id/history` → `TicketHistoryEvent[]`. The two shapes agree
  * field for field; this validates rather than casts, because a cast would let a
  * garbled event render as history.
@@ -1707,20 +1721,26 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
  * the tripwire something to route around**, which is why the guard is still
  * there and still passing.
  *
- * ## The roster is EMPTY, by force rather than by choice
+ * ## The roster is the CALLER'S, and it is now a real one
  *
  * `mapBoardView` joins the members route for display names because the board
- * body names its workspace. This body does not, and `getTickets(projectId,
- * filter, grouping)` does not take one either, so there is no id from which a
- * roster could be fetched. `mapAssignee` and `mapProvenance` both degrade
- * correctly on an empty roster — the assignee's `name` becomes the actor id,
- * which is what `actorLabel(id, null)` renders everywhere else in this client,
- * and `actorName` stays `null`, which is that field's documented absence value.
- * A name is missing; no fact is invented. Growing the list route a
- * `workspaceId` to close it would be a route change for a display convenience,
- * and it is left to whoever owns the signature.
+ * body names its workspace. This body names one too — `ListResponse.workspaceId`,
+ * added for exactly this (case 13.1287) — so `getTickets` fetches the roster
+ * through `listWorkspaceId(raw)` and passes it in here, once for the whole walk,
+ * exactly as `getBoard` does through `boardWorkspaceId(raw)`.
+ *
+ * The parameter still DEFAULTS to an empty map, and that is not a leftover: it
+ * is the shape a roster the caller may not read arrives in. `mapAssignee` and
+ * `mapProvenance` both degrade correctly on it — the assignee's `name` becomes
+ * the actor id, which is what `actorLabel(id, null)` renders everywhere else in
+ * this client, and `actorName` stays `null`, which is that field's documented
+ * absence value. A name is missing; no fact is invented. Verified at the seam
+ * by case 13.1289, where the members route answers 404.
  */
-export function mapListPage(raw: unknown): ListPage {
+export function mapListPage(
+  raw: unknown,
+  roster: ReadonlyMap<string, string> = new Map(),
+): ListPage {
   const record = asRecord(raw, 'list');
 
   // THE CURSOR IS CARRIED OUT, not dropped and not refused (ruling P41).
@@ -1759,7 +1779,6 @@ export function mapListPage(raw: unknown): ListPage {
   const nextCursor =
     rawCursor === null || rawCursor === undefined ? null : asString(rawCursor, 'list.nextCursor');
 
-  const roster: ReadonlyMap<string, string> = new Map();
   const rows: ListRow[] = [];
   asArray(record['groups'], 'list.groups').forEach((entry, groupIndex) => {
     const path = `list.groups[${groupIndex}]`;

@@ -27,6 +27,20 @@ const PROJECT = '01J9GPRJ000000000000000000';
 const ANSELMA = '01J9GUSA000000000000000000';
 
 /**
+ * A request for a PAGE of the list walk, as opposed to the roster join
+ * `getTickets` also makes.
+ *
+ * `getTickets` asks for the members roster ONCE per walk — that is its own case
+ * (13.1290), which counts the roster calls directly. The paging cases filter it
+ * out because what they assert is the SHAPE OF THE WALK: how many pages, which
+ * cursor page two carried, whether the filter survived every request. Counting
+ * the total instead would make each of them fail the moment a join was added to
+ * the method they are about, which is a change to the walk's surroundings and
+ * not to the walk.
+ */
+const isTicketCall = (url: string) => !url.includes('/v1/workspaces/');
+
+/**
  * A fetch that answers only the paths it was given, 404s everything else, and
  * records every call. The 404 is not a convenience: it is the answer every `/v1`
  * read route gives for "no such thing" and "not yours" alike, so a test that
@@ -56,10 +70,33 @@ function recordingFetch(answers: Record<string, unknown>) {
  * one forever and a loop that ignored the cursor would still "assemble two
  * pages" out of the same rows.
  */
-function pagingFetch(pages: readonly { ticketIds: readonly string[] }[]) {
+function pagingFetch(
+  pages: readonly { ticketIds: readonly string[] }[],
+  options: { members?: unknown } = {},
+) {
   const urls: string[] = [];
   const fetchImpl = async (input: string) => {
     urls.push(input);
+    // THE ROSTER ROUTE IS ITS OWN PATH, and the walk asks for it exactly once.
+    // Without this arm the members URL would fall through to the ticket-page
+    // logic below and be answered with page one's LIST body — which
+    // `rosterByActorId(mapActors(...))` cannot read, so every paging case would
+    // fail with a mapping error about a body it never asked for. A helper that
+    // answered the wrong route with a well-formed body of another shape is the
+    // same class of lie as the cursor-as-index this file already repented.
+    //
+    // ABSENT BY DEFAULT, which is the 404 the shipped members route answers a
+    // caller who may not read the roster (`door(..., 'no-guests')`). The walk
+    // still resolves and names degrade to ids — that is 13.1289, so the default
+    // is the refused case rather than the happy one.
+    if (input.includes(`/v1/workspaces/${WORKSPACE}/members`)) {
+      const body = options.members;
+      return {
+        ok: body !== undefined,
+        status: body === undefined ? 404 : 200,
+        json: async () => body,
+      } as Response;
+    }
     // KEYSET, matching the shipped route rather than a protocol invented here.
     // `routes/list.ts` binds `t.ticket_id > $n` and emits the LAST TICKET ID of
     // the page as `nextCursor`. An earlier draft of this helper used the page
@@ -86,13 +123,23 @@ function pagingFetch(pages: readonly { ticketIds: readonly string[] }[]) {
       return {
         ok: true,
         status: 200,
-        json: async () => ({ projectId: PROJECT, groupBy: 'flat', groups: [], nextCursor: null }),
+        json: async () => ({
+          workspaceId: WORKSPACE,
+          projectId: PROJECT,
+          groupBy: 'flat',
+          groups: [],
+          nextCursor: null,
+        }),
       } as Response;
     }
     return {
       ok: true,
       status: 200,
       json: async () => ({
+        // REQUIRED on the body since case 13.1287 — the id the roster join is
+        // fetched with. A fixture without it is no longer a body the route can
+        // produce, and `listWorkspaceId` refuses it by name.
+        workspaceId: WORKSPACE,
         projectId: PROJECT,
         groupBy: 'flat',
         groups: [
@@ -796,19 +843,20 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     // TWO REQUESTS, and the second carried the cursor. Without this, a source
     // that fetched page one twice from a stubbed fetch answering everything
     // would satisfy every assertion above.
-    expect(urls).toHaveLength(2);
-    expect(urls[0]).not.toContain('cursor=');
+    const walked = urls.filter(isTicketCall);
+    expect(walked).toHaveLength(2);
+    expect(walked[0]).not.toContain('cursor=');
     // The cursor is the LAST ID OF PAGE ONE, which is what the shipped route
     // emits and consumes — not an index this test made up.
-    expect(urls[1]).toContain('cursor=t2');
+    expect(walked[1]).toContain('cursor=t2');
     // The filter and grouping survive paging — a second page requested without
     // them would silently be a different query against the same accumulator.
-    expect(urls[1]).toContain('groupBy=flat');
+    expect(walked[1]).toContain('groupBy=flat');
     // The page size is SENT, not inherited from the server's default — the
     // constant the row bound is computed from, so if this stops being sent the
     // "2000 rows" the user is told becomes a different number silently.
-    expect(urls[0]).toContain(`limit=${LIST_PAGE_SIZE}`);
-    expect(urls[1]).toContain(`limit=${LIST_PAGE_SIZE}`);
+    expect(walked[0]).toContain(`limit=${LIST_PAGE_SIZE}`);
+    expect(walked[1]).toContain(`limit=${LIST_PAGE_SIZE}`);
   });
 
   /**
@@ -834,7 +882,7 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
 
     const view = await source.query.getTickets(PROJECT, {}, 'flat');
     expect(view.rows).toHaveLength(LIST_PAGE_CAP);
-    expect(urls).toHaveLength(LIST_PAGE_CAP);
+    expect(urls.filter(isTicketCall)).toHaveLength(LIST_PAGE_CAP);
     // Complete and in order, so "did not throw" is not the whole assertion.
     expect(view.rows.map((row) => row.ticketId)).toEqual(
       pages.map((page) => page.ticketIds[0]),
@@ -869,7 +917,7 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     // Removing the cap (the ruling's second mutation) makes this loop run to
     // exhaustion and the refusal never fires, so the `toBeInstanceOf` above
     // goes red; without this length check, a cap of 1 would also pass.
-    expect(urls).toHaveLength(LIST_PAGE_CAP);
+    expect(urls.filter(isTicketCall)).toHaveLength(LIST_PAGE_CAP);
   });
 
   /**
@@ -906,6 +954,12 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     const urls: string[] = [];
     const fetchImpl = async (input: string) => {
       urls.push(input);
+      // The roster join `getTickets` makes once per walk. 404, the answer the
+      // shipped members route gives a caller who may not read it — this case is
+      // about the WALK's length, and names are not its subject.
+      if (!isTicketCall(input)) {
+        return { ok: false, status: 404, json: async () => undefined } as unknown as Response;
+      }
       const pages = narrow(input) ? NARROW : WIDE;
       const cursor = new URL(input, 'http://x').searchParams.get('cursor');
       const index =
@@ -916,6 +970,7 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
         ok: true,
         status: 200,
         json: async () => ({
+          workspaceId: WORKSPACE,
           projectId: PROJECT,
           groupBy: 'flat',
           groups: [
@@ -947,7 +1002,11 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
 
     // And the narrowing was on EVERY request of the walk, not only the first.
     // Printed as a list so a failure names which page went out wide.
-    expect(urls.map((url) => new URL(url, 'http://x').searchParams.get('filter'))).toEqual([
+    expect(
+      urls
+        .filter(isTicketCall)
+        .map((url) => new URL(url, 'http://x').searchParams.get('filter')),
+    ).toEqual([
       JSON.stringify({ stateCategory: 'active' }),
       JSON.stringify({ stateCategory: 'active' }),
     ]);
@@ -961,7 +1020,119 @@ describe('getTickets pages to exhaustion (ruling P41, Door B)', () => {
     const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
     const view = await source.query.getTickets(PROJECT, {}, 'flat');
     expect(view.rows.map((row) => row.ticketId)).toEqual(['t1']);
-    expect(urls).toHaveLength(1);
+    expect(urls.filter(isTicketCall)).toHaveLength(1);
+  });
+});
+
+/** A roster the walk can join: one named member, and nobody else. */
+const NAMED_MEMBERS: MemberListResponse = {
+  workspaceId: WORKSPACE,
+  members: [{ userId: 'u1', displayName: 'Kiro', role: 'owner', email: 'kiro@example.test' }],
+};
+
+/**
+ * A one-page list body whose cards are assigned to `assigneeId` AND whose state
+ * claim is theirs.
+ *
+ * The two are set together because `mapListRow` routes them through the SAME
+ * roster by two different call sites — `assignee` through `mapAssignee`,
+ * `stateProvenance.actorName` through `mapProvenance`. A case that asserted only
+ * the assignee would pass on a join wired to one of the two, which is the
+ * half-witnessed contract this series is named for.
+ */
+function listBodyAssignedTo(...pairs: readonly (readonly [string, string])[]) {
+  return {
+    workspaceId: WORKSPACE,
+    projectId: PROJECT,
+    groupBy: 'flat',
+    groups: [
+      {
+        key: 'all',
+        label: 'All',
+        cards: pairs.map(([ticketId, actorId]) => ({
+          ...listCard(ticketId),
+          assigneeId: actorId,
+          stateProvenance: { actorId, clientTime: 'c', serverTime: 's', cause: null },
+        })),
+      },
+    ],
+    nextCursor: null,
+  };
+}
+
+/**
+ * 13.1288–13.1290 — `getTickets` joins the roster the list body names.
+ *
+ * The List tab printed ULIDs for the assignee because the walk mapped every row
+ * against a literal empty roster: the body named no workspace, so there was no
+ * id to fetch one with (case 13.1287 gave it one, and the mapper's own docblock
+ * named this exact closing move). These three cases pin the join itself — that
+ * it happens, that a refused roster does not take the list down with it, and
+ * that it happens ONCE for the whole walk rather than once per page.
+ */
+describe('getTickets joins the roster off the list body’s own workspaceId', () => {
+  it('13.1288 a named member’s row carries their NAME as the assignee and as the provenance actor', async () => {
+    const { fetchImpl, calls } = recordingFetch({
+      [`/v1/projects/${PROJECT}/tickets`]: listBodyAssignedTo(['t1', 'u1'], ['t2', 'u9']),
+      [`/v1/workspaces/${WORKSPACE}/members`]: NAMED_MEMBERS,
+    });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+
+    // THE NAMED MEMBER, through both doors into the one map.
+    expect(view.rows[0]?.assignee).toEqual({ id: 'u1', name: 'Kiro' });
+    expect(view.rows[0]?.stateProvenance.actorName).toBe('Kiro');
+
+    // THE CONTROL, in the same case: a row assigned to somebody the roster does
+    // not cover keeps the ID — what `actorLabel(id, null)` renders everywhere
+    // else in this client. Without it, a mapper that printed the first member's
+    // name for EVERY row would satisfy the assertions above.
+    expect(view.rows[1]?.assignee).toEqual({ id: 'u9', name: 'u9' });
+    expect(view.rows[1]?.stateProvenance.actorName).toBeNull();
+
+    // And the roster was fetched from the id the BODY named. `WORKSPACE` is that
+    // id and it appears nowhere else in this test, so a join pointed at a
+    // constant, at `PROJECT`, or at nothing at all fails here.
+    expect(calls.filter((call) => !isTicketCall(call.input)).map((call) => call.input)).toEqual([
+      `http://server.test/v1/workspaces/${WORKSPACE}/members`,
+    ]);
+  });
+
+  it('13.1289 a REFUSED roster does not take the list with it — the walk resolves and names stay ids', async () => {
+    // No members answer: `recordingFetch` 404s every path it was not given,
+    // which is the shipped members route's answer to a caller it will not show
+    // the roster to (`door(..., 'no-guests')`). The board has the same guard.
+    const { fetchImpl, calls } = recordingFetch({
+      [`/v1/projects/${PROJECT}/tickets`]: listBodyAssignedTo(['t1', 'u1']),
+    });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+
+    expect(view.rows.map((row) => row.ticketId)).toEqual(['t1']);
+    expect(view.rows[0]?.assignee).toEqual({ id: 'u1', name: 'u1' });
+
+    // The join was ATTEMPTED. Without this the case would be green on a source
+    // that never fetched a roster at all — which is precisely the defect it
+    // guards. Asserted on the roster call so the two readings are separable.
+    expect(calls.filter((call) => !isTicketCall(call.input))).toHaveLength(1);
+  });
+
+  it('13.1290 a two-page walk fetches the roster ONCE, not once per page', async () => {
+    const { fetchImpl, urls } = pagingFetch([{ ticketIds: ['t1', 't2'] }, { ticketIds: ['t3'] }], {
+      members: NAMED_MEMBERS,
+    });
+    const source = createOnlineDataSource({ baseUrl: '', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+
+    // The walk is unchanged by the join: both pages, in order.
+    expect(view.rows.map((row) => row.ticketId)).toEqual(['t1', 't2', 't3']);
+    expect(urls.filter(isTicketCall)).toHaveLength(2);
+
+    // ONCE for the whole walk. A join evaluated inside the per-page mapping
+    // would fetch it twice and still satisfy every row assertion above — the
+    // walk would merely be slower, and a membership revoked between pages would
+    // name the same person two ways inside one view.
+    expect(urls.filter((url) => !isTicketCall(url))).toHaveLength(1);
   });
 });
 

@@ -15,6 +15,7 @@ import {
   LIST_TOO_LARGE_ABSENCE,
   ServingGapError,
   mapListPage,
+  listWorkspaceId,
   mapMyWork,
   mapPreferences,
   mapSearchHits,
@@ -119,7 +120,7 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
   const http: HttpClient = createHttpClient(deps.baseUrl, fetchImpl);
 
   /**
-   * The workspace roster, fetched fresh for every board read.
+   * The workspace roster, fetched fresh for every board, ticket and list read.
    *
    * NOT cached across calls, deliberately: a cached roster keeps naming somebody
    * whose membership was revoked, on a surface whose whole job is saying who
@@ -127,6 +128,12 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
    * from `door(..., 'no-guests')`) yields an EMPTY roster rather than
    * propagating, because "no name known" is what an empty roster means and it is
    * what `mapAssignee` already handles.
+   *
+   * ONE call per read, never one per page: `getTickets` walks up to `LIST_PAGE_CAP`
+   * pages and joins ONCE before mapping them (case 13.1290). A join inside the
+   * per-page mapping would be a request per page for an answer that does not
+   * change between them — and, worse, a membership revoked mid-walk could name
+   * the same person two ways inside one view.
    */
   async function workspaceRoster(workspaceId: string): Promise<Map<string, string>> {
     const raw = await http.get(`/v1/workspaces/${workspaceId}/members`);
@@ -225,6 +232,14 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
     getTickets: async (projectId, filter, grouping) => {
       const rows: ListRow[] = [];
       let cursor: string | null = null;
+      // THE ROSTER IS JOINED ONCE, and it is joined off the FIRST page's body
+      // (case 13.1290). `ListResponse.workspaceId` is on every page, but a
+      // per-page fetch would be the same request N times for an answer that
+      // cannot differ — and it would let a membership revoked mid-walk name one
+      // person two ways inside a single view. Hoisted out of the loop rather
+      // than memoised inside it, because "once" is the property and a cache
+      // would make it an accident of timing.
+      let roster: ReadonlyMap<string, string> | null = null;
       for (let page = 0; page < LIST_PAGE_CAP; page += 1) {
         // `limit` is SENT rather than inherited — see `LIST_PAGE_SIZE`. It is
         // the route's validated maximum, so the walk is four times shorter than
@@ -243,7 +258,12 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         // when there was only ever a page 1. Raised as the STATUS it was,
         // exactly as `getBoard` does one method up.
         if (raw === null) throw new HttpError(404, url);
-        const answered: ListPage = mapListPage(raw);
+        // Fetched AFTER a non-null body and BEFORE the first mapping: a 404 here
+        // is "no such project, or not yours", and joining a roster for an answer
+        // this method is about to raise would be a round trip on its behalf.
+        // `??=` rather than an assignment, so pages 2..N reuse the first join.
+        roster ??= await workspaceRoster(listWorkspaceId(raw));
+        const answered: ListPage = mapListPage(raw, roster);
         rows.push(...answered.rows);
         if (answered.nextCursor === null) {
           return { projectId: answered.projectId, rows };
@@ -259,9 +279,10 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
     /**
      * The roster join, the same one `getBoard` makes and for the same reason:
      * this signature already names the workspace, so the display names are one
-     * shipped route away. `getTickets` above gets an EMPTY roster instead —
-     * neither its signature nor the list body names a workspace — and
-     * `mapListPage`'s docblock argues why that degrades rather than lies.
+     * shipped route away. `getTickets` above makes the SAME join now — off
+     * `listWorkspaceId(raw)` rather than off a parameter, since the list body
+     * names its workspace too (case 13.1287) — so all three reads that carry
+     * actor ids resolve them the same way.
      * (It was `mapListView` until ruling P41. This cross-reference is LIVE, so
      * it is repointed rather than left naming a symbol that no longer exists.)
      *

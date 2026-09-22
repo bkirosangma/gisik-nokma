@@ -2367,3 +2367,25 @@ they read the same rows. The nameless-member fallback (name → email → id) is
   of the project id beside it. The field is REQUIRED on `ListResponse` (`string`, first field, mirroring
   `BoardResponse.workspaceId`), which is what makes the typecheck find every fixture that constructs a
   body rather than letting `undefined` reach a mapper that would degrade silently. — (`apps/server/test/routes/list.test.ts`)
+
+The client half. `getTickets` now fetches the roster through `listWorkspaceId(raw)` and passes it to
+`mapListPage` for every page of the walk — the same join `getBoard` has always made, off the body
+instead of off a parameter.
+
+- **13.1288** ✅ A named member's row carries their NAME as the assignee AND as the provenance actor —
+  both doors into the one roster map are asserted in a single case, because a join wired to only one of
+  them would satisfy the other. **The control is in the same case and in the same walk:** a row assigned
+  to somebody the roster does not cover keeps the id, so a mapper that printed the first member's name
+  for every row cannot pass. The roster is fetched from the id the BODY named — the test's `WORKSPACE`
+  appears nowhere else, so a join pointed at a constant, at the project id, or at nothing fails. —
+  (`packages/app-core/test/online/online-data-source.test.ts`)
+- **13.1289** ✅ A REFUSED roster does not take the list down with it: the members route answers 404 (the
+  shipped answer to a caller who may not read the roster, `door(..., 'no-guests')`), the walk still
+  resolves, and names stay ids. **The case asserts the join was ATTEMPTED**, without which it would be
+  green on a source that never fetched a roster at all — which is the defect it guards. —
+  (`packages/app-core/test/online/online-data-source.test.ts`)
+- **13.1290** ✅ A two-page walk fetches the roster exactly ONCE. The row assertions alone would pass on
+  a join evaluated inside the per-page mapping; the walk would merely be slower, and a membership revoked
+  between pages would name one person two ways inside a single view. Counted on the roster calls, with
+  the ticket-page count asserted beside it so "once" cannot be satisfied by a walk that stopped early. —
+  (`packages/app-core/test/online/online-data-source.test.ts`)
