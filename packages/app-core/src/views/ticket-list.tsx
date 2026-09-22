@@ -1243,6 +1243,15 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
 export type TicketListState = {
   /** `null` until the rows load, and it stays null when the read FAILS. */
   rows: ListRow[] | null;
+  /**
+   * Whether the list has EVER answered, over this hook's whole lifetime.
+   *
+   * `rows === null` is the right test for "do I have rows to render". It is the
+   * wrong test for "does the New ticket control exist", because a filter change
+   * re-keys the query and nulls `rows` on every toggle — which retracted the
+   * button and flickered the project header. Gate controls on this instead.
+   */
+  rowsHaveAnswered: boolean;
   prefs: ProjectViewPrefs;
   /**
    * The PROJECT-level summary of `prefs`' two halves — `'default'` only when the
@@ -1391,6 +1400,10 @@ export function useTicketList(
 
   return {
     rows: list.data?.rows ?? null,
+    // Lifetime, not per-key — a filter change re-keys the query and nulls `rows`,
+    // and a caller gating a CONTROL on `rows === null` would retract it on every
+    // toggle. See `LiveQueryResult.hasAnswered`.
+    rowsHaveAnswered: list.hasAnswered,
     prefs,
     prefsOrigin: prefsOriginOf(prefs),
     canSetPrefs: preferences.document !== null,

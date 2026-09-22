@@ -17,9 +17,12 @@ import type { HttpClient } from '@gisik-nokma/app-core/online';
  * That real URL needs a **projectId**, and a `Notification` does not carry one:
  * `packages/domain/src/notifications.ts` puts `workspaceId` on the row and every
  * one of the five payloads carries a `ticketId` and no project. So the shell has
- * to ask. `app/w/[workspaceId]/my-work/page.tsx` hit the same wall and answered
- * it the only way it could — it resolves the project out of the row it already
- * holds — and the inbox holds no such row.
+ * to ask. `app/w/[workspaceId]/my-work/page.tsx` hits the same wall and answers
+ * it the only way it can — it resolves the project out of the row it already
+ * holds, falling back to THIS gateway for a ticket no row carries (owner
+ * request 2026-09-23: a My Work click opens the sheet on My Work, so the sheet's
+ * project-scoped props have to come from the open ticket) — and the inbox holds
+ * no such row at all.
  *
  * ## Deliberately NOT a `DataSource` method, and not `getTicket`
  *
