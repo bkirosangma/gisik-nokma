@@ -3079,3 +3079,4 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ⚙️ **The detach rule is derived in the reducer** — the last detach of an inherit-scoped note reverts to the remembered scope or to private (`applyNoteEvent`, spec §3.3–3.4).
 - ⚙️ **Notes are projected into `proj_notes`, `proj_note_attachments`, `proj_note_comments`** — whole-row writes from the reducer, verifier-clean, no history table (versions are read from `events`).
 - ⚙️ **One reader predicate, two spellings, asserted equal** — `canReadNote` and `visibleNotesWhere` (spec §4.1, §4.3).
+- ⚙️ **Note writes are gated by `checkNotePermission`** — author/admin-reader/owner edit; readers attach on tickets they can see; readers comment (spec §4.2; admins have no override beyond what they can read, per `can-see.ts`).

@@ -5,7 +5,8 @@ import { SqlParams } from '../../src/read/sql-params.js';
 import { visibleNotesWhere } from '../../src/read/visible-where.js';
 import { canReadNote, canReadNoteById, loadNoteForVisibility } from '../../src/visibility/can-read-note.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { applyCommitted, makeCommitted, resetEntitySeqs } from '../helpers/apply.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
+import { seedNotesFixture } from '../helpers/notes-fixture.js';
 
 /**
  * The reader predicate's fixture: 5 notes × 7 people.
@@ -112,115 +113,12 @@ let NOTES: Record<string, string>;
 
 beforeAll(async () => {
   db = await createTestDatabase();
-  resetEntitySeqs();
-
-  WS = newUlid();
-  P = newUlid();
-  TP = newUlid();
-  TE = newUlid();
-  ids = {
-    owner: newUlid(),
-    admin: newUlid(),
-    memberIn: newUlid(),
-    memberOut: newUlid(),
-    guestListed: newUlid(),
-    guestUnlisted: newUlid(),
-    author: newUlid(),
-  };
-  NOTES = {
-    nPrivate: newUlid(),
-    nWorkspace: newUlid(),
-    nProject: newUlid(),
-    nExplicit: newUlid(),
-    nInherit: newUlid(),
-  };
-
-  const ws = { workspaceId: WS, actorId: ids.owner };
-  // The roster shapes are copied from `helpers/read-scenario.ts:120` rather than
-  // paraphrased, because the projection is the oracle: `membership.granted`
-  // DECLARES scope as `z.never()` (the 2026-08-27 collapse), so a `scope` key
-  // would be refused inside proj_memberships and the person would silently hold
-  // no role at all.
-  const ticket = (id: string, title: string) =>
-    makeCommitted({ ...ws, entity: { kind: 'ticket', id }, type: 'ticket.created', payload: { typeId: 'task', projectId: P, parentId: null, title } });
-  const noteEv = (id: string, type: string, payload: unknown) =>
-    makeCommitted({ ...ws, actorId: ids.author, entity: { kind: 'note', id }, type, payload });
-
-  await applyCommitted(db.pool, [
-    makeCommitted({ ...ws, entity: { kind: 'workspace', id: WS }, type: 'workspace.created', payload: { name: 'Convenience Corner' } }),
-    makeCommitted({ ...ws, entity: { kind: 'project', id: P }, type: 'project.created', payload: { name: 'Registrations' } }),
-    ...(
-      [
-        ['owner', 'owner'],
-        ['admin', 'admin'],
-        ['memberIn', 'member'],
-        ['memberOut', 'member'],
-        ['guestListed', 'guest'],
-        ['guestUnlisted', 'guest'],
-        ['author', 'member'],
-      ] as [U, string][]
-    ).map(([who, role]) =>
-      makeCommitted({
-        ...ws,
-        entity: { kind: 'membership', id: `${WS}:${ids[who]}` },
-        type: 'membership.granted',
-        payload: { userId: ids[who], role },
-      }),
-    ),
-    // ON P: owner, memberIn, author. NOT admin, NOT memberOut — those two
-    // absences are the cells the `project` row is written from.
-    ...(['owner', 'memberIn', 'author'] as U[]).map((who) =>
-      makeCommitted({ ...ws, entity: { kind: 'project', id: P }, type: 'project.member_added', payload: { userId: ids[who], projectAdmin: who === 'owner' } }),
-    ),
-    // The workflow and the ticket type, in `seedReadScenario`'s exact shapes and
-    // with its exact ids. Not decoration: `proj_tickets` folds `ticket.created`
-    // through the engine, which refuses an unknown type, so a fixture that seeded
-    // tickets without these would fail at the projection rather than at an
-    // assertion. The ids are fixed rather than minted for the same reason they
-    // are fixed there (`type_id = 'task'` is asserted by name elsewhere), and
-    // that is safe here because this file uses its own fresh database.
-    makeCommitted({
-      ...ws,
-      entity: { kind: 'workflow', id: SCENARIO_WORKFLOW_ID },
-      type: 'workflow.defined',
-      payload: {
-        id: SCENARIO_WORKFLOW_ID,
-        version: 1,
-        name: 'Errands',
-        initialStateId: 'todo',
-        states: [
-          { id: 'todo', name: 'To do', category: 'open' },
-          { id: 'doing', name: 'Doing', category: 'active' },
-          { id: 'done', name: 'Done', category: 'terminal' },
-        ],
-        transitions: [
-          { from: '*', to: 'todo', rules: [] },
-          { from: '*', to: 'doing', rules: [] },
-          { from: '*', to: 'done', rules: [] },
-        ],
-      },
-    }),
-    makeCommitted({
-      ...ws,
-      entity: { kind: 'ticket-type', id: 'task' },
-      type: 'ticket-type.defined',
-      payload: { id: 'task', name: 'Task', icon: 'check', rank: 3, workflowId: SCENARIO_WORKFLOW_ID, fields: [] },
-    }),
-    ticket(TP, 'Renew the trade licence'),
-    ticket(TE, 'Share the July invoices'),
-    makeCommitted({ ...ws, entity: { kind: 'ticket', id: TE }, type: 'visibility.set', payload: { ticketId: TE, mode: 'explicit', userIds: [ids.guestListed] } }),
-
-    noteEv(NOTES.nPrivate!, 'note.created', { title: 'Private', homeProjectId: P, scope: { mode: 'private' } }),
-    noteEv(NOTES.nWorkspace!, 'note.created', { title: 'Workspace', homeProjectId: P, scope: { mode: 'workspace' } }),
-    noteEv(NOTES.nProject!, 'note.created', { title: 'Project', homeProjectId: P, scope: { mode: 'project' } }),
-    noteEv(NOTES.nExplicit!, 'note.created', { title: 'Explicit', homeProjectId: P, scope: { mode: 'explicit', userIds: [ids.guestListed] } }),
-    noteEv(NOTES.nInherit!, 'note.created', {
-      title: 'Inherit',
-      homeProjectId: P,
-      scope: { mode: 'inherit' },
-      attachTicketId: TE,
-    }),
-  ]);
+  // The world is `test/helpers/notes-fixture.ts`’s, shared with the writer matrix
+  // (18.024) so the two cannot come to disagree about what "the world" is. It
+  // resets the helper’s process-local seq counter itself, which is why the ids it
+  // mints and the seqs `applyCommitted` writes cannot collide.
+  const fixture = await seedNotesFixture(db.pool);
+  ({ WS, P, TP, TE, ids, NOTES } = fixture);
 });
 
 afterAll(async () => {

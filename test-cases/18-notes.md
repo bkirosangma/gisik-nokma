@@ -49,3 +49,10 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.021 — `visibleNotesWhere` returns exactly the notes `canReadNote` accepts,** asserted per user on the same fixture. Mutation: change the `project` arm to ignore project membership.
 - ✅ **18.022 — an `inherit` note is readable through ANY one attached visible ticket** (union), and not readable when every attached ticket is invisible or deleted. Mutation: require all.
 - ✅ **18.023 — the owner reads every note; the author reads their own private note; a non-member reads nothing.** Mutation: drop the author arm.
+
+## 18.4 Server — who may write which note event
+
+- ✅ **18.024 — the matrix of spec §4.2**: every note event × {author, reader-member, non-reader-member, guest-listed, admin-reader, admin-non-reader, owner} refuses or allows exactly as the table says. Mutation: flip one cell.
+- ✅ **18.025 — `note.created` refuses a guest, refuses a project home the actor is not on, and requires ticket visibility for `attachTicketId`.** Control: a member on the project creates. Mutation: drop the project-membership check.
+- ✅ **18.026 — `note.attached` requires BOTH reading the note AND seeing the ticket;** a reader who cannot see the ticket is refused, a ticket-viewer who cannot read the note is refused. Mutation: drop either half.
+- ✅ **18.027 — refusals carry rule `permission.note` and a plain-language reason;** `note.created` by a guest carries `permission.role` (the role check fires first). Mutation: use the visibility rule id.
