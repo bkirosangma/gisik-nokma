@@ -2447,3 +2447,14 @@ that skipped to the id would pass an assertion written against either alone.
   untouched. The phone resolved `displayName` verbatim on BOTH sides — the label it returned and the
   string it matched against — which is the same defect E5-4 closed on the web sheet's `queryUsers`. —
   (`apps/mobile/src/screens/mention-query.test.ts`)
+
+  **AND THE VISIBILITY EDITOR'S VIEWER CHIPS**, the one surface the first sweep of this rule missed
+  (controller addendum, 2026-09-22): `visibility-editor.tsx`'s own `nameOf` read `.name` off the roster
+  row it already held (`members.find`), so a nameless member's chip under "Who can see it" — and the
+  same member inside the `Only: …` sentence — printed the ULID, while the picker one section up had
+  offered them by email since E4-6. Fixed in the shape the ticket sheet's `nameOf` takes: resolve the
+  found row through `memberLabel`, and keep `actorLabel(userId, null)` for an id the roster does not
+  cover (the id floor, and the system-actor step). One `it` asserts the nameless member's chip is the
+  ADDRESS and that the ULID appears nowhere, with the NAMED member as the control in the same audience
+  and a chip count so the label change cannot have moved the number of chips drawn. —
+  (`packages/app-core/test/views/visibility-editor.test.tsx`)

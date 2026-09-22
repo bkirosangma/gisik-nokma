@@ -357,8 +357,22 @@ export function VisibilityEditor({
   const triggerRef = useRef<HTMLButtonElement>(null);
   const [menuOpen, setMenuOpen] = useState(false);
 
-  const nameOf = (userId: string): string =>
-    actorLabel(userId, members.find((member) => member.id === userId)?.name ?? null);
+  // The viewers/sentence renderer, and the SAME shape `ticket-sheet.tsx`'s
+  // `nameOf` takes: `actorLabel` stays the outer renderer — it checks
+  // `SYSTEM_ACTOR_NAMES` first, which is what keeps a system actor from being
+  // renamed and keeps the id floor total — while the LABEL it is handed comes
+  // from `memberLabel` when the id is on the roster (name → email → id), and
+  // from `null` when it is not, which `actorLabel` renders as the id.
+  //
+  // The member row was already in hand (`members.find`); reading `.name` past
+  // it printed a ULID for the nameless population on the two surfaces that are
+  // most obviously lists of PEOPLE — the chips under "Who can see it" and the
+  // `Only: …` sentence — while the picker one section up had offered those same
+  // people by email since E4-6. Case 13.1296.
+  const nameOf = (userId: string): string => {
+    const member = members.find((candidate) => candidate.id === userId);
+    return actorLabel(userId, member === undefined ? null : memberLabel(member));
+  };
 
   const toggle = (userId: string) =>
     setUserIds((chosen) =>
