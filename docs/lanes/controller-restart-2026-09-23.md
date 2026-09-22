@@ -1,5 +1,46 @@
 # ▣ RESTART CARD — controller session, 2026-09-23 (Claude Code restart for an update)
 
+## ▶ UPDATE 2026-09-23 ~05:15 IST — READ THIS BLOCK FIRST; it overrides anything below it
+
+**Released.** `release/2026-09-23` → `main` as **#700**, merge `3cf4e551` (owner's word). DO deployment
+`ea53c95e` ACTIVE on `3cf4e55` (server, web, backup); `pm-api…/healthz` 200, web 307→`/workspaces` 200.
+Rollback target was `d8918f6a` (`59029e1`). Gate: local `ctl gate` 33/33, 0 cached, Node v22.22.2 — **no
+CI ran** (billing). `ctl land <pr> --repo <gate worktree>` works for the release→`main` landing; the marker
+lives in the gated worktree's gitdir, so pass the same `--repo` to both verbs. No new `release/<date>` has
+been cut — that is the owner's call.
+
+**THE NOTES SERIES — a six-plan loop the controller runs without the owner between plans.**
+- Branch **`release/notes`**, cut from `main` `59029e1c` (so it does NOT contain #700's release). Spec
+  `docs/superpowers/specs/2026-09-23-notes-design.md`; Plan 1's header holds the series table:
+  1 backend core (—) · 2 sync (1) · 3 search (1) · 4 editor port (— , parallel) · 5 notes page (1-4) ·
+  6 ticket section (1,2,4). After 1 lands: 2 ∥ 3; 4 runs beside 1; then 5, then 6. Never two lanes on one plan.
+- **Plan author = the owner's peer session `Priority field [6bfc4d]`** (SendMessage, that exact name). It
+  writes Plan n+1 after Plan n lands and pastes a CTL-HANDOFF into the controller window. Re-message after
+  an hour of silence.
+- **Per plan:** push `origin/release/notes:refs/heads/task/notes-<n>-<slug>` → copy
+  `gisik-nokma-lanes/LANE-notes-plan-2026-09-23.md` to `LANE-notes-<n>-<date>.md` + two lines `PLAN=…`,
+  `BRANCH=…` → `ctl restart <win> <worktree> <brief>` (verify the seat by the STATUS LINE) → nudger
+  `IDLE_NUDGER_TARGETS` in `~/.claude/scripts/com.kiro.claude-idle-nudger.plist`, bootout+bootstrap →
+  watch the pane for `(PROGRESS|DONE|BLOCKED) notes-N … — <sha8>` → on DONE review against the plan (a
+  commit per task, RED/GREEN + NODE= in bodies, mutation lines, `Features.md` §15 + `test-cases/18-notes.md`
+  in the same commits, `pnpm check:citations`) → `ctl pr open task/notes-<n>-<slug> --repo <wt> --base
+  release/notes …` → `--no-ff` merge from a throwaway worktree → verify reachability → SendMessage the peer:
+  `NOTES PLAN <n> LANDED — PR #<num> — merge <full sha> — release/notes now <full sha>`.
+- **BLOCKED:** plan defect → message the peer verbatim and hold; owner ruling → owner report and hold.
+- **DeepSeek 402 / credit out:** `tmux set-environment -t gisik GISIK_EXECUTOR_BACKEND anthropic` and
+  `EXECUTOR_MODEL sonnet`, then `ctl restart` the same window/worktree/brief (RESUMING section picks up at
+  the first uncommitted task). Switch back when credit returns. Report every switch.
+- **DO NOT:** `ctl rebuild` from `release/notes`; merge to `main`; §13 allocation rows for notes (§18
+  blocks live in `test-cases/18-notes.md`).
+- **Open owner ruling (carried, not blocking):** spec §4.2 limits admin edit/delete to notes they can read;
+  the brainstorm said "admins can edit any note". Plan 1 builds the spec's version; one line flips it.
+
+**State at this write:** #698 merged into `release/notes` as `0817d1e4`. Plan 1 `task/notes-1-backend-core`
+running on **`gisik:2`** (worktree `gisik-nokma-ds3`, deepseek-flash), nudger → `gisik:2`. `gisik:3`
+(`gisik-nokma-ds5`) idle, reserved for Plan 4. `gisik:1` idle (board lane, done).
+
+
+
 Written before a deliberate restart of the CONTROLLER SESSION ONLY — not the machine, not the lanes. Lane
 processes, worktrees and branches are untouched by it. Read this, then `docs/lanes/controller-state.md`'s own card only if
 you need the older topology — most of what that card says about lanes and cycles predates this session.
