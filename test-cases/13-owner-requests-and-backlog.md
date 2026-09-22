@@ -2401,3 +2401,25 @@ the same order spelled twice, free to drift; everything else read `member.name` 
   function returning the id for everybody would pass the other three. The third and fourth arms are
   different shapes of input reaching the same floor (blank versus absent), which is the distinction the
   server's own withholding draws. — (`packages/app-core/test/member-label.test.ts`)
+
+`memberLabel` is now what the roster JOIN's value is built with (`rosterByActorId`), which is the step
+that makes the board, the list and the ticket read correct without any of them knowing an address exists.
+The join used to hold the raw `displayName`, so a blank-named member joined to `''` — an empty name on
+screen, decided by which surface you were looking at, since only the pickers had a fallback.
+
+- **13.1292** ✅ A blank-named member with a real address is named by the ADDRESS through the board, the
+  list AND the ticket read — asserted on all three in one case, because a join changed in one mapper's
+  path and not another's is exactly the half-witnessed contract this series is named for. Both doors into
+  the one map are asserted where a surface has two (the assignee and the state claim's actor), and the
+  NAMED member is the control on the same roster and the same surfaces. **The roster is built the way the
+  source builds it — a members BODY through `mapActors` carrying `displayName: ''`** — because a fixture
+  handing `rosterByActorId` a literal map, or driven against an empty roster, would read back the id and
+  the email branch would never run: green for the wrong reason. —
+  (`packages/app-core/test/online/mappers.test.ts`)
+- **13.1293** ✅ `actorLabel`'s order is UNTOUCHED by the email step: the reserved system actor still wins
+  even against a label that a join could produce — an address included, which is the shape this change
+  made reachable — and `actorLabel`'s own floor is still the id. **This is the invariant half and it is
+  green before and after the change by design**: the email step lives in the join, not in `actorLabel`,
+  which is handed a claim's `{actorId, actorName}` and has no roster to reach for. Recorded as a case
+  rather than left as a comment because a future joining change is what would break it. —
+  (`packages/app-core/test/online/mappers.test.ts`)

@@ -42,6 +42,10 @@ import type {
   WorkspaceRef,
   WorkspaceSettings,
 } from '../view-types.js';
+// What a roster JOIN's value is built with. A REAL runtime import, unlike the
+// two type-only ones below: this module is what resolves an actor id to
+// something printable, and the rule for that is `memberLabel`'s.
+import { memberLabel } from '../member-label.js';
 // The list entry union lives with the component that renders it; see the note
 // on the same import in `../data-source.ts`. Type-only, so no runtime edge.
 import type { AttachmentListEntry } from '../views/attachment-list.js';
@@ -450,10 +454,13 @@ export function mapRollup(raw: unknown, path = 'rollup'): RollupToViewer | null 
  *
  * ## What did NOT change
  *
- * `rosterByActorId` below still answers the id→name map the board join wants,
- * and `RosterMember` is an `Actor`, so nothing on that path moves. The board
- * sends `assigneeId` and no role, and it still gets no role — the width added
- * here is on the ROSTER value, not on the ticket's `assignee`.
+ * `rosterByActorId` below still answers the actor-id → string map the board join
+ * wants, and `RosterMember` is an `Actor`, so nothing on that path moves. (The
+ * STRING it answers is `memberLabel`'s since 2026-09-22 — see that function
+ * below — which is a change to what the value is, not to the shape of the map,
+ * and this paragraph is about the shape.) The board sends `assigneeId` and no
+ * role, and it still gets no role — the width added here is on the ROSTER value,
+ * not on the ticket's `assignee`.
  *
  * `role` is REQUIRED and read with `asString`, so an entry that arrives without
  * one is a `MappingError` naming the path rather than a person silently
@@ -488,9 +495,32 @@ export function mapActors(raw: unknown): RosterMember[] {
   });
 }
 
-/** The roster as the board join consumes it: actor id → display name. */
-export function rosterByActorId(actors: readonly Actor[]): Map<string, string> {
-  return new Map(actors.map((actor) => [actor.id, actor.name]));
+/**
+ * The roster as the join consumes it: actor id → **the member's LABEL**.
+ *
+ * `memberLabel`, not `actor.name`. The value used to be the raw display name,
+ * and a display name of `''` is a shape this product really produces — an email
+ * sign-up has none, because better-auth's magic-link plugin creates the user
+ * with `name: name || ""` (`member-label.ts` has the full account) — so the join
+ * handed every downstream mapper an EMPTY NAME to print. Rendering an empty name
+ * is not a degradation, it is a hole on screen; the mappers were left to invent
+ * something or show nothing, and the surfaces holding a roster row in hand had
+ * each grown their own copy of the fallback instead.
+ *
+ * Resolving it HERE rather than at each render is what makes the rule hold for
+ * every join at once: `mapAssignee` and `mapProvenance` are unchanged by it and
+ * now correct (case 13.1292), and a future caller that joins a roster gets the
+ * fallback without knowing it exists.
+ *
+ * The parameter is structural — `{id, name, email?}` — so `RosterMember` passes
+ * and `Actor` does too (a ticket's `assignee`, `replica-data-source.ts`'s
+ * synthesised rows). An `Actor` simply has no address to offer, which is the
+ * correct answer for a value that cannot know one.
+ */
+export function rosterByActorId(
+  actors: readonly { id: string; name: string; email?: string }[],
+): Map<string, string> {
+  return new Map(actors.map((actor) => [actor.id, memberLabel(actor)]));
 }
 
 /**
@@ -542,6 +572,19 @@ function mapCause(raw: unknown, path: string): TransitionCause | null {
  *
  * The third is taken. It is a degradation, not an invention: the id is a fact
  * the server sent.
+ *
+ * ## …and the roster's VALUE is now a label, not a display name
+ *
+ * The substitution above is `roster.get(id) ?? id` and nothing else, which is
+ * still the whole of this function's judgement. What changed is what the map
+ * HOLDS: `rosterByActorId` builds each value with `memberLabel` (name → email →
+ * id), because a display name of `''` is a shape this product really produces
+ * and an empty name is a hole on screen rather than a degradation of one. So an
+ * assignee whose name the server did not set reads as their ADDRESS here, and
+ * one with neither reads as their id — the row's own case is 13.1292.
+ *
+ * This is the one place the change reaches: the substitution rule, the refusal
+ * to invent, and the `null` arm above are all untouched.
  */
 function mapAssignee(raw: unknown, path: string, roster: ReadonlyMap<string, string>): Actor | null {
   // `TicketCard.assigneeId` is `string | null`, required. `null` is the wire's

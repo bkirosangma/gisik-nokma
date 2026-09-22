@@ -292,9 +292,14 @@ section follow the controller's rule, so the next free id after B16 is one past 
   "the caller named nothing". — `packages/app-core/test/online/mappers.test.ts`
 - **3.969** ✅ The priority claim crosses the wire as a CLAIM, on both card sites: the board card carries
   value plus provenance with `actorName` resolved through the roster, and the list row carries the same
-  claim with `actorName: null` (that mapper is handed no roster — the lossless absence `mapProvenance`
-  documents). A card with NO `priority` and a card whose level is off the ladder each THROW naming the path
-  and the three levels, rather than defaulting to P2. — `packages/app-core/test/online/mappers.test.ts`
+  claim with `actorName: null` **for a call that hands no roster** — the lossless absence `mapProvenance`
+  documents, and still a reachable shape since a roster the caller may not read arrives as an empty map
+  (13.1289). **This case's prose said the mapper "takes NO roster"; that was true when written and expired
+  2026-09-22**, when the list body began naming its workspace (13.1287) and `mapListPage` grew the
+  parameter (13.1288) — the plan text's original `mapListPage(fixture, roster)` assertion can now be made
+  and is made by 13.1292. A card with NO `priority` and a card whose level is off the ladder each THROW
+  naming the path and the three levels, rather than defaulting to P2. —
+  `packages/app-core/test/online/mappers.test.ts`
 - **3.970** ✅ The replica carries the birth claim on the list row AND the board card, read off the same
   folded state so the two cannot disagree: `P2`, attributed to the creating actor with both clocks and a
   `null` actorName. — `packages/app-core/test/replica/replica-data-source.test.ts`
