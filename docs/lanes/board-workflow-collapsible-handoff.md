@@ -63,6 +63,13 @@ previous person's collapse) and by project (two projects can hold the same workf
    `13.469` used the absence of a level-2 heading as its witness that a fixture carries one workflow. It
    was amended to a stronger witness (exactly one group heading, naming that workflow), and that is a
    behaviour change rather than a repair.
+7. **One of MY OWN cases could not fail, and only a mutation found it.** `13.1416` as first written stayed
+   green with the term it was supposed to witness removed — see "the case it REPAIRED" below. Worth
+   carrying forward as a pattern rather than as an incident: a case whose fixture never reaches the state
+   its assertion depends on is green for a reason that has nothing to do with the assertion.
+8. **`13.1408` needs an INVERTING mutation, not a removing one.** It is the control arm of `13.1407` and is
+   satisfied both before and after the feature, so every mutation that deletes the empty-group default
+   leaves it green. A control arm's witness has to be built to point the other way.
 
 ## State of verification, stated precisely
 
@@ -77,17 +84,36 @@ Measured on **Node v22.22.2**, LOCAL runs (a dev PR into a release branch runs n
 - **NOT re-run at the current head:** the three full suites and the typecheck. The changes since are
   test-file-only, so the source under test is unchanged — but that is an argument, not a measurement.
 
+## The mutation round, finished — and the case it REPAIRED
+
+Fifteen mutations were run against the committed tree, each restored in a `finally`. The measured table is
+in `test-cases/13-owner-requests-and-backlog.md`; what belongs here is the one that mattered:
+
+**The auto-expand rule's `Object.hasOwn(groupChoices, key)` term survived its first mutation — 20/20 green
+with the term removed.** That term is the whole reason the stored shape exists (it is what stops the rule
+undoing a person's own collapse), so a survivor there meant `13.1416` was **asserting the right property
+about a scenario where the property is not load-bearing**: its fixture never let the group become EMPTY, so
+the group never became *collapsed by the default*, the rule's `previous` guard alone kept it shut, and the
+term was never reached. A control that cannot fail, one level up from the kind this project already
+catalogues.
+
+`13.1416` gained a second arm for the only sequence where the term decides anything — **collapse by hand →
+empty out → refill** — and the mutation is now KILLED (`1 failed / 20 passed, 13.1416`). Every one of the
+fifteen cases now has at least one killer, `13.1408` included: it needed a mutation that INVERTS the
+default rather than removes it, since it is the control arm of `13.1407` and is true before and after the
+feature.
+
 ## Owed, named rather than implied
 
-1. **Two mutations, both re-anchored and ready but NOT run** (the checkpoint interrupted the round):
-   the auto-expand effect's `Object.hasOwn` term removed (the first attempt produced an unparsable source
-   and therefore a NON-RESULT, not a survivor), and the rail's `id` made to disagree with its
-   `aria-controls` (the first attempt renamed both sides and mutated nothing).
-2. **`13.1408` has no killer** in the mutation set: it is the control arm of `13.1407`, true before and
-   after the feature. The mutation that would kill it — inverting the default for a NON-empty group — is
-   owed.
-3. The full suites and typecheck at the current head (above).
-4. No PR is open. The PR must target **`--base release/2026-09-23`**, never `main`.
+1. **Nothing in the case block.** The two mutations the checkpoint deferred are run (both killed); the
+   `13.1408` killer is added and measured.
+2. **The three full suites and the build at the final head**: build and typecheck were re-run and are green;
+   the suites' results are in the PR body.
+3. **No browser measurement.** `13.1412`–`13.1420` are jsdom cases; nothing here was seen in a real
+   browser, and the caret's paint and the rail's `display: none` are the two things a jsdom run cannot
+   show. `13.1418` pins both as source, which is the honest half a suite can hold.
+4. No PR was open at the time this line was written; it must target **`--base release/2026-09-23`**, never
+   `main`.
 
 The twelve measured mutations above were run by `scripts/zz-mutation-driver.py`, committed for the two
 owed re-runs rather than deleted — it holds the exact anchors (including the two CORRECTED ones), applies

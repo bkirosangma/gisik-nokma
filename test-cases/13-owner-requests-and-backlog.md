@@ -3276,12 +3276,22 @@ same workflow at the same version, so a user-only key would share one collapsed 
   another project's record is refused the same way; and a record this build does not recognise — a
   `"yes"` for a boolean — answers the default, while a signed-out board (`''`, the shell's sentinel)
   writes nothing at all.
-- **13.1415** ✅ **A GROUP NOBODY COLLAPSED REVEALS NEW WORK.** A card arriving in an empty-default
-  collapsed group opens it AND writes the expansion through, so a reload cannot put the new work back
-  behind a heading.
-- **13.1416** ✅ **A COLLAPSE THE PERSON MADE IS NOT UNDONE BY AN ARRIVAL.** The group stays collapsed
-  and the STORE IS UNCHANGED — asserted by comparing the whole record before and after, so the refusal
-  to reopen is a refusal to WRITE rather than a write the render ignored.
+- **13.1415** ✅ **A GROUP NOBODY COLLAPSED REVEALS NEW WORK** (two arms). A card arriving in an
+  empty-default collapsed group opens it AND writes the expansion through, so a reload cannot put the new
+  work back behind a heading. **The second arm counts WRITES** — the owner named this hazard by name
+  (*"the board re-reads on every stream frame — a naive effect here is a write storm"*) — asserting that
+  mounting writes nothing, the one transition writes once, and four re-reads of the same board (the same
+  object twice, then a fresh but EQUAL one twice) write nothing more. ⚠ The instrument is
+  `vi.spyOn(Storage.prototype, 'setItem')`: the instance-level forms record **0** calls while the write
+  succeeds, so a case built on either would report "no write storm" over any number of writes.
+- **13.1416** ✅ **A COLLAPSE THE PERSON MADE IS NOT UNDONE BY AN ARRIVAL** (two arms, the second added
+  after a mutation round — see below). The group stays collapsed and the STORE IS UNCHANGED, asserted by
+  comparing the whole record before and after, so the refusal to reopen is a refusal to WRITE rather than
+  a write the render ignored. **The second arm is the one that actually reaches the stored shape's
+  distinction:** collapse a group by hand, move its last ticket OUT — the group is now collapsed by the
+  DEFAULT as well, which arms the auto-expand rule's transition guard — then move a ticket back IN. Both
+  of the rule's other terms point at reopening it, so only the `false` the shape remembers keeps it shut.
+  A board reaches that sequence in ordinary use; the first arm alone could not see the term at all.
 - **13.1417** ✅ **THE CARET IS DRAWN, NEVER TYPED.** Each toggle's `textContent` is exactly the workflow
   name and no `▸`/`▾` appears anywhere on the board, so the accessible name cannot pick up a direction
   glyph — the defect `.gn-list__columns-caret`'s own rule exists to avoid.
@@ -3321,37 +3331,41 @@ because a mutation table nobody re-measured is the "a check that cannot fail" sh
 | `.gn-board__rail[hidden]` deleted from `ui.css` | `13.1418` (1 failed) |
 | the caret's `content` glyphs replaced with `none` | `13.1418` (1 failed) |
 
-**Two findings from the round that contradict what was expected, both kept:**
+**Three more mutations, run after the checkpoint, one of which found a real defect in a case:**
 
-- **The write-storm guard IS witnessed, which I had assumed it would not be.** Dropping the effect's
-  `previous` guard reddens `13.1415` — the arm added for the owner's own warning (*"a naive effect here is
-  a write storm against the preferences door"*), which counts writes through `Storage.prototype.setItem`.
-  Without that arm the mutation SURVIVES silently, because every other case reads the record's VALUE and a
-  rewrite of the same bytes reads back identical. **⚠ And the spy must be on `Storage.prototype`, measured
-  rather than styled:** `vi.spyOn(window.localStorage, 'setItem')` and a plain instance assignment each
-  recorded **0** calls while the write succeeded — jsdom's `localStorage` is a Proxy that answers a bound
-  method from its internal store, so an instance-level instrument reports "no write storm" over any number
-  of writes, including the storm. The prototype-level spy recorded it.
-- **A prediction of mine was wrong: `13.1412` was expected to redden under the first mutation and does
-  not** — correctly: its fixture holds
-  a lone group WITH a card, so dropping the lone-workflow term of the default cannot change it. The
-  prediction was mine and it was wrong.
+| mutation | reddened |
+|---|---|
+| `defaultCollapsed`'s `groupIsEmpty` term dropped (every group on a multi-workflow board collapsed) | `13.1406`, `13.1407`, `13.1408`, `13.1410`, `13.1411`, `13.1414`, `13.1415`, `13.1416`, `13.1418`, `13.1419` (10 failed) |
+| the rail's `id` made to disagree with its `aria-controls` | `13.1406` (1 failed) |
+| the auto-expand effect's `Object.hasOwn(groupChoices, key)` term removed | `13.1416` (1 failed) — **but only after the case was strengthened; see below** |
 
-**⚠ TWO MUTATIONS ARE OWED, named rather than implied, because the checkpoint interrupted the round.**
-Both were re-anchored after the first pass produced a NON-RESULT and a no-op, and NEITHER HAS BEEN RUN:
+**⚠ THE LAST MUTATION SURVIVED FIRST TIME, AND THAT IS THE ROUND'S REAL FINDING.** Dropping the
+`Object.hasOwn(groupChoices, key)` term — the term that stops the auto-expand rule undoing a person's own
+collapse — left the whole file **20/20 GREEN**. `13.1416` as written could not see it, and the reason is
+structural rather than incidental: its fixture never lets the group become EMPTY, so the group never
+becomes *collapsed by the default* either, the rule's `previous` transition guard alone keeps it shut, and
+the term the case was supposed to witness is **never reached**. The case was asserting the right property
+about a scenario in which the property is not load-bearing — a control that cannot fail, one level up from
+the kind this file already guards against.
 
-1. **the auto-expand effect's `Object.hasOwn(groupChoices, key)` term removed.** The first attempt cut the
-   line mid-condition, leaving `&&\n      ) {` — a source that does not PARSE, so vitest never ran the
-   file and printed no summary line. That is a NON-RESULT, not a surviving mutation, and reading it as a
-   survivor would have credited the guard with nothing. It is the term that keeps auto-expand off a
-   detection a person made, so this is the single most important mutation still owed.
-2. **the rail's `id` made to disagree with its `aria-controls`.** The first attempt renamed BOTH sides
-   (`railId` is read by both), so the property "the control names the element that exists" was never
-   disturbed and the file stayed 20/20 green — a mutation that mutated nothing.
+The fix is a second arm on `13.1416` and the only sequence where the term decides anything — a sequence an
+ordinary board reaches: **collapse a group by hand → move its last ticket out (it is now ALSO collapsed by
+the default, so the guard is armed) → move a ticket back in.** Both of the rule's other terms point at
+reopening it; the stored `false` is the only thing that stops it. Re-run against the strengthened case:
+**1 failed / 20 passed, `13.1416` — KILLED.**
 
-**And `13.1408` has no killer in this set**, stated rather than left to be discovered: it is the control arm
-of `13.1407`, true both before and after the feature, so nothing above reddens it. The mutation that would
-is inverting the default for a group that is NOT empty; that is owed too.
+**EVERY CASE IN THE BLOCK NOW HAS AT LEAST ONE KILLER, measured rather than intended**: `13.1406` (four
+mutations), `13.1407` (three), `13.1408` (one, from the `groupIsEmpty`-term mutation — it is the control arm
+of `13.1407` and true both before and after the feature, so it needs a mutation that INVERTS the default
+rather than removes it), `13.1409` (three), `13.1410` (three), `13.1411` (three), `13.1412` (one),
+`13.1413` (one), `13.1414` (five), `13.1415` (four), `13.1416` (five), `13.1417` (one), `13.1418` (three),
+`13.1419` (two), `13.1420` (two).
+
+**`13.1408` HAD no killer in the first twelve and now has one, which is why the second table carries a
+third row.** It is the control arm of `13.1407` and is true both before and after the feature, so no
+mutation that REMOVES the default can redden it — only one that INVERTS it for a group that is not empty,
+which is what `default-ignores-emptiness` does. Recorded rather than passed over, because "this case is
+true either way" is exactly the shape a reviewer should expect to find a witness for, not to be told about.
 
 **One case elsewhere was AMENDED, and the amendment is a behaviour change rather than a repair.**
 `apps/web/test/board-narrowing.test.tsx` `13.469` asserted that a one-workflow board renders NO level-2
