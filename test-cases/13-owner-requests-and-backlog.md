@@ -2604,3 +2604,64 @@ called exactly once, with the correct URL, and with **one** argument.
   it places it in ANOTHER. **Both arms are in the SAME case, not sibling `it`s**: a blanket
   `{ scroll: false }` on `openParentTicket` passes the first arm, and a sibling case would let that
   variant report green on the arm that matters. — (`apps/web/test/sheet-no-scroll.test.tsx`)
+
+## The ticket key column, left of the title (owner request, 2026-09-22)
+
+**The owner's third item, from the List tab screenshot:** *"on the left of the title, add the ticket
+key column."* The key is the `CCSO-12`-style identifier PR #681 put on every card that morning.
+
+**The wire already carried it and the client's row type did not.** `TicketCard.key` is
+`string | null` on the domain type, `ListCard = TicketCard & { … }`, and the board's mapper has read it
+since #681. The List's `ListRow` had no `key` at all and `mapListRow` never looked — the same
+one-mapper-at-a-time gap `13.703` records for `rank`, and the same remedy: the field is REQUIRED on
+`ListRow`, because a required field on a view type is what makes the typecheck find every fixture that
+constructs one. **It found twelve sites, one per file, ten of them under `apps/web/test` and two under
+`packages/app-core/test`** (`helpers/seed.ts`'s `listRowSeed`, plus `filter/list-filter.test.ts`) — a
+count taken from `git diff` over the fixture files, not from memory, because a fixture the field did not
+reach would be a `ListRow` built without one.
+
+**Three states, and the third is a refusal.** A key crosses. `null` is the server's own word for "the
+ledger holds no prefix" and must arrive as `null` — read with `toBeNull` and not `toBeFalsy`, since
+`undefined` is exactly what a forgotten field looks like. An ABSENT key is a body the server does not
+send, refused by name so that a mapper which dropped the field cannot pass for a prefix-less
+workspace. `13.1280` pins the same three arms on the board card, deliberately: the same two states
+cross the same wire.
+
+**The replica answers `null` for every row, because it cannot compose one.** A key's number is derived
+from the ledger's order and the device holds no prefix — the same under-claim the replica's board cards
+already make (`replica-data-source.ts`), where locally re-deriving the number would be a second
+implementation of a server read, and a key naming a different ticket from the server's would be worse
+than no key.
+
+**The column is FIXED, like Title.** No `ListColumnId`, not in `AVAILABLE_COLUMNS`, never persisted —
+so no stored `columns` array can omit it and the tray offers no chip for it. It renders `—` for a null
+key: never a blank cell (which reads as "this cell did not render") and never `row.ticketId` (an
+internal ULID where a person expects the workspace's own identifier).
+
+- **13.1337** ✅ `mapListPage` carries a card's `key` onto the row (`'CCSO-7'` → `'CCSO-7'`); `null` on
+  the wire arrives as `null` — the positive control, in the same `it`, differing in that one key — and a
+  body WITHOUT the field is refused with a `MappingError` naming `.key`. —
+  (`packages/app-core/test/online/mappers.test.ts`)
+- **13.1338** ✅ A list row read from the replica has `key === null`, read with `toBeNull` so an absent
+  field reddens, with `typeRank` off the same object as the control. —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
+- **13.1339** ✅ The table's header row has `Key` IMMEDIATELY before `Title` (asserted as adjacency, so
+  the optional checkbox column may come and go), and a row with `key: 'CCSO-7'` renders `CCSO-7` in
+  `.gn-list__key` while a row with `key: null` renders `—` — not the id and not empty, both named. —
+  (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1340** ✅ The Key column renders whatever the chooser stored — mounted with `prefs.columns`
+  stored as `[]`, the header row is exactly `Key, Title` — and the Columns tray offers no Key chip
+  while still drawing its six. — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1341** ✅ `.gn-list__key` declares `color: var(--gn-text-muted)`, `white-space: nowrap` and
+  `font-variant-numeric: tabular-nums`, with no literal colour, and the component really draws that
+  class. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
+
+**Two pre-existing cases were about a whole `<tr>` and had to name a cell.** `13.667` searched the row
+for `—` to prove an unclaimed date is NAMED rather than dashed, and `13.668` searched the row for the
+progress dash; the Key column's own `—` for a null key put a second dash in every row, so both now read
+the cell they are about through `cellUnder(row, 'Due date' | 'Progress')`, located by HEADER. That is
+the same repair `3.52`'s zone battery needed, where the new leading column shifted every index by one
+and a case comparing a row's TITLE against a date failed for a reason with nothing to do with the
+clock. Neither was a defect; both had stopped addressing their own cell. `13.647`'s "a column narrower"
+control was a hard-coded `1` and is now measured against the selection arm in the same case, so the next
+fixed column does not expire it.

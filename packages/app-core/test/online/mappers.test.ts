@@ -2503,6 +2503,48 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // email step lives in the JOIN and not here.
     expect(actorLabel('u1', null)).toBe('u1');
   });
+
+  /**
+   * 13.1337 — the LIST half of 13.1280 (owner request 2026-09-22: *"on the left
+   * of the title, add the ticket key column"*).
+   *
+   * `ListCard` is `TicketCard & {…}` and `TicketCard.key` has ridden the wire
+   * since #681, so the list BODY already carried this field — the row type and
+   * this mapper were the two places that did not look at it. The three arms are
+   * 13.1280's three arms, deliberately: the same two states cross the same wire
+   * and have to survive the same way on both card mappers. A key crosses; `null`
+   * is the server's own word for "no prefix in the ledger" and must arrive as
+   * `null` rather than collapse to `undefined` (`ListRow.key` is REQUIRED, and
+   * `undefined` is what a forgotten field looks like); and an ABSENT key is a
+   * body the server does not send, refused by name so that a mapper which forgot
+   * the field cannot pass for a workspace without a prefix.
+   */
+  it('13.1337 mapListPage carries a card key onto the row, keeps null, and refuses absence', () => {
+    const body = (card: Partial<ListCard>): ListResponse => ({
+      workspaceId: '01J9GWS0000000000000000000',
+      projectId: 'p',
+      groupBy: 'flat',
+      groups: [{ key: 'all', label: 'All', cards: [serverListCard(card)] }],
+      nextCursor: null,
+    });
+
+    expect(mapListPage(body({ key: 'CCSO-7' })).rows[0]?.key).toBe('CCSO-7');
+
+    // The positive control for the refusal below, and it runs through the SAME
+    // path: this body differs from the one above in this one key alone, so a
+    // throw there cannot be about the fixture. `toBeNull` and not `toBeFalsy` —
+    // the whole assertion is that a real `null` survived rather than an absent
+    // field reading as one.
+    expect(mapListPage(body({ key: null })).rows[0]?.key).toBeNull();
+
+    const { key: _dropped, ...without } = serverCard();
+    const absent = body({});
+    absent.groups[0]!.cards = [without as ListCard];
+    expect(() => mapListPage(absent)).toThrow(MappingError);
+    // The error NAMES the field: a bare `toThrow(MappingError)` would accept any
+    // of this mapper's many other reasons to throw.
+    expect(() => mapListPage(absent)).toThrow(/\.key/);
+  });
 });
 
 /**

@@ -134,6 +134,8 @@ const LIST: TicketListView = {
     {
       ticketId: '01J9TICKET00000000000000EP',
       title: 'Rewire the shop sign',
+      // REQUIRED on the row since 2026-09-22 (the List's Key column).
+      key: 'CCSO-7',
       typeId: 'epic',
       typeRank: 1,
       parentId: null,

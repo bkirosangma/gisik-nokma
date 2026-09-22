@@ -501,6 +501,8 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     const row = (id: string, title: string, category: 'active' | 'terminal', epicId: string | null) => ({
       ticketId: id,
       title,
+      // REQUIRED on the row since 2026-09-22 (the List's Key column).
+      key: 'CCSO-7',
       typeId: epicId === null ? 'epic' : 'task',
       typeRank: epicId === null ? 1 : 3,
       parentId: epicId,

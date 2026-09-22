@@ -1691,6 +1691,23 @@ a.gn-ticket-sheet__crumb--link {
    is the LINE BOX, so raising it is the whole change: this control has no
    `min-height` to set. */
 .gn-list__open { font-size: 1.0625rem; line-height: 1.5rem; }
+/* The Key cell (owner request 2026-09-22, the List tab: *"on the left of the
+   title, add the ticket key column"*). The FIXED column left of Title, and the
+   ink is not a new decision: the board has drawn its card's key muted since
+   the key reached the cards (`.gn-board-card__key`, above; 13.1280), and one
+   identifier should not be two colours on two tabs of one product. `nowrap` because the key is an
+   identifier — `CCSO-12` broken across a line stops reading as one token — and
+   `tabular-nums` so the digits line up down the column, which is the whole
+   reason a person scans this column rather than the title.
+
+   ⚠ THE INK IS `--gn-text-muted` AND NOT A LITERAL: `ticket-list-css-binding
+   .test.tsx` (13.1341) reads this rule's declarations out of this file, so a
+   literal colour here is a case that reddens rather than a note nobody reads. */
+.gn-list__key {
+  color: var(--gn-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .gn-list__assignee { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gn-list__empty-cell { color: var(--gn-text-muted); }
 /* The due cell's own tone (`:2854`): `di.late ? var(--danger) : var(--label2)`.

@@ -95,6 +95,13 @@ export function listRowSeed(overrides: Partial<ListRow> = {}): ListRow {
   return {
     ticketId: newUlid(),
     title: 'File the GST return',
+    // REQUIRED on the row (owner request 2026-09-22, the List's Key column), and
+    // the SAME default the sibling `boardCardSeed` above takes, for the same
+    // reason: `null` is "the ledger holds no prefix", which is the offline
+    // replica's own answer for every row. The two seeds are read side by side in
+    // this file, so they disagree only where a case says why. A case that wants
+    // a key passes one — `13.1339` and `13.1341` do, on both arms.
+    key: null,
     typeId: 'task',
     typeRank: 3,
     parentId: null,

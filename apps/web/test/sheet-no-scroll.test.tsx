@@ -110,6 +110,8 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
   return {
     ticketId: TICKET,
     title: TITLE,
+    // REQUIRED on the row since 2026-09-22 (the List's Key column).
+    key: 'CCSO-7',
     typeId: 'task',
     typeRank: 3,
     parentId: null,
