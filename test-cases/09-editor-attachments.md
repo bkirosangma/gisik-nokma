@@ -372,3 +372,6 @@ assumed it would find.
 - ✅ **9.262 — `DOC_SCHEMA_VERSION` is 2 and `emptyDoc()` says so; a version-1 document loads and re-serialises with its own content unchanged.** Mutation: make `emptyDoc` say 1.
 - ✅ **9.263 — the rule census names every new input rule per extension** (`taskItem: 1`); paste rules unchanged. Mutation: add an unregistered paste rule.
 - ✅ **9.264 — typing `[ ] ` at a line start makes an unchecked task item; `[x] ` a checked one; control: `[ ]` mid-line stays text.** Mutation: disable TaskItem's input rule.
+- ✅ **9.265 — `docToPlainText` gives task items, details summary/content and code blocks their own lines; a wiki-link contributes its title.** Control: a paragraph unchanged. Mutation: drop `taskItem` from `BLOCK_NODE_TYPES`.
+- ✅ **9.266 — the conformance suite's "every block node the schema names" case covers the v2 blocks.** Mutation: remove `details` from the fixture.
+- ✅ **9.267 — `renderCommentBody` renders each new node with its chrome:** `input[type=checkbox][disabled]` for a task item (checked mirrors `attrs.checked`), `<details open>` + `<summary>` for a collapsible, `a[href="/notes/<id>"]` for a wiki-link; control: the default branch still renders an unknown node's children. Mutation: delete the `details` branch.

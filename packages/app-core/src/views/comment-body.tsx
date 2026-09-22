@@ -215,6 +215,56 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
   if (node.type === 'codeBlock' || node.type === 'code_block') {
     return createElement('pre', { className: 'gn-comment__code', key }, createElement('code', null, children));
   }
+  // Schema v2's nodes (spec §8.3 consequence 1, added by the notes editor
+  // port). Each carries its FULL chrome rather than degrading to text: a
+  // checkbox that says whether the thing was done, a `<details>` that can be
+  // folded open, a link that goes to the note. The one deliberate degradation
+  // is the checkbox's: it is DISABLED and reads the stored `checked`, because
+  // a comment is read-only and a control that looked live but refused the
+  // click would be a lie about what this surface can do.
+  if (node.type === 'taskList') {
+    return createElement('ul', { className: 'gn-comment__list gn-comment__list--tasks', key }, children);
+  }
+  if (node.type === 'taskItem') {
+    const attrs = asNode(node.attrs);
+    return createElement(
+      'li',
+      { className: 'gn-comment__task', key },
+      createElement('input', {
+        type: 'checkbox',
+        disabled: true,
+        readOnly: true,
+        checked: attrs !== null && attrs['checked'] === true,
+      }),
+      createElement('span', null, children),
+    );
+  }
+  if (node.type === 'details') {
+    const attrs = asNode(node.attrs);
+    return createElement(
+      'details',
+      { className: 'gn-comment__details', open: attrs !== null && attrs['open'] === true, key },
+      children,
+    );
+  }
+  if (node.type === 'detailsSummary') {
+    return createElement('summary', { key }, children);
+  }
+  if (node.type === 'detailsContent') {
+    return createElement('div', { key }, children);
+  }
+  if (node.type === 'wikiLink') {
+    const attrs = asNode(node.attrs);
+    const noteId = attrs !== null && typeof attrs['noteId'] === 'string' ? attrs['noteId'] : '';
+    // The stored title is the fallback when there is no id to link to, which
+    // is the same preference the walker takes (doc-text.ts): the words a
+    // person read, never the ULID. A link with no id would point at
+    // `/notes/`, so it degrades to a span rather than to a broken href.
+    const title = attrs !== null && typeof attrs['title'] === 'string' ? attrs['title'] : noteId;
+    return noteId === ''
+      ? createElement('span', { key }, title)
+      : createElement('a', { className: 'gn-comment__wikilink', href: `/notes/${noteId}`, key }, title);
+  }
   if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'doc') {
     const element = node.type === 'doc' ? Fragment : 'p';
     return createElement(element, node.type === 'doc' ? { key } : { key }, children);

@@ -1448,6 +1448,13 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   `packages/editor/src/schema/extensions.ts`
 - ✅ **Task lists in every document** — `[ ] ` / `[x] ` at a line start; schema is version 2
   (`DOC_SCHEMA_VERSION`), version-1 documents render unchanged.
+- ⚙️ **Plain text and the read-only comment renderer understand every v2 node** (task items,
+  collapsibles, wiki-links) — search indexing and comment display never drop content silently. Both
+  walk the same three shapes and take the same preference: a wiki-link contributes its stored TITLE,
+  never its note id, and an unknown node renders its CHILDREN rather than nothing. The comment
+  renderer gives each node its chrome — a disabled checkbox reading the stored `checked`, a
+  `<details>` that can be folded, a link to `/notes/<id>`. `packages/domain/src/doc-text.ts`,
+  `packages/app-core/src/views/comment-body.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

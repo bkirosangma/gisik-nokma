@@ -49,7 +49,7 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
   /**
    * 9.39 — a document this editor produces round-trips through the domain's `docToPlainText` with the same text the editor renders, the conformance direction between the editor and the search projection.
    */
-  it('renders every block node the schema names as its own line', () => {
+  it('9.266 renders every block node the schema names as its own line', () => {
     const editor = createTestEditor(undefined, {
       type: 'doc',
       content: [
@@ -73,6 +73,32 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
           content: [{ type: 'paragraph', content: [{ type: 'text', text: 'CA said wait' }] }],
         },
         { type: 'codeBlock', content: [{ type: 'text', text: 'npm run gst' }] },
+        // Schema v2's blocks, added by the notes editor port (Plan 4 Task 2).
+        // Both are placed ABOVE the final paragraph for the same reason
+        // codeBlock is: a textblock that ends the document has its trailing
+        // newline trimmed, so a v2 block placed last could lose a line
+        // boundary and still agree with the expected string.
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'buy milk' }] }],
+            },
+          ],
+        },
+        {
+          type: 'details',
+          attrs: { open: false },
+          content: [
+            { type: 'detailsSummary', content: [{ type: 'text', text: 'Why' }] },
+            {
+              type: 'detailsContent',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'because' }] }],
+            },
+          ],
+        },
         // Deliberately NOT the last block. A textblock that ends the document
         // has its trailing newline trimmed away, so putting codeBlock last
         // would let the walker forget codeBlock is a block and still produce
@@ -81,7 +107,7 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
       ],
     });
     expect(docToPlainText(editor.getJSON())).toBe(
-      'GST filing\ndue soon\ncollect invoices\nfile GSTR-1\nCA said wait\nnpm run gst\nthen reconcile',
+      'GST filing\ndue soon\ncollect invoices\nfile GSTR-1\nCA said wait\nnpm run gst\nbuy milk\nWhy\nbecause\nthen reconcile',
     );
     editor.destroy();
   });
