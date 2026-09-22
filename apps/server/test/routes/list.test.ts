@@ -317,6 +317,30 @@ function memberVisible(): string[] {
 // ---------------------------------------------------------------------------
 
 describe('GET /v1/projects/:projectId/tickets — the flat list and its filters', () => {
+  // 13.1287 — the list body NAMES its workspace.
+  //
+  // The client renders a row's assignee by joining the roster
+  // (`/v1/workspaces/<id>/members`), and it fetches that roster from the id the
+  // BODY names — exactly as `getBoard` does from `boardWorkspaceId(raw)`. Before
+  // this field existed the list body carried no id at all, so `mapListPage`
+  // mapped every row against a literal empty roster and a named member rendered
+  // as a ULID. The board body has named its workspace all along
+  // (`BoardResponse.workspaceId`); this is the list route catching up.
+  //
+  // The control in the same case is a read of a DIFFERENT project in the SAME
+  // workspace: both answer the same id while their `projectId`s differ, so the
+  // field is the workspace the request was authorised against and not a copy of
+  // the project id it sits beside.
+  it('13.1287 the list body names the workspace it was read for, so the client can join a roster', async () => {
+    const list = await listOf('member', read.world.projectId);
+    expect(list.workspaceId).toBe(read.world.workspaceId);
+
+    const other = await listOf('member', fixtures.bulkProjectId);
+    expect(other.workspaceId).toBe(read.world.workspaceId);
+    expect(other.projectId).toBe(fixtures.bulkProjectId);
+    expect(other.projectId).not.toBe(other.workspaceId);
+  });
+
   it('7.18 answers the visible flat list by default: one group, every card the caller may see, no cursor', async () => {
     const list = await listOf('member', read.world.projectId);
     expect(list.projectId).toBe(read.world.projectId);

@@ -704,6 +704,9 @@ describe('GET /v1/projects/:projectId/tickets — the list', () => {
     );
 
     expect(freezeClocks(res.json())).toEqual({
+      // The body names its workspace, which is the id the client fetches the
+      // roster from before it can render these cards' actor ids as names.
+      workspaceId,
       projectId,
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All tickets', cards }],

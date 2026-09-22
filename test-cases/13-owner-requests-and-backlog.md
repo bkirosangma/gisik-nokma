@@ -2348,3 +2348,22 @@ on `rows === null` as well, and its docblock recorded that a preferences 500 was
 failure — witnessed at `3.158`. That comment was the only record of the fold's blast radius, and the four
 tab arms beside it did not share its guard. The fold is gone now, so the guard is no longer the only
 place in the file that knows the difference; its own note is kept and extended rather than deleted.
+
+## Names, not ids — the assignee roster join (owner request, 2026-09-22)
+
+The owner, with two screenshots: *"In the list tab, for the assignee, it's showing the id instead of the
+name. Also in the ticket details, it shows the id. Everywhere for id, show the Name; if name is
+empty/blank, show the email."*
+
+Two independent causes, so two sets of cases. **This one is the envelope:** the List tab printed a ULID
+because the list BODY named no workspace, so the client had no id to fetch a roster with and mapped
+every row against a literal empty roster. The board body has named its workspace all along; this is the
+list route catching up, and it fixes every row-level provenance tooltip and the calendar with it, since
+they read the same rows. The nameless-member fallback (name → email → id) is the section below.
+
+- **13.1287** ✅ The list body names the workspace it was read for. Asserted with a control in the same
+  case: a read of a DIFFERENT project in the SAME workspace answers the same `workspaceId` while the two
+  `projectId`s differ — so the field is the workspace the request was authorised against and not a copy
+  of the project id beside it. The field is REQUIRED on `ListResponse` (`string`, first field, mirroring
+  `BoardResponse.workspaceId`), which is what makes the typecheck find every fixture that constructs a
+  body rather than letting `undefined` reach a mapper that would degrade silently. — (`apps/server/test/routes/list.test.ts`)

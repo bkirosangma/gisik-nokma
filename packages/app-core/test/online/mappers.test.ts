@@ -1034,6 +1034,7 @@ describe('3.969 the priority claim crosses the wire as a claim; absence and an o
     ...overrides,
   });
   const listOf = (card: ListCard): ListResponse => ({
+    workspaceId: '01J9GWS0000000000000000000',
     projectId: '01J9GPRJ000000000000000000',
     groupBy: 'flat',
     groups: [{ key: 'all', label: 'All tickets', cards: [card] }],
@@ -1610,6 +1611,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
 
   it('maps a list body into rows carrying all five formerly-absent facts', () => {
     const body: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: '01J9GPRJ000000000000000000',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All tickets', cards: [serverListCard()] }],
@@ -1641,6 +1643,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
    */
   it('13.580 mapListPage carries the wire card\'s closed flag onto the row, present and null', () => {
     const bodyClosed: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [
@@ -1660,6 +1663,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     expect(mapListPage(bodyClosed).rows[0]?.closed).toEqual({ actorId: ANSELMA, at: '2026-09-17T00:00:00.000Z' });
 
     const bodyOpen: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-open', closed: null })] }],
@@ -1690,6 +1694,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
    */
   it("13.703 mapListPage and mapTicketRead both carry the wire's rank onto the read model, present and null", () => {
     const ranked = (): ListResponse => ({
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-ranked', rank: 'i' })] }],
@@ -1702,6 +1707,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // the Backlog tab's order (`compareByRank`) separates "ranked" from
     // "unranked" by exactly this distinction.
     const unranked = (): ListResponse => ({
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-unranked', rank: null })] }],
@@ -1786,6 +1792,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // last place this can be caught, and it is caught by the SAME predicate the
     // domain door uses (`isRankKey`) rather than a second copy of the rule.
     const body: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-bad', rank: 'a b' })] }],
@@ -1801,6 +1808,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
 
   it('flattens groups in order and loses no card', () => {
     const body: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'status',
       groups: [

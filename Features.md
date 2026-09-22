@@ -991,6 +991,12 @@ reason on record, not an oversight:*
   yields P1, P2, P3 because that is string order). Without the arm the switch fell through and the 200
   carried no `groups` at all — a build failure (`tsc` requires the switch be exhaustive) as well as a
   runtime one, and the gap was flagged by Task 1's and Task 3's executors before this lane closed it.
+  **The body now NAMES ITS WORKSPACE** (`ListResponse.workspaceId`, required, first field, mirroring
+  `BoardResponse.workspaceId`; case 13.1287). The client renders each row's `assignee` and its
+  provenance actor as a NAME, and the display names live on the members route, which is keyed by
+  workspace — so without this field `mapListPage` had nothing to fetch a roster with, mapped every row
+  against a literal empty roster, and printed a ULID where a person belongs. The route already held
+  the id as a parameter; the field is what makes it addressable.
   `apps/server/src/routes/list.ts`, `apps/server/src/read/membership.ts`, `apps/server/src/app.ts`
 - ✅ **The builder read surface — `GET /v1/workspaces/:id/workflows`, `/workflows/:id`,
   `/ticket-types`, `/members`, `/workflows/:id/state-occupancy`, `/ticket-types/:id/population`** —
