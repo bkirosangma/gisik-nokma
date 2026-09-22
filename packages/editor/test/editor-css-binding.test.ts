@@ -101,4 +101,33 @@ describe('13.1272 editor chrome css binding', () => {
     expect(declared(submit, 'cursor')).toBe('pointer');
     expect(BARE).toMatch(/\.editor-slot__submit:focus-visible\s*\{[^}]*outline:\s*2px solid var\(--gn-focus-ring\)/);
   });
+  /**
+   * 13.1275 — THE TYPING AREA IS THE FIELD (owner, 2026-09-22: "description, and
+   * comment text area should also follow the same style" as `#gn-new-project-name`).
+   * That input is `.gn-field__input`; the body of both composers now wears the
+   * SAME class, so its coat comes from `ui.css`'s base rule and its
+   * `[data-style="neo"]` override, never from values copied here. What THIS file
+   * owns is the slot-scoped geometry, the wrapper going transparent (the ground
+   * and shadow moved onto the body), the placeholder rule the editor never had,
+   * and the focus ring on the body.
+   */
+  it('13.1275 the slot body carries only geometry, the wrapper carries no ground, the placeholder and the focus ring are declared', () => {
+    const body = ruleBody(EDITOR_CSS, '.editor-slot .ticket-editor__content');
+    expect(declared(body, 'border-radius')).toBe('0');
+    expect(declared(body, 'min-height')).toBe('6rem');
+    // NO ground here: `background` and `box-shadow` are the shared field class's.
+    expect(declared(body, 'background')).toBeNull();
+    expect(declared(body, 'box-shadow')).toBeNull();
+    const wrapper = ruleBody(EDITOR_CSS, '.editor-slot');
+    expect(declared(wrapper, 'background')).toBeNull();
+    expect(declared(wrapper, 'box-shadow')).toBeNull();
+    expect(declared(wrapper, 'overflow')).toBe('hidden');
+    // The placeholder, drawn from the attribute Tiptap's Placeholder extension writes,
+    // in the ink `.gn-field__input::placeholder` uses.
+    const ph = ruleBody(EDITOR_CSS, '.ticket-editor__content .is-editor-empty:first-child::before');
+    expect(declared(ph, 'content')).toBe('attr(data-placeholder)');
+    expect(declared(ph, 'color')).toBe('var(--gn-text-muted)');
+    expect(declared(ph, 'pointer-events')).toBe('none');
+    expect(BARE).toMatch(/\.editor-slot \.ticket-editor__content:focus-within\s*\{[^}]*outline:\s*2px solid var\(--gn-focus-ring\)/);
+  });
 });

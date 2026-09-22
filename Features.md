@@ -1519,7 +1519,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   **The composer's CHROME is shared, and since 2026-09-22 both composers wear it (sheet prototype parity).**
   `TicketEditorSlot` draws a toolbar tray, a sunken field and a footer row carrying a hint on the left and the
   submit control on the right; the comment composer's control reads `Post` (the prototype's word) where the
-  description's reads `Save description`. The footer's left slot is filled by `footerNote?: string` — one
+  description's reads `Save description`. **The typing area IS the field (owner, 2026-09-22):** the content node wears `gn-field__input` beside its own class, so both composers take the same coat as `#gn-new-project-name` and every other text input in every style×theme from one rule pair in `ui.css`; the wrapper is transparent; and the Tiptap placeholder is painted for the first time, in the input's muted ink (no stylesheet had a `data-placeholder` rule before). Cases `13.1275`–`13.1277`. The footer's left slot is filled by `footerNote?: string` — one
   additive optional field on the twice-written contract, carrying the host's sentence in comment mode (the
   prototype's `cmtHint`) and the Markdown hint in description mode, and drawn EMPTY when a comment mount
   supplies neither, so the two composers never borrow each other's advice. Because `TicketEditor` renders the

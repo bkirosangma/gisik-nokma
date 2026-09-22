@@ -709,3 +709,33 @@ describe('13.1270 the composer chrome', () => {
     d.unmount();
   });
 });
+
+/**
+ * 13.1276 / 13.1277 — the typing area wears the SHARED field class (owner,
+ * 2026-09-22: the description and comment areas follow `#gn-new-project-name`).
+ * The class is what makes the coat come from `ui.css` in every style×theme
+ * rather than from a copy; the placeholder attribute is what the new CSS rule
+ * draws from, and the editor had NO placeholder rule anywhere before this, so
+ * "No description yet" and "Add a comment…" were configured and never painted.
+ */
+describe('13.1276 the typing area is a field', () => {
+  it('13.1276 the content node carries gn-field__input beside its own class, in both modes', async () => {
+    const c = render(<TicketEditorSlot {...makeProps({ mode: 'comment' })} />);
+    await vi.waitFor(() => expect(c.container.querySelector('.ticket-editor__content')).not.toBeNull());
+    expect(c.container.querySelector('.ticket-editor__content')!.classList.contains('gn-field__input')).toBe(true);
+    c.unmount();
+    const d = render(<TicketEditorSlot {...makeProps({ mode: 'description' })} />);
+    await vi.waitFor(() => expect(d.container.querySelector('.ticket-editor__content')).not.toBeNull());
+    expect(d.container.querySelector('.ticket-editor__content')!.classList.contains('gn-field__input')).toBe(true);
+  });
+
+  it('13.1277 an EMPTY editor exposes its placeholder as data-placeholder on an is-editor-empty paragraph; a filled one does not (the control)', async () => {
+    const empty = render(<TicketEditorSlot {...makeProps({ doc: null, placeholder: 'No description yet' })} />);
+    await vi.waitFor(() => expect(empty.container.querySelector('.is-editor-empty')).not.toBeNull());
+    expect(empty.container.querySelector('.is-editor-empty')!.getAttribute('data-placeholder')).toBe('No description yet');
+    empty.unmount();
+    const filled = render(<TicketEditorSlot {...makeProps({ doc: DOC })} />);
+    await vi.waitFor(() => expect(filled.container.querySelector('.ProseMirror')).not.toBeNull());
+    expect(filled.container.querySelector('.is-editor-empty')).toBeNull();
+  });
+});

@@ -359,14 +359,13 @@
    silently restore the UA's grey fill on the product's primary control without
    failing any test. */
 
-/* The wrapper is the chrome: the field's ground and shadow, with the tray and
-   the footer inside its corners. `overflow: hidden` is what lets the tray and
-   the footer sit square inside a rounded wrapper without needing radii of their
-   own on the two edges that meet it. */
+/* The wrapper is the CLIP, not the field: it owns the corners and lets the tray,
+   the body and the footer sit square inside them without radii of their own.
+   It carried the field's ground and shadow until 2026-09-22; those now sit on
+   the body itself through `.gn-field__input` (see the body rule below), so a
+   wrapper ground would paint a second, larger field behind the real one. */
 .editor-slot {
   border-radius: var(--gn-radius-control);
-  background: var(--gn-surface-sunken);
-  box-shadow: var(--gn-shadow-sunken);
   overflow: hidden;
 }
 /* Inside the slot the strip is the TOP of one surface rather than a block
@@ -379,10 +378,40 @@
 /* The prototype's field: taller than the bare editor's 4rem floor, and set at
    the 17px/22px step the rest of the sheet's reading text uses. */
 .editor-slot .ticket-editor__content {
+  /* GEOMETRY ONLY. The ground, the border (hig/minimal) and the sunken shadow
+     (neo) are `.gn-field__input`'s — the class the content node now wears —
+     so they are declared ONCE, in `ui.css`, for this body and for
+     `#gn-new-project-name` alike (owner, 2026-09-22). The wrapper above used
+     to carry a ground of its own; it went transparent in the same change so
+     the field is the body and not the block around it. Square corners because
+     the wrapper owns the radius and clips the tray and footer to it. */
+  border-radius: 0;
   min-height: 6rem;
   padding: 0.75rem 0.875rem;
   font-size: 1.0625rem;
   line-height: 1.375rem;
+}
+/* The input's focus ring, on the body: the editable node is `.ProseMirror`
+   INSIDE this element, so `:focus-within` is what fires when a person types. */
+.editor-slot .ticket-editor__content:focus-within {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: -2px;
+}
+/* THE PLACEHOLDER, painted for the first time. Tiptap's Placeholder extension
+   writes `data-placeholder` onto the first empty paragraph and marks it
+   `is-editor-empty` (`schema/extensions.ts`), and no stylesheet in the repo
+   ever drew it — "No description yet" and "Add a comment — @ to mention
+   someone" were configured and invisible (measured 2026-09-22: zero hits for
+   `data-placeholder` / `is-editor-empty` across ui.css, editor.css,
+   globals.css). The ink is `.gn-field__input::placeholder`'s. `float: left` +
+   `height: 0` is the extension's own documented recipe: the pseudo-element
+   takes no line of its own, so the caret sits where the text will. */
+.ticket-editor__content .is-editor-empty:first-child::before {
+  content: attr(data-placeholder);
+  color: var(--gn-text-muted);
+  float: left;
+  height: 0;
+  pointer-events: none;
 }
 
 .editor-slot__footer {
