@@ -120,8 +120,19 @@ services:
       # HEAD are not mounted"). Trusting the origin is necessary, not sufficient.
       - key: WEB_ORIGIN
         value: https://pm.artsourced.in
+      # THE WEB ORIGIN, NOT THE API HOST (go-live day, 2026-09-22). The web app's
+      # auth client posts to ITS OWN origin and Next.js proxies `/api/auth/*` to
+      # this server (`apps/web/next.config.ts` rewrites; `apps/web/src/auth-client.ts`
+      # `baseURL: window.location.origin`). So the OAuth state cookie is stored by
+      # the browser against pm.artsourced.in — and better-auth builds the Google
+      # redirect URI from THIS value. With the API host here, Google returned the
+      # browser to pm-api.artsourced.in, where that cookie is never sent, and every
+      # sign-in ended in `state_security_mismatch` ("State not persisted correctly").
+      # The dev stack hid it: both hosts were localhost, and cookies ignore ports.
+      # Google's registered redirect URI is therefore
+      # `https://pm.artsourced.in/api/auth/callback/google`.
       - key: BETTER_AUTH_URL
-        value: https://pm-api.artsourced.in
+        value: https://pm.artsourced.in
       - key: BETTER_AUTH_SECRET
         type: SECRET
       - key: SMTP_URL
@@ -135,8 +146,9 @@ services:
       # renders no button rather than a button that fails at the server.
       #
       # Google's redirect URI must be registered as
-      # `https://pm-api.artsourced.in/api/auth/callback/google` — the API host,
-      # which is this component, not the web one.
+      # `https://pm.artsourced.in/api/auth/callback/google` — the WEB host, because
+      # the browser reaches this component only through the web app's proxy (see
+      # BETTER_AUTH_URL above).
       - key: GOOGLE_CLIENT_ID
         type: SECRET
       - key: GOOGLE_CLIENT_SECRET

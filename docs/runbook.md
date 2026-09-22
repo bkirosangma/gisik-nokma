@@ -21,6 +21,12 @@ See `deploy/do/README.md`. DigitalOcean App Platform + Managed PostgreSQL + Spac
 `pm.artsourced.in` with the API at `pm-api.artsourced.in` — two sibling single-label CNAMEs (`pm`,
 `pm-api`) in the `artsourced.in` zone, not a nested name.
 
+**`BETTER_AUTH_URL` is the WEB origin, `https://pm.artsourced.in`, not the API host** (go-live day,
+2026-09-22): the browser reaches the auth surface only through the web app's same-origin proxy, so
+the OAuth state cookie lives on the web host and Google's redirect URI must come back there —
+`https://pm.artsourced.in/api/auth/callback/google`. With the API host in that variable every
+sign-in ended in `state_security_mismatch`.
+
 **`WEB_ORIGIN` is an auth setting as well as a CORS one.** It is appended to better-auth's
 `trustedOrigins`, which otherwise holds only `BETTER_AUTH_URL`'s origin — the API host, which no browser
 ever sends. In this deployment the two are different hosts, so getting it wrong answers every
