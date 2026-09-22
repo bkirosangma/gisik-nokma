@@ -3236,27 +3236,35 @@ param **on its own route**, and the click keeps the reader where they were.
   `/w/:ws/my-work?ticket=<id>` with `{ scroll: false }` — asserted as `toHaveBeenCalledTimes(1)` plus a
   negative on any `/p/` path, because the defect is a SECOND push to the project page — and the sheet is
   then in the document with the clicked ticket's title, with My Work's own heading still on screen.
-  —
+  **Post-commit mutation (measured):** pushing the OPEN TICKET's project path instead of this page's —
+  i.e. the old redirect — reddens this case, `13.1163`, `13.1397` and `3.162`: every arm in the tree
+  that asserts where a click GOES. —
   (`apps/web/test/my-work-sheet-in-place.test.tsx`)
 - **13.1392** ✅ **THE PARAM IS THE STATE: a page loaded on `?ticket=` mounts the sheet with NO
   navigation at all.** A reload — or a link somebody sent — reaches the same sheet, and the page pushes
-  nothing on mount (a page that pushed would fight the back button). **Post-commit mutation:** replacing
-  the param read with `useState` (`const openTicketId = useState<string | null>(null)[0]`) reddens this
-  case and `13.1391`'s second half, and leaves the other eight in the file green.
-  —
+  nothing on mount (a page that pushed would fight the back button).
+  **Post-commit mutation (measured):** gating the sheet on a click-time `useRef` — which is what
+  `useState` would have given you, since the sheet then requires a click and a reload opens nothing —
+  reddens `13.1392`, `13.1395`, `13.1396`, `13.1397` and `13.1400` (5 of 13), and leaves `13.1391` and
+  `13.1393` green. —
   (`apps/web/test/my-work-sheet-in-place.test.tsx`)
 - **13.1393** ✅ **CONTROL for `13.1391`: with no `?ticket=` param the page renders NO sheet at all.**
   Its own case rather than an arm, because "the sheet opened" would otherwise also be satisfied by a page
   that mounts a sheet unconditionally — a different bug from the one the owner reported, and one that
-  would delete the page's subject. **Mutation:** dropping the `openTicketId !== null` term from the
-  mount gate reddens exactly here. —
+  would delete the page's subject.
+  **Post-commit mutation (measured):** defaulting the id when the param is absent
+  (`?? myWork.data?.assigned[0]?.ticketId`) reddens EXACTLY here — one case of the thirteen. (The
+  mutation the first draft of this entry named, *dropping the `openTicketId !== null` term*, does NOT
+  redden it: the sheet is also gated on a resolved project, which is `null` without an id, so that
+  mutation is a check that cannot fail and was replaced.) —
   (`apps/web/test/my-work-sheet-in-place.test.tsx`)
 - **13.1394** ✅ **THE SHEET IS TOLD THE OPEN TICKET'S PROJECT, not the page's first row.** Two rows in
   two projects, the second one clicked: the project crumb is an ADDRESS, so the assertion is the href
   (`/w/:ws/p/<the open ticket's project>`) *and* the absence of the other row's project — a resolver
   that fell through to the first list passes the href check while failing the absence. **Mutation:**
-  resolving the project from the first work item instead of the open ticket reddens here and nowhere
-  else in the file. —
+  resolving the project from the first row of the first section — the wrong-project answer this case
+  names — reddens here, `13.1397`, `13.1398` and `3.162`: one wrong resolver is wrong from four
+  directions, which is why the assertion is the href AND the other project's absence. —
   (`apps/web/test/my-work-sheet-in-place.test.tsx`)
 - **13.1395** ✅ **CLOSING THE SHEET IS THE PARAM'S REMOVAL, and it stays on My Work**: one push, to
   `/w/:ws/my-work` with no param and `{ scroll: false }` — not to the project page, which is where a
@@ -3286,7 +3294,8 @@ param **on its own route**, and the click keeps the reader where they were.
   the page draws the expired-session notice, mounts no dialog, and **asks nobody where the ticket is** —
   the page's own `!expired` term, which is new code on this mount and would otherwise fire a locate at a
   server that answers 401, painting an error about the wrong thing over the message that matters.
-  **Mutation:** dropping `!expired` from the mount gate reddens here. —
+  **Post-commit mutation (measured):** dropping the `expired` term at BOTH sites — the effect's guard
+  and the mount gate — reddens exactly here. —
   (`apps/web/test/my-work-sheet-in-place.test.tsx`)
 - **13.1400** ✅ **A DELETION MADE FROM MY WORK LEAVES THE VIEW.** The sheet's footer Delete is driven
   for real (two presses since E2-35), the `ticket.deleted` is committed, and then BOTH of the page's
