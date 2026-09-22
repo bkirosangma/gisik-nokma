@@ -126,6 +126,15 @@ export type EditorSlotProps = {
   // person's words. It was `Promise<void>`, and `void` cannot say which
   // happened — so the clear ran on every one of those five outcomes.
   submit?: (submission: EditorSubmission) => Promise<boolean>;
+  /**
+   * The document as it stands, reported on every edit — transcribed from
+   * app-core's half, which carries the full reasoning (the New ticket dialog
+   * needs the document BEFORE any submit, because the ticket it describes does
+   * not exist until `Create` is pressed). The two declarations move together:
+   * `test/ticket-editor-slot.test.tsx` compares their field-name sets, so a
+   * one-sided addition fails there rather than drifting silently.
+   */
+  onChange?: (doc: unknown) => void;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -141,6 +150,30 @@ export type EditorSlotProps = {
  */
 export type TicketEditorSlotProps = EditorSlotProps & {
   editorRef?: React.MutableRefObject<Editor | null>;
+  /**
+   * Whether this mount draws the slot's OWN submit control (owner request
+   * 2026-09-23). `'footer'` — the default — keeps every mount this component has
+   * ever had exactly as it was; `'none'` omits the button and leaves the rest of
+   * the footer, which also carries the hint sentence.
+   *
+   * **Seam-only, deliberately, and for `editorRef`'s own reason:** it lives here
+   * rather than in the shared `EditorSlotProps` because it is a fact about
+   * mounting THIS component, not about what an editor slot promises. The
+   * contract's other mount — app-core's read-only `PlainTextEditorSlot` — has no
+   * submit control to suppress, and a host that does not know which component it
+   * is passed could not meaningfully ask for this. Being optional, its presence
+   * does not disturb the assignability proof that the two halves still meet.
+   *
+   * ## Why a caller needs it at all
+   *
+   * The New ticket dialog's description. Its `Create` control is the one act
+   * that files the ticket, and the composer's own "Submit" would sit inside the
+   * same form offering a SECOND, differently-shaped act — one that sends a
+   * `ticket.field_set` for a ticket that does not exist yet. Two submit controls
+   * for one act is not a styling question: the inner one would be an attempt to
+   * write to nothing.
+   */
+  submitSlot?: 'footer' | 'none';
 };
 
 const NO_MENTIONS = async (): Promise<MentionCandidate[]> => [];
@@ -283,6 +316,16 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         onAttachmentAdded={props.emitAttachmentAdded ?? NO_EMIT}
         onUploadError={(err) => props.onError?.(err)}
         onSubmit={(doc) => void handleSubmit(doc)}
+        /*
+          13.1365 — the document as it stands, for a host that will submit it
+          LATER. `TicketEditor` wires this to ProseMirror's `onUpdate` and to
+          nothing else, so an untouched composer reports nothing at all — which
+          is what lets the create dialog read "never reported" as "no
+          description" rather than having to tell an empty document from an
+          untyped one. Passed straight through; the slot adds no policy of its
+          own, exactly as it adds none to `queryUsers` or `emitAttachmentAdded`.
+        */
+        onDocChange={(doc) => props.onChange?.(doc)}
         onEditorReady={() => setReady(true)}
         editorRef={editorRef}
         /*
@@ -319,6 +362,26 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         <p className="editor-slot__hint">
           {isComment ? (props.footerNote ?? '') : props.readOnly ? '' : MARKDOWN_HINT}
         </p>
+        {/*
+          ⚠ `submitSlot: 'none'` OMITS THE BUTTON AND NOT THE FOOTER, and the
+          split is the point rather than a leftover: the footer's LEFT half is
+          the hint sentence, which the caller above still wants (13.1365b
+          asserts the footer survives). Removing the whole row would have been
+          the shorter edit and would have taken a sentence with it that has
+          nothing to do with who publishes the claim.
+
+          The `disabledReason` machinery below is deliberately NOT gated on this
+          prop. It is computed from `readOnly`/`submit`, and the span that
+          carries it is rendered only when there is a control to be described —
+          so with no button the span would be an orphan, and it is left to the
+          `disabledReason !== undefined &&` condition it already has: a
+          `submitSlot: 'none'` mount that also supplies no `submit` renders the
+          hidden span for a control that is not there. Harmless (a hidden,
+          unreferenced sentence) and NOT worth a third condition, but stated
+          here so the next reader does not read the span as evidence the button
+          exists somewhere they cannot see.
+        */}
+        {props.submitSlot === 'none' ? null : (
         <button
           type="button"
           className="editor-slot__submit"
@@ -340,6 +403,7 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
               only: `handleSubmit` and the event it composes are untouched. */}
           {isComment ? 'Post' : 'Save description'}
         </button>
+        )}
       </div>
       {disabledReason !== undefined && (
         <span

@@ -589,7 +589,9 @@ describe('13.591f the birth-state control does not depend on which parent a REAL
       getPreferences: async () => EMPTY_PREFERENCES,
     });
     services.dataSource.ingest = async (events) => {
-      for (const event of events) ingested.push({ type: event.type, payload: event.payload });
+      for (const event of events) {
+        ingested.push({ type: event.type, payload: event.payload as { start?: unknown } });
+      }
       return events.map((event) => ({
         status: 'committed' as const,
         eventId: event.id,
