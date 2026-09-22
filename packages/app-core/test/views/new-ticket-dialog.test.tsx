@@ -6,8 +6,21 @@ import { userEvent } from '@testing-library/user-event';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { NEW_TICKET_START_KEY } from '../../src/preferences/new-ticket-start.js';
 import { NewTicketDialog, defaultRootTypeFor } from '../../src/views/new-ticket-dialog.js';
+
+/**
+ * The remembered backlog answer is a `localStorage` record, and `localStorage`
+ * is shared by every case in a file. Cleared BETWEEN cases rather than inside
+ * the ones that write it: a leak turns a LATER case green for the wrong reason,
+ * so the guard belongs where it cannot be forgotten by whoever adds the next
+ * case. The choice cases clear it again themselves before asserting, because
+ * "no record" is the state their own controls depend on.
+ */
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 // The cross-package stylesheet read `sync-ux-css-binding.test.tsx:47` and
 // `inbox-css-binding.test.tsx` already establish for "is this class a rule?".
@@ -87,6 +100,7 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         parentCandidatesNarrowing="tickets in progress"
@@ -127,6 +141,7 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         onCreate={vi.fn()}
@@ -161,6 +176,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
   ) => {
     const onCreate = vi.fn();
     const props = {
+      userId: 'usr_ada',
       open: true,
       typeOptions: TYPES,
       parentCandidates: CANDIDATES,
@@ -292,6 +308,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         onCreate={onCreate}
@@ -361,33 +378,50 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
 });
 
 /**
- * 13.591 — NEW TICKETS ARE BORN IN THE BACKLOG (backlog/closed spec §5.4,
- * 2026-09-17), with one exception: a child of a parent that is itself in
- * focus may start there too, by explicit, undoable choice.
+ * 13.591 / 13.1351–13.1357 — NEW TICKETS ARE BORN IN THE BACKLOG, and the
+ * question is now a SWITCH rather than a sentence plus a sometimes-checkbox.
  *
- * Two candidates, told apart only by `inFocus` — the caller's own claim about
- * each candidate's live state (this component derives nothing; see
- * `NewTicketDialogProps.parentCandidates`'s own docblock). The checkbox's
- * EXISTENCE is the thing every case but the first two is really about: it
- * must track the CHOSEN candidate's `inFocus`, not some fixed truth about the
- * dialog, and it must never leave the draft's `start` disagreeing with
- * whether it was ever shown at all.
+ * ## What changed, and why the old cases could not simply be re-lettered
+ *
+ * Until 2026-09-23 this block pinned spec §5.4: an unconditional SENTENCE
+ * ("Starts in the backlog"), plus a "Start in focus" CHECKBOX that existed only
+ * when the chosen parent was itself in focus — a condition (`startCheckboxVisible`)
+ * that was really a rule about the ticket's birth state. **The owner lifted that
+ * condition** (ruling 2026-09-23): a ticket may be born in focus whatever its
+ * parent, the control is always present and always answerable, and the choice is
+ * remembered across sessions.
+ *
+ * Two consequences shape every case below rather than being footnotes to them:
+ *
+ * - **The polarity INVERTED.** The old control meant "start in FOCUS" and was
+ *   checked by default; the new one means "starts in BACKLOG" and is ON by
+ *   default. They are opposites, so `startInFocus` could not be wired straight
+ *   to `checked` — the draft's `start` is now derived from the switch's own
+ *   sense, and 13.1353 pins the direction that would otherwise be silently
+ *   backwards.
+ * - **Ruling 40 is SUPERSEDED, not deleted.** "Checked by default, PER CHOSEN
+ *   PARENT" was a promise about a control that tracked the parent. The switch
+ *   does not track the parent at all, so the parent picker no longer resets it —
+ *   and 13.591g survives as the case that pins exactly that removal, because a
+ *   stale reset would silently overwrite the person's remembered answer.
  */
-describe('13.591 new tickets are born in the backlog; a child of an in-focus parent may start there', () => {
+describe('13.591 the backlog question is a Switch, and it is always answerable', () => {
   const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
   const CANDIDATES = [
     { id: 'parent_focus', title: 'In-focus parent', inFocus: true },
     { id: 'parent_backlog', title: 'Backlog parent', inFocus: false },
     // A SECOND in-focus candidate, for 13.591g's switch-between-two-in-focus-
-    // parents case (Ruling 40) — every other case in this block ignores it.
+    // parents case — every other case in this block ignores it.
     { id: 'parent_focus_2', title: 'Another in-focus parent', inFocus: true },
   ];
+  const QUESTION = 'Starts in the backlog?';
 
-  const renderDialog = () => {
+  const renderDialog = (userId = 'usr_ada') => {
     const onCreate = vi.fn();
     render(
       <NewTicketDialog
         open
+        userId={userId}
         typeOptions={TYPES}
         parentCandidates={CANDIDATES}
         onCreate={onCreate}
@@ -397,14 +431,106 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
     return onCreate;
   };
 
-  it('13.591a states "Starts in the backlog" under the title field, unconditionally', () => {
+  const switchControl = (): HTMLElement => screen.getByRole('checkbox', { name: QUESTION });
+
+  it('13.591a asks "Starts in the backlog?" with the SHARED Switch, and it opens ON', () => {
     renderDialog();
-    expect(screen.getByText('Starts in the backlog')).toBeInTheDocument();
+    const control = switchControl();
+    // The shared component, not a lookalike: `Switch` renders the product's one
+    // switch — a restyled `gn-switch` checkbox inside a `gn-switch-row` label
+    // (`packages/ui/src/components/switch.tsx`). A hand-rolled toggle would
+    // satisfy an accessible-name assertion and still be a second on/off control
+    // for the product to keep in step.
+    expect(control).toHaveClass('gn-switch');
+    expect(control.closest('label')).toHaveClass('gn-switch-row');
+    // ON is the default, and ON means BACKLOG — asserted on the control AND on
+    // the draft below, because the two can disagree only if the polarity is
+    // wired backwards, which a name assertion alone cannot see.
+    expect(control).toBeChecked();
+    // The question is the control's own accessible name, so the words on screen
+    // and the words a screen reader announces are the same node's — the
+    // `Switch` contract, whose children ARE the name with no `aria-label` to
+    // drift from them.
+    expect(screen.getByText(QUESTION)).toBeInTheDocument();
   });
 
-  it('13.591b with no parent chosen, no checkbox renders and the draft leaves with start: "backlog"', () => {
+  it('13.1354 the thing it replaced is GONE — the old sentence and the "Start in focus" checkbox', () => {
+    renderDialog();
+    // The `?` is the whole difference in text, and `getByText` matches
+    // normalised text EXACTLY, so asserting the old string absent and the new
+    // one present cannot both be satisfied by one node. A dialog that kept the
+    // old `<p>` and added a switch beside it would read as one claim plus one
+    // control — the pair the owner asked to have replaced.
+    expect(screen.queryByText('Starts in the backlog')).toBeNull();
+    expect(screen.getByText(QUESTION)).toBeInTheDocument();
+    // …and the checkbox went with the condition it existed to serve. A leftover
+    // one would be a SECOND control for the same fact, and the two could
+    // disagree: the draft's `start` reads the switch alone.
+    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).toBeNull();
+    // Exactly ONE on/off control remains, so "the checkbox is gone" cannot be
+    // satisfied by a dialog that lost the switch too.
+    expect(screen.getAllByRole('checkbox')).toHaveLength(1);
+  });
+
+  it('13.1352 the switch stays PRESENT and ENABLED for every parent — §5.4\'s condition is lifted', async () => {
+    const user = userEvent.setup();
+    renderDialog();
+
+    // ARM ONE — no parent chosen. This is the case the owner was looking at:
+    // under §5.4 the checkbox was absent here and the sentence dangled.
+    expect(switchControl()).toBeEnabled();
+    // ARM TWO — an IN-FOCUS parent, the only parent that ever revealed the old
+    // control. Without this arm the case passes against a switch that is
+    // enabled only where the checkbox used to appear.
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
+    );
+    expect(switchControl()).toBeEnabled();
+    // ARM THREE — a BACKLOG parent, which HID the old control outright.
+    await user.click(
+      within(await openPicker(user, 'Parent')).getByRole('option', { name: 'Backlog parent' }),
+    );
+    expect(switchControl()).toBeEnabled();
+  });
+
+  it('13.1353 turning it OFF with NO parent chosen sends start: "focus" — a ticket may be born in focus without a parent', () => {
     const onCreate = renderDialog();
-    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    fireEvent.click(switchControl());
+    expect(switchControl()).not.toBeChecked();
+
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: null,
+      start: 'focus',
+      priority: 'P2',
+    });
+  });
+
+  it('13.1353 CONTROL: left untouched with no parent chosen, the SAME draft sends start: "backlog"', () => {
+    // The direction pin. ON means BACKLOG, and a switch wired straight to the
+    // old `startInFocus` sense would pass the case above while sending the
+    // opposite of what this one asserts — the two are red together or the
+    // polarity is not being tested at all.
+    const onCreate = renderDialog();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith({
+      title: 'Renew the trade licence',
+      typeId: 'task',
+      parentId: null,
+      start: 'backlog',
+      priority: 'P2',
+    });
+  });
+
+  it('13.591b with no parent chosen the switch is ON and the draft leaves with start: "backlog"', () => {
+    const onCreate = renderDialog();
+    expect(switchControl()).toBeChecked();
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
@@ -421,7 +547,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
     });
   });
 
-  it('13.591c choosing an in-focus parent renders "Start in focus" checked, and submits start: "focus"', async () => {
+  it('13.591c an in-focus parent is no longer a precondition: OFF sends start: "focus" under it too', async () => {
     const user = userEvent.setup();
     const onCreate = renderDialog();
 
@@ -429,9 +555,8 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
     await user.click(
       within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
     );
-
-    const checkbox = screen.getByRole('checkbox', { name: 'Start in focus' });
-    expect(checkbox).toBeChecked();
+    expect(switchControl()).toBeChecked();
+    await user.click(switchControl());
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     expect(onCreate).toHaveBeenCalledWith({
@@ -443,7 +568,7 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
     });
   });
 
-  it('13.591d unticking "Start in focus" submits start: "backlog" instead', async () => {
+  it('13.591d turning the switch OFF under a parent sends start: "backlog" when turned back ON', async () => {
     const user = userEvent.setup();
     const onCreate = renderDialog();
 
@@ -451,9 +576,12 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
     await user.click(
       within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
     );
-    const checkbox = screen.getByRole('checkbox', { name: 'Start in focus' });
-    await user.click(checkbox);
-    expect(checkbox).not.toBeChecked();
+    await user.click(switchControl());
+    expect(switchControl()).not.toBeChecked();
+    // …and back ON: the control is answerable in BOTH directions, which a
+    // one-way toggle would fail here rather than in the draft assertions.
+    await user.click(switchControl());
+    expect(switchControl()).toBeChecked();
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     expect(onCreate).toHaveBeenCalledWith({
@@ -461,14 +589,11 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       typeId: 'task',
       parentId: 'parent_focus',
       start: 'backlog',
-      // Spec 2026-09-22: the dialog always SENDS a priority, and it starts at
-      // the middle — the wire's absence-means-P2 rule is for events older than
-      // the field, not for this client.
       priority: 'P2',
     });
   });
 
-  it('13.591e choosing a backlog parent renders no checkbox, and the draft leaves with start: "backlog"', async () => {
+  it('13.591e a BACKLOG parent no longer hides the control, and the draft leaves with start: "backlog"', async () => {
     const user = userEvent.setup();
     const onCreate = renderDialog();
 
@@ -476,7 +601,10 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
     await user.click(
       within(await openPicker(user, 'Parent')).getByRole('option', { name: 'Backlog parent' }),
     );
-    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+    // The control the old rule removed for exactly this parent. Asserting it is
+    // PRESENT and ON is the whole case: §5.4 hid it here because a backlog
+    // parent could not father a focus child, and that rule is lifted.
+    expect(switchControl()).toBeChecked();
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     expect(onCreate).toHaveBeenCalledWith({
@@ -492,38 +620,41 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
   });
 
   /**
-   * 13.591g (Ruling 40, coordinator, fix round 1, 2026-09-17) — "checked by
-   * default" (spec §5.4) is a promise PER CHOSEN PARENT. Untick the box for
-   * in-focus parent A, then pick a DIFFERENT in-focus parent B: B's own box
-   * must render checked on ITS first appearance, not inherit A's untick.
-   * Named `g` rather than reusing `a` — the coordinator's fix-round message
-   * named this case 13.591a, but that id already covers this file's own
-   * "states the note unconditionally" case (a distinct, already-cited
-   * behaviour); reusing one id for two unrelated assertions in the same file
-   * would violate the "never let one checkmark cover two different things"
-   * convention this catalogue otherwise holds to, so this continues the
-   * block's own lettering instead — `f` is `apps/web/test/project-create-
-   * gate.test.tsx`'s case, a different file's next free letter, not this
-   * one's.
+   * 13.591g — RULING 40 SUPERSEDED (owner ruling 2026-09-23).
+   *
+   * Ruling 40 made "checked by default" a promise PER CHOSEN PARENT: the Parent
+   * picker's own `onChange` reset the box on every selection, so switching from
+   * in-focus parent A to in-focus parent B rendered B's box at its own starting
+   * state rather than inheriting A's untick.
+   *
+   * That reset existed because the control TRACKED the parent. The switch does
+   * not: it answers a question about the ticket, not about its parent, and it is
+   * remembered for the person. Keeping the reset would therefore be an active
+   * defect rather than a harmless vestige — it would silently overwrite an
+   * answer the person gave and that this dialog has just been asked to remember.
+   *
+   * So the case survives, inverted: it now pins that CHOOSING A PARENT CHANGES
+   * NOTHING. The id is kept deliberately — the catalogue rule is that ids are
+   * never renumbered, and this is the same question (what does a parent change
+   * about the birth state?) answered by the rule that replaced §5.4.
    */
-  it('13.591g unticking the checkbox for one in-focus parent, then switching to a DIFFERENT in-focus parent, renders the new parent\'s box CHECKED', async () => {
+  it('13.591g choosing a different parent leaves the switch exactly as the person left it', async () => {
     const user = userEvent.setup();
     const onCreate = renderDialog();
 
     fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    await user.click(switchControl());
+    expect(switchControl()).not.toBeChecked();
+
     await user.click(
       within(await openPicker(user, 'Parent')).getByRole('option', { name: 'In-focus parent' }),
     );
-    const checkboxA = screen.getByRole('checkbox', { name: 'Start in focus' });
-    expect(checkboxA).toBeChecked();
-    await user.click(checkboxA);
-    expect(checkboxA).not.toBeChecked();
+    expect(switchControl()).not.toBeChecked();
 
     await user.click(
       within(await openPicker(user, 'Parent')).getByRole('option', { name: 'Another in-focus parent' }),
     );
-    const checkboxB = screen.getByRole('checkbox', { name: 'Start in focus' });
-    expect(checkboxB).toBeChecked();
+    expect(switchControl()).not.toBeChecked();
 
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
     expect(onCreate).toHaveBeenCalledWith({
@@ -533,6 +664,110 @@ describe('13.591 new tickets are born in the backlog; a child of an in-focus par
       start: 'focus',
       priority: 'P2',
     });
+  });
+});
+
+/**
+ * 13.1355–13.1357 — THE CHOICE IS REMEMBERED, KEYED BY USER.
+ *
+ * `localStorage` outlives a session, so the record carries the user it was
+ * written for and a record belonging to anyone else is not honoured — the
+ * load-bearing half of the pattern `apps/web/src/use-last-workspace.ts` and
+ * `use-last-project.ts` establish, and the reason the key is not a flat
+ * boolean: sign out, hand the laptop over, and a bare key would start the next
+ * person's tickets in the previous person's state.
+ *
+ * Every case here clears storage first. `localStorage` is shared by every case
+ * in a file, so a leaked record turns a later case green for the wrong reason —
+ * the same "a state you did not set" defect this file's `E2-37` block is about.
+ */
+describe('13.1355–13.1357 the backlog answer is remembered, per user', () => {
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const QUESTION = 'Starts in the backlog?';
+
+  const props = (userId: string) => ({
+    userId,
+    typeOptions: TYPES,
+    parentCandidates: [],
+    onCreate: vi.fn(),
+    onClose: () => undefined,
+  });
+  const switchControl = (): HTMLElement => screen.getByRole('checkbox', { name: QUESTION });
+
+  it('13.1355 an answer survives a close and reopen, and is stored against the user', () => {
+    const { rerender } = render(<NewTicketDialog open {...props('usr_ada')} />);
+    fireEvent.click(switchControl());
+    expect(switchControl()).not.toBeChecked();
+
+    // The record, read back and compared WHOLE: the user id is what the key's
+    // shape is for, and a record that stored the answer without it would still
+    // satisfy the reopen assertion below while being the leak this key exists
+    // to prevent.
+    expect(JSON.parse(window.localStorage.getItem(NEW_TICKET_START_KEY) ?? 'null')).toEqual({
+      userId: 'usr_ada',
+      start: 'focus',
+    });
+
+    // The REAL reopen path rather than a fresh mount: the flow mounts this
+    // component for its whole life and only toggles `open`, so the seed has to
+    // survive `open: false → true` on a SURVIVING instance — which a component
+    // that seeded only in `useState`'s initialiser would fail.
+    rerender(<NewTicketDialog open={false} {...props('usr_ada')} />);
+    rerender(<NewTicketDialog open {...props('usr_ada')} />);
+    expect(switchControl()).not.toBeChecked();
+  });
+
+  it('13.1356 a record written for ANOTHER user is not honoured — and the same bytes DO answer for the user they name', () => {
+    window.localStorage.setItem(
+      NEW_TICKET_START_KEY,
+      JSON.stringify({ userId: 'usr_grace', start: 'focus' }),
+    );
+
+    // CONTROL FIRST, and it is the whole reason this case can be trusted: the
+    // SAME bytes, read for the user the record names, do turn the switch OFF.
+    // Without it, "the other user's record was refused" is indistinguishable
+    // from a reader that failed for some unrelated reason — a typo in the key,
+    // an unparsed shape — which is the failure mode `use-last-project.ts`'s own
+    // 13.853 control names.
+    const control = render(<NewTicketDialog open {...props('usr_grace')} />);
+    expect(switchControl()).not.toBeChecked();
+    control.unmount();
+
+    render(<NewTicketDialog open {...props('usr_ada')} />);
+    expect(switchControl()).toBeChecked();
+  });
+
+  it('13.1357 blocked site data still renders the dialog at the default, and the switch still toggles', () => {
+    const real = window.localStorage;
+    // A browser with site data blocked throws on the ACCESSOR, not on the value
+    // — so this stubs the object itself, which is the shape the guard in the
+    // module has to survive. `configurable: true` is required to put the real
+    // one back in the `finally`: leaving a throwing stub in place would poison
+    // every case after this one in the file.
+    Object.defineProperty(window, 'localStorage', {
+      configurable: true,
+      value: {
+        getItem(): string | null {
+          throw new Error('site data blocked');
+        },
+        setItem(): void {
+          throw new Error('site data blocked');
+        },
+      },
+    });
+    try {
+      render(<NewTicketDialog open {...props('usr_ada')} />);
+      // The default, which the ruling names: backlog ON. A dialog that refused
+      // to render because it could not read a convenience would be worse than
+      // one that forgot the convenience.
+      expect(switchControl()).toBeChecked();
+      // …and the control still WORKS. The write is what throws here, so this is
+      // the arm that proves the write is guarded too rather than only the read.
+      fireEvent.click(switchControl());
+      expect(switchControl()).not.toBeChecked();
+    } finally {
+      Object.defineProperty(window, 'localStorage', { configurable: true, value: real });
+    }
   });
 });
 
@@ -568,6 +803,7 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={TYPES}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -665,7 +901,7 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
  */
 describe('E2-37 a reopened New-ticket dialog is EMPTY', () => {
   const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
-  const props = { typeOptions: TYPES, parentCandidates: [], onClose: () => undefined };
+  const props = { userId: 'usr_ada', typeOptions: TYPES, parentCandidates: [], onClose: () => undefined };
 
   it('PLANTED DEFECT: reopening offers no title, and Create is disabled again', () => {
     const onCreate = vi.fn();
@@ -739,6 +975,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={LADDER}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -789,6 +1026,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     const { rerender } = render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={LADDER}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -805,6 +1043,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     rerender(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={[{ id: 'errand', name: 'Errand', rank: 3 }]}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -834,6 +1073,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     const { rerender } = render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={LADDER}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -847,6 +1087,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     rerender(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={[...LADDER, { id: 'errand', name: 'Errand', rank: 3 }]}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -861,6 +1102,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={[{ id: 'sub-task', name: 'Sub-task', rank: 4 }]}
         parentCandidates={[]}
         onCreate={onCreate}
@@ -907,6 +1149,7 @@ describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () 
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
         parentCandidates={[]}
         onCreate={vi.fn()}
@@ -953,6 +1196,7 @@ describe('13.1234 the new-ticket dialog offers P1/P2/P3, preselected at P2', () 
     render(
       <NewTicketDialog
         open
+        userId="usr_ada"
         typeOptions={CHOICES}
         parentCandidates={[]}
         onCreate={onCreate}

@@ -26,7 +26,7 @@ export type CreateTicketFlowProps = {
   /** See `NewTicketDialogProps.typeOptions` — this flow only passes it through. */
   typeOptions: readonly TypeOption[];
   /** See `NewTicketDialogProps.parentCandidates` — this flow only passes it through. */
-  parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
+  parentCandidates: Array<{ id: string; title: string }>;
   /** See `NewTicketDialogProps.parentCandidatesUnavailable`. */
   parentCandidatesUnavailable?: string;
   /** See `NewTicketDialogProps.parentCandidatesNarrowing`. */
@@ -406,6 +406,13 @@ export function CreateTicketFlow({
          * longer closes both surfaces — and neither half implies the other.
          */
         open={dialogOpen && reopenPrompt === null}
+        // The remembered birth-state answer is keyed by user (owner ruling
+        // 2026-09-23), and this flow is the layer that already holds the
+        // session's own id — `currentUserId`, the same value `makeSubmittedFactory`
+        // stamps on every claim below. Passed straight through: the dialog reads
+        // and writes the record itself, because it is the thing that knows WHEN
+        // the person answered.
+        userId={currentUserId}
         typeOptions={typeOptions}
         parentCandidates={parentCandidates}
         parentCandidatesUnavailable={parentCandidatesUnavailable}

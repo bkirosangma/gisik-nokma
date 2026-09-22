@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { DEFAULT_PRIORITY, DEEPEST_RANK, PRIORITIES, type Priority } from '@gisik-nokma/domain';
-import { Button, Dialog, SegmentedControl, Select } from '@gisik-nokma/ui';
+import { Button, Dialog, SegmentedControl, Select, Switch } from '@gisik-nokma/ui';
+import { readNewTicketStart, rememberNewTicketStart } from '../preferences/new-ticket-start.js';
 
 /**
  * A ticket type as this dialog is handed it: the label to paint, and the RANK
@@ -48,10 +49,20 @@ export type NewTicketDraft = {
   typeId: string;
   parentId: string | null;
   /**
-   * Where the ticket is born (backlog/closed spec §5.4, 2026-09-17):
-   * `'backlog'` unless the checkbox below is shown AND left checked. ALWAYS
-   * present — never optional here, even though `ticketCreatedPayload` on the
-   * wire treats an absent `start` as `'focus'` for events older than this
+   * Where the ticket is born (backlog/closed spec §5.4, 2026-09-17; condition
+   * LIFTED by the owner 2026-09-23): whatever the "Starts in the backlog?"
+   * switch below says — `'backlog'` when it is ON, which is its default, and
+   * `'focus'` when the person has turned it off, WHATEVER parent is chosen.
+   *
+   * No longer conditional on the parent. Until 2026-09-23 §5.4 let a ticket be
+   * born in focus only under a parent that was itself in focus, and the draft's
+   * `start` was `startCheckboxVisible && startInFocus`. The owner lifted that:
+   * the control is always present and always answerable, so the parent has no
+   * bearing on this value at all and the `inFocus` claim the caller used to
+   * carry is gone from `parentCandidates` with it.
+   *
+   * ALWAYS present — never optional here, even though `ticketCreatedPayload` on
+   * the wire treats an absent `start` as `'focus'` for events older than this
    * field. That absence-means-focus rule exists so a v1 event keeps its v1
    * meaning; it says nothing about what THIS client, built after the field
    * exists, is allowed to leave out. `create-ticket-flow.tsx`'s `create()`
@@ -77,16 +88,37 @@ export type NewTicketDialogProps = {
   open: boolean;
   typeOptions: readonly TypeOption[];
   /**
-   * `inFocus` (backlog/closed spec §5.4, 2026-09-17): whether THIS candidate,
-   * if chosen as parent, would show the "Start in focus" checkbox below — a
-   * candidate sitting outside the universal Backlog state and never closed.
-   * Computed by the caller from data this component does not have (a
-   * candidate's own `stateId`/`closed`, ruling: this dialog only ever sees
-   * `{id, title}` shapes otherwise) — the same division of labour
-   * `parentCandidatesUnavailable`/`parentCandidatesNarrowing` already draw:
-   * this component renders a caller's claim, it does not derive one.
+   * Whose remembered answer this dialog reads and writes (owner ruling
+   * 2026-09-23): the "Starts in the backlog?" switch's position is remembered
+   * in `localStorage` across sessions, and that record is KEYED BY USER.
+   *
+   * **REQUIRED, and that is the point rather than tidiness.** An optional
+   * `userId` would compile at every call site and silently stop remembering the
+   * answer wherever it was omitted — a feature that is absent and looks
+   * present, which is the failure mode `TypeOption.rank`'s own required field
+   * exists to make impossible. The report REQUIRES it for the identical reason:
+   * `'backlog'` on the wire is a real state, so a defaulted-to-unset value here
+   * would not fail loudly, it would just forget.
+   *
+   * `''` is "no session" — the sentinel `CreateTicketFlowProps.currentUserId`
+   * already carries, `page.tsx:241`'s own spelling of it. Nothing is read back
+   * and nothing is written for it; the switch still renders, at its default.
    */
-  parentCandidates: Array<{ id: string; title: string; inFocus: boolean }>;
+  userId: string;
+  /**
+   * What may be chosen as this ticket's parent.
+   *
+   * **`inFocus` used to be here and is deliberately GONE** (owner ruling
+   * 2026-09-23). It existed for exactly one reader — the `startCheckboxVisible`
+   * condition that hid the birth-state control unless the chosen parent was
+   * itself in focus — and when that condition was lifted the field lost its
+   * only purpose. `page.tsx` computed it from a real row's `stateId`/`closed`
+   * (`row.stateId !== BACKLOG_STATE_ID && row.closed === null`) and no longer
+   * does: a claim nothing reads is a claim the next reader will assume is load
+   * bearing, and this dialog now asserts nothing whatever about a parent's own
+   * state.
+   */
+  parentCandidates: Array<{ id: string; title: string }>;
   /**
    * Why the parent list could not be loaded, when it could not be.
    *
@@ -145,6 +177,7 @@ export type NewTicketDialogProps = {
  */
 export function NewTicketDialog({
   open,
+  userId,
   typeOptions,
   parentCandidates,
   parentCandidatesUnavailable,
@@ -229,7 +262,22 @@ export function NewTicketDialog({
     setTitle('');
     setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
     setParentId('');
-    setStartInFocus(true);
+    // ⚠ NOT `true`, and not a resettable default either: the switch opens at
+    // whatever this PERSON last chose (owner ruling 2026-09-23 — *"same as how
+    // workspace and project is remembered"*). Resetting it to ON here would be
+    // the stale-draft rule applied to a value that is not part of the draft:
+    // the answer belongs to the person, not to the ticket being composed, and a
+    // Cancel is not a reason to forget it.
+    //
+    // Read HERE rather than in `useState`'s initialiser, and that placement is
+    // load-bearing twice over. This effect runs only on the client, after a user
+    // action — so there is no server render in which `window` is missing and no
+    // hydration mismatch between a server that answered ON and a client that
+    // answered OFF. And it re-reads on every OPEN, which is what makes the read
+    // honest for a person who signed in as somebody else since the last time:
+    // `readNewTicketStart` refuses a record belonging to another user, and the
+    // refusal can only happen if it is asked again.
+    setStartInBacklog(readNewTicketStart(userId) === 'backlog');
     // Priority is reset with the rest (spec 2026-09-22): "empty on OPEN" is the
     // rule, and a priority left at the previous draft's level is the same
     // stale-draft defect E2-37 names, one field over.
@@ -237,31 +285,47 @@ export function NewTicketDialog({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [open]);
   const [parentId, setParentId] = useState('');
-  // Checked by default (spec §5.4), PER CHOSEN PARENT — Ruling 40 (coordinator,
-  // fix round 1, 2026-09-17): the Parent picker's own `onChange` below resets
-  // this to `true` on every selection, so switching to a DIFFERENT in-focus
-  // parent always renders THAT parent's checkbox at its spec-mandated
-  // starting state, rather than inheriting whatever a previously-chosen
-  // parent's box was left at. See that `onChange` for the full reasoning;
-  // this state's own job is only to hold whatever the box currently shows.
-  const [startInFocus, setStartInFocus] = useState(true);
+  /**
+   * The "Starts in the backlog?" switch's position — ON means the ticket is born
+   * in the universal Backlog state, OFF means the workflow's initial (focus)
+   * state.
+   *
+   * ## The polarity is INVERTED from the control it replaced, and that is a trap
+   *
+   * The old "Start in focus" checkbox meant `start: 'focus'` when CHECKED. This
+   * switch means `start: 'backlog'` when checked. They are opposites, so the
+   * shipped `startInFocus` could not be renamed and kept: wiring it straight to
+   * `checked` would have shipped a control whose ON position silently meant the
+   * reverse of what it said. The state is named for what the switch SHOWS rather
+   * than for what the payload carries, so the derivation at the submit boundary
+   * below reads as the plain translation it is — and 13.1353 pins both
+   * directions, because an inverted control passes any single-direction case.
+   *
+   * ## It is never disabled, and the parent has no say in it
+   *
+   * Spec §5.4's condition — a ticket may be born in focus only when the chosen
+   * parent is itself in focus — was LIFTED by the owner (2026-09-23). What is
+   * left is a question about the ticket, answerable at any moment, so there is
+   * no `disabled` and nothing here reads the chosen parent. Ruling 40's
+   * per-parent reset went with the condition it served: a switch that does not
+   * track the parent cannot be reset by it, and a stale reset would overwrite
+   * the very answer this dialog is asked to remember (13.591g).
+   *
+   * The initial value is ON and is never observed: the open effect above seeds
+   * it before the dialog can be seen. It exists so the first render has a
+   * position, not to be an answer.
+   */
+  const [startInBacklog, setStartInBacklog] = useState(true);
 
   // The SAME "no usable parent" test the submit boundary below already makes
   // for `parentId` — reused, not re-derived, so the two can never disagree
   // about what counts as a real parent. `undefined` here (the picker itself
   // withheld) counts as "no usable parent" for the identical reason `parentId`
   // leaves as `null` in that case: a withheld picker's `parentId` state may
-  // still hold a stale selection (3.157's own invariant), and this dialog must
-  // not read a chosen candidate's `inFocus` off state the payload itself
-  // refuses to send.
+  // still hold a stale selection (3.157's own invariant), and `null` is the
+  // only value the payload is allowed to carry for a parent this dialog has
+  // told the person it will not use.
   const noUsableParent = parentCandidatesUnavailable !== undefined || parentId === '';
-  const chosenParent = noUsableParent
-    ? undefined
-    : parentCandidates.find((candidate) => candidate.id === parentId);
-  // Spec §5.4: the checkbox exists ONLY when the parent actually chosen in
-  // THIS dialog is in focus — never for no parent, a withheld picker, or a
-  // backlog/closed one, which is exactly `chosenParent?.inFocus === true`.
-  const startCheckboxVisible = chosenParent?.inFocus === true;
 
   /**
    * TWO flags, on purpose, because they answer different questions at different
@@ -310,12 +374,13 @@ export function NewTicketDialog({
         // exists to refuse. Witnessed at 3.157, with a control proving the
         // parent still travels when the picker IS shown.
         parentId: noUsableParent ? null : parentId,
-        // Spec §5.4: 'backlog' unless the checkbox above is BOTH visible
-        // and checked. `startCheckboxVisible` already carries "a usable,
-        // in-focus parent is chosen" — re-testing `noUsableParent` here
-        // would be a second, driftable spelling of the same fact this
-        // component already computed once above.
-        start: startCheckboxVisible && startInFocus ? 'focus' : 'backlog',
+        // The switch's own sense, translated once (owner ruling 2026-09-23).
+        // ON is BACKLOG — the INVERSE of the control this replaced, whose ON
+        // meant focus. `noUsableParent` deliberately does NOT appear here, and
+        // its absence is the ruling rather than an oversight: the parent list
+        // has no bearing on where a ticket is born any more, so a withheld
+        // picker withholds the PARENT and nothing else.
+        start: startInBacklog ? 'backlog' : 'focus',
         // Spec 2026-09-22. ALWAYS sent, like `start` and for the same reason:
         // the wire's absence-means-P2 rule is for events older than the field,
         // not for this client. The control is preselected, so this is always a
@@ -350,13 +415,52 @@ export function NewTicketDialog({
         />
       </label>
       {/*
-        Spec §5.4: this note is unconditional — every ticket this dialog can
-        create starts in the backlog UNLESS the checkbox below both exists and
-        stays checked. Placed under Title (spec's own words), ahead of the
-        Parent picker whose choice is what can turn the sentence into a
-        checkbox instead of leaving it standing alone.
+        The birth-state question, and it is a QUESTION now rather than a
+        statement plus a sometimes-control (owner ruling 2026-09-23).
+
+        It replaces TWO things at once, which is why it sits where the old note
+        sat rather than where the old checkbox sat. Under spec §5.4 this spot
+        held the unconditional sentence *"Starts in the backlog"* — and the
+        checkbox that could contradict it lived below the Parent picker, so the
+        dialog said one thing near the title and offered another near the
+        parent. The sentence was true in most of the states the dialog can be
+        in, which is exactly why the pair read as noise: the ONLY action
+        available was to make the sentence false, and where it was false by
+        default the control was absent and the sentence simply dangled.
+
+        One control, in the note's place, above the Parent picker, asking the
+        question the note used to answer. The `?` is load-bearing rather than
+        decorative — 13.591a asserts the old sentence is gone AND the new
+        question is present, and `getByText` matches normalised text exactly, so
+        the two strings cannot both be on screen.
+
+        **`gn-new-ticket__note` is not reused, and it had no rule to reuse.**
+        `ui.css` holds exactly two `.gn-new-ticket` rules — `__actions` and
+        `__field` (`:2794`, `:2795`) — so the old note was a `<p>` wearing a
+        name nothing styled, and the old checkbox took its spacing from
+        `gn-new-ticket__field` rather than from `__start-focus`. The wrapper is
+        therefore the shared `Switch`'s own `.gn-switch-row` label and
+        `.gn-switch` input — the product's ONE on/off control
+        (`packages/ui/src/components/switch.tsx`) — and neither dead class name
+        is carried over to imply a rule that was never there.
       */}
-      <p className="gn-new-ticket__note">Starts in the backlog</p>
+      <Switch
+        checked={startInBacklog}
+        onChange={(next) => {
+          setStartInBacklog(next);
+          // Written at the moment of the CHOICE, not at creation (owner ruling
+          // 2026-09-23: *"same as how workspace and project is remembered"*).
+          // The workspace and project records are written when the person opens
+          // one — the act of choosing is what is remembered there — and the
+          // analogue here is the act of setting the switch, so a Cancel after a
+          // deliberate answer keeps it. A create-time write would also be a
+          // write this component cannot make: it does not submit, and it does
+          // not know whether the attempt succeeded.
+          rememberNewTicketStart(userId, next ? 'backlog' : 'focus');
+        }}
+      >
+        Starts in the backlog?
+      </Switch>
       <label className="gn-new-ticket__field">
         Type
         <Select
@@ -422,31 +526,26 @@ export function NewTicketDialog({
               })),
             ]}
             value={parentId}
-            onChange={(value) => {
-              setParentId(value);
-              // Ruling 40 (coordinator, fix round 1, 2026-09-17): "checked by
-              // default" (spec §5.4) is a promise PER CHOSEN PARENT, not a
-              // one-time initial value for the whole dialog session. Before
-              // this reset, unticking the box for in-focus parent A and then
-              // picking a DIFFERENT in-focus parent B rendered B's checkbox
-              // UNTICKED on its very first appearance — a starting state B's
-              // own "checked by default" spec line never asked for; nothing
-              // about parent B's checkbox should remember what a person did
-              // to parent A's.
-              //
-              // Fires on EVERY selection from this picker — including
-              // switching AWAY from an in-focus parent (to "None", or to a
-              // backlog/closed one, which hides the box) and including
-              // re-selecting the SAME parent the box is already showing —
-              // not only when the newly chosen candidate differs from the
-              // last. That is the simpler, uniform rule: "reset whenever this
-              // control fires" needs no second test for "did the value
-              // actually change", and it costs nothing while the box is
-              // hidden, since `start` is only ever read as
-              // `startCheckboxVisible && startInFocus` — a reset nobody can
-              // see never reaches the payload.
-              setStartInFocus(true);
-            }}
+            /*
+              ONE line, and the line it USED to carry is the interesting part.
+
+              Ruling 40 (coordinator, fix round 1, 2026-09-17) made this
+              `onChange` reset `startInFocus` to `true` on EVERY selection, so
+              that "checked by default" was a promise PER CHOSEN PARENT rather
+              than a one-time initial value — switching from in-focus parent A
+              to in-focus parent B rendered B's box at its own starting state
+              instead of inheriting A's untick.
+
+              That reset existed to serve a control that TRACKED the parent.
+              The switch does not: it answers a question about the ticket, and
+              the person's answer to it is REMEMBERED across sessions (owner
+              ruling 2026-09-23). Keeping the reset would therefore be an active
+              defect rather than a harmless vestige — picking a parent would
+              silently overwrite an answer the person gave and this dialog has
+              just been asked not to forget. So it is deleted, and choosing a
+              parent now changes exactly one thing: the parent.
+            */
+            onChange={setParentId}
             searchable
             aria-label="Parent"
           />
@@ -494,31 +593,19 @@ export function NewTicketDialog({
         </span>
       ) : null}
       {/*
-        Spec §5.4: exists ONLY while the parent actually chosen above is in
-        focus — `startCheckboxVisible` reads the SAME `chosenParent` the
-        submit boundary below reads, so this box can never be on screen while
-        the payload it claims to set is about to leave as `'backlog'` anyway,
-        or absent while a `'focus'` claim is about to leave with nothing on
-        screen to explain it.
+        ⚠ A CONTROL THAT WAS HERE IS GONE (owner ruling 2026-09-23), and the
+        reason it is not merely moved is worth one paragraph for whoever greps
+        for `Start in focus`.
 
-        Checked by default (spec: "checked by default, and sets
-        `start: 'focus'`") — the labelled `<input type="checkbox">` idiom this
-        codebase already uses (`account/notifications-section.tsx`), not the
-        text-first `<label>{text}<input/></label>` shape Title/Type/Parent use
-        above: those wrap a text CONTROL, this wraps a boolean one, and a
-        checkbox reading its own name from LEADING text is the established
-        pattern for that shape here.
+        This slot held the "Start in focus" checkbox, rendered only while the
+        parent chosen ABOVE was itself in focus — spec §5.4's condition, and the
+        reason the control sat below the Parent picker rather than beside the
+        note it could contradict. The owner lifted that condition, so the
+        control is no longer conditional: it is the `Switch` above, and it asks
+        the inverse question. Both of the things this slot did — the existence
+        test and the reset-on-every-parent-selection that Ruling 40 added — went
+        with the condition, and neither is left computed and unused here.
       */}
-      {startCheckboxVisible ? (
-        <label className="gn-new-ticket__field gn-new-ticket__start-focus">
-          <input
-            type="checkbox"
-            checked={startInFocus}
-            onChange={(event) => setStartInFocus(event.target.checked)}
-          />
-          Start in focus
-        </label>
-      ) : null}
       <div className="gn-new-ticket__actions">
         <Button onClick={onClose}>Cancel</Button>
         <Button

@@ -1718,13 +1718,20 @@ function ProjectBoard() {
    * `parentCandidates` is only ever built from rows that ARRIVED. Everything
    * else is a state the create control names out loud below.
    *
-   * `inFocus` (backlog/closed spec §5.4, 2026-09-17) drives the New-ticket
-   * dialog's "Start in focus" checkbox: a candidate is in focus when it sits
-   * outside the universal Backlog state AND has never been closed (or was
-   * reopened) — `row.closed === null` reads exactly that, the same
-   * `state.closed ?? null` idiom every other reader of the flag spells,
-   * since `ListRow.closed` is REQUIRED (never the optional domain form this
-   * row was assembled from — `view-types.ts`).
+   * ⚠ AN `inFocus` KEY USED TO BE COMPUTED HERE AND IS GONE (owner ruling
+   * 2026-09-23). It was `row.stateId !== BACKLOG_STATE_ID && row.closed ===
+   * null` — a candidate is in focus when it sits outside the universal Backlog
+   * state AND has never been closed (or was reopened) — and its ONE reader was
+   * the New-ticket dialog's "Start in focus" checkbox, which appeared only
+   * under an in-focus parent. The owner lifted that condition: the dialog's
+   * birth-state control is now a `Switch` that is always present, always
+   * answerable, and remembers the person's answer, so the parent's own state
+   * has no bearing on where a ticket is born and this map has nothing to claim
+   * about it. The formula is recorded here rather than silently dropped because
+   * `test-cases/13-owner-requests-and-backlog.md`'s 13.591f pinned it at this
+   * exact site for a whole release, and the next reader deserves to know what
+   * happened to it rather than to re-derive it from the spec §5.4 text it
+   * contradicts.
    */
   const parentCandidates =
     list.rows === null
@@ -1732,7 +1739,6 @@ function ProjectBoard() {
       : list.rows.map((row) => ({
           id: row.ticketId,
           title: row.title,
-          inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null,
         }));
 
   const typeOptions =
