@@ -2234,12 +2234,53 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    be the first step toward the shared component `submitStartDate`'s docblock
    declines to extract on two instances. */
 .gn-ticket-sheet__start-input { align-self: start; }
-/* The Priority row's segmented control (spec 2026-09-22), `inline-flex` to
-   match the prototype's own (`desktop.dc.html:1192`) — `.gn-ticket-sheet__field
-   dd` is a flex COLUMN whose default `stretch` would otherwise run the three
-   segments the full width of the sheet, which is the defect the due input's
-   `align-self` above exists to prevent on the other axis. */
-.gn-ticket-sheet__field .gn-segmented { display: inline-flex; }
+/* The Priority row's segmented control (spec 2026-09-22): `align-self: start`
+   for the reason the due input's rule directly above gives — `.gn-ticket-sheet__
+   field dd` is a flex COLUMN whose default `stretch` would otherwise run the
+   three segments the full width of the sheet. Same remedy as the date input,
+   and the same axis.
+
+   ⚠ **IT MUST NOT BE A DESCENDANT SELECTOR NAMING THE SEGMENTED TRACK, and this
+   comment is the load-bearing part.** That shape is what this rule first shipped
+   as, with the caller's row class as the ancestor — and it was a LANDMINE:
+   `rule(selector)` in `packages/ui/test/components.test.tsx` resolves a rule
+   with `UI_CSS.match(...)`, and `.match()` takes the FIRST occurrence IN FILE
+   ORDER. So a selector whose own text contains the track's class name, sitting
+   ABOVE the real track rule, becomes the body that the bare-selector lookup
+   returns. MEASURED 2026-09-22: with such a selector preceded by a dot and a
+   brace at `:2163` and the real rule at `:5125`, the lookup for the bare track
+   class answered `" display: inline-flex; "` — the OVERRIDE, not the track.
+   Every existing case stayed GREEN, because they all query the `__item` class
+   and that suffix blocks the prefix match; the hazard would have fired only for
+   whoever next wrote the bare class, which is the most natural thing to write.
+   Hence a class of the caller's own, passed through `SegmentedControlProps.
+   className`. **Do not re-express this as a descendant selector, and never
+   write this class name followed by a brace in a comment** — the scan reads raw
+   text, comments included, so reproducing the pattern here reintroduces it.
+   (That is not hypothetical: this comment did exactly that on its first
+   draft, and the re-measurement caught it.)
+
+   ## Why BOTH declarations, and which one does the work
+
+   The plan text prescribed `display: inline-flex` here. **On this element that
+   declaration cannot shrink the track**, because the track is a flex ITEM — a
+   direct child of `.gn-ticket-sheet__field dd`, which this file declares
+   `display: flex; flex-direction: column` at `:2108` — and a flex item's
+   inline-level `display` is BLOCKIFIED to its block-level equivalent (CSS
+   Display 3 §2.7), leaving the default `align-self: stretch` in force. That is
+   why the prototype's declaration does not transfer: in the prototype the
+   control sits in a block container, where `inline-flex` shrink-wraps it.
+
+   ⚠ **That reasoning is from the spec and this file's own two declarations, NOT
+   from a measurement — nothing in this repo can measure it.** jsdom computes no
+   layout, and the browser suites run against `main`, not against this branch.
+   So the rule carries BOTH declarations and depends on neither reading being
+   right: `align-self: start` does the work while `dd` is a flex column (and is
+   the same remedy, on the same axis, as the due input's rule above), and
+   `display: inline-flex` takes over the day `dd` is not a flex container. Today
+   it is inert — labelled here so a reader does not think it is load-bearing.
+   **Do not delete either one as redundant.** */
+.gn-ticket-sheet__priority { align-self: start; display: inline-flex; }
 /* Three states of the History tab, three renderings. `__history-error` is NOT
    `__refusal`: getTicketHistory answers, so a rejection is a failure that may
    retry, not a permanent serving gap. */
