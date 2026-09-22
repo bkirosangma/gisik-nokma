@@ -3076,3 +3076,4 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 ## 15. Notes
 
 - ⚙️ **A note is an entity in the ledger** — nine `note.*` events (`packages/domain/src/events/note-events.ts`), folded by `applyNoteEvent` (`packages/domain/src/note-state.ts`); `comment.added` is filed against notes as well as tickets. Spec: `docs/superpowers/specs/2026-09-23-notes-design.md` §3.
+- ⚙️ **The detach rule is derived in the reducer** — the last detach of an inherit-scoped note reverts to the remembered scope or to private (`applyNoteEvent`, spec §3.3–3.4).
