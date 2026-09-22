@@ -428,6 +428,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   history is retained"** message follows with an **Undo** for about fifteen seconds, and that Undo is the
   product's only route back — once it goes, no control anywhere restores the job.
 
+  **One exception, added 2026-09-23: a job deleted from My Work has no Undo.** The message and the
+  fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place
+  without them, so the deletion there is silent and final. The job still stops appearing in every
+  view and its history is still kept. **If you want the way back, delete the job from its project
+  page.**
+
   If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
   alternative.
 - **You cannot move a job to a different project.**
