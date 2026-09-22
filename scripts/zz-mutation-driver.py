@@ -7,12 +7,20 @@ permanence: it was written as a throwaway and a machine-restart checkpoint asked
 for it to be either deleted or committed, and committing it is what lets the next
 lane re-run the fifteen measurements recorded in
 `test-cases/13-owner-requests-and-backlog.md` (and the two the checkpoint
-deferred, which are in here too, re-anchored). It is machine-local — the repo root
-is absolute — and wired into no `package.json` task. `zz-` marks it scratch.
+deferred, which are in here too, re-anchored). **It resolves its own checkout from
+`__file__`, so it operates on whichever copy it lives in** — run it from another
+checkout and it mutates and restores THAT checkout, never this one. It is wired
+into no `package.json` task. `zz-` marks it scratch.
 
-⚠ IT REQUIRES A CLEAN, COMMITTED TREE. Its restore is `git checkout --`, which
-reverts a file to HEAD and therefore DESTROYS uncommitted work SILENTLY, leaving a
-clean `git status` that reads like success — commit first, always.
+⚠ IT REQUIRES A CLEAN, COMMITTED TREE, AND THAT IS NOW ENFORCED RATHER THAN ASKED
+FOR. Its restore is `git checkout --`, which reverts a file to HEAD and therefore
+DESTROYS uncommitted work SILENTLY, leaving a clean `git status` that reads like
+success. This was a docstring once and that was the defect: the version that
+shipped with PR #699 carried an ABSOLUTE repo root, so a run from any other
+checkout would have restored the WRONG worktree — destroying whatever was
+uncommitted there while the operator watched this one stay clean. `refuse_if_dirty`
+runs before any mutation is applied and exits non-zero naming the files; the root
+is derived from `__file__` so there is no longer a wrong tree to reach.
 
 ⚠ AND A MUTATION THAT DOES NOT APPLY IS NOT A RESULT. Two of the first attempts
 were mis-designed: one cut a condition mid-line and produced a source that does
@@ -29,11 +37,20 @@ import subprocess
 import sys
 from pathlib import Path
 
-ROOT = Path("/Users/kiro/my_projects/gisik-nokma-task1")
+ROOT = Path(__file__).resolve().parents[1]
 BOARD = ROOT / "packages/app-core/src/views/board.tsx"
 STORE = ROOT / "packages/app-core/src/preferences/workflow-collapse.ts"
 CSS = ROOT / "packages/ui/src/ui.css"
 TEST = ROOT / "packages/app-core/test/views/board-workflow-collapse.test.tsx"
+
+# The three files `restore()` reverts, as ROOT-relative paths. A second constant
+# rather than reusing the absolute BOARD/STORE/CSS handles, deliberately: git is
+# asked about these by path, and `--porcelain` matches a repository-relative one.
+RESTORED_PATHS = [
+    "packages/app-core/src/views/board.tsx",
+    "packages/app-core/src/preferences/workflow-collapse.ts",
+    "packages/ui/src/ui.css",
+]
 
 # name, file, old, new, extra test path args
 MUTATIONS = [
@@ -81,8 +98,43 @@ def run(cmd, cwd=ROOT, timeout=600):
 
 
 def restore():
-    run(["git", "checkout", "--", "packages/app-core/src/views/board.tsx",
-         "packages/app-core/src/preferences/workflow-collapse.ts", "packages/ui/src/ui.css"])
+    run(["git", "checkout", "--", *RESTORED_PATHS])
+
+
+def refuse_if_dirty():
+    """Refuse to run unless the files `restore()` reverts are CLEAN in ROOT.
+
+    A PRECONDITION, NOT A DOCSTRING, and the distinction is the whole fix. The
+    restore is `git checkout --`, which reverts a file to HEAD and therefore
+    DESTROYS uncommitted work SILENTLY — the tree it leaves is clean, so the
+    operation reports success. A docstring asking the operator to commit first
+    is a check that cannot fail: nothing reads it at runtime, and the failure it
+    describes looks exactly like success.
+
+    Asked of GIT rather than by comparing mtimes or bytes: `--porcelain` answers
+    "does this differ from HEAD", which is precisely the set the restore would
+    discard. A merely-touched file whose content matches is correctly quiet,
+    because reverting it would lose nothing.
+    """
+    status = run(["git", "status", "--porcelain", "--", *RESTORED_PATHS])
+    if status.returncode != 0:
+        # Do NOT proceed on an unanswerable question. A git that failed (not a
+        # repository, a broken index) cannot tell us the tree is clean, and
+        # treating "no output" as "clean" is how a dirty tree gets restored.
+        sys.stderr.write(
+            f"REFUSING: `git status` failed in {ROOT} (exit {status.returncode}): "
+            f"{status.stderr.strip()}\n"
+        )
+        sys.exit(3)
+    dirty = status.stdout.strip()
+    if dirty:
+        sys.stderr.write(
+            "REFUSING: these files differ from HEAD, and this script's restore is "
+            "`git checkout --`, which would DISCARD the changes below silently:\n"
+            f"{dirty}\n"
+            "Commit them, or set them aside, before running a mutation.\n"
+        )
+        sys.exit(2)
 
 
 def reddened_cases(log: str) -> list[str]:
@@ -111,6 +163,9 @@ def suite_counts(log: str) -> str:
 
 
 def main():
+    # FIRST, before `only` is even read and long before any mutation is applied —
+    # see `refuse_if_dirty`, which owns the whole argument.
+    refuse_if_dirty()
     only = [w for w in sys.argv[1].split(",") if w] if len(sys.argv) > 1 else None
     out = []
     for name, path, old, new, extra in MUTATIONS:
