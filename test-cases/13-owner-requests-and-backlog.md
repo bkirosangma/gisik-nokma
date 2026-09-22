@@ -2423,3 +2423,27 @@ screen, decided by which surface you were looking at, since only the pickers had
   which is handed a claim's `{actorId, actorName}` and has no roster to reach for. Recorded as a case
   rather than left as a comment because a future joining change is what would break it. —
   (`packages/app-core/test/online/mappers.test.ts`)
+
+**Every surface that holds a roster member in hand.** The rule is one function now, but a rule is only
+one rule where it is CALLED: each of these sites held a member and read `.name` (or `actorLabel(id,
+name)`) past it, so each could render a blank or a ULID for the population the owner named. Each case
+below asserts BOTH populations at once — a named member as the control, and the nameless pair (with an
+address, and with neither) — because one member cannot tell the two steps apart, and an implementation
+that skipped to the id would pass an assertion written against either alone.
+
+- **13.1294** ✅ The ticket sheet's TWO pickers: the Assignee dropdown offers a nameless member by their
+  ADDRESS and a member with neither by their id, in one option list that asserts the whole sequence; and
+  the `@`mention list both NAMES and FINDS them the same way — typing `account` reaches the address
+  member and does **not** reach the id member, which is what makes the assertion about the address rather
+  than about loose matching. The two halves are separate assertions on purpose: a label fixed without the
+  filter matched against it leaves a member listed and unfindable. —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.1295** ✅ The board filter's person rows (Assignee and Collaborators) in `apps/web`, the same way:
+  a button exists is findable by its accessible name, so the case queries by ROLE AND NAME — the shape
+  E5-4 established here — and asserts both members in BOTH groups. —
+  (`apps/web/test/filters-sheet.test.tsx`)
+- **13.1296** ✅ The phone's `@`mention list (`queryWorkspaceMembers`): the nameless-with-address member
+  is found by typing their address, the member with neither by their id, and the named member is
+  untouched. The phone resolved `displayName` verbatim on BOTH sides — the label it returned and the
+  string it matched against — which is the same defect E5-4 closed on the web sheet's `queryUsers`. —
+  (`apps/mobile/src/screens/mention-query.test.ts`)

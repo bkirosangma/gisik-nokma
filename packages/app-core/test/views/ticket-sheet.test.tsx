@@ -1761,8 +1761,19 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
    * name falls back to the raw actor id — attributed, never blank") already
    * governs the sibling `visibility-editor.tsx` picker via `actorLabel`; this
    * is the same contract applied here.
+   *
+   * **13.1294 EXTENDS IT to the second step of the same rule** (owner request,
+   * 2026-09-22: *"Everywhere for id, show the Name; if name is empty/blank,
+   * show the email"*). The ruling above closed the blank option by falling to
+   * the ID; a member whose name is blank and whose address IS on the wire has a
+   * better handle than a ULID, and the picker showed neither. The roster here
+   * carries BOTH populations at once — `user_nameless` (no name, no address, so
+   * the id is still the floor) and `user_accountant` (no name, a real address) —
+   * because one member could not distinguish the two steps, and an
+   * implementation that skipped straight to the id would pass an assertion
+   * written against either alone.
    */
-  it('a member with no display name renders by id, never a blank option', async () => {
+  it('13.1294 a member with no display name renders by email when there is one, and by id when there is not', async () => {
     const read = ticketRead();
     const source = createFakeDataSource({
       getTicket: async () => read,
@@ -1771,6 +1782,7 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
         { id: 'user_kiro', name: 'Kiro', role: 'owner' },
         { id: 'user_anselma', name: 'Anselma Marak', role: 'member' },
         { id: 'user_nameless', name: '', role: 'guest' },
+        { id: 'user_accountant', name: '', role: 'guest', email: 'accountant@example.test' },
       ],
       getTicketHistory: async () => [],
     });
@@ -1782,7 +1794,10 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
       'Unassigned',
       'Kiro',
       'Anselma Marak',
+      // No name and no address: the id is still the floor.
       'user_nameless',
+      // No name, a real address: the ADDRESS, which is the step this case adds.
+      'accountant@example.test',
     ]);
     // The blank-string failure mode this ruling closes: no option's visible
     // text is empty, which a `.toEqual` on the full array above could in
@@ -1803,8 +1818,15 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
    * `EditorSlotComponent`, the same dependency-injection seam 13.989's own
    * describe block uses, since it is a closure private to `TicketSheet`
    * and not otherwise reachable from a test.
+   *
+   * **13.1294 EXTENDS IT to the email step**, and the arm is the reason the two
+   * people are both in the roster: `user_nameless` (no name, no address) is
+   * found by its ID and `user_accountant` (no name, a real address) by its
+   * ADDRESS. Typing `account` must not reach `user_nameless`, which is what
+   * makes the second assertion about the address rather than about matching
+   * anything loose.
    */
-  it('the @mention list resolves a nameless member by id, and finds them by typing it', async () => {
+  it('13.1294 the @mention list resolves a nameless member by email when they have one, by id when they do not, and finds each by what it shows', async () => {
     const read = ticketRead();
     const source = createFakeDataSource({
       getTicket: async () => read,
@@ -1812,6 +1834,7 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
       getMembers: async () => [
         { id: 'user_kiro', name: 'Kiro', role: 'owner' },
         { id: 'user_nameless', name: '', role: 'guest' },
+        { id: 'user_accountant', name: '', role: 'guest', email: 'accountant@example.test' },
       ],
       getTicketHistory: async () => [],
     });
@@ -1826,6 +1849,10 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
 
     const all = await captured!('');
     expect(all).toContainEqual({ userId: 'user_nameless', name: 'user_nameless' });
+    expect(all).toContainEqual({
+      userId: 'user_accountant',
+      name: 'accountant@example.test',
+    });
 
     // Reachable by typing the id — the raw empty name could never have
     // matched anything, so this is the assertion that would fail if the
@@ -1833,6 +1860,12 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     // still what `.includes(needle)` matched against.
     const found = await captured!('user_nameless');
     expect(found.map((person) => person.userId)).toContain('user_nameless');
+
+    // Reachable by typing the ADDRESS, for the same reason one step further
+    // out — and the control is that the same query does NOT reach the member
+    // whose label is an id: `account` appears in one label and not the other.
+    const byEmail = await captured!('account');
+    expect(byEmail.map((person) => person.userId)).toEqual(['user_accountant']);
   });
 
   it('names who assigned the ticket, in the sibling rows’ own shape', async () => {

@@ -1,4 +1,5 @@
 import type { MemberListResponse } from '@gisik-nokma/domain';
+import { memberLabel } from '@gisik-nokma/app-core';
 
 /**
  * E2-52: `ticket-screen.tsx` never passed `onMentionQuery` to `EditorWebView`,
@@ -35,7 +36,21 @@ export async function queryWorkspaceMembers(opts: {
   if (!res.ok) return [];
   const body = (await res.json()) as MemberListResponse;
   const needle = opts.query.trim().toLowerCase();
+  // BOTH sides resolved through `memberLabel` (2026-09-22, case 13.1296) — the
+  // label the popup shows AND the string the query matches against.
+  // `displayName` verbatim was blank for the magic-link population, so such a
+  // member was a nameless row no typing could reach: the same defect E5-4
+  // closed on the web sheet's `queryUsers`, one surface over. Resolving only
+  // the LABEL would leave them listed and still unfindable.
+  //
+  // A wire `WorkspaceMember`, so the fields are renamed on the way in — the
+  // structural parameter is what lets this pass a shape that is not a
+  // `RosterMember`. This list names PEOPLE, so no `actorLabel` and no system
+  // override: that step belongs to claims.
   return body.members
-    .filter((member) => needle === '' || member.displayName.toLowerCase().includes(needle))
-    .map((member) => ({ userId: member.userId, name: member.displayName }));
+    .map((member) => ({
+      userId: member.userId,
+      name: memberLabel({ id: member.userId, name: member.displayName, email: member.email }),
+    }))
+    .filter((candidate) => needle === '' || candidate.name.toLowerCase().includes(needle));
 }

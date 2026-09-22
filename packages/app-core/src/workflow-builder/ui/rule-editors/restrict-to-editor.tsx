@@ -1,5 +1,6 @@
 import type { Rule, WorkspaceRole } from '@gisik-nokma/domain';
 import { useBuilderEnv, useBuilderStore } from '../builder-context.js';
+import { memberLabel } from '../../../member-label.js';
 
 const ALL_ROLES: readonly WorkspaceRole[] = ['owner', 'admin', 'member', 'guest'];
 
@@ -66,24 +67,38 @@ export function RestrictToEditor(props: { transitionIndex: number; ruleIndex: nu
       </fieldset>
       <fieldset className="restrict-to-editor__people">
         <legend>Named people</legend>
-        {members.map((member) => (
-          <label key={member.userId}>
-            <input
-              type="checkbox"
-              aria-label={member.displayName}
-              checked={rule.userIds?.includes(member.userId) ?? false}
-              onChange={(changeEvent) => {
-                const current = rule.userIds ?? [];
-                update({
-                  userIds: changeEvent.target.checked
-                    ? [...current, member.userId]
-                    : current.filter((candidate) => candidate !== member.userId),
-                });
-              }}
-            />
-            <span>{member.displayName}</span>
-          </label>
-        ))}
+        {members.map((member) => {
+          // BOTH the visible span and the ACCESSIBLE NAME, off ONE resolved
+          // label (2026-09-22). `member.displayName` verbatim made a
+          // magic-link member a blank checkbox whose `aria-label` was the empty
+          // string — invisible AND unannounceable — which is the defect class
+          // the members screen closed by resolving its label once per row. Two
+          // reads of one possibly-empty string is how a control and its
+          // accessible name come to disagree.
+          const label = memberLabel({
+            id: member.userId,
+            name: member.displayName,
+            email: member.email,
+          });
+          return (
+            <label key={member.userId}>
+              <input
+                type="checkbox"
+                aria-label={label}
+                checked={rule.userIds?.includes(member.userId) ?? false}
+                onChange={(changeEvent) => {
+                  const current = rule.userIds ?? [];
+                  update({
+                    userIds: changeEvent.target.checked
+                      ? [...current, member.userId]
+                      : current.filter((candidate) => candidate !== member.userId),
+                  });
+                }}
+              />
+              <span>{label}</span>
+            </label>
+          );
+        })}
       </fieldset>
       {isEmpty ? (
         <p className="restrict-to-editor__empty-warning">

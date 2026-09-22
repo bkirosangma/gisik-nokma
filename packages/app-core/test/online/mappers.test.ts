@@ -2420,9 +2420,12 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
 
     // THE TICKET READ — the second screenshot. `ticketReadBody` fixes the state
     // claim to a named actor, so the join is exercised through the ASSIGNMENT
-    // claim, which is the other `mapProvenance` call site on this body.
+    // claim, which is the other `mapProvenance` call site on this body. The
+    // `parent` is a visible one, as in the helper's other call sites — this
+    // case is about a name, and an absent parent would exercise an arm of
+    // `mapParentRef` that has its own cases.
     const read = mapTicketRead(
-      ticketReadBody(null, null, null, null, null, {
+      ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null, null, null, {
         actorId: 'u2',
         clientTime: 'c',
         serverTime: 's',
