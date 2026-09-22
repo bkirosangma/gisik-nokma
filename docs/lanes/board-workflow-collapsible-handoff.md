@@ -124,8 +124,10 @@ feature.
 3. **No browser measurement.** `13.1412`–`13.1420` are jsdom cases; nothing here was seen in a real
    browser, and the caret's paint and the rail's `display: none` are the two things a jsdom run cannot
    show. `13.1418` pins both as source, which is the honest half a suite can hold.
-4. No PR was open at the time this line was written; it must target **`--base release/2026-09-23`**, never
-   `main`.
+4. **The PR is open — `#699`, base `release/2026-09-23`**, head verified equal to the branch tip at the
+   time it was opened. It was created through `ctl pr open --base release/2026-09-23`, the sanctioned door
+   (a raw `gh pr create` is refused by a hook on this machine). A later docs-only commit moves the head;
+   the marker chain re-reads the head at merge time, which is its design.
 
 The twelve measured mutations above were run by `scripts/zz-mutation-driver.py`, committed for the two
 owed re-runs rather than deleted — it holds the exact anchors (including the two CORRECTED ones), applies

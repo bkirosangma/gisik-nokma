@@ -1,9 +1,27 @@
 #!/usr/bin/env python3
-"""SCRATCH, deleted before commit. Applies one mutation, runs the focused case
-file, reports WHICH case ids reddened, and restores from the commit.
+"""Applies one mutation, runs the focused case file, reports WHICH case ids
+reddened, and restores from the commit.
 
-The tree is clean and committed before this runs (b8299931), so `git checkout --`
-is a restore to a known commit rather than a revert of uncommitted work.
+⚠ THIS IS COMMITTED ON PURPOSE, and the reason is findability rather than
+permanence: it was written as a throwaway and a machine-restart checkpoint asked
+for it to be either deleted or committed, and committing it is what lets the next
+lane re-run the fifteen measurements recorded in
+`test-cases/13-owner-requests-and-backlog.md` (and the two the checkpoint
+deferred, which are in here too, re-anchored). It is machine-local — the repo root
+is absolute — and wired into no `package.json` task. `zz-` marks it scratch.
+
+⚠ IT REQUIRES A CLEAN, COMMITTED TREE. Its restore is `git checkout --`, which
+reverts a file to HEAD and therefore DESTROYS uncommitted work SILENTLY, leaving a
+clean `git status` that reads like success — commit first, always.
+
+⚠ AND A MUTATION THAT DOES NOT APPLY IS NOT A RESULT. Two of the first attempts
+were mis-designed: one cut a condition mid-line and produced a source that does
+not PARSE (vitest never ran the file, printed no summary, and a
+`failed`-only reader would have called that a SURVIVOR); the other renamed BOTH
+sides of the `aria-controls`/`id` pair, so the property under test was never
+disturbed and the file stayed green — a mutation that mutated nothing. The anchors
+below are the corrected ones for both, and `suite_counts` deliberately reports a
+missing summary as a NON-RESULT rather than as a pass.
 """
 import json
 import re
