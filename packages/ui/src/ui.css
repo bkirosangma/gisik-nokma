@@ -1315,11 +1315,15 @@ a.gn-ticket-sheet__crumb--link {
    distinct — this button sits in `.gn-board__column-header`, not in a card —
    and like it, only the METRICS are shared.
    Second wave Task 11 (backlog/closed spec §8.3, 2026-09-18) — the same body
-   once more, for the List's `Close selected (N)`, which sits in the list's own
+   once more, for the List's bulk close, which sits in the list's own
    `.gn-list__controls` row rather than in a row or a card header. Fourth
    member of the set, and the third time the DOCUMENT is the reason: this
    control is beside the summary sentence, not inside a table row, so
-   `.gn-row-action` would be true of the metrics and false of the DOM. */
+   `.gn-row-action` would be true of the metrics and false of the DOM. It wears
+   the SAME class under both of its labels — `Bulk close` unarmed and
+   `Confirm close (N)` armed (owner request, 2026-09-22) — because it is one
+   control whose text changes, and a second class would be a second set of
+   metrics to keep in step. */
 .gn-board-card__close,
 .gn-row-action,
 .gn-board__column-action,

@@ -1069,8 +1069,16 @@ describe('13.596 emptyCopy renders only when a caller passes one, over a zero-ro
 /**
  * 13.647 — the two `TicketList` additions Task 11 needs, and neither of them
  * exclusive to the List tab: a leading row-checkbox column (`selection`) the
- * `Close selected (N)` surface reads, and a slot for a caller's own control
- * (`controls`) in the controls row it already renders.
+ * bulk close reads, and a slot for a caller's own control (`controls`) in the
+ * controls row it already renders.
+ *
+ * **The strings this file's `controls` fixtures pass are ARBITRARY, and the one
+ * below (`Close selected (0)`) is now HISTORICAL**: the product's own caller
+ * says `Bulk close` / `Confirm close (N)` since the owner's request of
+ * 2026-09-22. It is left as written because nothing in this case is about what
+ * the caller writes — `TicketList` neither knows nor cares — and rewording it
+ * would look like a claim about the surface. The product's own label is held in
+ * `apps/web/test/list-bulk-close.test.tsx`, not here.
  *
  * `selection` is a CONTROLLED pair, not a starting value: `selected` is the
  * truth and `onToggle` reports the gesture upward, the same shape `prefs`/

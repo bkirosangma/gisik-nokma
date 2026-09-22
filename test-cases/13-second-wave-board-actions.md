@@ -1306,7 +1306,10 @@ verified by sha256 (not `git checkout`), each guarded by a replacement count of 
    open dialog) → reddens **13.793 and nothing else**. This one exists because an independent review found
    the reachable path; the mutation confirms the guard, not the prose, is what holds the invariant.
 
-## List row checkboxes and `Close selected (N)` (executor 2, 2026-09-18) — ids `13.647`–`13.649`, plus `13.794`–`13.795`
+## List row checkboxes and the bulk close (executor 2, 2026-09-18) — ids `13.647`–`13.649`, plus `13.794`–`13.795`
+(⚠ the action was called `Close selected (N)` when this section was written; since the owner's request of
+2026-09-22 it is `Bulk close` unarmed and `Confirm close (N)` armed — see the `rel/list-bulk-close-arm`
+section in `13-owner-requests-and-backlog.md`. The cases below keep their ids and their substance.)
 
 **Second-wave Task 11.** The plan's own step text names `13.647`–`13.649`, from its `13.613`–`13.649`
 reservation. **Measured before minting, not taken from the dispatch**: this file's highest case MARKER at
@@ -1335,7 +1338,7 @@ that expires; a block is the only form that stays true.
   (`controls`), `:610` (the slot's render), `:937` (the leading column),
   `packages/app-core/test/views/ticket-list.test.tsx:1080`
 
-- ✅ **13.648 — `Close selected (N)`: the gate, the batch, and the clear.** Spec §8.3's own sentence —
+- ✅ **13.648 — the List's bulk close: the gate, the batch, and the clear.** Spec §8.3's own sentence —
   *"enabled only when every selected row is terminal and not closed — the cross-column case"* — with BOTH
   terms asserted against their own negative: a `Doing` row is terminal's, a closed `Done` row is
   `closed === null`'s, and the case returns to enabled afterwards so neither negative is passing because
@@ -1345,8 +1348,15 @@ that expires; a block is the only form that stays true.
   `onClosed`'s reload follows, the selection is empty afterwards, and the dialog has left (a COMPLETE
   close, which is the half 13.794 shows the other side of). The read is call-count-driven, so "the list
   reloaded" is falsifiable rather than satisfied by a fixed answer.
-  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:788` (the selection),
-  `:684` (the gate), `apps/web/test/list-bulk-close.test.tsx:165`
+  **⚠ THE CONTROL IS REACHED THROUGH THE ARMING CLICK SINCE 2026-09-22** (owner request,
+  `rel/list-bulk-close-arm`): this case and 13.649/13.794/13.795 keep their ids, their substance and
+  their negative arms, and gained the `Bulk close` click before their checkboxes exist plus a rename of
+  the control they press (`Close selected (N)` → `Confirm close (N)`). **The selection-clear half is now
+  read through a RE-ARM** — the completion ends the mode as well as clearing the set, so with the
+  checkboxes gone "cleared" and "hidden" are the same pixels, and only a re-arm tells them apart. The
+  block docblock above records the full shape; cases **13.1329–13.1333** are its own.
+  **Citations:** `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:951` (the selection — and `:952`
+  is `bulkArmed`, the mode), `:955` (the gate), `apps/web/test/list-bulk-close.test.tsx:165`
 
 - ✅ **13.649 — a signed-out viewer is offered neither the checkboxes nor the control.** Its first
   assertion is the positive control, and it is the reason the case means anything: the List's rows ARE on

@@ -2667,3 +2667,58 @@ mutated file before and after).**
   `.gn-list__controls-end` becomes a styled class nothing renders, which is exactly the defect that
   direction exists to find. **13.647 passes under it**, measured rather than assumed — the proof that
   the END was a freedom until this request spent it.
+
+### The armed mode — ids `13.1329`–`13.1333`
+
+**The checkbox column is the STATE of the mode, not a feature of the List.** `selection` is spread into
+`TicketList` only while `bulkArmed`, so its presence and its absence are the same switch, and every case
+below reads the mode through the COLUMN **and** through the LABEL — either alone passes on a page that
+did only one of the two (boxes with a `Bulk close` label, or a `Confirm close (N)` label over a table
+with nothing to tick).
+
+**Every checkbox read is scoped to `{ name: /^Select / }`, and that is a measurement.** An unfiltered
+`queryAllByRole('checkbox')` on this page is never empty: the page's own "active only" `Switch` is a real
+`<input class="gn-switch" type="checkbox">`. An earlier draft asserted the unfiltered query was empty and
+cited `ticket-list.test.tsx`'s 13.647 control arm as precedent — **and that precedent is about the
+COMPONENT, not the page**: `TicketList` alone has no `Switch`, so its unfiltered query is empty and
+always was. A probe that rendered the List unarmed found exactly one `gn-switch` input.
+
+- **13.1329** ✅ Before arming: the rows are on screen (the positive control), `Bulk close` is **enabled**,
+  there is no row-select checkbox at all, and neither `Confirm close (…)` nor `Cancel bulk close` exists.
+  — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1330** ✅ The arming click draws the column and changes the label: one `Select <title>` box per row,
+  in the rows' own order (asserted against the fixture's three titles rather than `> 0`, so a column that
+  drew one box per SECTION is red rather than merely non-empty), `Confirm close (0)` **disabled**,
+  `Cancel bulk close` present, and `Bulk close` gone — one control, two labels. — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1331** ✅ The gate's two terms, either alone passing on a control enabled too often: ONE eligible
+  row enables `Confirm close (1)`; adding the CLOSED terminal row gives `Confirm close (2)` **disabled**
+  (control, same `it`); unticking returns it to enabled; and a `Doing` row is terminal's negative. The
+  label keeps counting the ticked rows while disabled. — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1332** ✅ `Cancel bulk close` with two rows ticked returns the action to `Bulk close`, takes the
+  checkboxes with it, and re-arming reads **`Confirm close (0)`** — the selection was CLEARED, not hidden.
+  The re-arm is the only thing that can tell those apart: with the column gone, the two look identical.
+  — (`apps/web/test/list-bulk-close.test.tsx`)
+- **13.1333** ✅ A COMPLETED close ends the mode — dialog gone, checkboxes gone, `Bulk close` back — and
+  the CONTROL ARM IS FIRST in the same `it`, because an assertion placed above a control masks it: the
+  DIALOG's own `Cancel`, on the same armed selection, leaves the mode armed with `Confirm close (2)` and
+  both boxes still ticked. A page that disarmed on either act would be red on the other.
+  — (`apps/web/test/list-bulk-close.test.tsx`)
+
+**Mutation witnesses (Task 2), each run against this lane's tree and restored — the page's sha256 was
+checked before and after every one.** All three are reported as they landed, including the ones that
+reddened more than the case they were aimed at: a mutation's blast radius is a measurement, and the
+structural neighbours it takes with it are the expected shape for a change to a shared expression.
+
+- **(a) `selection` spread regardless of `bulkArmed`** → **5 failed / 5 passed**: 13.1329 (the case it was
+  aimed at — the column exists before the arming click), plus 13.648 case 2, 13.794, 13.1332 and 13.1333,
+  every one of which asserts the column's ABSENCE after a disarm. 13.1330/13.1331 stay green under it,
+  which is the honest characterisation of the mutation: it removes the arming's only visible effect, not
+  the label or the gate.
+- **(b) Confirm's `disabled` reads `listSelectedRows.length === 0` instead of `canBulkClose`** →
+  **2 failed / 8 passed**: 13.1331 (the case aimed at) and 13.648 case 1. Both are the gate's cases, and
+  nothing else reads eligibility — which is what makes 13.1331's two negatives load-bearing rather than
+  decorative.
+- **(c) `setBulkArmed(false)` dropped from `reloadListClearingSelection`** → **3 failed / 7 passed**:
+  13.1333 (the case aimed at — the completion stops ending the mode), and 13.648 case 2 and 13.794, the
+  two other cases that read the post-reload state. 13.1332 stays green, and should: it drives the ✕,
+  which disarms directly and never goes through the wrapper.
