@@ -1,6 +1,7 @@
 import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
 import { projInvites } from './proj-invites.js';
+import { notesProjection } from './notes.js';
 import { membershipsProjection } from './proj-memberships.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
@@ -101,6 +102,23 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // anyone reading the two tables inside one transaction.
   registry.register(projInvites);
   registry.register(projVisibility);
+  // The notes series (Plan 1 of 6). Its position is the SPEC's (§6.2: "after
+  // `proj_visibility` and `proj_tickets`"), and it is worth saying plainly that
+  // no adjacency is load-bearing here in either direction: `apply` reads ONLY
+  // its own two tables — `getNoteStateFromDb` selects `proj_notes` and
+  // `proj_note_attachments`, both of which this projection owns — and no
+  // registered projection reads either table inside an ingest transaction,
+  // because Plan 1 ships no reader that runs in one. The reads that DO exist
+  // (`read/notes.ts`, `visibility/can-read-note.ts`) are request-path callers,
+  // never handlers.
+  //
+  // Placed at the position the spec names rather than appended, because here the
+  // spec HAS a position and appending would be a silent contradiction of it for
+  // no benefit. Should a later projection ever read these tables inside a
+  // transaction, that is the moment this position becomes load-bearing and must
+  // be justified AS an adjacency — and Plan 3's search projection is the first
+  // candidate, since `proj_note_search` will read notes.
+  registry.register(notesProjection);
   registry.register(projContested);
   // APPENDED because no adjacency is load-bearing here — and appended is NOT a
   // §8 position, because §8 does not name one for this projection (see above).

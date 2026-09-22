@@ -119,6 +119,14 @@ describe('proj_entity_heads', () => {
       // first and was told about this one by a red suite.
       'proj_invites',
       'proj_visibility',
+      // The notes series, Plan 1 of 6. INSERTED, not appended, because the notes
+      // design doc §6.2 names this position ("after `proj_visibility` and
+      // `proj_tickets`"). No adjacency is load-bearing at this commit —
+      // `notesProjection.apply` reads only its own two tables and none is read
+      // inside an ingest transaction by another projection — so this row follows
+      // the spec's order rather than discharging a dependency. See
+      // projection-order.test.ts, the pin of record.
+      'proj_notes',
       'proj_contested',
       // Plan 5 Task 4. APPENDED, and NOT at a §8 position: §8's order ends at
       // proj_visibility and proj_contested already sits past it, so there is no
