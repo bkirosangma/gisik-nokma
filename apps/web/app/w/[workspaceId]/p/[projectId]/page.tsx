@@ -2381,9 +2381,15 @@ function ProjectBoard() {
                   moves by exactly one line.
               The HEADER rect is identical at both widths in both states, so the
               owner's actual complaint — the note dropping the whole controls row out
-              from beside the title — is fixed either way. Case `13.1383` carries the
-              numbers and the open owner decision: accept the shift at ~1000 px,
-              reserve two lines, or shorten the sentence.
+              from beside the title — is fixed either way.
+
+              RULED 2026-09-23 (owner): **the 18 px rail shift at ~1000 px is
+              ACCEPTED.** Reserving two lines and shortening the sentence were both
+              offered and not taken, so the row reserves ONE line and the rail drops
+              by one line wherever the sentence wraps. That is the shipped behaviour.
+              Do not "fix" it by growing `min-height` on `.gn-project__scope-row`:
+              that would reserve the second line at EVERY width, which is the cost
+              the owner declined. Case `13.1383` carries the numbers.
 
               ALWAYS RENDERED, EMPTY WHEN OFF. The `<p>` is in the tree in both
               states and only its TEXT is conditional, so the band is reserved either

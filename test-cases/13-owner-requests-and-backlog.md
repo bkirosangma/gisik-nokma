@@ -2908,9 +2908,13 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   `.gn-project__scope-note`, so a raw sweep can find a comment and report its position as the rule's.
   (Post-commit mutation: dropping `min-height` from the new rule reddens it.) —
   (`apps/web/test/project-page-head.test.tsx`)
-- **13.1383** 🧪 **THE PAINT: NOTHING MOVES WHEN THE SWITCH COMES ON.** At **1000 px and 1280 px**
-  viewports, `.gn-project__header`'s bounding rect and the rail's `top` are IDENTICAL with the switch
-  off and on, and the note row is **18 px** tall in both states. jsdom applies no layout, so this half
+- **13.1383** 🧪 **THE PAINT: THE CONTROLS ROW NEVER MOVES; THE RAIL MOVES ONLY WHERE THE SENTENCE WRAPS.**
+  ⚠ This opening asserted "nothing moves … at **1000 px and 1280 px** … the note row is **18 px** tall in
+  both states" before anyone measured it, and the measurement below falsifies the 1000 px half. It is
+  rewritten rather than left standing with a correction bolted underneath, because the first sentence is
+  what a reader takes away. What is true at BOTH widths: `.gn-project__header`'s bounding rect is
+  IDENTICAL with the switch off and on. What is true only at 1280 px: the rail's `top` is identical too
+  and the note row is 18 px in both states. jsdom applies no layout, so this half
   cannot be a jsdom case — `13.1381` asserts the DOM structure that makes the paint possible and
   `13.1382` the declarations that reserve the band; this one is the measurement, taken by the controller
   in the rebuilt dev stack (`ctl rebuild`), which records the numbers here. **Recipe:** sign in on
@@ -2940,8 +2944,16 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   is not inside that column, so its own width tracks the viewport. The sentence needs somewhere between
   960 and 1240 px. At 960 it wraps, the row becomes 36 px, and the single reserved line no longer covers
   it, so the rail drops by exactly one line.
-  So 1000 px is a "viewport narrow enough to wrap" — the very case this text says is out of scope. The
-  behaviour is the accepted cost; the sentence naming 1000 px as a width where the line holds was never
-  measured. **OWNER DECISION OPEN:** accept the 18 px rail shift at ~1000 px (the width of the original
-  screenshots), reserve two lines, or shorten the sentence. Nothing here should be flipped to ✅ until
-  that is answered.
+  So 1000 px is a "viewport narrow enough to wrap" — the very case the original text called out of scope
+  while naming it as a width that holds.
+
+  **RULED 2026-09-23 (owner): the 18 px rail shift at ~1000 px is ACCEPTED.** The alternatives — reserving
+  two lines, or shortening the sentence — were offered and not taken. So the row reserves ONE line, and at
+  viewports where the sentence wraps the rail drops by exactly one line when the switch comes on. That is
+  the shipped behaviour, not an outstanding defect, and a future reader finding the 1000 px numbers above
+  should not "fix" them.
+
+  **STAYS 🧪 and is deliberately NOT flipped to ✅.** The acceptance settles the product question, not the
+  evidence question: this is a hand-run controller measurement with no test file, and `check-case-citations`
+  demands a citing test for a ✅. jsdom applies no layout, so the only instrument that could witness it is a
+  browser. `13.1381` (DOM structure) and `13.1382` (the declarations) are the automated halves and are ✅.
