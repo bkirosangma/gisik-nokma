@@ -654,3 +654,53 @@ describe('13.1341 the Key cell is muted identifier ink, and the component draws 
     expect(container.querySelector('.gn-list__key')?.textContent).toBe('CCSO-7');
   });
 });
+
+/**
+ * Case `13.1346` — "Group by is two lines" is ONE layout fact with two halves, and
+ * neither half alone fixes it.
+ *
+ * `.gn-list__control` is an `inline-flex` row holding a label and the shared
+ * `Select` (`ui.css:1379`). The trigger is `width: 100%`, so inside that row it
+ * took the width and the LABEL — the only shrinkable item — wrapped: that is the
+ * measured origin of the `Group` / `by` the owner photographed. So the fix is
+ * that the label leaves the shrink (`flex: none`) and refuses to break
+ * (`white-space: nowrap`), AND the trigger stops claiming the row (`width:
+ * auto`). Either declaration without the other leaves the bug reachable.
+ *
+ * This file is the right home for it and `ticket-list.test.tsx` is not: jsdom has
+ * no layout engine, so `13.1345` can witness the class names and nothing about
+ * their effect. Those two declarations ARE the effect, read out of the stylesheet
+ * rather than described — and what this file still cannot see is stated the way
+ * its own header states it: a declaration that is present and then OVERRIDDEN
+ * reads as present here.
+ */
+describe('13.1346 the Group by control holds one line', () => {
+  it('13.1346 the label is nowrap and out of the shrink, and the trigger is content-sized', () => {
+    const label = declarationsFor(CSS, '.gn-list__control-label');
+    expect(label, 'no `.gn-list__control-label` rule in ui.css').not.toBeNull();
+    expect(label).toContain('white-space: nowrap');
+    // `nowrap` alone leaves the label shrinkable; a shrunk-to-nothing label still
+    // wraps nothing and the row still reflows, so both halves are asserted.
+    expect(label).toContain('flex: none');
+
+    const scopedTrigger = declarationsFor(CSS, '.gn-list__control .gn-select__trigger');
+    expect(scopedTrigger, 'no `.gn-list__control .gn-select__trigger` rule in ui.css').not.toBeNull();
+    expect(scopedTrigger).toContain('width: auto');
+
+    // CONTROL, in this same `it`: `width: auto` has to be an OVERRIDE of a real
+    // declaration, not a declaration that appeared from nowhere. The shared base
+    // rule still claims the full width — and it must, because every Select that is
+    // not this control is full-width. If the base rule ever stopped saying
+    // `width: 100%`, the scoped `auto` would still pass this case while meaning
+    // something entirely different.
+    const baseTrigger = declarationsFor(CSS, '.gn-select__trigger');
+    expect(baseTrigger, 'no base `.gn-select__trigger` rule in ui.css').not.toBeNull();
+    expect(baseTrigger).toContain('width: 100%');
+
+    // CONTROL 2, same `it`: the reader reached TWO different rules, not the same
+    // body twice. `declarationsFor` is line-anchored precisely so the scoped rule
+    // and the shared one cannot answer for each other, and this is the assertion
+    // that would fail if that anchoring regressed.
+    expect(scopedTrigger).not.toBe(baseTrigger);
+  });
+});

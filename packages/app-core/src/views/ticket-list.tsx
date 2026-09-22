@@ -514,12 +514,37 @@ export function TicketList({
             why it sits after the summary sentence and before the arrangement
             controls, and why its absence renders nothing at all. */}
         {controls ?? null}
+        {/* Owner request 2026-09-22: `Group by` was rendering as `Group` over
+            `by`, and the dropdown was a bare field. Three things fix it and all
+            three are needed:
+
+            - `gn-list__control-label` gives the label a rule of its own to be
+              kept out of the shrink (`flex: none`) and held on one line
+              (`white-space: nowrap`). A bare `<span>` in an `inline-flex` row
+              beside a `width: 100%` trigger is the only shrinkable item left,
+              which is what wrapped.
+            - `appearance="raised"` lifts the trigger onto the product's raised
+              coat. It is an option on the shared `Select` rather than a rule
+              scoped to this row, because the coat is a property of the control
+              and not of where it is put — and because a descendant selector
+              from `.gn-list__control` would become the body `rule()` in the ui
+              suite resolves for the shared class (see that component's
+              `SelectAppearance` docblock).
+            - the row's own `width: auto` override for the trigger is in
+              `ui.css` beside `.gn-list__control`, next to the docblock that
+              records why the shared rule's `width: 100%` is right everywhere
+              else and wrong here.
+
+            The chevron the owner called important comes with the appearance
+            change and needs nothing from this call site: it is drawn by the
+            shared component on every single non-searchable Select, both coats. */}
         <div className="gn-list__control">
-          <span>Group by</span>
+          <span className="gn-list__control-label">Group by</span>
           <Select
             options={GROUPING_OPTIONS.map((option) => ({ value: option, label: option }))}
             value={grouping}
             disabled={!prefsEditable}
+            appearance="raised"
             onChange={(next) =>
               onPrefsChange({
                 ...prefs,

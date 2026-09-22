@@ -710,6 +710,111 @@ describe('Select — multiple', () => {
   });
 });
 
+/**
+ * Case `13.1342` — OWNER REQUEST 2026-09-22: *"the down arrow is important."*
+ *
+ * A single, non-searchable `Select` drew NO chevron at all: the trigger was
+ * `<button class="gn-select__trigger gn-field__input"><span>{label}</span></button>`
+ * and `select-icons.tsx` carried Check/Remove/Search and nothing else. So the one
+ * control in the product whose entire job is "a list will open under this" wore
+ * the same coat as a plain text field and gave no sign of it.
+ *
+ * The chevron goes on EVERY single non-searchable `Select`, both appearances, not
+ * only the raised one: one component must not have two shapes by appearance, and
+ * the affordance the owner called important is not a property of the coat.
+ * `SearchableSelect` and the `multiple` branch are deliberately NOT touched —
+ * they already carry their own affordances (a typeable field; chips plus an open
+ * button), and a chevron on either would be a second, competing signal.
+ *
+ * This `it` holds its control INLINE, not in a sibling: the searchable arm and
+ * the multi arm are what make "single non-searchable" a real claim rather than a
+ * description of the only branch the test happened to render.
+ */
+describe('Select — the single non-searchable trigger draws a chevron (13.1342)', () => {
+  it('renders exactly one aria-hidden chevron, and it changes no accessible name', () => {
+    const single = render(
+      <Select options={FRUIT} value="banana" onChange={vi.fn()} aria-label="Fruit" />,
+    );
+    const trigger = screen.getByRole('button', { name: /Fruit/ });
+
+    const chevrons = trigger.querySelectorAll('.gn-select__chevron');
+    expect(chevrons).toHaveLength(1);
+    const chevron = chevrons[0];
+    if (chevron === undefined) throw new Error('no .gn-select__chevron inside the trigger');
+    // The glyph is decoration. Without `aria-hidden` it would be an unlabelled
+    // graphic in the name computation of the control it sits in.
+    expect(chevron.querySelector('svg[aria-hidden="true"]')).not.toBeNull();
+
+    // CONTROL, in this same `it`: decoration is only decoration if it changes no
+    // name. `useSelect` composes the trigger's name from the value element and
+    // the `aria-label`, so the name is asserted VERBATIM — a `toContain` would
+    // pass while the chevron silently appended anything that wasn't text.
+    expect(trigger).toHaveAccessibleName('Banana Fruit');
+    single.unmount();
+
+    // Control arm 2, same `it`: the two branches that already have an affordance
+    // gain no chevron. Without this, "the chevron is on the single trigger" and
+    // "the chevron is on every trigger" are the same passing test.
+    const searchable = render(
+      <Select options={FRUIT} value={null} onChange={vi.fn()} aria-label="Fruit" searchable />,
+    );
+    expect(searchable.container.querySelector('.gn-select__chevron')).toBeNull();
+    searchable.unmount();
+
+    const multi = render(
+      <Select
+        options={FRUIT}
+        value={[]}
+        onChange={vi.fn()}
+        aria-label="Fruit"
+        multiple
+      />,
+    );
+    expect(multi.container.querySelector('.gn-select__chevron')).toBeNull();
+  });
+});
+
+/**
+ * Case `13.1343` — the `appearance` option, which is what the owner's second
+ * screenshot is actually asking for: *"have the dropdown button be a raised style
+ * instead. (this could be an alternative option on the component we built.)"*
+ *
+ * `SelectProps` carried no appearance at all, so every Select in the product wore
+ * the field coat. The default stays `'sunken'` — spelled as an explicit
+ * `appearance="sunken"` arm below, not inferred from an omitted prop — because a
+ * default that is only ever tested by omission is a default nobody has measured.
+ */
+describe('Select — the raised appearance adds its modifier, and only when asked (13.1343)', () => {
+  it('appearance="raised" adds `gn-select__trigger--raised`; the default and "sunken" do not', () => {
+    const raised = render(
+      <Select options={FRUIT} value="banana" onChange={vi.fn()} aria-label="Fruit" appearance="raised" />,
+    );
+    const raisedTrigger = screen.getByRole('button', { name: /Fruit/ });
+    expect(raisedTrigger).toHaveClass('gn-select__trigger--raised');
+    // CONTROL, in this same `it`: the modifier is ADDITIVE. Asserting only the
+    // presence of the new class would stay green if the raised coat replaced the
+    // field coat — which is exactly how the pill would lose the 44px tap floor
+    // `.gn-field__input`'s own `min-height` gives it.
+    expect(raisedTrigger).toHaveClass('gn-select__trigger', 'gn-field__input');
+    raised.unmount();
+
+    // Arm 2: the DEFAULT. `appearance` omitted, which is how 14 of the 15 call
+    // sites in the product still reach this component.
+    const byDefault = render(
+      <Select options={FRUIT} value="banana" onChange={vi.fn()} aria-label="Fruit" />,
+    );
+    expect(screen.getByRole('button', { name: /Fruit/ })).not.toHaveClass('gn-select__trigger--raised');
+    byDefault.unmount();
+
+    // Arm 3: the default spelled out. A `'sunken'` that behaved like `'raised'`
+    // would be a prop whose value is ignored, which arm 2 cannot see.
+    const sunken = render(
+      <Select options={FRUIT} value="banana" onChange={vi.fn()} aria-label="Fruit" appearance="sunken" />,
+    );
+    expect(screen.getByRole('button', { name: /Fruit/ })).not.toHaveClass('gn-select__trigger--raised');
+  });
+});
+
 const WITH_ICONS: SelectOption[] = [
   { value: 'apple', label: 'Apple', icon: <span data-testid="apple-icon" />, description: 'A crisp fruit' },
   { value: 'banana', label: 'Banana' },

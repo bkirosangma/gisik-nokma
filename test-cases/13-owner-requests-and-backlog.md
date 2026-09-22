@@ -2665,3 +2665,86 @@ and a case comparing a row's TITLE against a date failed for a reason with nothi
 clock. Neither was a defect; both had stopped addressing their own cell. `13.647`'s "a column narrower"
 control was a hard-coded `1` and is now measured against the selection arm in the same case, so the next
 fixed column does not expire it.
+
+## Group by on one line, as a raised pill with its own chevron (owner request, 2026-09-22)
+
+**The owner sent two screenshots and one instruction:** *"group by is currently 2 line. make it one line.
+and have the dropdown button be a raised style instead. (this could be an alternative option on the
+component we built. and the down arrow is important.)"* The second screenshot is the target — `Group by`
+on one line, then a raised pill reading `epic` with a `⌄` at its right edge.
+
+**Why "Group / by" wrapped, measured rather than guessed.** `.gn-list__control` is an `inline-flex` row
+holding a bare `<span>` and the shared Select. The trigger is `width: 100%` (`.gn-select__trigger`), so
+inside that row it took the width and the label — the only shrinkable item — wrapped. The two-line
+symptom is therefore ONE layout fact with two halves, and both are asserted: the label is taken out of
+the shrink (`flex: none`) and held on one line (`white-space: nowrap`), and the trigger is made
+content-sized (`width: auto`) so it stops claiming the row.
+
+**The raised coat is a `Select` option, not a List-scoped rule.** The owner's own parenthesis asked for
+"an alternative option on the component we built", and that is what `SelectProps.appearance` is —
+`'sunken'` (the default, and every call site that omits it) or `'raised'`. Scoping it to the List with a
+descendant selector would have been the smaller diff and the worse one: it is the exact shape
+`.gn-list__control .gn-select__trigger` already demonstrates, and `rule()` in the ui suite resolves a
+selector by FIRST match in file order, so a caller-side rule containing the shared class becomes the body
+every later case reads for it (measured — see `13.1344`).
+
+**⚠ TWO THINGS THE PLAN PINNED THAT MEASUREMENT REFUTED, both recorded because both would have shipped
+a green check over a wrong fact.**
+
+The first: the plan's control for `13.1344` was to assert that `rule('.gn-select__trigger')` still
+declares `justify-content: space-between`. **It does not, and never did.** `rule()` is
+`UI_CSS.match(...)` with no line anchor, and the first place in `ui.css` where the literal
+`.gn-select__trigger {` appears is not the base rule (`:3032`) — it is the List-scoped
+`.gn-list__control .gn-select__trigger` (`:1419`), whose body is `padding` / `font-size` /
+`font-weight`. So the planned control would have failed against a tree where nothing was wrong. The case
+now asserts what that reader ACTUALLY returns (pinning the trap so a change in what it resolves to goes
+red) and reaches the base rule by a line-anchored scan instead.
+
+The second: the plan's raised rule was `.gn-select__trigger--raised` at `(0,1,0)`, placed in the trigger's
+own block. Measured, that **loses to `[data-style="neo"] .gn-field__input`** — `(0,2,0)`, and the trigger
+wears `gn-field__input` in both appearances because that class carries the 44px `min-height` floor. Under
+`neo`, the shipped default, that override repaints the control sunken and swaps the raised shadow for the
+sunken one, so the owner's raised pill would have rendered PRESSED with every case green. The rule
+therefore takes the field class into its own selector to reach `(0,2,0)`, and sits AFTER the override it
+beats, because at equal specificity source order is the only thing that decides. `13.1344` asserts that
+ordering, with comments stripped first — the override's selector text is named in prose earlier in the
+stylesheet, and an `indexOf` over the raw file finds the COMMENT.
+
+- **13.1342** ✅ A single non‑searchable `Select` renders EXACTLY ONE `.gn-select__chevron` inside its
+  trigger, wrapping an `svg[aria-hidden="true"]`. Control, in the same `it`: the trigger's accessible
+  name is asserted VERBATIM as `Banana Fruit` (value, then `aria-label`), because decoration is only
+  decoration if it adds no name — a `toContain` would pass while the chevron silently appended anything
+  that was not text. Two further arms in the same `it`: the searchable trigger and the multi-select
+  trigger render no chevron at all, without which "on the single trigger" and "on every trigger" are the
+  same passing test. — (`packages/ui/test/select.test.tsx`)
+- **13.1343** ✅ `appearance="raised"` adds `gn-select__trigger--raised`, and the modifier is ADDITIVE —
+  the trigger still carries `gn-select__trigger` and `gn-field__input`, which is where the tap floor
+  comes from. Two control arms in the same `it`: the default (prop omitted) adds nothing, and
+  `appearance="sunken"` adds nothing either — a `'sunken'` that behaved like `'raised'` would be a prop
+  whose value is ignored, which the omitted-prop arm cannot see. — (`packages/ui/test/select.test.tsx`)
+- **13.1344** ✅ `.gn-select__trigger--raised` declares `background: var(--gn-surface-raised)`,
+  `box-shadow: var(--gn-shadow-raised)` and `border-color: transparent`. Controls in the same `it`: what
+  the unanchored reader returns for the bare name (asserted as the measurement above, and asserted not to
+  be the raised rule); the BASE rule, reached by a line-anchored scan, still declaring
+  `justify-content: space-between` and `width: 100%` — the layout the raised coat rides on rather than
+  replaces; the raised rule's source position AFTER `[data-style="neo"] .gn-field__input`, which is the
+  tie-break the coat depends on, measured on comment-stripped text; and `globals.css`, which
+  `apps/web/app/layout.tsx` imports after `ui.css` and which would win at equal specificity, not
+  re-declaring the class. — (`packages/ui/test/components.test.tsx`)
+- **13.1345** ✅ The `Group by` text is a `gn-list__control-label` span whose `textContent` is exactly
+  `Group by`, and the grouping control's own trigger carries `gn-select__trigger--raised` AND
+  `gn-field__input` (the raised coat is additive — the field class is where the 44px floor comes from).
+  Controls in the same `it`: the label and the trigger are SIBLINGS in one `.gn-list__control` — the
+  class must be on the element holding the words, and on the label rather than the trigger or the row —
+  and the row contains EXACTLY ONE raised trigger, so the raise belongs to this control rather than
+  having become the component's default (that default is owned by `13.1343`). — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1346** ✅ `.gn-list__control-label` declares `white-space: nowrap` AND `flex: none`, and
+  `.gn-list__control .gn-select__trigger` declares `width: auto`. **Neither half is asserted alone**:
+  `nowrap` on a label that is still the shrinkable item overflows instead of wrapping, and a
+  content-sized trigger still lets a wrapping label break — the owner's `Group` / `by` is reachable with
+  either one missing. Control: the shared base rule still declares `width: 100%`, so the scoped `auto` is
+  an OVERRIDE of a declaration that exists rather than one that appeared from nowhere — an override of a
+  deleted declaration reads identically to one that works. Control 2: the two readers returned two
+  different bodies, which is the line-anchoring (`declarationsFor`) doing the job it exists for.
+  **jsdom has no layout engine**, so this case asserts the declarations and NOT a line box — the paint is
+  the controller's measurement, not a number invented here. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
