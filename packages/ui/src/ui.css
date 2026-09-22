@@ -1429,15 +1429,41 @@ a.gn-ticket-sheet__crumb--link {
   color: var(--gn-text-muted);
   font-size: 0.9375rem;
 }
+/* ── ONE LINE, and this rule plus the `width: auto` below are the whole of it
+   (owner request 2026-09-22, cases 13.1345/13.1346).
+
+   The owner photographed `Group` over `by`. The cause is this row: `.gn-list__control`
+   is an `inline-flex` row holding a label and the shared `Select`, the trigger is
+   `width: 100%`, so the trigger took the width and the LABEL — the only
+   shrinkable item left — wrapped. Neither half fixes it alone: `nowrap` on a
+   label that is still the shrinkable item overflows instead of wrapping, and a
+   content-sized trigger still lets a wrapping label break.
+
+   `flex: none` therefore takes the label out of the shrink, and `white-space:
+   nowrap` states the one-line intent the owner asked for rather than leaving it
+   to be inferred from a width. The `nowrap` is not belt-and-braces: at narrow
+   widths — the phone widths `apps/web/e2e-viewport/` walks — the row is exactly
+   where a label gets squeezed, and the owner's screenshot IS that squeeze. */
+.gn-list__control-label {
+  white-space: nowrap;
+  flex: none;
+}
 /* The `Group by` trigger, and the ONE rule in this restyle that is scoped
    rather than declared. The shared `Select` renders its single-select trigger
    as `button.gn-select__trigger.gn-field__input` (`packages/ui/src/select/
-   select.tsx:254`), so the prototype's own three metric values
+   select.tsx`), so the prototype's own three metric values
    (`desktop.dc.html:409`: `min-height:36px;padding:0 10px;font-size:15px;
    font-weight:600`) can only be reached by overriding the shared field class
    in place. Scoping to `.gn-list__control` is what keeps that override from
    becoming a second, quieter definition of what a field looks like: every
    other `.gn-field__input` in the product is untouched.
+
+   `width: auto` is the second half of the one-line fix: the shared rule's
+   `width: 100%` is right for every other Select in the product and wrong for
+   this one, whose whole row is a label plus a control that should size to its
+   own value. `13.1346` asserts BOTH halves — the base rule still saying
+   `width: 100%`, and this rule overriding it — because an override of a
+   declaration that no longer exists reads identically to one that works.
 
    TWO DELIBERATE OMISSIONS, both of them already-recorded decisions this rule
    is not allowed to reopen:
@@ -1455,7 +1481,12 @@ a.gn-ticket-sheet__crumb--link {
      `.gn-board-card__move:557-561`): raising a `ctlBg` control to neo's raised
      shadow is not something one task settles on one control. It is left out
      here for the same reason those three leave it out, not because the
-     prototype omitted it.
+     prototype omitted it. **The raised pill this control now wears does NOT
+     reopen that decision and is not it:** it comes from the shared component's
+     own `appearance` option (owner request 2026-09-22), it paints
+     `--gn-surface-raised`/`--gn-shadow-raised` — the pair `.gn-card` already
+     uses — rather than raising a `ctlBg` control to neo's raised shadow, and
+     every call site other than this one still gets the sunken default.
 
    `min-height` also DIVERGES from the prototype's `36px` and stays at the
    shared rule's `2.75rem` (44px) — the same tap-target floor
@@ -1463,6 +1494,7 @@ a.gn-ticket-sheet__crumb--link {
    reason. The trigger's own metric line is omitted entirely rather than
    restated at 44px, so it keeps inheriting whatever that floor becomes. */
 .gn-list__control .gn-select__trigger {
+  width: auto;
   padding: 0 0.625rem;
   font-size: 0.9375rem;
   font-weight: 600;
@@ -1737,6 +1769,23 @@ a.gn-ticket-sheet__crumb--link {
    is the LINE BOX, so raising it is the whole change: this control has no
    `min-height` to set. */
 .gn-list__open { font-size: 1.0625rem; line-height: 1.5rem; }
+/* The Key cell (owner request 2026-09-22, the List tab: *"on the left of the
+   title, add the ticket key column"*). The FIXED column left of Title, and the
+   ink is not a new decision: the board has drawn its card's key muted since
+   the key reached the cards (`.gn-board-card__key`, above; 13.1280), and one
+   identifier should not be two colours on two tabs of one product. `nowrap` because the key is an
+   identifier — `CCSO-12` broken across a line stops reading as one token — and
+   `tabular-nums` so the digits line up down the column, which is the whole
+   reason a person scans this column rather than the title.
+
+   ⚠ THE INK IS `--gn-text-muted` AND NOT A LITERAL: `ticket-list-css-binding
+   .test.tsx` (13.1341) reads this rule's declarations out of this file, so a
+   literal colour here is a case that reddens rather than a note nobody reads. */
+.gn-list__key {
+  color: var(--gn-text-muted);
+  white-space: nowrap;
+  font-variant-numeric: tabular-nums;
+}
 .gn-list__assignee { display: inline-flex; align-items: center; gap: 0.4rem; }
 .gn-list__empty-cell { color: var(--gn-text-muted); }
 /* The due cell's own tone (`:2854`): `di.late ? var(--danger) : var(--label2)`.
@@ -3075,6 +3124,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    checked. */
 .fields-editor__required { flex: none; }
 
+/* The `appearance="raised"` coat for this trigger is NOT declared here, and a
+   reader looking for it will not find it by scrolling this block. It sits
+   immediately after `[data-style="neo"] .gn-field__input` at the foot of the
+   FIELD section, because that override is `(0,2,0)` and repaints any
+   `gn-field__input` sunken under `neo` — the raised coat has to follow the rule
+   it beats. Its own comment there carries the full reason. */
 .gn-select__trigger {
   display: flex;
   align-items: center;
@@ -3085,6 +3140,25 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-select__trigger:disabled { cursor: not-allowed; }
+
+/* The dropdown affordance on the single non-searchable trigger (case 13.1342).
+   `flex: none` so a long option label cannot squash it, and `inline-flex` so the
+   SVG inside is a flex item rather than an inline box with a baseline gap.
+   `--gn-text-muted` is the same tone the panel's own secondary text uses; the
+   colour is on the wrapper rather than passed to `ChevronDownIcon`, which draws
+   in `currentColor` so it stays a property of whatever coat it sits on.
+
+   Its selector is deliberately NOT written out with its braces in this comment:
+   `rule()` in `components.test.tsx` does a raw brace-matching scan with no
+   awareness of comments, so repeating it here would hand that helper an earlier
+   match than the real rule — the footgun this file's own doc-comments on
+   `.gn-select__trigger--multiple` and `.gn-select__trigger--searchable:focus-within`
+   already warn about for the same helper. */
+.gn-select__chevron {
+  display: inline-flex;
+  flex: none;
+  color: var(--gn-text-muted);
+}
 
 .gn-select__trigger--searchable {
   cursor: text;
@@ -5588,6 +5662,53 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   border: none;
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
+}
+
+/* ── The raised trigger coat (`Select`'s `appearance="raised"`; case 13.1344).
+
+   OWNER REQUEST 2026-09-22: *"have the dropdown button be a raised style
+   instead."* The coat is the product's own raised pair — the same two roles
+   `.gn-card` paints — so the pill reads as lifted rather than as a new kind of
+   surface.
+
+   WHY THIS RULE SITS HERE AND NOT IN THE `.gn-select__trigger` BLOCK, and why
+   its selector is compound. Both halves are forced by the rule directly above
+   this one, and neither is a preference:
+
+   - `[data-style="neo"] .gn-field__input` is `(0,2,0)`. The trigger wears
+     `gn-field__input` in every appearance (see the docblock at the trigger in
+     `select.tsx` — the field class is what carries the 44px tap floor), so under
+     `neo` — the SHIPPED DEFAULT — that override repaints this control sunken and
+     swaps the raised shadow for the sunken one. At the `(0,1,0)` a bare modifier
+     selector carries, it loses on specificity and the owner's raised pill would
+     have rendered PRESSED in the default style, with every case in this repo
+     green. So the modifier takes the field class in its own selector to reach
+     `(0,2,0)`.
+   - At `(0,2,0)` against `(0,2,0)` specificity decides nothing and SOURCE ORDER
+     does, which is why this rule follows the override it has to beat instead of
+     sitting with the rest of the trigger's rules 2,500 lines above. `.gn-card`,
+     the precedent for this coat, never had the problem: nothing overrides it per
+     style axis.
+   - The third declaration is the one that is NOT the `.gn-card` pair, and it is
+     here so the raised coat is one boundary rather than two: `hig`/`minimal`
+     still carry 13.291's field border, and the base rule's own docblock records
+     that the borderless treatment was ruled out for those two styles because
+     `SHADOWS.hig/minimal.sunken` are both `[]`. `border-color: transparent`
+     keeps the box (no reflow, the border's 1px is still spent) while the raised
+     shadow draws the edge. Under `minimal`, `--gn-shadow-raised` is `[]` too, so
+     the pill's edge there is the `surfaceRaised`↔page FILL difference alone —
+     the same way every `.gn-card` in the product already reads under `minimal`,
+     named here rather than discovered later.
+
+   `.gn-list__control`'s own comment records an OPEN DECISION that this rule does
+   NOT reopen: `box-shadow: var(--ctlShadow)` on a `ctlBg` control is the owner's
+   to settle product-wide. This is `appearance` on the shared component, opt-in by
+   the caller, and it paints the two roles `.gn-card` already uses — it is not
+   that decision. */
+.gn-select__trigger.gn-select__trigger--raised {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  border-color: transparent;
 }
 
 /* ── The ghost button gets its own rule at last. It had none, and the plan's

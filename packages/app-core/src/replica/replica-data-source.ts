@@ -900,6 +900,14 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     return {
       ticketId: state.id,
       title: titleOf(state),
+      // `null`, honestly, and for exactly the reason the board cards in this
+      // same file give at their own `key: null`: the replica holds no workspace
+      // or project prefix and no per-project number, so it CANNOT compose a
+      // key. Deriving the number from the local ledger's order would be a
+      // second implementation of a server read, and a key naming a different
+      // ticket from the server's would be worse than no key. The List's Key
+      // cell draws the em dash for it (13.1338).
+      key: null,
       typeId: state.typeId,
       typeRank: types.get(state.typeId)?.rank ?? 0,
       parentId: state.parentId,

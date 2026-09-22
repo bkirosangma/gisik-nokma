@@ -82,6 +82,29 @@ function chose(columns: ListColumnId[], grouping: Grouping): ProjectViewPrefs {
 }
 
 /**
+ * The `<td>` under a named column, found by reading the HEADER row — a case that
+ * is about one cell's content says which cell it read, instead of relying on the
+ * cell happening to be at an index that nothing else in the table has moved.
+ *
+ * That reliance is not hypothetical: adding the fixed Key column (owner request
+ * 2026-09-22) shifted every index in this table by one, and two cases here that
+ * searched the whole `<tr>` for the list's own `—` absence mark began finding the
+ * KEY cell's dash instead (`13.1339` draws one for a null key). Neither had a
+ * bug; both had stopped addressing the cell they were about.
+ */
+function cellUnder(row: Element, columnName: string): HTMLElement {
+  const table = row.closest('table');
+  if (table === null) throw new Error('the row is not inside a table');
+  const index = [...table.querySelectorAll('thead th')].findIndex(
+    (header) => header.textContent === columnName,
+  );
+  if (index < 0) throw new Error(`no \`${columnName}\` column in this table`);
+  const cell = row.querySelectorAll('td')[index];
+  if (cell === undefined) throw new Error(`this row has no cell at index ${String(index)}`);
+  return cell as HTMLElement;
+}
+
+/**
  * `TicketList` is CONTROLLED: `prefs` arrives as a prop and `onPrefsChange`
  * reports upwards. The plan's own harness passes a `vi.fn()` and a frozen
  * `prefs`, so picking a grouping in it changes nothing on screen and the
@@ -271,8 +294,85 @@ describe('3.51 TicketList — Asana-shaped, honest to the row set', () => {
     const headers = within(section)
       .getAllByRole('columnheader')
       .map((header) => header.textContent);
-    expect(headers).toEqual(['Title', 'Due date', 'Status']);
+    // The FIXED Key column leads, then Title, then the chosen ones in the order
+    // the user arranged them (owner request 2026-09-22). This assertion moved
+    // from `['Title', 'Due date', 'Status']` in the same change that added the
+    // column — the case is about the CHOSEN columns' order and placement, and
+    // the two fixed columns around them are the frame it reads them in.
+    expect(headers).toEqual(['Key', 'Title', 'Due date', 'Status']);
     expect(within(section).getByText("30 Aug 2026 — Kiro's claim")).toBeInTheDocument();
+  });
+
+  /**
+   * 13.1339 — the Key column, and it is a FIXED column like Title rather than a
+   * chosen one (owner request 2026-09-22, the List tab screenshot: *"on the left
+   * of the title, add the ticket key column"*).
+   *
+   * `ListRow.key` is `string | null` and `null` is a real answer — the server
+   * composes the key from workspace and project prefixes and answers `null`
+   * when the ledger holds no prefix, and the OFFLINE replica answers `null` for
+   * every row (`13.1338`). So the cell has exactly two arms and both are here in
+   * one mount: the key, and an EM DASH for the null.
+   *
+   * The control is the other row, and it is what makes this case about the null
+   * arm: a component that fell back to the ticket id would draw `k2` in the
+   * second cell and satisfy "not empty" while printing an internal ULID where a
+   * person expects a key. `not.toBe('k2')` is named separately from the `toEqual`
+   * above because the id is the SPECIFIC wrong answer, and an em dash that
+   * quietly became the id is the defect this case exists to catch.
+   */
+  it('13.1339 the Key header sits immediately before Title, and the cell draws the key — an em dash for a null', () => {
+    const rows: ListRow[] = [
+      listRowSeed({ ticketId: 'k1', title: 'Has a key', key: 'CCSO-7' }),
+      listRowSeed({ ticketId: 'k2', title: 'Has none', key: null }),
+    ];
+    render(<ControlledList rows={rows} initial={chose(['status'], 'flat')} />);
+    const section = screen.getByRole('region', { name: 'All tickets' });
+
+    // "Immediately before", asserted as adjacency rather than as a literal
+    // array, so the optional leading checkbox column may come and go without
+    // this case having to know which mount it is in.
+    const headers = within(section)
+      .getAllByRole('columnheader')
+      .map((header) => header.textContent);
+    expect(headers[headers.indexOf('Title') - 1]).toBe('Key');
+
+    // Both arms, in row order, off the one class the cell is drawn with.
+    const cells = [...section.querySelectorAll('.gn-list__key')].map((node) => node.textContent);
+    expect(cells).toEqual(['CCSO-7', '—']);
+    // The null arm is not the id, named on its own: `—` is the answer and the
+    // ticket id is the specific wrong one.
+    expect(cells[1]).not.toBe('k2');
+  });
+
+  /**
+   * 13.1340 — the KEY is not the user's to arrange (owner request 2026-09-22).
+   *
+   * The column chooser stores `columns: ListColumnId[]` on the server and the
+   * tray draws one chip per entry, so a Key column built as a `ListColumnId`
+   * would have been absent for every user who has arranged this project, and
+   * would have added a seventh chip. Both halves are pinned: with NOTHING
+   * chosen the header row is exactly `Key, Title`, and the tray still draws its
+   * six and offers no Key.
+   */
+  it('13.1340 the Key column renders whatever the chooser stored, and the chooser does not offer it', async () => {
+    const user = userEvent.setup();
+    render(<ControlledList initial={chose([], 'flat')} />);
+    const section = screen.getByRole('region', { name: 'All tickets' });
+    // Nothing chosen at all: Key and Title are the WHOLE header row.
+    expect(
+      within(section)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent),
+    ).toEqual(['Key', 'Title']);
+
+    await user.click(screen.getByRole('button', { name: 'Columns' }));
+    const tray = screen.getByTestId('list-columns-tray');
+    expect(within(tray).queryByRole('checkbox', { name: 'Key' })).toBeNull();
+    // And the floor is still six — the count is what a `ListColumnId` Key would
+    // have moved, so asserting the absence alone would pass on a tray that had
+    // simply stopped drawing one of the others.
+    expect(within(tray).getAllByRole('checkbox')).toHaveLength(6);
   });
 
   it('PLANTED DEFECT: a due date is never rendered bare — the claimant travels with it', () => {
@@ -572,8 +672,20 @@ describe('3.52 TicketList — one clock, named, and not the device’s', () => {
     try {
       const view = render(<ControlledList rows={DUE_ONLY} initial={chose(['dueDate'], 'flat')} />);
       const section = screen.getByRole('region', { name: 'All tickets' });
+      // The due cell is located by its HEADER, not by an index. It was
+      // `cells[1]` while Title led the row; the fixed Key column (owner request
+      // 2026-09-22) made index 1 the TITLE, and a case that reads the due claim
+      // out of a title would have compared a row's title against a date and
+      // failed for a reason with nothing to do with the clock.
+      const column = within(section)
+        .getAllByRole('columnheader')
+        .map((header) => header.textContent)
+        .indexOf('Due date');
+      // Named rather than left to a silent `cells[-1]`: without this, a header
+      // renamed out from under the case reads as an empty string.
+      expect(column, 'no `Due date` header in this row').toBeGreaterThanOrEqual(0);
       const cells = within(section).getAllByRole('cell');
-      const text = cells[1]?.textContent ?? '';
+      const text = cells[column]?.textContent ?? '';
       view.unmount();
       return text;
     } finally {
@@ -1148,7 +1260,22 @@ describe('13.647 the selection checkbox column and the controls slot (packages/a
     for (const row of Array.from(container.querySelectorAll('tbody tr'))) {
       expect(row.querySelectorAll('td')).toHaveLength(headerCells);
     }
-    expect(headerCells).toBe(1);
+    // "A column narrower" is a RELATIVE fact, so it is measured against the
+    // selection arm in this same case rather than against a literal. The
+    // literal was `1` while Title was the only column here, and the fixed Key
+    // column (owner request 2026-09-22) moved it to 2 — a bare `2` would expire
+    // the next time a fixed column is added, which is precisely the drift this
+    // assertion is not about.
+    const withSelection = render(
+      <ControlledList
+        rows={[OPEN_ROW, CLOSED_ROW]}
+        initial={chose([], 'flat')}
+        selection={{ selected: new Set<string>(), onToggle: vi.fn() }}
+      />,
+    );
+    expect(headerCells).toBe(
+      withSelection.container.querySelectorAll('thead th').length - 1,
+    );
   });
 
   it('`controls` renders inside the controls row, after the summary; absent, nothing renders', () => {
@@ -1305,6 +1432,57 @@ describe('13.659 Group by keeps its accessible name and exactly its six keys', (
     // `ListRow`, so the key is held, not transcribed — and a length check
     // alone would pass if someone swapped `flat` out for `workflow`.
     expect(within(listbox).queryByRole('option', { name: 'workflow' })).not.toBeInTheDocument();
+  });
+});
+
+/**
+ * Case `13.1345` — OWNER REQUEST 2026-09-22: *"group by is currently 2 line. make
+ * it one line."* (two screenshots: before, `Group` over `by`; after, `Group by`
+ * on one line with a raised `epic` pill beside it.)
+ *
+ * The DOM half of the fix, and the half a jsdom render CAN witness: the label is
+ * a span carrying its own class, and the grouping control's trigger carries the
+ * raised modifier. The two CSS declarations those class names resolve to are a
+ * separate case (`13.1346`, in `ticket-list-css-binding.test.tsx`) because jsdom
+ * has no layout engine — no render here can measure a line box, and a case that
+ * claimed to would be asserting a number it had made up.
+ */
+describe('13.1345 Group by is one line: a labelled span beside a raised trigger', () => {
+  it('the `Group by` text is a `gn-list__control-label` span, and its Select is the raised one', () => {
+    const { container } = render(<ControlledList />);
+
+    const label = container.querySelector('.gn-list__control-label');
+    expect(
+      label,
+      'no `.gn-list__control-label` in the List — the `Group by` text is still a bare <span>, which is the half of the two-line bug that wraps.',
+    ).not.toBeNull();
+    // The class must have landed on the element holding the WORDS. A class on an
+    // empty wrapper would satisfy the query above and fix nothing.
+    expect(label?.textContent).toBe('Group by');
+
+    const trigger = screen.getByRole('button', { name: /Group by/ });
+    expect(trigger).toHaveClass('gn-select__trigger--raised');
+    // Same additive contract as the ui suite's own case: the field class is where
+    // this control's 44px tap floor comes from, so the raised coat must not have
+    // traded it away.
+    expect(trigger).toHaveClass('gn-field__input');
+
+    // CONTROL (a), in this same `it`: the label and the trigger are SIBLINGS in
+    // ONE `.gn-list__control`. Putting `gn-list__control-label` on the trigger, or
+    // on the row rather than the label, satisfies both assertions above while the
+    // `Group by` text stays a bare wrapping span — which is the defect.
+    expect(label?.contains(trigger)).toBe(false);
+    expect(trigger.contains(label as Node)).toBe(false);
+    expect(label?.parentElement).toBe(trigger.parentElement);
+    expect(trigger.parentElement?.classList.contains('gn-list__control')).toBe(true);
+
+    // CONTROL (b), same `it`: the raise belongs to the GROUPING control, not to
+    // this List's trigger-generation in general. The Columns toggle is the other
+    // button in this row and is not a Select at all — if a future edit put
+    // `appearance="raised"` on the shared component's default, this is the arm
+    // that would still be green, so it is named as what it is rather than relied
+    // on. The component-level default is owned by `13.1343`.
+    expect(container.querySelectorAll('.gn-list__control .gn-select__trigger--raised')).toHaveLength(1);
   });
 });
 
@@ -1613,7 +1791,12 @@ describe('13.667 an unclaimed due date is named, never blank', () => {
     const row = screen.getByTestId('ticket-card-ra_open').closest('tr');
     if (row === null) throw new Error('no <tr> for ra_open');
     expect(within(row).getByText('No date claimed')).toBeInTheDocument();
-    expect(within(row).queryByText('—')).not.toBeInTheDocument();
+    // Scoped to the DUE CELL, which is the cell this case is about. The row
+    // also carries the fixed Key column, and a null key's answer IS an em dash
+    // (`13.1339`) — so a row-wide search for `—` now finds the key cell and
+    // reports a missing date that is not missing.
+    const cell = cellUnder(row, 'Due date');
+    expect(within(cell).queryByText('—')).not.toBeInTheDocument();
   });
 });
 
@@ -1641,8 +1824,13 @@ describe('13.668 progress reads `N of M done`, and its absence is a dash', () =>
     render(<ControlledList rows={[OPEN_ROW]} initial={chose(['progress'], 'flat')} />);
     const row = screen.getByTestId('ticket-card-ra_open').closest('tr');
     if (row === null) throw new Error('no <tr> for ra_open');
-    expect(within(row).getByText('—')).toBeInTheDocument();
-    expect(within(row).queryByText(/done/)).not.toBeInTheDocument();
+    // Both assertions are about the PROGRESS CELL — `cellUnder` says so, and it
+    // has to now: the row also carries the fixed Key column, whose null answer
+    // is the same `—` (`13.1339`), so a row-wide search is ambiguous rather
+    // than about progress.
+    const cell = cellUnder(row, 'Progress');
+    expect(within(cell).getByText('—')).toBeInTheDocument();
+    expect(within(cell).queryByText(/done/)).not.toBeInTheDocument();
   });
 });
 

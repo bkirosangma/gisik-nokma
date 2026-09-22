@@ -11,9 +11,33 @@ import { useComboBoxState } from '@react-stately/combobox';
 import { ListCollection } from '@react-stately/list';
 import type { ListState } from '@react-stately/list';
 import { useSelectState } from '@react-stately/select';
-import { CheckIcon, RemoveIcon, SearchIcon } from './select-icons.js';
+import { CheckIcon, ChevronDownIcon, RemoveIcon, SearchIcon } from './select-icons.js';
 
 export type SelectOption = { value: string; label: string; icon?: ReactNode; description?: string };
+
+/**
+ * The trigger's coat. `'sunken'` — the DEFAULT, and every call site that does not
+ * pass this prop — is the shared field treatment the trigger has always worn.
+ * `'raised'` lifts it onto the product's raised coat (`var(--gn-surface-raised)` /
+ * `var(--gn-shadow-raised)`, the same pair `.gn-card` uses), which is what the
+ * owner asked for on the List's grouping control (2026-09-22: *"have the dropdown
+ * button be a raised style instead. (this could be an alternative option on the
+ * component we built.)"*).
+ *
+ * It is an option on the component rather than a rule scoped to the List because
+ * the coat is a property of the control, not of where it is placed — and the
+ * alternative, a descendant selector from the List's own class, is the pattern
+ * `.gn-list__control .gn-select__trigger` already demonstrates and that this
+ * component's own stylesheet warns about: `rule()` in the ui suite resolves a
+ * selector by FIRST match in file order, so a caller-side rule containing the
+ * shared class becomes the body every later case reads for it.
+ *
+ * A coat changes paint only. It does not change the trigger's class list (the
+ * field class is kept, so the 44px `min-height` floor survives), its accessible
+ * name, or which chevron it draws — the chevron is on every single
+ * non-searchable `Select`, both appearances.
+ */
+export type SelectAppearance = 'sunken' | 'raised';
 
 export type SelectProps =
   | {
@@ -24,6 +48,7 @@ export type SelectProps =
       searchable?: boolean;
       placeholder?: string;
       disabled?: boolean;
+      appearance?: SelectAppearance;
       'aria-label'?: string;
     }
   | {
@@ -35,6 +60,7 @@ export type SelectProps =
       maxSelected?: number;
       placeholder?: string;
       disabled?: boolean;
+      appearance?: SelectAppearance;
       'aria-label'?: string;
     };
 
@@ -140,7 +166,7 @@ export function Select(props: SelectProps) {
 // every render, satisfying the rules of hooks) while still getting real per-mode type safety
 // where it's read.
 function NonSearchableSelect(props: SelectProps & { collection: ListCollection<SelectOption> }) {
-  const { options, placeholder = 'Select…', disabled = false, collection } = props;
+  const { options, placeholder = 'Select…', disabled = false, appearance = 'sunken', collection } = props;
   const [maxMessage, setMaxMessage] = useState<string | null>(null);
 
   const state = useSelectState<SelectOption, 'single' | 'multiple'>({
@@ -252,8 +278,44 @@ function NonSearchableSelect(props: SelectProps & { collection: ListCollection<S
   return (
     <>
       <HiddenSelect state={state} triggerRef={triggerRef} label={props['aria-label']} name={props['aria-label']} />
-      <button {...buttonProps} ref={triggerRef} className="gn-select__trigger gn-field__input">
+      {/*
+        The trigger wears `gn-field__input` in BOTH appearances, and the raised
+        coat arrives as an additive modifier (case 13.1343 asserts the field class
+        survives). That is not tidiness: `.gn-field__input` carries the
+        `min-height: 2.75rem` this control's 44px tap floor comes from, so a
+        raised trigger that swapped the coat out would lose the floor the rest of
+        the product's controls are held to.
+
+        The chevron is drawn on the single non-searchable trigger of EVERY
+        appearance — the owner's *"the down arrow is important"* is about the
+        affordance, which is a fact about a dropdown, not about how it is painted.
+        `SearchableSelect` and the `multiple` branch below deliberately do not get
+        one: the searchable trigger wears a `SearchIcon` and is a typeable field,
+        and the multi trigger is chips plus an open button, so a chevron on either
+        would be a second, competing signal for the same interaction (case
+        13.1342 controls for exactly that, in both directions).
+
+        It is placed AFTER the value span because `.gn-select__trigger` is
+        `justify-content: space-between`: two children put the label at the
+        leading edge and the chevron at the trailing one with no layout rule of
+        its own. `aria-hidden` (on the icon itself) keeps it out of the trigger's
+        accessible name, which stays the value plus the `aria-label` — asserted
+        verbatim by 13.1342, since a chevron that leaked a name would be a change
+        to every query in this repo that addresses these controls by name.
+      */}
+      <button
+        {...buttonProps}
+        ref={triggerRef}
+        className={
+          appearance === 'raised'
+            ? 'gn-select__trigger gn-select__trigger--raised gn-field__input'
+            : 'gn-select__trigger gn-field__input'
+        }
+      >
         <span {...valueProps}>{selected ? selected.label : placeholder}</span>
+        <span className="gn-select__chevron" aria-hidden="true">
+          <ChevronDownIcon />
+        </span>
       </button>
       {panel}
     </>

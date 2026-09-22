@@ -2722,3 +2722,149 @@ structural neighbours it takes with it are the expected shape for a change to a 
   13.1333 (the case aimed at — the completion stops ending the mode), and 13.648 case 2 and 13.794, the
   two other cases that read the post-reload state. 13.1332 stays green, and should: it drives the ✕,
   which disarms directly and never goes through the wrapper.
+
+---
+
+## The ticket key column, left of the title (owner request, 2026-09-22)
+
+**The owner's third item, from the List tab screenshot:** *"on the left of the title, add the ticket
+key column."* The key is the `CCSO-12`-style identifier PR #681 put on every card that morning.
+
+**The wire already carried it and the client's row type did not.** `TicketCard.key` is
+`string | null` on the domain type, `ListCard = TicketCard & { … }`, and the board's mapper has read it
+since #681. The List's `ListRow` had no `key` at all and `mapListRow` never looked — the same
+one-mapper-at-a-time gap `13.703` records for `rank`, and the same remedy: the field is REQUIRED on
+`ListRow`, because a required field on a view type is what makes the typecheck find every fixture that
+constructs one. **It found twelve sites, one per file, ten of them under `apps/web/test` and two under
+`packages/app-core/test`** (`helpers/seed.ts`'s `listRowSeed`, plus `filter/list-filter.test.ts`) — a
+count taken from `git diff` over the fixture files, not from memory, because a fixture the field did not
+reach would be a `ListRow` built without one.
+
+**Three states, and the third is a refusal.** A key crosses. `null` is the server's own word for "the
+ledger holds no prefix" and must arrive as `null` — read with `toBeNull` and not `toBeFalsy`, since
+`undefined` is exactly what a forgotten field looks like. An ABSENT key is a body the server does not
+send, refused by name so that a mapper which dropped the field cannot pass for a prefix-less
+workspace. `13.1280` pins the same three arms on the board card, deliberately: the same two states
+cross the same wire.
+
+**The replica answers `null` for every row, because it cannot compose one.** A key's number is derived
+from the ledger's order and the device holds no prefix — the same under-claim the replica's board cards
+already make (`replica-data-source.ts`), where locally re-deriving the number would be a second
+implementation of a server read, and a key naming a different ticket from the server's would be worse
+than no key.
+
+**The column is FIXED, like Title.** No `ListColumnId`, not in `AVAILABLE_COLUMNS`, never persisted —
+so no stored `columns` array can omit it and the tray offers no chip for it. It renders `—` for a null
+key: never a blank cell (which reads as "this cell did not render") and never `row.ticketId` (an
+internal ULID where a person expects the workspace's own identifier).
+
+- **13.1337** ✅ `mapListPage` carries a card's `key` onto the row (`'CCSO-7'` → `'CCSO-7'`); `null` on
+  the wire arrives as `null` — the positive control, in the same `it`, differing in that one key — and a
+  body WITHOUT the field is refused with a `MappingError` naming `.key`. —
+  (`packages/app-core/test/online/mappers.test.ts`)
+- **13.1338** ✅ A list row read from the replica has `key === null`, read with `toBeNull` so an absent
+  field reddens, with `typeRank` off the same object as the control. —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
+- **13.1339** ✅ The table's header row has `Key` IMMEDIATELY before `Title` (asserted as adjacency, so
+  the optional checkbox column may come and go), and a row with `key: 'CCSO-7'` renders `CCSO-7` in
+  `.gn-list__key` while a row with `key: null` renders `—` — not the id and not empty, both named. —
+  (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1340** ✅ The Key column renders whatever the chooser stored — mounted with `prefs.columns`
+  stored as `[]`, the header row is exactly `Key, Title` — and the Columns tray offers no Key chip
+  while still drawing its six. — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1341** ✅ `.gn-list__key` declares `color: var(--gn-text-muted)`, `white-space: nowrap` and
+  `font-variant-numeric: tabular-nums`, with no literal colour, and the component really draws that
+  class. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
+
+**Two pre-existing cases were about a whole `<tr>` and had to name a cell.** `13.667` searched the row
+for `—` to prove an unclaimed date is NAMED rather than dashed, and `13.668` searched the row for the
+progress dash; the Key column's own `—` for a null key put a second dash in every row, so both now read
+the cell they are about through `cellUnder(row, 'Due date' | 'Progress')`, located by HEADER. That is
+the same repair `3.52`'s zone battery needed, where the new leading column shifted every index by one
+and a case comparing a row's TITLE against a date failed for a reason with nothing to do with the
+clock. Neither was a defect; both had stopped addressing their own cell. `13.647`'s "a column narrower"
+control was a hard-coded `1` and is now measured against the selection arm in the same case, so the next
+fixed column does not expire it.
+
+## Group by on one line, as a raised pill with its own chevron (owner request, 2026-09-22)
+
+**The owner sent two screenshots and one instruction:** *"group by is currently 2 line. make it one line.
+and have the dropdown button be a raised style instead. (this could be an alternative option on the
+component we built. and the down arrow is important.)"* The second screenshot is the target — `Group by`
+on one line, then a raised pill reading `epic` with a `⌄` at its right edge.
+
+**Why "Group / by" wrapped, measured rather than guessed.** `.gn-list__control` is an `inline-flex` row
+holding a bare `<span>` and the shared Select. The trigger is `width: 100%` (`.gn-select__trigger`), so
+inside that row it took the width and the label — the only shrinkable item — wrapped. The two-line
+symptom is therefore ONE layout fact with two halves, and both are asserted: the label is taken out of
+the shrink (`flex: none`) and held on one line (`white-space: nowrap`), and the trigger is made
+content-sized (`width: auto`) so it stops claiming the row.
+
+**The raised coat is a `Select` option, not a List-scoped rule.** The owner's own parenthesis asked for
+"an alternative option on the component we built", and that is what `SelectProps.appearance` is —
+`'sunken'` (the default, and every call site that omits it) or `'raised'`. Scoping it to the List with a
+descendant selector would have been the smaller diff and the worse one: it is the exact shape
+`.gn-list__control .gn-select__trigger` already demonstrates, and `rule()` in the ui suite resolves a
+selector by FIRST match in file order, so a caller-side rule containing the shared class becomes the body
+every later case reads for it (measured — see `13.1344`).
+
+**⚠ TWO THINGS THE PLAN PINNED THAT MEASUREMENT REFUTED, both recorded because both would have shipped
+a green check over a wrong fact.**
+
+The first: the plan's control for `13.1344` was to assert that `rule('.gn-select__trigger')` still
+declares `justify-content: space-between`. **It does not, and never did.** `rule()` is
+`UI_CSS.match(...)` with no line anchor, and the first place in `ui.css` where the literal
+`.gn-select__trigger {` appears is not the base rule (`:3032`) — it is the List-scoped
+`.gn-list__control .gn-select__trigger` (`:1419`), whose body is `padding` / `font-size` /
+`font-weight`. So the planned control would have failed against a tree where nothing was wrong. The case
+now asserts what that reader ACTUALLY returns (pinning the trap so a change in what it resolves to goes
+red) and reaches the base rule by a line-anchored scan instead.
+
+The second: the plan's raised rule was `.gn-select__trigger--raised` at `(0,1,0)`, placed in the trigger's
+own block. Measured, that **loses to `[data-style="neo"] .gn-field__input`** — `(0,2,0)`, and the trigger
+wears `gn-field__input` in both appearances because that class carries the 44px `min-height` floor. Under
+`neo`, the shipped default, that override repaints the control sunken and swaps the raised shadow for the
+sunken one, so the owner's raised pill would have rendered PRESSED with every case green. The rule
+therefore takes the field class into its own selector to reach `(0,2,0)`, and sits AFTER the override it
+beats, because at equal specificity source order is the only thing that decides. `13.1344` asserts that
+ordering, with comments stripped first — the override's selector text is named in prose earlier in the
+stylesheet, and an `indexOf` over the raw file finds the COMMENT.
+
+- **13.1342** ✅ A single non‑searchable `Select` renders EXACTLY ONE `.gn-select__chevron` inside its
+  trigger, wrapping an `svg[aria-hidden="true"]`. Control, in the same `it`: the trigger's accessible
+  name is asserted VERBATIM as `Banana Fruit` (value, then `aria-label`), because decoration is only
+  decoration if it adds no name — a `toContain` would pass while the chevron silently appended anything
+  that was not text. Two further arms in the same `it`: the searchable trigger and the multi-select
+  trigger render no chevron at all, without which "on the single trigger" and "on every trigger" are the
+  same passing test. — (`packages/ui/test/select.test.tsx`)
+- **13.1343** ✅ `appearance="raised"` adds `gn-select__trigger--raised`, and the modifier is ADDITIVE —
+  the trigger still carries `gn-select__trigger` and `gn-field__input`, which is where the tap floor
+  comes from. Two control arms in the same `it`: the default (prop omitted) adds nothing, and
+  `appearance="sunken"` adds nothing either — a `'sunken'` that behaved like `'raised'` would be a prop
+  whose value is ignored, which the omitted-prop arm cannot see. — (`packages/ui/test/select.test.tsx`)
+- **13.1344** ✅ `.gn-select__trigger--raised` declares `background: var(--gn-surface-raised)`,
+  `box-shadow: var(--gn-shadow-raised)` and `border-color: transparent`. Controls in the same `it`: what
+  the unanchored reader returns for the bare name (asserted as the measurement above, and asserted not to
+  be the raised rule); the BASE rule, reached by a line-anchored scan, still declaring
+  `justify-content: space-between` and `width: 100%` — the layout the raised coat rides on rather than
+  replaces; the raised rule's source position AFTER `[data-style="neo"] .gn-field__input`, which is the
+  tie-break the coat depends on, measured on comment-stripped text; and `globals.css`, which
+  `apps/web/app/layout.tsx` imports after `ui.css` and which would win at equal specificity, not
+  re-declaring the class. — (`packages/ui/test/components.test.tsx`)
+- **13.1345** ✅ The `Group by` text is a `gn-list__control-label` span whose `textContent` is exactly
+  `Group by`, and the grouping control's own trigger carries `gn-select__trigger--raised` AND
+  `gn-field__input` (the raised coat is additive — the field class is where the 44px floor comes from).
+  Controls in the same `it`: the label and the trigger are SIBLINGS in one `.gn-list__control` — the
+  class must be on the element holding the words, and on the label rather than the trigger or the row —
+  and the row contains EXACTLY ONE raised trigger, so the raise belongs to this control rather than
+  having become the component's default (that default is owned by `13.1343`). — (`packages/app-core/test/views/ticket-list.test.tsx`)
+- **13.1346** ✅ `.gn-list__control-label` declares `white-space: nowrap` AND `flex: none`, and
+  `.gn-list__control .gn-select__trigger` declares `width: auto`. **Neither half is asserted alone**:
+  `nowrap` on a label that is still the shrinkable item overflows instead of wrapping, and a
+  content-sized trigger still lets a wrapping label break — the owner's `Group` / `by` is reachable with
+  either one missing. Control: the shared base rule still declares `width: 100%`, so the scoped `auto` is
+  an OVERRIDE of a declaration that exists rather than one that appeared from nowhere — an override of a
+  deleted declaration reads identically to one that works. Control 2: the two readers returned two
+  different bodies, which is the line-anchoring (`declarationsFor`) doing the job it exists for.
+  **jsdom has no layout engine**, so this case asserts the declarations and NOT a line box — the paint is
+  the controller's measurement, not a number invented here. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)

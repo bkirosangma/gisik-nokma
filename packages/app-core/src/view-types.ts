@@ -390,6 +390,30 @@ export type ListColumnId =
 export type ListRow = {
   ticketId: string;
   title: string;
+  /**
+   * The ticket's key — `<workspace prefix><project prefix>-<number>`, the same
+   * composition `TicketCard.key` makes server-side (`packages/domain/src/read-models.ts`)
+   * and the same one the single-ticket read makes for its crumb (`ticketKey`,
+   * `packages/domain/src/prefix.ts`) — or `null` when the ledger holds no
+   * prefix. REQUIRED here on the same rule as `closed` and `rank` below, and for
+   * the same reason: every producer of a row is this task's own code (the online
+   * mapper, the replica), so there is no legacy literal to spare, and a reader
+   * spells `… ?? null` at the boundary rather than inheriting an optionality
+   * onto this type.
+   *
+   * `null` is a fact about the ledger and not a hole, and the two producers
+   * reach it differently. The server answers `null` when it cannot compose one;
+   * an ABSENT key is refused rather than defaulted by both card mappers, the
+   * refusal `TicketCard.key`'s own docblock records, so a forgotten field cannot
+   * pass for a prefix-less workspace. The OFFLINE replica answers `null` for
+   * EVERY row — the number is derived from the ledger's order and cannot be
+   * composed on the device (`replica-data-source.ts`'s `rowOf`), which is the
+   * same under-claim its board cards make.
+   *
+   * The consumer is the List's fixed Key column, left of the title, where the
+   * null draws an em dash — never a blank cell and never the ticket id.
+   */
+  key: string | null;
   typeId: string;
   typeRank: number;
   parentId: string | null;

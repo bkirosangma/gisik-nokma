@@ -56,6 +56,9 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
   const base: ListRow = {
     ticketId: 't_1',
     title: 'A ticket',
+    // REQUIRED on the row since 2026-09-22 (the List's Key column). A real key
+    // rather than `null`: this fixture models a row the SERVER composed one for.
+    key: 'CCSO-7',
     typeId: 'task',
     typeRank: 3,
     parentId: null,

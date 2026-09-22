@@ -890,6 +890,8 @@ function listRow(overrides: Partial<ListRow> = {}): ListRow {
   const base: ListRow = {
     ticketId: 'lt_1',
     title: 'A list row',
+    // REQUIRED on the row since 2026-09-22 (the List's Key column).
+    key: 'CCSO-7',
     typeId: 'task',
     typeRank: 3,
     parentId: null,

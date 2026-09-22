@@ -663,3 +663,100 @@ describe('13.1328 the caller’s slot is anchored to the row’s trailing edge',
     expect(row).not.toMatch(/margin-left:\s*auto/);
   });
 });
+
+/**
+ * 13.1341 — the Key cell's own rule (owner request 2026-09-22: *"on the left of
+ * the title, add the ticket key column"*).
+ *
+ * The rule is what MAKES the column read as an identifier rather than as a
+ * second title, and every one of its three declarations is load-bearing in a
+ * direction a component test cannot see: colour is the board's own muted key
+ * ink (`13.1280`'s `.gn-board-card__key`), `nowrap` keeps `CCSO-12` from
+ * breaking across a line, and `tabular-nums` is what lets the numbers line up
+ * down the column — the thing a person scans a key column FOR.
+ *
+ * The component half is asserted beside it, in the same shape the tray's
+ * `hidden` attribute is pinned above: a declaration is only half the fact, and a
+ * rule for a class no element carries is a style that has quietly stopped
+ * applying. The class-parity case in this file would catch that eventually, but
+ * it reports it as one line of a set difference; this says which class moved.
+ */
+describe('13.1341 the Key cell is muted identifier ink, and the component draws the class it names', () => {
+  it('the rule declares the muted token, no literal colour, and a single-line tabular key', () => {
+    const declarations = declarationsFor(CSS, '.gn-list__key');
+    expect(declarations).not.toBeNull();
+    expect(declarations).toContain('color: var(--gn-text-muted)');
+    expect(declarations).toContain('white-space: nowrap');
+    expect(declarations).toContain('font-variant-numeric: tabular-nums');
+    // NO LITERAL INK. `--gn-text-muted` is the board's own key colour and the
+    // only one this column may use; a hex or an `rgb()` here would be a second
+    // answer to a question the token layer already answers, and it is the
+    // failure mode a `toContain` above cannot see (a rule can carry the token
+    // AND a literal, and only the literal would win where it is more specific).
+    expect(declarations).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(/);
+  });
+
+  it('and the component really draws that class, off the row it belongs to', () => {
+    const { container } = render(
+      <TicketList
+        rows={[listRowSeed({ ticketId: 'k1', title: 'Has a key', key: 'CCSO-7' })]}
+        currentUserId="me"
+        prefs={DEFAULT_VIEW_PREFS}
+        onPrefsChange={vi.fn()}
+        labels={LABELS}
+        onOpenTicket={vi.fn()}
+      />,
+    );
+    expect(container.querySelector('.gn-list__key')?.textContent).toBe('CCSO-7');
+  });
+});
+
+/**
+ * Case `13.1346` — "Group by is two lines" is ONE layout fact with two halves, and
+ * neither half alone fixes it.
+ *
+ * `.gn-list__control` is an `inline-flex` row holding a label and the shared
+ * `Select` (`ui.css:1379`). The trigger is `width: 100%`, so inside that row it
+ * took the width and the LABEL — the only shrinkable item — wrapped: that is the
+ * measured origin of the `Group` / `by` the owner photographed. So the fix is
+ * that the label leaves the shrink (`flex: none`) and refuses to break
+ * (`white-space: nowrap`), AND the trigger stops claiming the row (`width:
+ * auto`). Either declaration without the other leaves the bug reachable.
+ *
+ * This file is the right home for it and `ticket-list.test.tsx` is not: jsdom has
+ * no layout engine, so `13.1345` can witness the class names and nothing about
+ * their effect. Those two declarations ARE the effect, read out of the stylesheet
+ * rather than described — and what this file still cannot see is stated the way
+ * its own header states it: a declaration that is present and then OVERRIDDEN
+ * reads as present here.
+ */
+describe('13.1346 the Group by control holds one line', () => {
+  it('13.1346 the label is nowrap and out of the shrink, and the trigger is content-sized', () => {
+    const label = declarationsFor(CSS, '.gn-list__control-label');
+    expect(label, 'no `.gn-list__control-label` rule in ui.css').not.toBeNull();
+    expect(label).toContain('white-space: nowrap');
+    // `nowrap` alone leaves the label shrinkable; a shrunk-to-nothing label still
+    // wraps nothing and the row still reflows, so both halves are asserted.
+    expect(label).toContain('flex: none');
+
+    const scopedTrigger = declarationsFor(CSS, '.gn-list__control .gn-select__trigger');
+    expect(scopedTrigger, 'no `.gn-list__control .gn-select__trigger` rule in ui.css').not.toBeNull();
+    expect(scopedTrigger).toContain('width: auto');
+
+    // CONTROL, in this same `it`: `width: auto` has to be an OVERRIDE of a real
+    // declaration, not a declaration that appeared from nowhere. The shared base
+    // rule still claims the full width — and it must, because every Select that is
+    // not this control is full-width. If the base rule ever stopped saying
+    // `width: 100%`, the scoped `auto` would still pass this case while meaning
+    // something entirely different.
+    const baseTrigger = declarationsFor(CSS, '.gn-select__trigger');
+    expect(baseTrigger, 'no base `.gn-select__trigger` rule in ui.css').not.toBeNull();
+    expect(baseTrigger).toContain('width: 100%');
+
+    // CONTROL 2, same `it`: the reader reached TWO different rules, not the same
+    // body twice. `declarationsFor` is line-anchored precisely so the scoped rule
+    // and the shared one cannot answer for each other, and this is the assertion
+    // that would fail if that anchoring regressed.
+    expect(scopedTrigger).not.toBe(baseTrigger);
+  });
+});
