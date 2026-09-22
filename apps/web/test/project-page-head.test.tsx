@@ -86,6 +86,25 @@ beforeEach(() => {
 });
 
 /**
+ * A rule body with its `/* … *\/` comments REMOVED — every declaration
+ * assertion below reads this, never the raw body.
+ *
+ * **Why, measured.** `ruleFor` returns the selector line through the closing
+ * brace, and several rules in `ui.css` carry their explanatory comment INSIDE
+ * that span. `.gn-segmented__item`'s E4-35 note is one, and it names the
+ * literal string `` `flex: 1` `` three times as PROSE about the declaration.
+ * So `expect(rule).toMatch(/flex:\s*1/)` is satisfied by the comment alone:
+ * mutating the real declaration to `flex: none` left the assertion GREEN
+ * (measured 2026-09-22 on this branch before this helper existed). A check
+ * that reads prose about a property cannot fail on the property.
+ *
+ * Stripping is the general remedy; an anchored `/^\s*flex:/m` would work here
+ * but only until the next comment line happens to start with the word.
+ */
+const declarationsOf = (rule: string | undefined): string =>
+  (rule ?? '').replace(/\/\*[\s\S]*?\*\//g, '');
+
+/**
  * The names come from the SAME `getMyWorkspaces` read `AppNav` already makes on
  * this page, so the crumb and title both resolve from one fixture — the mount is
  * copied from `project-page-chrome.test.tsx` (`13.431`'s own world) for exactly
@@ -212,18 +231,18 @@ describe('13.1304 the head row and the identity column are styled as the prototy
 
   it('13.1304 `.gn-project__head` splits its two halves and carries the row margin', () => {
     expect(head).toBeDefined();
-    expect(head).toMatch(/justify-content:\s*space-between/);
-    expect(head).toMatch(/flex-wrap:\s*wrap/);
+    expect(declarationsOf(head)).toMatch(/justify-content:\s*space-between/);
+    expect(declarationsOf(head)).toMatch(/flex-wrap:\s*wrap/);
     // The prototype's `margin-top:24px` (`:320`), at this repo's 16px root. It
     // moved UP from `.gn-project__header`, which held it while the controls were
     // the top of the page: in the prototype the margin belongs to the row that
     // holds BOTH the identity and the controls.
-    expect(head).toMatch(/margin-top:\s*1\.5rem/);
+    expect(declarationsOf(head)).toMatch(/margin-top:\s*1\.5rem/);
   });
 
   it('13.1304 `.gn-project__identity` is the prototype\'s column', () => {
     expect(identity).toBeDefined();
-    expect(identity).toMatch(/flex-direction:\s*column/);
+    expect(declarationsOf(identity)).toMatch(/flex-direction:\s*column/);
   });
 
   it('13.1304 CONTROL — `.gn-project__header` no longer carries the margin', () => {
@@ -234,7 +253,7 @@ describe('13.1304 the head row and the identity column are styled as the prototy
     expect(header).toBeDefined();
     // Both margins on both rules would double the gap to 48px, which is the
     // defect this arm exists to catch. `.gn-project__head` now owns it.
-    expect(header).not.toMatch(/margin-top/);
+    expect(declarationsOf(header)).not.toMatch(/margin-top/);
   });
 });
 
@@ -292,8 +311,8 @@ describe('13.1306 the rail opts out in globals.css, leaving the shared item alon
     // where five tabs at `padding: 0 1rem` no longer fit on one line.
     const track = ruleFor(GLOBALS_CSS, /^\.gn-project__rail\s*\{/);
     expect(track).toBeDefined();
-    expect(track).toMatch(/align-self:\s*flex-start/);
-    expect(track).toMatch(/flex-wrap:\s*wrap/);
+    expect(declarationsOf(track)).toMatch(/align-self:\s*flex-start/);
+    expect(declarationsOf(track)).toMatch(/flex-wrap:\s*wrap/);
 
     // The items stop sharing a width the track no longer has. Without this they
     // keep `flex: 1` and would still distribute free space — but with
@@ -301,7 +320,7 @@ describe('13.1306 the rail opts out in globals.css, leaving the shared item alon
     // is the track's, and this rule is what makes the two consistent.
     const item = ruleFor(GLOBALS_CSS, /^\.gn-project__rail \.gn-segmented__item\s*\{/);
     expect(item).toBeDefined();
-    expect(item).toMatch(/flex:\s*none/);
+    expect(declarationsOf(item)).toMatch(/flex:\s*none/);
 
     // CONTROL, in the SAME `it` — the shared rule is untouched. A `.gn-segmented__item`
     // rewritten to `flex: none` in `ui.css` would satisfy every assertion above
@@ -309,6 +328,6 @@ describe('13.1306 the rail opts out in globals.css, leaving the shared item alon
     // this arm is what tells "the board opted out" from "the control changed".
     const shared = ruleFor(UI_CSS, /^\.gn-segmented__item\s*\{/);
     expect(shared).toBeDefined();
-    expect(shared).toMatch(/flex:\s*1/);
+    expect(declarationsOf(shared)).toMatch(/flex:\s*1;/);
   });
 });

@@ -1829,7 +1829,18 @@ describe('13.1153 the segmented item carries the prototype\'s horizontal padding
     // substring regex over `ui.css`, so a descendant selector ending in
     // `.gn-segmented__item {` in this file could become the very body this case
     // reads.
-    expect(rule('.gn-segmented__item')).toMatch(/flex:\s*1/);
+    //
+    // ⚠ AND IT HAD TO BE MADE ABLE TO FAIL FIRST (2026-09-22, measured). This
+    // rule carries its E4-35 comment INSIDE the rule, and `rule()` captures
+    // everything up to the first `}` — so the comment's own prose, which names
+    // `` `flex: 1` `` three times, satisfied the bare `toMatch(/flex:\s*1/)`.
+    // Changing the declaration to `flex: none` left this case GREEN, i.e. it
+    // could not fail on the property it names. Comments are stripped below, and
+    // the declaration's own `;` is required, so the assertion now reads the
+    // declaration rather than prose about the declaration. The claim is
+    // unchanged; only its ability to be false is.
+    const declarations = rule('.gn-segmented__item').replace(/\/\*[\s\S]*?\*\//g, '');
+    expect(declarations).toMatch(/flex:\s*1;/);
   });
 });
 
