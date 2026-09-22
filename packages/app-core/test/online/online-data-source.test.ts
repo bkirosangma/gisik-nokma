@@ -126,6 +126,7 @@ function listCard(ticketId: string) {
     collaboratorIds: [],
     title: `Ticket ${ticketId}`,
     dueDate: { state: 'never-claimed' },
+    key: null,
     // REQUIRED on the wire (spec 2026-09-22), and the same fixture churn `closed`
     // and `rank` caused here before it: the server serves a claim on EVERY card,
     // so a fixture that omits it is not a body the product can produce —
@@ -180,6 +181,7 @@ const BOARD: BoardResponse = {
           collaboratorIds: [],
           title: 'File the GST return',
           dueDate: { state: 'never-claimed' },
+    key: null,
           // REQUIRED on the wire (spec 2026-09-22): `TicketCard.priority` is
           // never nullable, so this fixture carries the birth default the
           // server serves for a ticket nobody has re-prioritised.

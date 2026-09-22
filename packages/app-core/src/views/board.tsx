@@ -1162,15 +1162,27 @@ function BoardCardView({
         >
           {card.priority.value}
         </span>
-        {card.dueDate !== null ? (
-          <span
-            className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
-            title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
-          >
-            {formatDate(card.dueDate.date)}
-          </span>
-        ) : null}
       </div>
+      {/* The prototype's META LINE (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
+          dueLabel].join(" · ")`), key first (owner, 2026-09-22). The due span is
+          the SAME element it was in the chips row, with its late tone (13.1177);
+          only its seat moved. A `null` key draws no separator and no placeholder
+          — a missing prefix is a fact about the ledger, not a blank to fill. The
+          line is omitted entirely when it would hold nothing. */}
+      {card.key !== null || card.dueDate !== null ? (
+        <p className="gn-board-card__meta-line">
+          {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
+          {card.key !== null && card.dueDate !== null ? <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span> : null}
+          {card.dueDate !== null ? (
+            <span
+              className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
+              title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
+            >
+              {formatDate(card.dueDate.date)}
+            </span>
+          ) : null}
+        </p>
+      ) : null}
       <button
         type="button"
         className="gn-board-card__provenance"
