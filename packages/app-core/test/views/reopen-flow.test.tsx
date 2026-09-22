@@ -4,7 +4,7 @@ import { act, fireEvent, render, screen, waitFor, within } from '@testing-librar
 // packages/ui/test/components.test.tsx and repeated by board.test.tsx and
 // ticket-list.test.tsx. The plan's Task 13 snippet carries the default spelling.
 import { userEvent } from '@testing-library/user-event';
-import { describe, expect, it, vi } from 'vitest';
+import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent, WorkflowDef } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { SERVING_GAPS, ServingGapError } from '../../src/online/mappers.js';
@@ -32,6 +32,19 @@ import { PARENT, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.j
  */
 const SERVER_PARENT_TERMINAL_REASON =
   '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
+
+/**
+ * The New-ticket dialog remembers the "Starts in the backlog?" answer in
+ * `localStorage`, keyed by user, and `renderFlow` mounts it with a real
+ * `currentUserId` — so 13.592b's flip writes a record that every later case in
+ * this file would inherit. Cleared between cases rather than inside the one case
+ * that writes it, for the reason `new-ticket-dialog.test.tsx` states at its own
+ * guard: a leaked record turns a later case green — or, here, red — for a reason
+ * that has nothing to do with what it asserts.
+ */
+beforeEach(() => {
+  window.localStorage.clear();
+});
 
 /** `rankRefusal('Task', 'Sub-task')`'s real output, pinned below. */
 const RANK_REASON =
@@ -193,14 +206,18 @@ function renderFlow(
   extra: {
     cache?: ReturnType<typeof createClientStateCache>;
     /**
-     * Defaults to a non-in-focus "Registrations" candidate — `inFocus: false` —
-     * so every pre-existing case in this file (none of which is ABOUT the
-     * checkbox) keeps seeing no "Start in focus" control and a plain
-     * `start: 'backlog'` first attempt, same as before this field existed.
-     * The 13.592/13.593 describe blocks below pass their own, deliberately
-     * `inFocus: true` or closed-parent candidate lists instead.
+     * Defaults to a plain "Registrations" candidate so every case in this file
+     * (none of which is about the birth-state control) keeps seeing a plain
+     * `start: 'backlog'` first attempt.
+     *
+     * ⚠ `inFocus` used to be on this shape and is gone (owner ruling
+     * 2026-09-23, lifting spec §5.4's parent condition). The fixtures that
+     * carried `inFocus: true` did so to make the dialog render its old "Start
+     * in focus" checkbox; the control is now a `Switch` that is always present
+     * and whose position the person owns, so no fixture can select it and the
+     * field had no reader left.
      */
-    parentCandidates?: Array<{ id: string; title: string; inFocus: boolean }>;
+    parentCandidates?: Array<{ id: string; title: string }>;
   } = {},
 ): ReturnType<typeof vi.fn> {
   const onCreated = vi.fn();
@@ -212,7 +229,13 @@ function renderFlow(
       projectId="01J9GPRJ000000000000000000"
       currentUserId="user_kiro"
       typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
-      parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations', inFocus: false }]}
+      parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations' }]}
+      // The roster the Assignee picker offers (owner request 2026-09-23). Empty
+      // here: no case in this file is about the assignee, and `[]` leaves the
+      // picker offering "Unassigned" alone, which is the draft's default — so
+      // every `ticket.created` below carries `assigneeId: null`, exactly as it
+      // did before the member existed.
+      assigneeCandidates={[]}
       onCreated={onCreated}
     />,
   );
@@ -542,14 +565,19 @@ describe('3.79 · T13.4 the reopen option (owner decision) — the whole flow', 
 });
 
 /**
- * 13.592 (backlog/closed spec §1.3, §5.4) — `CreateTicketFlow.create` never
- * leaves `start` off the `ticket.created` payload it builds, whatever the
- * draft's own value. The key assertion below is `Object.keys(payload)`, not a
- * value comparison: a mutated `create()` that drops the `start:` line from its
- * payload object literal produces a payload with NO `start` key at all, and
- * `toEqual`/`toBe` value checks treat a missing key the same as one holding
- * `undefined` — they would not catch that mutation. Reading the key set is
- * what does.
+ * 13.592 (backlog/closed spec §1.3; §5.4's parent condition LIFTED 2026-09-23)
+ * — `CreateTicketFlow.create` never leaves `start` off the `ticket.created`
+ * payload it builds, whatever the draft's own value. The key assertion below is
+ * `Object.keys(payload)`, not a value comparison: a mutated `create()` that
+ * drops the `start:` line from its payload object literal produces a payload
+ * with NO `start` key at all, and `toEqual`/`toBe` value checks treat a missing
+ * key the same as one holding `undefined` — they would not catch that mutation.
+ * Reading the key set is what does.
+ *
+ * Both cases used to reach `'focus'` through an in-focus PARENT. The parent no
+ * longer has any bearing on the birth state, so the second case now turns the
+ * dialog's own switch — which is the honest way to reach a value the draft is
+ * supposed to be the source of.
  */
 describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created', () => {
   it('13.592a a create with no parent sends payload.start: "backlog", and the key is never omitted', async () => {
@@ -575,20 +603,49 @@ describe('13.592 CreateTicketFlow.create always sends `start` on ticket.created'
     expect(onCreated).toHaveBeenCalled();
   });
 
-  it('13.592b choosing an in-focus parent with "Start in focus" left checked sends payload.start: "focus"', async () => {
+  it('13.592b turning the birth-state switch OFF sends payload.start: "focus", through the flow', async () => {
+    // ⚠ REWRITTEN 2026-09-23. This case read *"choosing an in-focus parent with
+    // 'Start in focus' left checked sends payload.start: 'focus'"* — under spec
+    // §5.4 the parent was what produced a focus birth, and the checkbox only
+    // existed under an in-focus one. The owner lifted that condition, so the
+    // PARENT no longer moves `start` at all and the control's ON position means
+    // the opposite of what it did. What the case is for is unchanged and is why
+    // it survives rather than being deleted: `CreateTicketFlow.create` must send
+    // the DRAFT's value, never a constant, and the load-bearing assertion is
+    // still the KEY SET — a `create()` that dropped the `start:` line produces a
+    // payload with no such key, which a `toEqual`-style value check cannot tell
+    // from one holding `undefined`.
     const user = userEvent.setup();
     const source = createFakeDataSource({}, (events) => events.map((event) => committed(event.id)));
     const onCreated = renderFlow(source, {
-      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: true }],
+      parentCandidates: [{ id: PARENT, title: 'Registrations' }],
     });
-    await createTicketUnderParent(user);
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    await user.type(screen.getByLabelText('Title'), 'Order the tent');
+    // The picker must be OPENED first: it is the shared searchable `Select`, so
+    // its options exist only while the panel is up and are portal-rendered into
+    // a `listbox` on `document.body` — the idiom `createTicketUnderParent` above
+    // records at length.
+    await user.click(screen.getByLabelText('Parent'));
+    await user.click(
+      within(await screen.findByRole('listbox')).getByRole('option', { name: 'Registrations' }),
+    );
+
+    // The switch is ON by default (born in the backlog) — asserted before it is
+    // flipped, so the case cannot pass against a control that was never ON and
+    // therefore proves nothing about the direction of the value.
+    const birthState = screen.getByRole('checkbox', { name: 'Starts in the backlog?' });
+    expect(birthState).toBeChecked();
+    await user.click(birthState);
+
+    await user.click(screen.getByRole('button', { name: 'Create' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     const payload = source.ingested[0]?.[0]?.payload as Record<string, unknown>;
     expect(payload.start).toBe('focus');
     expect(Object.keys(payload)).toContain('start');
-    // The priority default is independent of the parent: an in-focus parent
-    // moves `start`, and it must move nothing else.
+    // The priority default is independent of the birth state: turning the switch
+    // off moves `start`, and it must move nothing else.
     expect(payload.priority).toBe('P2');
     expect(onCreated).toHaveBeenCalled();
   });
@@ -675,7 +732,7 @@ describe('13.593 creating under a CLOSED terminal parent — the confirm submits
       { getTicket: async () => CLOSED_PARENT_READ },
     );
     const onCreated = renderFlow(source, {
-      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+      parentCandidates: [{ id: PARENT, title: 'Registrations' }],
     });
     await createTicketUnderParent(user);
 
@@ -749,7 +806,7 @@ describe('13.593e retrying a different target after a closed parent\'s reopen ha
       { getTicket: async () => CLOSED_PARENT_READ },
     );
     const onCreated = renderFlow(source, {
-      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+      parentCandidates: [{ id: PARENT, title: 'Registrations' }],
     });
     await createTicketUnderParent(user);
 
@@ -836,7 +893,7 @@ describe('13.593f a not-closed refusal of the reopen itself also unsticks the re
       { getTicket: async () => CLOSED_PARENT_READ },
     );
     const onCreated = renderFlow(source, {
-      parentCandidates: [{ id: PARENT, title: 'Registrations', inFocus: false }],
+      parentCandidates: [{ id: PARENT, title: 'Registrations' }],
     });
     await createTicketUnderParent(user);
 

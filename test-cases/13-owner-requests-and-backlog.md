@@ -769,40 +769,45 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   second line of defence if `attemptMove` ever stops clearing on its own; `cp`/`sha256sum` restore
   performed after each of the three mutations above —
   (`packages/app-core/test/views/board-moves-ui.test.tsx`)
-- **13.591** ✅ New tickets are born in the backlog, with one exception (backlog/closed spec §5.4,
-  2026-09-17) — `NewTicketDialog` states "Starts in the backlog" under the title field, UNCONDITIONALLY.
-  `NewTicketDraft` gains a REQUIRED `start: 'backlog' | 'focus'` (never optional here, even though the
-  wire's `ticketCreatedPayload.start` is optional and an absent value means focus for events written
-  before the field existed — a rule about legacy compatibility, not about what a client built after the
-  field exists is allowed to leave out). With NO parent chosen, no checkbox renders and the draft leaves
-  with `start: 'backlog'`. Choosing an IN-FOCUS parent (`parentCandidates` now carry `inFocus: boolean`
-  beside `id`/`title`, a claim the CALLER computes — this component derives nothing from a candidate's own
-  state) renders a **"Start in focus"** checkbox, CHECKED BY DEFAULT, and the draft leaves with
-  `start: 'focus'`; unticking it flips the SAME draft to `'backlog'` without touching the chosen parent.
-  Choosing a BACKLOG parent (`inFocus: false`) renders no checkbox at all and the draft stays `'backlog'`
-  — the checkbox's visibility (`startCheckboxVisible`) and the draft's `start` both read the SAME
-  `chosenParent`/`noUsableParent` values computed once, so a checkbox can never be on screen while the
-  payload it claims to set is about to leave as `'backlog'` anyway, or absent while a `'focus'` claim
-  leaves with nothing on screen to explain it —
+- **13.591** ✅ **REWRITTEN 2026-09-23** (owner ruling lifting spec §5.4's parent condition) — the birth
+  state is now ONE control asking the inverse question: the shared `Switch`, always present and always
+  answerable. `NewTicketDraft.start` stays REQUIRED (never optional here, even though the wire's
+  `ticketCreatedPayload.start` is optional and an absent value means focus for events written before the
+  field existed — a rule about legacy compatibility, not about what a client built after the field exists
+  is allowed to leave out). The former text, kept here because the case ids below still name it: the
+  dialog **states** "Starts in the backlog" under the title field UNCONDITIONALLY, and an in-focus parent
+  (`parentCandidates` carrying `inFocus: boolean`, a claim the CALLER computed) revealed a CHECKED-BY-
+  DEFAULT **"Start in focus"** checkbox whose visibility (`startCheckboxVisible`) and the draft's `start`
+  both read the same `chosenParent`/`noUsableParent` values once, so a checkbox could never be on screen
+  while the payload claimed `'backlog'`, or absent while a `'focus'` claim left unexplained.
+  **`startCheckboxVisible` and `parentCandidates[].inFocus` are now deleted, not merely disabled** — the
+  parent has no bearing on where a ticket is born. `13.591a` (the question + the SHARED `Switch`, ON, and
+  the old sentence absent), `13.591b` (no parent → switch ON → `start: 'backlog'`), `13.591c` (an
+  in-focus parent is no longer a precondition: OFF under it → `'focus'`), `13.591d` (OFF then back ON →
+  `'backlog'`, so the control is answerable BOTH ways), `13.591e` (a BACKLOG parent no longer hides it) —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
-- **13.591f** ✅ The `inFocus` derivation itself, at its ONE real-data call site (`page.tsx`'s
-  `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null`) — nothing in `packages/app-core`
-  can witness this, since every case there PASSES `inFocus` in as a literal fixture value; a wrong `!==`
-  or a dropped `row.closed === null` half would ship with 13.591a–e and every other gate reporting green.
-  Three list rows differing only in the two facts the formula reads: a BACKLOG row (`stateId: 'backlog'`,
-  never closed), a plain ACTIVE row (neither backlog nor closed), and a CLOSED terminal row (not backlog,
-  but closed). Only the ACTIVE row's pick renders the "Start in focus" checkbox; the BACKLOG and CLOSED
-  picks both render none. Mutation 1 (`row.closed === null` → `row.closed !== null`, `cp`/`sha256sum`
-  restore): kills exactly this case, on the CLOSED-row assertion (`PASS (9) FAIL (1)`). Mutation 2
-  (`row.stateId !== BACKLOG_STATE_ID` → `===`, same restore method): kills exactly this case again, on the
-  BACKLOG-row assertion — the two mutations redden the SAME case at two DIFFERENT assertions, proving both
-  halves of the formula are load-bearing and neither alone would catch the other's defect —
+- **13.591f** ✅ **REWRITTEN 2026-09-23** — the birth-state control's INDIFFERENCE to the parent, at the ONE
+  site that hands it real row data. The former subject was `page.tsx`'s own `inFocus` derivation
+  (`row.stateId !== BACKLOG_STATE_ID && row.closed === null`), which nothing in `packages/app-core` could
+  witness because every case there passes `inFocus` in as a literal; the ruling deleted the formula and
+  the field with it, so that claim is no longer made anywhere. The fixture is deliberately UNCHANGED —
+  a BACKLOG row, a plain ACTIVE row, and a CLOSED terminal row, told apart by the same two facts — and
+  what is asserted at each pick is that the switch is PRESENT and ENABLED; the CLOSED row is the one that
+  matters, because §5.4 forbade a focus birth under a closed parent OUTRIGHT. **The load-bearing assertion
+  reads the INGESTED PAYLOAD**: the switch is turned OFF under the closed parent and `ticket.created` must
+  carry `start: 'focus'` — so a dialog that painted an always-enabled switch and still sent `'backlog'`
+  fails here rather than passing on the screen alone. Control arms in the same `it`: the switch is ON
+  before it is flipped, so the case cannot pass against a control that was never ON. —
   (`apps/web/test/project-create-gate.test.tsx`)
 - **13.592** ✅ `CreateTicketFlow.create` never leaves `start` off the `ticket.created` payload it builds
   (backlog/closed spec §1.3), whatever the draft's own value: a create with no parent sends
-  `payload.start: 'backlog'`, and choosing an in-focus parent with the checkbox left checked sends
-  `payload.start: 'focus'` — proving the value travels from the DRAFT rather than a hardcoded constant.
-  The load-bearing assertion is `Object.keys(payload)` containing `'start'`, not a value comparison: a
+  `payload.start: 'backlog'`, and the birth-state switch turned OFF sends `payload.start: 'focus'` —
+  proving the value travels from the DRAFT rather than a hardcoded constant. **`13.592b` was rewritten
+  2026-09-23**: it used to reach `'focus'` by choosing an in-focus parent with the checkbox left checked,
+  and the parent no longer moves `start` at all, so it now flips the dialog's own switch — the honest way
+  to reach a value the draft is supposed to be the source of, and it asserts the switch was ON before the
+  flip so it cannot pass against a control that was never ON. The load-bearing assertion is
+  `Object.keys(payload)` containing `'start'`, not a value comparison: a
   mutated `create()` that drops the `start:` line from its payload object literal produces a payload with
   NO `start` key at all, and `toEqual`/`toBe`-style value checks treat a missing key the same as one
   holding `undefined` — they would not catch that mutation; only reading the key set does. Mutation
@@ -873,15 +878,19 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   REFUSAL_RULES.notClosed` arm, `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one
   event" assertion (`PASS (19) FAIL (1)` of the file's 20) —
   (`packages/app-core/test/views/reopen-flow.test.tsx`)
-- **13.591g** ✅ Fix round 1, Ruling 40 (coordinator, 2026-09-17; review Finding 3) — "checked by default"
-  (spec §5.4) is a promise PER CHOSEN PARENT, not a one-time initial value for the whole dialog session.
-  Unticking "Start in focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent,
-  renders the new parent's checkbox CHECKED (not inheriting the previous parent's untick) — the Parent
-  picker's own `onChange` now resets `startInFocus` to `true` on every selection. Mutation (dropping that
-  reset, `cp`/`sha256sum` restore): kills exactly this case, on the "checkbox B is checked" assertion
-  (`PASS (11) FAIL (1)`). Named `g` rather than the coordinator's literal `13.591a` — that id already
-  covers this file's own "states the note unconditionally" case, a different, already-cited behaviour;
-  continuing the block's own lettering avoids one checkmark covering two unrelated assertions —
+- **13.591g** ✅ **INVERTED 2026-09-23** (owner ruling lifting §5.4; supersedes Ruling 40) — the case now
+  pins that CHOOSING A PARENT CHANGES NOTHING about the birth state. Ruling 40's text, kept because the
+  ruling it records is what this case's new form removes: *"checked by default" (spec §5.4) is a promise
+  PER CHOSEN PARENT, not a one-time initial value for the whole dialog session — unticking "Start in
+  focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent, renders the new parent's
+  checkbox CHECKED, and the Parent picker's own `onChange` resets `startInFocus` to `true` on every
+  selection.* **That reset is DELETED, and deleting it is a fix rather than a tidy-up:** it existed to
+  serve a control that TRACKED the parent, and the switch does not — it answers a question about the
+  ticket and the person's answer is REMEMBERED across sessions, so a surviving reset would silently
+  overwrite the very answer the dialog was just asked not to forget. Turn the switch OFF, pick in-focus
+  parent A, then pick a DIFFERENT in-focus parent B: it stays OFF, and the draft leaves `start: 'focus'`
+  under B. The id is kept deliberately — ids are never renumbered, and this is the same question (*what
+  does a parent change about the birth state?*) answered by the rule that replaced §5.4. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
 - **13.594** ✅ Task 10 (backlog/closed spec §5.4, 2026-09-17) — the Backlog tab. A FIFTH tab, `Backlog`,
   joins the project page's segmented rail FIRST — ahead of `Board`, since a ticket sits in the backlog
@@ -2957,3 +2966,198 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   evidence question: this is a hand-run controller measurement with no test file, and `check-case-citations`
   demands a citing test for a ✅. jsdom applies no layout, so the only instrument that could witness it is a
   browser. `13.1381` (DOM structure) and `13.1382` (the declarations) are the automated halves and are ✅.
+
+## The New ticket form — the backlog question, its memory, and the two fields (owner request 2026-09-23)
+
+*Block `13.1351`–`13.1380`, allocated to `task/new-ticket-form-fields` against `release/2026-09-23`
+`fd114852` — the FIRST task branch cut off a release branch rather than `main` (see
+`13-hig-per-screen.md`'s block table). The case file is this one, and a wide block was reserved on
+purpose: the assignee and description asks reach the domain payload, the reducer, the projections and the
+permission rules, not only the dialog.*
+
+- **13.1351** ✅ The dialog asks **"Starts in the backlog?"** with the SHARED `Switch`, and it opens ON.
+  Three things asserted together because a lookalike satisfies any one of them alone: the control carries
+  `gn-switch` and sits inside a `gn-switch-row` label (so it IS `packages/ui/src/components/switch.tsx`
+  rather than a second on/off control for the product to keep in step); it is CHECKED, which is the
+  ruling's default and, because ON means BACKLOG, is also the draft's first assertion in 13.591b; and its
+  accessible name is the question itself — `Switch`'s `children` ARE the name, with no `aria-label` to
+  drift from the words on screen. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1352** ✅ The switch is present and **ENABLED for every parent** — §5.4's condition is lifted.
+  Three arms in one `it`, and all three are needed: with NO parent chosen (the state the owner was
+  looking at, where the old checkbox was absent and the sentence dangled), under an IN-FOCUS parent (the
+  only parent that ever revealed the old control), and under a BACKLOG parent (which hid it outright).
+  Dropping the middle or last arm leaves the case passing against a switch enabled only where the
+  checkbox used to appear. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1353** ✅ Turning it OFF with NO parent chosen sends `start: 'focus'` — a ticket may be born in
+  focus without a parent. **Its CONTROL is a separate `it` in the same block** and that is deliberate: the
+  pair pins the POLARITY, which is the one thing a rename could silently reverse. The switch means BACKLOG
+  when ON and the checkbox it replaced meant FOCUS when checked, so a control wired straight to the old
+  `startInFocus` sense would pass the ON-direction case while sending the opposite of what the OFF one
+  asserts. Both are red together or the direction is not being tested. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1354** ✅ The thing the switch replaced is **GONE** — the old unconditional sentence *and* the
+  `"Start in focus"` checkbox. The `?` is the whole difference in text and `getByText` matches normalised
+  text EXACTLY, so asserting the old string absent and the new question present cannot both be satisfied
+  by one node; a dialog that kept the `<p>` and added a switch beside it is exactly the pair the owner
+  asked to have replaced. A second control for the same fact is refused too: a leftover checkbox could
+  disagree with the switch, since the draft reads the switch alone. Final arm: exactly ONE `checkbox` role
+  remains, so "the old one is gone" cannot be satisfied by a dialog that lost the switch as well. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1355** ✅ The answer is **REMEMBERED for the user**: turning the switch OFF survives a close and a
+  reopen, and the stored record is `{userId, start}` read back and compared WHOLE — a record that kept the
+  answer without the user would still satisfy the reopen assertion while being precisely the leak the
+  key's shape exists to prevent. The reopen is the REAL path rather than a fresh mount: the flow mounts
+  this dialog for its whole life and only toggles `open`, so the seed has to survive `open: false → true`
+  on a SURVIVING instance — which a component seeding only in `useState`'s initialiser would fail. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1356** ✅ A record written for **ANOTHER user is not honoured**, and its CONTROL — in the same `it`,
+  and the reason the case can be trusted — reads the SAME BYTES for the user the record names and finds
+  them honoured, turning the switch OFF. Without that arm, "the other user's record was refused" is
+  indistinguishable from a reader that failed for an unrelated reason: a typo in the key, an unparsed
+  shape. Both halves are needed because they fail independently. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1357** ✅ **Blocked site data** still renders the dialog, at the default (backlog ON), and the switch
+  still toggles. The stub replaces `window.localStorage` itself rather than one method, because a browser
+  with site data blocked throws on the ACCESSOR — and the toggle arm is what proves the WRITE is guarded
+  as well as the read, since the write is the half that throws here. `configurable: true` plus a `finally`
+  restore, because leaving a throwing stub in place would poison every later case in the file. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+*The rest of block `13.1351`–`13.1380`: the description and the assignee. **`13.1360` and `13.1361` are
+UNUSED** — the payload-shape cases and the engine's field-kind parity were folded into `13.1358`/
+`13.1359` and into `13.1364` rather than split out, and ids are never renumbered, so they stay empty.*
+
+- **13.1358** ✅ A ticket's BIRTH description is a CLAIM on head state, attributed to the creator and the
+  creation clocks — or there is NO `description` key at all. The two halves are one case because they are
+  one decision: the reducer spreads the claim in only when the member is present, so
+  `Object.keys(state.fields)` is the assertion, not a value. A `claim(null, env)` for the absent member
+  would answer *"has anybody described this?"* YES for every ticket nobody described, and name the person
+  who filed it as the one who set an empty description — `ticket-sheet.tsx` reads that key's PRESENCE
+  (`descriptionClaim === undefined`) to choose between "no description yet" and "set by X on DATE".
+  Controls in the same case: the title and priority claims are written beside it (so the absence is one
+  key and not a fold that wrote nothing), the value is the DOCUMENT and not a projection of it, and a v1
+  `ticket.created` carrying neither new member still folds. Payload half: `description` is optional, is
+  held to the SAME `z.record` shape `ticketFieldSetPayload` demands of the field_set door — a string
+  REDDENS rather than reaching head state as a value the edit door would then refuse to replace — and an
+  explicit `null` is REFUSED, because at birth absent is the one spelling of none. —
+  (`packages/domain/test/ticket-state.test.ts`, `packages/domain/test/ticket-events.test.ts`)
+- **13.1359** ✅ A ticket's BIRTH ASSIGNEE lands on `state.assigneeId`; absent or explicit `null` leaves
+  it `null`, which is what every pre-existing `ticket.created` meant (the reducer hard-coded `null` there
+  before the member existed). The CONTROL pinning `null`-equals-absent is deliberate: the client OMITS
+  the member rather than sending `null`, and a future schema that refused `null` would have to change
+  that case on purpose rather than drift. `assigneeId` is `z.string().min(1).nullable()`, so an
+  EMPTY-STRING assignee — a named person who is nobody — is refused at the door, exactly as
+  `ticketAssignedPayload` refuses it. Payload round-trips are asserted through `parseEvent`, which
+  compares the PARSED payload to what was submitted, so a member the schema stripped would redden rather
+  than vanish. —
+  (`packages/domain/test/ticket-state.test.ts`, `packages/domain/test/ticket-events.test.ts`)
+- **13.1362** ✅ **THE BIRTH ASSIGNEE IS HELD TO THE SAME NAMED-PERSON RULE `ticket.assigned` IS** — a
+  `ticket.created` naming somebody with no role in the workspace is refused
+  `permission.role` / *"That person is not in this workspace."*, asserted as the WHOLE refusal object
+  because this module reports `permission.role` from four places and the actor here really is on the
+  project, so nothing else could have fired. **PLANTED DEFECT — measured before the fix:** the identical
+  name arriving on a `ticket.created` was `committed` while `ticket.assigned` refused it, because the
+  E6-17 lookup ran AFTER `canSee` and `ticket.created` returns before that block (there is no ticket to
+  see yet). The lookup is now ONE function called from both branches; writing it a second time inside
+  the `ticket.created` branch would have been two spellings of one rule, free to drift. The read side
+  would have served the typo as an assignee NAME (`roster.get(id) ?? id`), matched it in the list's
+  `assigneeId` filter, and made a `groupBy=assignee` column for it. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+- **13.1363** ✅ CONTROL for `13.1362`, in the same `describe` and its own `it` so the refusal cannot pass
+  against a build that refuses every birth assignee: a REAL member is admitted, and BOTH spellings of
+  nobody are admitted too (`null`, and the member omitted entirely) — without those two arms the fix
+  would have made the dialog's default, Unassigned, unsubmittable. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+- **13.1364** ✅ A ticket's BIRTH description reaches `proj_search.description`, **and reaches `tsv`** —
+  the second half is what an exact-column assertion cannot show, since a value written to the right place
+  but never indexed would satisfy the first. **Measured before the fix:** the `ticket.created` branch
+  inserted `(ticket_id, workspace_id, project_id, title)` and nothing else, so a description composed at
+  creation lived in head state and the sheet while the search column kept the table's own default — the
+  person found the ticket by its title and not by the words they had just typed. The extraction is the
+  `ticket.field_set` branch's own `docToPlainText` call, so the two doors cannot disagree about what a
+  description is as search text. Controls: the title still matches (the row exists and is indexed at
+  all), and a ticket born with NO description gets `''` rather than the string `'undefined'` or `'null'`
+  indexed instead. **In its own FILE rather than in `search.test.ts`**, whose docblock makes case order
+  part of its fixture and two of whose read-only cases assert the table's exact row count — a case that
+  ADDS rows would have forced edits to assertions belonging to cases about something else. —
+  (`apps/server/test/projections/search-birth-description.test.ts`)
+- **13.1365** ✅ The create dialog mounts the description composer from its `editorSlot` prop as a
+  `'description'` composer — empty (`doc: null`), editable, scoped to the caller's workspace, carrying a
+  REAL ULID for a ticket that does not exist yet, and with NO `submit` wired (there is nowhere to submit
+  to; Create is the one act). All renders are required to agree on the SCOPE, because a slot whose mode
+  or workspace changed between renders is a composer re-mounting under the person mid-typing. A document
+  the slot reports travels in the draft as `description`, **under the id the slot was scoped to** — the
+  scoping invariant, without which a dialog that showed the composer one id and created the ticket under
+  another would satisfy every other assertion here. The composer test doubles as the seam's proof: it
+  drives a FAKE slot, because what belongs to app-core is the contract and what belongs to
+  `packages/editor` is that package's own suite. Second half, in `packages/editor`: `onChange` carries
+  the document as it is typed and NOT before anything is typed (`TicketEditor` wires it to ProseMirror's
+  `onUpdate`), so a host can read "never reported" as "no description"; and it is the DOCUMENT, not a
+  plain-text projection, because the field_set door refuses a string. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`,
+  `packages/editor/test/ticket-editor-slot.test.tsx`)
+- **13.1365b** ✅ `submitSlot: 'none'` omits the slot's own submit control and KEEPS THE FOOTER, which
+  also carries the hint sentence — asserted on the footer rather than by counting children, since the
+  hint is a sibling the button's removal must not take with it. The composer is still editable, so "no
+  button" cannot be satisfied by a slot that rendered nothing. **Control in the SAME `it`** (a control in
+  a sibling case proves nothing about this one): the same mount WITHOUT the prop still draws the button,
+  so the case cannot pass against a component that lost its submit control for every mount. The prop is
+  seam-only on `TicketEditorSlotProps`, the `editorRef` precedent — it is a fact about mounting THAT
+  component, and the shared contract cannot carry it. —
+  (`packages/editor/test/ticket-editor-slot.test.tsx`)
+- **13.1366** ✅ An EMPTY description is OMITTED from the draft — the KEY is absent, not a document that
+  renders to nothing. The key set is the assertion, because `description: undefined` satisfies a
+  `toEqual` against an absent key. The decision is `docToPlainText(...).length === 0`, the domain's one
+  total projection, so an untouched composer (which reports nothing at all) and one emptied back to
+  nothing take the SAME arm. CONTROL in the same describe: with no `editorSlot` at all the dialog still
+  works and sends no description — without it, "an empty document is omitted" passes against a dialog
+  that omitted descriptions entirely. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1367** ✅ The Assignee picker offers **"Unassigned" plus the caller's roster**, and omitting it is
+  the default: `null` travels, not absent and not `''`, because `ticketCreatedPayload.assigneeId` is
+  nullable and `TicketState.assigneeId` is `string | null`, so `null` is the one spelling of nobody the
+  whole chain agrees on. "Unassigned" is an OPTION and not the absence of one — a picker with no way back
+  to it cannot un-assign. A chosen person travels as their id, asserted after reading the trigger back so
+  the label the person sees and the value the payload carries are both pinned. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1368** ✅ An UNREAD roster is STATED, and the draft carries `assigneeId: null` rather than a wrong
+  one — the discipline `parentCandidatesUnavailable` established one field over: an empty picker asserts
+  *nobody in this workspace can be assigned*, which is a claim made from a read that never answered, and
+  inside a modal the sentence that would correct it is on the page behind. The caller's own reason
+  travels VERBATIM and unparaphrased, so a person can tell a refusal from a read still in flight.
+  Enforced at the SUBMIT site as well as by hiding the picker, because the prop can arrive after a
+  selection has been made and hiding a control does not clear the state behind it (3.157's own
+  invariant). —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1369** ✅ **CREATING A TICKET OPENS IT** — measured before anything was written, because the
+  wiring was already present end to end and the ask read as a missing feature only because NOTHING
+  PINNED IT: an unpinned path is one refactor away from being a missing one, and the two are
+  indistinguishable by looking at the app. The case runs the ROUTED page (not the sheet mounted
+  directly): a real create through the real dialog reaches `router.push`, and the id it pushes is read
+  back off the `ticket.created` envelope that was actually ingested — so the URL cannot name a ticket
+  other than the one the ledger received, which a shape check could not tell. Then the sheet is opened
+  from that param and its title is read off `gn-ticket-sheet__title-input`, the sheet's own title
+  CONTROL; `getByText` would FAIL against a perfectly open sheet, measured, and that is recorded because
+  it is the mistake this case's first draft made. CONTROL, in its own `it`: with no `?ticket=` param no
+  sheet renders, asserted after the page has certainly loaded, so the arm above is not reading a page
+  that always shows one. **⚠ THIS WITNESSES THE CLIENT HALF ONLY.** `getTicket` is stubbed, so "the sheet
+  answered" means "the sheet renders when its read answers" — it says NOTHING about whether a read
+  against a live server, issued moments after the create, sees the row. That is the question the owner's
+  separately-reported live-update defect asks, and this case must not be read as evidence about it
+  either way. —
+  (`apps/web/test/new-ticket-opens-sheet.test.tsx`)
+- **13.1370** ✅ A person chosen BEFORE the roster was withheld does not reach the draft — 3.157's
+  defect, one field over. The transition is the thing: the picker works, a person is chosen, and THEN
+  the read fails, so React state survives while the control that set it stops rendering. **This needed
+  its OWN case, measured rather than tidy:** `13.1368` sets `assigneeCandidatesUnavailable` from the
+  FIRST render, so its picker is never usable and `assigneeId` is still `UNASSIGNED` at Create — it
+  exercises the `UNASSIGNED` arm and nothing else. **Mutation (dropping the
+  `assigneeCandidatesUnavailable !== undefined` term from the submit boundary) left all 39 cases in the
+  file GREEN**, i.e. the submit-site check was covered by no test at all while looking covered; with
+  this case it reddens exactly here and nowhere else. Asserted on the DRAFT and not the screen, because
+  the sentence was already correct and the payload was what contradicted it. Control in the same `it`:
+  the picker is opened and used first, since a case that started withheld could never build the state
+  this defect needs. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)

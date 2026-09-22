@@ -165,6 +165,40 @@ export type EditorSlotProps = {
    * happened, and that is the point.
    */
   submit?: (submission: EditorSlotSubmission) => Promise<boolean>;
+  /**
+   * The document as it stands, reported on every EDIT (owner request
+   * 2026-09-23).
+   *
+   * ## Why the seam needed a second way out for the document
+   *
+   * Until this existed, `submit` was the only channel a document ever left an
+   * editor through — and it fires on the press of the COMPOSER'S OWN control.
+   * That is right for both surfaces this contract has had: the sheet's
+   * description and its comment thread both write to a ticket that already
+   * exists, so a `ticket.field_set`/`comment.added` is exactly the act.
+   *
+   * The New ticket dialog is the mount where neither holds. Its description
+   * belongs to a ticket that **does not exist yet** — `Create` mints the id and
+   * writes `ticket.created` — so there is nothing to submit to at the moment the
+   * words are typed, and a `ticket.field_set` sent early would name a ticket
+   * nobody has created. The host therefore needs the document itself, held in
+   * the draft until the create lands.
+   *
+   * **On the SHARED contract rather than on `packages/editor`'s seam-only
+   * extras**, unlike `editorRef`: the caller is app-core, which may not name the
+   * editor package at all (amendment 12), so a channel only that package's own
+   * props carry is a channel app-core structurally cannot reach. That is the
+   * same constraint that widened `doc` to `unknown` and moved the narrowing to
+   * `isDocJson` at the editor's mount.
+   *
+   * Semantics: fired on every change, with the current document; NOT fired for a
+   * mount that is never typed into. A host that treats "never reported" as "no
+   * description" and an empty document as the same thing would then be wrong
+   * only in the direction of writing an empty one, which
+   * `create-ticket-flow.tsx` refuses on its own (`docToPlainText` + a length
+   * test) rather than relying on this description of it.
+   */
+  onChange?: (doc: unknown) => void;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };

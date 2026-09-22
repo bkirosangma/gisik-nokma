@@ -509,21 +509,40 @@ describe('3.144 the write door is never offered an empty actor', () => {
 });
 
 /**
- * 13.591f (backlog/closed spec §5.4, Task 9) — `parentCandidates`'s own
- * `inFocus` derivation, at the ONE site that computes it from real row data:
+ * 13.591f — THE BIRTH-STATE CONTROL IS INDIFFERENT TO THE PARENT, at the ONE
+ * site that hands the dialog real row data.
+ *
+ * ## What this case used to be, and why it could not be re-lettered
+ *
+ * Until 2026-09-23 this was `parentCandidates`'s own `inFocus` derivation:
  * `page.tsx`'s `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed ===
- * null`. Nothing in `packages/app-core` can witness this — its own tests pass
- * `inFocus` in as a literal on the fixture, never derive it — so a wrong `!==`
- * or a dropped `row.closed === null` half here would ship with every gate
- * this task ran reporting green. Three rows, told apart only by the two facts
- * the formula reads: a BACKLOG row (`stateId: 'backlog'`, the reserved id —
- * dispatch context's own binding ruling — never closed), a plain ACTIVE row
- * (neither backlog nor closed — the one case that should show the checkbox),
- * and a CLOSED terminal row (not backlog, but closed). `typeRank`/`typeId`
- * copy `LIST.rows[0]`'s shape; only the three fields the formula reads differ
- * between rows.
+ * null`, feeding the New-ticket dialog's "Start in focus" checkbox, which
+ * appeared ONLY for a plain active row. Nothing in `packages/app-core` could
+ * witness that — its own tests pass `inFocus` in as a literal — so this was the
+ * only place a wrong `!==` or a dropped `row.closed === null` half would have
+ * been caught. **The owner lifted spec §5.4's condition**, so the derivation is
+ * gone from `page.tsx` and the claim it computed is no longer made anywhere.
+ *
+ * ## What replaces it, and why it is still worth a case at THIS site
+ *
+ * The ruling's consequence is an ABSENCE at the component level ("no control
+ * depends on the parent") and the component can only prove that about the
+ * literals its own tests hand it. What cannot be proved there — and is exactly
+ * what this site is for — is that the real rows the page builds **have nowhere
+ * left to carry a parent's state**: `parentCandidates` is now `{id, title}` and
+ * nothing else, so the dialog could not consult `stateId`/`closed` even if a
+ * future edit reintroduced the condition. Three rows are still the fixture, told
+ * apart by the same two facts the deleted formula read — a BACKLOG row, a plain
+ * ACTIVE row, and a CLOSED terminal row — because the CLOSED one is the
+ * configuration §5.4 forbade OUTRIGHT (a ticket could not be born in focus
+ * under a closed parent), so it is the row that makes the end-to-end claim
+ * falsifiable rather than incidental.
+ *
+ * **The last assertion is the load-bearing one: it reads the INGESTED PAYLOAD,
+ * not the screen.** A dialog that rendered an always-enabled switch and still
+ * sent `'backlog'` would satisfy every assertion above it.
  */
-describe('13.591f the New-ticket dialog\'s "Start in focus" checkbox tracks a REAL row\'s state', () => {
+describe('13.591f the birth-state control does not depend on which parent a REAL row is', () => {
   const BACKLOG_ROW = {
     ...LIST.rows[0]!,
     ticketId: '01J9TICKET0000000BACKLOG01',
@@ -561,30 +580,59 @@ describe('13.591f the New-ticket dialog\'s "Start in focus" checkbox tracks a RE
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: title }));
   }
 
-  it('13.591f a backlog row and a closed row both compute inFocus: false — only the plain active row shows the checkbox', async () => {
-    render(
-      <Providers
-        services={stubServices({
-          getBoard: async () => BOARD,
-          getTickets: async () => LIST_THREE,
-          getTicketTypes: async () => WORKSPACE_TYPES,
-          getPreferences: async () => EMPTY_PREFERENCES,
-        })}
-      >
-        <ProjectPage />
-      </Providers>,
-    );
+  it('13.591f every real row leaves the switch present and answerable, and a CLOSED parent can still bear a focus child', async () => {
+    const ingested: Array<{ type: string; payload: { start?: unknown } }> = [];
+    const services = stubServices({
+      getBoard: async () => BOARD,
+      getTickets: async () => LIST_THREE,
+      getTicketTypes: async () => WORKSPACE_TYPES,
+      getPreferences: async () => EMPTY_PREFERENCES,
+    });
+    services.dataSource.ingest = async (events) => {
+      for (const event of events) {
+        ingested.push({ type: event.type, payload: event.payload as { start?: unknown } });
+      }
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-08-20T09:00:00.000Z',
+      }));
+    };
+    render(<Providers services={services}><ProjectPage /></Providers>);
     const user = userEvent.setup();
     await user.click(await screen.findByRole('button', { name: 'New ticket' }));
 
+    const birthState = (): HTMLElement => screen.getByRole('checkbox', { name: 'Starts in the backlog?' });
+
+    // ARM ONE — the BACKLOG row, which under §5.4 hid the old checkbox.
     await pickParent(user, 'Sits in the backlog');
-    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+    expect(birthState()).toBeEnabled();
+    expect(birthState()).toBeChecked();
 
+    // ARM TWO — the CLOSED row, the configuration §5.4 forbade outright.
     await pickParent(user, 'Done, and closed');
-    expect(screen.queryByRole('checkbox', { name: 'Start in focus' })).not.toBeInTheDocument();
+    expect(birthState()).toBeEnabled();
 
+    // ARM THREE — the plain ACTIVE row, the only one that ever revealed the old
+    // control. Without it, "the switch is indifferent" would read identically
+    // against a dialog that had simply lost the control everywhere.
     await pickParent(user, 'Actively worked, never closed');
-    expect(screen.getByRole('checkbox', { name: 'Start in focus' })).toBeInTheDocument();
+    expect(birthState()).toBeEnabled();
+
+    // …and the DRAFT agrees, under the closed parent. Turned OFF, this is
+    // `start: 'focus'` under a parent the old rule could never have allowed it
+    // under — asserted on the payload that actually left, so the screen cannot
+    // say one thing while the wire says another.
+    await user.click(birthState());
+    await user.type(screen.getByLabelText('Title'), 'Order the new sign');
+    await user.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() =>
+      expect(
+        ingested.filter((event) => event.type === 'ticket.created').map((event) => event.payload.start),
+      ).toEqual(['focus']),
+    );
   });
 });
 
