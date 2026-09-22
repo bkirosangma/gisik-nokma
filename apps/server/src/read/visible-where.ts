@@ -226,3 +226,57 @@ export const LIVE_TICKET_WHERE = 't.deleted_at IS NULL';
 export function explicitAudienceWhere(userId: string, params: SqlParams): string {
   return `(v.resolved_mode = 'explicit' AND ${params.add(userId)} = ANY (v.resolved_user_ids))`;
 }
+
+/**
+ * The note half of the same decision table, over alias `n` of `proj_notes`
+ * (notes series, Plan 1 of 6, spec §4.3).
+ *
+ * ## It is the SQL spelling of `canReadNote`, and 18.021 is why that is allowed
+ *
+ * `../visibility/can-read-note.ts` is the definition; this is the only other
+ * place the rule is written, and it exists because a LIST read cannot call a
+ * function per row. The two are asserted EQUAL per user on one fixture (case
+ * 18.021) — that case, and not this docblock, is what keeps them in step. Change
+ * an arm in either and the case is what tells you.
+ *
+ * ## No parameter it does not use
+ *
+ * The `$memberProjectIds` value is added INSIDE the arm that reads it, not above
+ * the branches. `SqlParams` is positional and `$n` must reference a bound value:
+ * a guest takes the `project` arm out of the list, and a value added for it
+ * would be bound with no `$n` to reference — Postgres answers "bind message
+ * supplies N parameters, but prepared statement requires M". This is the same
+ * hazard `visibleTicketsWhere`'s docblock records; here it would have fired,
+ * because 18.021 walks every fixture user and two of them are guests.
+ *
+ * ## Owner and non-member return before adding anything
+ *
+ * `TRUE` for the owner and `FALSE` for a null role, both with NO value bound,
+ * for the reason above and matching `visibleTicketsWhere` exactly.
+ *
+ * The inherit arm reaches `visibleTicketsWhere` over alias `v`, with
+ * `proj_tickets` joined as `t` for `LIVE_TICKET_WHERE`. One consequence worth
+ * naming: a note attached to a DELETED ticket is not admitted through it, which
+ * is the SQL half of `loadNoteForVisibility`'s `ticketIsLive` filter.
+ */
+export function visibleNotesWhere(eff: EffectiveRole, userId: string, params: SqlParams): string {
+  if (eff.workspaceRole === null) return 'FALSE';
+  if (eff.workspaceRole === 'owner') return 'TRUE';
+  const user = params.add(userId);
+  const isGuest = eff.workspaceRole === 'guest';
+  const inheritArm = `(n.scope_mode = 'inherit' AND EXISTS (
+      SELECT 1 FROM proj_note_attachments na
+      JOIN proj_visibility v ON v.ticket_id = na.ticket_id
+      JOIN proj_tickets t ON t.ticket_id = na.ticket_id
+      WHERE na.note_id = n.note_id AND ${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, userId, params)}))`;
+  const arms = [
+    `n.author_id = ${user}`,
+    isGuest ? null : `n.scope_mode = 'workspace'`,
+    isGuest
+      ? null
+      : `(n.scope_mode = 'project' AND n.home_project_id = ANY (${params.add([...eff.projects.keys()])}::text[]))`,
+    `(n.scope_mode = 'explicit' AND ${user} = ANY (n.scope_user_ids))`,
+    inheritArm,
+  ].filter((arm): arm is string => arm !== null);
+  return `(${arms.join(' OR ')})`;
+}
