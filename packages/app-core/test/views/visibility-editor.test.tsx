@@ -61,7 +61,12 @@ const MEMBERS: RosterMember[] = [
 ];
 
 /**
- * What the PICKER draws for a member — `name || email || id` (`pickerLabel`).
+ * What the PICKER draws for a member — `name || email || id`, the rule the
+ * component gets from `memberLabel` (`app-core/src/member-label.ts`), spelled
+ * out here so the expectation is INDEPENDENT of the implementation it checks.
+ *
+ * (This comment named `pickerLabel` until 2026-09-22, a private copy of that
+ * rule this component used to hold; the copy is gone and the name with it.)
  *
  * The walk below asks "does this member's label appear", and it needs the same
  * answer the component gives: with a nameless member, testing `text.includes(
@@ -950,6 +955,41 @@ describe('16.118 the visibility pill is a menu trigger', () => {
     expect(within(viewers).getByText('Kiro')).toBeInTheDocument();
     expect(within(viewers).getByText('Anselma Marak')).toBeInTheDocument();
     expect(within(viewers).queryAllByRole('button')).toHaveLength(0);
+  });
+
+  /**
+   * 13.1296 — the viewer chips are the LAST surface that held a roster member and
+   * read `.name` past `memberLabel` (`nameOf` in this component, the same
+   * node-shape `ticket-sheet.tsx`'s own `nameOf` had).
+   *
+   * A chip is a PERSON, and the roster row is right there — `members.find` — so
+   * the address step applies exactly as it does to the picker's options one
+   * section up, which have shown this member by email since E4-6. The chip was
+   * the one place that still printed the ULID: the rarer fallback, in the
+   * product's own words, applied to the surface that is most obviously a list of
+   * people.
+   *
+   * The control is the NAMED member in the same audience — without it, a chip
+   * that printed the first member's label for every id would pass.
+   */
+  it('13.1296 a nameless member’s viewer chip reads their EMAIL, and the named member’s reads their name', () => {
+    mount({
+      current: { ownMode: 'explicit', resolvedMode: 'explicit', userIds: [KIRO, NAMELESS], claim: null },
+    });
+    const viewers = screen.getByTestId('visibility-viewers');
+
+    // THE NAMELESS MEMBER — the address, not the 26-character id.
+    expect(within(viewers).getByText('accountant@e2e.gisik-nokma.local')).toBeInTheDocument();
+    expect(within(viewers).queryByText(NAMELESS)).toBeNull();
+
+    // THE CONTROL, same audience, same render: the named member is untouched.
+    expect(within(viewers).getByText('Kiro')).toBeInTheDocument();
+    expect(within(viewers).queryByText(KIRO)).toBeNull();
+
+    // One chip per person still — the label change must not have altered how
+    // many chips the audience draws. Counted on the chips themselves rather than
+    // on `/./`-matching text, which would also count the group's own caption.
+    expect(viewers.querySelectorAll('.gn-visibility__viewer')).toHaveLength(2);
   });
 
   it('16.121 with NO served audience the pill still exists so the menu can be reached', async () => {

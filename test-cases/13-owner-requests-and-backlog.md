@@ -2349,6 +2349,116 @@ failure — witnessed at `3.158`. That comment was the only record of the fold's
 tab arms beside it did not share its guard. The fold is gone now, so the guard is no longer the only
 place in the file that knows the difference; its own note is kept and extended rather than deleted.
 
+## Names, not ids — the assignee roster join (owner request, 2026-09-22)
+
+The owner, with two screenshots: *"In the list tab, for the assignee, it's showing the id instead of the
+name. Also in the ticket details, it shows the id. Everywhere for id, show the Name; if name is
+empty/blank, show the email."*
+
+Two independent causes, so two sets of cases. **This one is the envelope:** the List tab printed a ULID
+because the list BODY named no workspace, so the client had no id to fetch a roster with and mapped
+every row against a literal empty roster. The board body has named its workspace all along; this is the
+list route catching up, and it fixes every row-level provenance tooltip and the calendar with it, since
+they read the same rows. The nameless-member fallback (name → email → id) is the section below.
+
+- **13.1287** ✅ The list body names the workspace it was read for. Asserted with a control in the same
+  case: a read of a DIFFERENT project in the SAME workspace answers the same `workspaceId` while the two
+  `projectId`s differ — so the field is the workspace the request was authorised against and not a copy
+  of the project id beside it. The field is REQUIRED on `ListResponse` (`string`, first field, mirroring
+  `BoardResponse.workspaceId`), which is what makes the typecheck find every fixture that constructs a
+  body rather than letting `undefined` reach a mapper that would degrade silently. — (`apps/server/test/routes/list.test.ts`)
+
+The client half. `getTickets` now fetches the roster through `listWorkspaceId(raw)` and passes it to
+`mapListPage` for every page of the walk — the same join `getBoard` has always made, off the body
+instead of off a parameter.
+
+- **13.1288** ✅ A named member's row carries their NAME as the assignee AND as the provenance actor —
+  both doors into the one roster map are asserted in a single case, because a join wired to only one of
+  them would satisfy the other. **The control is in the same case and in the same walk:** a row assigned
+  to somebody the roster does not cover keeps the id, so a mapper that printed the first member's name
+  for every row cannot pass. The roster is fetched from the id the BODY named — the test's `WORKSPACE`
+  appears nowhere else, so a join pointed at a constant, at the project id, or at nothing fails. —
+  (`packages/app-core/test/online/online-data-source.test.ts`)
+- **13.1289** ✅ A REFUSED roster does not take the list down with it: the members route answers 404 (the
+  shipped answer to a caller who may not read the roster, `door(..., 'no-guests')`), the walk still
+  resolves, and names stay ids. **The case asserts the join was ATTEMPTED**, without which it would be
+  green on a source that never fetched a roster at all — which is the defect it guards. —
+  (`packages/app-core/test/online/online-data-source.test.ts`)
+- **13.1290** ✅ A two-page walk fetches the roster exactly ONCE. The row assertions alone would pass on
+  a join evaluated inside the per-page mapping; the walk would merely be slower, and a membership revoked
+  between pages would name one person two ways inside a single view. Counted on the roster calls, with
+  the ticket-page count asserted beside it so "once" cannot be satisfied by a walk that stopped early. —
+  (`packages/app-core/test/online/online-data-source.test.ts`)
+
+The other half of the owner's sentence — *"if name is empty/blank, show the email"*. That rule existed
+as two PRIVATE copies (`memberLabel` in the members page, `pickerLabel` in the visibility editor) with
+the same order spelled twice, free to drift; everything else read `member.name` raw or went through
+`actorLabel`, which has no email step at all.
+
+- **13.1291** ✅ ONE `memberLabel`, and the four arms of its order in one `describe`: a named member is
+  named by their name; a BLANK name falls to the email; a blank name AND blank address falls to the id;
+  and a member with no name and no `email` KEY also falls to the id. The first arm is the control — a
+  function returning the id for everybody would pass the other three. The third and fourth arms are
+  different shapes of input reaching the same floor (blank versus absent), which is the distinction the
+  server's own withholding draws. — (`packages/app-core/test/member-label.test.ts`)
+
+`memberLabel` is now what the roster JOIN's value is built with (`rosterByActorId`), which is the step
+that makes the board, the list and the ticket read correct without any of them knowing an address exists.
+The join used to hold the raw `displayName`, so a blank-named member joined to `''` — an empty name on
+screen, decided by which surface you were looking at, since only the pickers had a fallback.
+
+- **13.1292** ✅ A blank-named member with a real address is named by the ADDRESS through the board, the
+  list AND the ticket read — asserted on all three in one case, because a join changed in one mapper's
+  path and not another's is exactly the half-witnessed contract this series is named for. Both doors into
+  the one map are asserted where a surface has two (the assignee and the state claim's actor), and the
+  NAMED member is the control on the same roster and the same surfaces. **The roster is built the way the
+  source builds it — a members BODY through `mapActors` carrying `displayName: ''`** — because a fixture
+  handing `rosterByActorId` a literal map, or driven against an empty roster, would read back the id and
+  the email branch would never run: green for the wrong reason. —
+  (`packages/app-core/test/online/mappers.test.ts`)
+- **13.1293** ✅ `actorLabel`'s order is UNTOUCHED by the email step: the reserved system actor still wins
+  even against a label that a join could produce — an address included, which is the shape this change
+  made reachable — and `actorLabel`'s own floor is still the id. **This is the invariant half and it is
+  green before and after the change by design**: the email step lives in the join, not in `actorLabel`,
+  which is handed a claim's `{actorId, actorName}` and has no roster to reach for. Recorded as a case
+  rather than left as a comment because a future joining change is what would break it. —
+  (`packages/app-core/test/online/mappers.test.ts`)
+
+**Every surface that holds a roster member in hand.** The rule is one function now, but a rule is only
+one rule where it is CALLED: each of these sites held a member and read `.name` (or `actorLabel(id,
+name)`) past it, so each could render a blank or a ULID for the population the owner named. Each case
+below asserts BOTH populations at once — a named member as the control, and the nameless pair (with an
+address, and with neither) — because one member cannot tell the two steps apart, and an implementation
+that skipped to the id would pass an assertion written against either alone.
+
+- **13.1294** ✅ The ticket sheet's TWO pickers: the Assignee dropdown offers a nameless member by their
+  ADDRESS and a member with neither by their id, in one option list that asserts the whole sequence; and
+  the `@`mention list both NAMES and FINDS them the same way — typing `account` reaches the address
+  member and does **not** reach the id member, which is what makes the assertion about the address rather
+  than about loose matching. The two halves are separate assertions on purpose: a label fixed without the
+  filter matched against it leaves a member listed and unfindable. —
+  (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.1295** ✅ The board filter's person rows (Assignee and Collaborators) in `apps/web`, the same way:
+  a button exists is findable by its accessible name, so the case queries by ROLE AND NAME — the shape
+  E5-4 established here — and asserts both members in BOTH groups. —
+  (`apps/web/test/filters-sheet.test.tsx`)
+- **13.1296** ✅ The phone's `@`mention list (`queryWorkspaceMembers`): the nameless-with-address member
+  is found by typing their address, the member with neither by their id, and the named member is
+  untouched. The phone resolved `displayName` verbatim on BOTH sides — the label it returned and the
+  string it matched against — which is the same defect E5-4 closed on the web sheet's `queryUsers`. —
+  (`apps/mobile/src/screens/mention-query.test.ts`)
+
+  **AND THE VISIBILITY EDITOR'S VIEWER CHIPS**, the one surface the first sweep of this rule missed
+  (controller addendum, 2026-09-22): `visibility-editor.tsx`'s own `nameOf` read `.name` off the roster
+  row it already held (`members.find`), so a nameless member's chip under "Who can see it" — and the
+  same member inside the `Only: …` sentence — printed the ULID, while the picker one section up had
+  offered them by email since E4-6. Fixed in the shape the ticket sheet's `nameOf` takes: resolve the
+  found row through `memberLabel`, and keep `actorLabel(userId, null)` for an id the roster does not
+  cover (the id floor, and the system-actor step). One `it` asserts the nameless member's chip is the
+  ADDRESS and that the ULID appears nowhere, with the NAMED member as the control in the same audience
+  and a chip count so the label change cannot have moved the number of chips drawn. —
+  (`packages/app-core/test/views/visibility-editor.test.tsx`)
+
 ## The project card's actions strip is the button's size (owner request, 2026-09-22)
 
 **The owner measured it, one screenshot, no theory.** On the workspace home the project card's Archive

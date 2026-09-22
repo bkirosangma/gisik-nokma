@@ -4,6 +4,7 @@ import type { DraftStore, WorkflowDraft } from '../draft-store.js';
 import { fieldChoicesFor } from '../fields.js';
 import type { WorkflowAuthoringGateway, WorkspaceMember } from '../gateway.js';
 import { summaryContextFor, type SummaryContext } from '../summaries.js';
+import { memberLabel } from '../../member-label.js';
 
 export type BuilderSession = { userId: string; role: WorkspaceRole };
 
@@ -52,14 +53,32 @@ export function useDraft(): WorkflowDraft {
   return useSyncExternalStore(store.subscribe, store.getState, store.getState);
 }
 
-/** Names for rule summaries: workspace members, plus fields of the types bound to this workflow. */
+/**
+ * Names for rule summaries: workspace members, plus fields of the types bound to
+ * this workflow.
+ *
+ * The member map's VALUE is `memberLabel` of the wire member, not its raw
+ * `displayName` (2026-09-22). A rule summary is read by a person deciding
+ * whether an edge does what they meant, and `displayName` is `''` for the
+ * magic-link population — so a criterion naming such a member summarised as a
+ * blank where a name belongs, which is the one thing a summary cannot be. The
+ * address then, the id only if there is neither.
+ */
 export function useSummaryCtx(): SummaryContext {
   const env = useBuilderEnv();
   const draft = useDraft();
   return useMemo(() => {
     const boundTypes = env.ticketTypes.filter((type) => type.workflowId === draft.def.id);
     return summaryContextFor(draft.def, {
-      memberNames: new Map(env.members.map((member) => [member.userId, member.displayName])),
+      memberNames: new Map(
+        env.members.map((member) => [
+          member.userId,
+          // A wire `WorkspaceMember`, so the fields are renamed on the way in —
+          // the structural parameter is what lets this call site pass a shape
+          // that is not a `RosterMember`.
+          memberLabel({ id: member.userId, name: member.displayName, email: member.email }),
+        ]),
+      ),
       fields: fieldChoicesFor(boundTypes),
     });
   }, [env.ticketTypes, env.members, draft.def]);

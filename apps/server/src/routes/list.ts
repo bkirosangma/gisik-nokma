@@ -169,6 +169,11 @@ export async function readList(
   const groups = await groupCards(db, workspaceId, listCards, pageRows, query.groupBy, epics);
 
   return {
+    // The workspace the request was authorised against, already a parameter of
+    // this function. It is on the body because the client renders actor IDS as
+    // names, and the roster it joins for that is keyed by workspace — see
+    // `ListResponse.workspaceId`.
+    workspaceId,
     projectId,
     groupBy: query.groupBy,
     groups,

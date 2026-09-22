@@ -18,11 +18,11 @@ import {
   EPIC_RANK,
   TicketSheet,
   TimelineView,
-  actorLabel,
   isBuiltinEpicType,
   makeSubmittedFactory,
   matchesBoardCard,
   matchesListRow,
+  memberLabel,
   sortByRank,
   useBoard,
   useLiveQuery,
@@ -1360,7 +1360,21 @@ function ProjectBoard() {
     dataSource.query.getMembers(workspaceId),
   );
   const nameOf = useMemo(() => {
-    const byId = new Map((members.data ?? []).map((member) => [member.id, member.name]));
+    // `memberLabel`, not `member.name` (2026-09-22). The old value was the raw
+    // display name, and `?? userId` does NOT save it from a blank one: `''` is
+    // not nullish, so a magic-link member's blank name SURVIVED the fallback and
+    // painted an empty assignee and an empty calendar row — the id floor was
+    // never reached for the one population that needs it. `memberLabel` answers
+    // name → email → id, so the same lookup now floors correctly.
+    //
+    // No `actorLabel` here, deliberately: every consumer of this function is a
+    // display name (`assigneeName` for the board filter's two views, `userName`
+    // for the calendar and the timeline), none of them renders a claim, and the
+    // system-actor override belongs to claims. Auto-close has no card in either
+    // view to be drawn on.
+    const byId = new Map(
+      (members.data ?? []).map((member) => [member.id, memberLabel(member)]),
+    );
     return (userId: string): string => byId.get(userId) ?? userId;
   }, [members.data]);
 
@@ -3667,7 +3681,12 @@ function FiltersSheet({
             // magic-link population (`name: ''`), painting a row with no
             // visible text and no accessible name — closed the same way
             // E4-18 closed it on the ticket sheet's own pickers.
-            const label = actorLabel(member.id, member.name);
+            //
+            // `memberLabel` since 2026-09-22, which is the shared rule and not
+            // `actorLabel`: this row is a person being chosen, so the address
+            // step applies, and the system override does not — the same split
+            // the ticket sheet's pickers and `visibility-editor.tsx` make.
+            const label = memberLabel(member);
             return (
               <TriStateChoice
                 key={member.id}

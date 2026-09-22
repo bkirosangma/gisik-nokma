@@ -32,8 +32,9 @@ export type Actor = { id: string; name: string };
  *
  * `Actor` is not only the roster's shape. It is also a ticket's `assignee`
  * (`:110`, `:199`), and that value is produced two ways that cannot know a
- * role: `online/mappers.ts`'s `mapAssignee` resolves an id through the id→name
- * map `rosterByActorId` builds, and `replica/replica-data-source.ts`'s `actorOf`
+ * role: `online/mappers.ts`'s `mapAssignee` resolves an id through the map
+ * `rosterByActorId` builds (id → the member's LABEL, since 2026-09-22 —
+ * `member-label.ts`), and `replica/replica-data-source.ts`'s `actorOf`
  * synthesises `{id, name: id}` for an actor the local ledger names but no roster
  * covers. A required `role` on `Actor` would oblige both to invent one — the
  * single move this client's mapper module refuses everywhere else — and would

@@ -358,6 +358,24 @@ export type ListCard = TicketCard & {
 export type ListGroup = { key: string; label: string; cards: ListCard[] };
 
 export type ListResponse = {
+  /**
+   * **REQUIRED, and it is what the client's roster join is fetched with.**
+   *
+   * Every `ListCard` carries `assignee` and `assignedProvenance`/`stateProvenance`
+   * naming an actor by ID; a client that can only render those ids prints a ULID
+   * where a person's name belongs. The display names live on the members route,
+   * which is keyed by workspace — so the list body has to say which workspace it
+   * was read for, exactly as `BoardResponse.workspaceId` (`:262`) does and for
+   * the same reason (`online-data-source.ts`'s `getBoard` fetches the roster
+   * through `boardWorkspaceId(raw)` before mapping).
+   *
+   * `projectId` sitting beside it is NOT a substitute: a project belongs to one
+   * workspace, and a client deriving one from the other would be re-deriving a
+   * fact the route already holds as a parameter. Required rather than optional
+   * so that a body which forgot it is a compile error at every construction
+   * site, rather than `undefined` reaching a mapper that would degrade silently.
+   */
+  workspaceId: string;
   projectId: string;
   groupBy: Grouping;
   groups: ListGroup[];

@@ -14,6 +14,7 @@ import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
+import { memberLabel } from '../member-label.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
@@ -884,8 +885,18 @@ export function TicketSheet({
     (ticketRead.visibility === null
       ? null
       : { ...ticketRead.visibility, userIds: null, claim: null });
-  const nameOf = (userId: string): string =>
-    actorLabel(userId, members.data?.find((member) => member.id === userId)?.name ?? null);
+  // `actorLabel` STAYS the outer renderer and that is not a leftover: this
+  // function names CLAIMS as well as people — "Closed by Auto-close on …" comes
+  // through here — and the system-actor step is what keeps a roster row from
+  // renaming a decision no person made. What changed (2026-09-22) is the LABEL
+  // it is handed: `memberLabel` (name → email → id) rather than the raw
+  // display name, so the magic-link population reads as their address here
+  // instead of as an empty string. A member the roster does not cover is still
+  // `null`, and `actorLabel`'s own id floor answers for it, unchanged.
+  const nameOf = (userId: string): string => {
+    const member = members.data?.find((candidate) => candidate.id === userId);
+    return actorLabel(userId, member === undefined ? null : memberLabel(member));
+  };
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
 
   /**
@@ -1316,13 +1327,19 @@ export function TicketSheet({
     const needle = query.trim().toLowerCase();
     // RULING E5-4: `member.name` verbatim is blank for the magic-link
     // population (`name: ''`) — the same defect E4-18 closed on the
-    // Assignee picker, here on the @mention list. Resolved through
-    // `actorLabel` BEFORE matching, not after: a nameless member is
-    // otherwise never reachable by typing (their raw name never matches
-    // anything) and, once resolved, is found the same way any other
-    // person is — by what this list actually shows for them.
+    // Assignee picker, here on the @mention list. Resolved BEFORE matching,
+    // not after: a nameless member is otherwise never reachable by typing
+    // (their raw name never matches anything) and, once resolved, is found
+    // the same way any other person is — by what this list actually shows
+    // for them.
+    //
+    // Resolved through `memberLabel` (2026-09-22), not `actorLabel`: a row in
+    // this list IS a roster member, so the address step applies, and "what this
+    // list shows for them" is now name → email → id rather than name → id.
+    // `actorLabel` would be wrong here for its FIRST step as well — the system
+    // override is for claims, not for a person you can @mention.
     return people
-      .map((member) => ({ userId: member.id, name: actorLabel(member.id, member.name) }))
+      .map((member) => ({ userId: member.id, name: memberLabel(member) }))
       .filter((person) => needle === '' || person.name.toLowerCase().includes(needle));
   };
 
@@ -2438,13 +2455,18 @@ export function TicketSheet({
             // able to express, and a picker with no way back to it cannot.
             { value: UNASSIGNED, label: 'Unassigned' },
             // RULING E4-18: `member.name` verbatim rendered a BLANK option
-            // for a member with no display name, breaking the honesty
-            // contract `provenance.ts` states ("a missing display name
-            // falls back to the raw actor id — attributed, never blank")
-            // and `visibility-editor.tsx:410`'s own picker already keeps.
+            // for a member with no display name — an empty string on screen,
+            // which is a hole rather than a degradation. The id floor was the
+            // first fix; since 2026-09-22 the ADDRESS is the second step
+            // (`memberLabel`, owner request: *"if name is empty/blank, show the
+            // email"*), so a nameless member with a real address is offered by
+            // their address and only a member with neither is offered by their
+            // id. `actorLabel` is deliberately NOT used: a picker option is a
+            // person, and the system-actor override belongs to claims — the
+            // same reason `visibility-editor.tsx`'s picker has its own label.
             ...people.map((member) => ({
               value: member.id,
-              label: actorLabel(member.id, member.name),
+              label: memberLabel(member),
             })),
           ]}
           value={state.assigneeId ?? UNASSIGNED}

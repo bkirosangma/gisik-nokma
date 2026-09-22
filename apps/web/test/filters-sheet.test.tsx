@@ -229,12 +229,23 @@ describe('13.447 picking an assignee narrows the board and discloses it', () => 
    * `getByRole('button', { name: … })` query below is the same shape
    * every other case in this file already uses to find a row, so this is
    * the case that shows a nameless member was simply unfindable that way.
+   *
+   * **13.1295 EXTENDS IT one step further down the same rule** (owner request,
+   * 2026-09-22: *"if name is empty/blank, show the email"*). The id was the
+   * only step this row had; a member whose name is blank and whose address IS
+   * on the wire has a better handle, and the roster here carries BOTH — so an
+   * implementation that stopped at the id, or one that reached for an address
+   * that is not there, each fails on one of the two people.
    */
-  it('E5-4 a member with no display name renders and is findable by id, in both person groups', async () => {
+  it('13.1295 a nameless member renders by email when one is on the wire and by id when none is, in both person groups', async () => {
     render(
       <Providers
         services={servedBoard(twoCards, {
-          getMembers: async () => [...ROSTER, { id: 'u_nameless', name: '', role: 'guest' }],
+          getMembers: async () => [
+            ...ROSTER,
+            { id: 'u_nameless', name: '', role: 'guest' },
+            { id: 'u_accountant', name: '', role: 'guest', email: 'accountant@example.test' },
+          ],
         })}
       >
         <ProjectPage />
@@ -245,8 +256,14 @@ describe('13.447 picking an assignee narrows the board and discloses it', () => 
     const dialog = await openFilters();
     const assignee = within(dialog).getByRole('group', { name: 'Assignee' });
     expect(within(assignee).getByRole('button', { name: 'u_nameless' })).toBeInTheDocument();
+    expect(
+      within(assignee).getByRole('button', { name: 'accountant@example.test' }),
+    ).toBeInTheDocument();
     const collaborators = within(dialog).getByRole('group', { name: 'Collaborators' });
     expect(within(collaborators).getByRole('button', { name: 'u_nameless' })).toBeInTheDocument();
+    expect(
+      within(collaborators).getByRole('button', { name: 'accountant@example.test' }),
+    ).toBeInTheDocument();
   });
 });
 

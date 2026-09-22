@@ -86,6 +86,7 @@ export {
   ServingGapError,
   UnexpressibleFilterError,
   boardWorkspaceId,
+  listWorkspaceId,
   mapActors,
   mapAttention,
   mapBoardView,

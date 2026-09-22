@@ -331,11 +331,26 @@ describe('the list cursor, against the real route', () => {
     // is actually reached.
     expect(new Set(view.rows.map((row) => row.ticketId)).size).toBe(3);
 
-    // THE REACH OF THIS CASE, PINNED. One request, because 3 < 200. This is the
-    // assertion that stops the docblock above from rotting into a false claim.
-    expect(calls).toHaveLength(1);
-    expect(calls[0]).toContain('limit=200');
-    expect(calls[0]).not.toContain('cursor=');
+    // THE REACH OF THIS CASE, PINNED. One PAGE request, because 3 < 200 — and the
+    // walk's one ROSTER request counted beside it rather than folded into the
+    // total (the display-name join `getTickets` makes once per walk, case
+    // 13.1290; it is a request this case is not about, and dividing the total by
+    // two would stop the page count from being a reading).
+    const pages = calls.filter((url) => url.includes('/tickets?'));
+    const rosters = calls.filter((url) => url.includes('/members'));
+    expect(pages).toHaveLength(1);
+    expect(pages[0]).toContain('limit=200');
+    expect(pages[0]).not.toContain('cursor=');
+    // ONE roster request for the whole walk — the same property 13.1290 pins at
+    // the unit level, here against the real route.
+    expect(rosters).toHaveLength(1);
+    // THE PARTITION'S TOTAL, and it is asserted rather than left to the two
+    // counts above: `pages = 1` and `rosters = 1` are both satisfied by a walk
+    // that also made a THIRD request, so on their own they do not say the walk
+    // made two. With this line the two buckets and the total are three views of
+    // one list, and the walk can neither lose nor gain a request in silence.
+    expect(calls).toHaveLength(2);
+    expect(pages.length + rosters.length).toBe(calls.length);
   });
 });
 

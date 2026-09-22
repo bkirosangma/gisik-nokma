@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { DEFAULT_VIEW_PREFS, type RosterMember } from '../../src/view-types.js';
+import { SYSTEM_ACTOR_AUTO_CLOSE, SYSTEM_ACTOR_NAMES } from '@gisik-nokma/domain';
+import { actorLabel } from '../../src/provenance.js';
 import type { BoardView } from '../../src/view-types.js';
 import type {
   AttentionResponse,
@@ -987,15 +989,21 @@ describe('3.38 toServerFilterSpec — the plural/singular disagreement, made lou
  * BOTH card sites, and its absence or an off-ladder value is a refusal rather
  * than a silent P2.
  *
- * ⚠ **THE PLAN TEXT'S SIGNATURE FOR THIS CASE IS WRONG AND THE DIFFERENCE IS
- * LOAD-BEARING.** It wrote `mapListPage(listPageFixtureWith(...), roster)` with
- * `actorName: 'Anselma Marak'`. The shipped `mapListPage(raw)` takes NO roster —
- * it builds an EMPTY one (`mappers.ts:1764`) — so a list row's `actorName` is
- * always `null`, which `mapProvenance`'s docblock calls the lossless absence
- * (`provenance.ts`'s `actorLabel` renders the raw id for a null name). Written
- * as the plan has it, the assertion could never pass. The roster-resolving half
- * is therefore asserted on the BOARD mapper, which does take one, and the list
- * mapper is asserted for what it actually does.
+ * ⚠ **THE PLAN TEXT'S SIGNATURE WROTE THIS AS UNPASSABLE, AND IT WAS RIGHT WHEN
+ * IT WAS WRITTEN — but that premise EXPIRED on 2026-09-22.** The plan wrote
+ * `mapListPage(listPageFixtureWith(...), roster)` with `actorName: 'Anselma
+ * Marak'`; the shipped `mapListPage` then took NO roster and built an empty one
+ * internally, so a list row's `actorName` was ALWAYS `null` and the assertion
+ * could never have passed. The roster-resolving half was therefore asserted on
+ * the BOARD mapper, which did take one.
+ *
+ * **The premise is no longer true and the reading is repointed rather than left
+ * standing:** `mapListPage(raw, roster)` takes one now, because the list BODY
+ * names its workspace (case 13.1287) and `getTickets` joins the roster off it
+ * (13.1288). The arm below therefore asserts the EMPTY-ROSTER DEFAULT rather
+ * than the only possible answer — a real shape, since a roster the caller may
+ * not read arrives as an empty map (13.1289) — and the plan's own assertion is
+ * made, for real, by 13.1292.
  */
 describe('3.969 the priority claim crosses the wire as a claim; absence and an off-ladder value are refusals', () => {
   const roster = new Map([[ANSELMA, 'Anselma Marak']]);
@@ -1037,6 +1045,7 @@ describe('3.969 the priority claim crosses the wire as a claim; absence and an o
     ...overrides,
   });
   const listOf = (card: ListCard): ListResponse => ({
+    workspaceId: '01J9GWS0000000000000000000',
     projectId: '01J9GPRJ000000000000000000',
     groupBy: 'flat',
     groups: [{ key: 'all', label: 'All tickets', cards: [card] }],
@@ -1056,7 +1065,7 @@ describe('3.969 the priority claim crosses the wire as a claim; absence and an o
     });
   });
 
-  it('the list row carries the same claim, with `actorName` null — that mapper is handed no roster', () => {
+  it('the list row carries the same claim, with `actorName` null when THIS call hands no roster', () => {
     const page = mapListPage(
       listOf(
         listCardOf({
@@ -1613,6 +1622,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
 
   it('maps a list body into rows carrying all five formerly-absent facts', () => {
     const body: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: '01J9GPRJ000000000000000000',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All tickets', cards: [serverListCard()] }],
@@ -1644,6 +1654,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
    */
   it('13.580 mapListPage carries the wire card\'s closed flag onto the row, present and null', () => {
     const bodyClosed: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [
@@ -1663,6 +1674,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     expect(mapListPage(bodyClosed).rows[0]?.closed).toEqual({ actorId: ANSELMA, at: '2026-09-17T00:00:00.000Z' });
 
     const bodyOpen: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-open', closed: null })] }],
@@ -1693,6 +1705,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
    */
   it("13.703 mapListPage and mapTicketRead both carry the wire's rank onto the read model, present and null", () => {
     const ranked = (): ListResponse => ({
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-ranked', rank: 'i' })] }],
@@ -1705,6 +1718,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // the Backlog tab's order (`compareByRank`) separates "ranked" from
     // "unranked" by exactly this distinction.
     const unranked = (): ListResponse => ({
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-unranked', rank: null })] }],
@@ -1789,6 +1803,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // last place this can be caught, and it is caught by the SAME predicate the
     // domain door uses (`isRankKey`) rather than a second copy of the rule.
     const body: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'flat',
       groups: [{ key: 'all', label: 'All', cards: [serverListCard({ ticketId: 't-bad', rank: 'a b' })] }],
@@ -1804,6 +1819,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
 
   it('flattens groups in order and loses no card', () => {
     const body: ListResponse = {
+      workspaceId: '01J9GWS0000000000000000000',
       projectId: 'p',
       groupBy: 'status',
       groups: [
@@ -2314,6 +2330,179 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     });
   });
 
+  /**
+   * 13.1292 — **THE ROSTER JOIN'S VALUE IS THE MEMBER'S LABEL**, so every name
+   * the join produces already carries the email fallback.
+   *
+   * The join was `id → displayName`, and `displayName` is `''` for exactly the
+   * population the owner's instruction is about: better-auth's magic-link plugin
+   * creates a user with `name: name || ""` and the sign-in page sends no name.
+   * So a blank-named member joined to `''` — never to their address — and the
+   * board and the list rendered an empty name where the sheet's pickers, which
+   * had their own copy of the fallback, rendered an address. One person, two
+   * names, decided by which surface you were looking at.
+   *
+   * `memberLabel` is what the join's VALUE is built with now, which is what makes
+   * `mapAssignee` and `mapProvenance` correct on all three card sites without
+   * either of them knowing an address exists — and, in Task 5's half, without
+   * every joining surface having to remember to call the label itself.
+   *
+   * ⚠ **THE ROSTER IS BUILT THE WAY THE SOURCE BUILDS IT — a members BODY through
+   * `mapActors` carrying `displayName: ''`.** A fixture that handed
+   * `rosterByActorId` a literal map, or that drove these mappers against an EMPTY
+   * roster, would read back the actor id and the email branch would never run:
+   * green for the wrong reason, which is the exact failure the `3.969` paragraph
+   * above records about a signature that could not express the assertion it
+   * wanted.
+   */
+  it('13.1292 a blank-named member with a real address is named by the ADDRESS through every join, on all three card sites', () => {
+    const roster = rosterByActorId(
+      mapActors({
+        workspaceId: '01J9GWS0000000000000000000',
+        members: [
+          { userId: 'u1', displayName: 'Kiro', role: 'owner' },
+          { userId: 'u2', displayName: '', role: 'guest', email: 'accountant@example.test' },
+        ],
+      }),
+    );
+
+    // THE BOARD, through BOTH doors into the one map from a single card: the
+    // assignee (`mapAssignee`) and the state claim's actor (`mapProvenance`).
+    const boardView = mapBoardView(
+      {
+        projectId: '01J9GPRJ000000000000000000',
+        workspaceId: '01J9GWS0000000000000000000',
+        columns: [
+          {
+            workflowId: 'wf-errand',
+            workflowName: 'Errand',
+            workflowVersion: 2,
+            stateId: 'doing',
+            name: 'Doing',
+            category: 'active',
+            blocked: false,
+            cards: [
+              serverCard({
+                assigneeId: 'u2',
+                stateProvenance: { actorId: 'u2', clientTime: 'c', serverTime: 's', cause: null },
+              }),
+            ],
+          },
+        ],
+      },
+      roster,
+    );
+    const boardCard = boardView.groups[0]?.columns[0]?.cards[0];
+    expect(boardCard?.assignee).toEqual({ id: 'u2', name: 'accountant@example.test' });
+    expect(boardCard?.stateProvenance.actorName).toBe('accountant@example.test');
+
+    // THE LIST — the surface the owner's first screenshot was about.
+    const page = mapListPage(
+      {
+        workspaceId: '01J9GWS0000000000000000000',
+        projectId: '01J9GPRJ000000000000000000',
+        groupBy: 'flat',
+        groups: [
+          {
+            key: 'all',
+            label: 'All',
+            cards: [
+              serverListCard({
+                assigneeId: 'u2',
+                stateProvenance: { actorId: 'u2', clientTime: 'c', serverTime: 's', cause: null },
+              }),
+            ],
+          },
+        ],
+        nextCursor: null,
+      },
+      roster,
+    );
+    expect(page.rows[0]?.assignee).toEqual({ id: 'u2', name: 'accountant@example.test' });
+    expect(page.rows[0]?.stateProvenance.actorName).toBe('accountant@example.test');
+
+    // THE TICKET READ — the second screenshot. `ticketReadBody` fixes the state
+    // claim to a named actor, so the join is exercised through the ASSIGNMENT
+    // claim, which is the other `mapProvenance` call site on this body. The
+    // `parent` is a visible one, as in the helper's other call sites — this
+    // case is about a name, and an absent parent would exercise an arm of
+    // `mapParentRef` that has its own cases.
+    const read = mapTicketRead(
+      ticketReadBody({ kind: 'ticket', id: 'parent-1', title: 'The epic' }, null, null, null, null, {
+        actorId: 'u2',
+        clientTime: 'c',
+        serverTime: 's',
+      }),
+      roster,
+    );
+    expect(read.assignedProvenance?.actorName).toBe('accountant@example.test');
+
+    // THE CONTROL, through the SAME roster and on the SAME three surfaces: the
+    // NAMED member still reads as their name. Without it, a join that returned
+    // the first member's label for every id — or the address for everybody —
+    // would pass everything above.
+    expect(roster.get('u1')).toBe('Kiro');
+    const namedBoard = mapBoardView(
+      {
+        projectId: '01J9GPRJ000000000000000000',
+        workspaceId: '01J9GWS0000000000000000000',
+        columns: [
+          {
+            workflowId: 'wf-errand',
+            workflowName: 'Errand',
+            workflowVersion: 2,
+            stateId: 'doing',
+            name: 'Doing',
+            category: 'active',
+            blocked: false,
+            cards: [serverCard({ assigneeId: 'u1' })],
+          },
+        ],
+      },
+      roster,
+    );
+    expect(namedBoard.groups[0]?.columns[0]?.cards[0]?.assignee).toEqual({
+      id: 'u1',
+      name: 'Kiro',
+    });
+  });
+
+  /**
+   * 13.1293 — **`actorLabel`'s ORDER IS UNTOUCHED: system actor, then the label,
+   * then the id.**
+   *
+   * The change above put an EMAIL into the join's value, and that value is what
+   * `actorLabel` is handed for every claim in this client. So the two properties
+   * that keep the email from leaking where it must not are asserted here rather
+   * than assumed:
+   *
+   * 1. **A reserved actor WINS, even against a roster row carrying that id.** A
+   *    person's name printed over a decision no person made is the claim
+   *    `provenance.ts`'s honesty contract exists to refuse, and "the roster is
+   *    authoritative for every id" would produce it.
+   * 2. **Auto-close is never given an address.** It has no roster row, so the
+   *    email step cannot reach it — and if a body ever minted one, the system
+   *    step above still answers first. Both halves are asserted, because only the
+   *    second survives a future joining bug.
+   */
+  it('13.1293 actorLabel still puts the system actor first, and never renders an address for it', () => {
+    const systemName = SYSTEM_ACTOR_NAMES.get(SYSTEM_ACTOR_AUTO_CLOSE);
+    expect(systemName).toBe('Auto-close');
+
+    // The system step wins over a label that a join could produce — INCLUDING an
+    // address, which is the shape this change made reachable.
+    expect(actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, 'Auto-close')).toBe(systemName);
+    expect(actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, 'accountant@example.test')).toBe(systemName);
+
+    // The control, on the same function and in the same case: an ORDINARY actor
+    // takes the label it was handed, so the two assertions above are about the
+    // reserved id and not about `actorLabel` ignoring its argument.
+    expect(actorLabel('u1', 'Kiro')).toBe('Kiro');
+    // And `actorLabel`'s own floor is still the id — it is handed a claim's
+    // `{actorId, actorName}` and has no address to reach for, which is why the
+    // email step lives in the JOIN and not here.
+    expect(actorLabel('u1', null)).toBe('u1');
+  });
 });
 
 /**

@@ -6,6 +6,22 @@ import type { ClaimProvenance } from './view-types.js';
  * A missing display name falls back to the raw actor id — attributed, never
  * blank, never a fabricated "system".
  *
+ * ## The chain is name → email → id, and THIS function only owns its last links
+ *
+ * The email step is real but it is **not here**: it lives in `memberLabel`
+ * (`../member-label.ts`), because it needs a ROSTER ROW and this function is
+ * handed a claim's `{actorId, actorName}` and nothing else. It reaches this
+ * function by riding the roster join's VALUE — `rosterByActorId`
+ * (`online/mappers.ts`) builds each value with `memberLabel` — so by the time a
+ * name arrives it has already been through the address. An email therefore
+ * reaches the screen through the same door a name does, and a caller holding
+ * only an id still gets the id.
+ *
+ * That division is deliberate and is why this function keeps NO email lookup of
+ * its own: adding one would mean giving it the roster, and then the SYSTEM step
+ * below would have to be checked against the roster too — the one thing it must
+ * never be. See `memberLabel`'s docblock for the end-to-end chain.
+ *
  * ## The reserved actors are checked FIRST, and that order is the rule
  *
  * One actor in this product is not a person: `SYSTEM_ACTOR_AUTO_CLOSE`, the id
@@ -13,15 +29,23 @@ import type { ClaimProvenance } from './view-types.js';
  * name is fixed by the spec — the sheet reads "Closed by Auto-close on <date>"
  * — and it is NOT a roster entry, because no workspace has a member by that id.
  *
- * So the lookup runs system → roster → id, and the MIDDLE step is what makes
- * the first one load-bearing rather than an extra fallback: a roster row that
- * happened to carry this id must not be able to rename a system actor. A
- * person's name printed over a decision no person made is the exact claim this
+ * So the lookup runs **system → the handed label → id**, and the MIDDLE step is
+ * what makes the first one load-bearing rather than an extra fallback: a roster
+ * row that happened to carry this id must not be able to rename a system actor.
+ * A person's name printed over a decision no person made is the exact claim this
  * module's honesty contract exists to refuse, and "the roster is authoritative
  * for every id" would produce it. `SYSTEM_ACTOR_NAMES` is a `Map` for the same
  * class of reason at the other end: an object literal would answer `true` for
  * `'toString'`, so `'constructor'`-shaped garbage from a wire body would read
  * as a reserved actor.
+ *
+ * The middle step reads the ARGUMENT and does not reach for a roster, so what it
+ * holds is whatever the caller resolved — and since 2026-09-22 that is
+ * `memberLabel`'s answer (name → email → id) wherever the caller joined a
+ * roster. **This function's own order is unchanged by that, and
+ * `SYSTEM_ACTOR_AUTO_CLOSE` is the case that proves it:** it has no roster row,
+ * so no join can hand it an address, and the system step answers before the
+ * argument is even trimmed. Case 13.1293 pins both halves.
  *
  * The fallback below it is unchanged and still total: an ordinary id with no
  * name is attributed by id, never blanked.
