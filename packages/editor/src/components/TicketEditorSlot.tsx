@@ -254,7 +254,11 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
   const isComment = props.mode === 'comment';
 
   return (
-    <div className="editor-slot">
+    // The mode modifier is for the stylesheet, not for the reader: the comment
+    // composer's field is three rows where the description's is five, and only
+    // the shell that already knows `mode` can say which is being mounted
+    // (`editor.css`, `.editor-slot--comment .ticket-editor__content`).
+    <div className={isComment ? 'editor-slot editor-slot--comment' : 'editor-slot editor-slot--description'}>
       <TicketEditor
         initialDoc={initialDoc}
         editable={!props.readOnly}

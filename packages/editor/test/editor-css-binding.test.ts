@@ -114,7 +114,11 @@ describe('13.1272 editor chrome css binding', () => {
   it('13.1275 the slot body carries only geometry, the wrapper carries no ground, the placeholder and the focus ring are declared', () => {
     const body = ruleBody(EDITOR_CSS, '.editor-slot .ticket-editor__content');
     expect(declared(body, 'border-radius')).toBe('0');
-    expect(declared(body, 'min-height')).toBe('6rem');
+    // The prototype's own box, not "taller than the bare editor's 4rem floor":
+    // the owner measured the built composer against the prototype on 2026-09-22
+    // and the field must be the description textarea's `rows="5"` height. The
+    // derivation is in 13.1314; the pin lives here with the rest of this rule.
+    expect(declared(body, 'min-height')).toBe('8.375rem');
     // NO ground here: `background` and `box-shadow` are the shared field class's.
     expect(declared(body, 'background')).toBeNull();
     expect(declared(body, 'box-shadow')).toBeNull();
@@ -129,5 +133,89 @@ describe('13.1272 editor chrome css binding', () => {
     expect(declared(ph, 'color')).toBe('var(--gn-text-muted)');
     expect(declared(ph, 'pointer-events')).toBe('none');
     expect(BARE).toMatch(/\.editor-slot \.ticket-editor__content:focus-within\s*\{[^}]*outline:\s*2px solid var\(--gn-focus-ring\)/);
+  });
+});
+
+/**
+ * 13.1312 / 13.1313 / 13.1314 — THE EDITABLE NODE FILLS THE FIELD, AND THE
+ * FIELD PAINTS THE ONE RING (owner, 2026-09-22: *"on focus, it's like this …
+ * and the actual text area is just that area where the placeholder is"*, with
+ * the prototype beside it).
+ *
+ * TWO MEASURED DEFECTS in the composer at `5b26f70d`, both from PR #680's
+ * change — it gave the body `gn-field__input` and its `:focus-within` ring, and
+ * stopped there:
+ *
+ *   1. **The editable node is one line tall inside a taller box.** The body
+ *      declares `min-height` + `padding` and no rule anywhere in the repo styles
+ *      `.ProseMirror`, so Tiptap's contenteditable is exactly one line (measured
+ *      body 605×96, `.ProseMirror` 577×22). Every pixel of the box below that
+ *      line is not the typing area: a click there places no caret, because
+ *      ProseMirror positions from the click's coordinates inside its own node.
+ *   2. **Two rings.** The body paints ours (`outline: 2px solid`); the focused
+ *      contenteditable ALSO paints the browser's own (`outline: auto 1px
+ *      rgb(0, 95, 204)`), because nothing removes it. That inner rectangle is
+ *      what the owner's screenshot shows around the placeholder line.
+ *
+ * The fill is `display: flex; flex-direction: column` on the body plus
+ * `flex: 1 1 auto` on the child, and the child carries `outline: none` — legal
+ * ONLY because the wrapper keeps its own ring, which is why 13.1313 asserts both
+ * in one `it` (see the E4-21 note there).
+ */
+describe('13.1312 the editable node fills the field', () => {
+  const BARE = stripComments(EDITOR_CSS);
+
+  it('13.1312 the body is a column flex container and its ProseMirror child fills it — and the inset is still there', () => {
+    const body = ruleBody(EDITOR_CSS, '.editor-slot .ticket-editor__content');
+    const child = ruleBody(EDITOR_CSS, '.editor-slot .ticket-editor__content > .ProseMirror');
+    expect(declared(body, 'display')).toBe('flex');
+    expect(declared(body, 'flex-direction')).toBe('column');
+    expect(declared(child, 'flex')).toBe('1 1 auto');
+    // CONTROL, same `it`: the fill must come from the child GROWING, not from
+    // the box having dropped its inset. A `pad: 0` body with a stretched child
+    // would satisfy every assertion above while making the field hug its text
+    // and losing `.gn-field__input`'s own geometry.
+    expect(declared(body, 'padding')).toBe('0.75rem 0.875rem');
+  });
+
+  it('13.1313 the child removes the UA ring AND the wrapper still declares its own — the pair, in one assertion', () => {
+    const child = ruleBody(EDITOR_CSS, '.editor-slot .ticket-editor__content > .ProseMirror');
+    expect(declared(child, 'outline')).toBe('none');
+    // E4-21 (`packages/ui/test/components.test.tsx`) is the product's ruling on
+    // this shape: `.gn-select__trigger--searchable input:focus { outline: none }`
+    // removes a focus indicator that WCAG 2.2 §2.4.7 requires, and it is
+    // tolerated ONLY because the WRAPPER paints a `:focus-within` ring instead.
+    // The same trade is made here, so the two halves live in one assertion: the
+    // inner suppression cannot be dropped without this going red, and this ring
+    // cannot be dropped without the suppression surviving it — the exact
+    // "removal with no replacement" state E4-21 exists to catch.
+    expect(BARE).toMatch(/\.editor-slot \.ticket-editor__content:focus-within\s*\{[^}]*outline:\s*2px solid var\(--gn-focus-ring\)/);
+  });
+
+  /**
+   * 13.1314 — THE TWO HEIGHTS, derived rather than invented. The prototype's
+   * own textareas are the numbers the owner pointed at:
+   *
+   *   - description (`design-system/interactive/desktop.dc.html:1171`):
+   *     `rows="5"`, `font-size:17px;line-height:22px`, `padding:12px 14px`
+   *     → 5 × 22 + 2 × 12 = 134px;
+   *   - comment (`:1314`): `rows="3"`, the same 17/22, `padding:11px 14px`
+   *     → 3 × 22 + 2 × 11 = 88px.
+   *
+   * Converted at 16px with the product's global `* { box-sizing: border-box }`
+   * (`apps/web/app/globals.css:5`), so `min-height` INCLUDES the padding:
+   * 134px = **8.375rem**, 88px = **5.5rem**. A box-sizing change would make both
+   * of these wrong together, which is why the numbers are asserted as rem.
+   */
+  it('13.1314 the description field is the prototype rows=5 box and the comment field is its rows=3 box', () => {
+    const body = ruleBody(EDITOR_CSS, '.editor-slot .ticket-editor__content');
+    const comment = ruleBody(EDITOR_CSS, '.editor-slot--comment .ticket-editor__content');
+    expect(declared(body, 'min-height')).toBe('8.375rem');
+    expect(declared(comment, 'min-height')).toBe('5.5rem');
+    // CONTROL, same `it`: the comment rule must not have replaced the shared
+    // one. If the selector above were typo'd into the body rule itself, the
+    // description arm would silently take the comment's height and this case
+    // would still read two values.
+    expect(declared(body, 'min-height')).not.toBe(declared(comment, 'min-height'));
   });
 });
