@@ -2404,3 +2404,22 @@ contract across a boundary was run at Node v22.22.2 and is green — `packages/e
   default, so a card without a level is not a state this product has; a one-armed assertion would be
   satisfied by a tone that is always on and by one that is never on alike. —
   `packages/app-core/test/views/board.test.tsx`
+
+## The project head row arranged as the prototype's two rows (owner, 2026-09-22)
+
+- **13.1302** ✅ The breadcrumb `<p>`, the `<h1>` and the archived line are all descendants of ONE
+  `.gn-project__identity` element, **in that DOM order** — containment alone would pass for a column
+  holding all three in the wrong sequence, so the order is asserted separately. —
+  `apps/web/test/project-page-head.test.tsx`
+- **13.1303** ✅ That identity column and the `.gn-project__header` that carries the search box are BOTH
+  direct children of the SAME `.gn-project__head` element; **control in the same case** — the rail
+  (`tablist` named `Project view`) is NOT inside `.gn-project__head`, because a head row swallowing the
+  rail too would satisfy every containment arm while collapsing the prototype's two rows into one. —
+  `apps/web/test/project-page-head.test.tsx`
+- **13.1304** ✅ The stylesheet pins the arrangement: `packages/ui/src/ui.css` declares
+  `.gn-project__head` with `justify-content: space-between`, `flex-wrap: wrap` and `margin-top: 1.5rem`,
+  and `.gn-project__identity` with `flex-direction: column`; **control in the same case** —
+  `.gn-project__header` no longer declares `margin-top` at all, so the 24px row margin is counted once
+  rather than twice (both rules carrying it would double the gap to 48px). Selector patterns are anchored
+  `^\.gn-project__head\s*\{` so neither name can report the other's body. —
+  `apps/web/test/project-page-head.test.tsx`

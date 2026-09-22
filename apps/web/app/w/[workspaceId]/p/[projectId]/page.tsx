@@ -2005,17 +2005,31 @@ function ProjectBoard() {
         ) : (
           <div className="gn-project">
             {/*
-              BREADCRUMB AND TITLE (fix round 1, Ruling 6; restructured fix round
-              2, coordinator Critical finding) — stacked children of `.gn-project`
-              itself, NOT of `.gn-project__header`. The metrics table lists "Page
-              padding", "Header row top margin 24px", "Breadcrumb 13/18" and
-              "Title 34/41" as separate entries against a COLUMN
-              (`.gn-project { flex-direction: column; gap: 14px }`), which is three
-              stacked children, not one flex line — putting the 34px/700 heading
-              inside `.gn-project__header` (`align-items: center`, `flex-wrap:
-              wrap`) vertically centred it on the same line as the 13px breadcrumb
-              and the New-ticket button, and would have put Tasks 4/5/8's search
-              box, workflow `<select>` and Filters button on that same line too.
+              BREADCRUMB AND TITLE — fix round 1 (Ruling 6) put them on the page;
+              fix round 2 moved them OUT of `.gn-project__header`; **the owner's
+              2026-09-22 instruction supersedes that placement** and this is the
+              third arrangement.
+
+              What fix round 2 objected to is real: a 34px/700 `<h1>` that is a
+              flex ITEM of a row with `align-items: center` is vertically centred
+              on one line with the 13px crumb and the buttons. That objection is
+              to the `<h1>` being a SIBLING of the controls — and it is answered
+              rather than ignored, because the prototype does not place it as one
+              either. `desktop.dc.html:319-341` draws the header as a column
+              (`:319`) holding two rows; row 1 (`:320`,
+              `justify-content:space-between`) has a LEFT half that is itself a
+              `flex-direction: column; gap: 4px` box (`:321-323`) carrying the
+              crumb over the `<h1>`, beside the controls row (right, `:325`). So
+              these three elements now sit in `.gn-project__identity`, inside the
+              `.gn-project__head` row — the `<h1>` is the second line of a column
+              beside the controls, never a flex item of the controls row.
+
+              Owner, 2026-09-22: *"the build's project header and controls area.
+              arrange it more like the prototype."* An ARRANGEMENT change: no
+              control was added, removed or relabelled, and no accessible name
+              moved. The archived line stays inside this column — it is the third
+              line of the identity, which is also where `ui.css`'s E2-38 note
+              already describes it ("it sits under the title as its own line").
 
               Each name is independently omitted — not a placeholder, not the raw
               id — while its own hook holds `null`. Neither reserves space while
@@ -2034,212 +2048,219 @@ function ProjectBoard() {
               survive unconsumed once that task has run; see `ui.css` for the
               deletion.
             */}
-            {workspaceName !== null ? (
-              <p className="gn-project__breadcrumb">{workspaceName}</p>
-            ) : null}
-            {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
-            {/* The SAME component and the SAME word the workspace home's card
-                uses for this state, so the two screens cannot describe one fact
-                two ways. A sentence is deliberately NOT added: everything else
-                worth saying about an archived project (who may restore it, where)
-                is admin-only and would be a second false claim for a member. */}
-            {projectArchived ? (
-              <p className="gn-project__archived">
-                <Chip tone="neutral">Archived</Chip>
-              </p>
-            ) : null}
+            <div className="gn-project__head">
+              <div className="gn-project__identity">
+                {workspaceName !== null ? (
+                  <p className="gn-project__breadcrumb">{workspaceName}</p>
+                ) : null}
+                {projectName !== null ? <h1 className="gn-project__title">{projectName}</h1> : null}
+                {/* The SAME component and the SAME word the workspace home's card
+                    uses for this state, so the two screens cannot describe one fact
+                    two ways. A sentence is deliberately NOT added: everything else
+                    worth saying about an archived project (who may restore it, where)
+                    is admin-only and would be a second false claim for a member. */}
+                {projectArchived ? (
+                  <p className="gn-project__archived">
+                    <Chip tone="neutral">Archived</Chip>
+                  </p>
+                ) : null}
+              </div>
 
-            {/*
-              `.gn-project__header` — Task 2 of the prototype port. Controls
-              ONLY: Task 4 (search), Task 8 (workflow `<select>`) and Task 5
-              (Filters) add their own controls here; New ticket is the one
-              control already built, so it moves in now rather than waiting for a
-              later task to relocate it. The breadcrumb and title moved OUT of
-              this container in fix round 2 — see the comment above.
-
-              MOVED OUT OF THE TABLIST, not merely reclassed: `createRegion` used
-              to render as the tablist's fifth child, a plain `<button>` (or a
-              `<p role="status">`) sitting inside a `role="tablist"` alongside four
-              `role="tab"` children — an ARIA violation `.gn-segmented`'s 2px-gap
-              flex track would only have made more visible. Every assertion this
-              page's tests make against `New ticket` queries `screen`/`within(dialog)`
-              directly rather than scoping from the tablist container, so the move
-              changes no test's reach (`page-refusals.test.tsx`,
-              `project-create-gate.test.tsx`).
-
-              SEARCH BOX (Task 4) renders here, ABOVE THE TABS, because `filter`
-              is page-level state that a tab switch must not reset (Step 2). Its
-              `aria-label` says "board" on purpose: today it narrows ONLY the
-              Board tab (Ruling 1 scopes T4 to the board path; Calendar and
-              Timeline already accept a `filter` prop of their own — confirmed by
-              reading `calendar-view.tsx`/`timeline-view.tsx` — but wiring it is
-              explicitly out of this task, since narrowing those tabs with no
-              count and no chip would itself violate the disclosure invariant
-              this task exists to satisfy). A generic, unlabelled "Search" here
-              would be a control implying a reach it does not have; naming the
-              scope in the accessible name is the fix that costs nothing else.
-            */}
-            <div className="gn-project__header">
-              <input
-                type="search"
-                className="gn-project__search"
-                aria-label="Search the board"
-                placeholder="Search the board"
-                value={filter.text ?? ''}
-                onChange={(event) => {
-                  const { value } = event.target;
-                  setFilter((current) => ({ ...current, text: value === '' ? undefined : value }));
-                }}
-              />
               {/*
-                THE WORKFLOW PICKER (Task 8, Ruling R3). Narrows the board to
-                one workflow's GROUP — a different granularity from every
-                control on this row, which narrow CARDS — so its state
-                (`workflowFilter`) and its fold into `boardNarrowing` are
-                declared beside `boardFilter` above, not beside `filter`.
-                ⚠ `boardNarrowing` itself — the fold this sentence names — moved
-                down to the roster block on 2026-09-20 for the reason recorded
-                there; the STATE this paragraph is about did not move.
-                `All workflows` is the first `<option>` and
-                `workflowFilter`'s own initial value, so the picker's resting
-                state IS the default (R3) with no extra wiring to keep them
-                in sync.
+                `.gn-project__header` — Task 2 of the prototype port. Controls
+                ONLY: Task 4 (search), Task 8 (workflow `<select>`) and Task 5
+                (Filters) add their own controls here; New ticket is the one
+                control already built, so it moves in now rather than waiting for a
+                later task to relocate it. The breadcrumb and title left this
+                container in fix round 2 and are now BESIDE it, in
+                `.gn-project__identity` — the two are the children of the
+                `.gn-project__head` row (owner, 2026-09-22; see the comment
+                above).
 
-                GATED ON `board.data.groups.length > 1`, not merely on
-                `board.data !== null`: a project with zero or exactly one
-                workflow offers no real choice — "All workflows" and that one
-                workflow's name would render the identical board — so the
-                control would be a picker between one thing and itself. This
-                mirrors `Board`'s OWN gate for the identical judgment one
-                level down (`board.tsx`: `board.groups.length > 1 ? <h3
-                className="gn-board__workflow">` — the workflow name itself
-                only renders once there is more than one to distinguish).
-                Deliberately reading `board.data.groups` here rather than
-                `boardNarrowing.view.groups`: the latter is ALREADY narrowed
-                by `workflowFilter`, so once a person picks a specific
-                workflow it would hold only that one surviving group and this
-                gate would compute `length > 1` as false and unmount the very
-                control that let them pick it — the picker must be judged
-                against the whole board, never against its own output.
+                MOVED OUT OF THE TABLIST, not merely reclassed: `createRegion` used
+                to render as the tablist's fifth child, a plain `<button>` (or a
+                `<p role="status">`) sitting inside a `role="tablist"` alongside four
+                `role="tab"` children — an ARIA violation `.gn-segmented`'s 2px-gap
+                flex track would only have made more visible. Every assertion this
+                page's tests make against `New ticket` queries `screen`/`within(dialog)`
+                directly rather than scoping from the tablist container, so the move
+                changes no test's reach (`page-refusals.test.tsx`,
+                `project-create-gate.test.tsx`).
 
-                No `.gn-select` (the multi-select combobox in
-                `packages/ui`): that component is a listbox-and-panel widget
-                with no native `<select>` underneath it, and the brief and
-                the design spec both name this control a plain `<select>` —
-                metrics table "Workflow select `:325`", its own new
-                `.gn-project__workflow-select` rule in `ui.css` (`ctlBg`/
-                `ctlR`, no new token role; `ctlShadow` omitted, following
-                `.gn-button`'s own already-recorded open decision — see that
-                rule's docblock).
-
-                `value={resolvedWorkflowFilter}`, not raw `workflowFilter`
-                (Ruling 20(b)) — so the control itself VISIBLY falls back to
-                "All workflows" the moment its own picked workflow drops out
-                of `board.data`, rather than showing a `<select>` whose
-                `value` names an `<option>` that no longer exists (which a
-                browser resolves by silently selecting nothing, an even
-                quieter failure than the phantom chip that motivated the
-                fallback in the first place). `onChange` still WRITES raw
-                `workflowFilter`, never `resolvedWorkflowFilter` — every
-                value this control can write comes from `board.data.groups`
-                at the moment of selection, so it is always valid when
-                written; only the READ side ever needs to fall back.
+                SEARCH BOX (Task 4) renders here, ABOVE THE TABS, because `filter`
+                is page-level state that a tab switch must not reset (Step 2). Its
+                `aria-label` says "board" on purpose: today it narrows ONLY the
+                Board tab (Ruling 1 scopes T4 to the board path; Calendar and
+                Timeline already accept a `filter` prop of their own — confirmed by
+                reading `calendar-view.tsx`/`timeline-view.tsx` — but wiring it is
+                explicitly out of this task, since narrowing those tabs with no
+                count and no chip would itself violate the disclosure invariant
+                this task exists to satisfy). A generic, unlabelled "Search" here
+                would be a control implying a reach it does not have; naming the
+                scope in the accessible name is the fix that costs nothing else.
               */}
-              {board.data !== null && board.data.groups.length > 1 ? (
-                <select
-                  className="gn-project__workflow-select"
-                  aria-label="Workflow"
-                  value={resolvedWorkflowFilter}
-                  onChange={(event) => setWorkflowFilter(event.target.value)}
+              <div className="gn-project__header">
+                <input
+                  type="search"
+                  className="gn-project__search"
+                  aria-label="Search the board"
+                  placeholder="Search the board"
+                  value={filter.text ?? ''}
+                  onChange={(event) => {
+                    const { value } = event.target;
+                    setFilter((current) => ({ ...current, text: value === '' ? undefined : value }));
+                  }}
+                />
+                {/*
+                  THE WORKFLOW PICKER (Task 8, Ruling R3). Narrows the board to
+                  one workflow's GROUP — a different granularity from every
+                  control on this row, which narrow CARDS — so its state
+                  (`workflowFilter`) and its fold into `boardNarrowing` are
+                  declared beside `boardFilter` above, not beside `filter`.
+                  ⚠ `boardNarrowing` itself — the fold this sentence names — moved
+                  down to the roster block on 2026-09-20 for the reason recorded
+                  there; the STATE this paragraph is about did not move.
+                  `All workflows` is the first `<option>` and
+                  `workflowFilter`'s own initial value, so the picker's resting
+                  state IS the default (R3) with no extra wiring to keep them
+                  in sync.
+
+                  GATED ON `board.data.groups.length > 1`, not merely on
+                  `board.data !== null`: a project with zero or exactly one
+                  workflow offers no real choice — "All workflows" and that one
+                  workflow's name would render the identical board — so the
+                  control would be a picker between one thing and itself. This
+                  mirrors `Board`'s OWN gate for the identical judgment one
+                  level down (`board.tsx`: `board.groups.length > 1 ? <h3
+                  className="gn-board__workflow">` — the workflow name itself
+                  only renders once there is more than one to distinguish).
+                  Deliberately reading `board.data.groups` here rather than
+                  `boardNarrowing.view.groups`: the latter is ALREADY narrowed
+                  by `workflowFilter`, so once a person picks a specific
+                  workflow it would hold only that one surviving group and this
+                  gate would compute `length > 1` as false and unmount the very
+                  control that let them pick it — the picker must be judged
+                  against the whole board, never against its own output.
+
+                  No `.gn-select` (the multi-select combobox in
+                  `packages/ui`): that component is a listbox-and-panel widget
+                  with no native `<select>` underneath it, and the brief and
+                  the design spec both name this control a plain `<select>` —
+                  metrics table "Workflow select `:325`", its own new
+                  `.gn-project__workflow-select` rule in `ui.css` (`ctlBg`/
+                  `ctlR`, no new token role; `ctlShadow` omitted, following
+                  `.gn-button`'s own already-recorded open decision — see that
+                  rule's docblock).
+
+                  `value={resolvedWorkflowFilter}`, not raw `workflowFilter`
+                  (Ruling 20(b)) — so the control itself VISIBLY falls back to
+                  "All workflows" the moment its own picked workflow drops out
+                  of `board.data`, rather than showing a `<select>` whose
+                  `value` names an `<option>` that no longer exists (which a
+                  browser resolves by silently selecting nothing, an even
+                  quieter failure than the phantom chip that motivated the
+                  fallback in the first place). `onChange` still WRITES raw
+                  `workflowFilter`, never `resolvedWorkflowFilter` — every
+                  value this control can write comes from `board.data.groups`
+                  at the moment of selection, so it is always valid when
+                  written; only the READ side ever needs to fall back.
+                */}
+                {board.data !== null && board.data.groups.length > 1 ? (
+                  <select
+                    className="gn-project__workflow-select"
+                    aria-label="Workflow"
+                    value={resolvedWorkflowFilter}
+                    onChange={(event) => setWorkflowFilter(event.target.value)}
+                  >
+                    <option value="all">All workflows</option>
+                    {board.data.groups.map((group) => (
+                      <option key={group.workflowId} value={group.workflowId}>
+                        {group.workflowName}
+                      </option>
+                    ))}
+                  </select>
+                ) : null}
+                {/*
+                  IN `.gn-project__header`, BESIDE THE FILTERS BUTTON — and the placement
+                  is still the whole point rather than a layout choice.
+
+                  It moved here from its own `.gn-list-filter` row on the owner's
+                  instruction (2026-09-19: *"gn-list-filter__control in w/<id> page should
+                  be next to the new filter button. and it should be a gn-switch."*), and
+                  it is the shared `Switch` now rather than a bare checkbox.
+
+                  WHAT THE MOVE HAD TO PRESERVE, because it is why this control was never
+                  in a tab arm: every renderer of the list lives inside
+                  `list.error === null` — put the narrowing control there and it is
+                  reachable by everyone EXCEPT the person who needs it, because past the
+                  cap those arms render a refusal instead. That is the identical mistake
+                  `createRegion` was making until PR #270, and it has the identical fix:
+                  gate an affordance on what it actually needs, not on the read that
+                  happens to sit beside it. This control needs nothing.
+                  `.gn-project__header` is rendered unconditionally and all four
+                  `list.error` gates sit INSIDE the tab arms below it, so the property
+                  holds where it now sits.
+
+                  Which forces the note beside it to NAME THE SURFACES. The control
+                  renders on every tab, but it narrows only the reads that take a
+                  filter: `useBoard` takes none and cannot be narrowed, so an unscoped
+                  "done are excluded" sits on the DEFAULT tab directly above a Done
+                  column holding a done card — an unnarrowed set claiming to be
+                  narrowed, which is the same class of lie as a narrowed one claiming
+                  to be whole and is the reason this control exists.
+                */}
+                <Switch checked={activeOnly} onChange={setActiveOnly}>
+                  Only tickets in progress
+                </Switch>
+                {/*
+                  THE FILTERS BUTTON (Task 5). Task 4's own report left it
+                  unrendered on purpose ("An inert Filters button is a button
+                  that lies... I chose do not render it yet") because nothing
+                  existed yet for it to open. It opens now, wired to the SAME
+                  `filter` state the search box and the removable chips already
+                  share — never a second filter object. `.gn-button`/
+                  `.gn-button--ghost` (unchanged, per the plan's own
+                  "Divergences already decided") already renders exactly this
+                  metric — `min-height:2.75rem` (44px), `padding:0 1.125rem`
+                  (18px), `background:fill-tertiary`, `color:text-accent`,
+                  `font-weight:600` — so no new CSS rule is needed for the
+                  trigger itself.
+                */}
+                <button
+                  ref={filtersButtonRef}
+                  type="button"
+                  className="gn-button gn-button--ghost"
+                  aria-haspopup="dialog"
+                  onClick={() => setFiltersOpen(true)}
                 >
-                  <option value="all">All workflows</option>
-                  {board.data.groups.map((group) => (
-                    <option key={group.workflowId} value={group.workflowId}>
-                      {group.workflowName}
-                    </option>
-                  ))}
-                </select>
-              ) : null}
-              {/*
-                IN `.gn-project__header`, BESIDE THE FILTERS BUTTON — and the placement
-                is still the whole point rather than a layout choice.
+                  Filters
+                </button>
+                {createRegion}
+                {/*
+                  Said here as well as in the list's own summary, because past the cap
+                  there IS no list to carry a summary — the arms are refusing — and
+                  this is the only place the state of the question is visible. LAST in
+                  the row on purpose: it is a sentence, not a control, and in a
+                  `flex-wrap: wrap` header it takes its own line rather than pushing the
+                  switch away from the button the owner asked it to sit beside.
 
-                It moved here from its own `.gn-list-filter` row on the owner's
-                instruction (2026-09-19: *"gn-list-filter__control in w/<id> page should
-                be next to the new filter button. and it should be a gn-switch."*), and
-                it is the shared `Switch` now rather than a bare checkbox.
-
-                WHAT THE MOVE HAD TO PRESERVE, because it is why this control was never
-                in a tab arm: every renderer of the list lives inside
-                `list.error === null` — put the narrowing control there and it is
-                reachable by everyone EXCEPT the person who needs it, because past the
-                cap those arms render a refusal instead. That is the identical mistake
-                `createRegion` was making until PR #270, and it has the identical fix:
-                gate an affordance on what it actually needs, not on the read that
-                happens to sit beside it. This control needs nothing.
-                `.gn-project__header` is rendered unconditionally and all four
-                `list.error` gates sit INSIDE the tab arms below it, so the property
-                holds where it now sits.
-
-                Which forces the note beside it to NAME THE SURFACES. The control
-                renders on every tab, but it narrows only the reads that take a
-                filter: `useBoard` takes none and cannot be narrowed, so an unscoped
-                "done are excluded" sits on the DEFAULT tab directly above a Done
-                column holding a done card — an unnarrowed set claiming to be
-                narrowed, which is the same class of lie as a narrowed one claiming
-                to be whole and is the reason this control exists.
-              */}
-              <Switch checked={activeOnly} onChange={setActiveOnly}>
-                Only tickets in progress
-              </Switch>
-              {/*
-                THE FILTERS BUTTON (Task 5). Task 4's own report left it
-                unrendered on purpose ("An inert Filters button is a button
-                that lies... I chose do not render it yet") because nothing
-                existed yet for it to open. It opens now, wired to the SAME
-                `filter` state the search box and the removable chips already
-                share — never a second filter object. `.gn-button`/
-                `.gn-button--ghost` (unchanged, per the plan's own
-                "Divergences already decided") already renders exactly this
-                metric — `min-height:2.75rem` (44px), `padding:0 1.125rem`
-                (18px), `background:fill-tertiary`, `color:text-accent`,
-                `font-weight:600` — so no new CSS rule is needed for the
-                trigger itself.
-              */}
-              <button
-                ref={filtersButtonRef}
-                type="button"
-                className="gn-button gn-button--ghost"
-                aria-haspopup="dialog"
-                onClick={() => setFiltersOpen(true)}
-              >
-                Filters
-              </button>
-              {createRegion}
-              {/*
-                Said here as well as in the list's own summary, because past the cap
-                there IS no list to carry a summary — the arms are refusing — and
-                this is the only place the state of the question is visible. LAST in
-                the row on purpose: it is a sentence, not a control, and in a
-                `flex-wrap: wrap` header it takes its own line rather than pushing the
-                switch away from the button the owner asked it to sit beside.
-
-                `gn-project__scope-note`, NOT the old `gn-list-filter__note`: that
-                block no longer renders, so the class was an orphan element with no
-                block, and `.gn-list-filter` never had a CSS rule anywhere in this
-                repo (measured — `git log -S -- '*.css'` across all refs is empty).
-                This re-scopes onto the rule its sibling `board-scope-note` already
-                uses (`ui.css`: muted small print), so the note gains the treatment
-                it should always have had and no new rule is added.
-                The `data-testid` is the contract and is unchanged.
-              */}
-              {activeOnly ? (
-                <span className="gn-project__scope-note" data-testid="list-filter-note">
-                  the list, calendar, timeline and backlog are asking only for tickets in
-                  progress — not started and done are both excluded, and the backlog is
-                  emptied. The board is not narrowed.
-                </span>
-              ) : null}
+                  `gn-project__scope-note`, NOT the old `gn-list-filter__note`: that
+                  block no longer renders, so the class was an orphan element with no
+                  block, and `.gn-list-filter` never had a CSS rule anywhere in this
+                  repo (measured — `git log -S -- '*.css'` across all refs is empty).
+                  This re-scopes onto the rule its sibling `board-scope-note` already
+                  uses (`ui.css`: muted small print), so the note gains the treatment
+                  it should always have had and no new rule is added.
+                  The `data-testid` is the contract and is unchanged.
+                */}
+                {activeOnly ? (
+                  <span className="gn-project__scope-note" data-testid="list-filter-note">
+                    the list, calendar, timeline and backlog are asking only for tickets in
+                    progress — not started and done are both excluded, and the backlog is
+                    emptied. The board is not narrowed.
+                  </span>
+                ) : null}
+              </div>
             </div>
 
             {/*
