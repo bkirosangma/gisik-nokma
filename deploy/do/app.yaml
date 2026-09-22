@@ -304,13 +304,17 @@ workers:
       - key: LEDGER_EXPORT_DOW_UTC
         value: "0"
 
+# NO `zone:` on either domain (go-live day, 2026-09-22). `zone` tells App Platform to
+# create the records in DigitalOcean DNS and to VERIFY that the apex's nameservers
+# point at DigitalOcean; `artsourced.in` is served by Wix (ns14/ns15.wixdns.net),
+# so that verification ran forever and the certificate steps never started. Without
+# `zone`, App Platform expects two plain CNAMEs at the real DNS host and issues TLS
+# once they resolve — which is what README step 5 has always said.
 domains:
   - domain: pm.artsourced.in
     type: PRIMARY
-    zone: artsourced.in
   - domain: pm-api.artsourced.in
     type: ALIAS
-    zone: artsourced.in
 
 ingress:
   rules:
