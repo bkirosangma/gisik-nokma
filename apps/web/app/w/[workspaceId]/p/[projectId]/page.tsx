@@ -2363,8 +2363,27 @@ function ProjectBoard() {
                 · at viewports narrow enough to wrap the sentence onto two lines,
                   the rail shifts down by one line when the switch comes on. Only a
                   two-line reservation would remove that, and the owner scoped it
-                  out; the measured cases are 1000 px and 1280 px, where the single
-                  line holds.
+                  out.
+
+              ⚠ WHERE THAT SECOND COST ACTUALLY BITES — MEASURED 2026-09-23, and
+              this docblock said otherwise until it was. The line above used to end
+              "the measured cases are 1000 px and 1280 px, where the single line
+              holds". **It does not hold at 1000 px.** The note is NOT inside the
+              fixed-width content column — that column is 684 px wide and merely
+              CENTRES as the viewport grows (`header.left` 295.65 → 575.65 between
+              1000 px and 1280 px while `header.width` stays 684.35) — so the note's
+              own width tracks the viewport: 960 px at a 1000 px viewport, 1240 px at
+              1280 px. The sentence needs somewhere between the two. Measured on the
+              stack built from `91a82eefaff4`:
+                · 1280 px — note 18 px in both states, rail `top` 248.59 → 248.59.
+                  Nothing moves.
+                · 1000 px — note 18 → 36 px, rail `top` 248.59 → **266.59**. The rail
+                  moves by exactly one line.
+              The HEADER rect is identical at both widths in both states, so the
+              owner's actual complaint — the note dropping the whole controls row out
+              from beside the title — is fixed either way. Case `13.1383` carries the
+              numbers and the open owner decision: accept the shift at ~1000 px,
+              reserve two lines, or shorten the sentence.
 
               ALWAYS RENDERED, EMPTY WHEN OFF. The `<p>` is in the tree in both
               states and only its TEXT is conditional, so the band is reserved either

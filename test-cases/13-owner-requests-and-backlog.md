@@ -2919,3 +2919,29 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   read both again. The two pairs must be equal at each width. A viewport narrow enough to wrap the
   sentence onto two lines is OUT of scope by the owner's ruling — the rail shifts by one line there and
   that is accepted. — (controller measurement; no test file)
+
+  **MEASURED 2026-09-23** by the controller on the dev stack rebuilt from `release/2026-09-23`
+  `91a82eefaff4`, Chrome, signed in on :3001, each width read after a full reload and driven switch OFF →
+  ON. **The case PASSES at 1280 px and FAILS at 1000 px**, and the failure is a defect in this section's
+  own PROSE, not in the change:
+
+  | width | note width | header rect (off → on) | railTop off → on | note height off → on | verdict |
+  |---|---|---|---|---|---|
+  | 1280 px | 1240 | `[136.09, 575.65, 684.35, 44]` → identical | `248.59` → `248.59` | 18 → 18 | ✅ nothing moves |
+  | 1000 px | 960 | `[136.09, 295.65, 684.35, 44]` → identical | `248.59` → **`266.59`** | 18 → **36** | ❌ rail moves 18 px |
+
+  **The header never moves at either width** — the owner's actual complaint (the note dropping the whole
+  controls row out from beside the title) is fixed, and that is what `13.1381`'s structure buys.
+
+  What is wrong is the claim, carried in this case's first sentence, in `page.tsx`'s docblock and in the
+  brief, that **1000 px holds a single line**. It does not: the note spans the `.gn-project` column, which
+  is **960 px** wide at a 1000 px viewport and **1240 px** at 1280 px — the content column is a fixed
+  width that CENTRES (`header.left` moves 295.65 → 575.65 while `header.width` stays 684.35), but the note
+  is not inside that column, so its own width tracks the viewport. The sentence needs somewhere between
+  960 and 1240 px. At 960 it wraps, the row becomes 36 px, and the single reserved line no longer covers
+  it, so the rail drops by exactly one line.
+  So 1000 px is a "viewport narrow enough to wrap" — the very case this text says is out of scope. The
+  behaviour is the accepted cost; the sentence naming 1000 px as a width where the line holds was never
+  measured. **OWNER DECISION OPEN:** accept the 18 px rail shift at ~1000 px (the width of the original
+  screenshots), reserve two lines, or shorten the sentence. Nothing here should be flipped to ✅ until
+  that is answered.
