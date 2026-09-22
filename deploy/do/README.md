@@ -12,8 +12,14 @@ Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` /
 `pm-api.artsourced.in`.
 
 1. `doctl auth init` with the team token.
-2. Spaces, region **BLR1**: create buckets `gisik-nokma-attachments` and
-   `gisik-nokma-backups` (both private), generate a Spaces key pair. Spaces
+2. Spaces, region **SGP1** — ⚠ **not BLR1, corrected on go-live day 2026-09-22:** the
+   account's full-access Spaces key was refused `CreateBucket` in BLR1 (`AccessDenied`,
+   twice, twenty seconds apart) and accepted in SGP1 in the same minute with the same key,
+   so BLR1 Spaces is closed to this account and the two buckets live in Singapore; App
+   Platform and the database stay in BLR1. Create buckets `gisik-nokma-attachments` and
+   `gisik-nokma-backups` (both private) and a Spaces key pair — done with `doctl spaces
+   keys create gisik-nokma-app --grants 'bucket=;permission=fullaccess'` and `aws s3api
+   create-bucket --endpoint-url https://sgp1.digitaloceanspaces.com`. Spaces
    **Standard Storage is available in BLR1**; **Cold Storage is not** —
    backups stay on Standard, which matches the design (nightly dumps and
    weekly ledger exports are read back during the monthly restore drill, so
