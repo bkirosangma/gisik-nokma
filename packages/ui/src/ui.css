@@ -5946,6 +5946,27 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-project__scope-note { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+/* The RESERVED BAND the scope note stands in on the project page (owner,
+   2026-09-23) — one line of that note's OWN `line-height`, present whether the
+   note says anything or not, so switching *Only tickets in progress* on moves no
+   other element. See `page.tsx`'s docblock on the row for the measured cause and
+   the two costs the owner accepted.
+
+   A SECOND rule rather than a `min-height` added to the shared treatment above:
+   that rule is also what styles the BOARD tab's own `board-scope-note`, which is
+   not a standing row and must not reserve anything. Declared here, AFTER it, on
+   purpose — `rule(selector)` in `packages/ui/test/components.test.tsx` (`:548-549`)
+   resolves a rule with an UNANCHORED `UI_CSS.match` over the whole file, so a
+   selector CONTAINING `.gn-project__scope-note` placed ABOVE the shared rule
+   matches first and becomes the body that suite's cases read.
+   (`apps/web/test/project-page-head.test.tsx` reads through `ruleFor`, a
+   first-match LINE scan, and is safe only because its callers ANCHOR their
+   patterns — the anchoring protects it, not the helper.)
+
+   `margin: 0` because `<p>` carries UA margins and `.gn-project`
+   (`:5804`) already spaces its children with `gap: 0.875rem` — a top margin
+   would stack on that gap and make the band taller than the line it reserves. */
+.gn-project__scope-row { min-height: 1.125rem; margin: 0; }
 .gn-project__search {
   min-height: 2.75rem;
   min-width: 12.5rem;

@@ -822,9 +822,13 @@ chip it is easy to mistake, are described in that section above.
 In the controls row above the tabs, beside the **Filters** button, there is a single switch:
 **"Only tickets in progress"**.
 
-Turn it on and you get a note: *"the list, calendar, timeline and backlog are asking only for tickets in
+Turn it on and you get a note: *"The list, calendar, timeline and backlog are asking only for tickets in
 progress — not started and done are both excluded, and the backlog is emptied. The board is not
 narrowed."*
+
+That line is always there, sitting between the project's title and the tab strip; with the switch off it
+is simply empty. So turning the switch on changes what the line **says** and never what the page
+**looks like** — nothing above or below it moves.
 
 > **Read that last sentence carefully.** The switch **does not affect the Board** — and a project opens
 > on the Board the first time you look at it. So you can turn it on, read "done are excluded", and be
