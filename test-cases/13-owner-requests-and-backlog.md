@@ -3300,23 +3300,58 @@ same workflow at the same version, so a user-only key would share one collapsed 
   that never collapsed anything) — and with its own control in the same case: the identical fixture with
   a SECOND group added IS collapsed by the empty-group rule.
 
-**Mutation witnesses, each run rather than reasoned** (post-commit, restored after each):
+**Mutation witnesses — MEASURED, not predicted.** Each was applied to the committed tree, run against
+`board-workflow-collapse.test.tsx`, and restored from the commit afterwards (`19–20` tests in the file, so
+the "passed" column is what stayed green). ⚠ **An earlier draft of this block carried PREDICTIONS written
+before the runs, and two of them were WRONG** — they are corrected here rather than quietly dropped,
+because a mutation table nobody re-measured is the "a check that cannot fail" shape one level up:
 
-- `defaultCollapsed`'s `board.groups.length > 1` term dropped → `13.1420` reddens (a lone empty group
-  collapses); `13.1413`, `13.1412` and `13.469` redden with it.
-- `groupIsEmpty` replaced by `() => false` → `13.1407`, `13.1409`, `13.1415`, `13.1419` redden; `13.1408`
-  and `13.1420` stay green, which is correct and is why the empty-default arms have their own cases.
-- the `hidden` attribute dropped from the rail → `13.1407`, `13.1409`, `13.1410`, `13.1412`, `13.1420`.
-- `aria-expanded={expanded}` replaced by `aria-expanded={true}` → `13.1406`, `13.1410`, `13.1416`,
-  `13.1418`.
-- the auto-expand effect's `!Object.hasOwn(groupChoices, key)` term dropped → `13.1416` reddens and
-  `13.1415` stays green: the two arms of the reconciliation.
-- the effect's `previous` guard dropped → `13.1415` still passes, and the WRITE becomes per-render;
-  recorded as a surviving-mutation honest note, since only the store's write count can see it (owed).
-- the caret element replaced by a typed `▸` in the button's text node → `13.1417`.
-- `currentUserId` ignored (always read/written as `''`) → `13.1414`'s arms.
-- the `hidden` guard on the toggle removed (`hidden={false}`) → `13.1418` reads the attribute selector
-  with no writer, and `13.1409`'s collapse arms go red.
+| mutation | reddened |
+|---|---|
+| `defaultCollapsed`'s `groups.length > 1` term dropped | `13.1413`, `13.1420` (3 failed) |
+| `groupIsEmpty` → `return false` | `13.1406`, `13.1407`, `13.1409`, `13.1414`, `13.1415`, `13.1419`, `13.1420` (11 failed) |
+| the rail's `hidden` attribute never written | `13.1407`, `13.1409`, `13.1410`, `13.1411`, `13.1412`, `13.1413`, `13.1414`, `13.1415`, `13.1416`, `13.1418`, `13.1419`, `13.1420` (14 failed) |
+| `aria-expanded` pinned to `true` | `13.1406`, `13.1410`, `13.1411`, `13.1416` (4 failed) |
+| the auto-expand effect's `previous` guard dropped | `13.1414`, `13.1415`, `13.1416` (6 failed) |
+| the toggle's write-through removed | `13.1414`, `13.1416` (2 failed) |
+| `readWorkflowCollapse` ignores the stored user id | `13.1414` (1 failed) |
+| the caret typed into the button's text node | `13.1417` (1 failed) |
+| the toggle's `type="button"` changed | `13.1406` (1 failed) |
+| the toggle's `aria-controls` removed | `13.1406` (1 failed) |
+| `.gn-board__rail[hidden]` deleted from `ui.css` | `13.1418` (1 failed) |
+| the caret's `content` glyphs replaced with `none` | `13.1418` (1 failed) |
+
+**Two findings from the round that contradict what was expected, both kept:**
+
+- **The write-storm guard IS witnessed, which I had assumed it would not be.** Dropping the effect's
+  `previous` guard reddens `13.1415` — the arm added for the owner's own warning (*"a naive effect here is
+  a write storm against the preferences door"*), which counts writes through `Storage.prototype.setItem`.
+  Without that arm the mutation SURVIVES silently, because every other case reads the record's VALUE and a
+  rewrite of the same bytes reads back identical. **⚠ And the spy must be on `Storage.prototype`, measured
+  rather than styled:** `vi.spyOn(window.localStorage, 'setItem')` and a plain instance assignment each
+  recorded **0** calls while the write succeeded — jsdom's `localStorage` is a Proxy that answers a bound
+  method from its internal store, so an instance-level instrument reports "no write storm" over any number
+  of writes, including the storm. The prototype-level spy recorded it.
+- **A prediction of mine was wrong: `13.1412` was expected to redden under the first mutation and does
+  not** — correctly: its fixture holds
+  a lone group WITH a card, so dropping the lone-workflow term of the default cannot change it. The
+  prediction was mine and it was wrong.
+
+**⚠ TWO MUTATIONS ARE OWED, named rather than implied, because the checkpoint interrupted the round.**
+Both were re-anchored after the first pass produced a NON-RESULT and a no-op, and NEITHER HAS BEEN RUN:
+
+1. **the auto-expand effect's `Object.hasOwn(groupChoices, key)` term removed.** The first attempt cut the
+   line mid-condition, leaving `&&\n      ) {` — a source that does not PARSE, so vitest never ran the
+   file and printed no summary line. That is a NON-RESULT, not a surviving mutation, and reading it as a
+   survivor would have credited the guard with nothing. It is the term that keeps auto-expand off a
+   detection a person made, so this is the single most important mutation still owed.
+2. **the rail's `id` made to disagree with its `aria-controls`.** The first attempt renamed BOTH sides
+   (`railId` is read by both), so the property "the control names the element that exists" was never
+   disturbed and the file stayed 20/20 green — a mutation that mutated nothing.
+
+**And `13.1408` has no killer in this set**, stated rather than left to be discovered: it is the control arm
+of `13.1407`, true both before and after the feature, so nothing above reddens it. The mutation that would
+is inverting the default for a group that is NOT empty; that is owed too.
 
 **One case elsewhere was AMENDED, and the amendment is a behaviour change rather than a repair.**
 `apps/web/test/board-narrowing.test.tsx` `13.469` asserted that a one-workflow board renders NO level-2
