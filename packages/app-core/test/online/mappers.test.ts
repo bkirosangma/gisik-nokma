@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest';
 import { DEFAULT_VIEW_PREFS, type RosterMember } from '../../src/view-types.js';
 import { SYSTEM_ACTOR_AUTO_CLOSE, SYSTEM_ACTOR_NAMES } from '@gisik-nokma/domain';
 import { actorLabel } from '../../src/provenance.js';
+import type { BoardView } from '../../src/view-types.js';
 import type {
   AttentionResponse,
   BoardResponse,
@@ -66,6 +67,8 @@ function serverCard(overrides: Partial<TicketCard> = {}): TicketCard {
     collaboratorIds: [],
     title: 'File the GST return',
     dueDate: { state: 'never-claimed' },
+    // Spec 2026-09-22: the card carries its key, or `null` when the ledger holds no prefix.
+    key: 'CCSO-7',
     // REQUIRED on the wire (spec 2026-09-22) and read unconditionally by both
     // card mappers; `P2` is the birth default `assembleTicketCards` serves for a
     // ticket nobody has re-prioritised. The `3.968`/`3.969` cases below are the
@@ -2944,5 +2947,28 @@ describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body wi
     delete omitted['assignedProvenance'];
     expect(() => mapTicketRead(omitted)).toThrow(/ticket\.assignedProvenance: expected an object/);
     expect(() => mapTicketRead(omitted)).toThrow(MappingError);
+  });
+});
+
+/**
+ * 13.1280 — the key crosses the wire as the card's own fact (owner, 2026-09-22).
+ * `null` is a real answer ("no prefix in the ledger") and survives; an ABSENT
+ * key is a body the server does not send and is refused, so a mapper that
+ * forgot the field cannot look like a workspace without a prefix.
+ */
+describe('13.1280 the board card key', () => {
+  const body = (card: Partial<TicketCard>) => ({
+    workspaceId: '01J9GWS0000000000000000000',
+    projectId: '01J9GPRJ000000000000000000',
+    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [serverCard(card)] }],
+  });
+  it('carries the key, keeps null, refuses absence', () => {
+    const firstCard = (view: BoardView) => view.groups[0]!.columns[0]!.cards[0]!;
+    expect(firstCard(mapBoardView(body({ key: 'CCSO-7' }))).key).toBe('CCSO-7');
+    expect(firstCard(mapBoardView(body({ key: null }))).key).toBeNull();
+    const { key: _dropped, ...without } = serverCard();
+    const absent = body({});
+    absent.columns[0]!.cards = [without as TicketCard];
+    expect(() => mapBoardView(absent)).toThrow(/key/);
   });
 });

@@ -1117,6 +1117,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // disagree about whether a date is claimed.
           dueDate: dueDateOf(state),
           priority: priorityOf(state),
+          // `null`, honestly: the replica holds no workspace or project prefix and
+          // no per-project number, so it cannot compose a key — the same
+          // under-claim `rollup: null` above makes, for the same reason.
+          key: null,
           pending: pendingIds.has(state.id),
         };
       }

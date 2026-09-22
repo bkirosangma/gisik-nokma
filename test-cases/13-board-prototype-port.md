@@ -2367,6 +2367,32 @@ its own class, the wrapper is transparent, and the placeholder is drawn in the i
   `is-editor-empty` paragraph, and a FILLED editor has no such paragraph. This case passed BEFORE the
   change (the attribute was always there), which is what shows the defect was paint, not data.
   `packages/editor/test/ticket-editor-slot.test.tsx`.
+
+### Follow-up (owner, 2026-09-22): the board card carries its key — cases `13.1278`–`13.1281`
+
+Owner: *"in the board, i want the ticket keys to be shown like in the prototype"* (`GN-1101 · Due 19 Oct`,
+`desktop.dc.html:2496-2504`). `BoardCard`'s own docblock recorded the gap: the wire carried no key, and a
+card had nothing to compose one from. `TicketCard.key: string | null` now travels on every card-building
+route, composed by `assembleTicketCards` from the three ledger facts the single-ticket read already uses for
+its crumb — workspace prefix, project prefix, per-project number — batched per workspace; `null` when any is
+missing, never a partial key. The offline replica answers `null` (it holds no prefixes). The card draws a
+meta line under the chips, key first, then the due label with its late tone; the due half keeps the product's
+one date formatter rather than the prototype's `Due 19 Oct` (ruling E5-2). The list row gets no key here.
+`apps/server/src/read/ticket-cards.ts`, `packages/domain/src/read-models.ts`,
+`packages/app-core/src/{view-types.ts,online/mappers.ts,replica/replica-data-source.ts,views/board.tsx}`.
+
+- **13.1278** ✅ Every card carries the key the single-ticket route would compose for it: in the read scenario
+  (no entered prefixes) two consecutively created tickets read `CCRE-n` and `CCRE-(n+1)`, equal to
+  `ticketKey('CC', 'RE', number)` with the number read back through `ticketNumbers`.
+  `apps/server/test/read/ticket-cards.test.ts`.
+- **13.1279** ✅ `composeCardKey` answers `null` when the workspace prefix, the project prefix or the number is
+  missing, and the full key only when all three are present. `apps/server/test/read/ticket-cards.test.ts`.
+- **13.1280** ✅ `mapBoardView` carries the key, keeps `null`, and REFUSES an absent key as a mapping error
+  naming `.key`. `packages/app-core/test/online/mappers.test.ts`.
+- **13.1281** ✅ The card's meta line reads `KEY · <due>` with the key first and the due span keeping its class;
+  CONTROL — a `null` key draws the due label alone with no separator; CONTROL — a key with no due date draws
+  the key alone. `packages/app-core/test/views/board.test.tsx`. The real-door round trip asserts `RTSF-1` /
+  `RTSF-2` on the attention and board bodies (`apps/server/test/integration/real-door-round-trip.test.ts`).
   `packages/editor/test/editor-css-binding.test.ts`.
 
 **This entry also carries the `Features.md` change**, in the same commit: §9's `<EditorSlot>` bullet now
@@ -2404,3 +2430,33 @@ contract across a boundary was run at Node v22.22.2 and is green — `packages/e
   default, so a card without a level is not a state this product has; a one-armed assertion would be
   satisfied by a tone that is always on and by one that is never on alike. —
   `packages/app-core/test/views/board.test.tsx`
+
+## The project head row arranged as the prototype's two rows (owner, 2026-09-22)
+
+- **13.1302** ✅ The breadcrumb `<p>`, the `<h1>` and the archived line are all descendants of ONE
+  `.gn-project__identity` element, **in that DOM order** — containment alone would pass for a column
+  holding all three in the wrong sequence, so the order is asserted separately. —
+  `apps/web/test/project-page-head.test.tsx`
+- **13.1303** ✅ That identity column and the `.gn-project__header` that carries the search box are BOTH
+  direct children of the SAME `.gn-project__head` element; **control in the same case** — the rail
+  (`tablist` named `Project view`) is NOT inside `.gn-project__head`, because a head row swallowing the
+  rail too would satisfy every containment arm while collapsing the prototype's two rows into one. —
+  `apps/web/test/project-page-head.test.tsx`
+- **13.1304** ✅ The stylesheet pins the arrangement: `packages/ui/src/ui.css` declares
+  `.gn-project__head` with `justify-content: space-between`, `flex-wrap: wrap` and `margin-top: 1.5rem`,
+  and `.gn-project__identity` with `flex-direction: column`; **control in the same case** —
+  `.gn-project__header` no longer declares `margin-top` at all, so the 24px row margin is counted once
+  rather than twice (both rules carrying it would double the gap to 48px). Selector patterns are anchored
+  `^\.gn-project__head\s*\{` so neither name can report the other's body. —
+  `apps/web/test/project-page-head.test.tsx`
+
+- **13.1305** ✅ The view rail (`tablist` named `Project view`) carries the class `gn-project__rail` **and
+  still `gn-segmented`** — the shared component appends a caller's class rather than substituting it, and
+  every `.gn-segmented` selector in the repo (plus the 3.974 shadowing guard) reads that base class. —
+  `apps/web/test/project-page-head.test.tsx`
+- **13.1306** ✅ The opt-out is pinned where it lives: `apps/web/app/globals.css` declares
+  `.gn-project__rail` with `align-self: flex-start` and `flex-wrap: wrap`, and
+  `.gn-project__rail .gn-segmented__item` with `flex: none`; **control in the same case** —
+  `packages/ui/src/ui.css`'s own `.gn-segmented__item` rule still declares `flex: 1`, so a fix that
+  edited the SHARED rule would be caught here rather than by `/sign-in` and `/inbox` breaking silently. —
+  `apps/web/test/project-page-head.test.tsx`

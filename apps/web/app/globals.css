@@ -1222,8 +1222,24 @@ input, textarea, select { font-family: inherit; }
    and eat the click. `margin-top: auto` pins it to the card's bottom now that
    every card in a row is the tallest one's height (Round 22): equal-height
    cards with buttons floating at different heights is the complaint the height
-   change would otherwise have traded for, so the two belong together. */
-.gn-project-card__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; position: relative; z-index: 1; margin-top: auto; }
+   change would otherwise have traded for, so the two belong together.
+
+   SHRINK-TO-FIT, and the lift above is exactly why it has to be. This strip is
+   a flex item of the COLUMN `.gn-project-card`, whose default
+   `align-items: stretch` widens every child to the card's inner width — and a
+   stretched strip has its WHOLE box raised above the door, so every pixel of
+   it that is not the button is a dead zone: the pointer there hits the strip,
+   not the door's overlay, and the card neither lights nor navigates. Owner,
+   2026-09-22, from one screenshot of this page: the container measured
+   362.66 x 44 against a ~186-wide Archive button, *"it has this wide empty
+   space there, which gets in the way of clicking the card. Make the container
+   size be the same as the button size."* `align-self` names the mechanism —
+   the parent's `stretch` — rather than fighting it with a width, so the strip
+   is now exactly its content (the one button, or several plus the `gap`) at
+   the card's left edge, still pinned to the bottom, and `flex-wrap` still
+   wraps if that content ever exceeds the card width. 13.1297 holds both
+   halves: the shrink, and that this lift survived it. */
+.gn-project-card__actions { display: flex; flex-wrap: wrap; gap: 0.625rem; position: relative; z-index: 1; margin-top: auto; align-self: flex-start; }
 /* Archive/Restore lights up UNDER THE POINTER, and the card body does not
    (Round 21, owner: "on hover over the archive button, light up the button and
    the card body stays normal").
@@ -2399,6 +2415,34 @@ input, textarea, select { font-family: inherit; }
    its container. */
 .gn-legal__head .gn-segmented { flex: none; }
 .gn-legal__tabs .gn-segmented__item { flex: none; padding: 0 0.85rem; text-decoration: none; }
+
+/* ── The project page's view rail (owner, 2026-09-22): CONTENT-SIZED, at the
+   left of its row — the same opt-out the legal head above makes, for the same
+   reason, and written HERE for the same reason too.
+
+   The prototype's rail is an `inline-flex` track (`desktop.dc.html:340`), so its
+   tabs are as wide as their labels plus padding. Rendered as a direct child of
+   the `.gn-project` COLUMN (`ui.css:5602`), the track fills that column and the
+   shared `.gn-segmented__item`'s `flex: 1` then spreads the five tabs evenly
+   across the full width — which is the spread the owner put beside the
+   prototype's screenshot. `align-self: flex-start` shrinks the track to fit;
+   `flex: none` on the items stops them sharing a width that no longer exists.
+
+   `flex-wrap: wrap` so five tabs that no longer fit one line WRAP at phone width
+   instead of overflowing the page. The items already carry `padding: 0 1rem`
+   (E4-35, `ui.css:5364`), so a content-sized tab is its label plus 2rem, and the
+   shared rule's `min-height: 2.75rem` tap floor still holds.
+
+   **Why not beside `.gn-project__*` in `ui.css`:** `packages/ui/test/components.test.tsx`
+   resolves a rule with a FIRST-MATCH SUBSTRING regex over `ui.css` (`:548`), so a
+   descendant selector ending in `.gn-segmented__item {` written anywhere in that
+   file can become the body its `13.1153` cases read. Keeping these here leaves
+   that helper's universe exactly as it was.
+
+   The shared control is NOT changed: `.gn-segmented__item` keeps `flex: 1`, so
+   every container-filling site (`/sign-in`, `/inbox`) still shares its row. */
+.gn-project__rail { align-self: flex-start; flex-wrap: wrap; }
+.gn-project__rail .gn-segmented__item { flex: none; }
 
 /* ── The anchor row (`legalToc`, `:1741-1745`) ─────────────────────────────
    2.75rem again, and here it is a DELIBERATE departure from the export, whose

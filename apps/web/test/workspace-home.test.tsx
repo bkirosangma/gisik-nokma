@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { cleanup, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
@@ -6,6 +9,7 @@ import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { tintIndexOf } from '@gisik-nokma/ui';
 import WorkspaceHomePage from '../app/w/[workspaceId]/page.js';
 import { Providers } from '../src/providers.js';
+import { ruleFor } from './helpers/css-rule-scan.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -34,6 +38,12 @@ import { stubServices } from './helpers/stub-services.js';
 const WORKSPACE = '01J9WORKSPACE0000000000000';
 const OTHER_WORKSPACE = '01J9WORKSPACE1111111111111';
 const KIRO = '01J9USER000000000000000000';
+
+/** The stylesheet the project card's rules live in, read as SOURCE — see
+ * 13.1297 at the foot of this file for why that is the only available
+ * instrument here. */
+const TEST_DIR = dirname(fileURLToPath(import.meta.url));
+const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 
 vi.mock('next/navigation', () => ({
   useRouter: () => ({ push: vi.fn() }),
@@ -1307,5 +1317,68 @@ describe('13.1217 the bar’s project item and the card door do not share one na
     // THE WHOLE PAGE, not the row: exactly one link answers to the project's
     // name, and it is the door. Two would be the defect this case exists for.
     expect(screen.getAllByRole('link', { name: 'Shop operations' })).toEqual([door]);
+  });
+});
+
+/**
+ * 13.1297 — the project card's Archive/Restore strip is the BUTTON's size, not
+ * the card's width (owner request, 2026-09-22, one screenshot).
+ *
+ * ## What the owner measured
+ *
+ * On this page the card's actions container `div.gn-project-card__actions`
+ * measured **362.66 × 44** while the Archive button inside it is about **186**
+ * wide, and the instruction was *"make the container size be the same as the
+ * button size"*. The 176px between them is not cosmetic. `.gn-project-card` is
+ * a column flex container, so its default `align-items: stretch` widened every
+ * item to the card's inner width — and this strip is the ONE child also raised
+ * above the door's stretched `::after` (`position: relative; z-index: 1`, the
+ * very lift the control arm below holds). So every pixel of the strip that was
+ * NOT the button sat over the door rather than under it: the pointer there hit
+ * the strip, not the overlay, and the card neither lit nor navigated. The
+ * card's clickable area was a rectangle with a 176px hole in it.
+ *
+ * ## Why a source scan rather than a render
+ *
+ * These component tests never load the real stylesheet into jsdom, so nothing
+ * rendered here could observe a flex stretch — the same reason
+ * `workspace-restricted-spacing.test.ts` (13.408) reads the source. The fix is
+ * one declaration, so the source text is the whole claim.
+ *
+ * ## The control arm, and why it is in the same `it`
+ *
+ * `align-self: flex-start` is what makes a child of a column container
+ * shrink-to-fit. The control asserts `position: relative` and `z-index: 1` are
+ * STILL declared, because the shrink only helps while the strip also stays
+ * above the door: a "fix" that bought the width by dropping the lift would put
+ * the door's transparent overlay back over Archive/Restore and eat the click on
+ * exactly the pixels this change rescues. The two are one assertion about one
+ * shape — a separate `it` would let the destructive variant report green on the
+ * arm that matters.
+ *
+ * The selector is ANCHORED (`^`) and the rule is a single line, both
+ * deliberately: `globals.css:1248`–`:1256` open three further rules beginning
+ * with `.gn-project-card__actions ` (then a space and `.gn-button`), so an
+ * unanchored substring match would find one of those on a LATER line first —
+ * the first-match landmine 3.974 records.
+ */
+describe('13.1297 the project card’s actions strip is content-sized', () => {
+  it('13.1297 declares align-self: flex-start, keeping the lift above the door', () => {
+    const css = readFileSync(GLOBALS_CSS_PATH, 'utf8');
+    const rule = ruleFor(css, /^\.gn-project-card__actions\s*\{/);
+    expect(rule, 'no rule found for .gn-project-card__actions').toBeDefined();
+
+    // The fix: shrink-to-fit, so the strip is the button's box, not the card's.
+    expect(rule).toMatch(/align-self:\s*flex-start/);
+
+    // The control: the lift that keeps Archive/Restore above the door is
+    // unmoved. See the docblock — an `align-self` that arrived by deleting
+    // either of these is not a fix.
+    expect(rule, 'the lift that keeps the button above the door is missing').toMatch(
+      /position:\s*relative/,
+    );
+    expect(rule, 'the lift that keeps the button above the door is missing').toMatch(
+      /z-index:\s*1\b/,
+    );
   });
 });

@@ -83,6 +83,7 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     // claims no date", the same default `boardCardSeed` uses. No case in this
     // file is about the due label.
     dueDate: null,
+    key: null,
     // REQUIRED since spec 2026-09-22 and never nullable: the birth default,
     // attributed to the same seeded claimant `claim()` names.
     priority: { value: 'P2', claim: claim() },

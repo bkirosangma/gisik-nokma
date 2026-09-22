@@ -1163,6 +1163,13 @@ button.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
+/* The prototype's meta line under the chips (`desktop.dc.html:2496-2504`), key first
+   (owner, 2026-09-22). One muted 13px run — `GN-1101 · 19 Oct 2026` — in the ink the
+   due label already wears, so the two halves read as one sentence; the late tone on
+   the due half stays its own. */
+.gn-board-card__meta-line { margin: 0.25rem 0 0; font-size: 0.8rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+.gn-board-card__key { color: var(--gn-text-muted); }
+.gn-board-card__meta-sep { color: var(--gn-text-muted); }
 /* Spec 2026-09-22: every card carries a priority, and P1 takes the SAME ink the
    late due label uses — the pair measured in the block above, on the same
    ground, clearing 4.5 in all six style×theme combinations. P2 is the default
@@ -5352,8 +5359,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
      `/inbox`, where `div.gn-inbox__header` is `justify-content: space-between`
      and the track is therefore content-sized: the *All* tab painted **31×44**
      while *Unread* took 64 and *Mentions* 78, i.e. the width of the word. On
-     the board the same class paints 92×44 and is unchanged by this, because
-     that track already fills its row and `flex: 1` distributes the extra.
+     the board the same class painted 92×44 and was unchanged by this, because
+     that track filled its row and `flex: 1` distributed the extra — **no longer
+     true since 2026-09-22**: the board's rail is content-sized at the left of
+     its row as the prototype draws it, so `flex: 1` has nothing to share there
+     either. That is the board opting out through `.gn-project__rail` in
+     `apps/web/app/globals.css`; this rule is unchanged and still distributes
+     for every container-filling site (`/sign-in`, `/inbox`).
 
      1rem is the prototype's own `padding:0 16px` on a segment. */
   padding: 0 1rem;
@@ -5621,7 +5633,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    product for one page's inset — `.gn-workspaces`' own docblock already made
    and recorded this exact trade-off for its own axis, and this rule inherits
    that reasoning on both axes rather than re-deriving it. */
-.gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; margin-top: 1.5rem; }
+.gn-project__header { display: flex; flex-wrap: wrap; align-items: center; gap: 0.75rem; }
 .gn-project__breadcrumb { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
 .gn-project__title { font-size: 2.125rem; line-height: 2.5625rem; font-weight: 700; letter-spacing: -0.025rem; margin: 0; }
 /* E2-38 (round-2 ruling, 2026-09-21): the archived chip on an archived project's
@@ -5630,6 +5642,32 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    state as a separate fact — the shape `/workspaces`' card gets from its
    `aria-label` instead, which a heading cannot carry. */
 .gn-project__archived { display: flex; align-items: center; gap: 0.5rem; margin: 0.5rem 0 0; }
+/* ── THE HEAD ROW (owner, 2026-09-22). The prototype's project header is TWO
+   rows (`desktop.dc.html:319-341`) inside a `flex-direction: column; gap: 14px`
+   wrapper (`:319`): row 1 (`:320`) is
+   `display:flex; gap:12px; align-items:center; flex-wrap:wrap;
+   justify-content:space-between; margin-top:24px` and holds a LEFT identity
+   column (`:321-323`, `flex-direction:column; gap:4px`) — the crumb `<p>` over
+   the `<h1>` — beside the RIGHT controls row (`:325`). These two rules are that
+   row 1 and its identity column; the rail row below is Task 2's.
+
+   **WHY THE `margin-top` MOVED UP HERE.** It used to sit on
+   `.gn-project__header` — correct while the controls were the top of the page.
+   In the prototype the margin belongs to the row that holds BOTH the identity
+   and the controls, so leaving it on the header as well would have stacked the
+   two and doubled the gap to 48px. It is declared once, here.
+
+   **WHAT THIS SUPERSEDES.** `page.tsx` moved the title OUT of the controls row
+   in fix round 2, because a 34px `<h1>` that was a SIBLING of the controls row
+   (`align-items: center`) got vertically centred on one line with the 13px
+   crumb and the buttons. The owner's 2026-09-22 instruction (*"the build's
+   project header and controls area. arrange it more like the prototype"*) puts
+   the crumb and the title back in the same ROW as the controls — but in their
+   own COLUMN, which is the prototype's own construction and is what answers
+   round 2's objection: the `<h1>` is not a flex item of the controls row, it is
+   the second line of a column beside it. */
+.gn-project__head { display: flex; flex-wrap: wrap; align-items: center; justify-content: space-between; gap: 0.75rem; margin-top: 1.5rem; }
+.gn-project__identity { display: flex; flex-direction: column; gap: 0.25rem; }
 
 /* ── Board client narrowing (board-prototype-port, Task 4, 2026-09-16).
    Step 1's four rules, verbatim (`.gn-project__narrowing`/`__count`/

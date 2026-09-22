@@ -1242,3 +1242,34 @@ describe('13.1237 the board card draws the priority badge; P1 carries the danger
     expect(screen.getAllByText(/^P[123]$/)).toHaveLength(2);
   });
 });
+
+/**
+ * 13.1281 — the prototype's meta line (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
+ * dueLabel].join(" · ")`), with the KEY first (owner, 2026-09-22). The due half keeps
+ * the product's one date formatter and its late tone (13.1177) — the prototype's
+ * `Due 19 Oct` spelling is not transcribed, because a second date spelling on one
+ * card is the drift ruling E5-2 closed. A `null` key (a workspace whose ledger holds
+ * no prefix, or the offline replica) draws the due label alone: no dash, no
+ * placeholder key.
+ */
+describe('13.1281 the board card meta line leads with the ticket key', () => {
+  const DUE = '2026-10-19';
+  it('13.1281 draws `KEY · <due>` in one meta line, key first', () => {
+    render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1101', dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
+    const key = screen.getByText('GN-1101');
+    expect(key.className).toContain('gn-board-card__key');
+    const line = key.closest<HTMLElement>('.gn-board-card__meta-line')!;
+    expect(line.textContent).toBe(`GN-1101 · ${formatDate(DUE)}`);
+    expect(within(line).getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
+  });
+  it('13.1281 CONTROL — a null key draws the due label alone, with no separator', () => {
+    render(<Board board={errandBoard([boardCardSeed({ key: null, dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
+    const line = screen.getByText(formatDate(DUE)).closest<HTMLElement>('.gn-board-card__meta-line')!;
+    expect(line.textContent).toBe(formatDate(DUE));
+    expect(line.querySelector('.gn-board-card__key')).toBeNull();
+  });
+  it('13.1281 CONTROL — a key with no due date draws the key alone', () => {
+    render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1102', dueDate: null })])} onOpenTicket={() => {}} />);
+    expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102');
+  });
+});
