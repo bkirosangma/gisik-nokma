@@ -362,12 +362,17 @@ describe('13.304 — the List narrows at the real door when the checkbox is tick
     // display names (the `memberLabel` join, case 13.1290), which carries no
     // filter and is not what this arm is about. That request is asserted
     // present, so the exclusion is a partition rather than a narrowing of the
-    // evidence.
+    // evidence — and the partition CARRIES its total below, because
+    // `pages = 1` and `rosters = 1` are both satisfied by a walk that made a
+    // third request too.
     const narrowedCalls = calls.slice(callsBefore);
     const narrowedPages = narrowedCalls.filter((url) => url.includes('/tickets?'));
+    const narrowedRosters = narrowedCalls.filter((url) => url.includes('/members'));
     expect(narrowedPages).toHaveLength(1);
     expect(decodeURIComponent(narrowedPages[0] ?? '')).toContain('"stateCategory":"active"');
-    expect(narrowedCalls.filter((url) => url.includes('/members'))).toHaveLength(1);
+    expect(narrowedRosters).toHaveLength(1);
+    expect(narrowedCalls).toHaveLength(2);
+    expect(narrowedPages.length + narrowedRosters.length).toBe(narrowedCalls.length);
 
     // ─── THE BOARD READ IS UNNARROWED — a SUPPORTING fact, NOT the negative arm ─
     // `getBoard(projectId)` takes NO filter (`data-source.ts:142`), so the Board's
