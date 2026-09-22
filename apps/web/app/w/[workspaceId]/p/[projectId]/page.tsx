@@ -3229,6 +3229,30 @@ function ProjectBoard() {
           workspaceName={workspaceName}
           projectName={projectName}
           /*
+            WHERE THE TWO CRUMBS GO — the locations this page already knows
+            (owner request, 2026-09-22: *"the workspace and the project should
+            also be clickable from the breadcrumb"*). The sheet renders them as
+            `<a href>` and cannot import Next's `Link`, so the router comes in
+            beside them; the component's own suite holds the click rules.
+
+            ⚠ `scroll` IS FALSE FOR THE PROJECT CRUMB AND TRUE FOR THE
+            WORKSPACE'S, and that difference is the owner's other report:
+            opening or closing the sheet was scrolling the page to the top,
+            because Next 15's `router.push(href)` scrolls by default (measured
+            in the running app: `scrollY` 600 → 0 on a default push, 600 → 600
+            with `{ scroll: false }`). The project crumb pushes the path this
+            page is ALREADY on — it closes the sheet by leaving `?ticket=`, the
+            same navigation `closeTicket` makes — so scrolling would jump to the
+            top of the page the reader is still reading. The workspace crumb
+            leaves for another page, where opening at the top is what a reader
+            expects, so it keeps the default.
+          */
+          workspaceHref={`/w/${workspaceId}`}
+          projectHref={`/w/${workspaceId}/p/${projectId}`}
+          onNavigate={(href) =>
+            router.push(href, { scroll: href !== `/w/${workspaceId}/p/${projectId}` })
+          }
+          /*
             THE EVIDENCE UPLOAD. The sheet has accepted this prop all along
             (`TicketSheetProps.uploadEvidence`) and forwarded it to its own
             `TransitionDialog` (`ticket-sheet.tsx`); THIS CALL SITE never passed

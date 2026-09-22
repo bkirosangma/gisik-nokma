@@ -2495,6 +2495,77 @@ container to change size.
   further rules in `globals.css` begin `.gn-project-card__actions ` — an unanchored match finds one of
   those on a later line first, the first-match landmine `3.974` records. — (`apps/web/test/workspace-home.test.tsx`)
 
+## The workspace and the project are clickable from the breadcrumb (owner request, 2026-09-22)
+
+**One screenshot of the ticket sheet's own bar — `Convenience Corner › Shop operations › CCSO-2 Open
+questions › CCSO-12` — and one sentence:** *"the workspace and the project should also be clickable from
+the breadcrumb."* The parent crumb was already a control (accent ink, opens that ticket's sheet); the two
+crumbs above it were plain text.
+
+**They are LINKS and not buttons, and that is the design rather than an implementation detail.** An
+ancestor crumb is a `<button>` because opening one needs a SERVER LOOKUP first — a parent may sit in
+another project, so `page.tsx` asks `ticketLocation.locate` before it can push anything. The workspace and
+the project are LOCATIONS the host already knows: `/w/<workspaceId>` and
+`/w/<workspaceId>/p/<projectId>`. A known address is an `<a href>`, and that is what buys middle-click,
+open-in-new-tab and copy-link-address — none of which a callback can give. `packages/app-core` renders the
+bare anchor because it is framework-neutral and cannot import Next's `Link` (it already renders bare
+anchors for attachments); the HOST decides whether a click becomes an in-app navigation.
+
+**The component is told the address and the router separately, and both are optional.** `workspaceHref` /
+`projectHref` are where the crumbs go; `onNavigate` is the host's client-side router. A plain left click is
+prevented and routed in-app; a modified click (`metaKey`/`ctrlKey`/`shiftKey`/`altKey`), a non-primary
+button, or an event something above has already prevented is left entirely to the browser. **With no href
+the crumb is the plain span it has always been** — the same degradation the callback-less ancestor crumb
+makes, because *"a control that cannot be honoured"* is not drawn and the NAME is still owed to the
+reader. The nav's whole-or-nothing gate on the two names is untouched: an href does not make a name.
+
+**No `aria-label` is added**, deliberately: a link's accessible name is its own text, and inventing one
+would move the accessible-names ratchet for a control that already has a name.
+
+- **13.1317** ✅ With `workspaceHref`/`projectHref` passed, both crumbs are found by ROLE AND NAME
+  (`within(nav).getByRole('link', { name })`), carry the exact hrefs, wear the `--link` modifier and sit
+  under `sheet-crumb-workspace` / `sheet-crumb-project`; **the ticket's own crumb is still NOT a link**
+  (there is nowhere further to go from here). **The control is in the same case**: mounted WITHOUT the two
+  hrefs, the nav holds no link at all and the two testids are plain `SPAN`s carrying the same names — a
+  caller that cannot route still gets the names. Asserted in one case because the property is a
+  CONDITIONAL: two sibling `it`s would let an unconditional-link version report green on the positive arm.
+  — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.1318** ✅ A plain left click on the project link calls `onNavigate` ONCE with that crumb's href —
+  asserted on the ARGUMENT, because a handler bound to the workspace href for both crumbs would satisfy
+  "the handler ran" — and the default is **prevented**. **Three controls in the same case**: a `metaKey`
+  click and a `button: 1` click each leave `onNavigate` uncalled AND the default unconsumed (routing
+  without consuming navigates twice; consuming without routing does nothing), and with hrefs but NO
+  `onNavigate` a click is not prevented at all, so the anchor navigates natively. `defaultPrevented` is
+  read off a real `MouseEvent` dispatched at the anchor, through a listener on `document` — an ancestor of
+  the container React delegates to, so it runs AFTER the component's handler and reads its decision rather
+  than making one (that listener then prevents the default itself, purely to keep jsdom from logging a
+  navigation it cannot perform). — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+- **13.1319** ✅ `a.gn-ticket-sheet__crumb--link` declares `color: var(--gn-text-accent)` and
+  `text-decoration: none`. **The `text-decoration` is the declaration that would actually be missed**: the
+  product's global link rule (`apps/web/app/globals.css:73`) sets `color` and nothing else, so an unset
+  `text-decoration` leaves the UA's underline standing — and a missing `color` would be invisible on the
+  web surface for exactly that reason, which is why the arm is read from the STYLESHEET. **The control is
+  the button arm's body, in the same `it`**: its `color`, `border` and `cursor` are unchanged and the
+  location body carries no `cursor` and no `button` — because the plausible wrong move is to widen the
+  existing rule into `button.…, a.…`, which would drop the button's resets onto an anchor and leave
+  `ticket-sheet-crumb-css-binding.test.tsx`'s exact-string pin reading a prefix of a longer selector.
+  — (`packages/app-core/test/views/ticket-sheet-crumb-css-binding.test.tsx`)
+- **13.1320** ✅ **AT THE CALL SITE**, which is the half no component test can hold: the sheet accepts
+  `workspaceHref`/`projectHref`/`onNavigate` all along, and a page that never passes them is this
+  repository's signature failure in its client-side form (*a mocked contract is the thing that excuses the
+  server from existing*) — the same shape as `uploadEvidence`, which the sheet had accepted since it was
+  written while this very mount never passed it. The REAL page is rendered, a REAL ticket opened, and the
+  bar read: both crumbs are links named after the served workspace and project, with hrefs
+  `/w/<workspaceId>` and `/w/<workspaceId>/p/<projectId>`. Clicking the PROJECT crumb calls the mocked
+  `router.push` with `/w/<workspaceId>/p/<projectId>` — the sheet-closing path `closeTicket` pushes — and
+  with **`{ scroll: false }`**, because that is the page the reader is already on and Next 15's
+  `router.push` scrolls to the top by default (the owner's report; the sibling lane fixing
+  `openTicket`/`closeTicket` measured it in the running app: `scrollY` 600 → 0 on a default push, 600 → 600
+  with the option). **Two controls in the same `it`**: clicking the WORKSPACE crumb calls
+  `push('/w/<workspaceId>', { scroll: true })` — it leaves for a different page, where the default is
+  wanted, so the option cannot be hard-coded — and the PARENT crumb is still a `button`, because it is the
+  one crumb in this bar that cannot be an address: opening it needs a server lookup first. The fixture
+  carries a parent for exactly that arm. — (`apps/web/test/sheet-crumb-links.test.tsx`)
 ## Opening or closing the ticket sheet does not scroll the page (owner request, 2026-09-22)
 
 **The owner measured it in the running app, twice over:** *"currently, opening a ticket, in the board
