@@ -2468,6 +2468,7 @@ outside it is the live production deploy itself, which is out of scope by the ow
 DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning is verified at deploy time
 (`13.21`), not by CI.)*
 
+- ⚙️ **Go-live day fixes (2026-09-22)** — the first production boot on DigitalOcean found two defects the dev stack could not: the backup worker's 30-day orphan-sweep timer overflowed Node's 32-bit cap and ran in a tight loop (`startScheduler` now arms in chunks ≤ 2^31-1 ms, case `13.1282`), and the image's migration step could not verify the managed cluster's certificate (`apps/server/docker-entrypoint.sh` writes the bound `DATABASE_CA_CERT` to a file and migrates over `sslrootcert`, case `13.1283`). Spaces lives in SGP1, not BLR1 — BLR1 refused bucket creation for this account (`deploy/do/README.md` step 2).
 - ⚙️ **Graceful shutdown on SIGTERM / SIGINT** — `installShutdownHandlers(app, pool)` is installed by
   the one non-test boot path BEFORE `app.listen`, and runs `app.close()` (bounded 5 s) → `pool.end()`
   (bounded 2 s), then lets the event loop drain to exit 0; a whole-process watchdog exits 1 at 8 s if

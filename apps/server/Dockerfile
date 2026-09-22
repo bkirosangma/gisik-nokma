@@ -120,5 +120,11 @@ WORKDIR /app
 COPY --from=build /out ./
 ENV NODE_ENV=production HOST=0.0.0.0 PORT=3000
 EXPOSE 3000
-ENTRYPOINT ["sh", "-c", "set -e; echo 'gisik-nokma: applying migrations...'; node node_modules/node-pg-migrate/bin/node-pg-migrate.js up --migrations-dir migrations; echo 'gisik-nokma: migrations current.'; exec \"$@\"", "--"]
+# The entrypoint is a SCRIPT since go-live day (2026-09-22), not an inline
+# `sh -c`: it grew a branch (write the bound `DATABASE_CA_CERT` to a file and
+# migrate over verified TLS) that no longer fits a JSON-quoted one-liner. It is
+# copied from the build stage, which holds the whole repo at /repo; `/out` is
+# `pnpm deploy`'s pruned tree and does not carry it. Case 13.1283.
+COPY --from=build /repo/apps/server/docker-entrypoint.sh /app/docker-entrypoint.sh
+ENTRYPOINT ["sh", "/app/docker-entrypoint.sh"]
 CMD ["node", "dist/index.js"]

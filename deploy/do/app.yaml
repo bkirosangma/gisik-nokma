@@ -1,6 +1,8 @@
 # DigitalOcean App Platform spec -- the ONLY file that knows the provider.
 # Region: blr (Bengaluru) -- the audience constraint is India-reachable,
-# phone-first; the region is the point, not a default. Spaces is BLR1 for
+# phone-first; the region is the point, not a default. Spaces is SGP1 (not BLR1 — see
+# deploy/do/README.md step 2: on go-live day, 2026-09-22, BLR1 Spaces refused CreateBucket
+# for this account while SGP1 accepted it; app and database stay in BLR1) for
 # the same reason: user uploads stay in India, beside the ledger.
 # DOMAINS: pm.artsourced.in serves the web app, pm-api.artsourced.in serves
 # the API. Two sibling single-label subdomains in the artsourced.in zone,
@@ -178,9 +180,9 @@ services:
       - key: OBJECT_STORE
         value: s3
       - key: OBJECT_STORE_S3_ENDPOINT
-        value: https://blr1.digitaloceanspaces.com
+        value: https://sgp1.digitaloceanspaces.com
       - key: OBJECT_STORE_S3_REGION
-        value: blr1
+        value: sgp1
       - key: OBJECT_STORE_S3_BUCKET
         value: gisik-nokma-attachments
       - key: OBJECT_STORE_S3_FORCE_PATH_STYLE
@@ -278,9 +280,9 @@ workers:
       # reason it is there: Spaces wants subdomain-style addressing;
       # path-style is MinIO's shape, for local dev.
       - key: OBJECT_STORE_S3_ENDPOINT
-        value: https://blr1.digitaloceanspaces.com
+        value: https://sgp1.digitaloceanspaces.com
       - key: OBJECT_STORE_S3_REGION
-        value: blr1
+        value: sgp1
       - key: OBJECT_STORE_S3_FORCE_PATH_STYLE
         value: "false"
       - key: OBJECT_STORE_S3_ACCESS_KEY_ID

@@ -2394,6 +2394,22 @@ one date formatter rather than the prototype's `Due 19 Oct` (ruling E5-2). The l
   CONTROL — a `null` key draws the due label alone with no separator; CONTROL — a key with no due date draws
   the key alone. `packages/app-core/test/views/board.test.tsx`. The real-door round trip asserts `RTSF-1` /
   `RTSF-2` on the attention and board bodies (`apps/server/test/integration/real-door-round-trip.test.ts`).
+
+### Go-live day (2026-09-22): two defects the first production boot found — cases `13.1282`–`13.1283`
+
+The first deployment of `deploy/do/app.yaml` to a real DigitalOcean account (app `61d94fe7`, BLR1) surfaced
+two defects no local stack could: the dev stack speaks plain TCP to Postgres and never sleeps 30 days.
+
+- **13.1282** ✅ `startScheduler` arms a delay longer than Node's 32-bit timer cap (2^31-1 ms, ~24.8 days)
+  in chunks no longer than the cap and fires only when the whole delay has elapsed. The backup worker's
+  monthly orphan sweep (`delayMs = 30 days`) had been clamped to 1 ms with `TimeoutOverflowWarning` and ran
+  in a tight loop from the first second. Asserted on the argument handed to `setTimeout`, because fake
+  timers do not clamp. `apps/server/test/ops/schedule.test.ts`.
+- **13.1283** ✅ The server image's entrypoint is `apps/server/docker-entrypoint.sh`: when `DATABASE_CA_CERT`
+  is bound it writes the PEM to a file and migrates over `sslmode=verify-full&sslrootcert=…` through its own
+  `MIGRATE_DATABASE_URL`, leaving the app's `DATABASE_URL` untouched; without a CA the URL passes through. The
+  first boot had died in the migration step with `SELF_SIGNED_CERT_IN_CHAIN` — the managed cluster's
+  `?sslmode=require` verifies, and its CA is not in the image. `apps/server/test/deploy/entrypoint-ca.test.ts`.
   `packages/editor/test/editor-css-binding.test.ts`.
 
 **This entry also carries the `Features.md` change**, in the same commit: §9's `<EditorSlot>` bullet now

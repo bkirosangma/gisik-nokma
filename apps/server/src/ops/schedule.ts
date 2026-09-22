@@ -167,15 +167,37 @@ export function startScheduler(jobs: ScheduledJob[], alerter: ErrorAlerter): { s
     }
   };
 
+  /**
+   * Arm in CHUNKS no longer than Node's 32-bit timer cap. GO-LIVE DAY, 2026-09-22:
+   * the backup worker's first production boot armed the monthly orphan sweep with
+   * `delayMs = 30 days` (2 592 000 000 ms); Node clamps any `setTimeout` above
+   * 2^31-1 ms (~24.8 days) to ONE MILLISECOND with a `TimeoutOverflowWarning`, so
+   * the sweep ran in a tight loop from the first second. The fix is the classic
+   * one: sleep at most the cap, re-measure what is left, repeat, and run only
+   * when nothing is left. `fireAt` is absolute so clock time consumed by the
+   * chunks is not re-added. Case 13.1282 asserts the argument handed to
+   * `setTimeout`, because fake timers do not clamp and a run count alone could
+   * not see this.
+   */
+  const MAX_TIMER_MS = 2_147_483_647;
   const arm = (job: ScheduledJob, delay: number): void => {
     if (stopped) return;
-    const timer = setTimeout(() => {
+    const fireAt = Date.now() + delay;
+    const tick = (): void => {
       timers.delete(timer);
+      if (stopped) return;
+      const remaining = fireAt - Date.now();
+      if (remaining > 0) {
+        timer = setTimeout(tick, Math.min(remaining, MAX_TIMER_MS));
+        timers.add(timer);
+        return;
+      }
       job
         .run()
         .catch((error: unknown) => onFailure(job.name, error))
         .finally(() => loop(job));
-    }, delay);
+    };
+    let timer = setTimeout(tick, Math.min(delay, MAX_TIMER_MS));
     timers.add(timer);
   };
 
