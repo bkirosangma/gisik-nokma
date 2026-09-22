@@ -2383,4 +2383,4 @@ container to change size.
   these component tests never load the real stylesheet into jsdom, so no render here could observe a
   flex stretch, and the claim is a single declaration. The selector is ANCHORED (`^`) because three
   further rules in `globals.css` begin `.gn-project-card__actions ` — an unanchored match finds one of
-  those on a later line first, the first-match landmine `13.974` records. — (`apps/web/test/workspace-home.test.tsx`)
+  those on a later line first, the first-match landmine `3.974` records. — (`apps/web/test/workspace-home.test.tsx`)

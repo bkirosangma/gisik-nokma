@@ -1360,7 +1360,7 @@ describe('13.1217 the bar’s project item and the card door do not share one na
  * deliberately: `globals.css:1248`–`:1256` open three further rules beginning
  * with `.gn-project-card__actions ` (then a space and `.gn-button`), so an
  * unanchored substring match would find one of those on a LATER line first —
- * the first-match landmine 13.974 records.
+ * the first-match landmine 3.974 records.
  */
 describe('13.1297 the project card’s actions strip is content-sized', () => {
   it('13.1297 declares align-self: flex-start, keeping the lift above the door', () => {
