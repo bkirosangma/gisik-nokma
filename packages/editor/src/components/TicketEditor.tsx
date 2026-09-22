@@ -81,6 +81,19 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         resolveAttachmentUrl:
           props.resolveAttachmentUrl ?? ((attachmentId) => `/v1/attachments/${attachmentId}`),
         ...(props.placeholder === undefined ? {} : { placeholder: props.placeholder }),
+        // SPEC §8.4's reader rule. Spelled as `=== false` rather than
+        // `!props.editable` so it takes the SAME absent-default as the
+        // `editable` binding below (`props.editable ?? true`): an absent prop
+        // means a writable composer, and `!undefined` would have made every
+        // caller that passes nothing a reader.
+        //
+        // Read ONCE, at mount, like every other extension option in this memo
+        // (the deps array is `[]`). That is right for this product's callers —
+        // `TicketEditorSlot.tsx:264` derives `editable` from the SLOT's
+        // `readOnly`, which is a permission that decides the same way for the
+        // life of a mounted editor — and a host that needs it to change must
+        // remount rather than expect the option to follow.
+        readOnly: props.editable === false,
       }),
       createAttachmentPasteExtension({
         uploadAttachment: (file) => propsRef.current.uploadAttachment(file),

@@ -6,6 +6,13 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
+import { TaskList } from '@tiptap/extension-task-list';
+import { TaskItem } from '@tiptap/extension-task-item';
+import {
+  Details,
+  DetailsContent,
+  DetailsSummary,
+} from '@tiptap/extension-details';
 import { VersionedDocument } from './versioned-document.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
@@ -23,6 +30,13 @@ export type EditorSchemaOptions = {
   /** Maps an image node's attachmentId to a URL (Task 3). Defaults to the server route. */
   resolveAttachmentUrl?: (attachmentId: string) => string;
   placeholder?: string;
+  /**
+   * When true, toggling a collapsible changes the view only — a reader must
+   * not write the document (spec §8.4). The Details extension saves the `open`
+   * state in the document only when `persist` is on, so this option is what
+   * makes the reader's toggle a view-local affordance rather than an edit.
+   */
+  readOnly?: boolean;
 };
 
 /**
@@ -111,14 +125,20 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
     // `italic` 2, `code` 1, `strike` 1, `link` 1), firing on external paste,
     // external drop, or an `applyPasteRules` meta (the guard at core
-    // dist:5121-5125); and NINETEEN INPUT RULES across eleven extensions
+    // dist:5121-5125); and TWENTY INPUT RULES across twelve extensions
     // (`heading` 6, `bold` 2, `italic` 2, `codeBlock` 2, `blockquote` 1,
     // `bulletList` 1, `code` 1, `orderedList` 1, `strike` 1,
-    // `horizontalRule` 1, `link` 1), firing from `handleTextInput` as text is
-    // typed (core dist:4834). **The counts were 18 and ten until 2026-09-21,
-    // and `link` is the one that moved** — with the option reversed it
-    // contributes to BOTH censuses, so `test/rule-census.test.ts`'s
-    // `pasted \ typed` set is now empty where it had always been `['link']`.
+    // `horizontalRule` 1, `link` 1, `taskItem` 1), firing from
+    // `handleTextInput` as text is typed (core dist:4834). **The counts were 18
+    // and ten until 2026-09-21, and `link` is the one that moved** — with the
+    // option reversed it contributes to BOTH censuses, so
+    // `test/rule-census.test.ts`'s `pasted \ typed` set is now empty where it
+    // had always been `['link']`. **`taskItem` is the second move and it is
+    // ADDITIVE, 2026-09-23 (Plan 4 Task 1): the notes editor port gave the
+    // document a task list, and its `[ ] ` / `[x] ` rule lands on `taskItem`,
+    // not on `taskList` — so the input total went 19 → 20 and the paste total
+    // did not move at all.** That asymmetry is the reason this paragraph names
+    // the extension each rule belongs to rather than only the totals.
     // Every number and every membership here is asserted per-extension by that
     // file, so a future upgrade that moves one fails there naming the extension
     // rather than reconciling two totals. So `**due soon**` arrives bold whether pasted,
@@ -155,6 +175,22 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     TableRow,
     TableHeader,
     TableCell,
+    // Schema v2's blocks, added by the notes editor port (Plan 4 Task 1).
+    // `nested: true` is TaskItem's only option and it is ON deliberately: a
+    // sub-task is a task item inside a task item, which is what a person
+    // writing a checklist expects from Tab.
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    // `persist: !readOnly` is the whole of spec §8.4's reader rule, expressed
+    // as configuration rather than as a branch in a click handler: an editor
+    // saves the folded state with the document because toggling IS an edit
+    // (D10), and a reader's toggle never reaches the document at all.
+    Details.configure({
+      persist: options.readOnly !== true,
+      HTMLAttributes: { class: 'editor-details' },
+    }),
+    DetailsSummary,
+    DetailsContent,
     // The image node of schema v1 (spec §2: only images embed inline). The
     // default attachment route is stated ONCE, in TicketImage's `addOptions`,
     // and is not restated here: `configure` merges with `mergeDeep` (core

@@ -5,7 +5,7 @@ import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
 
 /**
- * Document schema v1's vocabulary, stated once. The spec calls this set
+ * Document schema v2's vocabulary, stated once. The spec calls this set
  * CLOSED, so the assertions below are equalities, not containments: a node
  * or mark that appears without being named here is as much a defect as one
  * that goes missing. StarterKit ships extensions this product never chose
@@ -16,8 +16,14 @@ import { typeText } from './helpers/type-text.js';
  * Task 4 adds `mention` the same way. That edit is the point — a closed
  * vocabulary should cost one line to widen and should be impossible to widen
  * by accident.
+ *
+ * The notes editor port (Plan 4) widens it a second time and says so, because
+ * `DOC_SCHEMA_VERSION` moved 1 → 2 in the same change: `taskList`, `taskItem`,
+ * `details`, `detailsSummary` and `detailsContent` join here, and `wikiLink`
+ * joins in Plan 4 Task 5. Exported so the tasks that add to it extend THIS
+ * list rather than restating it.
  */
-const SCHEMA_V1_NODES = [
+export const SCHEMA_V2_NODES = [
   'doc',
   'paragraph',
   'text',
@@ -35,19 +41,28 @@ const SCHEMA_V1_NODES = [
   'tableCell',
   'image',
   'mention',
+  // Schema v2's blocks, added by the notes editor port (Plan 4 Task 1).
+  // `wikiLink` is the one node the port adds at Plan 4 Task 5; it is NOT
+  // listed here until the extension exists, because this array is consumed by
+  // the set-equality case below.
+  'taskList',
+  'taskItem',
+  'details',
+  'detailsSummary',
+  'detailsContent',
 ];
 
-const SCHEMA_V1_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];
+export const SCHEMA_V2_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];
 
-describe('document schema v1', () => {
+describe('document schema v2', () => {
   it('exposes every node and mark the spec names', () => {
     const editor = createTestEditor();
     const nodes = Object.keys(editor.schema.nodes);
     const marks = Object.keys(editor.schema.marks);
-    for (const node of SCHEMA_V1_NODES) {
+    for (const node of SCHEMA_V2_NODES) {
       expect(nodes, `schema is missing node "${node}"`).toContain(node);
     }
-    for (const mark of SCHEMA_V1_MARKS) {
+    for (const mark of SCHEMA_V2_MARKS) {
       expect(marks, `schema is missing mark "${mark}"`).toContain(mark);
     }
     editor.destroy();
@@ -56,17 +71,17 @@ describe('document schema v1', () => {
   /**
    * 9.37 — the node and mark vocabulary of the built extension list is pinned by SET equality, not containment, so an extension adding an unnamed node or mark fails here.
    */
-  it('exposes NOTHING the spec does not name — the vocabulary is closed', () => {
+  it('9.261 exposes NOTHING the spec does not name — the vocabulary is closed', () => {
     const editor = createTestEditor();
-    expect(Object.keys(editor.schema.nodes).sort()).toEqual([...SCHEMA_V1_NODES].sort());
-    expect(Object.keys(editor.schema.marks).sort()).toEqual([...SCHEMA_V1_MARKS].sort());
+    expect(Object.keys(editor.schema.nodes).sort()).toEqual([...SCHEMA_V2_NODES].sort());
+    expect(Object.keys(editor.schema.marks).sort()).toEqual([...SCHEMA_V2_MARKS].sort());
     editor.destroy();
   });
 
   /**
-   * 9.38 — `VersionedDocument` stamps `schemaVersion 1` into the serialized doc.
+   * 9.38 — `VersionedDocument` stamps `schemaVersion` into the serialized doc.
    */
-  it('stamps schemaVersion 1 into the serialized doc', () => {
+  it('stamps the schema version the document module names into the serialized doc', () => {
     const editor = createTestEditor();
     const json = editor.getJSON() as { type: string; attrs?: { schemaVersion?: number } };
     expect(json.type).toBe('doc');
@@ -97,7 +112,10 @@ describe('document schema v1', () => {
   it('accepts a version-less doc (attrs default fills in)', () => {
     const editor = createTestEditor(undefined, { type: 'doc', content: [{ type: 'paragraph' }] });
     const json = editor.getJSON() as { attrs?: { schemaVersion?: number } };
-    expect(json.attrs?.schemaVersion).toBe(1);
+    // The default is the constant, not a literal — a version-less document is
+    // stamped with whatever the CURRENT schema version is. Spelling 1 here
+    // would have made this case assert the past.
+    expect(json.attrs?.schemaVersion).toBe(DOC_SCHEMA_VERSION);
     editor.destroy();
   });
 
@@ -389,7 +407,7 @@ describe('behavioural options that spec §2 constrains', () => {
    * The same path, and part of why Task 5's decision is bigger than links:
    * five configured extensions register seven paste rules between them
    * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Its TYPED
-   * sibling — eighteen input rules across ten extensions, behind
+   * sibling — twenty input rules across twelve extensions, behind
    * `enableInputRules` rather than `enablePasteRules` — is a disjoint rule
    * set: disabling either lever was verified to leave the other set firing,
    * so no single lever settles Task 5's decision. Census and dist citations

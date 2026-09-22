@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { docToPlainText } from '@gisik-nokma/domain';
+import { DOC_SCHEMA_VERSION } from '../src/doc.js';
 import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
 
@@ -288,7 +289,10 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     const editor = createTestEditor();
     typeText(editor, '# GST filing');
     const json = editor.getJSON() as { attrs?: { schemaVersion?: number } };
-    expect(json.attrs?.schemaVersion).toBe(1);
+    // The value is the constant, not a literal. Plan 4 Task 1 moved it 1 → 2;
+    // this assertion's claim is "the attrs this schema stamps do not reach the
+    // walker", which is a claim about the CONSTANT, so it reads the constant.
+    expect(json.attrs?.schemaVersion).toBe(DOC_SCHEMA_VERSION);
     expect(editor.getText()).toBe('GST filing\n\n');
     expect(docToPlainText(json)).toBe('GST filing');
     editor.destroy();

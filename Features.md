@@ -1433,26 +1433,30 @@ assigns `Features.md` sections one per implementation plan, so numbering is clai
 rather than taken next-free. (§6 and §7 were named here as absent too; both have since been opened,
 by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is unchanged.)*
 
-- ⚙️ **Document schema v1** — `DOC_SCHEMA_VERSION = 1`, `emptyDoc()`, `isDocJson()`, and
+- ⚙️ **Document schema v2** — `DOC_SCHEMA_VERSION = 2`, `emptyDoc()`, `isDocJson()`, and
   `VersionedDocument`, a replacement for Tiptap's `Document` that carries `schemaVersion` on the doc
   node. The vocabulary is CLOSED: a set-equality test over node and mark types fails when an extension
-  adds one, so a new vocabulary item cannot arrive unnoticed. `packages/editor/src/doc.ts`,
+  adds one, so a new vocabulary item cannot arrive unnoticed. A version-1 document contains none of
+  v2's nodes and renders unchanged under v2. `packages/editor/src/doc.ts`,
   `packages/editor/src/schema/versioned-document.ts`
 - ⚙️ **One extension set for every client** — `buildEditorExtensions(options)` / `EditorSchemaOptions`
-  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`). The single origin of schema v1: web, desktop,
-  the RN webview bundle and every test build their list here, so the schema cannot drift between
-  clients. Everything StarterKit contributes that v1 does not name is switched off by an explicit
-  `false` rather than left to a default — `document` because it is replaced, `link` because it is
-  reconfigured, `underline` because it is not this product's vocabulary.
+  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`, `readOnly`). The single origin of schema v2:
+  web, desktop, the RN webview bundle and every test build their list here, so the schema cannot drift
+  between clients. Everything StarterKit contributes that v2 does not name is switched off by an
+  explicit `false` rather than left to a default — `document` because it is replaced, `link` because it
+  is reconfigured, `underline` because it is not this product's vocabulary.
   `packages/editor/src/schema/extensions.ts`
+- ✅ **Task lists in every document** — `[ ] ` / `[x] ` at a line start; schema is version 2
+  (`DOC_SCHEMA_VERSION`), version-1 documents render unchanged.
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
-  `**due soon**` arrives bold whether typed, pasted or dropped. `autolink`, `linkOnPaste` and
-  `markdownLinks` are all `false`, and they are not sufficient: **seven paste rules across five
-  extensions** and **eighteen input rules across ten** remain live, counted against the built
-  extension list at tiptap 3.30.5, and the two sets sit behind `enablePasteRules` /
-  `enableInputRules` — `Editor` options this function returns `Extensions` for and therefore cannot
-  reach. In tension with spec §2's "nothing silently becomes markup"; **left as it is, deliberately
-  and unruled**, with the census pinned by a test so the number cannot drift silently.
+  `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
+  (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
+  fires), and they are not sufficient: **seven paste rules across five extensions** and **twenty input
+  rules across twelve** remain live, counted against the built extension list at tiptap 3.30.5, and the
+  two sets sit behind `enablePasteRules` / `enableInputRules` — `Editor` options this function returns
+  `Extensions` for and therefore cannot reach. In tension with spec §2's "nothing silently becomes
+  markup"; **left as it is, deliberately and unruled**, with the census pinned by a test so the number
+  cannot drift silently.
   `packages/editor/src/schema/extensions.ts`, `packages/editor/test/rule-census.test.ts`
 - ⚙️ **Ticket image node** — `TicketImage`, `IMAGE_WRAP_MODES` (`inline-left` · `inline-right` ·
   `block`), `ImageWrapMode`, `TicketImageOptions`. Wrap is validated per-attribute at the parse door
