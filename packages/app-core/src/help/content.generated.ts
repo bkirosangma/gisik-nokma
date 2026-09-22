@@ -4405,7 +4405,32 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"the list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
+                    "text": "\"The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "That line is always there, sitting between the project's title and the tab strip; with the switch off it is simply empty. So turning the switch on changes what the line "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "says"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and never what the page "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "looks like"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — nothing above or below it moves."
                   }
                 ]
               },

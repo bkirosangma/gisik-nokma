@@ -2868,3 +2868,54 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   different bodies, which is the line-anchoring (`declarationsFor`) doing the job it exists for.
   **jsdom has no layout engine**, so this case asserts the declarations and NOT a line box — the paint is
   the controller's measurement, not a number invented here. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
+- **13.1381** ✅ **THE SCOPE NOTE IS A STANDING ROW, NOT A CHILD OF THE CONTROLS ROW.** The owner
+  toggled *Only tickets in progress* on the live project page (two screenshots, Board tab, ~1000 CSS px)
+  and the ENTIRE controls row — search, workflow picker, switch, Filters, New ticket — dropped out from
+  beside the title and onto its own line. The note was the cause and it was the LAST child of
+  `.gn-project__header`, a `flex-wrap: wrap` row: **a wrapping flex container's max-content contribution
+  to its parent is all its children on ONE line**, so the ~770 px sentence pushed that row's intrinsic
+  width to ~1400 px against ~625 px without it, and `.gn-project__head` (`flex-wrap: wrap;
+  justify-content: space-between`) wrapped the whole row rather than shrinking the note. The docblock
+  that stood over the old span described the INNER wrap ("it takes its own line rather than pushing the
+  switch away") and missed the OUTER one — it was false and is replaced, not patched. The case asserts
+  the note is a direct child of the `.gn-project` column and the `nextElementSibling` of
+  `.gn-project__head`, before the `Project view` tablist; that it is PRESENT and EMPTY with the switch
+  off and carries the sentence once clicked; and that it is the SAME node across the toggle, so the row
+  is reserved rather than unmounted and remounted. **Controls, all in the same `it`:** the controls row
+  does not contain the note **in either state** — asserted twice, because with the switch off there was
+  nothing to find in the old defect, so a single on-state arm would pass whenever the switch was off and
+  a regression that restored the span would go unseen; and the count of the column's direct children is
+  identical before and after the click, which is what tells "reserved" from "inserted" and is the arm a
+  note written as `activeOnly ? <p…/> : null` — the obvious way to write the pinned markup — fails.
+  Red before the change on the note's absence when off. (Post-commit mutation: restoring
+  `activeOnly ? <p…/> : null` reddens it.) — (`apps/web/test/project-page-head.test.tsx`)
+- **13.1382** ✅ **THE RESERVED BAND IS ITS OWN RULE, PLACED AFTER THE SHARED NOTE RULE.**
+  `.gn-project__scope-row` declares `min-height: 1.125rem` — one line of the note's OWN `line-height`,
+  so the band is the same height in both switch states — and `margin: 0`, because `<p>` carries UA
+  margins and `.gn-project` already spaces its children with `gap: 0.875rem`. Asserted as its own
+  SINGLE-SELECTOR rule (a grouped selector would put the band on every class it named) and as declared
+  AFTER `.gn-project__scope-note` — the order another suite's witness depends on, since
+  `packages/ui/test/components.test.tsx` resolves a rule with an UNANCHORED `UI_CSS.match` (`:548-549`),
+  so a selector NAMING the note placed above `ui.css:5948` matches first and becomes the body its cases
+  read. (`ruleFor`, the shared `test/helpers/css-rule-scan.ts` this case also reads through, is a
+  first-match LINE scan and is safe only because its callers ANCHOR their patterns — the anchoring
+  protects it, not the helper.) **Control, same `it`:** the
+  `.gn-project__scope-note` rule is byte-identical to what it was — its whole declaration list pinned,
+  not just the two declarations this change adds elsewhere — because the one-line way to reserve a band
+  is a `min-height` on that rule itself, which would satisfy every assertion above while changing the
+  treatment of a class the BOARD tab also renders (`board-scope-note`). Both position reads and the
+  single-selector read run on COMMENT-STRIPPED text: `ui.css:5799` carries prose naming
+  `.gn-project__scope-note`, so a raw sweep can find a comment and report its position as the rule's.
+  (Post-commit mutation: dropping `min-height` from the new rule reddens it.) —
+  (`apps/web/test/project-page-head.test.tsx`)
+- **13.1383** 🧪 **THE PAINT: NOTHING MOVES WHEN THE SWITCH COMES ON.** At **1000 px and 1280 px**
+  viewports, `.gn-project__header`'s bounding rect and the rail's `top` are IDENTICAL with the switch
+  off and on, and the note row is **18 px** tall in both states. jsdom applies no layout, so this half
+  cannot be a jsdom case — `13.1381` asserts the DOM structure that makes the paint possible and
+  `13.1382` the declarations that reserve the band; this one is the measurement, taken by the controller
+  in the rebuilt dev stack (`ctl rebuild`), which records the numbers here. **Recipe:** sign in on
+  :3001, open a project, read `document.querySelector('.gn-project__header').getBoundingClientRect()`
+  and the rail's `getBoundingClientRect().top` with the switch off; click *Only tickets in progress*;
+  read both again. The two pairs must be equal at each width. A viewport narrow enough to wrap the
+  sentence onto two lines is OUT of scope by the owner's ruling — the rail shifts by one line there and
+  that is accepted. — (controller measurement; no test file)

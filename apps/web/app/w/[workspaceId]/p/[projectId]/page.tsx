@@ -2318,32 +2318,79 @@ function ProjectBoard() {
                   Filters
                 </button>
                 {createRegion}
-                {/*
-                  Said here as well as in the list's own summary, because past the cap
-                  there IS no list to carry a summary — the arms are refusing — and
-                  this is the only place the state of the question is visible. LAST in
-                  the row on purpose: it is a sentence, not a control, and in a
-                  `flex-wrap: wrap` header it takes its own line rather than pushing the
-                  switch away from the button the owner asked it to sit beside.
-
-                  `gn-project__scope-note`, NOT the old `gn-list-filter__note`: that
-                  block no longer renders, so the class was an orphan element with no
-                  block, and `.gn-list-filter` never had a CSS rule anywhere in this
-                  repo (measured — `git log -S -- '*.css'` across all refs is empty).
-                  This re-scopes onto the rule its sibling `board-scope-note` already
-                  uses (`ui.css`: muted small print), so the note gains the treatment
-                  it should always have had and no new rule is added.
-                  The `data-testid` is the contract and is unchanged.
-                */}
-                {activeOnly ? (
-                  <span className="gn-project__scope-note" data-testid="list-filter-note">
-                    the list, calendar, timeline and backlog are asking only for tickets in
-                    progress — not started and done are both excluded, and the backlog is
-                    emptied. The board is not narrowed.
-                  </span>
-                ) : null}
               </div>
             </div>
+
+            {/*
+              THE SCOPE NOTE'S OWN STANDING ROW (owner request, 2026-09-23).
+
+              IT USED TO BE THE LAST CHILD OF `.gn-project__header` ABOVE, and every
+              time it appeared it moved a control — which is what the owner's two
+              screenshots of the live project page show, and what the docblock that
+              stood here got wrong. With the switch OFF the controls row (search,
+              workflow picker, switch, Filters, New ticket) sits beside the title;
+              switching it ON dropped that ENTIRE row under the title, and only then
+              wrapped the note inside it.
+
+              THE CAUSE IS INTRINSIC WIDTH, NOT WRAPPING. `.gn-project__header`
+              (`ui.css:5831`) is a wrapping flex row, itself the second flex item of
+              `.gn-project__head` (`ui.css:5864` — `flex-wrap: wrap;
+              justify-content: space-between`) whose first item is
+              `.gn-project__identity` (crumb over `<h1>`). **A wrapping flex
+              container's max-content contribution to ITS parent is all its children
+              on ONE line**: the sentence is ~770 CSS px and the controls ~625 px, so
+              with the note present the row's intrinsic width is ~1400 px, it no
+              longer fits beside the identity column, and `.gn-project__head` wraps
+              the whole row down. The note wraps INSIDE the row only after that has
+              already happened. The docblock that stood here described that inner
+              wrap — "it takes its own line rather than pushing the switch away from
+              the button" — and missed the outer one, which is the one the owner saw.
+              It was false, so it is replaced rather than patched.
+
+              WHY NO FREE SPOT EXISTED FOR IT, before settling on a reserved row.
+              `.gn-project` (`ui.css:5804`) stacks the head row, the rail and the
+              content with `gap: 0.875rem` (14px), and the note is an 18px line — an
+              overlay in that gap overlaps the rail. The rail row's free width at the
+              owner's viewport (~700 px) is narrower than the sentence, so the note
+              cannot sit beside the tabs either. Both were rejected on measurement.
+
+              THE RULING (owner, 2026-09-23): **the note must not move any other
+              element when it appears.** Two costs are ACCEPTED and recorded here
+              rather than discovered later:
+                · a permanent 32px band between the head row and the rail — the
+                  14px gap, the reserved 18px line, and the 14px gap again —
+                  present whether or not the note says anything;
+                · at viewports narrow enough to wrap the sentence onto two lines,
+                  the rail shifts down by one line when the switch comes on. Only a
+                  two-line reservation would remove that, and the owner scoped it
+                  out; the measured cases are 1000 px and 1280 px, where the single
+                  line holds.
+
+              ALWAYS RENDERED, EMPTY WHEN OFF. The `<p>` is in the tree in both
+              states and only its TEXT is conditional, so the band is reserved either
+              way and the element is the SAME node across the toggle — asserted, not
+              assumed, in `13.1381`. `visibility: hidden` is deliberately NOT used:
+              there is nothing to hide when the switch is off. The row is EMPTY, not
+              invisible, and an empty row cannot be read aloud, clicked or focused.
+
+              THE SENTENCE BEGINS WITH A CAPITAL NOW. It is a standing row rather
+              than a fragment hanging off the controls, so it reads as the sentence
+              it is. Two places quote it and moved in the same change:
+              `page-refusals.test.tsx`'s `12.387` arm and `docs/manual.md`, whose
+              quote is compiled into the in-app help corpus.
+
+              `gn-project__scope-note` is KEPT for the type treatment (`ui.css:5948`,
+              the muted small print it shares with the board tab's own
+              `board-scope-note`); `gn-project__scope-row` is the new reservation,
+              declared AFTER it so the shared rule is not edited to make one page
+              reserve a line. The `data-testid` is the contract and is unchanged.
+            */}
+            <p
+              className="gn-project__scope-note gn-project__scope-row"
+              data-testid="list-filter-note"
+            >
+              {activeOnly ? 'The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.' : null}
+            </p>
 
             {/*
               THE SHARED CONTROL ITSELF, not the shared control's CLASSES — and
