@@ -248,6 +248,29 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
       // default-deny shape already supported a new class, which is why adding
       // one is three lines rather than a redesign.
       return 'admin';
+    case 'note':
+      // WITHHELD, and this branch exists rather than the kind being left out
+      // because the switch's return annotation forbids leaving it out. The notes
+      // series (Plan 1 of 6) adds `'note'` to `ENTITY_KINDS` for the domain, the
+      // projections and the reads; the STREAM half is spec §5.1, which is
+      // Plan 2's — it needs `noteGrantNoticeFor`, the note arm of
+      // `ReachGrantedInstruction` and the §5.2 cascade, and none of those exist
+      // yet.
+      //
+      // So the honest answer today is the one the switch's own docblock demands:
+      // a named case, stating the intent, returning the class that DROPS the
+      // event (`case 'withheld': break` in the generator below). The two wrong
+      // answers are the two that docblock names — falling through silently
+      // (which TS2366 forbids) and a permissive `default:`. `return 'note'`
+      // would be wrong in a third way neither covers: Plan 1 ships no `notes`
+      // replica table, so every note event streamed before Plan 2 lands would
+      // reach a client that cannot fold it.
+      //
+      // **Plan 2 changes this line to `return 'note'` and adds the union member
+      // beside it.** Until then notes are absent from the stream by decision,
+      // not by omission — and the case that catches a silent drop is Plan 2's
+      // own §11.4.
+      return 'withheld';
   }
 }
 
