@@ -74,15 +74,27 @@ previous person's collapse) and by project (two projects can hold the same workf
 ## State of verification, stated precisely
 
 Measured on **Node v22.22.2**, LOCAL runs (a dev PR into a release branch runs no CI — `ci.yml` filters
-`pull_request` on the BASE):
+`pull_request` on the BASE). Taken after merging `origin/release/2026-09-23` into the branch, so they
+describe the tree the PR would land rather than this lane's tree alone:
 
-- `pnpm turbo run build` → 11/11, `pnpm turbo run typecheck` → 17/17: run at the commit that added the
-  tests, BEFORE the last two test-file additions (the `aria-controls` arm and the write-count arm).
-- `packages/app-core` **2001 passed / 106 files**, `apps/web` **768 passed / 72 files**, `packages/ui`
-  **432 passed / 10 files**: all at that same commit.
-- The focused file `board-workflow-collapse.test.tsx` is **20/20** at the CURRENT head.
-- **NOT re-run at the current head:** the three full suites and the typecheck. The changes since are
-  test-file-only, so the source under test is unchanged — but that is an argument, not a measurement.
+```
+ Tasks:    11 successful, 11 total        (pnpm turbo run build)
+ Tasks:    17 successful, 17 total        (pnpm turbo run typecheck)
+
+ packages/app-core    Test Files  106 passed (106)     Tests  2003 passed (2003)
+ apps/web             Test Files   73 passed (73)      Tests   778 passed (778)
+ packages/ui          Test Files   10 passed (10)      Tests   432 passed (432)
+```
+
+`apps/web` reads 778 against 768 on the pre-merge head: the ten extra are the merged sibling lane's
+(`task/my-work-sheet-in-place`), not this PR's. Both catalogue guards green;
+`board-workflow-collapse.test.tsx` **21/21**.
+
+**The merge conflicted in exactly one file**, `test-cases/13-owner-requests-and-backlog.md`: both lanes
+appended a new section at the end of it. Resolved by keeping **both** sections (the sibling's first, this
+lane's second) — nothing was in dispute, and re-running the id guard afterwards confirms both blocks'
+ids are intact (2956 → 2967 unique). `Features.md` auto-merged, and its diff against the release branch is
+still only this lane's two changes (2 insertions, 1 deletion), so the sibling's edit to it survived.
 
 ## The mutation round, finished — and the case it REPAIRED
 
@@ -107,8 +119,8 @@ feature.
 
 1. **Nothing in the case block.** The two mutations the checkpoint deferred are run (both killed); the
    `13.1408` killer is added and measured.
-2. **The three full suites and the build at the final head**: build and typecheck were re-run and are green;
-   the suites' results are in the PR body.
+2. **Nothing on the gate side**: build, typecheck and all three suites were re-run on the MERGED head and
+   are green — the summary lines are in the section above.
 3. **No browser measurement.** `13.1412`–`13.1420` are jsdom cases; nothing here was seen in a real
    browser, and the caret's paint and the rail's `display: none` are the two things a jsdom run cannot
    show. `13.1418` pins both as source, which is the honest half a suite can hold.
