@@ -8,6 +8,9 @@ function row(overrides: Partial<ListRow> = {}): ListRow {
   return {
     ticketId: 't_1',
     title: 'Restock the cold shelf',
+    // REQUIRED on the row since 2026-09-22 (the List's Key column);
+    // `startTargetFor` reads neither it nor `title`.
+    key: 'CCSO-7',
     typeId: 'task',
     typeRank: 3,
     parentId: null,

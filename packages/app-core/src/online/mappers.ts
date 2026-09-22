@@ -1668,6 +1668,12 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
   return {
     ticketId: asString(record['ticketId'], `${path}.ticketId`),
     title: asString(record['title'], `${path}.title`),
+    // The SAME read the board card makes over the same wire field (`mapBoardCard`,
+    // where `ListCard = TicketCard & {…}` guarantees the field is on the body):
+    // `null` is the truth ("no prefix in the ledger") and survives; an ABSENT key
+    // is a body the server does not send since 2026-09-22 and `asString` refuses
+    // it, so a forgotten field cannot pass as a prefix-less workspace.
+    key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
     typeId: asString(record['typeId'], `${path}.typeId`),
     typeRank: asNumber(record['typeRank'], `${path}.typeRank`),
     // `parentId` and `epicId` are `string | null` and REQUIRED on both sides:

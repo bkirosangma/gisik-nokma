@@ -354,6 +354,34 @@ describe('12.178-12.181 what the offline copy answers that the online source ref
     expect(row?.rollup).toBeNull();
   });
 
+  /**
+   * 13.1338 — the offline list row's `key` is `null`, and that is a measured
+   * answer rather than a hole (owner request 2026-09-22, the List's key column).
+   *
+   * The key is `<workspace prefix><project prefix>-<number>` and the NUMBER is
+   * derived from the ledger's order, which the device does not hold — the same
+   * under-claim the board cards make in the same file (`key: null` on both card
+   * builders, whose docblocks record it and why a locally re-derived number
+   * would be worse than no key). So a row here must answer `null` exactly as the
+   * board does, and the list's Key cell renders the em dash for it.
+   *
+   * `toBeNull` and not `toBeFalsy`: `ListRow.key` is REQUIRED, so the failure
+   * this case exists to catch is a producer that stopped carrying the field at
+   * all — `undefined` — which `toBeFalsy` would accept. The control is in the
+   * same case and reads the SAME object: `typeRank` is populated off the same
+   * `rowOf`, so the null above is a value on a real row and not the shape of a
+   * row that failed to build.
+   */
+  it('13.1338 a list row read from the replica carries key null, and is otherwise a real row', async () => {
+    const { ds, taskId } = await fixture();
+    const list = await ds.query.getTickets(PROJECT, {}, 'flat');
+    const row = list.rows.find((r) => r.ticketId === taskId);
+    expect(row).toBeDefined();
+    // The control, first and on the same object.
+    expect(row?.typeRank).toBe(3);
+    expect(row?.key).toBeNull();
+  });
+
   it('12.179 hasRestrictedParent stays FALSE while the engine is not live — lag is not restriction', async () => {
     const { ds, replica, taskId } = await fixture();
     // The parent is purged, so it is genuinely absent from local scope.

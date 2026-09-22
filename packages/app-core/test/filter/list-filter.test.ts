@@ -12,7 +12,13 @@ const provenance = { actorId: 'u1', actorName: 'Ada', clientTime: '', serverTime
 
 /** The same ticket as the list renders it — every axis a ListRow can answer is populated. */
 const row: ListRow = {
-  ticketId: 't1', title: 'Ship the board', typeId: 'task', typeRank: 3,
+  ticketId: 't1', title: 'Ship the board',
+  // REQUIRED on the row since 2026-09-22 (the List's Key column), and populated
+  // here as every other axis is: the list FILTER never narrows on it (nothing in
+  // `ListFilterSpec` mentions the key — the title is what the text filter reads),
+  // so this is fixture completeness rather than a value a case here examines.
+  key: 'CCSO-7',
+  typeId: 'task', typeRank: 3,
   parentId: null, epicId: null,
   stateId: 's-doing', stateName: 'Doing', stateCategory: 'active',
   stateProvenance: provenance,
