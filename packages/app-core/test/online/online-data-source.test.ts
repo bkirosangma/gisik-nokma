@@ -214,6 +214,7 @@ const BOARD: BoardResponse = {
       name: 'Doing',
       category: 'active',
       blocked: false,
+      creatable: true,
       cards: [
         {
           ticketId: '01J9GTKA000000000000000000',

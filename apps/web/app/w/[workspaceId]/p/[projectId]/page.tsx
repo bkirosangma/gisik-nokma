@@ -6,6 +6,7 @@ import {
   BACKLOG_STATE,
   BACKLOG_STATE_ID,
   BUILTIN_TICKET_TYPE_SEEDS,
+  isCreatableState,
   type StateCategory,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
@@ -154,6 +155,14 @@ const BUILTIN_TYPE_LADDER = BUILTIN_TICKET_TYPE_SEEDS.map((seed) => ({
   // seed list, like the two fields above it, so it cannot drift from the
   // hierarchy the engine enforces.
   rank: seed.rank,
+  // `''` — "no workflow known" (starting-status design, 2026-09-23):
+  // `BUILTIN_TICKET_TYPE_SEEDS` carries no workflow binding of its own, only
+  // `builtinTicketTypeDefs(defaultWorkflowId)` does, and this constant is the
+  // LOADING fallback shown before the workspace's real types (and their real
+  // `workflowId`s) have answered. `workflowStates('')` reads `null` for it,
+  // the same "not loaded" state the Starting-status select already shows
+  // while this fallback ladder itself is on screen.
+  workflowId: '',
 }));
 
 export const BUILTIN_LADDER_NOTICE =
@@ -609,6 +618,20 @@ function ProjectBoard() {
    * `open`/`onOpenChange` props provide.
    */
   const [createOpen, setCreateOpen] = useState(false);
+  /**
+   * A board column's own identity, when the New-ticket dialog was opened
+   * FROM one (starting-status design, 2026-09-23) — `Board`'s
+   * `onCreateTicket` selection, threaded to `CreateTicketFlow`'s
+   * `initialSelection`. `null` for every other open (the header's own "New
+   * ticket" button, or the empty-board banner), which carry no selection at
+   * all. Cleared on CLOSE (`onOpenChange`, below) rather than left to leak
+   * into the next open — a header-opened dialog right after a column-opened
+   * one must not inherit the column's status.
+   */
+  const [createSelection, setCreateSelection] = useState<{
+    workflowId: string;
+    stateId: string;
+  } | null>(null);
   const filtersButtonRef = useRef<HTMLButtonElement | null>(null);
   const closeFilters = useCallback((returnFocus: boolean) => {
     setFiltersOpen(false);
@@ -1803,7 +1826,72 @@ function ProjectBoard() {
   const typeOptions =
     ticketTypes.data === null
       ? BUILTIN_TYPE_LADDER
-      : ticketTypes.data.map((type) => ({ id: type.id, name: type.name, rank: type.rank }));
+      : ticketTypes.data.map((type) => ({
+          id: type.id,
+          name: type.name,
+          rank: type.rank,
+          // Starting-status design, 2026-09-23 — `TicketTypeDef.workflowId`
+          // carries straight through, the same field `workflowStatesFor`
+          // below keys its read on.
+          workflowId: type.workflowId,
+        }));
+
+  /**
+   * THE DISTINCT WORKFLOWS BEHIND THIS PROJECT'S OWN TYPES (starting-status
+   * design, 2026-09-23) — the same "one `getWorkflowDef` per distinct id"
+   * shape `backlogWorkflowIds`/`backlogWorkflowDefs` above already use for
+   * the backlog's rows, applied to `typeOptions` instead: a project whose
+   * five ticket types share two workflows opens two round trips, not five.
+   */
+  const ticketTypeWorkflowIds = useMemo(
+    () => Array.from(new Set(typeOptions.map((type) => type.workflowId).filter((id) => id !== ''))).sort(),
+    [typeOptions],
+  );
+  const ticketTypeWorkflowDefs = useLiveQuery(
+    dataSource,
+    workspaceId,
+    `${workspaceId}:ticket-type-workflow-defs:${ticketTypeWorkflowIds.join(',')}`,
+    async () => {
+      const entries = await Promise.all(
+        ticketTypeWorkflowIds.map(
+          async (workflowId): Promise<readonly [string, WorkflowDef | null]> => [
+            workflowId,
+            await dataSource.query.getWorkflowDef(workspaceId, workflowId),
+          ],
+        ),
+      );
+      const defs = new Map<string, WorkflowDef>();
+      for (const [workflowId, def] of entries) {
+        if (def !== null) defs.set(workflowId, def);
+      }
+      return defs;
+    },
+  );
+  /**
+   * `NewTicketDialogProps.workflowStates` — a workflow id in, its
+   * `initialStateId` and EVERY state out (each with its OWN `creatable`, the
+   * ONE helper every other site on this design asks — `isCreatableState`),
+   * or `null` while `ticketTypeWorkflowDefs` has not resolved it (the "not
+   * loaded" state the select shows as "Loading states…"). Unfiltered
+   * deliberately: `NewTicketDialog` is the one place that narrows to
+   * `creatable` (its own docblock says why), so this read states the fact
+   * and lets the dialog decide what to do with it.
+   */
+  const workflowStatesFor = (
+    workflowId: string,
+  ): { initialStateId: string; states: Array<{ id: string; name: string; category: string; creatable: boolean }> } | null => {
+    const def = ticketTypeWorkflowDefs.data?.get(workflowId);
+    if (def === undefined) return null;
+    return {
+      initialStateId: def.initialStateId,
+      states: def.states.map((state) => ({
+        id: state.id,
+        name: state.name,
+        category: state.category,
+        creatable: isCreatableState(def, state.id),
+      })),
+    };
+  };
 
   /**
    * The board's own column names, id → name, for the `stateIds` chip below.
@@ -2115,7 +2203,15 @@ function ProjectBoard() {
       <>
         <CreateTicketFlow
           open={createOpen}
-          onOpenChange={setCreateOpen}
+          onOpenChange={(next) => {
+            setCreateOpen(next);
+            // Cleared on CLOSE, not on open (starting-status design,
+            // 2026-09-23): a board-column click sets it and opens the
+            // dialog in the same act, so clearing it there would race the
+            // very read that needs it. The NEXT open — from the header, or
+            // from another column — must not inherit a stale selection.
+            if (!next) setCreateSelection(null);
+          }}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}
@@ -2132,6 +2228,8 @@ function ProjectBoard() {
           editorSlot={NewTicketDescriptionSlot}
           assigneeCandidates={assigneeCandidates}
           {...(membersRefusal === null ? {} : { assigneeCandidatesUnavailable: membersRefusal })}
+          workflowStates={workflowStatesFor}
+          {...(createSelection === null ? {} : { initialSelection: createSelection })}
           onCreated={openTicket}
         />
         {ticketTypes.data === null ? (
@@ -3041,8 +3139,24 @@ function ProjectBoard() {
                     and `emitting`/`session` are read here rather than
                     re-derived, so the two doors cannot disagree about when
                     creation is available.
+
+                    AMENDED (starting-status design, 2026-09-23): `selection`
+                    is now a column's own `{workflowId, stateId}` when the
+                    click came from an empty COLUMN's "Add a ticket", or
+                    `undefined` from the empty-BOARD button — `Board` calls
+                    with none there, unchanged. `setCreateSelection` stores it
+                    for `CreateTicketFlow`'s `initialSelection` to read; a
+                    `null` (never overwritten by an unscoped open) is what a
+                    header-opened dialog reads as "no selection".
                   */
-                  {...(canCreate ? { onCreateTicket: () => setCreateOpen(true) } : {})}
+                  {...(canCreate
+                    ? {
+                        onCreateTicket: (selection?: { workflowId: string; stateId: string }) => {
+                          setCreateSelection(selection ?? null);
+                          setCreateOpen(true);
+                        },
+                      }
+                    : {})}
                   isNarrowed={boardNarrowing.shown !== boardNarrowing.total}
                   /*
                     WHICH OF THE TWO EMPTY SENTENCES (owner ruling, 2026-09-20). True

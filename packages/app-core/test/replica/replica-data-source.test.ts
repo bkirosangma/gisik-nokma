@@ -279,6 +279,29 @@ describe('12.172-12.177 the ruling P30 contract: one interface, two implementati
     expect(cards.find((card) => card.ticketId === epicId)?.pending).toBe(false);
   });
 
+  /**
+   * 13.1434a — starting-status design, 2026-09-23. The REPLICA's own
+   * `isCreatableState` derivation (`replica-data-source.ts`'s `getBoard`,
+   * `columns: def.states.map(...)`), UNWITNESSED until this case: earlier
+   * fixture edits in this file only satisfied the typecheck each `creatable`
+   * addition required, without asserting the VALUE the replica actually
+   * computes. Suffixed because the UI block (`13.1431`–`13.1445`) is fully
+   * spent; cited by hand, since `check-case-citations`' ratchet skips
+   * suffixed ids.
+   */
+  it('13.1434a getBoard carries creatable per column, read off the SAME workflow def every other query answers from', async () => {
+    const { ds } = await fixture();
+    const board = await ds.query.getBoard(PROJECT);
+    const columns = board.groups.flatMap((group) => group.columns);
+    const byState = new Map(columns.map((column) => [column.stateId, column.creatable]));
+    // `wfV1` (this file's own fixture, above): three non-terminal states —
+    // creatable regardless of `blocked` — and one terminal state — not.
+    expect(byState.get('todo')).toBe(true);
+    expect(byState.get('doing')).toBe(true);
+    expect(byState.get('waiting')).toBe(true);
+    expect(byState.get('done')).toBe(false);
+  });
+
   it('12.176 a rule violation refuses instantly with the named rule, RETURNS a real IngestResult, and queues nothing', async () => {
     const { ds, outbox, taskId } = await fixture();
     const bare = newSubmittedEvent({

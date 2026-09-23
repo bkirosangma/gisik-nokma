@@ -114,7 +114,7 @@ function boardOf(cards: BoardCard[]): BoardView {
         workflowVersion: 1,
         workflowName: 'Basic',
         columns: [
-          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards },
+          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards },
         ],
       },
     ],

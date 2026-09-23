@@ -25,7 +25,7 @@ const card: BoardCard = {
   epic: null,
 };
 const column: BoardColumn = {
-  stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, cards: [card],
+  stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [card],
 };
 
 /** The same ticket as the list sees it — every field the board's view-model dropped. */

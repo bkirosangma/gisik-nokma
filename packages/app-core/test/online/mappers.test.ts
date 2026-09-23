@@ -307,6 +307,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'Doing',
         category: 'active',
         blocked: false,
+        creatable: true,
         cards: [serverBoardCard()],
       },
       {
@@ -317,6 +318,11 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'Waiting on counterparty',
         category: 'active',
         blocked: true,
+        // Independent of `blocked` — a workflow setting can forbid creation
+        // in a non-terminal state too (starting-status design). `false` here,
+        // against `columns[0]`'s `true`, is what lets 13.1434 assert BOTH
+        // real booleans travel rather than one masking a default.
+        creatable: false,
         cards: [],
       },
       {
@@ -327,6 +333,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'New',
         category: 'open',
         blocked: false,
+        creatable: true,
         cards: [],
       },
     ],
@@ -365,6 +372,9 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
           name: 'ancient',
           category: 'open',
           blocked: false,
+          // A real straggler is always `false` — `routes/board.ts`'s own
+          // convention, no published definition to read the flag off.
+          creatable: false,
           cards: [serverBoardCard({ ticketId: '01J9GTKB000000000000000000', stateId: 'ancient' })],
         },
       ],
@@ -425,6 +435,29 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
     // swallowed by the check that refuses a missing one.
     expect(mapBoardView(body).groups[0]?.columns[0]?.blocked).toBe(false);
     expect(mapBoardView(body).groups[0]?.columns[1]?.blocked).toBe(true);
+  });
+
+  /**
+   * 13.1434 — starting-status design, 2026-09-23. `creatable` is REQUIRED on
+   * the wire `BoardColumn` for the identical reason `blocked` is, two cases
+   * up: a garbled or absent read must fail loudly rather than default to a
+   * value that reads on screen as a claim about the work ("Add a ticket" for
+   * a state the workflow forbids, or its silent absence from a state that
+   * allows it).
+   */
+  it('13.1434 REFUSES an unreadable creatable flag rather than defaulting it, and both real booleans travel', () => {
+    for (const bad of [undefined, 'true', 1, null]) {
+      const column = { ...body.columns[1], creatable: bad };
+      const mangled = { ...body, columns: [column] } as unknown as BoardResponse;
+      expect(() => mapBoardView(mangled), String(bad)).toThrow(
+        /board\.columns\[0\]\.creatable: expected a boolean/,
+      );
+    }
+    // Controls, same run: `body.columns[0]` is creatable, `body.columns[1]`
+    // is not — both real booleans travel, and `false` is not swallowed by
+    // the check that refuses a missing one.
+    expect(mapBoardView(body).groups[0]?.columns[0]?.creatable).toBe(true);
+    expect(mapBoardView(body).groups[0]?.columns[1]?.creatable).toBe(false);
   });
 
   it('3.43 REFUSES a cause kind it does not know rather than rendering an anonymous flip', () => {
@@ -1099,6 +1132,7 @@ describe('3.969 the priority claim crosses the wire as a claim; absence and an o
         name: 'Doing',
         category: 'active',
         blocked: false,
+        creatable: true,
         // Widened to `BoardTicketCard` here rather than at every `serverCard()`
         // call this helper wraps: `card` is a plain `TicketCard` because this
         // describe is about the PRIORITY claim, not the board's two hierarchy
@@ -2497,6 +2531,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             name: 'Doing',
             category: 'active',
             blocked: false,
+            creatable: true,
             cards: [
               serverBoardCard({
                 assigneeId: 'u2',
@@ -2571,6 +2606,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             name: 'Doing',
             category: 'active',
             blocked: false,
+            creatable: true,
             cards: [serverBoardCard({ assigneeId: 'u1' })],
           },
         ],
@@ -3118,7 +3154,7 @@ describe('13.1280 the board card key', () => {
   const body = (card: Partial<BoardTicketCard>) => ({
     workspaceId: '01J9GWS0000000000000000000',
     projectId: '01J9GPRJ000000000000000000',
-    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [serverBoardCard(card)] }],
+    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [serverBoardCard(card)] }],
   });
   it('carries the key, keeps null, refuses absence', () => {
     const firstCard = (view: BoardView) => view.groups[0]!.columns[0]!.cards[0]!;

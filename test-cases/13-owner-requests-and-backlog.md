@@ -3556,6 +3556,229 @@ with the same `dueDateValueSchema` import and omits empty inputs, with no preche
   tree. `13.1450` stays unspent. —
   (`packages/rule-engine/test/fields.test.ts`)
 
+## Board read + view, the New ticket form, and the page (starting-status design, 2026-09-23) — UI half
+
+*Block `13.1431`–`13.1445`, the UI half of `task/starting-status`'s `13.1431`–`13.1450` (the controller's
+split of a shared id space — see `13-hig-per-screen.md`'s block table; the DOMAIN half, `13.1446`–`13.1450`,
+is the section immediately above and is not this one). Branch `task/starting-status-ui`, cut from
+`origin/release/notes` after the domain half landed.*
+
+- **13.1431** ✅ A `creatable` empty column shows "Add a ticket", and the click passes that column's own
+  `{workflowId, stateId}` — not the unscoped handler the button used to call. `board.tsx`'s `BoardProps.
+  onCreateTicket?` widens to `(selection?: {workflowId, stateId}) => void`; the empty-column card reads
+  `group.workflowId`/`column.stateId`, both already in scope from the `.map` that renders it. Mutation-
+  witnessed: always rendering the button (dropping the `column.creatable` term from the gate) reddens
+  `13.1432`'s PRIMARY assertion — the `creatable: false` `Done` column now shows the button too,
+  `expected <button>… to be null` — restored from the committed tree. (`13.1432`'s own sibling-column
+  control, that `To do` still shows the button, is unaffected by this mutation either way, since it was
+  never the arm in question.) —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1432** ✅ A `creatable: false` empty column shows the empty copy only — no `+` icon, no button —
+  while its `creatable: true` sibling in the SAME render still shows the button (control, same `it`, so a
+  gate that suppressed the button everywhere could not pass). This is the case the mutation above reddens. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1433** ✅ The empty-BOARD "Create a ticket" button calls `onCreateTicket` with **zero** arguments,
+  not `[undefined]` and not the click event. `onClick={onCreateTicket}` would hand React's click event
+  through as `selection` the moment the prop widened — MEASURED, not assumed: reverting to that exact line
+  and running this case shows `calls[0][0]` as a `SyntheticBaseEvent` wrapping a `PointerEvent` (`_reactName:
+  'onClick'`, `type: 'click'`), which the assertion catches by comparing `calls` (built from the handler's
+  own rest-args) to `[[]]` — that event payload and an explicit `undefined` argument both fail this assertion
+  differently than an assertion on `selection` alone would. **Control, same render, same `it`:** a DIFFERENT
+  button on the SAME screen — the empty, creatable 'To do' column's own "Add a ticket" — calls the SAME
+  handler WITH its column's own `{workflowId, stateId}`, so the zero-argument assertion above is not
+  vacuously true of a handler nothing ever calls with an argument. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1434** ✅ `creatable` is REQUIRED on the wire `BoardColumn` (`packages/domain/src/read-models.ts`)
+  for the identical reason `blocked` already is: `mapBoardColumn` REFUSES an unreadable or absent flag
+  (`asBoolean`) rather than defaulting it, and both real booleans travel — proven with `body.columns[0]`
+  `creatable: true` against `body.columns[1]` `creatable: false`, independent of `blocked` (a workflow
+  setting can forbid creation in a non-terminal state too, so the two flags are asserted as independent
+  axes rather than one standing in for the other). The SERVER half of the same fact is asserted separately
+  against a real published workflow (`todo`/`doing`/`waiting` — open or active, `creatable: true` — against
+  the terminal `done`, `creatable: false`): `readBoard`'s column loop reads `isCreatableState(def, state.
+  id)`, and `appendStragglerColumns` — no published definition to read the flag off — is always `false`,
+  mirroring `blocked`'s own straggler convention. Mutation-witnessed twice: the mapper's `asBoolean` call
+  loosened to `record['creatable'] === true` reddens `expected [Function] to throw an error` (the REFUSAL
+  half); the server's `isCreatableState(def, state.id)` hardcoded to `true` reddens the `done` row's
+  `creatable: false` expectation. Both restored from the committed tree. —
+  (`packages/app-core/test/online/mappers.test.ts`, `apps/server/test/routes/board.test.ts`)
+- **13.1434a** ✅ (suffixed — the UI block is fully spent; `check-case-citations`' ratchet skips suffixed
+  ids, so this citation is by hand.) The REPLICA's own `isCreatableState` derivation
+  (`replica-data-source.ts`'s `getBoard`), UNWITNESSED by any assertion on the VALUE until this case — the
+  earlier fixture edits this branch needed only satisfied the typecheck each `creatable` addition required.
+  `wfV1` (this file's own fixture): three non-terminal states (`todo`, `doing`, `waiting` — the last
+  `blocked` too, independent axis) read `creatable: true`; the terminal `done` reads `false`.
+  Mutation-witnessed: hardcoding the derivation to `creatable: true` reddens the `done` expectation,
+  restored from the committed tree (`git checkout -- packages/app-core/src/replica/replica-data-source.ts`,
+  since only that one file was touched by this mutation). —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
+
+- **13.1435** ✅ The Starting-status select lists only `creatable` states and defaults to the workflow's
+  own `initialStateId`. `NewTicketDialog` filters `workflowStates`'s FULL per-state list itself
+  (`creatableStates`, keyed on each state's own `creatable` boolean) rather than trusting the caller to
+  pre-filter — the fixture's `wf-errand` carries a terminal `done` AND a merely-`creatable: false` `locked`
+  (active category), so the case proves the filter keys on the flag itself, not on `category === 'terminal'`
+  alone, which `done` could not distinguish on its own. Mutation-witnessed: dropping the filter (`.filter
+  ((state) => state.creatable)` → the bare unfiltered array) reddens with FOUR options where two were
+  expected, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1436** ✅ The select is DISABLED while "Starts in the backlog?" is ON, with a helper sentence naming
+  the state a backlog ticket actually starts in ("A backlog ticket starts in To do when it enters focus") —
+  the owner's own ruling, *"the state selection is disabled if starting from backlog."* **Control, same
+  dialog, same `it`:** switched OFF, the select re-enables and the helper sentence disappears — the disabled
+  state above is the switch's doing, not a permanently disabled control. Mutation-witnessed: dropping
+  `startInBacklog` from the `disabled` expression leaves the select enabled under the switch's default ON,
+  reddening `toBeDisabled()`, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1437** ✅ Switching "Starts in the backlog?" back OFF re-enables the select with the PREVIOUS value —
+  `stateId` is its own `useState`, never cleared by the switch, so disabling only hides the control rather
+  than resetting what it holds. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1438** ✅ A TYPE change resets Starting status to the new workflow's own `initialStateId` UNLESS the
+  standing value already exists there: picking a sibling type on the SAME workflow (`errand`, sharing
+  `wf-errand` with `task`) keeps a chosen `doing`; picking a type on a DIFFERENT workflow (`chore`, on
+  `wf-chore`, which has no `doing` at all) resets to that workflow's own `queued`. **Picked through a real
+  click, not `fireEvent.change`** — this file's own 3.157 docblock already records that `fireEvent.change`
+  against a searchable Select's combobox input sets the filter text and selects nothing, which the first
+  draft of this case fell into: both assertions passed for the wrong reason (`typeId` never actually moved,
+  so nothing was ever exercised) until the interaction was corrected to a real option click. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1439** ✅ The draft omits `stateId` in the two cases that say nothing new — backlog ON (asserted via
+  `not.toHaveProperty('stateId')`, since a `toEqual`-style comparison cannot tell a dropped key from one
+  holding `undefined`), and backlog OFF with the value left at the workflow's own initial state — and
+  carries it otherwise (`stateId: 'doing'`, backlog OFF, a value that is NOT the initial state). Three
+  submits, one dialog instance, `onCreate` cleared between them. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1440** ✅ `initialSelection` pre-fills the type — `defaultRootTypeFor` over the `typeOption`s sharing
+  the column's workflow, NOT the design's literal "the first is pre-selected" (planner default, unobjected:
+  "when several types share the column's workflow the first is pre-selected"). **MEASURED DEVIATION,** and
+  this is the case that proves it: `epic` is listed FIRST on `wf-errand` (this block's own `TYPES` fixture,
+  built that way on purpose), `task` is listed second but has the higher rank — `task` is what renders,
+  because an epic created into a column vanishes from every column the board draws (`isEpic`'s filter, owner
+  ruling 2026-09-20), which "the first is pre-selected" read literally would have shipped. Also pre-fills the
+  status (`doing`), and switches "Starts in the backlog?" OFF. **Control, same block:** an `initialSelection`
+  naming a workflow NO type on this project shares is ignored ENTIRELY — the type, status and switch all read
+  their ordinary, no-selection defaults, not merely a type-less half-fill. Mutation-witnessed (the deviation
+  itself, not merely the ordinary reseed logic): restoring the design's literal `typeOptions.find((o) =>
+  o.workflowId === initialSelection.workflowId)` in the open effect reddens with `expected Task, received
+  Epic`, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1441** ✅ The remembered backlog preference is NOT overwritten by a board-initiated open. Storage
+  seeded to `'backlog'`; opened from a board column (`initialSelection`) — the switch answers OFF, per the
+  design's own ruling, regardless of what is remembered; closed, then reopened UNSCOPED (the header's own
+  "New ticket") — the switch answers ON again, proving the board-initiated open never called
+  `rememberNewTicketStart` (which the design's own open-effect docblock states explicitly: that write
+  belongs to the person's own deliberate toggle, not to a board click answering a different question). —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1441a** ✅ (suffixed — the UI block is fully spent; cited by hand, the ratchet skips suffixed ids.)
+  The INLINE `stateRefusal` precheck — `CreateTicketFlow.create`'s own state-creatable branch, `setStateRefusal`,
+  the reason rendered under the dialog's Starting-status select — UNWITNESSED by any test until this case,
+  despite being real, shipped code. REACHABLE IN PRODUCTION, not dormant: `apps/web/src/providers.tsx` wires
+  `cache-feed.ts`'s `cache.upsertWorkflowDef(def)` into the real `ClientStateCache` on every mount, so the web
+  app's `CreateTicketFlow` genuinely holds workflow defs this precheck can disagree with `workflowStates`
+  about. New file `create-ticket-flow.test.tsx`: a cache whose def marks `locked` `creatable: false` while
+  `workflowStates` offers it as creatable (the one way this branch can fire — the select's own options are
+  already filtered, so an ordinary session cannot pick a state its own `workflowStates` refused); pressing
+  Create submits NOTHING and the sentence `workflowStateNotCreatableRefusal` builds renders inside the open
+  dialog. Mutation-witnessed: gating the branch on `false && ...` (skip it entirely) reddens with the event
+  actually reaching `source.ingested`, restored from the committed tree (`git checkout --`). —
+  (`packages/app-core/test/views/create-ticket-flow.test.tsx`)
+
+**A same-commit effect-ordering defect, found and fixed before any of the above landed, worth recording as
+measured rather than as a general claim about every caller.** Measured against THIS file's own fixtures,
+whose `workflowStates` functions close over a stable, describe-scoped constant — `page.tsx`'s own
+`workflowStatesFor` builds a fresh object literal on every call instead, and whether that difference changes
+the reproduction was not separately tested; the mechanism below (same-commit `setState` batching across two
+effects) does not obviously depend on `workflowStates`'s object identity, but that is reasoning, not a
+second measurement. The "empty on
+OPEN" effect (E2-37) and the Starting-status reseed effect both fire in the SAME commit on every open — and
+both are declared as separate `useEffect`s that call `setStateId`. The open effect's original text set a
+bare `''` ("nothing chosen yet, the reseed effect will fill it in"), relying on the reseed effect — declared
+EARLIER in the component — to correct it a render later. React batches same-tick `setState` calls to one
+piece of state: the reseed effect's `setStateId('todo')` and the open effect's later `setStateId('')` within
+the SAME flush coalesce to whichever ran LAST (the open effect), and because the NET value across the whole
+pass was `'' → ''` (the initial value, unchanged), React saw no state change to re-render for and the reseed
+effect never got a second pass. Measured directly: 13.1435 and 13.1440's control both showed the select's
+placeholder ("Choose a status") instead of the workflow's initial state on a plain mount. **Fix:** the open
+effect now computes the correct seed value DIRECTLY (`seedStateIdFor`, a small helper closing over
+`workflowStates`) rather than deferring to the reseed effect for the ordinary case; the reseed effect stays,
+now genuinely needed only for a LATE `workflowStates` load or a truly stale value reached some other way.
+
+## The board-to-form pre-fill, end to end (starting-status design, 2026-09-23) — UI half
+
+- **13.1442** ✅ The ONE site that mounts the whole chain at once — `Board`'s `onCreateTicket` selection,
+  through `page.tsx`'s `createSelection` state, to `CreateTicketFlow.initialSelection`, to the actual
+  `ticket.created` payload. `apps/web/test/project-create-gate.test.tsx`, the file that already exists to
+  stop the New-ticket control from making claims nothing backs. Clicking the (real, non-`todo`) `Doing`
+  column's own "Add a ticket" pre-fills Type — `Task`, NOT `epic` (`WORKSPACE_TYPES`' first entry sharing
+  `wf-errands`): this dialog asks `defaultRootTypeFor` over the types sharing the workflow, the SAME
+  measured deviation 13.1440 pins, closing here at the one site that proves the real workspace fixture
+  (`epic` genuinely listed first) hits it too — and Starting status (`Doing`), switches the backlog switch
+  OFF, and a submit from there carries `stateId: 'doing'` on the wire. **CONTROL, same render:** the create
+  closes the dialog on its own (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on a committed outcome
+  — no explicit Cancel needed, and the first draft of this case tried to click one that was no longer there),
+  and reopening from the HEADER's own unscoped "New ticket" carries no selection at all — no `stateId` key on
+  the wire, the same omission rule 13.1439 pins at the dialog level, now exercised through the real page. The
+  EMPTY, creatable column deliberately used is `doing`, NOT the workflow's own `todo`: a click on `todo` would
+  produce a `stateId` the omission rule (13.1439) drops again, making the case indistinguishable from the
+  control. Mutation-witnessed: `page.tsx`'s `onCreateTicket` handler with `setCreateSelection(selection ??
+  null)` hardcoded to `setCreateSelection(null)` reddens the pre-fill assertion, `expected element to have
+  value Task, received Chore` (the ordinary rank-tie-broken default among ALL of `WORKSPACE_TYPES`, proving
+  the selection never reached the dialog at all), restored from the committed tree — rebuilding
+  `packages/app-core` first, since `apps/web` reads its `dist`, not its source (measured the hard way earlier
+  in this same session: the FIRST run of this exact case after the `defaultRootTypeFor` fix still showed
+  `Epic` until the rebuild). —
+  (`apps/web/test/project-create-gate.test.tsx`)
+
+## The birth Start and Due date inputs (addendum, 2026-09-23) — UI half
+
+*Cases `13.1443`–`13.1445`, the remainder of the UI block. `13.1442` is the page e2e case, below.*
+
+- **13.1443** ✅ Both `<input type="date">` controls (`aria-label="Start date"`/`"Due date"`) exist, empty by
+  default, and `NewTicketDraft` omits whichever is left empty rather than carrying an empty string — the
+  SAME "absent means no claim" rule `description` already follows, asserted with `not.toHaveProperty`
+  rather than a `toEqual`-style comparison, which cannot tell a dropped key from one holding `undefined`.
+  Mutation-witnessed: dropping the `=== '' ? {} : {...}` guard in `new-ticket-dialog.tsx`'s own draft
+  construction (sending the bare, possibly-empty string unconditionally) reddens with `dueDate: ""` present
+  where the assertion expected the key gone, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1444** ✅ The ACTUAL `ticket.created` payload — not the dialog's own bare-string draft, which
+  13.1443 already covers, but what `CreateTicketFlow.create` sends to `DataSource.ingest` — wraps a filled
+  input as `{date: '...'}` (the wire's own `dueDateValueSchema` shape) and carries NO key at all for an
+  empty one, in three arms: one filled, both filled, neither filled. New file
+  `create-ticket-flow.test.tsx` (this component had none), because this is the one place that can see the
+  wire shape at all — `new-ticket-dialog.tsx` never builds `{date: ...}`, only the bare string.
+  Mutation-witnessed: replacing the `...(draft.startDate === undefined ? {} : {...})` spreads with an
+  unconditional `startDate: {date: draft.startDate ?? ''}` reddens BOTH the "one filled" case (`dueDate:
+  {date: ''}` present where absent was expected) and the "neither filled" case (`startDate: {date: ''}`
+  present), restored from the committed tree. —
+  (`packages/app-core/test/views/create-ticket-flow.test.tsx`)
+- **13.1445** ✅ An invalid day disables Create with an inline reason under the field, checked by the SAME
+  `dueDateValueSchema` import `ticketCreatedPayload`/`ticket.field_set` use (no copy of the regex, per the
+  plan author's ruling) — there is no precheck branch for dates. **MEASURED, not assumed, which value can
+  even reach the check:** jsdom's own `<input type="date">` sanitizes a malformed value to `''` BEFORE React
+  ever sees a change event, for every shape tried except one — `2026-13-01` (bad month), `2026-02-30`
+  (out-of-calendar day), `30-09-2026` (wrong field order) and a bare non-date string all vanish to `''`
+  on `fireEvent.change`; a 5-digit year (`99999-01-01`) survives, because `IST_DAY_REGEX` is `^\d{4}-\d{2}
+  -\d{2}$` and jsdom's own sanitizer does not enforce THAT particular width. That is the one value this case
+  can use to exercise the component's own validation at all — a probe script confirmed this empirically
+  before the case was written, not inferred. Clearing the field back to empty removes the refusal and
+  re-enables Create (empty is omitted, not invalid — the same distinction 13.1443 draws). Mutation-witnessed:
+  dropping `startDateInvalid || dueDateInvalid` from the Create button's `disabled` expression reddens
+  (`toBeDisabled()` fails), restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+**Addendum item 6 — "the created ticket appears on the calendar for its due day" — is 🧪, deliberately, and
+spends no id.** The UI block (`13.1431`–`13.1445`) is fully spent by the cases above; the addendum's own
+text allows this ("if a calendar assertion is cheap [...] else 🧪 with the recipe"). Considered rather than
+dropped silently: the design's own FACTS section records that the calendar/timeline/filters already read
+`fields -> 'dueDate' -> 'value' ->> 'date'` (`compile-filter.ts:133-137`) with NO projection change needed —
+the birth claim lands in `fields` through machinery `13.1444` already proves reaches the wire, and the
+calendar's OWN read of that path is existing, already-tested code this feature introduces no new version of.
+Recipe, if picked up later: seed a board/page world whose ticket carries a `dueDate` claim from
+`ticket.created` (not a later `field_set`), switch to the Calendar tab, and assert the ticket renders under
+its due day — mirroring whatever fixture `project-calendar-timeline.test.tsx` already uses for a `field_set`
+due date, with the ONE difference that the claim originates at birth.
 ## 13.1451–13.1466 — board card badges: priority icon + tint, parent-key badge, epic chip (owner request, 2026-09-23)
 
 Block `13.1451`–`13.1470` (`13-hig-per-screen.md`'s allocation table has the row). `BoardTicketCard`
