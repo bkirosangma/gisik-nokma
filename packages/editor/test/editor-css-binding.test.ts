@@ -237,7 +237,7 @@ describe('13.1312 the editable node fills the field', () => {
  * — that is not the property this case is for.
  */
 describe('9.272 the collapsible block is styled', () => {
-  it('9.272 .editor-details carries a border, a radius and padding; its summary is the fold control', () => {
+  it('9.272 the block carries a border, a radius and padding; its title is weighted; its TOGGLE is the control', () => {
     const box = ruleBody(EDITOR_CSS, '.editor-details');
     expect(declared(box, 'border')).not.toBeNull();
     expect(declared(box, 'border-radius')).not.toBeNull();
