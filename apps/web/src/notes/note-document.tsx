@@ -11,6 +11,7 @@ import {
 import {
   makeSubmittedFactory,
   useLiveQuery,
+  type DataSource,
   type RosterMember,
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
@@ -18,6 +19,7 @@ import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/
 import { useAppServices, useCurrentUser } from '../providers.js';
 import { NoteByline } from './note-byline.js';
 import { NoteTitle } from './note-title.js';
+import { useNoteAutosave } from './use-note-autosave.js';
 
 /**
  * The note itself (notes series Plan 5, spec §9.2, §9.6).
@@ -232,41 +234,105 @@ export function NoteDocument({
       />
 
       <div className="gn-notes__editor" ref={editorRoot} data-testid="note-editor">
-        <TicketEditorSlot
-          mode="note"
-          doc={note.body}
-          readOnly={!canEdit}
-          workspaceId={note.workspaceId}
-          ticketId=""
-          noteId={note.noteId}
-          submitSlot="none"
-          onDraft={(doc) => setDraft(doc)}
-          placeholder="Write the note…"
-          queryNotes={async (query: string) => {
-            const needle = query.trim().toLowerCase();
-            const hits: Array<{ noteId: string; title: string }> = [];
-            for (const candidate of [note, ...treeNotes]) {
-              if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
-              if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
-              hits.push({ noteId: candidate.noteId, title: candidate.title });
-              if (hits.length === 8) break;
-            }
-            return hits;
-          }}
-          resolveNoteTitle={(id: string) => {
-            if (id === note.noteId) return note.title;
-            return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
-          }}
-          previewNote={async (id: string) => {
-            const target =
-              id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
-            if (target === null) return null;
-            return docToPlainText(target.body).slice(0, 200);
-          }}
-          onNavigateNote={(id: string) => router.push(`/notes/${id}`)}
+        <NoteEditorPane
+          key={note.noteId}
+          note={note}
+          treeNotes={treeNotes}
+          canEdit={canEdit}
+          dataSource={dataSource}
+          userId={user?.id ?? ''}
+          onDraftChange={setDraft}
+          onNavigateNote={(id) => router.push(`/notes/${id}`)}
         />
       </div>
     </div>
+  );
+}
+
+/**
+ * The editor mount, and the ONLY thing `useNoteAutosave` is ever called
+ * from — `NoteDocument` renders this keyed by `note.noteId`, so a different
+ * note REMOUNTS this component rather than handing the hook a new `note`
+ * prop on an existing instance. That remount is what makes the hook's own
+ * lazy-state draft recovery run with the right note already in hand (see its
+ * docblock), and its unmount is spec §9.4's "flush on route change".
+ */
+function NoteEditorPane({
+  note,
+  treeNotes,
+  canEdit,
+  dataSource,
+  userId,
+  onDraftChange,
+  onNavigateNote,
+}: {
+  note: NoteDetail;
+  treeNotes: NoteSummary[];
+  canEdit: boolean;
+  dataSource: DataSource;
+  userId: string;
+  onDraftChange: (doc: unknown) => void;
+  onNavigateNote: (id: string) => void;
+}) {
+  const autosave = useNoteAutosave({
+    dataSource,
+    userId,
+    workspaceId: note.workspaceId,
+    noteId: note.noteId,
+    note,
+  });
+
+  // Seeds the PARENT's `draft` (Copy as Markdown, reading time) with a
+  // recovered draft, once — without it, opening a note with an unsaved draft
+  // would copy and measure the SERVER'S body until the person typed a single
+  // character. One render behind `initialDoc` itself: acceptable here, unlike
+  // the editor's own content, because nothing renders `draft` before an
+  // effect gets a turn to run.
+  useEffect(() => {
+    onDraftChange(autosave.initialDoc);
+    // Runs once, at mount — this component is remounted per note (see the
+    // docblock above), so there is no later `note` to reseed from.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  return (
+    <TicketEditorSlot
+      mode="note"
+      doc={autosave.initialDoc}
+      readOnly={!canEdit}
+      workspaceId={note.workspaceId}
+      ticketId=""
+      noteId={note.noteId}
+      submitSlot="none"
+      onDraft={(doc) => {
+        onDraftChange(doc);
+        autosave.onDraft(doc);
+      }}
+      onSave={autosave.onSave}
+      saveState={autosave.saveState}
+      placeholder="Write the note…"
+      queryNotes={async (query: string) => {
+        const needle = query.trim().toLowerCase();
+        const hits: Array<{ noteId: string; title: string }> = [];
+        for (const candidate of [note, ...treeNotes]) {
+          if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+          if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
+          hits.push({ noteId: candidate.noteId, title: candidate.title });
+          if (hits.length === 8) break;
+        }
+        return hits;
+      }}
+      resolveNoteTitle={(id: string) => {
+        if (id === note.noteId) return note.title;
+        return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
+      }}
+      previewNote={async (id: string) => {
+        const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
+        if (target === null) return null;
+        return docToPlainText(target.body).slice(0, 200);
+      }}
+      onNavigateNote={onNavigateNote}
+    />
   );
 }
 

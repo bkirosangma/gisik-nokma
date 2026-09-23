@@ -5,6 +5,7 @@ import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
+import { noteDraftKey } from '../src/notes/use-note-autosave.js';
 import { stubServices } from './helpers/stub-services.js';
 
 /**
@@ -418,5 +419,60 @@ describe('18.11 The Notes page — the document', () => {
       expect(second.container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('true'),
     );
     expect(screen.getByRole('toolbar')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 18.205–18.209 — autosave, INTEGRATED (Plan 5 Task 5, spec §9.4).
+ *
+ * `use-note-autosave.test.tsx` proves the hook's own contract in isolation.
+ * These two prove the wiring: that the REAL editor (`stubSlot` stays false —
+ * see this file's header) actually mounts with what the hook recovered,
+ * rather than with the note's server-loaded body regardless. That distinction
+ * is not academic here — an earlier draft of `NoteDocument` set `initialDoc`
+ * from an EFFECT, which `useEditor`'s one-time, empty-deps `content` read
+ * (`packages/editor` case 9.72) would have silently ignored on every render
+ * after the first, opening every note's recovered draft as if it had never
+ * existed. `use-note-autosave.test.tsx`'s `renderHook`-based cases could not
+ * see that: they read `result.current.initialDoc` after `act()` has already
+ * flushed effects, which is exactly the synchrony a REAL mount does not get
+ * for free.
+ */
+describe('18.205-18.209 autosave, mounted through NoteDocument', () => {
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('a draft newer than the note reopens IN THE EDITOR, not the server body, and reports Not saved', async () => {
+    window.localStorage.setItem(
+      noteDraftKey('u_kiro', NOTE),
+      JSON.stringify({ doc: body('a draft nobody has seen yet'), at: Date.parse('2026-09-23T07:00:00.000Z') }),
+    );
+    const { container } = renderDocument();
+
+    await waitFor(() =>
+      expect(container.querySelector('.ProseMirror')?.textContent ?? '').toContain('a draft nobody has seen yet'),
+    );
+    // CONTROL — the server's own body is NOT what rendered.
+    expect(container.querySelector('.ProseMirror')?.textContent ?? '').not.toContain(
+      'Compressor stopped in the cold room',
+    );
+    expect(screen.getByTestId('editor-save-state')).toHaveTextContent('Not saved (kept on this device)');
+  });
+
+  it('a throwing localStorage never stops the note from opening, with the note’s own body', async () => {
+    const getItem = vi.spyOn(Storage.prototype, 'getItem').mockImplementation(() => {
+      throw new DOMException('blocked', 'SecurityError');
+    });
+    try {
+      const { container } = renderDocument();
+      await waitFor(() =>
+        expect(container.querySelector('.ProseMirror')?.textContent ?? '').toContain(
+          'Compressor stopped in the cold room',
+        ),
+      );
+    } finally {
+      getItem.mockRestore();
+    }
   });
 });
