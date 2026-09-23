@@ -56,6 +56,12 @@ export function NotesPage({ noteId }: { noteId?: string }) {
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
+  /**
+   * ONE filter for every section (18.190). It lives on the page rather than in
+   * each section because "narrow the tree" is one act by one person, and two
+   * inputs could be left disagreeing — which reads as a tree that half-answered.
+   */
+  const [titleFilter, setTitleFilter] = useState('');
 
   useEffect(() => {
     if (!signedIn) return;
@@ -91,6 +97,22 @@ export function NotesPage({ noteId }: { noteId?: string }) {
         </div>
         <div className="gn-notes__body">
           <nav aria-label="Notes" className="gn-notes__tree">
+            {/* The tree head. The filter is drawn only once the tree has
+                something to filter — a box over a refusal or a spinner is a
+                control whose effect nobody can see. Task 3 puts the Create
+                button beside it. */}
+            {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
+              <div className="gn-notes__tree-head">
+                <input
+                  type="text"
+                  className="gn-notes__filter"
+                  aria-label="Filter by title"
+                  placeholder="Filter by title"
+                  value={titleFilter}
+                  onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
+                />
+              </div>
+            ) : null}
             {!signedIn ? (
               <p className="gn-notes__session" role="status">
                 {session.kind === 'loading' ? (
@@ -114,7 +136,12 @@ export function NotesPage({ noteId }: { noteId?: string }) {
               </p>
             ) : (
               workspaces.map((workspace) => (
-                <WorkspaceNotesSection key={workspace.id} workspace={workspace} />
+                <WorkspaceNotesSection
+                  key={workspace.id}
+                  workspace={workspace}
+                  openNoteId={noteId}
+                  titleFilter={titleFilter}
+                />
               ))
             )}
           </nav>

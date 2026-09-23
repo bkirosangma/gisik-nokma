@@ -3178,6 +3178,116 @@ input, textarea, select { font-family: inherit; }
   margin-top: 0.5rem;
 }
 
+/* The tree head — the title filter now, and Task 3's Create button beside it. */
+.gn-notes__tree-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* The filter takes the room the button does not. `min-width: 0` on a flex child
+   is what lets an input shrink below its default intrinsic width instead of
+   overflowing the 18rem tree column. */
+.gn-notes__filter {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--gn-text);
+  background: var(--gn-surface-raised);
+  border: 1px solid var(--gn-border);
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__filter:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* One group's rows. A plain list: the tree is a navigation, so what carries the
+   meaning is the `<a>` inside each `<li>`, not the list itself. */
+.gn-notes__rows {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.gn-notes__row-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.gn-notes__row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding: 0.25rem 0.375rem;
+  color: var(--gn-text);
+  text-decoration: none;
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__row:hover {
+  background: var(--gn-fill-secondary);
+}
+
+/* The open note. Declaration AND attribute: `aria-current` is what a screen
+   reader hears, this is what a reader sees, and both come from one boolean. */
+.gn-notes__row--open {
+  background: var(--gn-fill-tertiary);
+  font-weight: 600;
+}
+
+/* The title takes the room; the keys do not wrap, so a long title truncates
+   rather than pushing a key off the row. */
+.gn-notes__row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gn-notes__keys {
+  flex: none;
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.gn-notes__key {
+  font-family: var(--gn-font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0 0.25rem;
+  white-space: nowrap;
+}
+
+/* The Deleted group. Separated from the project groups above it by a rule,
+   because it is not a home: it is every home's notes that were removed. */
+.gn-notes__deleted {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gn-border);
+}
+
+.gn-notes__restore-failure {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gn-danger);
+}
+
 /* The four sentences the tree can say about a READ rather than about notes:
    loading, refused, empty, and your-session-is-not-here. Muted because every
    one of them is the page telling the reader something in passing, and none is
