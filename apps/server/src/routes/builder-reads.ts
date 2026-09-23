@@ -494,15 +494,17 @@ export async function readTicketCounts(db: Queryable, workspaceId: string): Prom
   const { rows } = await db.query<{ type_id: string; count: number }>(
     // The soft-delete predicate written LONGHAND on the `k` alias — this is the
     // one builder read whose `t` is already taken, by `proj_ticket_types`. It is
-    // `LIVE_TICKET_WHERE`'s clause on a different alias, and it is in the JOIN's
-    // ON clause rather than the WHERE, deliberately: this is a LEFT JOIN whose
-    // whole job is to report a count of ZERO for a type that has no tickets, and
-    // a WHERE on the right-hand alias would turn a zero into an absent row.
+    // `LIVE_TICKET_WHERE`'s clause on a different alias (Task 6 added the
+    // container half), and it is in the JOIN's ON clause rather than the
+    // WHERE, deliberately: this is a LEFT JOIN whose whole job is to report a
+    // count of ZERO for a type that has no tickets, and a WHERE on the
+    // right-hand alias would turn a zero into an absent row.
     `SELECT t.type_id, count(k.ticket_id)::int AS count
        FROM proj_ticket_types t
        LEFT JOIN proj_tickets k
          ON k.workspace_id = t.workspace_id AND k.type_id = t.type_id
         AND k.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = k.project_id AND dp.deleted_at IS NOT NULL)
       WHERE t.workspace_id = $1
       GROUP BY t.type_id`,
     [workspaceId],

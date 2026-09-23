@@ -86,6 +86,39 @@ async function noteHomeProjectId(db: Queryable, noteId: string): Promise<string 
   return id === undefined || id === '' ? null : id;
 }
 
+/**
+ * The project that CONTAINS this event, for the project-wide gate below — or
+ * `null` for an event with no project affiliation at all (a workflow, a
+ * ticket-type, a workspace act, …), which the gate then leaves alone.
+ *
+ * `ticket.created` and `note.created` are read from their OWN PAYLOAD, not
+ * from a row: their entity has no `proj_tickets`/`proj_notes` row yet at door
+ * time, the same reason Task 4's `readLifecycle` docblock gives for every
+ * other kind.
+ */
+async function projectIdForGate(db: Queryable, env: EventEnvelope): Promise<string | null> {
+  switch (env.entity.kind) {
+    case 'project':
+      return env.entity.id;
+    case 'ticket': {
+      if (env.type === 'ticket.created') {
+        const payload = env.payload as { projectId: string };
+        return payload.projectId;
+      }
+      return ticketProjectId(db, env.entity.id);
+    }
+    case 'note': {
+      if (env.type === 'note.created') {
+        const payload = env.payload as { homeProjectId: string };
+        return payload.homeProjectId === '' ? null : payload.homeProjectId;
+      }
+      return noteHomeProjectId(db, env.entity.id);
+    }
+    default:
+      return null;
+  }
+}
+
 export async function checkLifecycle(db: Queryable, env: EventEnvelope, now: Date): Promise<Refusal | null> {
   // Trash series, Plan 1 Task 5 (spec §4 T10). In a DELETED workspace, refuse
   // every event except the ones that manage the WORKSPACE's own lifecycle —
@@ -107,6 +140,34 @@ export async function checkLifecycle(db: Queryable, env: EventEnvelope, now: Dat
     const workspace = await readLifecycle(db, 'workspace', env.workspaceId);
     if (workspace.deletedAt !== null) {
       return refuse(WORKSPACE_DELETED_REASON);
+    }
+  }
+
+  // Task 6 (spec §4 T10): the same choke point, one container down. Every
+  // event whose CONTAINING project is deleted is refused here, before the
+  // per-type switch — which is what catches `ticket.field_set`, `note.body_set`
+  // and any other type this switch has no case for.
+  //
+  // `project.deleted` is NOT exempted (Ruling, matching Task 5's workspace
+  // gate): the project IS its own container for a `project.*` event, so
+  // exempting only undelete/mark/unmark and not delete would make the FIRST
+  // `project.deleted` answer this gate's generic reason instead of falling
+  // through — the per-type arm below still needs to run for 19.030's ALREADY
+  // case, and it can only do that if `project.deleted` reaches it too. Cost if
+  // wrong: a project's own delete would read the wrong refusal reason.
+  const isProjectOwnAct =
+    env.entity.kind === 'project' &&
+    (env.type === 'project.deleted' ||
+      env.type === 'project.undeleted' ||
+      env.type === 'purge.marked' ||
+      env.type === 'purge.unmarked');
+  if (!isProjectOwnAct) {
+    const projectId = await projectIdForGate(db, env);
+    if (projectId !== null) {
+      const project = await readLifecycle(db, 'project', projectId);
+      if (project.deletedAt !== null) {
+        return refuse(PROJECT_DELETED_REASON);
+      }
     }
   }
 
@@ -156,29 +217,13 @@ export async function checkLifecycle(db: Queryable, env: EventEnvelope, now: Dat
         return refuse(ALREADY_MARKED_REASON(kind));
       }
       // Containment (spec §4): a child inside a deleted parent is not
-      // separately markable.
-      if (kind === 'ticket') {
-        const projectId = await ticketProjectId(db, env.entity.id);
-        if (projectId !== null) {
-          const project = await readLifecycle(db, 'project', projectId);
-          if (project.deletedAt !== null) {
-            return refuse(PROJECT_DELETED_REASON);
-          }
-        }
-      } else if (kind === 'note') {
-        const projectId = await noteHomeProjectId(db, env.entity.id);
-        if (projectId !== null) {
-          const project = await readLifecycle(db, 'project', projectId);
-          if (project.deletedAt !== null) {
-            return refuse(PROJECT_DELETED_REASON);
-          }
-        }
-      } else if (kind === 'project') {
-        const workspace = await readLifecycle(db, 'workspace', env.workspaceId);
-        if (workspace.deletedAt !== null) {
-          return refuse(WORKSPACE_DELETED_REASON);
-        }
-      }
+      // separately markable — enforced above by the workspace-wide gate
+      // (Task 5) and the project-wide gate (Task 6), both of which run before
+      // this switch and refuse first for any container that is itself
+      // deleted. `purge.marked` is not exempted from either gate (only
+      // `undeleted`/`purge.marked`/`purge.unmarked` on the container's OWN
+      // entity are), so a mark on a ticket/note/project whose container is
+      // deleted never reaches this arm at all.
       return null;
     }
     case 'purge.unmarked': {

@@ -209,6 +209,22 @@ async function recomputeParent(
   parentId: string,
 ): Promise<void> {
   await tx.query(
+    // NOT converted to `LIVE_TICKET_WHERE` (Task 6, T10 coverage sweep), and
+    // this one needed working out rather than assuming: `hierarchy.cross-project`
+    // (`packages/rule-engine/src/checks/hierarchy.ts:157`) refuses a parent and
+    // child in different projects, so every child THIS query scans shares ONE
+    // parent's ONE project — a project's deletion therefore excludes either ALL
+    // of a parent's live children or NONE, never a subset. The all-excluded case
+    // makes `count(*) = 0`, which `HAVING count(*) > 0` below turns into ZERO
+    // rows to insert — no write happens at all, and the row already on disk
+    // (written while the project was live) is left stale rather than corrected.
+    // There is therefore no reachable case in which the container clause could
+    // be observed changing this query's answer, on this trigger or any other —
+    // adding it would be an assertion with no case that can drive it. The
+    // staleness itself is a real, PRE-EXISTING gap (the `workflow.defined`
+    // trigger below has no trailing DELETE the way `recomputeProject` does for
+    // the ticket-delete path), recorded here rather than fixed: fixing it is a
+    // rollup-staleness question, not a T10 container-clause one.
     `INSERT INTO proj_rollups
        (parent_ticket_id, workspace_id, project_id,
         total_children, open_children, active_children, terminal_children)
@@ -311,6 +327,15 @@ async function recomputeProject(
   // `NOT IN` over a subquery that can yield NULL matches nothing at all, which
   // is why the subquery carries the same `IS NOT NULL` filter as the scan above
   // rather than relying on the outer predicate.
+  //
+  // NOT converted to `LIVE_TICKET_WHERE` (Task 6, T10 coverage sweep): every
+  // caller hands this function a `projectId` the door has ALREADY verified is
+  // live at the instant of the triggering ticket event (`ticket.deleted`/
+  // `restored`/`reparented`, the only three callers, one project id apiece).
+  // The container clause would ask whether project $2 is deleted while the
+  // query is already scoped to project $2 — a question this call site cannot
+  // observe answered "yes", so there is no case that can drive it and no
+  // reason to add an unobservable branch.
   await tx.query(
     `DELETE FROM proj_rollups
       WHERE workspace_id = $1 AND project_id = $2

@@ -261,12 +261,19 @@ export async function rollupFor(
   // a parent's progress that still counted it would be the "5 of 8" this file
   // exists to keep honest reading "5 of 8" about a ticket nobody can reach.
   const { rows } = await db.query<ChildRow>(
+    // Task 6 (T10) added the container half — `AND NOT EXISTS (… dp.deleted_at
+    // IS NOT NULL)` — inside the first disjunct only. It reads `t.project_id`,
+    // which is NULL on the same join-miss row `t.ticket_id IS NULL` answers
+    // for, so `NOT EXISTS` against a NULL project id matches no row and is
+    // TRUE — it does not fight the join-miss escape, it is simply moot there.
     `SELECT v.ticket_id, v.workspace_id, v.project_id, v.resolved_mode, v.resolved_user_ids,
             t.state_category
      FROM proj_visibility v
      LEFT JOIN proj_tickets t ON t.ticket_id = v.ticket_id
      WHERE v.parent_id = $1
-       AND (t.deleted_at IS NULL OR t.ticket_id IS NULL)
+       AND ((t.deleted_at IS NULL
+             AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL))
+            OR t.ticket_id IS NULL)
      ORDER BY v.ticket_id`,
     [ticketId],
   );

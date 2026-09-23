@@ -60,3 +60,12 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.043 — `GET /v1/me/workspaces` serves `archived: true` after `workspace.archived` and `false` after `workspace.restored`; an archived workspace is still served in full (T8: archive removes nobody's access);** control: a never-archived workspace serves `false`. Mutation: filter archived workspaces out.
 - ✅ **19.044 — the online mapper maps `archived` onto `WorkspaceRef` and refuses a row without it;** control: `true` and `false` round-trip. Mutation: default a missing field to `false`.
 - ✅ **19.045 — `GET /v1/stream` and `POST /v1/sync/bootstrap` for a member of a deleted workspace deliver nothing from it;** control: the live workspace still streams. Mutation: skip the resolver in the stream audience. (If either door does not ask the resolver, this case is where you find out — fix the door, and name it in the commit body.)
+
+## 19.6 Deleted project
+
+- ✅ **19.050 — after `project.deleted`, the project is absent from `GET /v1/me/workspaces`' projects (for owner and member alike) and its tickets from the board, list, search and my-work;** control: a sibling live, prefix-colliding project's tickets are still served on each and its resolved prefix is unchanged by its neighbour's deletion. Mutation: revert `LIVE_TICKET_WHERE`.
+- ✅ **19.051 — each converted longhand site excludes a deleted project's ticket (one arm per site, named in the test by file);** control: the live sibling. Mutation: revert one longhand site — its arm alone reddens.
+- ✅ **19.052 — `routes/my-work.ts`'s TypeScript filter excludes a deleted project's ticket;** control: the sibling. Mutation: revert it.
+- ✅ **19.053 — a project-scoped note in a deleted project is absent from the notes list and from a ticket's attached-notes read;** control: a workspace-scoped note is still served. Mutation: skip the notes clause.
+- ✅ **19.054 — a ticket event and a project-scoped note event into a deleted project are refused with `PROJECT_DELETED_REASON`;** control: accepted after `project.undeleted`. Mutation: exempt `ticket.field_set`.
+- ✅ **19.055 — a ticket deleted on its own, then its project deleted, then the project undeleted, is still deleted (absent from the board; `deleted_at` unchanged);** control: its sibling that was not deleted on its own is back. Mutation: have the projection null tickets' `deleted_at` on `project.undeleted`.
