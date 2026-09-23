@@ -289,10 +289,19 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
   // itself a comment.
   const isComment = props.mode === 'comment';
   // NOTE MODE (Plan 4 Task 8): a document that saves itself. It has no submit
-  // control because there is no event to submit — the host receives every
-  // change through `onDraft` and a debounced write through `onSave` — and it
-  // draws no Markdown hint because the hint describes syntax for a composer
-  // whose submission the reader is choosing to make.
+  // control because there is no event to submit, and it draws no Markdown hint
+  // because the hint describes syntax for a composer whose submission the
+  // reader is choosing to make.
+  //
+  // ⚠ `onDraft` IS THE DURABLE PATH, NOT `onSave`, and an earlier version of
+  // this comment said the opposite ("a debounced write through `onSave`").
+  // `onSave` fires on BLUR and the toolbar makes the difference concrete:
+  // mousedown on a control moves focus out — so `onSave` fires carrying the
+  // document as it was BEFORE the click — and the command then mutates the
+  // document, which reaches the host as `onDraft` and never as a second
+  // `onSave`. A host that wrote ONLY on `onSave` would lose the last change
+  // made with a toolbar button, and would lose it silently: no blur follows a
+  // tab close. Raised for Plan 5, which owns the debounce.
   const isNote = props.mode === 'note';
 
   return (

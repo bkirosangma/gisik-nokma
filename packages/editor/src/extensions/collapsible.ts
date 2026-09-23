@@ -18,13 +18,23 @@ import { TextSelection } from '@tiptap/pm/state';
  * SATISFIES 9.269 or 9.270 … do NOT add a duplicate shortcut"* — so the
  * question is not whether the package has shortcuts but whether they run.
  *
- * **For Enter in a summary, they do not.** `getPlugins()` builds one keymap
- * plugin per extension from `sortExtensions([...extensions].reverse())` (core
- * dist:5206), and every extension here sits at the same default priority — so
- * on this list the BASE keymap's Enter runs first and `handleEnter`'s
- * `createParagraphNear` returns true. Measured, not reasoned: a real `keydown`
- * Enter inside a summary put the cursor in a NEW TOP-LEVEL PARAGRAPH and left
- * the content untouched. The package's `Details.Enter` was never reached.
+ * **For Enter in a summary, they do not.** Measured: a real `keydown` Enter
+ * inside a summary put the cursor in a NEW TOP-LEVEL PARAGRAPH and left the
+ * content untouched, and DELETING the branch below reddens 9.269. The
+ * package's `Details.Enter` is not what runs there.
+ *
+ * **WHICH handler does run there is NOT ESTABLISHED, and an earlier version of
+ * this docblock named one wrongly.** It said the base keymap runs first and
+ * that `handleEnter`'s `createParagraphNear` returns true. Both halves are
+ * false, and the second was measured: `editor.commands.first([newlineInCode,
+ * createParagraphNear, liftEmptyBlock, splitBlock])` returns FALSE at the
+ * summary position and TRUE on the last empty paragraph of a body. The base
+ * `keymap` extension IS in the built list (50 extensions; 67 plugins carry a
+ * `handleKeyDown`), so the key it gets is decided by the order those 67 are
+ * consulted in — an order this file has NOT determined, and one that
+ * `sortExtensions([...resolveExtensions(built)].reverse())` does not reproduce
+ * (it omits `keymap` from the result, so that call is not the list that
+ * matters). What IS measured is the effect: without this branch, 9.269 fails.
  *
  * `priority: 1000` is what makes this file's keymap run first. It is the
  * smallest lever that makes the behaviour deterministic instead of dependent

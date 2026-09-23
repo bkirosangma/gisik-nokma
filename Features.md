@@ -1479,7 +1479,11 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   `text/html` is left to the default handler); copying formatted content puts Markdown in the PLAIN-TEXT
   clipboard flavour only; `exportMarkdown` renders a whole document through the editor's own schema.
   Ported from the knowledge-base app, with `data-raw-block` dropped (§8.7) and the note-link form re-keyed
-  to `[[title]]`. `packages/editor/src/markdown/serializer.ts`,
+  to `[[title]]`. **Two things do NOT survive the round trip, recorded here rather than left to be
+  discovered**: a note link re-imports as TEXT (markdown cannot spell a note id — the spec's own note), and
+  a task list's words survive while its item TYPE and its CHECKED STATE do not: CommonMark merges two
+  same-marker lists separated by a blank line, and a Tiptap task item is `li[data-type="taskItem"]`, an
+  attribute markdown cannot carry. `packages/editor/src/markdown/serializer.ts`,
   `packages/editor/src/extensions/markdown-clipboard.ts`
 - ✅ **Code blocks carry a Copy button, and the toolbar gained four controls** — the strip keeps the
   prototype's six (`B i code link list quote`) and appends Task item, Code block, Collapsible and
