@@ -58,7 +58,42 @@ export type PreflightReport = {
   role: { name: string; superuser: boolean; createDatabase: boolean } | null;
   /** Whether `REQUIRED_EXTENSIONS` can all be created by the connected role. */
   canCreateExtensions: boolean;
+  /** Present only when the caller asked for the embedding warm-up. */
+  embedding?: EmbeddingMeasurement;
 };
+
+/**
+ * The process's resident set, in MiB.
+ *
+ * RSS rather than heap: the 130 MB token table is a typed array over a Buffer,
+ * which is outside V8's heap accounting, and a measurement that could not see it
+ * would report a delta near zero for the one thing it was asked about.
+ */
+export function rssMb(): number {
+  return Math.round((process.memoryUsage().rss / (1024 * 1024)) * 10) / 10;
+}
+
+export type EmbeddingMeasurement = { beforeMb: number; afterMb: number; deltaMb: number } | { error: string };
+
+/**
+ * RSS before and after a warm-up embedding (case 18.129).
+ *
+ * The failure is REPORTED rather than thrown: this tool's primary question is
+ * the extensions, asked of a managed database where the model is irrelevant,
+ * and an operator whose checkout has no model files must still get that answer.
+ * The line is printed either way, so a broken embedding cannot pass unnoticed —
+ * it just cannot take the extension verdict down with it.
+ */
+export async function measureEmbeddingRss(warmUp: () => Promise<unknown>): Promise<EmbeddingMeasurement> {
+  const beforeMb = rssMb();
+  try {
+    await warmUp();
+  } catch (error) {
+    return { error: error instanceof Error ? error.message : String(error) };
+  }
+  const afterMb = rssMb();
+  return { beforeMb, afterMb, deltaMb: Math.round((afterMb - beforeMb) * 10) / 10 };
+}
 
 type ExtensionRow = {
   name: string;
@@ -77,7 +112,7 @@ type RoleRow = { rolname: string; rolsuper: boolean; rolcreatedb: boolean };
  */
 export async function searchPreflight(
   pool: Pool,
-  options: { extensions?: readonly string[] } = {},
+  options: { extensions?: readonly string[]; measureEmbedding?: () => Promise<unknown> } = {},
 ): Promise<PreflightReport> {
   const requested = options.extensions ?? REQUIRED_EXTENSIONS;
 
@@ -134,7 +169,7 @@ export async function searchPreflight(
   const canCreateExtensions =
     role !== null && (role.superuser || required.every((entry) => entry.available && entry.trusted));
 
-  return {
+  const report: PreflightReport = {
     database: context.rows[0]?.database ?? '',
     serverVersion: context.rows[0]?.server_version ?? '',
     extensions,
@@ -142,6 +177,8 @@ export async function searchPreflight(
     role,
     canCreateExtensions,
   };
+  if (options.measureEmbedding) report.embedding = await measureEmbeddingRss(options.measureEmbedding);
+  return report;
 }
 
 export function formatPreflight(report: PreflightReport): string {
@@ -159,6 +196,13 @@ export function formatPreflight(report: PreflightReport): string {
   }
   if (report.missing.length > 0) {
     lines.push(`  MISSING: ${report.missing.join(', ')}`);
+  }
+  if (report.embedding) {
+    lines.push(
+      'error' in report.embedding
+        ? `  embedding: FAILED — ${report.embedding.error}`
+        : `  embedding: RSS ${String(report.embedding.beforeMb)} MB → ${String(report.embedding.afterMb)} MB (Δ ${String(report.embedding.deltaMb)} MB)`,
+    );
   }
   return lines.join('\n');
 }
@@ -179,7 +223,12 @@ async function main(): Promise<void> {
   }
   const pool = createPool(databaseUrl);
   try {
-    const report = await searchPreflight(pool);
+    // Imported HERE rather than at the top of the file so that `searchPreflight`
+    // — the surface 18.124 drives — carries no dependency on the embedding
+    // module, and so a caller that only wants the extension verdict does not
+    // pay for a 130 MB model's parser to be loaded.
+    const { embedQuery } = await import('../search/embedding.js');
+    const report = await searchPreflight(pool, { measureEmbedding: () => embedQuery('warm-up') });
     console.log(formatPreflight(report));
     process.exitCode = report.missing.length === 0 && report.canCreateExtensions ? 0 : 1;
   } finally {
