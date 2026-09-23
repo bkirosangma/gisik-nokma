@@ -429,4 +429,6 @@ assumed it would find.
 `task/editor-polish`: Unit 1 (`:ticket` does not open the picker — bug), Unit 2 (Attach-note button/menu
 styling), Unit 3 (inline `:note`/`:ticket` picker positioning + styling), Unit 4 (editor toolbar restyle,
 tooltips, Insert note/Insert ticket buttons, no @), Unit 5 (an Attach button reaching the existing upload
-path). Cases file: this one. Minted: none yet — this is the reservation commit; the lane fills this block.*
+path). Cases file: this one.*
+
+- ✅ **9.313 — Unit 1 bug fix: a bare `:ticket` (empty query) never calls `search` — the server's `searchTermSchema.min(1)` always refuses an empty term (400), which is why the picker read as "does not open"; it answers instead from `getTickets(projectId, {}, 'flat')`, the current project's tickets; control in the same `it`: a typed query still calls `search`.** Mutation: drop the empty-query guard (routes back to `search('')`, which the fake — enforcing `searchTermSchema` itself — throws on). `apps/web/test/ticket-ref-callbacks.test.ts`.
