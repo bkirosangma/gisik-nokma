@@ -14,11 +14,32 @@ import { ticketSheetPath } from './ticket-location.js';
  * connection" status lives in `packages/editor/src/extensions/ticket-ref.ts`'s
  * `items` wrapper (Ruling 1, 2026-09-23 — no channel exists to carry that fact
  * through `TicketRefCandidate` itself).
+ *
+ * **The empty query is answered LOCALLY, and does not reach `search` at all
+ * (bug fix, case 9.313, 2026-09-24).** `:ticket` alone — nothing typed after
+ * the trigger — is a legitimate open: `packages/editor/test/ticket-ref.test.ts`
+ * case 9.302 calls `queryTickets('')` exactly this way, the same way `:note`'s
+ * own empty query is legitimate. But `search`'s server route refuses an empty
+ * term (`searchTermSchema.min(1)`, `packages/domain/src/filter-spec.ts:73` —
+ * shared with note search and filter text, and not this route's schema to
+ * relax), so every `:ticket ` with no query yet used to send a request that
+ * ALWAYS 400s, which the picker's `items` wrapper turns into "Search needs a
+ * connection" — read by the owner as "`:ticket` does not open" (2026-09-23
+ * report), since `:note` shows every note for the same empty state and
+ * `:ticket` showed nothing. The fix answers the empty query from
+ * `getTickets(projectId, {}, 'flat')` instead — the current project's
+ * tickets, the same route `ticket-sheet.tsx`'s subtasks read already uses for
+ * "every ticket in this project," and the honest match for a query the caller
+ * has not narrowed yet. A rejection from `getTickets` propagates exactly as a
+ * `search` rejection does — this branch does not add a second catch.
  */
 export type TicketRefCandidate = { ticketId: string; projectId: string; key: string; title: string };
 
 /** The subset of `SearchHit` this file reads — kept structural so it never needs `@gisik-nokma/app-core`'s type exported. */
 type TicketSearchHit = { ticketId: string; projectId: string; title: string; key: string | null };
+
+/** The subset of `ListRow` the empty-query browse default reads — kept structural for the same reason `TicketSearchHit` is. */
+type TicketListRow = { ticketId: string; title: string; key: string | null };
 
 /**
  * `SearchHit`s, as the `:ticket` picker's candidates. `key` falls back to the
@@ -71,11 +92,26 @@ export function prioritizeProject<T extends { projectId: string }>(items: T[], p
  * partition was meant to promote.
  */
 export function buildProjectPageQueryTickets(
-  dataSource: { query: { search: (workspaceId: string, text: string) => Promise<TicketSearchHit[]> } },
+  dataSource: {
+    query: {
+      search: (workspaceId: string, text: string) => Promise<TicketSearchHit[]>;
+      getTickets: (
+        projectId: string,
+        filter: Record<string, never>,
+        grouping: 'flat',
+      ) => Promise<{ rows: TicketListRow[] }>;
+    };
+  },
   workspaceId: string,
   projectId: string,
 ): (query: string) => Promise<TicketRefCandidate[]> {
   return async (query: string) => {
+    if (query.trim() === '') {
+      const page = await dataSource.query.getTickets(projectId, {}, 'flat');
+      return ticketRefCandidatesOf(
+        page.rows.map((row) => ({ ticketId: row.ticketId, projectId, title: row.title, key: row.key })),
+      );
+    }
     const hits = await dataSource.query.search(workspaceId, query);
     return prioritizeProject(ticketRefCandidatesOf(hits), projectId);
   };

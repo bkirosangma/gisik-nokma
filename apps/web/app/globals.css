@@ -1822,11 +1822,17 @@ input, textarea, select { font-family: inherit; }
    underneath, transparent means the text shows through the bar. `--gn-surface`
    keeps the bar's resting appearance byte-identical to what it was.
 
-   `z-index: 20` sits deliberately BELOW the two values already in the tree:
-   `.gn-select__panel` and `.mention-popup` at 30, and `.gn-dialog__scrim` /
-   `.gn-sheet__scrim` at 40. A dropdown opening near the top of the page must
-   render OVER the bar, and a modal scrim must cover it entirely; a bar that
-   outranked either would clip the menu it belongs to. */
+   `z-index: 20` sits deliberately BELOW the values already in the tree:
+   `.gn-select__panel` at 30, `.gn-dialog__scrim` / `.gn-sheet__scrim` at 40,
+   and the suggestion popups (`.mention-popup`/`.wikilink-popup`/
+   `.ticketref-popup`, `packages/editor/src/styles/editor.css`) at 50 —
+   raised from 30 in the same commit that fixed `:ticket`'s picker
+   (2026-09-24): all three are `position: fixed` siblings of `.gn-sheet__
+   scrim` appended straight to `document.body`, so one opened from a ticket
+   sheet's comment box (the reported bug's own reproduction) is a stacking
+   comparison against the scrim, and 30 lost. A dropdown opening near the top
+   of the page must render OVER the bar, and a modal scrim must cover it
+   entirely; a bar that outranked either would clip the menu it belongs to. */
 
 /* The bar's own height, published for the things that must sit clear of it
    once it stops scrolling away. Measured on the live page, identical at 768px
@@ -1865,6 +1871,53 @@ input, textarea, select { font-family: inherit; }
    unprefixed name keeps it out of that contract, and consumers read it with a
    `0px` fallback so the no-nav shell is unaffected without knowing anything
    about this file. */
+/* The suggestion popups' own colour, radius and shadow (bug fix, owner
+   report 2026-09-23: "the inline :note menu is also unstyled") —
+   `packages/editor` draws `.mention-popup`/`.wikilink-popup`/`.ticketref-
+   popup` with structure only (a `currentColor` border, no background: that
+   package's own stylesheet may hold no colour token at all), so this is the
+   host's half. The SAME raised surface and shadow `.gn-select__panel` uses
+   (`packages/ui/src/ui.css`) — a picker reads as the same kind of floating
+   control wherever the product draws one, rather than the browser's bare
+   `Canvas` colour the wiki-link and ticket-ref popups drew before this. */
+.mention-popup,
+.wikilink-popup,
+.ticketref-popup {
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  padding: 0.25rem;
+}
+.mention-popup__item,
+.wikilink-popup__item,
+.ticketref-popup__item {
+  border-radius: var(--gn-radius-control);
+}
+/* Selected state by BACKGROUND, not outline (owner request, 2026-09-23) —
+   the same fill `.gn-select__option[data-focused]` uses for its own
+   hover/selected tier, reused rather than a bespoke value. */
+.mention-popup__item--selected,
+.wikilink-popup__item--selected,
+.ticketref-popup__item--selected {
+  background: var(--gn-fill-tertiary);
+}
+/* `.ticketref-popup__status` alone is drawn VISIBLE (`editor.css` gives it
+   layout padding but no visually-hidden clip, unlike the other two popups'
+   status lines) — Unit 3 ruling, 2026-09-24: it can read "Search needs a
+   connection", a real state a sighted caller needs to see, not only a
+   result count. Muted, the same tier `.gn-select__option-description` uses. */
+.ticketref-popup__status {
+  color: var(--gn-text-muted);
+  font-size: 0.85em;
+}
+/* The ticket's key, a muted chip before the title (`ticket-ref-popup.ts`'s
+   `paint()` gives it its own `<span>` for exactly this). */
+.ticketref-popup__key {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+  font-size: 0.85em;
+}
+
 :root { --app-nav-offset: 4.35rem; }
 .gn-nav__inner {
   display: flex;
