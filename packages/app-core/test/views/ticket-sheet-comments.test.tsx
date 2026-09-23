@@ -1,7 +1,9 @@
+import { useState } from 'react';
 import { render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import { createFakeDataSource } from '../helpers/fake-data-source.js';
+import type { NoteSummary } from '@gisik-nokma/domain';
+import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
 import { TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import type { TicketRead } from '../../src/view-types.js';
@@ -520,5 +522,187 @@ describe('TicketSheet — the comment thread and its box', () => {
     expect(description?.['resolveTicketHref']).toBeDefined();
     expect(comment?.['queryTickets']).toBeDefined();
     expect(comment?.['resolveTicketHref']).toBeDefined();
+  });
+});
+
+/**
+ * Cases 18.276–18.277, 18.280 — Plan 7 Task 5 (spec §14.3, D27–D28): the
+ * ticket-comment side of "tagging a note attaches it". `attachmentsImpliedBy`
+ * itself (the pure document walk, 18.275, 18.279) is
+ * `test/flows/attachments-implied-by.test.ts`'s; this file is `submitComment`
+ * wiring it to `dataSource.ingest` and the sheet's own `Toast`. 18.278 (note
+ * comments never call it) is `apps/web/test/note-comments.test.tsx`'s — that
+ * file, not this one, is where `note-comments.tsx`'s own `submitComment` lives.
+ */
+function wikiLink(noteId: string, title: string): unknown {
+  return { type: 'wikiLink', attrs: { noteId, title } };
+}
+
+function commentBody(...content: unknown[]): unknown {
+  return { type: 'doc', content: [{ type: 'paragraph', content }] };
+}
+
+function noteSummary(noteId: string, title: string): NoteSummary {
+  return {
+    noteId,
+    workspaceId: WS,
+    homeProjectId: '',
+    authorId: 'user_kiro',
+    title,
+    scope: { mode: 'workspace' },
+    attachedTickets: [],
+    deleted: false,
+    createdAt: '2026-09-23T00:00:00.000Z',
+    updatedAt: '2026-09-23T00:00:00.000Z',
+  };
+}
+
+/** A comment composer stub that posts a FIXED body on Post — unlike `fakeEditorSlot`, whose body is always empty. */
+function referencingEditorSlot(body: unknown): EditorSlotComponent {
+  return function ReferencingSlot(props) {
+    const [accepted, setAccepted] = useState<boolean | null>(null);
+    if (props.mode === 'description') return <div data-testid="fake-description-editor" />;
+    return (
+      <div data-testid="fake-comment-editor">
+        <button
+          type="button"
+          onClick={() => {
+            void props.submit?.({ type: 'comment.added', payload: { body } }).then(setAccepted);
+          }}
+        >
+          Post
+        </button>
+        {/* EXPOSES `submit`'s own return — D28's "the comment stays posted" is
+            read by `TicketEditorSlot.handleSubmit` as `true`; a build that
+            reported `false` after an already-committed comment would clear
+            nothing and would read here as a claim the post FAILED, which is
+            the observable shape "the comment was rolled back" takes for a
+            caller of this seam. */}
+        {accepted === null ? null : <div data-testid="post-accepted">{String(accepted)}</div>}
+      </div>
+    );
+  };
+}
+
+describe('TicketSheet — tagging a note in a ticket comment attaches it', () => {
+  it('18.276 posting a comment with two note references ingests the comment first, then two attachments; the section reloads and shows both badges', async () => {
+    const user = userEvent.setup();
+    let reloadCount = 0;
+    const getNotesForTicket = vi.fn(async () => {
+      reloadCount += 1;
+      return reloadCount > 1 ? [noteSummary('n1', 'Cold room'), noteSummary('n2', 'Compressor log')] : [];
+    });
+    const src = source({ getNotesForTicket });
+    const body = commentBody(wikiLink('n1', 'Cold room'), { type: 'text', text: ' and ' }, wikiLink('n2', 'Compressor log'));
+    renderSheet(src, { editorSlot: referencingEditorSlot(body) });
+    await screen.findByTestId('fake-comment-editor');
+    await screen.findByText('Notes · 0');
+
+    await user.click(screen.getByRole('button', { name: 'Post' }));
+
+    // ORDER: the comment first, then the two attachments — as one FURTHER
+    // ingest call, not folded into the first.
+    await waitFor(() => expect(src.ingested).toHaveLength(2));
+    expect(src.ingested[0]).toHaveLength(1);
+    expect(src.ingested[0]![0]!.type).toBe('comment.added');
+    expect(src.ingested[1]).toHaveLength(2);
+    expect(src.ingested[1]!.every((e) => e.type === 'note.attached')).toBe(true);
+    expect(src.ingested[1]!.map((e) => e.entity)).toEqual([
+      { kind: 'note', id: 'n1' },
+      { kind: 'note', id: 'n2' },
+    ]);
+    expect(src.ingested[1]!.every((e) => e.payload && (e.payload as { ticketId?: string }).ticketId === TICKET)).toBe(
+      true,
+    );
+
+    // The section's OWN live query reloads and shows both badges.
+    await screen.findByText('Notes · 2');
+    expect(screen.getByRole('link', { name: 'Cold room' })).toHaveAttribute('href', '/notes/n1');
+    expect(screen.getByRole('link', { name: 'Compressor log' })).toHaveAttribute('href', '/notes/n2');
+  });
+
+  it('18.277 a refused attachment leaves the comment posted and shows the toast naming the note and the reason', async () => {
+    const user = userEvent.setup();
+    let call = 0;
+    const ingestScript: IngestScript = (events) => {
+      call += 1;
+      if (call === 1) {
+        return events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: 1,
+          serverTime: '2026-09-23T09:00:00.000Z',
+        }));
+      }
+      return events.map((event) => ({
+        status: 'refused' as const,
+        eventId: event.id,
+        rule: 'note.attachment.locked',
+        reason: 'This note is locked.',
+      }));
+    };
+    const src = source({}, ingestScript);
+    const body = commentBody(wikiLink('n1', 'Cold room'));
+    renderSheet(src, { editorSlot: referencingEditorSlot(body) });
+    await screen.findByTestId('fake-comment-editor');
+
+    await user.click(screen.getByRole('button', { name: 'Post' }));
+
+    // The comment itself committed — TWO ingest calls happened, the second
+    // (the attachment) is the one that was refused.
+    await waitFor(() => expect(call).toBe(2));
+    // The toast names the note and the server's reason.
+    await screen.findByText('Couldn\'t attach "Cold room": This note is locked.');
+    // The comment STAYS POSTED (D28) — found by its own thread entry, not by
+    // the toast's absence, since a rolled-back comment would leave neither.
+    expect(screen.getByText('The bucket is the defect.')).toBeInTheDocument();
+    // …and `submitComment` itself answers `true`: a refused ATTACHMENT is not
+    // a refused COMMENT, and a `false` here is what "rolled back" looks like
+    // to `TicketEditorSlot.handleSubmit` — the composer would keep the words
+    // instead of clearing them, over a comment the ledger already has.
+    expect(await screen.findByTestId('post-accepted')).toHaveTextContent('true');
+  });
+
+  it('18.277b a transport failure on the implied ingest still leaves the comment posted, with its own toast line (D28)', async () => {
+    const user = userEvent.setup();
+    const src = source({});
+    const realIngest = src.ingest.bind(src);
+    let call = 0;
+    src.ingest = async (events) => {
+      call += 1;
+      if (call === 1) return realIngest(events);
+      throw new Error('network down');
+    };
+    const body = commentBody(wikiLink('n1', 'Cold room'));
+    renderSheet(src, { editorSlot: referencingEditorSlot(body) });
+    await screen.findByTestId('fake-comment-editor');
+
+    await user.click(screen.getByRole('button', { name: 'Post' }));
+
+    await waitFor(() => expect(call).toBe(2));
+    await screen.findByText("Couldn't attach the tagged notes: the server did not answer.");
+    // The comment's own thread entry is still there — nothing rolled it back.
+    await screen.findByText('The bucket is the defect.');
+  });
+
+  it('18.280 removing a reference later (a new comment without it) detaches nothing; control: the badge stays', async () => {
+    const user = userEvent.setup();
+    const getNotesForTicket = vi.fn(async () => [noteSummary('n1', 'Cold room')]);
+    const src = source({ getNotesForTicket });
+    const bodyWithoutReference = commentBody({ type: 'text', text: 'no links here' });
+    renderSheet(src, { editorSlot: referencingEditorSlot(bodyWithoutReference) });
+    await screen.findByTestId('fake-comment-editor');
+    // CONTROL: the badge is there BEFORE posting, from an earlier attach.
+    await screen.findByRole('link', { name: 'Cold room' });
+
+    await user.click(screen.getByRole('button', { name: 'Post' }));
+
+    // Only the comment is ever ingested — a body naming no reference implies
+    // nothing, so there is no second `ingest` call at all.
+    await waitFor(() => expect(src.ingested).toHaveLength(1));
+    expect(src.ingested[0]![0]!.type).toBe('comment.added');
+    // Still there — never detached.
+    expect(screen.getByRole('link', { name: 'Cold room' })).toBeInTheDocument();
+    expect(src.ingested.flat().some((e) => e.type === 'note.detached')).toBe(false);
   });
 });

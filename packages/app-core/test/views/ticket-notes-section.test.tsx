@@ -6,15 +6,36 @@ import { makeSubmittedFactory } from '../../src/submit.js';
 import type { IngestScript } from '../helpers/fake-data-source.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import { PROJECT, TICKET, WS } from '../helpers/seed.js';
-import { TicketNotesSection } from '../../src/views/ticket-notes-section.js';
+import { TicketNotesSection, type TicketNotesSectionProps } from '../../src/views/ticket-notes-section.js';
 import { TicketSheet } from '../../src/views/ticket-sheet.js';
+import { useLiveQuery } from '../../src/views/use-live-query.js';
 import type { TicketRead } from '../../src/view-types.js';
 import { ticketStateSeed } from '../helpers/seed.js';
 
 /**
  * Cases 18.241–18.246 — the ticket's Notes section (notes series, Plan 6 of 7,
  * spec §10.1–10.2). Case ids live in `test-cases/18-notes.md` §18.12.
+ *
+ * ⚠ **THE `<ticketId>:notes` QUERY MOVED, Plan 7 Task 5 (spec §14.3).**
+ * `TicketNotesSection` no longer calls `useLiveQuery` itself — `TicketSheet`
+ * lifted it, so `submitComment` can read the same `data` for
+ * `alreadyAttached` and `reload()` it after an implied attachment. Two
+ * consequences for the cases below: 18.241 (the query's KEY) and 18.246 (the
+ * live-stream refetch) are now facts about the SHEET, not the section, and
+ * mount `<TicketSheet>`; 18.242–18.245 (badges, detach, undo, refusal) are
+ * still facts about the section's own rendering and event-building, and mount
+ * it through `Harness`, a component that owns `useLiveQuery` exactly the way
+ * `TicketSheet` now does and hands the section its `notes` prop — keeping
+ * every one of those four cases' own bodies unchanged.
  */
+
+/** Mirrors `TicketSheet`'s own lift — see the file docblock above. */
+function Harness(props: Omit<TicketNotesSectionProps, 'notes'>) {
+  const notes = useLiveQuery(props.dataSource, props.workspaceId, `${props.ticketId}:notes`, () =>
+    props.dataSource.query.getNotesForTicket(props.workspaceId, props.ticketId),
+  );
+  return <TicketNotesSection {...props} notes={notes} />;
+}
 
 function note(overrides: Partial<NoteSummary> = {}): NoteSummary {
   return {
@@ -41,25 +62,33 @@ function makeFactory() {
   return makeSubmittedFactory({ actorId: 'user_kiro', origin: 'web' });
 }
 
+const MINIMAL_READ: TicketRead = {
+  ticket: ticketStateSeed(),
+  title: 'File the GST return',
+  stateProvenance: { actorId: 'user_anselma', actorName: 'Anselma Marak', clientTime: '2026-08-19T09:58:12.000Z', serverTime: '2026-08-19T10:00:00.000Z' },
+  assignedProvenance: null,
+  visibility: null,
+  parent: null,
+  rollup: null,
+  key: null,
+  epic: null,
+};
+
 afterEach(() => {
   cleanup();
 });
 
 describe('TicketNotesSection', () => {
-  it('18.241 the section reads getNotesForTicket under a key that carries the ticket id, and the heading counts the notes', async () => {
+  /**
+   * 18.241 — MOVED onto the production path (Plan 7 Task 5): the
+   * `<ticketId>:notes` key is now `TicketSheet`'s own, not the section's, so
+   * this mounts the sheet rather than the section alone.
+   */
+  it('18.241 the sheet\'s own <ticketId>:notes key carries the ticket id, and the heading counts the notes', async () => {
     const getNotesForTicket = vi.fn(async () => []);
-    const source = createFakeDataSource({ getNotesForTicket });
+    const source = createFakeDataSource({ getTicket: async () => MINIMAL_READ, getNotesForTicket });
     const { rerender } = render(
-      <TicketNotesSection
-        dataSource={source}
-        workspaceId={WS}
-        ticketId={TICKET}
-        projectId={PROJECT}
-        currentUserId="user_kiro"
-        canEdit
-        make={makeFactory()}
-        onRefusal={vi.fn()}
-      />,
+      <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} />,
     );
     await screen.findByText('Notes · 0');
     expect(getNotesForTicket).toHaveBeenCalledTimes(1);
@@ -67,38 +96,17 @@ describe('TicketNotesSection', () => {
     expect(screen.queryAllByRole('link')).toHaveLength(0);
 
     // The key must carry the ticket id: switching tickets on the SAME mounted
-    // component (no unmount) must re-fetch for the new ticket. A key that
-    // dropped the ticket id would leave `useLiveQuery`'s refetch effect
-    // unchanged across this rerender, and `getNotesForTicket` would never be
-    // called a second time.
+    // sheet (no unmount) must re-fetch for the new ticket. A key that dropped
+    // the ticket id would leave `useLiveQuery`'s refetch effect unchanged
+    // across this rerender, and `getNotesForTicket` would never be called a
+    // second time.
     const OTHER_TICKET = 'ticket_other_0000000000000';
     rerender(
-      <TicketNotesSection
-        dataSource={source}
-        workspaceId={WS}
-        ticketId={OTHER_TICKET}
-        projectId={PROJECT}
-        currentUserId="user_kiro"
-        canEdit
-        make={makeFactory()}
-        onRefusal={vi.fn()}
-      />,
+      <TicketSheet dataSource={source} workspaceId={WS} ticketId={OTHER_TICKET} currentUserId="user_kiro" onClose={vi.fn()} />,
     );
     await waitFor(() => expect(getNotesForTicket).toHaveBeenCalledTimes(2));
     expect(getNotesForTicket).toHaveBeenLastCalledWith(WS, OTHER_TICKET);
   });
-
-  const MINIMAL_READ: TicketRead = {
-    ticket: ticketStateSeed(),
-    title: 'File the GST return',
-    stateProvenance: { actorId: 'user_anselma', actorName: 'Anselma Marak', clientTime: '2026-08-19T09:58:12.000Z', serverTime: '2026-08-19T10:00:00.000Z' },
-    assignedProvenance: null,
-    visibility: null,
-    parent: null,
-    rollup: null,
-    key: null,
-    epic: null,
-  };
 
   it('18.241a the section sits between Subtasks and Comments in the Details tab', async () => {
     const getNotesForTicket = vi.fn(async () => []);
@@ -115,7 +123,7 @@ describe('TicketNotesSection', () => {
   it('18.242 one badge per note, linking to /notes/<id>, tinted by scope.mode, with the × only when canEdit', async () => {
     const source = createFakeDataSource({ getNotesForTicket: async () => TWO_NOTES });
     const { unmount } = render(
-      <TicketNotesSection
+      <Harness
         dataSource={source}
         workspaceId={WS}
         ticketId={TICKET}
@@ -140,7 +148,7 @@ describe('TicketNotesSection', () => {
     // Control: a reader gets the same links and no ×, and no Attach button.
     const readerSource = createFakeDataSource({ getNotesForTicket: async () => TWO_NOTES });
     render(
-      <TicketNotesSection
+      <Harness
         dataSource={readerSource}
         workspaceId={WS}
         ticketId={TICKET}
@@ -162,7 +170,7 @@ describe('TicketNotesSection', () => {
     const getNotesForTicket = vi.fn(async () => TWO_NOTES);
     const source = createFakeDataSource({ getNotesForTicket });
     render(
-      <TicketNotesSection
+      <Harness
         dataSource={source}
         workspaceId={WS}
         ticketId={TICKET}
@@ -193,7 +201,7 @@ describe('TicketNotesSection', () => {
     const getNotesForTicket = vi.fn(async () => TWO_NOTES);
     const source = createFakeDataSource({ getNotesForTicket });
     render(
-      <TicketNotesSection
+      <Harness
         dataSource={source}
         workspaceId={WS}
         ticketId={TICKET}
@@ -237,7 +245,7 @@ describe('TicketNotesSection', () => {
     const source = createFakeDataSource({ getNotesForTicket }, ingestScript);
     const onRefusal = vi.fn();
     render(
-      <TicketNotesSection
+      <Harness
         dataSource={source}
         workspaceId={WS}
         ticketId={TICKET}
@@ -260,18 +268,9 @@ describe('TicketNotesSection', () => {
     vi.useFakeTimers();
     try {
       const getNotesForTicket = vi.fn(async () => TWO_NOTES);
-      const source = createFakeDataSource({ getNotesForTicket });
+      const source = createFakeDataSource({ getTicket: async () => MINIMAL_READ, getNotesForTicket });
       render(
-        <TicketNotesSection
-          dataSource={source}
-          workspaceId={WS}
-          ticketId={TICKET}
-          projectId={PROJECT}
-          currentUserId="user_kiro"
-          canEdit
-          make={makeFactory()}
-          onRefusal={vi.fn()}
-        />,
+        <TicketSheet dataSource={source} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} />,
       );
       await act(async () => {
         await vi.runAllTimersAsync();

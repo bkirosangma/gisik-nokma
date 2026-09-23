@@ -8,7 +8,7 @@ import {
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Chip, Dialog, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
+import { Button, Chip, Dialog, SegmentedControl, Select, Sheet, Toast } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -18,6 +18,7 @@ import { memberLabel } from '../member-label.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
+import { attachmentsImpliedBy, noteReferencesIn } from '../flows/attachments-implied-by.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import { CommentsThread, type TicketComment } from './comments-thread.js';
 import {
@@ -650,6 +651,17 @@ export function TicketSheet({
    */
   const [editorError, setEditorError] = useState<string | null>(null);
   /**
+   * Refusals from the attachments a posted comment IMPLIED (Plan 7 Task 5,
+   * spec §14.3, D28) — one line per note `attachmentsImpliedBy` tried and
+   * failed to attach, shown together in this sheet's own `Toast`. A comment's
+   * own posting refusal stays on `serverRefusal`, the same slot every other
+   * ticket-write refusal uses; this is a SEPARATE slot because the comment
+   * that implies these attachments has already committed by the time any of
+   * them can fail — D28's own rule, "the comment stays posted" — so the two
+   * facts must be drawable at once rather than one overwriting the other.
+   */
+  const [attachRefusals, setAttachRefusals] = useState<string[]>([]);
+  /**
    * The title control's draft — `null` MEANS "not editing", and that is the
    * whole mechanism rather than a flag beside one.
    *
@@ -820,6 +832,17 @@ export function TicketSheet({
    */
   const comments = useLiveQuery(dataSource, workspaceId, `${ticketId}:comments`, () =>
     dataSource.query.getTicketComments(workspaceId, ticketId),
+  );
+  /**
+   * The ticket's attached notes (Plan 7 Task 5, spec §14.3) — LIFTED here from
+   * `TicketNotesSection`, which used to own this query itself (Plan 6). The
+   * sheet's own `submitComment` needs the SAME `data` to compute
+   * `alreadyAttached` and to `reload()` after an implied attachment commits,
+   * so both it and the section now read the one instance rather than each
+   * keeping a query that could answer differently for a moment.
+   */
+  const notes = useLiveQuery(dataSource, workspaceId, `${ticketId}:notes`, () =>
+    dataSource.query.getNotesForTicket(workspaceId, ticketId),
   );
   /**
    * The ticket's CHILDREN (door F, 2026-09-19) — derived from the list read the
@@ -1271,6 +1294,52 @@ export function TicketSheet({
       setEditorError(null);
       comments.reload();
       history.reload();
+      // TAGGING A NOTE ATTACHES IT (spec §14.3, D27–D28) — AFTER the comment's
+      // own commit, never before: 18.276 pins the order, because an implied
+      // attachment is a CONSEQUENCE of the comment landing, not a
+      // precondition of it. `attachedNoteIds` reads the lifted `<ticketId>:notes`
+      // query's CURRENT answer, so a note already attached (by this comment's
+      // own author moments ago, or by anyone else) is never re-claimed.
+      //
+      // Only a `comment.added` submission carries a `body` to walk — the other
+      // two `EditorSlotSubmission` arms (`note.body_set`, `ticket.field_set`)
+      // do not, and `submitComment` is this sheet's TICKET-comment door only
+      // (D28: note comments never call this at all — `note-comments.tsx`
+      // does not import `attachmentsImpliedBy`).
+      if (submission.type === 'comment.added') {
+        const alreadyAttached = (notes.data ?? []).map((n) => n.noteId);
+        const implied = attachmentsImpliedBy(submission.payload.body, workspaceId, ticketId, alreadyAttached, make);
+        if (implied.length > 0) {
+          // THE COMMENT MUST STAND EVEN IF THIS FAILS TO ANSWER AT ALL —
+          // D28's "the comment stays posted" covers a silent transport
+          // failure here exactly as it covers a real refusal below. Without
+          // this catch, a rejected `ingest` would throw OUT of an already-
+          // `true`-bound function, which `TicketEditorSlot.handleSubmit`
+          // reads as the SUBMIT itself failing — its own `catch` fires
+          // `onError` and leaves the words in the composer, so the author
+          // would re-post a comment the ledger already has.
+          try {
+            const titleOf = new Map(noteReferencesIn(submission.payload.body).map((ref) => [ref.noteId, ref.title]));
+            const impliedResults = await dataSource.ingest(implied);
+            const refusals: string[] = [];
+            implied.forEach((impliedEvent, index) => {
+              const impliedResult = impliedResults[index];
+              const title = titleOf.get(impliedEvent.entity.id) ?? impliedEvent.entity.id;
+              if (impliedResult === undefined) {
+                refusals.push(`Couldn't attach "${title}": The server did not answer this change.`);
+              } else if (impliedResult.status === 'refused') {
+                refusals.push(`Couldn't attach "${title}": ${impliedResult.reason}`);
+              } else if (impliedResult.status !== 'committed') {
+                refusals.push(`Couldn't attach "${title}": ${impliedResult.message}`);
+              }
+            });
+            if (refusals.length > 0) setAttachRefusals(refusals);
+            notes.reload();
+          } catch {
+            setAttachRefusals(['Couldn\'t attach the tagged notes: the server did not answer.']);
+          }
+        }
+      }
       return true;
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
@@ -3724,6 +3793,7 @@ export function TicketSheet({
             make={make}
             onNavigate={onNavigate}
             onRefusal={(r) => setServerRefusal(r)}
+            notes={notes}
           />
 
           {/*
@@ -3814,6 +3884,20 @@ export function TicketSheet({
                 />
               )
             }
+          />
+          {/*
+            Refusals from notes a posted comment TRIED to attach (spec §14.3,
+            D27–D28) — the comment itself always stands; this only reports what
+            could not follow it. `tone="danger"` rather than the plan's own
+            "error", because `ToastTone` (`packages/ui`) names no such tone —
+            the nearest real one, and `undo` stays absent: an attach retry is
+            not an undo of anything.
+          */}
+          <Toast
+            open={attachRefusals.length > 0}
+            message={attachRefusals.join(' ')}
+            tone="danger"
+            onDismiss={() => setAttachRefusals([])}
           />
         </div>
       ) : tab === 'attachments' ? (

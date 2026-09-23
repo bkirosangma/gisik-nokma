@@ -153,6 +153,51 @@ describe('18.213-18.215 NoteComments', () => {
   });
 
   /**
+   * 18.278 — Plan 7 Task 5 (spec §14.3, D28): "the auto-attach fires only when
+   * a TICKET comment is posted" — a note comment tagging a note never implies
+   * an attachment, regardless of what its body references. `submitComment` in
+   * `ticket-sheet.tsx` is the only caller of `attachmentsImpliedBy`
+   * (`packages/app-core/test/views/ticket-sheet-comments.test.tsx` proves ITS
+   * side, cases 18.276–18.277); this proves `NoteComments`' own `submitComment`
+   * never calls it at all — ONE ingest, ever, however many `wikiLink`s the
+   * body carries.
+   *
+   * Mutation: call the helper from `note-comments.tsx` — a second `ingested`
+   * batch (`note.attached`) would appear.
+   */
+  it('18.278 a note comment with a wikiLink never produces note.attached (D28)', async () => {
+    const ingested: SubmittedEvent[] = [];
+    const services = stubServices({ getNoteComments: async () => [] });
+    services.dataSource.ingest = committedIngest(ingested);
+
+    render(
+      <Providers services={services}>
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+      </Providers>,
+    );
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+
+    const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikiLink', attrs: { noteId: 'n_other', title: 'Compressor log' } }],
+        },
+      ],
+    };
+    let accepted = false;
+    await act(async () => {
+      accepted = await submit({ type: 'comment.added', payload: { body } });
+    });
+    expect(accepted).toBe(true);
+    // ONE batch, ever — the comment itself, never a second (implied) one.
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0]!.type).toBe('comment.added');
+  });
+
+  /**
    * 18.215 — a reader who is not the author still gets a working composer,
    * and `canComment=false` withholds it entirely.
    *
