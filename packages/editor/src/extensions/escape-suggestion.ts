@@ -1,13 +1,19 @@
 import { Extension } from '@tiptap/core';
 import type { EditorState, Transaction } from '@tiptap/pm/state';
 import { Plugin, PluginKey } from '@tiptap/pm/state';
-import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 /**
- * Spec §2's named mechanic: when a typed reserved character sequence
- * triggers formatting, surface an inline suggestion offering the escaped
- * literal, so nothing silently becomes markup. Accepting keeps the literal
- * text; dismissing keeps the formatting.
+ * Spec §2 originally named a visible mechanic here: when a typed reserved
+ * character sequence triggered formatting, an inline chip offered the
+ * escaped literal, so nothing silently became markup. **That visible offer
+ * is WITHDRAWN (owner ruling 2026-09-24)** — the chip, the `Escape`
+ * keyboard shortcut that dismissed it, and the `dismissed` bookkeeping that
+ * shortcut needed are all deleted. What remains, and is unchanged in
+ * substance, is the REPAIR below: pressing Backspace immediately after a
+ * reserved sequence still reverts the conversion and restores the literal
+ * typed characters, for every one of the 21 registered input rules. Nothing
+ * renders to advertise that window; it is simply what Backspace does if you
+ * use it right away.
  *
  * THE MECHANISM DESCRIBED IN THIS PLAN'S TASK TEXT DOES NOT WORK AS WRITTEN,
  * and the gap is not cosmetic — it is the reason this file does not read
@@ -140,8 +146,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
  * multi-step transaction ending in a position-shifting step; both core's
  * `undoInputRule` and this one build exactly that shape. Nothing in this
  * file can fix a core test helper, so the test drives a real keydown
- * instead of the helper, the same way this file's own Escape shortcut is
- * already tested.
+ * instead of the helper.
  *
  * The literal itself is also not `record.text` alone — that field is only
  * the ONE character that completed the match (the not-yet-inserted
@@ -157,7 +162,7 @@ import { Decoration, DecorationSet } from '@tiptap/pm/view';
 
 type InputRuleRecord = { transform: Transaction; from: number; to: number; text: string };
 
-type EscapePluginState = { record: InputRuleRecord | null; dismissed: InputRuleRecord | null };
+type EscapePluginState = { record: InputRuleRecord | null };
 
 export const escapeSuggestionKey = new PluginKey<EscapePluginState>('escapeSuggestion');
 
@@ -220,11 +225,15 @@ function deriveLiteral(record: InputRuleRecord): string {
   return blockTextBefore + record.text;
 }
 
-/** The suggestion currently on offer, if any — tests and toolbars read this. */
+/**
+ * Whether there is a pending undo-able record — tests read this to check
+ * internal state. No visible chip renders from this any more (owner ruling
+ * 2026-09-24, withdrawing spec §2's chip mechanic); the record it reports
+ * still drives `undoInputRule` below.
+ */
 export function getEscapeSuggestion(state: EditorState): { literal: string } | null {
   const pluginState = escapeSuggestionKey.getState(state);
   if (!pluginState?.record) return null;
-  if (pluginState.record === pluginState.dismissed) return null;
   return { literal: deriveLiteral(pluginState.record) };
 }
 
@@ -251,50 +260,8 @@ function revertRecord(record: InputRuleRecord, state: EditorState): Transaction 
   return tr;
 }
 
-function buildChip(literal: string, onAccept: () => void): HTMLElement {
-  const chip = document.createElement('button');
-  chip.type = 'button';
-  chip.className = 'escape-chip';
-  chip.setAttribute('data-escape-chip', '');
-  chip.contentEditable = 'false';
-
-  const label = document.createElement('span');
-  label.className = 'escape-chip__label';
-  const shown = literal.trim() === '' ? literal : literal.trim();
-  label.textContent = `Keep "${shown}" as text`;
-  chip.appendChild(label);
-
-  const hint = document.createElement('span');
-  hint.className = 'escape-chip__hint';
-  hint.textContent = 'Backspace or click · Esc keeps formatting';
-  chip.appendChild(hint);
-
-  // mousedown, not click: it fires before the editor loses focus.
-  chip.addEventListener('mousedown', (event) => {
-    event.preventDefault();
-    onAccept();
-  });
-  return chip;
-}
-
 export const EscapeSuggestion = Extension.create({
   name: 'escapeSuggestion',
-
-  addKeyboardShortcuts() {
-    return {
-      Escape: () => {
-        if (!getEscapeSuggestion(this.editor.state)) return false;
-        // Dismiss: the formatting stands; only the offer is withdrawn. A
-        // meta-only transaction touches neither doc nor selection, so it
-        // cannot itself trip the "something else changed, clear" branch in
-        // `apply` below, and TrailingNode ignores non-doc-changing
-        // transactions outright (its own `apply` returns `value` unless
-        // `tr.docChanged`).
-        this.editor.view.dispatch(this.editor.state.tr.setMeta(escapeSuggestionKey, 'dismiss'));
-        return true;
-      },
-    };
-  },
 
   addCommands() {
     return {
@@ -306,9 +273,8 @@ export const EscapeSuggestion = Extension.create({
       undoInputRule:
         () =>
         ({ state, dispatch }: { state: EditorState; dispatch?: (tr: Transaction) => void }) => {
-          const pluginState = escapeSuggestionKey.getState(state);
-          const record = pluginState?.record ?? null;
-          if (!record || record === pluginState?.dismissed) return false;
+          const record = escapeSuggestionKey.getState(state)?.record ?? null;
+          if (!record) return false;
           if (dispatch) dispatch(revertRecord(record, state));
           return true;
         },
@@ -316,19 +282,14 @@ export const EscapeSuggestion = Extension.create({
   },
 
   addProseMirrorPlugins() {
-    const editor = this.editor;
     return [
       new Plugin<EscapePluginState>({
         key: escapeSuggestionKey,
         state: {
-          init: () => ({ record: null, dismissed: null }),
+          init: () => ({ record: null }),
           apply(tr, prev) {
-            const meta = tr.getMeta(escapeSuggestionKey) as
-              | { capture: InputRuleRecord }
-              | 'dismiss'
-              | undefined;
-            if (meta && typeof meta === 'object') return { record: meta.capture, dismissed: null };
-            if (meta === 'dismiss') return { record: prev.record, dismissed: prev.record };
+            const meta = tr.getMeta(escapeSuggestionKey) as { capture: InputRuleRecord } | undefined;
+            if (meta && typeof meta === 'object') return { record: meta.capture };
             // A transaction ProseMirror itself appended within the CURRENT
             // dispatch group (prosemirror-state tags every one with this
             // meta, pointing at the group's root tr — dist:714) is a
@@ -337,13 +298,14 @@ export const EscapeSuggestion = Extension.create({
             // in the same group as a heading/list/blockquote/codeBlock
             // conversion (see file docblock) to keep the doc ending in a
             // paragraph, and its insert has `docChanged: true` — without this
-            // guard it would clear the suggestion THIS plugin just captured
-            // from that very same conversion, one line above.
+            // guard it would clear the record THIS plugin just captured from
+            // that very same conversion, one line above.
             if (tr.getMeta('appendedTransaction')) return prev;
             // Anything else that changed the doc or the selection is a new
-            // user action (more typing, a click, an external edit) — the
-            // spec's "dismiss by continuing to type or clicking elsewhere".
-            if (tr.docChanged || tr.selectionSet) return { record: null, dismissed: null };
+            // user action (more typing, a click, an external edit), and the
+            // undo window closes: `undoInputRule` only reverts IMMEDIATELY
+            // after the trigger, never after further typing.
+            if (tr.docChanged || tr.selectionSet) return { record: null };
             return prev;
           },
         },
@@ -354,21 +316,6 @@ export const EscapeSuggestion = Extension.create({
           // `addToHistory: false`: this is bookkeeping, not an edit — it
           // must not become its own undo step.
           return newState.tr.setMeta(escapeSuggestionKey, { capture: found }).setMeta('addToHistory', false);
-        },
-        props: {
-          decorations(state) {
-            const suggestion = getEscapeSuggestion(state);
-            if (!suggestion) return null;
-            const chip = Decoration.widget(
-              state.selection.from,
-              () =>
-                buildChip(suggestion.literal, () => {
-                  editor.commands.undoInputRule();
-                }),
-              { side: 1, key: 'escape-suggestion-chip' },
-            );
-            return DecorationSet.create(state.doc, [chip]);
-          },
         },
       }),
     ];
