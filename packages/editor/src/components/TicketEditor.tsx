@@ -5,6 +5,7 @@ import { Extension } from '@tiptap/core';
 import { buildEditorExtensions } from '../schema/extensions.js';
 import { createAttachmentPasteExtension } from '../extensions/attachment-paste.js';
 import type { MentionCandidate } from '../extensions/mention.js';
+import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
 import { emptyDoc, type DocJson } from '../doc.js';
 import type { UploadResult } from '../upload.js';
 import { ImageWrapMenu } from './ImageWrapMenu.js';
@@ -16,6 +17,17 @@ export type TicketEditorProps = {
   editable?: boolean;
   placeholder?: string;
   queryUsers(query: string): Promise<MentionCandidate[]>;
+  /**
+   * Wiki-link capabilities (Plan 4 Task 5), the same four that reach
+   * `buildEditorExtensions` and the same four app-core's twin declares. All
+   * optional: a mount with none of them still renders and round-trips
+   * `wikiLink` nodes, it just offers no picker, follows no renames, shows no
+   * hover card and does not navigate.
+   */
+  queryNotes?(query: string): Promise<NoteLinkCandidate[]>;
+  resolveNoteTitle?(noteId: string): string | null;
+  previewNote?(noteId: string): Promise<string | null>;
+  onNavigateNote?(noteId: string): void;
   uploadAttachment(file: File): Promise<UploadResult>;
   /** Emit attachment.added — runs after upload, before any node insertion. */
   onAttachmentAdded(result: UploadResult): Promise<void> | void;
@@ -94,6 +106,22 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         // life of a mounted editor — and a host that needs it to change must
         // remount rather than expect the option to follow.
         readOnly: props.editable === false,
+        // Threaded through `propsRef` like `queryUsers` above, and for the same
+        // reason: Tiptap snapshots extension options at construction, so a
+        // closure over the CURRENT prop is what keeps a re-rendering parent's
+        // new callbacks reachable. The three conditionals are the same pattern
+        // `extensions.ts` uses, one layer up — an explicitly-passed `undefined`
+        // would read as "no resolver" rather than "not supplied yet".
+        queryNotes: (query) => propsRef.current.queryNotes?.(query) ?? Promise.resolve([]),
+        ...(props.resolveNoteTitle === undefined
+          ? {}
+          : { resolveNoteTitle: (noteId: string) => propsRef.current.resolveNoteTitle?.(noteId) ?? null }),
+        ...(props.previewNote === undefined
+          ? {}
+          : { previewNote: (noteId: string) => propsRef.current.previewNote?.(noteId) ?? Promise.resolve(null) }),
+        ...(props.onNavigateNote === undefined
+          ? {}
+          : { onNavigateNote: (noteId: string) => propsRef.current.onNavigateNote?.(noteId) }),
       }),
       createAttachmentPasteExtension({
         uploadAttachment: (file) => propsRef.current.uploadAttachment(file),

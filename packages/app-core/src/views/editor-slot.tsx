@@ -141,6 +141,16 @@ export type EditorSlotProps = {
   // for composing, and states the gap honestly when one is missing rather than
   // pretending (e.g. no uploadAttachment → image paste is refused, not dropped).
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
+  // Wiki-link capabilities (Plan 4 Task 5), the twin of the block in
+  // `packages/editor/src/components/TicketEditorSlot.tsx`. Declared with the
+  // same four names and the same inline shapes ON PURPOSE: the transcription
+  // case in `packages/editor/test/ticket-editor-slot.test.tsx` compares this
+  // declaration's field names against its own copy, so adding a prop here
+  // without adding it there fails a test before it fails a build.
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
   /**

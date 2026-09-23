@@ -242,7 +242,7 @@ describe('the editor toolbar (16.85)', () => {
     expect(names.slice(0, 6)).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
     // …and the port's three are the ones that follow, in their own order, so a
     // future control cannot slip in between the six and these three unnoticed.
-    expect(names.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible']);
+    expect(names.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible', 'Link a note']);
     expect(view.container.querySelector('.ticket-editor__hint')?.textContent).toBe(MARKDOWN_HINT);
     view.unmount();
   });

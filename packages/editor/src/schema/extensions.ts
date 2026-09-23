@@ -18,6 +18,7 @@ import { CodeBlockWithCopy } from '../extensions/code-block-copy.js';
 import { Collapsible } from '../extensions/collapsible.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
+import { WikiLink, type NoteLinkCandidate } from '../extensions/wiki-link.js';
 import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
 
 export type EditorSchemaOptions = {
@@ -39,6 +40,17 @@ export type EditorSchemaOptions = {
    * makes the reader's toggle a view-local affordance rather than an edit.
    */
   readOnly?: boolean;
+  /**
+   * Wiki-link data source (Plan 4 Task 5). All four are optional and the
+   * defaults are deliberate: no picker, no rename-following, no hover card, and
+   * a link that does not navigate — a document with wiki-links still RENDERS
+   * and still round-trips on a host that supplies none of them, which is what
+   * keeps this widening additive for every existing mount.
+   */
+  queryNotes?: (query: string) => Promise<NoteLinkCandidate[]>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
 };
 
 /**
@@ -236,6 +248,23 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // and `Mention.addOptions` still carries its own, for a host that
     // configures the extension directly.
     Mention.configure({ queryUsers: options.queryUsers ?? (async () => []) }),
+    // The wiki-link node of schema v2 (Plan 4 Task 5). `queryNotes` is spelled
+    // with `??` like the mention's, for the same reason: the fallback is a
+    // VALUE, not a default being protected from an explicit `undefined` (which
+    // is TicketImage's case above). The other three travel CONDITIONALLY — an
+    // explicitly-passed `undefined` would REPLACE the extension's own fallback
+    // under `mergeDeep`, and `resolveNoteTitle: undefined` is precisely the
+    // "no resolver" answer the node view reads as "show the stored title".
+    WikiLink.configure({
+      queryNotes: options.queryNotes ?? (async () => []),
+      ...(options.resolveNoteTitle === undefined
+        ? {}
+        : { resolveNoteTitle: options.resolveNoteTitle }),
+      ...(options.previewNote === undefined ? {} : { previewNote: options.previewNote }),
+      ...(options.onNavigateNote === undefined
+        ? {}
+        : { onNavigateNote: options.onNavigateNote }),
+    }),
     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
     // input rules OFFER — it is not a constraint on stored documents, and it

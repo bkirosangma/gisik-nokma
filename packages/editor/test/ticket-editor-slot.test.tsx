@@ -96,6 +96,14 @@ type AppCoreEditorSlotProps = {
   labelledBy?: string;
   footerNote?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
+  // 9.280 — the wiki-link four (Plan 4 Task 5). Transcribed here with the same
+  // names and inline shapes so the case below, which compares THIS type's field
+  // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if
+  // either half gains a prop the other does not have.
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
   // V7 — mirrored from app-core's seam, and the TYPE is part of the parity the

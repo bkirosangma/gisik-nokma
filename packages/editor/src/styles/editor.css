@@ -546,3 +546,44 @@
   font: inherit;
   cursor: pointer;
 }
+
+/* The wiki-link node and its picker (spec §8.5, Plan 4 Task 5). Structure
+   only, like everything above: this file names no colour. */
+.editor-wikilink { overflow-wrap: anywhere; }
+/* THE MISSING PILL, drawn apart from a live link without an ink — this file's
+   header forbids every colour form and packages/editor must not reach
+   packages/ui's tokens. A wavy underline is the affordance a reader already
+   reads as "this reference does not resolve", and `cursor: help` says the
+   element is still worth hovering (it carries the stored title). */
+.editor-wikilink--missing {
+  text-decoration: underline wavy;
+  cursor: help;
+}
+.wikilink-popup {
+  background: Canvas;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 50;
+}
+.wikilink-popup__list { display: flex; flex-direction: column; }
+.wikilink-popup__item { padding: 4px 8px; cursor: pointer; }
+/* Selection is never colour alone (spec): the active row is outlined, and
+   `aria-selected` carries the same fact to a screen reader. */
+.wikilink-popup__item--selected { outline: 2px solid currentColor; }
+.wikilink-popup__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.wikilink-preview {
+  position: absolute;
+  max-width: 24rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: Canvas;
+  z-index: 50;
+}

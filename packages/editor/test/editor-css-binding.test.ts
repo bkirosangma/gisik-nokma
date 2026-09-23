@@ -279,3 +279,32 @@ describe('9.275 the code block copy button is placed', () => {
     expect(copy).not.toBe(box);
   });
 });
+
+/**
+ * 9.282 — THE WIKI-LINK'S TWO RENDERINGS (spec §8.5, Plan 4 Task 5).
+ *
+ * `renderNode`/the node view produce either an `<a>` or a `--missing` pill,
+ * and the whole point of the pill is that a reader can TELL. jsdom applies no
+ * stylesheet, so the only place that difference can be checked is this file.
+ *
+ * The distinction is drawn with `text-decoration`, not with an ink, and that is
+ * this stylesheet's own rule rather than a preference: `editor.css`'s header
+ * forbids every colour form — hex, function and bare keyword — and
+ * packages/editor must not reach packages/ui's tokens. The assertion is on the
+ * declaration and on the two rules really differing, never on a colour.
+ */
+describe('9.282 the wiki-link and its missing pill are styled apart', () => {
+  it('9.282 .editor-wikilink has a rule and .editor-wikilink--missing reads differently', () => {
+    const link = ruleBody(EDITOR_CSS, '.editor-wikilink');
+    const missing = ruleBody(EDITOR_CSS, '.editor-wikilink--missing');
+    // CONTROL, first: the two selectors must reach DIFFERENT rules. `ruleBody`
+    // is a first-match substring search, so a missing-pill rule absent from the
+    // file would let this arm read the base rule and pass with no pill styling
+    // at all — which is the mutation this case names.
+    expect(missing).not.toBe(link);
+    expect(declared(missing, 'text-decoration')).not.toBeNull();
+    // …and the base rule does NOT carry it, so the two renderings differ by a
+    // declaration rather than by the pill merely repeating the link's rule.
+    expect(declared(link, 'text-decoration')).toBeNull();
+  });
+});

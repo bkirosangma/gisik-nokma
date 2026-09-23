@@ -1459,6 +1459,12 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   into the body, Enter on an empty last line leaves the block, Backspace in an empty summary removes
   it; the folded state is saved with the document for an editor and is view-only for a reader
   (spec §8.4). `packages/editor/src/extensions/collapsible.ts`
+- ✅ **Wiki-links between notes** — type `[[` to pick a note; the link stores the note id and the title
+  it had, follows renames through `resolveNoteTitle`, hovers a preview card, and renders as a missing
+  pill when the target is gone or unreadable (spec §8.5). **The pill is not red**, which is a deviation
+  from the spec's wording rather than an omission: `editor.css`'s header forbids every colour form and
+  packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
+  a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
 - ✅ **Code blocks carry a Copy button, and the toolbar gained three controls** — the strip keeps the
   prototype's six (`B i code link list quote`) and appends Task item, Code block and Collapsible. The
   code block's node view keeps its name (`codeBlock`) and its two input rules, so the document is

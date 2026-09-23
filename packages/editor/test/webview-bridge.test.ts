@@ -159,3 +159,49 @@ describe('createEditorBridge', () => {
     expect(JSON.parse(serializeEditorMessage(message))).toEqual(message);
   });
 });
+
+/**
+ * 9.281 — THE NOTE-LOOKUP PAIR ON THE BRIDGE (Plan 4 Task 5).
+ *
+ * The wiki-link picker is the second thing the editor cannot answer for
+ * itself: the note list lives on the host, and the RN WebView has no access to
+ * it. So the pair mirrors `mentionQuery`/`mentionResults` exactly — one
+ * outbound request and one inbound batch of candidates — and this case pins
+ * both halves plus the forward-compatibility control that makes the parser's
+ * refusal path mean something.
+ *
+ * The plan wrote these messages with a `type` field; the envelope this package
+ * actually speaks is `{ bridge: 1, kind }` (`bridge.ts`'s unions, and every
+ * case in this file), so the shape below is the real one.
+ */
+describe('9.281 note-lookup messages', () => {
+  it('9.281 parses noteResults, serialises noteQuery, and still refuses an alien kind', () => {
+    const CANDIDATES = [{ noteId: 'n1', title: 'Cold room' }];
+    const parsed = parseHostMessage({
+      bridge: 1,
+      kind: 'noteResults',
+      requestId: 'r1',
+      candidates: CANDIDATES,
+    });
+    expect(parsed).toEqual({
+      bridge: 1,
+      kind: 'noteResults',
+      requestId: 'r1',
+      candidates: CANDIDATES,
+    });
+
+    expect(
+      JSON.parse(serializeEditorMessage({ bridge: 1, kind: 'noteQuery', requestId: 'r1', query: 'co' })),
+    ).toEqual({ bridge: 1, kind: 'noteQuery', requestId: 'r1', query: 'co' });
+
+    // THE CONTROL, and it is the one that keeps the parser's `default` branch
+    // honest: an unknown kind is refused rather than coerced into a shape a
+    // newer or older peer invented. A `noteResults` branch that swallowed
+    // everything would make the positive arm above prove nothing.
+    expect(parseHostMessage({ bridge: 1, kind: 'bogus', requestId: 'r1' })).toBeNull();
+
+    // …and a `noteResults` missing its candidates is refused like every other
+    // per-branch partial message.
+    expect(parseHostMessage({ bridge: 1, kind: 'noteResults', requestId: 'r1' })).toBeNull();
+  });
+});

@@ -19,9 +19,9 @@ import { typeText } from './helpers/type-text.js';
  *
  * The notes editor port (Plan 4) widens it a second time and says so, because
  * `DOC_SCHEMA_VERSION` moved 1 → 2 in the same change: `taskList`, `taskItem`,
- * `details`, `detailsSummary` and `detailsContent` join here, and `wikiLink`
- * joins in Plan 4 Task 5. Exported so the tasks that add to it extend THIS
- * list rather than restating it.
+ * `details`, `detailsSummary`, `detailsContent` and the inline `wikiLink` all
+ * join here. Exported so the tasks that add to it extend THIS list rather than
+ * restating it.
  */
 export const SCHEMA_V2_NODES = [
   'doc',
@@ -42,14 +42,13 @@ export const SCHEMA_V2_NODES = [
   'image',
   'mention',
   // Schema v2's blocks, added by the notes editor port (Plan 4 Task 1).
-  // `wikiLink` is the one node the port adds at Plan 4 Task 5; it is NOT
-  // listed here until the extension exists, because this array is consumed by
-  // the set-equality case below.
   'taskList',
   'taskItem',
   'details',
   'detailsSummary',
   'detailsContent',
+  // …and the one INLINE node the port adds, at Plan 4 Task 5.
+  'wikiLink',
 ];
 
 export const SCHEMA_V2_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];

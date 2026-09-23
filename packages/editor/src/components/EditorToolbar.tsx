@@ -201,6 +201,19 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       active: editor.isActive('details'),
       run: () => editor.chain().focus().setDetails().run(),
     },
+    // The wiki-link control INSERTS THE TRIGGER rather than opening a picker of
+    // its own (Plan 4 Task 5). The picker is `@tiptap/suggestion`'s, driven by
+    // what is typed, so a button that opened a second popup would be a second
+    // implementation of it — and one that could not see the query the reader
+    // types next. Typing the two characters is exactly what the keyboard path
+    // does, so both routes end in the same plugin.
+    {
+      key: 'wikiLink',
+      label: '[[',
+      name: 'Link a note',
+      active: editor.isActive('wikiLink'),
+      run: () => editor.chain().focus().insertContent('[[').run(),
+    },
   ];
 
   return (

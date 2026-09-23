@@ -73,6 +73,15 @@ export type EditorSlotProps = {
   /** ProseMirror JSON, opaque to the caller; anything that is not a document → empty composer. */
   doc: unknown;
   readOnly: boolean;
+  // Wiki-link capabilities (Plan 4 Task 5). Optional like the block below, and
+  // declared with app-core's twin BYTE-FOR-BYTE — the transcription case in
+  // `test/ticket-editor-slot.test.tsx` reads both declarations and fails if
+  // their field names diverge, so these four must be added in the same change
+  // set as `packages/app-core/src/views/editor-slot.tsx`'s.
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
   /**
    * Contract-required, and THIS IMPLEMENTATION READS NEITHER — said plainly
    * rather than dressed up as a guarantee. Both scopes arrive already baked
@@ -275,6 +284,19 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         {...(props.labelledBy === undefined ? {} : { labelledBy: props.labelledBy })}
         placeholder={props.placeholder ?? (isComment ? 'Write a comment…' : 'Describe this ticket…')}
         queryUsers={props.queryUsers ?? NO_MENTIONS}
+        // The wiki-link four, passed through CONDITIONALLY. Unlike `queryUsers`
+        // there is no `NO_NOTES` fallback worth naming: the editor's own
+        // `addOptions` already answers `[]`, and an explicit `undefined` here
+        // would read as "the host supplied no resolver" for the other three —
+        // which is why absence, not a stand-in, is what travels.
+        {...(props.queryNotes === undefined ? {} : { queryNotes: props.queryNotes })}
+        {...(props.resolveNoteTitle === undefined
+          ? {}
+          : { resolveNoteTitle: props.resolveNoteTitle })}
+        {...(props.previewNote === undefined ? {} : { previewNote: props.previewNote })}
+        {...(props.onNavigateNote === undefined
+          ? {}
+          : { onNavigateNote: props.onNavigateNote })}
         uploadAttachment={uploadOrRefuse}
         // The host owns event emission. Non-image uploads reach the ticket's
         // attachment list the same way — through this event and the ledger —
