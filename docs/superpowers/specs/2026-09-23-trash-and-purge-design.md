@@ -48,7 +48,7 @@ New types, each v1, each `.strict()`, filed against the entity it names:
 | `workspace.archived` / `workspace.restored` | workspace | `{}` | T8. Mirrors the project pair exactly (same docblock argument: a pair, not a toggle). |
 | `workspace.deleted` / `workspace.undeleted` | workspace | `{}` | Soft delete / restore of the whole workspace (T10). |
 | `project.deleted` / `project.undeleted` | project | `{}` | Soft delete / restore of the project and its contents. |
-| `purge.marked` / `purge.unmarked` | the item (workspace, project, ticket, note) | `{ dueAt: ISO instant }` on marked; `{}` on unmarked | T9. `dueAt` = the mark's `server_time` + 15 days, computed by the server at ingest; a client-supplied value is refused. |
+| `purge.marked` / `purge.unmarked` | the item (workspace, project, ticket, note) | `{}` (both) | T9. The purge date is DERIVED, never claimed: `dueAt` = the mark event's `server_time` + 15 days, computed by every reader from the ledger. The empty `.strict()` payload is what refuses a client trying to supply its own date. |
 | `purge.completed` | the item | `{ kind, markedBy, markedAt }` | The tombstone (§5.3). Content-free by construction: no title, no name, no body. Written only by the purge function. |
 
 - Restore names: the ticket and note pairs already use `*.restored` for undelete; the project and workspace pairs already use `*.restored` for UNARCHIVE. To keep one type = one meaning, the new undelete events for project and workspace are `*.undeleted`. The ticket/note `*.restored` keep their names (renaming live types is not worth a migration).
