@@ -3,6 +3,7 @@
 import Link from 'next/link';
 import { AccountMenu } from './account-menu.js';
 import { InboxNavLink } from './inbox-nav-link.js';
+import { NavBrand } from './nav-brand.js';
 import { useCurrentUser } from './providers.js';
 
 /**
@@ -80,31 +81,16 @@ export function LegalNav() {
       aria-label="Legal"
     >
       <div className="gn-nav__inner">
-        {/* Both halves are `<span>`s, matching the export (`:1723` tile, `:1726` wordmark): it
-            draws neither as a link. That is also what keeps this bar from
-            adding a destination the product has not decided on — `/` redirects
-            to `/workspaces`, which bounces a signed-out reader straight back to
-            `/sign-in`, so a wordmark link here would be a third route to the
-            page they are already on. */}
-        <span className="gn-nav__brand">
-          <span className="gn-nav__brand-tile" aria-hidden="true">
-            {/* The export's glyph, paths verbatim (`:1724`). */}
-            <svg
-              width="17"
-              height="17"
-              viewBox="0 0 24 24"
-              fill="none"
-              stroke="currentColor"
-              strokeWidth="1.9"
-              strokeLinecap="round"
-              strokeLinejoin="round"
-              aria-hidden="true"
-            >
-              <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
-            </svg>
-          </span>
-          <span className="gn-nav__wordmark">Gisik Nokma</span>
-        </span>
+        {/* `NavBrand` (widened 2026-09-24, `apps/web/src/nav-brand.tsx`) —
+            neither piece is a link, which is also what keeps this bar from
+            adding a destination the product has not decided on: `/`
+            redirects to `/workspaces`, which bounces a signed-out reader
+            straight back to `/sign-in`, so a wordmark link here would be a
+            third route to the page they are already on. Was this bar's own
+            hand-rolled `<span>` pair (a `--gn-accent` tile, its own one-path
+            svg) until the class-collision fix unified it with `AppNav`'s —
+            see `NavBrand`'s own docblock. */}
+        <NavBrand />
         <span className="gn-nav__spacer" />
         {user === null ? (
           <Link className="gn-nav__signin" href="/sign-in">

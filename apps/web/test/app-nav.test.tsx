@@ -1494,13 +1494,17 @@ describe('E4-11 — the workspace links sit behind one disclosure', () => {
 });
 
 /**
- * 13.1474–13.1476 — the nav's own brand tile (owner request 2026-09-23: "put
- * it on the nav bar of the far left as well. not clickable."). `BrandMark`
- * (13.1471), not a second copy of the glyph — a non-interactive `<span
- * aria-hidden="true">`, the FIRST child of `.gn-nav__inner`, before the links,
- * rendered whether or not a session exists.
+ * 13.1474–13.1476 — the nav's own brand group (owner request 2026-09-23: "put
+ * it on the nav bar of the far left as well. not clickable."; widened
+ * 2026-09-24 to a tile + wordmark, `NavBrand`, shared with `LegalNav` — see
+ * 13.1491–13.1494 in `nav-brand.test.tsx`). `BrandMark` (13.1471), not a
+ * second copy of the glyph — a non-interactive `<span aria-hidden="true">`
+ * TILE inside `.gn-nav__brand`, the FIRST child of `.gn-nav__inner`, before
+ * the links, rendered whether or not a session exists. `.gn-nav__brand`
+ * itself is no longer `aria-hidden` — only the tile is — since the wordmark
+ * beside it is plain visible text now, not a second copy of a hidden glyph.
  */
-describe('the nav brand tile', () => {
+describe('the nav brand group', () => {
   function renderNav() {
     return render(
       <Providers services={NO_NAV_SERVICES}>
@@ -1515,7 +1519,8 @@ describe('the nav brand tile', () => {
     const inner = container.querySelector('.gn-nav__inner');
     const brand = inner?.firstElementChild ?? null;
     expect(brand?.className).toBe('gn-nav__brand');
-    expect(brand?.querySelector('svg')).not.toBeNull();
+    expect(brand?.querySelector('.gn-nav__brand-tile svg')).not.toBeNull();
+    expect(brand?.querySelector('.gn-nav__wordmark')?.textContent).toBe('Gisik Nokma');
     // BEFORE `.gn-nav__links` — immediately, not merely somewhere in the bar.
     expect(brand?.nextElementSibling?.className).toContain('gn-nav__links');
 
@@ -1525,16 +1530,20 @@ describe('the nav brand tile', () => {
     const { container: signedOutContainer } = renderNav();
     const signedOutBrand = signedOutContainer.querySelector('.gn-nav__brand');
     expect(signedOutBrand).not.toBeNull();
-    expect(signedOutBrand?.querySelector('svg')).not.toBeNull();
+    expect(signedOutBrand?.querySelector('.gn-nav__brand-tile svg')).not.toBeNull();
+    expect(signedOutBrand?.querySelector('.gn-nav__wordmark')?.textContent).toBe('Gisik Nokma');
     mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
   });
 
   /**
    * NOT a link, NOT a button, no tabindex — DOM checks rather than role
-   * queries: `aria-hidden="true"` removes the whole subtree from the
-   * accessibility tree, so `within(brand).queryByRole('link')` would report
-   * `null` whether or not a `<Link>` sat inside it. MUTATION TARGET: wrap the
-   * tile in `<Link href="/workspaces">`.
+   * queries. The TILE alone carries `aria-hidden="true"` (the wordmark beside
+   * it is plain visible text, widened 2026-09-24 — see `nav-brand.test.tsx`),
+   * so `within(brand).queryByRole('link')` is no longer blind here the way it
+   * was when the whole group was hidden; the DOM checks below are kept
+   * anyway, since they prove the same thing without depending on which piece
+   * is or is not in the accessibility tree. MUTATION TARGET: wrap the tile in
+   * `<Link href="/workspaces">`.
    */
   it('13.1475 is not focusable and is not a link or a button', () => {
     currentPath = '/workspaces';
@@ -1550,8 +1559,9 @@ describe('the nav brand tile', () => {
    * The accessible-name ratchet (Features.md:33) counts exactly four
    * attributes product-wide — `aria-label`, `role`, `aria-selected`,
    * `aria-describedby` — one way per route, so a rise nothing else catches
-   * ships silently. This tile must introduce NONE of them. MUTATION TARGET:
-   * add `aria-label` to the tile.
+   * ships silently. This group — tile AND wordmark, swept over the whole
+   * subtree — must introduce NONE of them. MUTATION TARGET: add `aria-label`
+   * to the tile.
    */
   it("13.1476 introduces none of the accessible-name ratchet's four counted attributes", () => {
     currentPath = '/workspaces';
