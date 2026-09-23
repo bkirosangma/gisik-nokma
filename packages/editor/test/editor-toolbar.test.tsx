@@ -374,6 +374,14 @@ describe('9.274 the toolbar gains task, code block and collapsible', () => {
     await vi.waitFor(() => {
       expect(JSON.stringify(collapsible.editor.getJSON())).toContain('"type":"details"');
     });
+    // ⚠ AND IT MUST BE OPEN. Found by the plan-close review: the Details
+    // extension's `setDetails()` inserts NO attrs, and `open` defaults to
+    // false — so the button produced a FOLDED block while the input rule
+    // produced an open one, and 9.274 could not see the difference because it
+    // asserted only the node's type. A folded block hides its own body from
+    // the reader who just asked for it, and `persist` is on for an editor, so
+    // the fold is written into the document.
+    expect(collapsible.editor.getJSON().content?.[0]?.attrs?.['open']).toBe(true);
     collapsible.view.unmount();
 
     // THE CONTROL ARM, in the same `it`: an older control still works, so a

@@ -57,6 +57,10 @@ describe('9.276-9.279 wiki-links', () => {
     const para = asJson(editor).content?.[0];
     const link = para?.content?.find((n) => n.type === 'wikiLink');
     expect(link?.attrs).toEqual({ noteId: 'n1', title: 'Cold room' });
+    // THE TRAILING SPACE the case's own text names, and which the first cut
+    // did not assert: without it the next word the reader types is glued to
+    // the link.
+    expect(editor.getText()).toBe('see Cold room ');
     editor.commands.clearContent();
     typeText(editor, '[[co');
     editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
@@ -106,6 +110,45 @@ describe('9.276-9.279 wiki-links', () => {
     editor.commands.insertWikiLink({ noteId: 'n2', title: 'Compressor log' });
     const link = asJson(editor).content?.[0]?.content?.find((n) => n.type === 'wikiLink');
     expect(Object.keys(link?.attrs ?? {}).sort()).toEqual(['noteId', 'title']);
+    editor.destroy();
+  });
+});
+
+/**
+ * 9.297 — `[[` INSIDE A CODE BLOCK.
+ *
+ * The same review that found 9.296 measured this one rather than assuming it:
+ * typing `[[co` with the caret in a code block DID call `queryNotes` and DID
+ * open the popup, and `insertWikiLink` then split the block exactly as the
+ * markdown paste did. Two things are wrong with that beyond the split — `[[`
+ * in code is literal text, and a note picker over a shell snippet is a
+ * suggestion nobody asked for.
+ *
+ * The gate is `@tiptap/suggestion`'s own `allow`, so no popup opens at all;
+ * `insertWikiLink` refuses independently, because it is a public command and a
+ * host may call it directly.
+ */
+describe('9.297 no note picker inside a code block', () => {
+  it('9.297 the suggestion does not open in a code block, and insertWikiLink refuses', async () => {
+    const queryNotes = vi.fn(async () => [{ noteId: 'n1', title: 'Cold room' }]);
+    const editor = createTestEditor(
+      { queryNotes },
+      { type: 'doc', content: [{ type: 'codeBlock', content: [{ type: 'text', text: 'x' }] }] },
+    );
+    typeText(editor, ' [[co');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(queryNotes).not.toHaveBeenCalled();
+    expect(document.querySelector('.wikilink-popup')).toBeNull();
+
+    // …and the COMMAND refuses too. `[[` stays literal text in the block.
+    editor.commands.insertWikiLink({ noteId: 'n1', title: 'Cold room' });
+    const json = asJson(editor);
+    // One code block, intact. The empty paragraph behind it is
+    // `TrailingNode`'s, which keeps a paragraph as a document's last block.
+    expect(json.content?.[0]?.type).toBe('codeBlock');
+    expect(JSON.stringify(json)).not.toContain('wikiLink');
+    expect(JSON.stringify(json)).not.toContain('Cold room');
     editor.destroy();
   });
 });

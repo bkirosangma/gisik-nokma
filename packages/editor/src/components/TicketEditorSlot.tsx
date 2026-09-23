@@ -400,9 +400,13 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
             `onDraft` already carries every change and `onSave` the blur, so a
             button would promise a commit the host has not asked for and cannot
             name. The save state takes its place in the same row. */}
-        {isNote ? (
+        {isNote && props.saveState !== undefined ? (
+          // NO DEFAULT ARM. `saved` was the first cut's fallback and it is the
+          // one value that makes a CLAIM — the host has said nothing, and a
+          // footer reading "Saved" asserts a write that may not exist. Silence
+          // is the honest report of silence.
           <span className="editor-slot__save-state" data-testid="editor-save-state">
-            {SAVE_STATE_TEXT[props.saveState ?? 'saved']}
+            {SAVE_STATE_TEXT[props.saveState]}
           </span>
         ) : (
         <button

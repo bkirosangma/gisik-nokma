@@ -154,7 +154,7 @@ describe('the <EditorSlot> contract, written twice', () => {
   /**
    * 9.75 — neither half of the twice-written contract carries a field the other lacks: THREE sets are compared for equality, not two, because assignability alone never rejects extra properties on a type.
    */
-  it('9.293 neither half of the contract has a field the other lacks', () => {
+  it('neither half of the contract has a field the other lacks', () => {
     const source = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
     const appCoreFields = fieldNamesOf(source, 'export type EditorSlotProps = {');
     const transcribedFields = fieldNamesOf(
@@ -808,6 +808,34 @@ describe('13.1315 the slot names its mode and the fill rule can match', () => {
 });
 
 /**
+ * 9.293 — THE note-MODE FIELDS ARE IN BOTH HALVES, AND `'note'` IS A MODE.
+ *
+ * Its own case rather than a second id on the field-name case above: that one
+ * is 9.75's, and this file's header records "two ids on one test at two
+ * granularities" as the defect a fix round closed. The plan-close review
+ * raised it for exactly that reason — and also because the field-name case
+ * alone is not enough for this claim: it compares NAMES, so a `mode` union
+ * that lost `'note'` while keeping the field would still pass it.
+ */
+describe('9.293 the note-mode contract', () => {
+  it("9.293 the note-mode fields are transcribed and app-core's mode union carries note", () => {
+    const appCore = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
+    const editorHalf = readFileSync(THIS_HALF_SOURCE, 'utf8');
+    const transcription = fieldNamesOf(
+      readFileSync(OWN_SOURCE, 'utf8'),
+      'type AppCoreEditorSlotProps = {',
+    );
+    for (const field of ['onDraft', 'onSave', 'saveState']) {
+      expect(appCore, `app-core's half is missing ${field}`).toContain(field);
+      expect(editorHalf, `the editor's half is missing ${field}`).toContain(field);
+      expect(transcription, `the transcription is missing ${field}`).toContain(field);
+    }
+    // …and the MODE UNION, which a field-name comparison cannot see.
+    expect(appCore).toContain("mode: 'comment' | 'description' | 'note'");
+  });
+});
+
+/**
  * 9.291–9.292 — THE `note` SLOT MODE (spec §8.3 consequence 4, Plan 4 Task 8).
  *
  * A note saves itself: the host receives every change through `onDraft` and a
@@ -881,6 +909,25 @@ describe('9.291-9.292 the note slot mode', () => {
     // the same string for two states would satisfy every assertion above and
     // tell the reader nothing.
     expect(new Set(Object.values(seen)).size).toBe(3);
+  });
+
+  /**
+   * 9.299 — NO STATE SUPPLIED MEANS NO STATE REPORTED.
+   *
+   * The first cut defaulted to `'saved'`, which is the one arm of the three
+   * that makes a CLAIM: it tells the reader their work is on the server when
+   * the host has said nothing at all. Found by the Task 9 review. A mount that
+   * supplies no `saveState` now renders no state element — silence, which is
+   * what the host gave it.
+   */
+  it('9.299 a note mount with no saveState renders no state rather than claiming Saved', async () => {
+    const slot = await mountSlot(makeProps({ mode: 'note' }));
+    expect(slot.view.container.querySelector('[data-testid="editor-save-state"]')).toBeNull();
+    // THE CONTROL, in the same `it`: the element is not missing because the
+    // footer stopped rendering — the toolbar and the field are both there.
+    expect(slot.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
+    expect(slot.view.container.querySelector('.ProseMirror')).not.toBeNull();
+    slot.view.unmount();
   });
 });
 

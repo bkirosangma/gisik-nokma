@@ -47,6 +47,16 @@ export const MarkdownClipboard = Extension.create({
             const types = Array.isArray(data.types) ? data.types : [];
             if (types.includes('text/html')) return false;
             if (typeof data.getData !== 'function') return false;
+            // A CODE BLOCK IS NOT MARKDOWN TERRAIN, and this guard is what
+            // stops the paste DESTROYING the block. `markdownToHtml` returns
+            // BLOCK nodes, and inserting blocks with the caret inside a code
+            // block lifts them to an ancestor and splits the block around
+            // them — measured, `npm ci` + a pasted `# install deps` became
+            // `codeBlock("npm ") | heading | paragraph | codeBlock("ci")`.
+            // Declining hands the paste to the default handler, which puts
+            // the plain text at the caret, inside the block — what a reader
+            // pasting a shell snippet wants.
+            if (editor.state.selection.$from.parent.type.spec.code === true) return false;
             const text = data.getData('text/plain');
             if (typeof text !== 'string' || text === '' || !looksLikeMarkdown(text)) return false;
             editor.commands.insertContent(markdownToHtml(text));

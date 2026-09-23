@@ -1467,7 +1467,8 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
   a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
 - ⚙️ **The editor slot has a `note` mode** — autosave hooks (`onDraft` on every change, `onSave` on
-  blur, `saveState` reported in the footer as `Saved` / `Saving…` / `Not saved (kept on this device)`)
+  blur, `saveState` reported in the footer as `Saved` / `Saving…` / `Not saved (kept on this device)`,
+  or nothing at all when the host supplies none — it does not default to the reassuring arm)
   instead of a submit button, and no Markdown hint: a note saves itself. The mobile WebView bundle is
   regenerated and carries schema v2. `packages/editor/src/components/TicketEditorSlot.tsx`,
   `apps/mobile/src/editor/editor-html.generated.ts`

@@ -45,7 +45,7 @@ const IMG = '01J9GIMA000000000000000000';
  * Stated at this length so a later reader does not mistake these cases for
  * whole-set coverage and build on a guarantee they do not give.
  */
-describe('schema v1 output conforms to the shipped plain-text walker', () => {
+describe('schema v2 output conforms to the shipped plain-text walker', () => {
   /**
    * 9.39 — a document this editor produces round-trips through the domain's `docToPlainText` with the same text the editor renders, the conformance direction between the editor and the search projection.
    */

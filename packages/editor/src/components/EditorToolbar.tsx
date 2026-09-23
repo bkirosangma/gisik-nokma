@@ -174,12 +174,13 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       active: editor.isActive('blockquote'),
       run: () => editor.chain().focus().toggleBlockquote().run(),
     },
-    // THE NOTES PORT'S THREE (Plan 4 Task 4), after the prototype's six rather
-    // than inserted among them: the prototype has no counterpart for any of
-    // them, so the strip keeps its transcribed order and grows at the end. The
-    // commands are `toggleTaskList` (extension-task-list), `toggleCodeBlock`
-    // (extension-code-block) and `setDetails` (extension-details, whose own
-    // `setDetails` inserts the same shape `Collapsible`'s input rule builds).
+    // THE NOTES PORT'S FOUR (Plan 4 Tasks 4 and 5), after the prototype's six
+    // rather than inserted among them: the prototype has no counterpart for
+    // any of them, so the strip keeps its transcribed order and grows at the
+    // end. The commands are `toggleTaskList` (extension-task-list),
+    // `toggleCodeBlock` (extension-code-block), `setDetails` +
+    // `updateAttributes` (extension-details — see the note at that control,
+    // the attrs are NOT free) and `insertContent('[[')` for the note picker.
     {
       key: 'task',
       label: '☐',
@@ -199,7 +200,14 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       label: '▸',
       name: 'Collapsible',
       active: editor.isActive('details'),
-      run: () => editor.chain().focus().setDetails().run(),
+      // `updateAttributes` IS PART OF THE COMMAND, not a flourish. The Details
+      // extension's `setDetails()` inserts NO attrs and `open` defaults to
+      // false, so the button on its own produced a FOLDED block while the `< `
+      // input rule produced an open one — and since `persist` is on for an
+      // editor, the fold was written into the document and hid the body from
+      // the reader who had just asked for it. Measured by the plan-close
+      // review; 9.274 now asserts the attribute.
+      run: () => editor.chain().focus().setDetails().updateAttributes('details', { open: true }).run(),
     },
     // The wiki-link control INSERTS THE TRIGGER rather than opening a picker of
     // its own (Plan 4 Task 5). The picker is `@tiptap/suggestion`'s, driven by

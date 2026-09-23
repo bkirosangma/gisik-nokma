@@ -156,6 +156,18 @@ describe('9.283 markdownToHtml — parse', () => {
     expect(html).toContain('[[Cold room]]');
     expect(html).not.toContain('data-note-id');
     expect(htmlToMarkdown(html)).toBe('[[Cold room]]');
+    // A DOUBLE QUOTE IN THE TITLE is escaped too, and the first cut did not:
+    // the unescaped `"` closed the attribute early, so the span was written
+    // out as literal TEXT and the document read
+    // `see <span data-note-title-text="He said "hi" now">[[He said "hi" now]]`.
+    // The words survived; the text was dirtied.
+    const quoted = markdownToHtml('see [[He said "hi" now]]');
+    // The span is written out as MARKUP, not escaped into text — the failure
+    // an unescaped quote produces is `&lt;span data-note-title-text=&quot;…`.
+    expect(quoted).not.toContain('&lt;span');
+    expect(quoted).toContain('data-note-title-text');
+    const quotedBack = htmlToMarkdown(quoted);
+    expect(quotedBack).toBe('see [[He said "hi" now]]');
   });
 
   it('9.283 DOC-4.4-18: blank lines between table rows are collapsed', () => {
@@ -213,6 +225,37 @@ describe('9.283 round-trip', () => {
     const piped = htmlToMarkdown('<table><tr><th>h</th></tr><tr><td>a|b</td></tr></table>');
     expect(piped).toContain('a\\|b');
     expect(markdownToHtml(piped)).toContain('<td>a|b</td>');
+  });
+
+  /**
+   * 9.298 — THE TWO STRUCTURES THE FIRST PORT GOT WRONG, both found by the
+   * Task 9 review by measuring rather than reading.
+   *
+   * A NESTED LIST was GLUED into its parent: `li(p("a"), ul(li(p("b"))))`
+   * exported as `"- a- b\n"`, so the child's text joined the parent's and its
+   * marker became text. It is reachable from the UI — StarterKit ships
+   * ListKeymap and its Tab runs `sinkListItem` — so the comment that called it
+   * unreachable was true of the plan and false of the product.
+   *
+   * A TWO-PARAGRAPH BLOCKQUOTE was MERGED into one, because the old branch
+   * dropped every blank line (`split('\n').filter(Boolean)`), and a blank line
+   * is exactly what separates two paragraphs inside a quote.
+   */
+  it('9.298 a nested list keeps its nesting and a two-paragraph quote keeps both paragraphs', () => {
+    const nested = htmlToMarkdown(
+      '<ul><li><p>a</p><ul><li><p>b</p></li></ul></li><li><p>c</p></li></ul>',
+    );
+    expect(nested).toBe('- a\n  - b\n- c');
+    // …and it re-imports as a list inside a list item, not as text.
+    const back = markdownToHtml(nested);
+    expect(back).toMatch(/<ul>[\s\S]*<ul>[\s\S]*<li>b<\/li>/);
+
+    const quote = htmlToMarkdown('<blockquote><p>first</p><p>second</p></blockquote>');
+    expect(quote).toBe('> first\n>\n> second');
+    // Two paragraphs out, two paragraphs back — the blank line is the
+    // separator and dropping it is what merged them.
+    const quoteBack = markdownToHtml(quote);
+    expect(quoteBack.match(/<p>/g)?.length).toBe(2);
   });
 
   it('9.283 task-list checkbox markdown round-trips bit-for-bit', () => {

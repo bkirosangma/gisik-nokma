@@ -55,12 +55,12 @@ export type EditorSchemaOptions = {
 };
 
 /**
- * The ONE origin of document schema v1. Every editor surface — web,
+ * The ONE origin of document schema v2. Every editor surface — web,
  * desktop, the RN webview bundle, and every test — builds its extension
  * list here, so there is exactly one schema and it cannot drift between
  * clients (spec §2: one document schema across all three clients).
  *
- * Everything StarterKit contributes to the schema that schema v1 does not
+ * Everything StarterKit contributes to the schema that schema v2 does not
  * name is switched off by an explicit `false`, not left to StarterKit's
  * defaults. The disables are load-bearing in two different ways and both
  * matter: `document` is REPLACED (VersionedDocument below), and `link` is
@@ -85,7 +85,7 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       document: false,
       // Configured separately below.
       link: false,
-      // Outside document schema v1's closed mark vocabulary.
+      // Outside document schema v2's closed mark vocabulary.
       underline: false,
       // REPLACED, not removed: `CodeBlockWithCopy` below extends the same node
       // and keeps its name, so leaving StarterKit's on would register two

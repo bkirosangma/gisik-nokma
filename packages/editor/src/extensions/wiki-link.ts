@@ -139,10 +139,16 @@ export const WikiLink = Node.create<WikiLinkOptions>({
     return {
       insertWikiLink:
         (attrs) =>
-        ({ chain }) =>
-          chain()
+        ({ chain, state }) => {
+          // THE SECOND DOOR, and it is not redundant: `allow` gates the
+          // PICKER, and this is a public command a host can call directly —
+          // the toolbar's `[[` button does. Both refuse for the same measured
+          // reason: the insertion splits a code block around the caret.
+          if (state.selection.$from.parent.type.spec.code === true) return false;
+          return chain()
             .insertContent([{ type: this.name, attrs }, { type: 'text', text: ' ' }])
-            .run(),
+            .run();
+        },
     };
   },
 
@@ -155,6 +161,12 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         // A note title routinely contains a space, so the match must not stop
         // at the first one — `@tiptap/suggestion`'s own option.
         allowSpaces: true,
+        // NO PICKER IN CODE. `[[` is literal text there, and the command it
+        // would run inserts a node beside the caret — measured, it split a
+        // code block in two exactly as a Markdown paste did. The gate is here
+        // rather than only in `command` so the popup never opens and no query
+        // is ever sent.
+        allow: ({ state, range }) => state.doc.resolve(range.from).parent.type.spec.code !== true,
         items: async ({ query }) => (await this.options.queryNotes(query)).slice(0, 8),
         command: ({ editor, range, props }) => {
           editor

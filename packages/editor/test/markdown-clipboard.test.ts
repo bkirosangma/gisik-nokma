@@ -194,3 +194,55 @@ describe('9.287 exportMarkdown and the round trip', () => {
     back.destroy();
   });
 });
+
+/**
+ * 9.296 — A MARKDOWN PASTE INSIDE A CODE BLOCK.
+ *
+ * Found by the plan-close review, and it was CONTENT-DESTROYING rather than
+ * merely wrong: `markdownToHtml` produces BLOCK nodes, and inserting blocks
+ * with the caret inside a code block lifts them to an ancestor and SPLITS the
+ * block around them. Measured on the unguarded version — pasting
+ * `# install deps\nnpm install` mid-`npm ci` gave
+ * `codeBlock("npm ") | heading("install deps") | paragraph("npm install") |
+ * codeBlock("ci")`. A shell snippet copied from a terminal carries no
+ * `text/html`, so this is the ordinary path into a snippet block.
+ *
+ * The fix is to DECLINE, which hands the paste to the default handler — and
+ * the default handler puts plain text exactly where the caret is. So the
+ * assertion is the whole block, unchanged but for the text.
+ */
+describe('9.296 markdown paste inside a code block', () => {
+  it('9.296 declines inside a code block so the text lands in the block', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'intro' }] },
+        { type: 'codeBlock', content: [{ type: 'text', text: 'npm ci' }] },
+      ],
+    });
+    // Caret at the end of the code block's text.
+    editor.commands.setTextSelection(editor.state.doc.content.size - 3);
+    paste(editor, '# install deps\nnpm install');
+    const json = editor.getJSON();
+    // The trailing empty paragraph is `TrailingNode`'s — it keeps a paragraph
+    // as a document's last block, so a document ending in a code block always
+    // carries one. What matters is that NOTHING WAS SPLIT.
+    expect(json.content?.slice(0, 2).map((n) => n.type)).toEqual(['paragraph', 'codeBlock']);
+    // THE TEXT IS IN THE BLOCK, at the caret — which is what "declined"
+    // produces and what the unguarded version could not: that one put a
+    // heading and a paragraph BESIDE the block and left `npm ` and `ci` in two
+    // half-blocks. Asserted as the block's own text rather than as a substring
+    // of its JSON, because the default handler inserts AT the caret: the
+    // original text survives on both sides of what was pasted in.
+    // The cast is the same one the sibling suites carry: `getJSON().content`
+    // is Tiptap's `Content` union, and a `TextType` member has no `.text` on
+    // the TYPE even though the runtime node does.
+    const blockText =
+      (json.content?.[1]?.content?.[0] as { text?: string } | undefined)?.text ?? '';
+    expect(blockText.startsWith('npm ')).toBe(true);
+    expect(blockText.endsWith('ci')).toBe(true);
+    expect(blockText).toContain('npm install');
+    expect(JSON.stringify(json)).not.toContain('"heading"');
+    editor.destroy();
+  });
+});

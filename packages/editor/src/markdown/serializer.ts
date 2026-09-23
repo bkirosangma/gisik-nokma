@@ -56,7 +56,16 @@ export function looksLikeMarkdown(text: string): boolean {
  * produce a link to `/notes/` — a broken target dressed as a working one.
  */
 function noteTextToHtml(title: string): string {
-  const escaped = title.replace(/&/g, '&amp;').replace(/</g, '&lt;').replace(/>/g, '&gt;');
+  // The DOUBLE QUOTE is escaped too, and leaving it out was a real defect: an
+  // unescaped `"` closes the attribute mid-value, markdown-it writes the span
+  // out as literal TEXT, and the document reads
+  // `see <span data-note-title-text="He said "hi" now">…` — the words survive
+  // and the text is dirtied.
+  const escaped = title
+    .replace(/&/g, '&amp;')
+    .replace(/</g, '&lt;')
+    .replace(/>/g, '&gt;')
+    .replace(/"/g, '&quot;');
   return `<span data-note-title-text="${escaped}">[[${escaped}]]</span>`;
 }
 
@@ -94,7 +103,17 @@ function nodeToMarkdown(node: Node): string {
       return `\`\`\`${lang}\n${code}\n\`\`\`\n\n`;
     }
     case 'blockquote':
-      return children.split('\n').filter(Boolean).map((line) => `> ${line}`).join('\n') + '\n\n';
+      // A BLANK LINE IS THE SEPARATOR BETWEEN TWO PARAGRAPHS IN A QUOTE, so
+      // dropping it (`filter(Boolean)`, the first cut) merged them into one.
+      // An empty line becomes a bare `>`, which is what markdown uses for a
+      // blank line inside a quote.
+      return (
+        children
+          .replace(/\n+$/, '')
+          .split('\n')
+          .map((line) => (line.trim() === '' ? '>' : `> ${line}`))
+          .join('\n') + '\n\n'
+      );
     case 'ul': return `${children}\n`;
     case 'ol': return `${children}\n`;
     case 'li': {
@@ -116,6 +135,15 @@ function nodeToMarkdown(node: Node): string {
           const childTag = (child as HTMLElement).tagName.toLowerCase();
           if (childTag === 'p' || childTag === 'div') {
             return Array.from(child.childNodes).map(nodeToMarkdown).join('').replace(/\n+$/, '');
+          }
+          if (childTag === 'ul' || childTag === 'ol') {
+            // A NESTED LIST IS INDENTED UNDER ITS PARENT ITEM. Without this the
+            // child's markdown ran straight on from the parent's text — `- a- b`
+            // — gluing the child's words into the parent's and turning its
+            // marker into prose. Reachable from the UI: StarterKit ships
+            // ListKeymap and Tab runs `sinkListItem`.
+            const nested = nodeToMarkdown(child).replace(/\n+$/, '');
+            return `\n${nested.split('\n').map((line) => `  ${line}`).join('\n')}`;
           }
           return nodeToMarkdown(child);
         })
