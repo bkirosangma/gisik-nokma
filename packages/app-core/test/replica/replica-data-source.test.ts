@@ -19,7 +19,7 @@ import {
   type SyncTransport,
 } from '@gisik-nokma/sync-client';
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
-import type { DataSource, ServerStreamFrame } from '../../src/data-source.js';
+import type { ClientStreamFrame, DataSource } from '../../src/data-source.js';
 import {
   OFFLINE_BORN_ABSENCE,
   OfflineAcceptError,
@@ -147,7 +147,8 @@ const idleTransport: SyncTransport = {
   sync: () => Promise.reject(new Error('offline')),
   openStream: () => ({ close: () => undefined }),
   bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
-      reconcile: () => Promise.reject(new Error('offline')),
+  bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
+  reconcile: () => Promise.reject(new Error('offline')),
 };
 
 type Fixture = {
@@ -460,7 +461,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 SEVENTEEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 TEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -476,17 +477,13 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       // `toEqual(Object.keys(REPLICA_GAPS))`, which is order-sensitive, and
       // `REPLICA_GAPS` gained this key directly under `getTicketAttachments`.
       ['getTicketComments', () => ds.query.getTicketComments(WS, newUlid())],
-      // Added by the notes series, Plan 1 of 6. SEVEN entries for ONE absence —
-      // `NOTES_ABSENCES` is shared by reference — placed together directly under
-      // `getTicketComments` because that is where `REPLICA_GAPS` gained them and
-      // the assertion below is order-sensitive.
-      ['getNotes', () => ds.query.getNotes(WS)],
-      ['getDeletedNotes', () => ds.query.getDeletedNotes(WS)],
-      ['getNote', () => ds.query.getNote(WS, newUlid())],
-      ['getNotesForTicket', () => ds.query.getNotesForTicket(WS, newUlid())],
-      ['getNoteComments', () => ds.query.getNoteComments(WS, newUlid())],
-      ['getNoteHistory', () => ds.query.getNoteHistory(WS, newUlid())],
-      ['getNoteVersion', () => ds.query.getNoteVersion(WS, newUlid(), newUlid())],
+      // THE SEVEN NOTE ENTRIES WERE HERE, and they left when Plan 2 of the notes
+      // series landed the replica tables and the implementations. Deleting them
+      // was forced by the assertion below rather than remembered: this list is
+      // compared against `Object.keys(REPLICA_GAPS)`, so a gap that outlives its
+      // gap fails here — which is the property 18.038 now pins from the other
+      // side. `search` is STILL in the list and unrelated: local note search is
+      // Plan 3's.
       ['search', () => ds.query.search(WS, 'x')],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
@@ -551,25 +548,43 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
    * The CONTROL is in the same `it` because a rejection list on its own is
    * satisfied by a source that rejects everything: `getTicketTypes` resolves.
    */
-  it('18.038 note reads are replica gaps until Plan 2', async () => {
+  it('18.038 the seven note reads ANSWER, and the gap list is what says so', async () => {
+    // INVERTED, not deleted. Plan 1 wrote this case as "note reads are replica
+    // gaps until Plan 2" and Plan 2 landed the tables and the implementations —
+    // so the same claim, read one plan later, is now FALSE in the direction it
+    // was written and TRUE in the direction that matters. Rewriting it to pin
+    // the reconciled state is the move `client-contract.test.ts` made for
+    // `scope-revoked`: a divergence that closed is a divergence that can
+    // silently re-open, and the machinery that caught the closing is what
+    // catches the regression.
     const { ds } = await fixture();
-    for (const m of [
-      'getNotes',
-      'getDeletedNotes',
-      'getNote',
-      'getNotesForTicket',
-      'getNoteComments',
-      'getNoteHistory',
-      'getNoteVersion',
+    for (const [m, args] of [
+      ['getNotes', [WS]],
+      ['getDeletedNotes', [WS]],
+      ['getNote', [WS, newUlid()]],
+      ['getNotesForTicket', [WS, newUlid()]],
+      ['getNoteComments', [WS, newUlid()]],
+      ['getNoteHistory', [WS, newUlid()]],
+      ['getNoteVersion', [WS, newUlid(), newUlid()]],
     ] as const) {
-      await expect(ds.query[m](WS, newUlid(), newUlid())).rejects.toBeInstanceOf(ReplicaGapError);
+      // Not "does not throw" — an ANSWER. Every one of these is a local read
+      // over an empty replica, and the honest answer to all seven is an empty
+      // one; a read that threw a `ReplicaGapError` would be the screen saying a
+      // feature is missing when it is not.
+      await expect((ds.query[m] as (...a: readonly string[]) => Promise<unknown>)(...args)).resolves.toBeDefined();
+      expect(REPLICA_GAPS[m], `${m} is still listed as a gap`).toBeUndefined();
     }
-    // CONTROL: an implemented read still answers, so the seven rejections above
-    // are about the note group and not about the source refusing everything.
+    // CONTROL, and it is the same one the case carried before inversion: an
+    // implemented read still answers, so the seven above are about the note
+    // group and not about a source that resolves everything.
     await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
+    // ...and the gap list still has teeth: `search` refuses, which is what
+    // separates "the note reads were implemented" from "the gap machinery was
+    // switched off".
+    await expect(ds.query.search(WS, 'x')).rejects.toBeInstanceOf(ReplicaGapError);
   });
 
-  it('12.186 subscribe hands its callback a real ServerStreamFrame — the kind useLiveQuery acts on', async () => {
+  it('12.186 subscribe hands its callback a real ClientStreamFrame — the kind useLiveQuery acts on', async () => {
     // A transport that hands the engine one stream, so a frame can be delivered
     // through the door a production stream uses.
     let handlers: StreamHandlers | null = null;
@@ -588,12 +603,13 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
           return { close: () => undefined };
         },
         bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
-      reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [] }),
+        bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
+        reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [], restrictedNotes: [] }),
       },
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
 
-    const seen: ServerStreamFrame[] = [];
+    const seen: ClientStreamFrame[] = [];
     const off = ds.subscribe(WS, 0, (item) => seen.push(item));
     await engine.start(WS);
     const streamed = envelope({ kind: 'ticket', id: newUlid() }, 'ticket.created', {

@@ -61,6 +61,7 @@ const idleTransport: SyncTransport = {
   sync: () => Promise.reject(new Error('offline')),
   openStream: () => ({ close: () => undefined }),
   bootstrapTicket: () => Promise.reject(new Error('offline')),
+  bootstrapNote: () => Promise.reject(new Error('offline')),
   reconcile: () => Promise.reject(new Error('offline')),
 };
 

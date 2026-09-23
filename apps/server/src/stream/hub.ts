@@ -244,7 +244,24 @@ export function createStreamHub(deps: StreamHubDeps): StreamHub {
             // former and vouches for it; the latter is whatever the injectable
             // filter seam yielded, and this module holds no second opinion
             // about anything the filter says.
-            send(sub, { type: 'reach-granted', workspaceId: sub.workspaceId, tickets: item.tickets });
+            // `notes` is carried when the instruction carries it and OMITTED
+            // when it does not, rather than sent as `undefined` or as `[]`.
+            // The wire schema declares it optional, and a frame that always
+            // named an empty `notes` would make "this notice is about tickets"
+            // and "this notice is about notes that turned out to be none"
+            // indistinguishable to a consumer — which is exactly the
+            // distinction the two arms exist to draw.
+            //
+            // `tickets` is NOT symmetric here: the instruction and the frame
+            // both declare it as a required array, and it is empty when the
+            // notice is entirely about notes. It is passed through as it
+            // arrives, empty or not.
+            send(sub, {
+              type: 'reach-granted',
+              workspaceId: sub.workspaceId,
+              tickets: item.tickets,
+              ...(item.notes === undefined ? {} : { notes: item.notes }),
+            });
             break;
           case 'scope-revoked': {
             if (item.projectId !== undefined) {

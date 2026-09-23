@@ -247,6 +247,23 @@ function fakeTransport(script: Script): SyncTransport {
       script.pullCalls.push({ workspaceId, ticketId });
       return script.pullImpl(workspaceId, ticketId);
     },
+    /**
+     * REFUSES, like `pullImpl`'s default and for the same reason: this file is
+     * the TICKET half, so a note pull reaching it is a surprise rather than a
+     * thing to answer. The note cases have their own fake
+     * (`test/sync-engine-notes.test.ts`); a shared one would have to satisfy
+     * both and would end up proving a payload neither sends.
+     *
+     * It exists because `SyncTransport` grew a sixth method and the COMPILER
+     * found this file — which is what that interface's "the interface has
+     * implementors a grep cannot find, so the compiler is the enumerator"
+     * docblock claims, demonstrated rather than asserted. `pnpm typecheck` was
+     * the first thing to see it: every per-package `vitest run` was green,
+     * because the test runner does not typecheck.
+     */
+    async bootstrapNote(_workspaceId, noteId) {
+      throw new Error(`fakeTransport: unexpected note pull for ${noteId}`);
+    },
     async reconcile(workspaceId, heldIds) {
       // Recorded, not merely answered: the reconcile cases assert WHAT was
       // presented, and a fake that only returned a verdict could not tell a
@@ -297,7 +314,7 @@ async function fixture(
     // reconcile finds when nothing was narrowed, and the one that must purge
     // nothing.
     reconcileImpl:
-      over.reconcileImpl ?? (async (workspaceId) => ({ workspaceId, restricted: [] })),
+      over.reconcileImpl ?? (async (workspaceId) => ({ workspaceId, restricted: [], restrictedNotes: [] })),
     pullCalls: [],
     // The default REFUSES. A pull that silently succeeded with an empty payload
     // would let every case here pass whether or not the drain ran, which is the
@@ -1314,6 +1331,7 @@ describe('reconcile — closure 5, the narrow half (ruling P37)', () => {
         { kind: 'restricted' as const, id: heldIds[0] ?? '' },
         { kind: 'restricted' as const, id: neverPresented },
       ],
+      restrictedNotes: [],
     }));
     const presentedFirst = (await f2.replica.listTickets(WS)).map((t) => t.ticketId)[0] ?? '';
     const result = await f2.engine.reconcile(WS);
@@ -1815,6 +1833,7 @@ describe('12.288 + 12.307 the reconcile schedule (closure 5b(b))', () => {
       reconcileImpl: async (workspaceId, heldIds) => ({
         workspaceId,
         restricted: heldIds.filter((id) => id === stale).map((id) => ({ kind: 'restricted' as const, id })),
+        restrictedNotes: [],
       }),
     });
     await engine.start(WS);

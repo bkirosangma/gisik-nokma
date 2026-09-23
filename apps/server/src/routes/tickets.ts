@@ -244,8 +244,17 @@ async function loadTicketRow(
   return rows[0];
 }
 
-/** A stored ledger row, as pg hands it back — both clocks are `timestamptz`, so both arrive as `Date`. */
-type LedgerRow = {
+/**
+ * A stored ledger row, as pg hands it back — both clocks are `timestamptz`, so
+ * both arrive as `Date`.
+ *
+ * EXPORTED (Plan 2 of the notes series) so the note-events route declares its
+ * result against the same type rather than a hand-copied twin. The column list
+ * in the two SELECTs is deliberately NOT shared — case 18.075 is the drift pin
+ * that compares what the two routes actually send, and a shared column list
+ * would make that comparison vacuous.
+ */
+export type LedgerRow = {
   id: string;
   workspace_id: string;
   entity_kind: string;
@@ -285,7 +294,7 @@ export type LedgerEventView = Omit<LedgerRow, 'client_time' | 'server_time'> & {
   server_time: string;
 };
 
-function toEventView(row: LedgerRow): LedgerEventView {
+export function toEventView(row: LedgerRow): LedgerEventView {
   return {
     ...row,
     client_time: row.client_time.toISOString(),

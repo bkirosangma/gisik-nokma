@@ -1,5 +1,7 @@
-import type { ReachGrantedTicket } from '@gisik-nokma/domain';
+import type { ReachGrantedNote, ReachGrantedTicket } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { resolveEffectiveRole } from '../permissions/effective-role.js';
+import { canReadNote, loadNoteForVisibility } from './can-read-note.js';
 import { canSee } from './can-see.js';
 import { listVisibleTickets } from './visible-tickets.js';
 
@@ -190,6 +192,63 @@ export function isGrantBackfillTrigger(type: string): boolean {
 }
 
 /**
+ * The note events that can WIDEN which reader may read a note — Plan 2 of 6,
+ * the note half of `GRANT_BACKFILL_TRIGGERS` above, read by
+ * `visible-events-for.ts`'s `note` branch and by nothing here.
+ *
+ * ## Every member, and the direction it can move
+ *
+ * - `note.scope_set` — the direct width change. The one the notice exists for:
+ *   it is how `private` becomes `workspace`, which is the transition a reader
+ *   cannot learn about any other way (the event that would tell them is itself
+ *   invisible to them, which is `GRANT_BACKFILL_TRIGGERS`' docblock's whole
+ *   asymmetry — a widening self-selects, a narrowing self-excludes).
+ * - `note.attached` — an `inherit` note gains a door. It cannot narrow:
+ *   `canReadNote`'s `inherit` arm admits on ANY attached visible ticket, so
+ *   adding one is monotone.
+ * - `note.created` — a note born already-wide. It is above every live cursor at
+ *   the instant it is created, so a SUBSCRIBED device gets the event on the
+ *   ordinary stream and needs no notice; a device whose cursor has since run
+ *   past it (it was offline, then caught up on other traffic) does not.
+ * - `note.restored` — the undo. A note deleted while a reader could not read it
+ *   and then restored is the same shape as `note.created`: visible now, and
+ *   possibly below a cursor that moved in between.
+ *
+ * ## Why `note.created` and `note.restored` are named rather than omitted
+ *
+ * The case for omitting them is real — a trigger whose own event is above every
+ * live cursor asks the client to pull what the stream is about to hand it
+ * anyway, which is the amplifier `GRANT_BACKFILL_TRIGGERS`' docblock bounds.
+ * They are kept because the consumer of a notice guards cheaply and exactly:
+ * the client queues a pull only when its local head for that note is BELOW
+ * `headSeq`, and `headSeq` is bounded at the reader's cursor (`withHeadSeq`
+ * below) — so a device already current on the note compares equal and fetches
+ * nothing. Over-naming is the cheap direction here, as it is above.
+ *
+ * ## Not `note.detached`, and the asymmetry is the module's own law
+ *
+ * A detach can NARROW: the last attachment removed from an `inherit` note
+ * reverts it to its remembered scope. A narrowing must never reach this module
+ * — it cannot ask "who could see this before" and may not reconstruct it (the
+ * ban cases 6.82 and 6.94, restated at `GRANT_BACKFILL_TRIGGERS`). Narrowing
+ * reaches a device through `POST /v1/sync/reconcile` instead, client-driven and
+ * asking nothing about a before-image (ruling P23). `note.deleted` is the same
+ * answer for a different reason: it is not a readership change at all
+ * (`canReadNote` ignores `deleted`), so it neither widens nor narrows.
+ */
+export const NOTE_GRANT_TRIGGERS = [
+  'note.created',
+  'note.scope_set',
+  'note.attached',
+  'note.restored',
+] as const;
+
+export function isNoteGrantTrigger(type: string): boolean {
+  const triggers: readonly string[] = NOTE_GRANT_TRIGGERS;
+  return triggers.includes(type);
+}
+
+/**
  * The tickets whose resolved audience depends on `ticketId`: itself, plus every
  * descendant that inherits, pruning at any child with an authored mode.
  *
@@ -306,7 +365,133 @@ export async function grantNoticeFor(
 }
 
 /**
- * Attach each ticket's head position — ruling P37.2.
+ * The `inherit`-scoped notes attached to any of these tickets — the candidates
+ * a ticket-audience change can widen, before any per-reader question is asked
+ * (spec §5.2).
+ *
+ * ## Why the filter is `scope_mode = 'inherit'` and nothing else
+ *
+ * Only an `inherit` note's readership depends on a ticket. A `workspace`,
+ * `project` or `explicit` note attached to the same ticket is readable or not
+ * for reasons the ticket has no part in, so a ticket-wide event is not news
+ * about it and announcing it would be a notice the client could not act on.
+ * `private` is excluded by the same clause for the stronger reason: nothing
+ * about a private note's audience involves a ticket at all.
+ *
+ * ## `deleted = FALSE`, and it is a DELIVERY decision rather than a read rule
+ *
+ * `canReadNote` deliberately ignores `deleted` — a deleted note is in the undo
+ * window and still readable — so this clause is NOT a restatement of that
+ * function and does not belong beside it. It is here because the cascade
+ * announces *"this is now readable, pull it"*, and a device that pulls a
+ * deleted note's history learns nothing it can show anybody. The deleted note
+ * is not stranded: its own `note.deleted` arrives on the ordinary stream to
+ * every reader who already held it, and `note.restored` is in
+ * `NOTE_GRANT_TRIGGERS`, so a restore re-announces it from the note's side.
+ * *Case 18.097 is the two-device witness.*
+ *
+ * ## No workspace predicate, inherited rather than chosen
+ *
+ * The same inheritance `audienceDependents`' docblock records: the caller's
+ * ticket ids come from a walk that has none, so adding one here would make this
+ * query and that walk disagree about the candidate set. It is not a disclosure
+ * on its own — what these ids become is a `noteGrantNoticeFor` call filtered by
+ * `canReadNote`, and a note in another workspace is admitted only to somebody
+ * who may read it there.
+ */
+export async function notesAttachedTo(
+  db: Queryable,
+  ticketIds: readonly string[],
+): Promise<string[]> {
+  if (ticketIds.length === 0) return [];
+  const { rows } = await db.query<{ note_id: string }>(
+    `SELECT DISTINCT na.note_id
+       FROM proj_note_attachments na
+       JOIN proj_notes n ON n.note_id = na.note_id
+      WHERE na.ticket_id = ANY($1::text[])
+        AND n.scope_mode = 'inherit'
+        AND n.deleted = FALSE
+      ORDER BY 1`,
+    [[...ticketIds]],
+  );
+  return rows.map((r) => r.note_id);
+}
+
+/**
+ * The note ids this reader may now read because their own reach, or the reach
+ * of a ticket they inherit from, just changed — the notes arm of one
+ * `reach-granted` notice (Plan 2 of 6, spec §5.1–§5.2).
+ *
+ * The same shape as `grantNoticeFor` above, one entity kind over, and the two
+ * differ in exactly one substantive way: a ticket's audience is walked
+ * (`audienceDependents`), while a note's is a function of its own scope and its
+ * attached tickets, so the caller decides which note ids are candidates and
+ * this function only decides which of them the reader may read.
+ *
+ * ## The `canReadNote` on every candidate is the disclosure gate
+ *
+ * Same argument as `grantNoticeFor`'s, and here it is the whole of it: under
+ * the notice shape the IDS ARE THE PAYLOAD, so a candidate admitted without
+ * this call is an id the reader may not see, disclosed. It is also what makes
+ * the caller's candidate list safe to over-produce — Task 2 hands over every
+ * `inherit` note attached to a ticket whose audience changed, and many of them
+ * are notes this particular reader still cannot read.
+ *
+ * ## `eff` is resolved per NOTE, cached per workspace — not once for the call
+ *
+ * The plan text resolved it once from `noteIds[0]`'s workspace, with the stated
+ * assumption that every id in one call is one workspace's. That assumption is
+ * not held anywhere: Task 2's candidate list comes from `notesAttachedTo`, and
+ * `audienceDependents`' own docblock records (unfixed, owner unassigned) that
+ * its walk carries no workspace predicate at all. A role resolved against the
+ * WRONG workspace is not a degraded answer, it is a different function — a
+ * member of workspace A would be admitted to workspace B's note by holding a
+ * role in A.
+ *
+ * The cache keeps the cost the same as the plan's single resolution in the
+ * ordinary case (one workspace, one lookup) and removes the extra
+ * `getNoteStateFromDb` read the plan's form needed to find the workspace at
+ * all: the note is loaded here regardless, and it names its own workspace.
+ */
+export async function noteGrantNoticeFor(
+  db: Queryable,
+  userId: string,
+  noteIds: readonly string[],
+  afterSeq: number,
+  backfilled: Set<string>,
+): Promise<ReachGrantedNote[]> {
+  const admitted: string[] = [];
+  const effs = new Map<string, Awaited<ReturnType<typeof resolveEffectiveRole>>>();
+  for (const id of noteIds) {
+    // Namespaced, because this set is shared with the ticket walk above in both
+    // callers: a ticket id and a note id are both ULIDs and a bare id would let
+    // one kind's delivery suppress the other's.
+    const key = `note:${id}`;
+    if (backfilled.has(key)) continue;
+    // Marked BEFORE the readability question, so a note this reader cannot read
+    // is not re-loaded by every later trigger in the same drain.
+    backfilled.add(key);
+    const loaded = await loadNoteForVisibility(db, id);
+    if (loaded === null) continue;
+    let eff = effs.get(loaded.note.workspaceId);
+    if (eff === undefined) {
+      eff = await resolveEffectiveRole(db, userId, loaded.note.workspaceId);
+      effs.set(loaded.note.workspaceId, eff);
+    }
+    if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities)) continue;
+    admitted.push(id);
+  }
+  return withNoteHeadSeq(db, admitted, afterSeq);
+}
+
+/**
+ * Attach each entity's head position — ruling P37.2.
+ *
+ * `entityKind` is a parameter rather than a second copy of the query (Plan 2 of
+ * 6 added notes). `entity_kind` is the ONLY thing that differs between the two
+ * arms, and a copy is what comes to disagree the day one of them grows a clause
+ * the other does not — which is the failure mode this module's sibling
+ * (`can-read-note.ts`) already has an equality case against.
  *
  * **An ID-ONLY notice was MEASURED not to work**, which is why this exists. The
  * client cannot tell a complete local copy from a STALE PARTIAL one by asking
@@ -318,47 +503,52 @@ export async function grantNoticeFor(
  * rather than a mistimed one. Case 12.316 carries the measurement.
  *
  * **READ, never computed, and never a neighbour's.** `MAX(workspace_seq)` over
- * the ticket's own events is the ledger's own number for "the last thing that
- * happened to this ticket". Ruling P36 refused a synthesised instant one surface
+ * the entity's own events is the ledger's own number for "the last thing that
+ * happened to this entity". Ruling P36 refused a synthesised instant one surface
  * over for exactly this reason: a number the server derives rather than reads is
  * one that can disagree with the ledger, and it would pass a gate.
  *
  * **BOUNDED AT `afterSeq`, and that bound is the whole correctness of the
- * comparison.** The notice answers "how much of this ticket's history will you
+ * comparison.** The notice answers "how much of this entity's history will you
  * NOT receive by simply staying subscribed" — which is the part at or below the
  * reader's cursor. Everything above it, the trigger event included, is already
  * in the caller's own range and arrives moments later on the stream.
  *
- * Taking the ticket's absolute head instead is WRONG and was measured wrong:
+ * Taking the entity's absolute head instead is WRONG and was measured wrong:
  * the notice is yielded BEFORE its trigger, so the trigger's own row is always
  * above the client's local maximum at the instant it compares — making
- * `localHead < headSeq` true for every trigger ticket, forever, and pulling on
+ * `localHead < headSeq` true for every trigger entity, forever, and pulling on
  * every no-op `visibility.set`. That is precisely the amplifier bound ruling
  * P37.1 exists to hold, and case 12.276 caught it.
  *
- * ONE query for the whole notice, not one per candidate — the walk above already
- * costs a query each, and doubling that for something a single `GROUP BY`
- * answers would be real cost for no property.
+ * ONE query for the whole notice, not one per candidate. On the ticket side the
+ * walk above already costs a query each and doubling that for something a single
+ * `GROUP BY` answers would be real cost for no property; on the note side the
+ * caller has no walk at all and this is the only read the notice costs.
  *
- * A ticket with no rows cannot reach here (`canSee` refuses a ticket with no
- * `proj_visibility` row, and every candidate has passed it), but `?? 0` is kept
- * rather than asserted away: zero makes the client PULL, which is the safe
- * direction, where a throw would take down the whole drain.
+ * `?? 0` is kept rather than asserted away: zero makes the client PULL, which is
+ * the safe direction, where a throw would take down the whole drain. On the
+ * ticket side a rowless candidate cannot reach here (`canSee` refuses a ticket
+ * with no `proj_visibility` row, and every candidate has passed it); on the note
+ * side nothing like that is true — a note whose every event is above the cursor
+ * is an ordinary case, and this is the line that drops it rather than naming it
+ * with a zero the published schema would refuse.
  */
 async function withHeadSeq(
   db: Queryable,
-  ticketIds: readonly string[],
+  entityIds: readonly string[],
   afterSeq: number,
-): Promise<ReachGrantedTicket[]> {
-  if (ticketIds.length === 0) return [];
+  entityKind: 'ticket' | 'note' = 'ticket',
+): Promise<Array<{ id: string; headSeq: number }>> {
+  if (entityIds.length === 0) return [];
   const { rows } = await db.query<{ entity_id: string; head: string }>(
     `SELECT entity_id, MAX(workspace_seq) AS head FROM events
-      WHERE entity_kind = 'ticket' AND entity_id = ANY($1::text[]) AND workspace_seq <= $2
+      WHERE entity_kind = $3 AND entity_id = ANY($1::text[]) AND workspace_seq <= $2
       GROUP BY entity_id`,
-    [[...ticketIds], afterSeq],
+    [[...entityIds], afterSeq, entityKind],
   );
   const heads = new Map(rows.map((r) => [r.entity_id, Number(r.head)]));
-  // A ticket with NOTHING at or below the cursor is DROPPED, not named with a
+  // An entity with NOTHING at or below the cursor is DROPPED, not named with a
   // zero — and the reason is semantic before it is schematic. Such a ticket has
   // no pre-cursor history to be missing: every one of its events is above the
   // reader's cursor and arrives on the stream unaided, so naming it would ask
@@ -370,9 +560,20 @@ async function withHeadSeq(
   // three assertions away in `client-contract.test.ts`. Recorded because that
   // is what a schema violation looks like from the outside here — not a
   // rejected frame, a silent stream.
-  return ticketIds
+  return entityIds
     .map((id) => ({ id, headSeq: heads.get(id) ?? 0 }))
     .filter((t) => t.headSeq > 0);
+}
+
+/** `withHeadSeq` over notes. The kind is a parameter rather than a second copy
+ * of the query: two copies is what comes to disagree the day one grows a clause
+ * the other does not, and `entity_kind` is the ONLY difference between them. */
+async function withNoteHeadSeq(
+  db: Queryable,
+  noteIds: readonly string[],
+  afterSeq: number,
+): Promise<ReachGrantedNote[]> {
+  return withHeadSeq(db, noteIds, afterSeq, 'note');
 }
 
 /**

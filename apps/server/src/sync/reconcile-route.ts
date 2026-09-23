@@ -2,6 +2,7 @@ import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import type { Pool } from 'pg';
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
+import { canReadNoteById } from '../visibility/can-read-note.js';
 import { canSee } from '../visibility/can-see.js';
 import { MAX_BATCH_SIZE } from '../routes/events.js';
 
@@ -25,6 +26,18 @@ export type ReconcileResponse = {
   workspaceId: string;
   /** Every presented id the caller may not see now, in the order presented. */
   restricted: ReconcileRestriction[];
+  /**
+   * The same answer for the NOTE ids the caller presented (notes series,
+   * Plan 2 of 6, spec §5.1), in their own array because they are answered by
+   * their own predicate and a client has two different purges to run.
+   *
+   * ALWAYS present, and empty when the request named no note ids. A field that
+   * appeared only when `heldNoteIds` was sent would make an old client's reply
+   * and a new client's empty one indistinguishable from a door that had stopped
+   * answering notes — and 18.072 is the case that pins the compatibility, so
+   * the shape it pins has to be the shape that is actually sent.
+   */
+  restrictedNotes: ReconcileRestriction[];
 };
 
 export type ReconcileRouteDeps = { pool: Pool };
@@ -144,12 +157,66 @@ export async function reconcileHeldIds(
   return restricted;
 }
 
+/**
+ * `reconcileHeldIds`'s sibling for notes, and it is a SEPARATE function rather
+ * than a parameterised one because the question it asks is a different question.
+ *
+ * ## Why the predicate cannot be shared
+ *
+ * Tickets are answered by `canSee`, which resolves a row in `proj_visibility`.
+ * A note has no row there, so `canSee` answers `false` for every note and every
+ * caller — a device would be told to purge its entire note store on every
+ * catch-up, which is the "answer that wipes a replica" failure `reconcile-route`'s
+ * own docblock names, one entity kind over. Notes are answered by
+ * `canReadNoteById`, which is `can-read-note.ts`'s ONE definition of who may
+ * read a note; that file already carries the argument for why the note rule is
+ * its own function rather than a call into the ticket one, and this is the
+ * second door to depend on it.
+ *
+ * ## Everything ELSE is the ticket arm's rule, unchanged
+ *
+ * - **Existence is never consulted.** `canReadNoteById` answers `false` for a
+ *   note that does not exist and for one that exists and is unreadable, and it
+ *   does so through the same single sentence `canSee` does — so a fabricated
+ *   note id comes back `restricted` exactly like a genuine loss, and the
+ *   presence-versus-absence oracle stays closed on this arm too. Case 18.071 is
+ *   the witness, and it is written against the implementation that would
+ *   "helpfully" skip unknown ids.
+ * - **The answer can only contain ids the caller presented.** Structurally: the
+ *   loop walks `heldNoteIds` and pushes a subset. No query here can produce an
+ *   id, so no id the caller did not type can reach the response.
+ * - **Duplicates are answered once**, for the same reason: repeating an id must
+ *   not multiply the work the predicate does per request.
+ *
+ * The membership gate is NOT here, exactly as it is not in `reconcileHeldIds`:
+ * it is a 403 with a reply body, and a caller that is not a route has no reply
+ * to send. The route asks it once for both arms.
+ */
+export async function reconcileHeldNoteIds(
+  db: Queryable,
+  userId: string,
+  heldNoteIds: readonly string[],
+): Promise<ReconcileRestriction[]> {
+  const restricted: ReconcileRestriction[] = [];
+  const asked = new Set<string>();
+  for (const id of heldNoteIds) {
+    if (asked.has(id)) continue;
+    asked.add(id);
+    // The ONE question, and it is the note one — see the docblock above for why
+    // borrowing the ticket arm's predicate here answers `true` for nobody.
+    if (!(await canReadNoteById(db, userId, id))) {
+      restricted.push({ kind: 'restricted', id });
+    }
+  }
+  return restricted;
+}
+
 export function registerReconcileRoute(
   app: FastifyInstance,
   deps: ReconcileRouteDeps,
   requireSession: preHandlerHookHandler,
 ): void {
-  app.post<{ Body: { workspaceId: string; heldIds: string[] } }>(
+  app.post<{ Body: { workspaceId: string; heldIds: string[]; heldNoteIds?: string[] } }>(
     '/v1/sync/reconcile',
     {
       preHandler: requireSession,
@@ -158,11 +225,34 @@ export function registerReconcileRoute(
           type: 'object',
           required: ['workspaceId', 'heldIds'],
           additionalProperties: false,
+          // A BODY MUST NAME SOMETHING, and the `anyOf` is the enforcement that
+          // `heldIds.minItems` used to be. Plan 2 of the notes series split this
+          // body into two independent arms, and a device holding NOTES BUT NO
+          // TICKETS is an ordinary device — it sends `heldIds: []`, which the old
+          // `minItems: 1` refused with a 400. That failure was silent: the
+          // engine's automatic reconcile catches it, so every note a user lost
+          // reach of stayed on their device for ever, with nothing on screen
+          // saying so. Measured by `test/sync/notes-client-seam.test.ts` (18.099),
+          // which runs the engine's own request through this schema.
+          anyOf: [
+            { required: ['heldIds'], properties: { heldIds: { type: 'array', minItems: 1 } } },
+            { required: ['heldNoteIds'], properties: { heldNoteIds: { type: 'array', minItems: 1 } } },
+          ],
           properties: {
             workspaceId: { type: 'string' },
             heldIds: {
               type: 'array',
-              minItems: 1,
+              maxItems: MAX_BATCH_SIZE,
+              items: { type: 'string' },
+            },
+            // Declared and NOT required, which is the whole compatibility story:
+            // a client that predates notes sends a body without it and gets a
+            // working reply with an empty `restrictedNotes` (case 18.072). It is
+            // bounded like `heldIds` — a caller holding more notes than
+            // `MAX_BATCH_SIZE` chunks, and the answer is per-request and
+            // order-independent, so chunking changes nothing.
+            heldNoteIds: {
+              type: 'array',
               maxItems: MAX_BATCH_SIZE,
               items: { type: 'string' },
             },
@@ -171,7 +261,7 @@ export function registerReconcileRoute(
       },
     },
     async (request, reply) => {
-      const { workspaceId, heldIds } = request.body;
+      const { workspaceId, heldIds, heldNoteIds } = request.body;
       const userId = request.currentUserId;
       const eff = await resolveEffectiveRole(deps.pool, userId, workspaceId);
       if (eff.workspaceRole === null) {
@@ -180,6 +270,7 @@ export function registerReconcileRoute(
       const body: ReconcileResponse = {
         workspaceId,
         restricted: await reconcileHeldIds(deps.pool, userId, heldIds),
+        restrictedNotes: await reconcileHeldNoteIds(deps.pool, userId, heldNoteIds ?? []),
       };
       return body;
     },
