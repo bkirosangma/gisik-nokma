@@ -1587,6 +1587,11 @@ Open one and it opens read-only with a banner reading **Viewing version from …
 bring the note back to that text (only if you can edit the note — a reader can open History and read
 old versions, just not put one back).
 
+**A note with several headings gets a small floating button, bottom left, labelled "On this page".**
+Press it to open a table of contents over the note; press a heading in it to jump straight there. It
+appears at any window width once a note has enough headings, whereas it used to be a column that showed
+only on a wide screen.
+
 ### Finding a note
 
 The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title
