@@ -27,6 +27,18 @@ function key(editor: Editor, name: string): void {
   );
 }
 
+/**
+ * `asJson(editor)` types its `content` as Tiptap's `Content` union
+ * (`NodeType | TextType`), so reading a CHILD's `content` or `attrs` off it is
+ * a type error even though the runtime object has them. The cast is local and
+ * named rather than sprinkled: this is the shape the assertions below read.
+ */
+type Json = { type?: string; attrs?: Record<string, unknown>; content?: Json[]; text?: string };
+
+function asJson(node: { getJSON(): unknown }): Json {
+  return node.getJSON() as Json;
+}
+
 describe('9.268-9.271 collapsible block', () => {
   /**
    * The `< ` trigger, and the two controls that keep it from being a greedy
@@ -37,7 +49,7 @@ describe('9.268-9.271 collapsible block', () => {
   it('9.268 "< " opens a details block; "<div>" and "abc< " do not', () => {
     const editor = createTestEditor();
     typeText(editor, '< Why it broke');
-    const first = editor.getJSON().content?.[0];
+    const first = asJson(editor).content?.[0];
     expect(first?.type).toBe('details');
     expect(first?.attrs?.open).toBe(true);
     expect(first?.content?.[0]?.type).toBe('detailsSummary');
@@ -45,10 +57,10 @@ describe('9.268-9.271 collapsible block', () => {
     expect(first?.content?.[1]?.type).toBe('detailsContent');
     editor.commands.clearContent();
     typeText(editor, '<div>');
-    expect(editor.getJSON().content?.[0]?.type).toBe('paragraph');
+    expect(asJson(editor).content?.[0]?.type).toBe('paragraph');
     editor.commands.clearContent();
     typeText(editor, 'abc< ');
-    expect(editor.getJSON().content?.[0]?.type).toBe('paragraph');
+    expect(asJson(editor).content?.[0]?.type).toBe('paragraph');
     editor.destroy();
   });
 
@@ -69,7 +81,7 @@ describe('9.268-9.271 collapsible block', () => {
     typeText(editor, 'body');
     key(editor, 'Enter'); // new empty paragraph inside content
     key(editor, 'Enter'); // exit
-    const doc = editor.getJSON();
+    const doc = asJson(editor);
     expect(doc.content?.[0]?.type).toBe('details');
     expect(doc.content?.[0]?.content?.[1]?.content).toHaveLength(1); // the empty paragraph was removed
     expect(doc.content?.[1]?.type).toBe('paragraph');
@@ -81,7 +93,7 @@ describe('9.268-9.271 collapsible block', () => {
     const editor = createTestEditor();
     typeText(editor, '< T');
     editor.commands.updateAttributes('details', { open: false });
-    expect(editor.getJSON().content?.[0]?.attrs?.open).toBe(false);
+    expect(asJson(editor).content?.[0]?.attrs?.open).toBe(false);
     editor.destroy();
     const reader = createTestEditor({ readOnly: true });
     const details = reader.extensionManager.extensions.find((e) => e.name === 'details');
@@ -103,10 +115,10 @@ describe('9.268-9.271 collapsible block', () => {
   it('9.295 Backspace at the start of an EMPTY summary removes the block and leaves one paragraph', () => {
     const editor = createTestEditor();
     typeText(editor, '< '); // the rule fires on the space: empty summary, empty body
-    const before = editor.getJSON().content ?? [];
+    const before = asJson(editor).content ?? [];
     expect(before[0]?.type).toBe('details');
     key(editor, 'Backspace');
-    const after = editor.getJSON().content ?? [];
+    const after = asJson(editor).content ?? [];
     // The block is GONE — no `details` anywhere in the document.
     expect(JSON.stringify(after)).not.toContain('"details"');
     // AND EXACTLY ONE BLOCK TOOK ITS PLACE. The count is asserted as a DELTA
@@ -130,7 +142,7 @@ describe('9.268-9.271 collapsible block', () => {
     typeText(kept, '< Ti');
     kept.commands.setTextSelection(4); // one position in from the start of "Ti"
     key(kept, 'Backspace');
-    const keptDoc = kept.getJSON();
+    const keptDoc = asJson(kept);
     expect(keptDoc.content?.[0]?.type).toBe('details');
     expect(keptDoc.content?.[0]?.content?.[0]?.content?.[0]?.text).toBe('T');
     kept.destroy();

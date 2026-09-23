@@ -1440,7 +1440,8 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   v2's nodes and renders unchanged under v2. `packages/editor/src/doc.ts`,
   `packages/editor/src/schema/versioned-document.ts`
 - ⚙️ **One extension set for every client** — `buildEditorExtensions(options)` / `EditorSchemaOptions`
-  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`, `readOnly`). The single origin of schema v2:
+  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`, `readOnly`, `queryNotes`, `resolveNoteTitle`,
+  `previewNote`, `onNavigateNote`). The single origin of schema v2:
   web, desktop, the RN webview bundle and every test build their list here, so the schema cannot drift
   between clients. Everything StarterKit contributes that v2 does not name is switched off by an
   explicit `false` rather than left to a default — `document` because it is replaced, `link` because it
@@ -1479,8 +1480,9 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   Ported from the knowledge-base app, with `data-raw-block` dropped (§8.7) and the note-link form re-keyed
   to `[[title]]`. `packages/editor/src/markdown/serializer.ts`,
   `packages/editor/src/extensions/markdown-clipboard.ts`
-- ✅ **Code blocks carry a Copy button, and the toolbar gained three controls** — the strip keeps the
-  prototype's six (`B i code link list quote`) and appends Task item, Code block and Collapsible. The
+- ✅ **Code blocks carry a Copy button, and the toolbar gained four controls** — the strip keeps the
+  prototype's six (`B i code link list quote`) and appends Task item, Code block, Collapsible and
+  Link a note (which inserts the `[[` trigger rather than opening a picker of its own). The
   code block's node view keeps its name (`codeBlock`) and its two input rules, so the document is
   unchanged and only its chrome is new. `packages/editor/src/extensions/code-block-copy.ts`,
   `packages/editor/src/components/EditorToolbar.tsx`

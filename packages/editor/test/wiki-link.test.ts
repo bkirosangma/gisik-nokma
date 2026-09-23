@@ -18,6 +18,18 @@ const NOTES = [
   { noteId: 'n2', title: 'Compressor log' },
 ];
 
+/**
+ * `asJson(editor)` types its `content` as Tiptap's `Content` union
+ * (`NodeType | TextType`), so reading a CHILD's `content` or `attrs` off it is
+ * a type error even though the runtime object has them. The cast is local and
+ * named rather than sprinkled: this is the shape the assertions below read.
+ */
+type Json = { type?: string; attrs?: Record<string, unknown>; content?: Json[]; text?: string };
+
+function asJson(node: { getJSON(): unknown }): Json {
+  return node.getJSON() as Json;
+}
+
 describe('9.276-9.279 wiki-links', () => {
   it('9.276 [[ opens the suggestion; Enter inserts the node; Escape keeps the text', async () => {
     const queryNotes = vi.fn(async (q: string) =>
@@ -42,7 +54,7 @@ describe('9.276-9.279 wiki-links', () => {
       expect(document.querySelector('.wikilink-popup__item')).not.toBeNull();
     });
     editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
-    const para = editor.getJSON().content?.[0];
+    const para = asJson(editor).content?.[0];
     const link = para?.content?.find((n) => n.type === 'wikiLink');
     expect(link?.attrs).toEqual({ noteId: 'n1', title: 'Cold room' });
     editor.commands.clearContent();
@@ -92,7 +104,7 @@ describe('9.276-9.279 wiki-links', () => {
   it('9.279 the stored attrs are exactly noteId and title', () => {
     const editor = createTestEditor();
     editor.commands.insertWikiLink({ noteId: 'n2', title: 'Compressor log' });
-    const link = editor.getJSON().content?.[0]?.content?.find((n) => n.type === 'wikiLink');
+    const link = asJson(editor).content?.[0]?.content?.find((n) => n.type === 'wikiLink');
     expect(Object.keys(link?.attrs ?? {}).sort()).toEqual(['noteId', 'title']);
     editor.destroy();
   });
