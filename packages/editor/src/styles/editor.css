@@ -536,9 +536,33 @@
   padding: 6px 10px;
   margin: 8px 0;
 }
-.editor-details > summary {
-  cursor: pointer;
+/* ⚠ THE SELECTOR HERE WAS `.editor-details > summary` AND IT MATCHED NOTHING.
+   The Details extension renders a NODE VIEW, and its DOM is
+
+     <div class="editor-details"> <button …></button> <div><summary>…</summary>…
+
+   — the summary is a GRANDCHILD, so the child combinator never matched it, and
+   neither `cursor` nor `font-weight` ever applied. MEASURED from the rendered
+   DOM, and the case did not catch it because a css-binding assertion reads the
+   STYLESHEET: it can see a declaration and cannot see whether the selector
+   matches anything the editor draws.
+   `collapsible.test.ts` now asserts `element.matches(<selector>)` for each
+   selector below, against a real mounted editor, so a selector that matches
+   nothing is red rather than merely present. */
+.editor-details summary {
   font-weight: 600;
+}
+/* THE FOLD CONTROL IS THE BUTTON, NOT THE SUMMARY — measured: clicking the
+   button dispatches the document change, and the summary is not clickable at
+   all. It arrives with NO class of its own, so nothing styled it and it painted
+   the user agent's own chrome — the defect class `bare-control-coverage` exists
+   for, on a control its fixed list does not name. The reset is that file's own
+   shape (`border: none; background: none; padding: 0`). */
+.editor-details > button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
 }
 /* ⚠ A PLACEHOLDER RULE STOOD HERE AND WAS REMOVED AS DEAD CSS, and the way it
    failed is the reason this note is this long.

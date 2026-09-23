@@ -243,8 +243,22 @@ describe('9.272 the collapsible block is styled', () => {
     expect(declared(box, 'border-radius')).not.toBeNull();
     expect(declared(box, 'padding')).not.toBeNull();
 
-    const summary = ruleBody(EDITOR_CSS, '.editor-details > summary');
-    expect(declared(summary, 'cursor')).toBe('pointer');
+    // ⚠ THE SELECTORS HERE ARE THE ONES THAT MATCH THE RENDERED DOM, and the
+    // first version of this case named `.editor-details > summary` — which
+    // matched NOTHING, because the Details node view puts the summary one level
+    // deeper inside a wrapper div. This assertion could not see that: it reads
+    // the STYLESHEET, so a declaration is visible to it and a selector that
+    // matches no element is not. `collapsible.test.ts` now asserts
+    // `element.matches(<selector>)` against a live editor, which is the half
+    // this file cannot do.
+    const summary = ruleBody(EDITOR_CSS, '.editor-details summary');
+    expect(declared(summary, 'font-weight')).toBe('600');
+    // …and the FOLD CONTROL is the button the extension renders, with no class
+    // of its own, so it painted the UA's chrome until this reset.
+    const toggle = ruleBody(EDITOR_CSS, '.editor-details > button');
+    expect(declared(toggle, 'cursor')).toBe('pointer');
+    expect(declared(toggle, 'border')).toBe('none');
+    expect(declared(toggle, 'background')).toBe('none');
 
     // CONTROL, same `it`: the two selectors must reach DIFFERENT rules.
     // `ruleBody` is a first-match substring search, so a docblock that merely

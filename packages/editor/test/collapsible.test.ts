@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import type { Editor } from '@tiptap/core';
 import { describe, expect, it } from 'vitest';
 import { createTestEditor } from './helpers/create-editor.js';
@@ -146,5 +149,53 @@ describe('9.268-9.271 collapsible block', () => {
     expect(keptDoc.content?.[0]?.type).toBe('details');
     expect(keptDoc.content?.[0]?.content?.[0]?.content?.[0]?.text).toBe('T');
     kept.destroy();
+  });
+});
+
+/**
+ * 9.272 — THE COLLAPSIBLE'S SELECTORS HAVE TO MATCH WHAT THE EDITOR DRAWS.
+ *
+ * Found by the plan-close audit, and it is the gap that let two dead rules
+ * stand: `editor.css` declared `.editor-details > summary { cursor: pointer }`
+ * and the case asserted that DECLARATION — which a stylesheet read can see. The
+ * Details extension renders its own node view, whose DOM is
+ * `<div class="editor-details"><button></button><div><summary>…</summary>…`, so
+ * the summary is a GRANDCHILD and the child combinator matched nothing. Neither
+ * that rule nor the `:empty::before` placeholder beside it could ever apply.
+ *
+ * The assertion below is the one that would have caught them: `matches()` asks
+ * the DOM, not the file.
+ */
+describe('9.272 the collapsible selectors match the rendered DOM', () => {
+  it('9.272 every selector the stylesheet declares for the block matches a real element', () => {
+    const editor = createTestEditor();
+    typeText(editor, '< T');
+    const root = editor.view.dom.querySelector('.editor-details');
+    expect(root, 'the node view did not render .editor-details').not.toBeNull();
+    const summary = root!.querySelector('summary');
+    const toggle = root!.querySelector('button');
+    expect(summary, 'the block rendered no summary').not.toBeNull();
+    expect(toggle, 'the block rendered no fold control').not.toBeNull();
+
+    // THE SELECTORS ARE READ OUT OF THE STYLESHEET, not typed here, and that is
+    // the whole point: asserting the DOM against a literal this file carries
+    // would pass while `editor.css` declared something else — which is exactly
+    // the state that shipped, with the stylesheet naming `.editor-details >
+    // summary` and no element matching it.
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css'), 'utf8');
+    const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+    const selectors = [...bare.matchAll(/(\.editor-details[^{,]*)\s*\{/g)].map((m) => m[1]!.trim());
+    // CONTROL FIRST: an extractor that found nothing would make the loop below
+    // vacuous, which is the failure mode this whole assertion exists to close.
+    expect(selectors.length, 'no .editor-details selectors extracted — the extractor is broken').toBeGreaterThan(0);
+    for (const selector of selectors) {
+      const matched = [root, summary, toggle].some((el) => el!.matches(selector));
+      expect(matched, `editor.css declares \`${selector}\`, which matches nothing the editor draws`).toBe(true);
+    }
+    // …and the CONTROL for the other direction: the selector that USED to be
+    // declared must still match nothing, so this case cannot pass by the DOM
+    // bending to the old spelling.
+    expect(summary!.matches('.editor-details > summary')).toBe(false);
+    editor.destroy();
   });
 });
