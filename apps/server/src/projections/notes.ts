@@ -53,6 +53,8 @@ type NoteRow = {
   pre_inherit_mode: NoteScope['mode'] | null;
   pre_inherit_user_ids: string[];
   deleted: boolean;
+  deleted_at: Date | null;
+  deleted_by: string | null;
   created_at: Date;
   updated_at: Date;
   last_body_event_id: string;
@@ -146,18 +148,49 @@ function schemaVersionOf(body: unknown): number {
   return typeof attrs?.schemaVersion === 'number' ? attrs.schemaVersion : 1;
 }
 
-async function upsertNote(tx: PoolClient, next: NoteState, event: LedgerEvent): Promise<void> {
+/**
+ * `deleted_at`/`deleted_by` (trash series, Plan 1 Task 2) beside `deleted`.
+ * Computed at apply time from the EVENT — `note.deleted` writes `serverTime`/
+ * `actorId`, `note.restored` nulls both — never from the reducer: `NoteState`
+ * is a shared domain type the client replica also builds, and these two
+ * columns are server-projection-only, the same reason `workspace_seq` lives
+ * here and not in `NoteState`. Every other note event must PRESERVE whatever
+ * is already on the row, since `upsertNote` rewrites the whole row on every
+ * note event (19.014's control: `deleted` still flips on delete/restore,
+ * independent of this pair).
+ */
+async function currentNoteDeletion(
+  tx: PoolClient,
+  noteId: string,
+): Promise<{ deletedAt: string | null; deletedBy: string | null }> {
+  const { rows } = await tx.query<{ deleted_at: Date | null; deleted_by: string | null }>(
+    'SELECT deleted_at, deleted_by FROM proj_notes WHERE note_id = $1',
+    [noteId],
+  );
+  const row = rows[0];
+  return { deletedAt: row?.deleted_at ? row.deleted_at.toISOString() : null, deletedBy: row?.deleted_by ?? null };
+}
+
+async function upsertNote(
+  tx: PoolClient,
+  next: NoteState,
+  event: LedgerEvent,
+  deletedAt: string | null,
+  deletedBy: string | null,
+): Promise<void> {
   const pre = next.scopeBeforeInherit;
   await tx.query(
     `INSERT INTO proj_notes
        (note_id, workspace_id, home_project_id, author_id, title, body, schema_version, scope_mode, scope_user_ids,
-        pre_inherit_mode, pre_inherit_user_ids, deleted, created_at, updated_at, last_body_event_id, seq, workspace_seq)
-     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17)
+        pre_inherit_mode, pre_inherit_user_ids, deleted, deleted_at, deleted_by, created_at, updated_at,
+        last_body_event_id, seq, workspace_seq)
+     VALUES ($1,$2,$3,$4,$5,$6,$7,$8,$9,$10,$11,$12,$13,$14,$15,$16,$17,$18,$19)
      ON CONFLICT (note_id) DO UPDATE SET
        home_project_id = EXCLUDED.home_project_id, title = EXCLUDED.title, body = EXCLUDED.body,
        schema_version = EXCLUDED.schema_version, scope_mode = EXCLUDED.scope_mode, scope_user_ids = EXCLUDED.scope_user_ids,
        pre_inherit_mode = EXCLUDED.pre_inherit_mode, pre_inherit_user_ids = EXCLUDED.pre_inherit_user_ids,
-       deleted = EXCLUDED.deleted, updated_at = EXCLUDED.updated_at, last_body_event_id = EXCLUDED.last_body_event_id,
+       deleted = EXCLUDED.deleted, deleted_at = EXCLUDED.deleted_at, deleted_by = EXCLUDED.deleted_by,
+       updated_at = EXCLUDED.updated_at, last_body_event_id = EXCLUDED.last_body_event_id,
        seq = EXCLUDED.seq, workspace_seq = EXCLUDED.workspace_seq`,
     [
       next.noteId,
@@ -172,6 +205,8 @@ async function upsertNote(tx: PoolClient, next: NoteState, event: LedgerEvent): 
       pre === null ? null : pre.mode,
       pre !== null && pre.mode === 'explicit' ? pre.userIds : [],
       next.deleted,
+      deletedAt,
+      deletedBy,
       next.createdAt,
       next.updatedAt,
       next.lastBodyEventId,
@@ -199,7 +234,10 @@ export const notesProjection: Projection = {
     if (event.type === 'comment.added') return;
     const current = await getNoteStateFromDb(tx, event.entity.id);
     const next = applyNoteEvent(current, event);
-    await upsertNote(tx, next, event);
+    const priorDeletion = await currentNoteDeletion(tx, event.entity.id);
+    const deletedAt = event.type === 'note.deleted' ? event.serverTime : event.type === 'note.restored' ? null : priorDeletion.deletedAt;
+    const deletedBy = event.type === 'note.deleted' ? event.actorId : event.type === 'note.restored' ? null : priorDeletion.deletedBy;
+    await upsertNote(tx, next, event, deletedAt, deletedBy);
     if (event.type === 'note.created' && next.attachedTicketIds.length === 1) {
       await insertAttachment(tx, next, next.attachedTicketIds[0]!, event);
     } else if (event.type === 'note.attached') {
