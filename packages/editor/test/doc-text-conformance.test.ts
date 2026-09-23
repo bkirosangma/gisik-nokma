@@ -308,6 +308,32 @@ describe('schema v2 output conforms to the shipped plain-text walker', () => {
     editor.destroy();
   });
 
+  /**
+   * 9.311 — the ticketRef counterpart of the mention case above: driven on a
+   * document this editor actually produced. It contributes `KEY title`, never
+   * `ticketId` — the id is what the chip's href navigates by, the key and
+   * title are what a person read.
+   */
+  it('9.311 renders an editor-produced ticketRef as "KEY title", inline', () => {
+    const editor = createTestEditor(undefined, {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'see ' },
+            {
+              type: 'ticketRef',
+              attrs: { ticketId: 't2', projectId: 'p1', key: 'SHOP-8', title: 'Compressor log' },
+            },
+          ],
+        },
+      ],
+    });
+    expect(docToPlainText(editor.getJSON())).toBe('see SHOP-8 Compressor log');
+    editor.destroy();
+  });
+
   it('is unbothered by the doc attrs this schema stamps and the paragraph typing appends', () => {
     // schemaVersion lives on the doc node's attrs, which the walker ignores
     // entirely; trailingNode appends an empty paragraph after a heading the

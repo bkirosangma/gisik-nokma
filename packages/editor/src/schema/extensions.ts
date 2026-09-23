@@ -20,6 +20,7 @@ import { MarkdownClipboard } from '../extensions/markdown-clipboard.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
 import { WikiLink, type NoteLinkCandidate } from '../extensions/wiki-link.js';
+import { TicketRef, type TicketRefCandidate } from '../extensions/ticket-ref.js';
 import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
 
 export type EditorSchemaOptions = {
@@ -52,6 +53,14 @@ export type EditorSchemaOptions = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  /**
+   * Ticket-reference data source (Plan 7 Task 1). Both optional and both
+   * default to "nothing offered" — a picker with no candidates and a chip
+   * with no link — which keeps this widening additive for every existing
+   * mount, the same rule `queryNotes`/`resolveNoteTitle` follow above.
+   */
+  queryTickets?: (query: string) => Promise<TicketRefCandidate[]>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
 };
 
 /**
@@ -287,6 +296,16 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       ...(options.onNavigateNote === undefined
         ? {}
         : { onNavigateNote: options.onNavigateNote }),
+    }),
+    // The ticket-ref node (Plan 7 Task 1). Both options are spelled with `??`
+    // like `queryNotes`'s: the fallback is a VALUE, not a default being
+    // protected from an explicit `undefined` — `resolveTicketHref` has no
+    // three-way "no resolver at all" answer the way `resolveNoteTitle` does,
+    // so there is nothing here for `mergeDeep`'s `undefined`-replaces-default
+    // behaviour to catch out.
+    TicketRef.configure({
+      queryTickets: options.queryTickets ?? (async () => []),
+      resolveTicketHref: options.resolveTicketHref ?? (() => null),
     }),
     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and

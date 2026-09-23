@@ -2,6 +2,8 @@
 
 > **Block `9.261`–`9.300` is the notes editor port** (Plan 4, `docs/superpowers/plans/2026-09-23-notes-4-editor-port.md`), minted 2026-09-23 from the tip `9.260`.
 
+> **Block `9.301`–`9.315` is the inline references in comments** (Plan 7, `docs/superpowers/plans/2026-09-23-notes-7-inline-references.md`), minted 2026-09-23 from the tip `9.300`.
+
 Mirrors `Features.md` §9. Status: `❌` not covered · `✅` covered · `🟡` partial · `🧪` manual · `🚫` out of scope (with reason).
 
 **Numbering, and why this file does not start at 9.1 — RESOLVED (Task 16).** `Features.md` §9 and this
@@ -408,3 +410,15 @@ assumed it would find.
 - ❌ **9.298 — `exportMarkdown`/`markdownToHtml` preserve a NESTED list and a multi-paragraph blockquote.** Mutation: drop the nested-list indent in the `li` case. *(Added by the Task 9 review, which measured the unguarded version GLUING a nested item's text into its parent's (`"- a- b"`) and merging a two-paragraph blockquote into one. Minted from the spare tail.)*
 - ❌ **9.299 — the save state is rendered ONLY when the host supplies `saveState`; a note-mode mount that supplies none reports nothing rather than "Saved".** Mutation: default to `'saved'`. *(Added by the same review: the default asserted a persistence claim nobody made. Minted from the spare tail.)*
 - ✅ **9.300 — the wiki-link hover card: resting on a link for 400 ms shows a `.wikilink-preview` carrying the first 200 characters of `previewNote`'s answer; a `null` answer shows NO card, and leaving before 400 ms fetches nothing.** Mutation: drop the `HOVER_DELAY_MS` guard. *(Minted from the block's LAST spare id. Spec §8.5 names the hover card and the plan's Task 5 Interfaces name `previewNote`, but the plan's Step 1 allocated no case to it — so `attachHoverPreview` shipped with no witness at all. Found by the plan-close audit.)*
+- ✅ **9.301 — schema v2 gains `ticketRef` and the closed-vocabulary case (9.261) still passes** (the list gains exactly one name). Mutation: drop the node from the extension list. `test/ticket-ref.test.ts`.
+- ✅ **9.302 — typing `:ticket comp` calls `queryTickets('comp')`, the popup lists `KEY title` rows, Enter inserts `ticketRef { ticketId, projectId, key, title }` followed by a space; controls: `re: ticket 5` opens nothing, and `:ticketfoo` never queries for `'foo'` — the trigger requires whitespace or end directly after `:ticket`.** Mutation: drop `allowSpaces`. `test/ticket-ref.test.ts`.
+- ✅ **9.303 — inside a code block `:ticket` opens nothing** (the shared `allow` gate). Mutation: remove `allow`. `test/ticket-ref.test.ts`.
+- ✅ **9.304 — the chip renders as `a.editor-ticketref[href]` when `resolveTicketHref` returns a string and as `span.editor-ticketref` without href when it returns null; text is `KEY title`** (the STORED title always — this node carries no live-title resolver). Mutation: always render `<a>`. `test/ticket-ref.test.ts`.
+- ✅ **9.305 — Escape closes the picker leaving `:ticket comp` as text.** Mutation: delete the range on Escape. `test/ticket-ref.test.ts`.
+- ✅ **9.306 — `editor.css` styles `.editor-ticketref` and `.ticketref-popup`** (binding test). Mutation: delete the popup rule. `test/editor-css-binding.test.ts`.
+- ✅ **9.307 — `:note co` opens the wiki-link picker and Enter inserts the same `wikiLink { noteId, title }` node `[[co` would; control: `[[` still works.** Mutation: give the second plugin the first plugin's key (ProseMirror throws — the test asserts the editor constructs). `test/wiki-link.test.ts`.
+- ✅ **9.308 — `:notebook` in prose opens nothing.** Mutation: drop the whitespace requirement. `test/wiki-link.test.ts`.
+- ✅ **9.309 — the twin transcription covers `queryTickets` and `resolveTicketHref` in both files.** Mutation: drop one from app-core's twin. `packages/editor/test/ticket-editor-slot.test.tsx`.
+- ✅ **9.310 — the bridge parses `ticketResults` and serialises `ticketQuery`; control: an unknown type is refused.** Mutation: drop the `ticketResults` case. `packages/editor/test/webview-bridge.test.ts`.
+- ✅ **9.311 — `docToPlainText` renders `ticketRef` as `KEY title`; a missing key falls back to the title (control in the same `it`).** Mutation: render the ticket id. `packages/domain/test/doc-text.test.ts`, `packages/editor/test/doc-text-conformance.test.ts`.
+- ✅ **9.312 — `renderCommentBody` renders `ticketRef` as a link when `ticketHref` resolves and as a span otherwise; control: `wikiLink` unchanged.** Mutation: link with `href="#"`. `packages/app-core/test/views/comment-body.test.tsx`.

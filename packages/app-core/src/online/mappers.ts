@@ -2237,6 +2237,7 @@ export function mapSearchHits(raw: unknown): SearchHit[] {
       title: asString(card['title'], `${path}.card.title`),
       snippet: asString(entry['snippet'], `${path}.snippet`),
       matchedIn: matchedInOf(entry['matchedIn'], `${path}.matchedIn`),
+      key: card['key'] === null ? null : asString(card['key'], `${path}.card.key`),
     };
   });
 }

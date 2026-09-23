@@ -2,6 +2,7 @@ import type { Editor } from '@tiptap/core';
 import { emptyDoc, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
+import type { TicketRefCandidate } from '../extensions/ticket-ref.js';
 import { parseHostMessage, type EditorToHostMessage } from './bridge.js';
 
 export type EditorBridgeDeps = {
@@ -15,6 +16,8 @@ export type EditorBridge = {
   resolveMentions(query: string): Promise<MentionCandidate[]>;
   /** Note data source for the webview editor's `[[` picker — the same round trip. */
   resolveNotes(query: string): Promise<NoteLinkCandidate[]>;
+  /** Ticket data source for the webview editor's `:ticket` picker — the same round trip. */
+  resolveTickets(query: string): Promise<TicketRefCandidate[]>;
   /** The attach affordance / captured paste: ask the host to run its native upload. */
   requestUpload(): void;
   dispose(): void;
@@ -34,6 +37,7 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
   let disposed = false;
   const pendingMentions = new Map<string, (users: MentionCandidate[]) => void>();
   const pendingNotes = new Map<string, (candidates: NoteLinkCandidate[]) => void>();
+  const pendingTickets = new Map<string, (candidates: TicketRefCandidate[]) => void>();
 
   const onUpdate = (): void => {
     if (disposed) return;
@@ -85,6 +89,14 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
           }
           break;
         }
+        case 'ticketResults': {
+          const resolve = pendingTickets.get(message.requestId);
+          if (resolve) {
+            pendingTickets.delete(message.requestId);
+            resolve(message.candidates);
+          }
+          break;
+        }
         case 'uploadFailed':
           // Nothing to roll back: the webview never inserted anything for
           // an in-flight host upload. The host surfaces its own error UI.
@@ -121,6 +133,13 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
         post({ bridge: 1, kind: 'noteQuery', requestId, query });
       });
     },
+    resolveTickets(query) {
+      const requestId = String(++requestCounter);
+      return new Promise((resolve) => {
+        pendingTickets.set(requestId, resolve);
+        post({ bridge: 1, kind: 'ticketQuery', requestId, query });
+      });
+    },
     requestUpload() {
       post({ bridge: 1, kind: 'requestUpload', requestId: String(++requestCounter) });
     },
@@ -129,6 +148,7 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
       editor.off('update', onUpdate);
       pendingMentions.clear();
       pendingNotes.clear();
+      pendingTickets.clear();
     },
   };
 }

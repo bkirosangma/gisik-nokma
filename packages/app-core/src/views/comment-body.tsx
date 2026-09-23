@@ -158,14 +158,17 @@ function applyMarks(text: string, marks: unknown, key: string): ReactNode {
   return node;
 }
 
-function childrenOf(node: Node, depth: number, keyPrefix: string): ReactNode[] {
+/** The `href` resolver `ticketRef` renders through — see `renderCommentBody`'s parameter. */
+type TicketHrefResolver = (ref: { ticketId: string; projectId: string }) => string | null;
+
+function childrenOf(node: Node, depth: number, keyPrefix: string, ticketHref: TicketHrefResolver): ReactNode[] {
   if (!Array.isArray(node.content)) return [];
   return node.content
-    .map((child, index) => renderNode(child, depth + 1, `${keyPrefix}.${index}`))
+    .map((child, index) => renderNode(child, depth + 1, `${keyPrefix}.${index}`, ticketHref))
     .filter((child): child is ReactNode => child !== null);
 }
 
-function renderNode(value: unknown, depth: number, key: string): ReactNode | null {
+function renderNode(value: unknown, depth: number, key: string, ticketHref: TicketHrefResolver): ReactNode | null {
   if (depth > MAX_DEPTH) return null;
   const node = asNode(value);
   if (node === null) return null;
@@ -195,7 +198,7 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
   // place they are drawn — the declared decision, unchanged.
   if (node.type === 'image') return null;
 
-  const children = childrenOf(node, depth, key);
+  const children = childrenOf(node, depth, key, ticketHref);
 
   if (node.type === 'bulletList' || node.type === 'bullet_list') {
     return createElement('ul', { className: 'gn-comment__list', key }, children);
@@ -265,6 +268,27 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
       ? createElement('span', { key }, title)
       : createElement('a', { className: 'gn-comment__wikilink', href: `/notes/${noteId}`, key }, title);
   }
+  if (node.type === 'ticketRef') {
+    const attrs = asNode(node.attrs);
+    const ticketId = attrs !== null && typeof attrs['ticketId'] === 'string' ? attrs['ticketId'] : '';
+    const projectId = attrs !== null && typeof attrs['projectId'] === 'string' ? attrs['projectId'] : '';
+    const ticketKey = attrs !== null && typeof attrs['key'] === 'string' ? attrs['key'] : '';
+    const title = attrs !== null && typeof attrs['title'] === 'string' ? attrs['title'] : '';
+    const text = `${ticketKey} ${title}`;
+    // Unlike `wikiLink` above, this renderer has NO href of its own to fall
+    // back on — the caller must supply `ticketHref`, and a refused href (the
+    // resolver answers `null`, or `safeHref` refuses what it answers) renders
+    // the label as plain text, the same rule `applyMarks`'s link mark follows.
+    // Unlike `wikiLink` above, this renderer has NO href of its own to fall
+    // back on — the caller must supply `ticketHref`, and a refused href (the
+    // resolver answers `null`, or `safeHref` refuses what it answers) renders
+    // the label as plain text, the same rule `applyMarks`'s link mark follows.
+    const resolved = ticketId === '' ? null : ticketHref({ ticketId, projectId });
+    const href = resolved === null ? null : safeHref(resolved);
+    return href === null
+      ? createElement('span', { className: 'gn-comment__ticketref', key }, text)
+      : createElement('a', { className: 'gn-comment__ticketref', href, key }, text);
+  }
   if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'doc') {
     const element = node.type === 'doc' ? Fragment : 'p';
     return createElement(element, node.type === 'doc' ? { key } : { key }, children);
@@ -277,7 +301,12 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
  * The comment body, as elements. Total: unrenderable input yields `null`, and
  * a malformed node yields nothing rather than throwing, so one bad comment
  * cannot take down the thread it sits in.
+ *
+ * `ticketHref` is optional and defaults to answering `null` for everything —
+ * this renderer has no href resolver of its own the way `wikiLink`'s
+ * `/notes/<id>` is built in, so a caller that supplies none gets a `ticketRef`
+ * chip rendered as a plain span (spec §14.2).
  */
-export function renderCommentBody(doc: unknown): ReactNode {
-  return renderNode(doc, 0, 'b');
+export function renderCommentBody(doc: unknown, ticketHref: TicketHrefResolver = () => null): ReactNode {
+  return renderNode(doc, 0, 'b', ticketHref);
 }
