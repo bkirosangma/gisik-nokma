@@ -21,7 +21,7 @@ import { parse as parseYaml } from 'yaml';
 
 type Rule = {
   match?: { authority?: { exact?: string; prefix?: string }; path?: { prefix?: string; exact?: string } };
-  component?: { name?: string };
+  component?: { name?: string; preserve_path_prefix?: boolean };
 };
 type Spec = {
   domains?: { domain: string; type?: string }[];
@@ -46,6 +46,12 @@ describe('13.1424 the API paths of the web host route to the server component', 
     const catchAll = ruleFor(primaryDomain!, undefined);
     expect(v1?.component?.name).toBe('server');
     expect(auth?.component?.name).toBe('server');
+    // App Platform TRIMS a matched path prefix before forwarding unless the
+    // rule sets preserve_path_prefix (docs.digitalocean.com, app spec,
+    // ingress.rules[].component). Without it /v1/stream reaches the server as
+    // /stream and 404s — the routing above would be right and the paths wrong.
+    expect(v1?.component?.preserve_path_prefix).toBe(true);
+    expect(auth?.component?.preserve_path_prefix).toBe(true);
     expect(catchAll?.component?.name).toBe('web');
     // Order: the path rules precede the host catch-all, so a precedence scheme
     // that takes the first match cannot hand /v1 to the web shell.

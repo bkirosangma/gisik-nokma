@@ -41,6 +41,14 @@ const serverOrigin = process.env.SERVER_ORIGIN ?? 'http://localhost:3000';
  * `NEXT_PUBLIC_SERVER_URL` (see `src/providers.tsx`). A rewrite for it would be
  * the same trap in the other direction — a rule that looks like it covers the
  * socket and does not.
+ *
+ * In PRODUCTION that URL is the web host itself (`https://pm.artsourced.in`),
+ * because the session cookie belongs to that host only and a socket dialled at
+ * the API host arrives without it (401 at the upgrade). App Platform's ingress
+ * routes `/v1` and `/api/auth` on the web host straight to the server component
+ * (`deploy/do/app.yaml`, ingress rules; 13.1424–13.1425) — so in production
+ * these rewrites are reached only by requests the edge did not already route,
+ * and the socket never touches Next at all.
  */
 const nextConfig: NextConfig = {
   /**
