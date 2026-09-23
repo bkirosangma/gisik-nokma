@@ -1197,6 +1197,33 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
   });
 
   /**
+   * 18.271 — Plan 7 Task 4 (spec §14.2): `key` rides on every search hit, the
+   * same field `mapTicketRead` and the board's card mappers already read off
+   * `TicketCard` — this mapper simply started dropping it, since search hits
+   * predate `:ticket`'s picker. Control in the same `it`: every other field
+   * stays exactly as 3.39 already proved.
+   */
+  it('18.271 mapSearchHits exposes key from the card; null stays null; other fields unchanged (control)', () => {
+    const body: SearchResponse = {
+      workspaceId: 'w',
+      query: 'q',
+      notes: [],
+      hits: [
+        { card: serverCard({ ticketId: 'tkt-h1', key: 'CCSO-9' }), snippet: 's1', matchedIn: 'title' },
+        { card: serverCard({ ticketId: 'tkt-h2', key: null }), snippet: 's2', matchedIn: 'comment' },
+      ],
+    };
+    const hits = mapSearchHits(body);
+    expect(hits[0]?.key).toBe('CCSO-9');
+    expect(hits[1]?.key).toBeNull();
+    // CONTROL: the other fields still read exactly as 3.39 pins them.
+    expect(hits[0]?.ticketId).toBe('tkt-h1');
+    expect(hits[0]?.snippet).toBe('s1');
+    expect(hits[0]?.matchedIn).toBe('title');
+    expect(hits[1]?.matchedIn).toBe('comment');
+  });
+
+  /**
    * 12.250 — `mapMyWork` ANSWERS, and this is what replaced case 3.41.
    *
    * 3.41 asserted that the two contested refusals blamed `/v1/contests` rather

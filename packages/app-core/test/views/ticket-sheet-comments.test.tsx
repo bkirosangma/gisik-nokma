@@ -431,4 +431,94 @@ describe('TicketSheet — the comment thread and its box', () => {
       ),
     ).toBe(true);
   });
+
+  /**
+   * 18.274 — Plan 7 Task 4 (spec §14.2): a ticket chip in a rendered comment
+   * links to the ticket's page — `TicketSheet` forwarding its own
+   * `resolveTicketHref` prop to `CommentsThread`'s `ticketHref`. Control in
+   * the SAME describe: with no `resolveTicketHref` supplied, the identical
+   * chip renders as a plain span (spec §14.2's default), never a dead link.
+   */
+  it('18.274 a ticketRef in a comment links to the ticket\'s page when the app supplies resolveTicketHref', async () => {
+    const ticketRefComment: TicketComment = {
+      commentId: '01COMMENTTWO',
+      authorId: 'user_anselma',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'text', text: 'see ' },
+              {
+                type: 'ticketRef',
+                attrs: { ticketId: TICKET, projectId: 'p_other', key: 'SHOP-9', title: 'Fix the freezer' },
+              },
+            ],
+          },
+        ],
+      },
+      recordedAt: '2026-09-23T09:00:00.000Z',
+      files: [],
+    };
+    renderSheet(source({ getTicketComments: async () => [ticketRefComment] }), {
+      resolveTicketHref: ({ ticketId, projectId }: { ticketId: string; projectId: string }) =>
+        `/w/${WS}/p/${projectId}?ticket=${ticketId}`,
+    });
+    const section = await screen.findByTestId('sheet-comments');
+    const link = within(section).getByRole('link', { name: 'SHOP-9 Fix the freezer' });
+    expect(link).toHaveAttribute('href', `/w/${WS}/p/p_other?ticket=${TICKET}`);
+  });
+
+  it('18.274 (control) the same chip renders as a plain span when the app supplies no resolveTicketHref', async () => {
+    const ticketRefComment: TicketComment = {
+      commentId: '01COMMENTTWO',
+      authorId: 'user_anselma',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              {
+                type: 'ticketRef',
+                attrs: { ticketId: TICKET, projectId: 'p_other', key: 'SHOP-9', title: 'Fix the freezer' },
+              },
+            ],
+          },
+        ],
+      },
+      recordedAt: '2026-09-23T09:00:00.000Z',
+      files: [],
+    };
+    renderSheet(source({ getTicketComments: async () => [ticketRefComment] }));
+    const section = await screen.findByTestId('sheet-comments');
+    expect(within(section).queryByRole('link', { name: 'SHOP-9 Fix the freezer' })).toBeNull();
+    expect(within(section).getByText('SHOP-9 Fix the freezer')).toBeInTheDocument();
+  });
+
+  /**
+   * 18.274 — the other half of the wiring: `TicketSheet` forwards its own
+   * `queryTickets`/`resolveTicketHref` props to BOTH `<EditorSlot>` mounts
+   * (description and comment), not only to `CommentsThread`.
+   */
+  it('18.274 forwards queryTickets/resolveTicketHref to both EditorSlot mounts', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const StubSlot: EditorSlotComponent = (props) => {
+      captured.push(props as unknown as Record<string, unknown>);
+      return <div data-testid={`stub-${props.mode}-editor`} />;
+    };
+    renderSheet(source(), {
+      editorSlot: StubSlot,
+      queryTickets: async () => [],
+      resolveTicketHref: () => null,
+    });
+    await screen.findByTestId('stub-comment-editor');
+    const description = captured.find((p) => p['mode'] === 'description');
+    const comment = captured.find((p) => p['mode'] === 'comment');
+    expect(description?.['queryTickets']).toBeDefined();
+    expect(description?.['resolveTicketHref']).toBeDefined();
+    expect(comment?.['queryTickets']).toBeDefined();
+    expect(comment?.['resolveTicketHref']).toBeDefined();
+  });
 });

@@ -145,4 +145,53 @@ describe('9.301-9.306 ticketRef', () => {
     expect(editor.getText()).toBe(':ticket comp');
     editor.destroy();
   });
+
+  /**
+   * 18.272 (mechanism half; the page's own half lives in
+   * apps/web/test/ticket-ref-callbacks.test.ts) — Ruling 1 (owner, via the
+   * plan author, 2026-09-23): `queryTickets` rejecting (the replica's search
+   * gap, offline) is caught HERE, inside the Suggestion's `items` wrapper —
+   * `@tiptap/suggestion@3.30.5`'s own async-fetch error path (`plugin/view.ts`)
+   * reaches the renderer as `loading: false` with `items` unchanged, no error
+   * flag — so a per-editor closure flag is the only channel. The editor still
+   * mounts and the popup still opens; its status line reads the connection
+   * sentence instead of the count. Control in the SAME `it` (Ruling 1a): the
+   * flag is cleared at the START of every `items()` call, so a query typed
+   * after reconnecting shows the count text again.
+   */
+  it('18.272 a rejected queryTickets shows "Search needs a connection" in the status line; the editor still mounts; a later successful query shows the count again (control)', async () => {
+    let fail = true;
+    const queryTickets = vi.fn(async (q: string) => {
+      if (fail) throw new Error('offline');
+      return TICKETS.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
+    });
+    let editor!: ReturnType<typeof createTestEditor>;
+    expect(() => {
+      editor = createTestEditor({ queryTickets });
+    }).not.toThrow();
+
+    typeText(editor, ':ticket comp');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.ticketref-popup__status')?.textContent).toBe(
+        'Search needs a connection',
+      );
+    });
+    // THE EDITOR STILL MOUNTS: the popup itself is present and the document
+    // is still there to type into — a rejection never reached the editor's
+    // own construction or its content.
+    expect(document.querySelector('.ticketref-popup')).not.toBeNull();
+    expect(editor.isEditable).toBe(true);
+
+    // CONTROL (Ruling 1a): reconnect, then type again — the SAME session
+    // continuing is what proves the flag resets on every call, not only on a
+    // fresh popup.
+    fail = false;
+    typeText(editor, 'r');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.ticketref-popup__status')?.textContent).toBe(
+        '1 ticket matches',
+      );
+    });
+    editor.destroy();
+  });
 });

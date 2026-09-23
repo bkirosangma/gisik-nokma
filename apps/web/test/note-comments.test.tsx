@@ -190,4 +190,66 @@ describe('18.213-18.215 NoteComments', () => {
     await screen.findByText('No comments yet.');
     expect(capturedSlotProps).toHaveLength(0);
   });
+
+  /**
+   * 18.273 / 18.274 — Plan 7 Task 4 (spec §14): the note page supplies the
+   * SAME two ticket-ref callbacks to its editor (`note-document.test.tsx`)
+   * and here, to its comment thread — `queryTickets`/`resolveTicketHref` to
+   * the composer, `ticketHref` to `CommentsThread`. 18.274 rides on the same
+   * mount: a real `ticketRef` in a seeded comment renders as a link to the
+   * ticket's page — `CommentsThread` is NOT stubbed in this file, unlike the
+   * composer, so this is the shipped renderer.
+   */
+  it('18.273/18.274 supplies queryTickets/resolveTicketHref to the composer and ticketHref to the thread; a ticketRef chip links to the ticket\'s page', async () => {
+    const search = vi.fn(async (_workspaceId: string, _text: string) => [
+      { ticketId: 't1', projectId: 'p1', title: 'Renew the trade licence', snippet: '', matchedIn: 'title' as const, key: 'CCSO-1183' },
+    ]);
+    const services = stubServices({
+      getNoteComments: async () => [
+        comment({
+          commentId: 'c1',
+          body: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  { type: 'text', text: 'see ' },
+                  {
+                    type: 'ticketRef',
+                    attrs: { ticketId: 't1', projectId: 'p1', key: 'CCSO-1183', title: 'Renew the trade licence' },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ],
+      search,
+    });
+
+    render(
+      <Providers services={services}>
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+      </Providers>,
+    );
+
+    // 18.274 — the rendered chip.
+    const link = await screen.findByRole('link', { name: 'CCSO-1183 Renew the trade licence' });
+    expect(link).toHaveAttribute('href', `/w/${WS}/p/p1?ticket=t1`);
+
+    // 18.273 — the composer's own two callbacks.
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    const queryTickets = slotProps().queryTickets as (
+      q: string,
+    ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+    const resolveTicketHref = slotProps().resolveTicketHref as (ref: {
+      ticketId: string;
+      projectId: string;
+    }) => string | null;
+    const hits = await queryTickets('licence');
+    expect(search).toHaveBeenCalledWith(WS, 'licence');
+    expect(hits).toEqual([{ ticketId: 't1', projectId: 'p1', key: 'CCSO-1183', title: 'Renew the trade licence' }]);
+    expect(resolveTicketHref({ ticketId: 't1', projectId: 'p1' })).toBe(`/w/${WS}/p/p1?ticket=t1`);
+  });
 });

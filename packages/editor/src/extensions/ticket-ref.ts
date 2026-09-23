@@ -129,6 +129,17 @@ export const TicketRef = Node.create<TicketRefOptions>({
   },
 
   addProseMirrorPlugins() {
+    // A PER-EDITOR FLAG, read only by this session's popup (Ruling 1,
+    // 2026-09-23 — the plan's own text had no channel for this: `items`
+    // returning a plain array is all `TicketRefCandidate`, the twin contracts
+    // and the bridge carry, and @tiptap/suggestion@3.30.5's own async-fetch
+    // error path — `plugin/view.ts`'s non-`resolved` arm — reaches the
+    // renderer as `loading: false` with `items` unchanged, no error prop).
+    // `items` below sets it when `queryTickets` rejects (offline: the
+    // replica's search gap, spec §14.1) and CLEARS it at the START of every
+    // call, so a query typed after reconnecting shows the count-based status
+    // again (case 18.272).
+    let searchUnavailable = false;
     return [
       Suggestion<TicketRefCandidate, TicketRefCandidate>({
         editor: this.editor,
@@ -155,7 +166,21 @@ export const TicketRef = Node.create<TicketRefOptions>({
           const query = matched.slice(TICKET_TRIGGER.length);
           return query.length === 0 || /^\s/.test(query);
         },
-        items: async ({ query }) => (await this.options.queryTickets(query.trim())).slice(0, 8),
+        items: async ({ query }) => {
+          searchUnavailable = false;
+          try {
+            return (await this.options.queryTickets(query.trim())).slice(0, 8);
+          } catch {
+            // A REJECTED, NOT A THROWN, RESULT: @tiptap/suggestion's own
+            // catch (async.ts) would have swallowed this identically, minus
+            // the flag — catching it here rather than there is what lets the
+            // popup say why the list is empty. An empty resolved array is
+            // exactly as benign to the library as a real zero-match answer,
+            // which is the whole of "the editor still mounts" (case 18.272).
+            searchUnavailable = true;
+            return [];
+          }
+        },
         command: ({ editor, range, props }) => {
           editor
             .chain()
@@ -164,7 +189,7 @@ export const TicketRef = Node.create<TicketRefOptions>({
             .insertContent([{ type: 'ticketRef', attrs: props }, { type: 'text', text: ' ' }])
             .run();
         },
-        render: () => createTicketRefPopup(),
+        render: () => createTicketRefPopup(() => searchUnavailable),
       }),
     ];
   },

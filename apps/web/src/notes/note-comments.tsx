@@ -3,6 +3,7 @@
 import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
 import { CommentsThread, makeSubmittedFactory, useLiveQuery, type TicketComment } from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
+import { ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 
 /**
  * The comment thread under a note's editor — the same kit component the
@@ -71,6 +72,7 @@ export function NoteComments({
       comments={comments.data}
       commentsUnavailable={comments.error ?? undefined}
       nameOf={nameOf}
+      ticketHref={ticketRefHrefIn(workspaceId)}
       composer={
         canComment ? (
           <TicketEditorSlot
@@ -83,6 +85,10 @@ export function NoteComments({
             placeholder="Add a comment"
             submit={submitComment}
             footerNote="Posting records an event citing you."
+            queryTickets={async (query: string) =>
+              ticketRefCandidatesOf(await dataSource.query.search(workspaceId, query))
+            }
+            resolveTicketHref={ticketRefHrefIn(workspaceId)}
           />
         ) : undefined
       }

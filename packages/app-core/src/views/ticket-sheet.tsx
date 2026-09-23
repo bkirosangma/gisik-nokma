@@ -205,6 +205,17 @@ export type TicketSheetProps = {
    */
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   /**
+   * Ticket-reference capabilities (Plan 7 Task 4, spec §14). Both optional and
+   * additive, the same shape `EditorSlotProps.queryTickets`/`resolveTicketHref`
+   * carry — this sheet cannot build them itself the way `queryUsers` is built
+   * from the roster it already reads: `resolveTicketHref` needs the app's own
+   * URL scheme (`ticketSheetPath`, in `apps/web`, which this package must never
+   * import), so the whole pair travels in from the page as a prop, wired to
+   * BOTH `<EditorSlot>` mounts below and to `<CommentsThread>`'s `ticketHref`.
+   */
+  queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  /**
    * The ticket's standing audience, for the "Who can see this" section — **an
    * OVERRIDE, not the source.**
    *
@@ -554,6 +565,8 @@ export function TicketSheet({
   attachments,
   attachmentsUnavailable,
   uploadAttachment,
+  queryTickets,
+  resolveTicketHref,
   visibility,
   canSetVisibility = true,
   onOpenTicket,
@@ -3104,6 +3117,8 @@ export function TicketSheet({
                 placeholder="No description yet"
                 submit={submitDescription}
                 queryUsers={queryUsers}
+                {...(queryTickets === undefined ? {} : { queryTickets })}
+                {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
                 onError={reportEditorError}
               />
               <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
@@ -3736,6 +3751,7 @@ export function TicketSheet({
             comments={comments.data}
             commentsUnavailable={comments.error ?? undefined}
             nameOf={nameOf}
+            {...(resolveTicketHref === undefined ? {} : { ticketHref: resolveTicketHref })}
             composer={
               editorSlot === undefined ? undefined : (
                 <EditorSlot
@@ -3750,6 +3766,8 @@ export function TicketSheet({
                   placeholder="Add a comment — @ to mention someone"
                   submit={submitComment}
                   queryUsers={queryUsers}
+                  {...(queryTickets === undefined ? {} : { queryTickets })}
+                  {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}

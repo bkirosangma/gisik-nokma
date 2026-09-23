@@ -44,8 +44,18 @@ export function ticketRefResultAnnouncement(count: number): string {
  * and ProseMirror's own `role="textbox"` being SAVED AND RESTORED rather than
  * stripped. What differs is the data, the row text (`KEY title` rather than a
  * name or a title alone) and four class names.
+ *
+ * `isSearchUnavailable` is Ruling 1's addition (2026-09-23, case 18.272): a
+ * getter the caller (`ticket-ref.ts`'s `items` wrapper) flips when
+ * `queryTickets` rejects — offline, the replica's search gap — since
+ * `@tiptap/suggestion`'s own async-fetch machinery gives this popup no way to
+ * tell a real zero-match answer from a search that never ran. Read fresh on
+ * every `paint()`, never cached, so the SAME open popup reflects a
+ * reconnect made mid-session.
  */
-export function createTicketRefPopup(): TicketRefPopupRenderer {
+export function createTicketRefPopup(
+  isSearchUnavailable: () => boolean = () => false,
+): TicketRefPopupRenderer {
   const popupId = `ticketref-popup-${(popupSequence += 1)}`;
   const listboxId = `${popupId}__list`;
   const optionId = (index: number): string => `${popupId}__option-${index}`;
@@ -79,7 +89,9 @@ export function createTicketRefPopup(): TicketRefPopupRenderer {
       });
       listbox?.appendChild(option);
     });
-    status.textContent = ticketRefResultAnnouncement(items.length);
+    status.textContent = isSearchUnavailable()
+      ? 'Search needs a connection'
+      : ticketRefResultAnnouncement(items.length);
     const selected = items[selectedIndex];
     if (editorDom && selected) {
       editorDom.setAttribute('aria-activedescendant', optionId(selectedIndex));

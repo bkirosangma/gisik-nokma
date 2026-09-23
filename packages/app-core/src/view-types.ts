@@ -828,6 +828,8 @@ export type SearchHit = {
   title: string;
   snippet: string;
   matchedIn: 'title' | 'description' | 'comment';
+  /** The ticket's key, or `null` when the ledger holds no prefix (Plan 7 Task 4, spec §14.2). */
+  key: string | null;
 };
 
 /**
