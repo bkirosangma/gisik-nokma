@@ -137,7 +137,9 @@ export async function getNoteStateFromDb(db: Queryable, noteId: string): Promise
  * on rebuild, and the verifier would call that drift.
  *
  * The default is 1 for a body that names none: a document written before
- * versioning rides at 1 (the editor's own default), and `EMPTY_NOTE_DOC` says 1.
+ * versioning rides at 1. It is not `EMPTY_NOTE_DOC`'s version — the empty
+ * document names its version in `attrs`, so it never reaches this default, and
+ * the version it names moved to 2 with `DOC_SCHEMA_VERSION` in Plan 4.
  */
 function schemaVersionOf(body: unknown): number {
   const attrs = (body as { attrs?: { schemaVersion?: unknown } } | null)?.attrs;

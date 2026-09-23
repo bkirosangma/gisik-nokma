@@ -69,10 +69,27 @@ export type EditorSlotUpload = UploadResult;
  */
 export type EditorSlotProps = {
   /** Which ledger event a submit becomes. */
-  mode: 'comment' | 'description';
+  mode: 'comment' | 'description' | 'note';
   /** ProseMirror JSON, opaque to the caller; anything that is not a document → empty composer. */
   doc: unknown;
   readOnly: boolean;
+  // Wiki-link capabilities (Plan 4 Task 5). Optional like the block below, and
+  // declared with app-core's twin BYTE-FOR-BYTE — the transcription case in
+  // `test/ticket-editor-slot.test.tsx` reads both declarations and fails if
+  // their field names diverge, so these four must be added in the same change
+  // set as `packages/app-core/src/views/editor-slot.tsx`'s.
+  // The AUTOSAVE hooks of `note` mode (Plan 4 Task 8). `onDraft` fires on
+  // every document change, `onSave` on blur, and `saveState` is what the
+  // footer reports — three separate things on purpose, because "the document
+  // moved" and "the host accepted it" are different facts and a slot that
+  // merged them would say "Saved" while a write was still in flight.
+  onDraft?: (doc: unknown) => void;
+  onSave?: (doc: unknown) => void;
+  saveState?: 'saved' | 'saving' | 'unsaved';
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
   /**
    * Contract-required, and THIS IMPLEMENTATION READS NEITHER — said plainly
    * rather than dressed up as a guarantee. Both scopes arrive already baked
@@ -126,6 +143,22 @@ export type EditorSlotProps = {
   // person's words. It was `Promise<void>`, and `void` cannot say which
   // happened — so the clear ran on every one of those five outcomes.
   submit?: (submission: EditorSubmission) => Promise<boolean>;
+  /**
+   * The document as it stands, reported on every edit — transcribed from
+   * app-core's half, which carries the full reasoning (the New ticket dialog
+   * needs the document BEFORE any submit, because the ticket it describes does
+   * not exist until `Create` is pressed). The two declarations move together:
+   * `test/ticket-editor-slot.test.tsx` compares their field-name sets, so a
+   * one-sided addition fails there rather than drifting silently.
+   *
+   * ⚠ "EVERY EDIT" IS QUALIFIED BY MODE: the slot routes `onDocChange` by
+   * `mode` (`note` → `onDraft`, everything else → here), so this channel
+   * carries the edits of `comment` and `description` mounts. See the note at
+   * the mount for why the routing exists. It costs the only caller that
+   * supplies this prop nothing: the create dialog mounts `description`
+   * (13.1365).
+   */
+  onChange?: (doc: unknown) => void;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -141,6 +174,42 @@ export type EditorSlotProps = {
  */
 export type TicketEditorSlotProps = EditorSlotProps & {
   editorRef?: React.MutableRefObject<Editor | null>;
+  /**
+   * Whether this mount draws the slot's OWN submit control (owner request
+   * 2026-09-23). `'footer'` — the default — keeps every mount this component has
+   * ever had exactly as it was; `'none'` omits the button and leaves the rest of
+   * the footer, which also carries the hint sentence.
+   *
+   * **Seam-only, deliberately, and for `editorRef`'s own reason:** it lives here
+   * rather than in the shared `EditorSlotProps` because it is a fact about
+   * mounting THIS component, not about what an editor slot promises. The
+   * contract's other mount — app-core's read-only `PlainTextEditorSlot` — has no
+   * submit control to suppress, and a host that does not know which component it
+   * is passed could not meaningfully ask for this. Being optional, its presence
+   * does not disturb the assignability proof that the two halves still meet.
+   *
+   * ## Why a caller needs it at all
+   *
+   * The New ticket dialog's description. Its `Create` control is the one act
+   * that files the ticket, and the composer's own "Submit" would sit inside the
+   * same form offering a SECOND, differently-shaped act — one that sends a
+   * `ticket.field_set` for a ticket that does not exist yet. Two submit controls
+   * for one act is not a styling question: the inner one would be an attempt to
+   * write to nothing.
+   */
+  submitSlot?: 'footer' | 'none';
+};
+
+/**
+ * The three save states, in the reader's words (Plan 4 Task 8). A mapping
+ * rather than three inline strings so the case can name each one, and so the
+ * one that is EASY to get wrong — `unsaved` is not "Saving…" — has a single
+ * place to be wrong in.
+ */
+const SAVE_STATE_TEXT: Record<'saved' | 'saving' | 'unsaved', string> = {
+  saved: 'Saved',
+  saving: 'Saving…',
+  unsaved: 'Not saved (kept on this device)',
 };
 
 const NO_MENTIONS = async (): Promise<MentionCandidate[]> => [];
@@ -199,6 +268,13 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
     const editor = editorRef.current;
     const submit = props.submit;
     if (!editor || submittingRef.current || submit === undefined || props.readOnly) return;
+    // NOTE MODE SUBMITS NOTHING. The narrowing is the point of reading `mode`
+    // here rather than casting at the call below: `composeEditorSubmission`
+    // maps a mode to a ledger EVENT, and note mode has no such event — its
+    // writes are the host's autosave, not this slot's submission. A cast would
+    // let a future caller produce `note.body_set` through a function that
+    // never meant to write one.
+    if (props.mode === 'note') return;
     const currentDoc = doc ?? (editor.getJSON() as DocJson);
     submittingRef.current = true;
     setSubmitting(true);
@@ -252,13 +328,43 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
   // discriminator, so a host cannot mount a description composer that calls
   // itself a comment.
   const isComment = props.mode === 'comment';
+  // NOTE MODE (Plan 4 Task 8): a document that saves itself. It has no submit
+  // control because there is no event to submit, and it draws no Markdown hint
+  // because the hint describes syntax for a composer whose submission the
+  // reader is choosing to make.
+  //
+  // ⚠ `onDraft` IS THE DURABLE PATH, NOT `onSave`, and an earlier version of
+  // this comment said the opposite ("a debounced write through `onSave`").
+  // `onSave` fires on BLUR and the toolbar makes the difference concrete:
+  // mousedown on a control moves focus out — so `onSave` fires carrying the
+  // document as it was BEFORE the click — and the command then mutates the
+  // document, which reaches the host as `onDraft` and never as a second
+  // `onSave`. A host that wrote ONLY on `onSave` would lose the last change
+  // made with a toolbar button, and would lose it silently: no blur follows a
+  // tab close. Raised for Plan 5, which owns the debounce.
+  const isNote = props.mode === 'note';
 
   return (
     // The mode modifier is for the stylesheet, not for the reader: the comment
     // composer's field is three rows where the description's is five, and only
     // the shell that already knows `mode` can say which is being mounted
     // (`editor.css`, `.editor-slot--comment .ticket-editor__content`).
-    <div className={isComment ? 'editor-slot editor-slot--comment' : 'editor-slot editor-slot--description'}>
+    <div
+      className={
+        isNote
+          ? 'editor-slot editor-slot--note'
+          : isComment
+            ? 'editor-slot editor-slot--comment'
+            : 'editor-slot editor-slot--description'
+      }
+      // `onSave` ON BLUR, and React's `onBlur` is `focusout` — it bubbles, so
+      // clicking the toolbar counts as leaving the field. That is the right
+      // reading of "on blur" for a composer whose chrome is part of itself:
+      // the reader has stopped typing either way.
+      {...(isNote
+        ? { onBlur: (): void => props.onSave?.(editorRef.current?.getJSON() ?? null) }
+        : {})}
+    >
       <TicketEditor
         initialDoc={initialDoc}
         editable={!props.readOnly}
@@ -275,6 +381,19 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         {...(props.labelledBy === undefined ? {} : { labelledBy: props.labelledBy })}
         placeholder={props.placeholder ?? (isComment ? 'Write a comment…' : 'Describe this ticket…')}
         queryUsers={props.queryUsers ?? NO_MENTIONS}
+        // The wiki-link four, passed through CONDITIONALLY. Unlike `queryUsers`
+        // there is no `NO_NOTES` fallback worth naming: the editor's own
+        // `addOptions` already answers `[]`, and an explicit `undefined` here
+        // would read as "the host supplied no resolver" for the other three —
+        // which is why absence, not a stand-in, is what travels.
+        {...(props.queryNotes === undefined ? {} : { queryNotes: props.queryNotes })}
+        {...(props.resolveNoteTitle === undefined
+          ? {}
+          : { resolveNoteTitle: props.resolveNoteTitle })}
+        {...(props.previewNote === undefined ? {} : { previewNote: props.previewNote })}
+        {...(props.onNavigateNote === undefined
+          ? {}
+          : { onNavigateNote: props.onNavigateNote })}
         uploadAttachment={uploadOrRefuse}
         // The host owns event emission. Non-image uploads reach the ticket's
         // attachment list the same way — through this event and the ledger —
@@ -282,7 +401,39 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         // sheet already rebuilds from its own projection.
         onAttachmentAdded={props.emitAttachmentAdded ?? NO_EMIT}
         onUploadError={(err) => props.onError?.(err)}
+        // `onSubmit` IS NOT WIRED IN NOTE MODE — there is no submit — and
+        // `onDocChange` is wired to `onDraft` instead, which is the same
+        // editor event read for a different purpose.
         onSubmit={(doc) => void handleSubmit(doc)}
+        /*
+          13.1365 — the document as it stands, for a host that will submit it
+          LATER. `TicketEditor` wires this to ProseMirror's `onUpdate` and to
+          nothing else, so an untouched composer reports nothing at all — which
+          is what lets the create dialog read "never reported" as "no
+          description" rather than having to tell an empty document from an
+          untyped one.
+
+          ⚠ THIS IS NOT A STRAIGHT PASS-THROUGH: IT ROUTES BY MODE, and the
+          sentence that used to stand here ("the slot adds no policy of its
+          own") was true only until note mode reached this same prop.
+          `TicketEditor` has ONE `onDocChange` and two features now read it:
+          the create dialog composes a description for a ticket that does not
+          exist yet (13.1365), and note mode autosaves through `onDraft`
+          (9.291) — its ONLY durable path, because a note has no submit control
+          to carry a change out. Wiring either one alone breaks the other
+          feature SILENTLY: a note loses its last edit, or a description never
+          leaves the composer.
+
+          So `mode` — already this contract's discriminator, and already what
+          picks the label, the placeholder and the footer's sentence — picks
+          the channel. The policy is one decision wide: note → `onDraft`,
+          everything else → `onChange`. Both channels stay optional and neither
+          is defaulted, so a mount that supplies only one is unaffected by the
+          other's existence.
+        */
+        {...(isNote
+          ? { onDocChange: (doc: DocJson): void => props.onDraft?.(doc) }
+          : { onDocChange: (doc: DocJson): void => props.onChange?.(doc) })}
         onEditorReady={() => setReady(true)}
         editorRef={editorRef}
         /*
@@ -317,8 +468,60 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
           reading of "the host supplied nothing".
         */}
         <p className="editor-slot__hint">
-          {isComment ? (props.footerNote ?? '') : props.readOnly ? '' : MARKDOWN_HINT}
+          {/* Note mode draws NO hint, and like the comment composer's empty
+              paragraph that is the honest reading rather than a saving: the
+              Markdown hint explains a syntax, and a note saves itself. */}
+          {isNote ? '' : isComment ? (props.footerNote ?? '') : props.readOnly ? '' : MARKDOWN_HINT}
         </p>
+        {/* NOTE MODE HAS NO SUBMIT CONTROL. There is no event for it to write:
+            `onDraft` already carries every change and `onSave` the blur, so a
+            button would promise a commit the host has not asked for and cannot
+            name. The save state takes its place in the same row. */}
+        {/* ⚠ THE OUTER TEST IS `isNote` ALONE, and the first cut had it as
+            `isNote && props.saveState !== undefined`. That put the submit
+            BUTTON in note mode's else arm, so a note mount that supplied no
+            saveState — the very case the inner test exists for — got the
+            control note mode is defined by NOT having. 9.291 passes
+            `saveState: 'saved'` and could not see it; 9.299 now asserts the
+            button's absence. NESTED, not conjoined.
+
+            ⚠ THIS TERNARY NOW CARRIES A THIRD GATE — `submitSlot`, 13.1365b —
+            so read the whole chain as: note mode answers with its save state
+            and NEVER a button; every other mode answers with a button unless
+            the mount asked for none. The nesting is what keeps both true at
+            once, and `isNote` must stay OUTERMOST: conjoining any later gate
+            into it would hand the button back to the note mount that gate
+            excludes, which is exactly the defect this note records. */}
+        {/*
+          ⚠ `submitSlot: 'none'` OMITS THE BUTTON AND NOT THE FOOTER, and the
+          split is the point rather than a leftover: the footer's LEFT half is
+          the hint sentence, which the caller above still wants (13.1365b
+          asserts the footer survives). Removing the whole row would have been
+          the shorter edit and would have taken a sentence with it that has
+          nothing to do with who publishes the claim.
+
+          The `disabledReason` machinery below is deliberately NOT gated on this
+          prop. It is computed from `readOnly`/`submit`, and the span that
+          carries it is rendered only when there is a control to be described —
+          so with no button the span would be an orphan, and it is left to the
+          `disabledReason !== undefined &&` condition it already has: a
+          `submitSlot: 'none'` mount that also supplies no `submit` renders the
+          hidden span for a control that is not there. Harmless (a hidden,
+          unreferenced sentence) and NOT worth a third condition, but stated
+          here so the next reader does not read the span as evidence the button
+          exists somewhere they cannot see.
+        */}
+        {isNote ? (
+          // NO DEFAULT ARM. `saved` was the first cut's fallback and it is the
+          // one value that makes a CLAIM — the host has said nothing, and a
+          // footer reading "Saved" asserts a write that may not exist. Silence
+          // is the honest report of silence.
+          props.saveState === undefined ? null : (
+            <span className="editor-slot__save-state" data-testid="editor-save-state">
+              {SAVE_STATE_TEXT[props.saveState]}
+            </span>
+          )
+        ) : props.submitSlot === 'none' ? null : (
         <button
           type="button"
           className="editor-slot__submit"
@@ -340,6 +543,7 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
               only: `handleSubmit` and the event it composes are untouched. */}
           {isComment ? 'Post' : 'Save description'}
         </button>
+        )}
       </div>
       {disabledReason !== undefined && (
         <span

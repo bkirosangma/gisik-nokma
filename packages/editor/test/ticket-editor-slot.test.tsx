@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import type { Editor } from '@tiptap/core';
@@ -74,6 +74,7 @@ describe('composeEditorSubmission', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 type AppCoreEditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }
+  | { type: 'note.body_set'; payload: { body: unknown } }
   | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: unknown } };
 
 type AppCoreEditorSlotUpload = {
@@ -86,7 +87,7 @@ type AppCoreEditorSlotUpload = {
 };
 
 type AppCoreEditorSlotProps = {
-  mode: 'comment' | 'description';
+  mode: 'comment' | 'description' | 'note';
   doc: unknown;
   readOnly: boolean;
   workspaceId: string;
@@ -96,12 +97,31 @@ type AppCoreEditorSlotProps = {
   labelledBy?: string;
   footerNote?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
+  // 9.280 — the wiki-link four (Plan 4 Task 5). Transcribed here with the same
+  // names and inline shapes so the case below, which compares THIS type's field
+  // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if
+  // either half gains a prop the other does not have.
+  // 9.291-9.293 — the note-mode autosave hooks (Plan 4 Task 8), transcribed
+  // with the same names and types as the editor's own declaration.
+  onDraft?: (doc: unknown) => void;
+  onSave?: (doc: unknown) => void;
+  saveState?: 'saved' | 'saving' | 'unsaved';
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
   // V7 — mirrored from app-core's seam, and the TYPE is part of the parity the
   // assignment below asserts: `Promise<void>` here would stop representing the
   // other half, and the assignment would pass while the two genuinely differed.
   submit?: (submission: AppCoreEditorSlotSubmission) => Promise<boolean>;
+  // 2026-09-23 — the CREATE dialog's half. It needs the document BEFORE any
+  // submit, because there is nothing to submit to yet: the ticket does not exist
+  // until Create is pressed. Mirrored here for the same reason every other field
+  // is — the parity case below compares the three name sets, and a one-sided
+  // addition fails it.
+  onChange?: (doc: unknown) => void;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -790,5 +810,251 @@ describe('13.1315 the slot names its mode and the fill rule can match', () => {
         view.unmount();
       }
     }
+  });
+});
+
+/**
+ * 9.293 — THE note-MODE FIELDS ARE IN BOTH HALVES, AND `'note'` IS A MODE.
+ *
+ * Its own case rather than a second id on the field-name case above: that one
+ * is 9.75's, and this file's header records "two ids on one test at two
+ * granularities" as the defect a fix round closed. The plan-close review
+ * raised it for exactly that reason — and also because the field-name case
+ * alone is not enough for this claim: it compares NAMES, so a `mode` union
+ * that lost `'note'` while keeping the field would still pass it.
+ */
+describe('9.293 the note-mode contract', () => {
+  it("9.293 the note-mode fields are transcribed and app-core's mode union carries note", () => {
+    const appCore = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
+    const editorHalf = readFileSync(THIS_HALF_SOURCE, 'utf8');
+    const transcription = fieldNamesOf(
+      readFileSync(OWN_SOURCE, 'utf8'),
+      'type AppCoreEditorSlotProps = {',
+    );
+    for (const field of ['onDraft', 'onSave', 'saveState']) {
+      expect(appCore, `app-core's half is missing ${field}`).toContain(field);
+      expect(editorHalf, `the editor's half is missing ${field}`).toContain(field);
+      expect(transcription, `the transcription is missing ${field}`).toContain(field);
+    }
+    // …and the MODE UNION, which a field-name comparison cannot see.
+    expect(appCore).toContain("mode: 'comment' | 'description' | 'note'");
+  });
+});
+
+/**
+ * 9.291–9.292 — THE `note` SLOT MODE (spec §8.3 consequence 4, Plan 4 Task 8).
+ *
+ * A note saves itself: the host receives every change through `onDraft` and a
+ * write on blur through `onSave`, and the footer reports the state. So the
+ * three things this pins are the three that a copy of the comment composer
+ * would get wrong — a submit button that has no event to write, a Markdown
+ * hint addressed to a reader who is not choosing to submit, and a `saveState`
+ * that never reaches the screen.
+ */
+describe('9.291-9.292 the note slot mode', () => {
+  it('9.291 note mode has no submit control and no hint, drafts every change, and saves on blur', async () => {
+    const onDraft = vi.fn();
+    const onSave = vi.fn();
+    const note = await mountSlot(
+      makeProps({ mode: 'note', onDraft, onSave, saveState: 'saved' }),
+    );
+    // The toolbar IS present: the notes page is an editor, not a viewer.
+    expect(note.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
+    // …and there is no submit control and no Markdown hint.
+    expect(note.view.container.querySelector('.editor-slot__submit')).toBeNull();
+    expect(note.view.container.querySelector('.editor-slot__hint')?.textContent).toBe('');
+
+    // EVERY CHANGE IS A DRAFT, read off the serialized document rather than
+    // off the call count — a handler wired to the wrong event would still fire
+    // once here, and the assertion below is what says which event it was.
+    // TWO changes, not one: with a single change the two hooks have the same
+    // count under either wiring, and the control below could not tell them
+    // apart.
+    note.editor.commands.insertContent('hello');
+    note.editor.commands.insertContent(' there');
+    await vi.waitFor(() => {
+      expect(onDraft.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(JSON.stringify(onDraft.mock.calls.at(-1)?.[0])).toContain('hello there');
+
+    // …and a blur is a save, carrying the same document.
+    const slot = note.view.container.querySelector('.editor-slot');
+    expect(slot).not.toBeNull();
+    fireEvent.focusOut(slot!);
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenCalled();
+    });
+    expect(JSON.stringify(onSave.mock.calls.at(-1)?.[0])).toContain('hello there');
+    // THE CONTROL FOR THE SAVE HOOK, and it can now FAIL: two changes were
+    // typed and `onSave` fired ONCE. The plan's named mutation — call `onSave`
+    // on every change — makes these two counts equal, which is precisely what
+    // the comparison catches.
+    expect(onDraft.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(onSave.mock.calls.length).toBe(1);
+    note.view.unmount();
+
+    // THE CONTROL ARM: comment mode still renders the submit control, so a
+    // slot that had stopped rendering it everywhere fails here.
+    const comment = await mountSlot(makeProps({ mode: 'comment' }));
+    expect(comment.view.container.querySelector('.editor-slot__submit')).not.toBeNull();
+    comment.view.unmount();
+  });
+
+  it('9.292 saveState renders its three texts, each one distinct', async () => {
+    const seen: Record<string, string | null> = {};
+    for (const state of ['saved', 'saving', 'unsaved'] as const) {
+      const slot = await mountSlot(makeProps({ mode: 'note', saveState: state }));
+      seen[state] =
+        slot.view.container.querySelector('[data-testid="editor-save-state"]')?.textContent ?? null;
+      slot.view.unmount();
+    }
+    expect(seen['saved']).toBe('Saved');
+    expect(seen['saving']).toBe('Saving…');
+    expect(seen['unsaved']).toBe('Not saved (kept on this device)');
+    // THE THREE ARE DISTINCT, which is the whole claim — a map that returned
+    // the same string for two states would satisfy every assertion above and
+    // tell the reader nothing.
+    expect(new Set(Object.values(seen)).size).toBe(3);
+  });
+
+  /**
+   * 9.299 — NO STATE SUPPLIED MEANS NO STATE REPORTED.
+   *
+   * The first cut defaulted to `'saved'`, which is the one arm of the three
+   * that makes a CLAIM: it tells the reader their work is on the server when
+   * the host has said nothing at all. Found by the Task 9 review. A mount that
+   * supplies no `saveState` now renders no state element — silence, which is
+   * what the host gave it.
+   */
+  it('9.299 a note mount with no saveState renders no state rather than claiming Saved', async () => {
+    const slot = await mountSlot(makeProps({ mode: 'note' }));
+    expect(slot.view.container.querySelector('[data-testid="editor-save-state"]')).toBeNull();
+    // ⚠ AND NO SUBMIT CONTROL. This assertion is why the FIRST cut of the fix
+    // was wrong and the suite was green: the condition was written
+    // `isNote && saveState !== undefined ? <state/> : <submit/>`, so a note
+    // mount WITHOUT a saveState fell into the ELSE arm and got the very button
+    // note mode exists to remove. 9.291 passes `saveState: 'saved'` and so
+    // never reached that arm. Silence about the save state must not become a
+    // submit button.
+    expect(slot.view.container.querySelector('.editor-slot__submit')).toBeNull();
+    // THE CONTROL, in the same `it`: neither element is missing because the
+    // footer stopped rendering — the toolbar and the field are both there.
+    expect(slot.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
+    expect(slot.view.container.querySelector('.ProseMirror')).not.toBeNull();
+    expect(slot.view.container.querySelector('.editor-slot__footer')).not.toBeNull();
+    slot.view.unmount();
+  });
+});
+
+/**
+ * 9.294 — THE MOBILE WEBVIEW BUNDLE CARRIES SCHEMA v2 (Plan 4 Task 8).
+ *
+ * The bundle is a BUILD ARTEFACT — one self-contained HTML string inlined into
+ * `apps/mobile/src/editor/editor-html.generated.ts` — so nothing in this
+ * package would notice if it went stale, and `apps/mobile`'s own `test` script
+ * is the only thing that checks it (`generate-editor-html.mjs --check`). This
+ * case is the fast half: it reads the committed file and fails when the
+ * schema moved without a regeneration.
+ *
+ * Read across packages, the same way the twin-transcription case reads
+ * `../app-core`. That is not a dependency — no import, just a file read — and
+ * it is the only place in this package where the artefact matters.
+ */
+describe('9.294 the mobile bundle is regenerated', () => {
+  it('9.294 the generated bundle carries the v2 nodes, and is not stale', () => {
+    const bundlePath = resolve(process.cwd(), '../../apps/mobile/src/editor/editor-html.generated.ts');
+    // POSITIVE CONTROL FIRST: a missing file must fail here rather than read as
+    // an empty string somewhere downstream.
+    expect(existsSync(bundlePath), `not found: ${bundlePath}`).toBe(true);
+    const bundle = readFileSync(bundlePath, 'utf8');
+    // `grep -c` counts LINES, and this file is one very long line — so the
+    // count is 1 for a needle that is THERE and 0 for one that is not, which
+    // is exactly what `>= 1` distinguishes.
+    for (const needle of ['detailsSummary', 'taskList', 'wikiLink']) {
+      expect(bundle.includes(needle), `the bundle does not carry "${needle}"`).toBe(true);
+    }
+    // …and a node this schema does NOT have is absent, so the assertion above
+    // cannot pass on a bundle that merely contains arbitrary text.
+    expect(bundle.includes('rawBlock')).toBe(false);
+  });
+});
+
+/**
+ * 13.1365 — THE SLOT CAN REPORT THE DOCUMENT, AND CAN BE MOUNTED WITHOUT ITS OWN
+ * SUBMIT CONTROL.
+ *
+ * Both halves exist for ONE caller: the New ticket dialog (owner request
+ * 2026-09-23). It composes a description at creation, and it is a different
+ * mount from every one this component has had until now in two ways that each
+ * break an assumption the slot was built on.
+ *
+ * **The document must leave the editor BEFORE any submit.** Until today the only
+ * way a document ever escaped this component was `submit(...)`, on the press of
+ * its own button — but the dialog's description has no ticket to submit to: the
+ * ticket is created by the dialog's OWN Create control, and a rich-text edit is
+ * not a claim until then. So the host needs the document as it stands, and
+ * `onChange` is that channel. It is on the shared `EditorSlotProps` rather than
+ * on this package's seam-only extras because app-core is the caller and may not
+ * name this package at all — the same constraint that widened `doc`.
+ *
+ * **The slot's own submit control is wrong there.** A "Submit" beside a create
+ * form's Create is two controls for one act, and the inner one would send a
+ * `ticket.field_set` for a ticket that does not exist. So `submitSlot: 'none'`
+ * omits it — a seam-only prop, exactly as `editorRef` is, because only a host
+ * that knows which component it is mounting can ask for it.
+ */
+describe('13.1365 the slot reports the document, and can be mounted without a submit control', () => {
+  it('13.1365 onChange receives the document as it is typed, and it is the DOCUMENT rather than a projection', async () => {
+    const onChange = vi.fn();
+    // No `submit` at all, deliberately: this is the dialog's mount, where there
+    // is nowhere to submit to. The slot must still be EDITABLE and must still
+    // report — a component that only reported when a submit handler was wired
+    // would be useless to the one caller this exists for.
+    const { editor } = await mountSlot(makeProps({ doc: null, onChange, submit: undefined }));
+
+    // Nothing is reported before anything is typed. `TicketEditor` wires this to
+    // ProseMirror's `onUpdate` and NOT to init, so an untouched composer reports
+    // nothing — which is what lets the dialog treat "never reported" as "no
+    // description" instead of having to guess whether an empty doc means empty.
+    expect(onChange).not.toHaveBeenCalled();
+
+    editor.commands.insertContent('the laminate is peeling');
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
+
+    const reported = onChange.mock.calls.at(-1)?.[0];
+    // The DOCUMENT, asserted structurally rather than by identity: a slot that
+    // reported `docToPlainText(...)` would satisfy "onChange was called with a
+    // string containing the words" and would hand the dialog a value its own
+    // `ticket.field_set` door refuses ('Description' needs a document).
+    expect(reported).toMatchObject({ type: 'doc' });
+    expect(JSON.stringify(reported)).toContain('the laminate is peeling');
+  });
+
+  it("13.1365b submitSlot: 'none' omits the footer's submit control — and its ABSENCE is a control arm of its own", async () => {
+    const view = render(<TicketEditorSlot {...makeProps({ submitSlot: 'none' })} />);
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull();
+    });
+
+    expect(view.container.querySelector('.editor-slot__submit')).toBeNull();
+    // …and the composer is still a composer: the FIELD is there and editable, so
+    // "no submit button" cannot be satisfied by a slot that rendered nothing.
+    expect(view.container.querySelector('.ProseMirror')).not.toBeNull();
+    // …and the footer itself survives, because it also carries the hint
+    // sentence. Asserted on the FOOTER rather than by counting children, since
+    // the hint is a sibling the button's removal must not take with it.
+    expect(view.container.querySelector('.editor-slot__footer')).not.toBeNull();
+
+    // CONTROL, in the SAME `it` because a control in a sibling case proves
+    // nothing about this one: the same mount WITHOUT the prop still draws the
+    // button. Without this arm, the assertions above pass against a component
+    // that had simply lost its submit control for every mount.
+    const withButton = render(<TicketEditorSlot {...makeProps()} />);
+    await vi.waitFor(() => {
+      expect(withButton.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull();
+    });
+    expect(withButton.container.querySelector('.editor-slot__submit')).not.toBeNull();
+    view.unmount();
+    withButton.unmount();
   });
 });

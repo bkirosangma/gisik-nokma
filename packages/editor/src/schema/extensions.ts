@@ -6,9 +6,20 @@ import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
+import { TaskList } from '@tiptap/extension-task-list';
+import { TaskItem } from '@tiptap/extension-task-item';
+import {
+  Details,
+  DetailsContent,
+  DetailsSummary,
+} from '@tiptap/extension-details';
 import { VersionedDocument } from './versioned-document.js';
+import { CodeBlockWithCopy } from '../extensions/code-block-copy.js';
+import { Collapsible } from '../extensions/collapsible.js';
+import { MarkdownClipboard } from '../extensions/markdown-clipboard.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
+import { WikiLink, type NoteLinkCandidate } from '../extensions/wiki-link.js';
 import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
 
 export type EditorSchemaOptions = {
@@ -23,15 +34,33 @@ export type EditorSchemaOptions = {
   /** Maps an image node's attachmentId to a URL (Task 3). Defaults to the server route. */
   resolveAttachmentUrl?: (attachmentId: string) => string;
   placeholder?: string;
+  /**
+   * When true, toggling a collapsible changes the view only — a reader must
+   * not write the document (spec §8.4). The Details extension saves the `open`
+   * state in the document only when `persist` is on, so this option is what
+   * makes the reader's toggle a view-local affordance rather than an edit.
+   */
+  readOnly?: boolean;
+  /**
+   * Wiki-link data source (Plan 4 Task 5). All four are optional and the
+   * defaults are deliberate: no picker, no rename-following, no hover card, and
+   * a link that does not navigate — a document with wiki-links still RENDERS
+   * and still round-trips on a host that supplies none of them, which is what
+   * keeps this widening additive for every existing mount.
+   */
+  queryNotes?: (query: string) => Promise<NoteLinkCandidate[]>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
 };
 
 /**
- * The ONE origin of document schema v1. Every editor surface — web,
+ * The ONE origin of document schema v2. Every editor surface — web,
  * desktop, the RN webview bundle, and every test — builds its extension
  * list here, so there is exactly one schema and it cannot drift between
  * clients (spec §2: one document schema across all three clients).
  *
- * Everything StarterKit contributes to the schema that schema v1 does not
+ * Everything StarterKit contributes to the schema that schema v2 does not
  * name is switched off by an explicit `false`, not left to StarterKit's
  * defaults. The disables are load-bearing in two different ways and both
  * matter: `document` is REPLACED (VersionedDocument below), and `link` is
@@ -56,8 +85,14 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       document: false,
       // Configured separately below.
       link: false,
-      // Outside document schema v1's closed mark vocabulary.
+      // Outside document schema v2's closed mark vocabulary.
       underline: false,
+      // REPLACED, not removed: `CodeBlockWithCopy` below extends the same node
+      // and keeps its name, so leaving StarterKit's on would register two
+      // `codeBlock` extensions and the schema would take one of them by
+      // accident. The rule census is the check — `codeBlock: 2` is unchanged,
+      // which is what says the replacement kept both input rules.
+      codeBlock: false,
     }),
     VersionedDocument,
     // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THE OPTIONS BELOW DO
@@ -111,14 +146,26 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
     // `italic` 2, `code` 1, `strike` 1, `link` 1), firing on external paste,
     // external drop, or an `applyPasteRules` meta (the guard at core
-    // dist:5121-5125); and NINETEEN INPUT RULES across eleven extensions
+    // dist:5121-5125); and TWENTY-ONE INPUT RULES across thirteen extensions
     // (`heading` 6, `bold` 2, `italic` 2, `codeBlock` 2, `blockquote` 1,
     // `bulletList` 1, `code` 1, `orderedList` 1, `strike` 1,
-    // `horizontalRule` 1, `link` 1), firing from `handleTextInput` as text is
-    // typed (core dist:4834). **The counts were 18 and ten until 2026-09-21,
-    // and `link` is the one that moved** — with the option reversed it
-    // contributes to BOTH censuses, so `test/rule-census.test.ts`'s
-    // `pasted \ typed` set is now empty where it had always been `['link']`.
+    // `horizontalRule` 1, `link` 1, `taskItem` 1, `collapsible` 1), firing
+    // from `handleTextInput` as text is typed (core dist:4834). **The counts were 18
+    // and ten until 2026-09-21, and `link` is the one that moved** — with the
+    // option reversed it contributes to BOTH censuses, so
+    // `test/rule-census.test.ts`'s `pasted \ typed` set is now empty where it
+    // had always been `['link']`. **`taskItem` is the second move and it is
+    // ADDITIVE, 2026-09-23 (Plan 4 Task 1): the notes editor port gave the
+    // document a task list, and its `[ ] ` / `[x] ` rule lands on `taskItem`,
+    // not on `taskList` — so the input total went 19 → 20 and the paste total
+    // did not move at all.** That asymmetry is the reason this paragraph names
+    // the extension each rule belongs to rather than only the totals.
+    // **`collapsible` is the third move, 2026-09-23 (Plan 4 Task 3), and it is
+    // additive in the same way: 20 → 21 input rules, paste unchanged. It is the
+    // only rule the collapsible block contributes — the Enter and Backspace
+    // shortcuts that ship beside it live in `addKeyboardShortcuts`, which
+    // neither census reads, so a reader expecting the block to cost two lines
+    // here finds one.**
     // Every number and every membership here is asserted per-extension by that
     // file, so a future upgrade that moves one fails there naming the extension
     // rather than reconciling two totals. So `**due soon**` arrives bold whether pasted,
@@ -144,7 +191,29 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // why it failed them and why they were FLIPPED rather than deleted.
     //
     // `openOnClick: false` keeps a click editing the link, not following it.
-    Link.configure({
+    // ⚠ THE PARSE RULE IS NARROWED, and it is load-bearing rather than tidy.
+    //
+    // A note link renders as an `<a data-note-id href="/notes/…">`, which the
+    // stock `a[href]` rule ALSO matches. prosemirror-model builds its rule list
+    // MARK RULES FIRST and node rules after (`dist:2654` for marks, `:2663` for
+    // nodes) and `matchTag` returns the FIRST match (`:2600-2616`) — so the
+    // LINK MARK always won, and an `<a data-note-id>` parsed back as a plain
+    // link on text: the note id survived only inside the href, where nothing
+    // reads it. MEASURED, and the effect is ordinary: copy a wiki-link, paste
+    // it, and it is no longer a note link — no rename-following, no missing
+    // pill, no `onNavigateNote` — and the HTML a host feeds to `setContent`
+    // does the same. Extension `priority` does NOT fix it (tried: `priority:
+    // 1000` on `WikiLink` left the round trip broken, because the ordering is
+    // by rule KIND, not by extension).
+    //
+    // `:not([data-note-id])` is the smallest change that hands the anchor to
+    // the node that renders it, and it changes nothing else: every other
+    // `<a href>` is still a link.
+    Link.extend({
+      parseHTML() {
+        return [{ tag: 'a[href]:not([data-note-id])' }];
+      },
+    }).configure({
       openOnClick: false,
       autolink: false,
       linkOnPaste: false,
@@ -155,6 +224,31 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     TableRow,
     TableHeader,
     TableCell,
+    // Schema v2's blocks, added by the notes editor port (Plan 4 Task 1).
+    // `nested: true` is TaskItem's only option and it is ON deliberately: a
+    // sub-task is a task item inside a task item, which is what a person
+    // writing a checklist expects from Tab.
+    TaskList,
+    TaskItem.configure({ nested: true }),
+    // `persist: !readOnly` is the whole of spec §8.4's reader rule, expressed
+    // as configuration rather than as a branch in a click handler: an editor
+    // saves the folded state with the document because toggling IS an edit
+    // (D10), and a reader's toggle never reaches the document at all.
+    Details.configure({
+      persist: options.readOnly !== true,
+      HTMLAttributes: { class: 'editor-details' },
+    }),
+    DetailsSummary,
+    DetailsContent,
+    // The code block, with its Copy button. Placed where StarterKit's own
+    // `codeBlock` would have been (the disable above), so the extension LIST
+    // order — and therefore the census and the schema — is unchanged.
+    CodeBlockWithCopy,
+    // The `< ` rule and the Enter/Backspace keymap the Details extension does
+    // not ship. It registers NO node of its own — it is an `Extension`, not a
+    // `Node` — so it adds one line to the input-rule census and nothing to the
+    // schema vocabulary.
+    Collapsible,
     // The image node of schema v1 (spec §2: only images embed inline). The
     // default attachment route is stated ONCE, in TicketImage's `addOptions`,
     // and is not restated here: `configure` merges with `mergeDeep` (core
@@ -177,6 +271,23 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // and `Mention.addOptions` still carries its own, for a host that
     // configures the extension directly.
     Mention.configure({ queryUsers: options.queryUsers ?? (async () => []) }),
+    // The wiki-link node of schema v2 (Plan 4 Task 5). `queryNotes` is spelled
+    // with `??` like the mention's, for the same reason: the fallback is a
+    // VALUE, not a default being protected from an explicit `undefined` (which
+    // is TicketImage's case above). The other three travel CONDITIONALLY — an
+    // explicitly-passed `undefined` would REPLACE the extension's own fallback
+    // under `mergeDeep`, and `resolveNoteTitle: undefined` is precisely the
+    // "no resolver" answer the node view reads as "show the stored title".
+    WikiLink.configure({
+      queryNotes: options.queryNotes ?? (async () => []),
+      ...(options.resolveNoteTitle === undefined
+        ? {}
+        : { resolveNoteTitle: options.resolveNoteTitle }),
+      ...(options.previewNote === undefined ? {} : { previewNote: options.previewNote }),
+      ...(options.onNavigateNote === undefined
+        ? {}
+        : { onNavigateNote: options.onNavigateNote }),
+    }),
     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
     // input rules OFFER — it is not a constraint on stored documents, and it
@@ -206,5 +317,9 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // does not extend to the two paste-rule tests in test/schema.test.ts —
     // this extension owns the typed (input-rule) trigger table only.
     EscapeSuggestion,
+    // Markdown on the clipboard (Plan 4 Task 6). An `Extension` with no node
+    // and no rule of its own — two `editorProps` handlers — so it moves
+    // neither census and adds nothing to the schema vocabulary.
+    MarkdownClipboard,
   ];
 }

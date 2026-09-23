@@ -662,3 +662,81 @@ describe('13.966 the single read carries the assignee’s provenance', () => {
     expect((bare.json() as { assignedProvenance: unknown }).assignedProvenance).toBeNull();
   });
 });
+
+/**
+ * ## 13.1384 — A BIRTH ASSIGNEE IS A REAL CLAIM, AND THE READ DOORS MUST SERVE IT
+ *
+ * Found in production use on the day the feature landed, not by a test. The New
+ * ticket dialog gained an Assignee picker, which names the person inside
+ * `ticket.created` itself and appends NO `ticket.assigned`. Both read doors
+ * resolve an assignment's provenance through `assignedProvenanceFor`, which
+ * queried `type = 'ticket.assigned'` alone, so a birth-assigned ticket answered
+ * ABSENT — and both doors are built to read that absence as "the projection and
+ * the ledger disagree" and to THROW.
+ *
+ * The measured blast radius: one such ticket answered **HTTP 500** on
+ * `GET /v1/projects/:id/tickets`, taking out the List, Calendar, Timeline and
+ * Backlog tabs of its whole project, and on
+ * `GET /v1/workspaces/:ws/tickets/:id`, taking out the sheet.
+ *
+ * Why no existing case caught it: `seedTicket`'s `assigneeId` writes the separate
+ * `ticket.assigned`, so the fixture could only build the shape that already
+ * worked. `birthAssigneeId` builds the other one, and this case is the reason it
+ * exists.
+ */
+describe('13.1384 a ticket assigned at birth reads back', () => {
+  it('13.1384 serves the single read and the list, and attributes the claim to the creator', async () => {
+    const ws = newUlid();
+    const prj = newUlid();
+    const { userId, headers } = await signedIn();
+    const assignee = await signedIn();
+    await seedMember(db.pool, ws, userId, 'member', [{ projectId: prj }]);
+
+    const bornAssigned = newUlid();
+    await seedTicket(db.pool, {
+      workspaceId: ws,
+      projectId: prj,
+      ticketId: bornAssigned,
+      birthAssigneeId: assignee.userId,
+      createdBy: userId,
+    });
+
+    // THE SINGLE READ. Before the fix this was a 500, not a wrong body.
+    const one = await get(`/v1/workspaces/${ws}/tickets/${bornAssigned}`, headers);
+    expect(one.statusCode).toBe(200);
+    const body = one.json() as {
+      ticketState: { assigneeId: string | null };
+      assignedProvenance: { actorId?: string } | null;
+    };
+    expect(body.ticketState.assigneeId).toBe(assignee.userId);
+    // The claim is attributed to whoever CREATED the ticket, because the creation
+    // is the event that made it. A door that merely stopped throwing — by serving
+    // `null` provenance for a real assignee — would pass a status check and still
+    // be serving an unattributed assignment, so the actor is asserted too.
+    expect(body.assignedProvenance?.actorId).toBe(userId);
+
+    // THE LIST DOOR IS NOT ASSERTED HERE, and that is a limit rather than an
+    // oversight. `assembleListCards` carries its own copy of the same invariant
+    // and was the door the owner hit first, but this seeded world cannot satisfy
+    // that route's preconditions — it answers 404 for a project with no published
+    // workflow definition, BEFORE reaching the provenance check. An arm asserting
+    // `404` there would pass with the fix reverted, which is a check that cannot
+    // fail. Both doors resolve through the SAME `assignedProvenanceFor`, so the
+    // fix is one function and this case witnesses it; a direct list-door case
+    // needs `seedWorkflowDef` and is owed.
+
+    // CONTROL, same `it`: a ticket nobody assigned still answers `null` rather
+    // than inventing a claim from its creation. Without this arm, a fix that
+    // attributed EVERY creation as an assignment would pass everything above.
+    const bare = newUlid();
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: bare, createdBy: userId });
+    const bareRead = await get(`/v1/workspaces/${ws}/tickets/${bare}`, headers);
+    expect(bareRead.statusCode).toBe(200);
+    const bareBody = bareRead.json() as {
+      ticketState: { assigneeId: string | null };
+      assignedProvenance: unknown | null;
+    };
+    expect(bareBody.ticketState.assigneeId).toBeNull();
+    expect(bareBody.assignedProvenance).toBeNull();
+  });
+});

@@ -294,78 +294,191 @@ function isStreamErrorCode(value: unknown): value is StreamErrorCode {
  * This is a docblock, not a check — see 12.361, which records exactly that, and
  * now records the buildable assertion this correction exposes.
  */
+/**
+ * ## ONE SOCKET PER CLIENT, fanned out to every subscriber (2026-09-23)
+ *
+ * This function used to open a socket per `subscribe()` call, and that was the
+ * live-update defect the owner reported: *"when the ticket is created, it required
+ * a manual reload before the new ticket is available in the client."* The chain,
+ * every link measured against the running stack rather than reasoned about:
+ *
+ * 1. every `useLiveQuery` instance calls `subscribe()` once, and a board page mounts
+ *    several — **six sockets within 3 ms** on one page load;
+ * 2. the server caps concurrent sockets at **eight per USER**
+ *    (`apps/server/src/stream/routes.ts`, `DEFAULT_MAX_SOCKETS_PER_USER`), a budget
+ *    whose own docblock reasons about "a phone, a laptop, and several browser tabs"
+ *    — roughly ONE socket per tab. One tab spent six of the eight;
+ * 3. a reload (the old page's sockets still held while the new page's six dial), a
+ *    second tab, or any reconnect churn crossed eight, and `requireConnectionBudget`
+ *    answered **HTTP 429 during the upgrade**;
+ * 4. a 429 on a handshake never becomes a close frame, so the browser reports
+ *    `close` code **1006** and the server logs an ordinary level-30 response —
+ *    the client looks broken while the server log looks clean;
+ * 5. the backoff below then retried into the same refusal: **205 `/v1/stream`
+ *    requests, 160 of them 429**, measured over forty minutes;
+ * 6. with no established socket the debounced re-read never fired.
+ *
+ * The cap is not wrong — eight is a sane budget for a person. Spending six of it on
+ * one tab is. The protocol already anticipated the fix: `routes.ts` states "One
+ * socket multiplexes several workspaces" and the client's `subscribe` frame names
+ * its own workspace, so one connection can carry them all.
+ *
+ * ## What a caller can and cannot rely on
+ *
+ * Subscribers to the SAME workspace share one server-side subscription, because the
+ * hub REFUSES a duplicate subscribe on one connection and there is no unsubscribe
+ * frame — the client's message door accepts `subscribeFrameSchema` and nothing else.
+ * Two consequences, stated rather than discovered later:
+ *
+ * - **A late joiner does not get a replay.** The room's cursor belongs to whoever
+ *   opened it; a second subscriber arriving with a lower `afterSeq` cannot rewind it
+ *   without a second connection, which is the thing this change exists to stop. The
+ *   one production consumer (`use-live-query.ts`) passes `0` and uses the callback
+ *   purely as a change signal before doing its own full read, so this costs it
+ *   nothing — but a consumer that wanted history must read it, not listen for it.
+ * - **`scope-revoked` ends ONE room, not the connection.** It names a workspace, and
+ *   another workspace's subscribers have had nothing revoked. The socket closes only
+ *   when the last room is gone, which for a single-room client is the old behaviour
+ *   exactly.
+ */
 export function createStreamSubscriber(deps: StreamDeps) {
   const factory = deps.webSocketFactory ?? ((url: string) => new WebSocket(url) as unknown as WebSocketLike);
   const random = deps.random ?? Math.random;
+
+  /** One workspace's shared subscription: its cursor and everyone listening to it. */
+  type Room = { lastSeq: number; listeners: Set<(item: ServerStreamFrame) => void> };
+  const rooms = new Map<string, Room>();
+
+  let socket: WebSocketLike | null = null;
+  let opened = false;
+  let attempt = 0;
+  let retryTimer: ReturnType<typeof setTimeout> | null = null;
+
+  function sendSubscribe(workspaceId: string, room: Room): void {
+    socket?.send(JSON.stringify({ type: 'subscribe', workspaceId, afterSeq: room.lastSeq }));
+  }
+
+  /** A copy, because a listener may unsubscribe from inside its own callback. */
+  function deliver(room: Room, frame: ServerStreamFrame): void {
+    for (const listener of [...room.listeners]) listener(frame);
+  }
+
+  function connect(): void {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+    // Nothing to listen for, or already connected: either way, do not spend a socket.
+    if (rooms.size === 0 || socket !== null) return;
+    socket = factory(streamUrl(deps.baseUrl));
+    socket.onopen = () => {
+      attempt = 0;
+      opened = true;
+      // Every room re-subscribes from ITS OWN cursor, which is what makes a
+      // reconnect resume rather than replay — see the cursor docblock above.
+      for (const [workspaceId, room] of rooms) sendSubscribe(workspaceId, room);
+    };
+    socket.onmessage = (event) => {
+      const frame = parseFrame(event.data);
+      if (frame === null) return;
+      // ROUTING. An event frame names its workspace inside the envelope; every
+      // other frame names it at the top level, and `null` there means the frame is
+      // about the CONNECTION (a malformed client frame, say) and belongs to
+      // everyone. A frame for a workspace nobody holds is a crossed stream: drop
+      // it rather than move a cursor by a number that means nothing here.
+      // Read the workspace ONCE and branch on the answer. The first draft tested
+      // `frame.type !== 'event' && frame.workspaceId === null` and then derived the
+      // id below, which is the same logic and does not TYPECHECK: narrowing a
+      // property of one arm of a union does not survive into a later ternary over
+      // that union, so `workspaceId` stayed `string | null` and `rooms.get` refused
+      // it. It cost a broken build rather than a broken behaviour, and only because
+      // the build ran before the edit — `vitest` strips types without checking them,
+      // so 1967 green tests said nothing about it.
+      const workspaceId = frame.type === 'event' ? frame.envelope.workspaceId : frame.workspaceId;
+      if (workspaceId === null) {
+        // A connection-level frame — a malformed client frame, say — names no
+        // workspace and belongs to everyone listening.
+        for (const room of [...rooms.values()]) deliver(room, frame);
+        return;
+      }
+      // A frame for a workspace nobody holds is a crossed stream: drop it rather
+      // than move a cursor by a number that means nothing here.
+      const room = rooms.get(workspaceId);
+      if (room === undefined) return;
+      deliver(room, frame);
+      // Everything below this line is "the consumer handled it". A throw from a
+      // listener skips it, which is the whole point — see the docblock.
+      if (frame.type === 'event') room.lastSeq = Math.max(room.lastSeq, frame.envelope.workspaceSeq);
+      if (frame.type === 'caught-up') room.lastSeq = Math.max(room.lastSeq, frame.seq);
+      if (frame.type === 'scope-revoked') {
+        rooms.delete(workspaceId);
+        if (rooms.size === 0) shutDownConnection();
+      }
+    };
+    socket.onclose = () => {
+      socket = null;
+      opened = false;
+      // No rooms left means this close was ours. Scheduling a retry here is how a
+      // timer outlives the thing it was retrying for — the case that measures
+      // `vi.getTimerCount()` exists because a socket count cannot see it.
+      if (rooms.size === 0) return;
+      retryTimer = setTimeout(connect, backoffDelayMs(attempt, random));
+      attempt += 1;
+    };
+    socket.onerror = () => {
+      socket?.close();
+    };
+  }
+
+  /**
+   * Drop the connection for good.
+   *
+   * `socket` is cleared BEFORE `close()`, and the ordering is load-bearing for the
+   * same reason it was when this was per-subscription: `WebSocketLike` is an
+   * INJECTED seam, a shell may dispatch `onclose` synchronously from inside
+   * `close()`, and the handler above must find the state already torn down. It
+   * does — `rooms` is emptied by the caller before this runs, so that re-entrant
+   * `onclose` takes its `rooms.size === 0` return and schedules nothing.
+   */
+  function shutDownConnection(): void {
+    if (retryTimer !== null) clearTimeout(retryTimer);
+    retryTimer = null;
+    const closing = socket;
+    socket = null;
+    opened = false;
+    closing?.close();
+  }
 
   return function subscribe(
     workspaceId: string,
     afterSeq: number,
     cb: (item: ServerStreamFrame) => void,
   ): Unsubscribe {
-    let lastSeq = afterSeq;
-    let attempt = 0;
-    let closed = false;
-    let socket: WebSocketLike | null = null;
-    let retryTimer: ReturnType<typeof setTimeout> | null = null;
+    const existing = rooms.get(workspaceId);
+    const room: Room = existing ?? { lastSeq: afterSeq, listeners: new Set() };
+    if (existing === undefined) rooms.set(workspaceId, room);
+    room.listeners.add(cb);
 
-    /**
-     * Stop for good.
-     *
-     * `closed` is set BEFORE `socket.close()`, and the exact value of that
-     * ordering is measured rather than asserted. The DOM WebSocket dispatches
-     * `onclose` on a later task, so for a browser socket the order is
-     * immaterial — but `WebSocketLike` is an INJECTED seam and a shell may close
-     * synchronously, in which case our own `close()` re-enters `onclose` while
-     * this function is still running. Even then `connect()`'s own
-     * `if (closed) return` refuses to open a socket, so the damage is narrower
-     * than it first looks and is stated exactly: with the flag set last, that
-     * `onclose` schedules a retry timer nothing ever clears — a timer outliving
-     * the subscription and firing into a dead one. The test asserts
-     * `vi.getTimerCount()`, because a socket-count assertion cannot see this and
-     * would have left the claim untested prose.
-     */
-    function shutDown(): void {
-      closed = true;
-      if (retryTimer !== null) clearTimeout(retryTimer);
-      retryTimer = null;
-      socket?.close();
+    if (socket === null) {
+      // `connect` is a no-op while a retry is pending only because it clears the
+      // timer and reconnects NOW: a fresh subscriber is a reason to stop waiting
+      // out a backoff, and letting the timer also fire would open a second socket.
+      connect();
+    } else if (existing === undefined && opened) {
+      // The connection is already up and this workspace is new to it. A room that
+      // already existed must NOT be re-subscribed: the hub refuses a duplicate.
+      sendSubscribe(workspaceId, room);
     }
 
-    function connect(): void {
-      if (closed) return;
-      socket = factory(streamUrl(deps.baseUrl));
-      socket.onopen = () => {
-        attempt = 0;
-        socket?.send(JSON.stringify({ type: 'subscribe', workspaceId, afterSeq: lastSeq }));
-      };
-      socket.onmessage = (event) => {
-        const frame = parseFrame(event.data);
-        if (frame === null) return;
-        // Amendment 19: purge/scope-revoked/caught-up/error name their workspace.
-        // One subscription holds exactly one workspace, so a frame for another is
-        // a crossed stream — drop it rather than move this cursor by a number
-        // that means nothing here, or end a subscription nobody revoked.
-        if (frame.type !== 'event' && frame.workspaceId !== null && frame.workspaceId !== workspaceId) return;
-        cb(frame);
-        // Everything below this line is "the consumer handled it". A throw from
-        // `cb` skips it, which is the whole point — see the docblock.
-        if (frame.type === 'event') lastSeq = Math.max(lastSeq, frame.envelope.workspaceSeq);
-        if (frame.type === 'caught-up') lastSeq = Math.max(lastSeq, frame.seq);
-        if (frame.type === 'scope-revoked') shutDown();
-      };
-      socket.onclose = () => {
-        socket = null;
-        if (closed) return;
-        retryTimer = setTimeout(connect, backoffDelayMs(attempt, random));
-        attempt += 1;
-      };
-      socket.onerror = () => {
-        socket?.close();
-      };
-    }
-
-    connect();
-    return shutDown;
+    let stopped = false;
+    return function unsubscribe(): void {
+      if (stopped) return;
+      stopped = true;
+      const current = rooms.get(workspaceId);
+      if (current === undefined) return;
+      current.listeners.delete(cb);
+      // There is no unsubscribe frame in the protocol, so an emptied room is
+      // dropped locally and simply stops being re-subscribed on the next connect.
+      if (current.listeners.size === 0) rooms.delete(workspaceId);
+      if (rooms.size === 0) shutDownConnection();
+    };
   };
 }

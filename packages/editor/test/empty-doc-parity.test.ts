@@ -14,9 +14,10 @@ import { emptyDoc } from '../src/doc.js';
  * copies from it: the copy is the thing under test, and a domain-side test could
  * only compare the copy to itself.
  *
- * Both say `DOC_SCHEMA_VERSION` 1 today. Plan 4 of the notes series raises the
- * version to 2 for the new node types and must raise BOTH — this test is what
- * makes forgetting one a red rather than a note in a docblock.
+ * Both say 2 today: `DOC_SCHEMA_VERSION` moved to 2 for the new node types in
+ * Plan 4 of the notes series, and `EMPTY_NOTE_DOC` was raised to match it. A
+ * further raise must move both again — this test is what makes forgetting one a
+ * red rather than a note in a docblock.
  */
 it('18.013 EMPTY_NOTE_DOC in domain equals emptyDoc() in editor', () => {
   expect(EMPTY_NOTE_DOC).toEqual(emptyDoc());

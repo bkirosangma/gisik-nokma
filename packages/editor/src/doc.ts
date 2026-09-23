@@ -1,4 +1,4 @@
-export const DOC_SCHEMA_VERSION = 1;
+export const DOC_SCHEMA_VERSION = 2;
 
 /**
  * A ticket document as it travels inside event payloads (`comment.added`

@@ -154,6 +154,77 @@ describe('check 2 — creating a ticket', () => {
   });
 });
 
+/**
+ * 13.1362–13.1363 (owner request 2026-09-23) — THE BIRTH ASSIGNEE, held to the
+ * same named-person rule `ticket.assigned` is held to.
+ *
+ * The New ticket dialog can name an assignee at creation, so `ticket.created`
+ * carries an optional `assigneeId`. **That member must not become a way around
+ * the assign permission**, and the reason it needs saying is that the check
+ * already exists one branch away: E6-17 refuses a `ticket.assigned` naming a
+ * person with no role in the workspace, and that refusal lives AFTER the
+ * `canSee` test. A birth has no ticket to `canSee` — the row does not exist yet
+ * — so the `ticket.created` branch RETURNS before reaching it, and a birth
+ * assignee that relied on the existing block would be admitted unchecked.
+ *
+ * Measured before this existed: `ticket.assigned` naming `nobody-here` is
+ * refused, and the identical name arriving on a `ticket.created` was
+ * `committed`. The read side then serves it — `mappers.ts` renders
+ * `roster.get(id) ?? id` as an assignee NAME, the list's `assigneeId` filter
+ * matches it, and `groupBy=assignee` makes a column for it — so a typo in the
+ * dialog was a permanent, attributed claim naming nobody.
+ */
+describe('13.1362 a birth assignee is held to the same named-person rule as ticket.assigned', () => {
+  function createTicketAssignedTo(
+    workspaceId: string,
+    projectId: string,
+    actorId: string,
+    assigneeId: string | null,
+  ): EventEnvelope {
+    return testEnvelope({
+      workspaceId,
+      entity: { kind: 'ticket', id: newUlid() },
+      type: 'ticket.created',
+      payload: { typeId: 'task', projectId, parentId: null, title: 'A new ticket', assigneeId },
+      actorId,
+    });
+  }
+
+  it('13.1362 PLANTED DEFECT: a birth naming a NON-MEMBER is refused, in the SAME sentence ticket.assigned gives', async () => {
+    const { workspaceId, projectId } = await workspace();
+    const member = newUlid();
+    await seedMember(db.pool, workspaceId, member, 'member', [{ projectId }]);
+    const stranger = newUlid();
+
+    // Asserted as the whole refusal object, not the rule alone: this module
+    // reports `permission.role` from four different places (the module's own
+    // docblock enumerates them), so a case reading only `rule` could not tell
+    // the named-person refusal from the project-membership one — and the actor
+    // here really is on the project, so nothing else could have fired.
+    expect(await gate(createTicketAssignedTo(workspaceId, projectId, member, stranger), member)).toEqual({
+      refused: true,
+      rule: PERMISSION_ROLE_RULE,
+      reason: NAMED_PERSON_NOT_IN_WORKSPACE_REASON,
+    });
+  });
+
+  it('13.1363 CONTROL: naming a real member is admitted — and so are both spellings of nobody', async () => {
+    // Without this arm, "refuses every birth assignee" passes the case above.
+    // The two nobody-arms are the other half of the same control: `null` and an
+    // omitted member must both still be admitted, or the fix would have made
+    // the dialog's Unassigned option — the default — unsubmittable.
+    const { workspaceId, projectId } = await workspace();
+    const member = newUlid();
+    const colleague = newUlid();
+    await seedMember(db.pool, workspaceId, member, 'member', [{ projectId }]);
+    await seedMember(db.pool, workspaceId, colleague, 'member', [{ projectId }]);
+
+    expect(await gate(createTicketAssignedTo(workspaceId, projectId, member, colleague), member)).toBeNull();
+    expect(await gate(createTicketAssignedTo(workspaceId, projectId, member, null), member)).toBeNull();
+    expect(await gate(createTicketEvent(workspaceId, projectId, member), member)).toBeNull();
+  });
+});
+
 // ---------------------------------------------------------------------------
 // Check 3 — a claim must name the ticket it rides on.
 // ---------------------------------------------------------------------------

@@ -19,6 +19,27 @@ export type LiveQueryResult<T> = {
   data: T | null;
   error: string | null;
   settled: boolean;
+  /**
+   * Has this hook EVER produced an answer — in its whole lifetime, not for the
+   * current key (owner, 2026-09-23).
+   *
+   * `settled` and `data !== null` both go false/null on every key change and
+   * every stream-driven refetch, which is correct for rendering the ANSWER and
+   * wrong for deciding whether a control exists. A caller that withholds a
+   * control while `data === null` retracts it on every reload, and the measured
+   * cost of that was a visible flicker: toggling *Only tickets in progress*
+   * changes the list's key, the rows reset to null, and the project header's
+   * New ticket button was replaced by its "Preparing the New ticket form…" gate
+   * — a differently-sized element, so the whole header row resized and snapped
+   * back, for about 40 ms.
+   *
+   * So this one is deliberately NOT reset by the key-change effect below. It
+   * answers "has this question ever been answerable", which is what a
+   * first-load gate actually wants. It stays a distinct field rather than a
+   * change to `settled`, because a caller rendering the DATA still needs to
+   * know the current key has not answered yet.
+   */
+  hasAnswered: boolean;
   reload: () => void;
 };
 
@@ -63,6 +84,8 @@ export function useLiveQuery<T>(
   // and set when one resolves, `isCurrent`-guarded the same way `data` is — a
   // superseded load's settlement says nothing about the question on screen now.
   const [settled, setSettled] = useState(false);
+  // Lifetime, not per-key — see `hasAnswered` on LiveQueryResult.
+  const [hasAnswered, setHasAnswered] = useState(false);
   const loadRef = useRef(load);
   loadRef.current = load;
   const keyRef = useRef(queryKey);
@@ -105,11 +128,16 @@ export function useLiveQuery<T>(
         setData(value);
         setError(null);
         setSettled(true);
+        setHasAnswered(true);
       },
       (cause: unknown) => {
         if (!isCurrent()) return;
         setError(cause instanceof Error ? cause.message : String(cause));
         setSettled(true);
+        // An ERROR is an answer for this purpose: the question reached the
+        // server and came back. A gate that waited for a SUCCESS would hold a
+        // control hostage to a failing read forever.
+        setHasAnswered(true);
       },
     );
   }, []);
@@ -143,5 +171,5 @@ export function useLiveQuery<T>(
     };
   }, [source, workspaceId, debounceMs, reload]);
 
-  return { data, error, settled, reload };
+  return { data, error, settled, hasAnswered, reload };
 }

@@ -888,6 +888,58 @@ a.gn-ticket-sheet__crumb--link {
    (nothing under apps/web/test, packages/app-core/test or packages/ui/test
    names `.gn-board__columns`), so the rename is not a breaking one. */
 .gn-board__rail { display: flex; gap: 0.875rem; align-items: flex-start; overflow-x: auto; padding-bottom: 0.5rem; }
+/* The workflow heading's disclosure (owner request, 2026-09-23: *"in the
+   board, the workflow is collapsible"*). The control lives INSIDE the `<h2>`
+   rather than beside it, which is the WAI-ARIA disclosure pattern and keeps
+   the heading in the outline with the workflow's name as its accessible name
+   — the button contributes its own text and nothing else, because the caret
+   below is a pseudo-element.
+   ⚠ DECLARED AFTER `.gn-board__workflow` (`:884`) AND AFTER `.gn-board__rail`
+   (`:890`) ON PURPOSE, and it is not tidiness: `packages/ui/test/components
+   .test.tsx`'s `rule()` helper is a FIRST-MATCH substring regex over this
+   file, so a new rule whose selector CONTAINS either of those names and sits
+   ABOVE them would become the body those pinned cases read. The same reason
+   `.gn-list__columns-toggle` sits where it does.
+   `font: inherit` is load-bearing, not a reset reflex: the UA gives a button
+   its own font, and inheriting from the `<h2>` is what keeps the workflow
+   name's size and family exactly what they were when it was the heading's own
+   text node. `color: inherit` does the same job for the muted tone set at
+   `:884`. The negative inline start pulls the CONTROL's box back over the
+   padding below it — the caret's glyph, not the name, then starts where the
+   heading's text started, so the name shifts right only by the caret's own
+   width and gap, which is what a disclosure in front of a label costs. */
+.gn-board__workflow-toggle {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.4375rem;
+  min-height: 2.25rem;
+  margin-inline-start: -0.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: inherit;
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+/* Drawn, never typed — the SAME idiom and the SAME reason as
+   `.gn-list__columns-caret` above: a `::after` contributes no text node, so
+   the toggle's accessible name stays exactly the workflow name and no screen
+   reader announces "▸ Onboarding". It also keeps the glyph out of the
+   type-scale sweep, which measures direct text nodes. `▸` closed, `▾` open,
+   keyed off the `aria-expanded` the button itself writes. */
+.gn-board__workflow-caret::after { content: '▸'; }
+.gn-board__workflow-toggle[aria-expanded='true'] .gn-board__workflow-caret::after { content: '▾'; }
+/* `display: flex` on `.gn-board__rail` above outranks the UA sheet's own
+   `hidden` rule (an author rule beats the UA sheet at equal specificity), so
+   the attribute the component collapses the rail with needs saying again here.
+   Without this rule a collapsed group is visibly open and `hidden` is
+   decorative — a check that cannot fail, which is exactly what the List's own
+   tray needed its twin of this rule for. The witness is case `13.1418`, which
+   reads BOTH halves: the attribute selectors out of these rules, and the
+   attributes the component writes. */
+.gn-board__rail[hidden] { display: none; }
 /* Same spec row, "Column": trayBg (surfaceSunken) + trayShadow (the sunken
    inset, matching `.gn-field__input`/`.ticket-type-list__row`'s own
    `--gn-shadow-sunken` under neo), radius cardR, 12px padding, a fixed
@@ -5946,6 +5998,27 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   cursor: pointer;
 }
 .gn-project__scope-note { font-size: 0.8125rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+/* The RESERVED BAND the scope note stands in on the project page (owner,
+   2026-09-23) — one line of that note's OWN `line-height`, present whether the
+   note says anything or not, so switching *Only tickets in progress* on moves no
+   other element. See `page.tsx`'s docblock on the row for the measured cause and
+   the two costs the owner accepted.
+
+   A SECOND rule rather than a `min-height` added to the shared treatment above:
+   that rule is also what styles the BOARD tab's own `board-scope-note`, which is
+   not a standing row and must not reserve anything. Declared here, AFTER it, on
+   purpose — `rule(selector)` in `packages/ui/test/components.test.tsx` (`:548-549`)
+   resolves a rule with an UNANCHORED `UI_CSS.match` over the whole file, so a
+   selector CONTAINING `.gn-project__scope-note` placed ABOVE the shared rule
+   matches first and becomes the body that suite's cases read.
+   (`apps/web/test/project-page-head.test.tsx` reads through `ruleFor`, a
+   first-match LINE scan, and is safe only because its callers ANCHOR their
+   patterns — the anchoring protects it, not the helper.)
+
+   `margin: 0` because `<p>` carries UA margins and `.gn-project`
+   (`:5804`) already spaces its children with `gap: 0.875rem` — a top margin
+   would stack on that gap and make the band taller than the line it reserves. */
+.gn-project__scope-row { min-height: 1.125rem; margin: 0; }
 .gn-project__search {
   min-height: 2.75rem;
   min-width: 12.5rem;
@@ -6996,6 +7069,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   overflow-x: auto;
 }
 .gn-comment__body a { color: var(--gn-text-accent); overflow-wrap: anywhere; }
+/* SCHEMA V2'S NODES IN A COMMENT BODY (spec §8.3 consequence 1, Plan 4 Task 2).
+   `renderCommentBody` grew chrome for a task item, a collapsible and a
+   wiki-link; these are its hooks. The class names deliberately EXTEND the
+   existing family rather than spelling their own, so the block above still
+   applies to them — which is why the rules here carry only what a plain list
+   or code block does not already say. */
+/* The marker goes, because the checkbox replaces it. */
+.gn-comment__list--tasks { list-style: none; padding-left: 0; }
+.gn-comment__task { display: flex; gap: 0.45rem; align-items: flex-start; }
+/* Nudged down onto the first line of text rather than the top of the item box. */
+.gn-comment__task > input[type='checkbox'] { margin: 0.15rem 0 0; flex: none; }
+.gn-comment__details { margin: 0; }
+.gn-comment__details > summary { cursor: pointer; font-weight: 600; }
+/* The destination of a wiki-link is a route, not a note's words; the label is
+   the title (`renderNode`), so the ink is the only thing this adds — the
+   accent and the wrap come from `.gn-comment__body a` above. */
+.gn-comment__wikilink { overflow-wrap: anywhere; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {
