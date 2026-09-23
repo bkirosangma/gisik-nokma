@@ -4,6 +4,7 @@ import { Button, Popover } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDateTime } from '../provenance.js';
 import { memberLabel } from '../member-label.js';
+import { PeoplePicker } from './people-picker.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type { ClaimProvenance, ResolvedVisibilityMode, RosterMember, TicketVisibility } from '../view-types.js';
 
@@ -614,48 +615,17 @@ export function VisibilityEditor({
             ))}
           </fieldset>
 
+          {/*
+            THE PICKER IS A COMPONENT NOW (notes series Plan 5, Task 3). The
+            forty lines that stood here moved to `views/people-picker.tsx`
+            unchanged, markup and docblocks included, so that the notes dialogs
+            can pick an `explicit` audience without a second spelling of the
+            label rule — the rule E4-6 exists for. This call is the CONTROL for
+            that extraction: this screen's own tests are what prove the moved
+            markup still renders what it did.
+          */}
           {mode === 'explicit' ? (
-            <fieldset className="gn-visibility__people">
-              <legend>Who, exactly</legend>
-              {members.length === 0 ? (
-                <p className="gn-visibility__no-roster">
-                  No one to choose from — the roster for this workspace has not been read.
-                </p>
-              ) : (
-                members.map((member) => (
-                  <label key={member.id} className="gn-visibility__person">
-                    <input
-                      type="checkbox"
-                      checked={userIds.includes(member.id)}
-                      onChange={() => toggle(member.id)}
-                    />
-                    {/* A ROSTER MEMBER'S LABEL IN THE PICKER, through the shared
-                        `memberLabel` — the same function that names a person
-                        everywhere else, and from Task 4 on the same function the
-                        roster JOIN's value is built with, so a person's row and
-                        their claim line cannot disagree.
-
-                        E4-6 is why this is not `actorLabel(member.id,
-                        member.name)`: that fallback is the raw id, which is right
-                        for PROVENANCE ("never blank, never a fabricated
-                        'system'") and wrong for a CHOOSER. A member whose display
-                        name is empty was offered as
-                        `01M1V035TASFV2G9WPWFV9QDVW`; the dev roster ships exactly
-                        that row (`accountant@e2e.gisik-nokma.local`, `name = ''`),
-                        so it is a shape the product really meets rather than a
-                        fixture's invention.
-
-                        `actorLabel` is NOT gone and is not the same job: it is
-                        still what `:242` and `:350` render this screen's claims
-                        through, because it checks `SYSTEM_ACTOR_NAMES` FIRST — a
-                        step a picker must never take, and one auto-close must
-                        never lose. It keeps no email step of its own; the email
-                        reaches it through the join, not through this call. */}
-                    {memberLabel(member)}
-                  </label>
-                ))
-              )}
-            </fieldset>
+            <PeoplePicker members={members} selected={userIds} onToggle={toggle} />
           ) : null}
 
           {willLockSelfOut ? (

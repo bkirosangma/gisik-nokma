@@ -5,8 +5,8 @@ import { nudgesEmbedding } from './nudge.js';
 
 /**
  * Re-exported so the predicate is reachable from the module that owns the loop.
- * It is DECLARED in `./nudge.ts`, which imports a type and nothing else, because
- * `app.ts` needs it and must not drag `@huggingface/transformers` into every
+ * It is DECLARED in `./nudge.ts`, which imports a type and nothing else, so
+ * `app.ts` cannot drag this module's — or `embedding.ts`'s — cost into every
  * `buildApp` in the suite — see that file's docblock.
  */
 export { nudgesEmbedding };

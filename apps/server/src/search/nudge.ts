@@ -7,11 +7,17 @@ import type { LedgerEvent } from '@gisik-nokma/domain';
  *
  * `app.ts` registers the commit listener that calls this, and `app.ts` is
  * imported by around sixty test files. `embed-worker.ts` imports
- * `embedding.ts`, which imports `@huggingface/transformers` and sets
- * `env.allowRemoteModels = false` at module load — so a predicate declared
- * there would make every one of those sixty files load a machine-learning
- * runtime to ask a question about two event-type strings. This module imports a
- * TYPE and nothing else, so the cost is zero.
+ * `embedding.ts` — this module imports a TYPE and nothing else, so a
+ * predicate declared there cannot make any of those sixty files pay for
+ * anything `embedding.ts` does. (Before task/notes-3-runtime-fix, that
+ * mattered more than it does now: `embedding.ts` used to import
+ * `@huggingface/transformers`, which dlopens `onnxruntime-node` at module
+ * load — every import was a native-runtime load, not merely a heavy one.
+ * `embedding.ts` no longer imports that package, and today's `embedding.ts`
+ * does nothing eager at import time — `loadTable`/`loadTokenizer` only run
+ * on first `embedBatch` call. The separation stays because it is still free
+ * and the loop's own module should be the one thing that can trigger it, not
+ * because importing `embedding.ts` is still expensive.)
  *
  * `embed-worker.ts` re-exports it, so the name is still reachable from the
  * module that owns the loop.

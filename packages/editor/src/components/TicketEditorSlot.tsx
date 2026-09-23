@@ -103,6 +103,25 @@ export type EditorSlotProps = {
    */
   workspaceId: string;
   ticketId: string;
+  /**
+   * The note an upload belongs to, in `note` mode — the twin of `ticketId`
+   * (notes series Plan 5, spec §4.4). Declared with app-core's copy BYTE-FOR-
+   * BYTE and asserted by `test/ticket-editor-slot.test.tsx`'s field-name set
+   * comparison, so a one-sided addition fails a test rather than drifting.
+   *
+   * **THIS IMPLEMENTATION DOES NOT READ IT**, for exactly the reason `ticketId`
+   * is not read either: uploads arrive here as an already-bound closure
+   * (`uploadAttachment`), and a host that has the closure has no need to hand
+   * its owner id over as well. It earns its place in the contract for the reader
+   * the twin names — the RN webview bridge posts `requestUpload` to a host on
+   * the far side of a message port, where there is no closure to carry the
+   * owner and no way to ask for one after the fact.
+   *
+   * At most one of `ticketId` and `noteId` is meaningful, and the route refuses
+   * both at once (`attachments.ts:375-388`); they are two optional-shaped fields
+   * rather than a union because `ticketId` predates note mode and is required.
+   */
+  noteId?: string;
   placeholder?: string;
   autoFocus?: boolean;
   /**
