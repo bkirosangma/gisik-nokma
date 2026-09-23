@@ -1011,6 +1011,45 @@ export async function checkProjectPrefixUnique(
 }
 
 /**
+ * May this claim NAME this person? `null` when it may, a refusal when it may not.
+ *
+ * ## One lookup, two doors, and the second door is why this exists
+ *
+ * The invariant is E6-17: a claim may name only a person who holds a role in
+ * this workspace — a non-member, a fresh ULID nobody owns and the string
+ * `nobody-here` are all refused with the same sentence. It was enforced for
+ * `ticket.assigned` and `ticket.collaborator_added` only, and the owner's
+ * request of 2026-09-23 added a THIRD way to name a person: an optional
+ * `assigneeId` on `ticket.created`, set by the New ticket dialog's Assignee
+ * picker.
+ *
+ * **The two doors are in different branches of `checkVisibilityPermission`, and
+ * they have to be.** The existing block runs after `canSee` — deliberately, so
+ * an actor with no standing on the ticket is never told whether the person they
+ * named is a member — and `ticket.created` RETURNS before reaching it, because
+ * a ticket that does not exist yet cannot be seen. So a birth assignee would
+ * have been admitted unchecked had this not been extracted and called from both
+ * places: writing the lookup a second time inside the `ticket.created` branch
+ * would have been two spellings of one rule, free to drift the moment either
+ * moved.
+ *
+ * `null` names nobody and passes — `ticket.assigned`'s unassignment, and a birth
+ * with no assignee at all. A guest IS a member of the workspace and passes here;
+ * whether a guest can see what they are assigned is the read side's question
+ * (case 7.27), not this door's.
+ */
+async function namedPersonRefusal(
+  db: Queryable,
+  workspaceId: string,
+  named: string | null,
+): Promise<Refusal | null> {
+  if (named === null) return null;
+  const namedRole = await resolveEffectiveRole(db, named, workspaceId);
+  if (namedRole.workspaceRole !== null) return null;
+  return refuse(NAMED_PERSON_NOT_IN_WORKSPACE_REASON);
+}
+
+/**
  * Who created this ticket, read from the LEDGER rather than from a projection.
  *
  * There is no projection to read it from: `proj_tickets` does not exist on this
@@ -1243,6 +1282,24 @@ export async function checkVisibilityPermission(
     if (!ctx.eff.projects.has(payload.projectId)) {
       return refuse(NOT_ON_PROJECT_REASON);
     }
+    /**
+     * …and the ticket's BIRTH ASSIGNEE, if it names one, is held to the same
+     * named-person rule (`namedPersonRefusal` above) that `ticket.assigned`
+     * is — checked HERE rather than in the block below because this branch
+     * returns before that one is reachable.
+     *
+     * Ordering, and it is the same ordering argument the `canSee` block makes
+     * from the other side: the project check runs FIRST, so an actor creating a
+     * ticket in a project they are not on is told THAT, rather than being handed
+     * a sentence about the person they named. A claim that fails for two reasons
+     * must report the one the actor can act on first.
+     */
+    const assigneeRefusal = await namedPersonRefusal(
+      ctx.db,
+      env.workspaceId,
+      payload.assigneeId ?? null,
+    );
+    if (assigneeRefusal !== null) return assigneeRefusal;
     return null;
   }
 
@@ -1291,12 +1348,12 @@ export async function checkVisibilityPermission(
       env.type === 'ticket.assigned'
         ? ticketAssignedPayload.safeParse(env.payload).data?.assigneeId ?? null
         : ticketCollaboratorPayload.safeParse(env.payload).data?.userId ?? null;
-    if (named !== null) {
-      const namedRole = await resolveEffectiveRole(ctx.db, named, env.workspaceId);
-      if (namedRole.workspaceRole === null) {
-        return refuse(NAMED_PERSON_NOT_IN_WORKSPACE_REASON);
-      }
-    }
+    // The lookup itself lives in `namedPersonRefusal` above, and it moved there
+    // when `ticket.created` gained a member that names a person: one rule, one
+    // spelling, called from both branches — see that function's docblock for why
+    // the second call had to be a second CALL SITE rather than a second check.
+    const namedRefusal = await namedPersonRefusal(ctx.db, env.workspaceId, named);
+    if (namedRefusal !== null) return namedRefusal;
   }
 
   if (env.type === 'visibility.set') {

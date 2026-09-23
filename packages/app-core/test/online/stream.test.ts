@@ -612,3 +612,110 @@ describe('parseFrame against the published schema', () => {
     expect(published).toContain('scope-revoked');
   });
 });
+
+/**
+ * ## One connection per client, fanned out — the live-update defect of 2026-09-23
+ *
+ * MEASURED against the running dev stack before these cases existed: a board page
+ * opened **six** sockets within 3 ms of each other, because `createStreamSubscriber`
+ * returned a `subscribe` that called the factory on every call and every
+ * `useLiveQuery` instance calls it once. The server caps concurrent sockets at
+ * EIGHT PER USER (`apps/server/src/stream/routes.ts`, `DEFAULT_MAX_SOCKETS_PER_USER`),
+ * a budget whose own docblock reasons about "a phone, a laptop, and several browser
+ * tabs" — one socket per tab. One tab spent six of the eight, so a reload or a second
+ * tab crossed the cap, `requireConnectionBudget` answered **429 during the upgrade**,
+ * and a 429 on a handshake reaches the browser as `close` code **1006** with no close
+ * frame and no server-side error log. The client backed off, retried, was refused
+ * again: **205 `/v1/stream` requests, 160 of them 429**, measured over forty minutes.
+ * With no established socket the debounced re-read never fired and a newly created
+ * ticket appeared only after a manual page load.
+ *
+ * The fix is to spend ONE socket per client and fan frames out, which the protocol
+ * already anticipates — `routes.ts` says "One socket multiplexes several workspaces"
+ * and the client's own `subscribe` frame names its workspace.
+ */
+describe('one connection per client, multiplexed', () => {
+  it('12.962 two subscriptions on one subscriber open ONE socket', () => {
+    const { sockets, subscribe } = harness();
+    subscribe('ws_1', 0, () => {});
+    subscribe('ws_1', 0, () => {});
+    expect(sockets).toHaveLength(1);
+  });
+
+  it('12.963 CONTROL two SEPARATE subscribers open two sockets — the sharing is per client, not global', () => {
+    // Without this arm, an implementation that memoised the socket in module scope
+    // would pass 12.962 and would break the moment a shell built a second client
+    // (Plan 10's Tauri and React Native shells each construct their own).
+    const first = harness();
+    const second = harness();
+    first.subscribe('ws_1', 0, () => {});
+    second.subscribe('ws_1', 0, () => {});
+    expect(first.sockets).toHaveLength(1);
+    expect(second.sockets).toHaveLength(1);
+  });
+
+  it('12.964 two listeners on the SAME workspace send ONE subscribe frame and both receive the event', () => {
+    // The hub refuses a DUPLICATE subscribe on one connection, so a second frame for
+    // a workspace already held would be refused rather than ignored.
+    const { subscribe, socketAt } = harness();
+    const seen: string[] = [];
+    subscribe('ws_1', 0, (frame) => seen.push(`a:${frame.type}`));
+    subscribe('ws_1', 0, (frame) => seen.push(`b:${frame.type}`));
+    socketAt(0).serverOpen();
+    expect(socketAt(0).sent).toHaveLength(1);
+    socketAt(0).serverSend({ type: 'event', envelope: ENVELOPE });
+    expect(seen).toEqual(['a:event', 'b:event']);
+  });
+
+  it('12.965 two workspaces share the socket, send two subscribe frames, and do not cross', () => {
+    const { subscribe, socketAt, sentFrame } = harness();
+    const one: string[] = [];
+    const two: string[] = [];
+    subscribe('ws_1', 0, (frame) => one.push(frame.type));
+    subscribe('ws_2', 0, (frame) => two.push(frame.type));
+    socketAt(0).serverOpen();
+    expect(socketAt(0).sent).toHaveLength(2);
+    expect(sentFrame(0, 0)).toMatchObject({ type: 'subscribe', workspaceId: 'ws_1' });
+    expect(sentFrame(0, 1)).toMatchObject({ type: 'subscribe', workspaceId: 'ws_2' });
+    socketAt(0).serverSend({ type: 'caught-up', workspaceId: 'ws_2', seq: 7 });
+    expect(one).toEqual([]);
+    expect(two).toEqual(['caught-up']);
+  });
+
+  it('12.966 dropping one of two listeners keeps the socket open for the other', () => {
+    const { subscribe, socketAt } = harness();
+    const survivor: string[] = [];
+    const stop = subscribe('ws_1', 0, () => {});
+    subscribe('ws_1', 0, (frame) => survivor.push(frame.type));
+    socketAt(0).serverOpen();
+    stop();
+    expect(socketAt(0).closedByClient).toBe(false);
+    socketAt(0).serverSend({ type: 'event', envelope: ENVELOPE });
+    expect(survivor).toEqual(['event']);
+  });
+
+  it('12.967 dropping the LAST listener closes the socket', () => {
+    const { subscribe, socketAt } = harness();
+    const stopA = subscribe('ws_1', 0, () => {});
+    const stopB = subscribe('ws_1', 0, () => {});
+    socketAt(0).serverOpen();
+    stopA();
+    stopB();
+    expect(socketAt(0).closedByClient).toBe(true);
+  });
+
+  it('12.968 a reconnect resumes from the highest seq seen, not from the original afterSeq', () => {
+    // The old per-subscription code hard-coded nothing, but `use-live-query.ts` passes
+    // `afterSeq: 0` on every hook, so every reconnect replayed the whole workspace —
+    // measured as the same history frames arriving six times over on one page load.
+    const { subscribe, socketAt, sentFrame } = harness();
+    subscribe('ws_1', 0, () => {});
+    socketAt(0).serverOpen();
+    expect(sentFrame(0, 0)).toMatchObject({ afterSeq: 0 });
+    socketAt(0).serverSend({ type: 'caught-up', workspaceId: 'ws_1', seq: 41 });
+    socketAt(0).serverClose();
+    vi.advanceTimersByTime(BACKOFF_INITIAL_MS);
+    socketAt(1).serverOpen();
+    expect(sentFrame(1, 0)).toMatchObject({ type: 'subscribe', workspaceId: 'ws_1', afterSeq: 41 });
+  });
+});

@@ -703,6 +703,103 @@ describe('3.965 ticket.created writes the priority claim — every ticket has on
   });
 });
 
+/**
+ * 13.1358–13.1359 (owner request 2026-09-23) — the New ticket dialog can set a
+ * DESCRIPTION and an ASSIGNEE at birth, so `ticket.created` carries two more
+ * OPTIONAL members.
+ *
+ * The precedent is `priority` directly above, and the additive-field rule is the
+ * same one `start` follows: an optional member must not change the meaning of
+ * events written before it existed. For both of these, absent means NONE — which
+ * is exactly what every pre-existing `ticket.created` meant, since the reducer
+ * hard-coded `assigneeId: null` and wrote no `description` claim at all.
+ *
+ * ## The two members take the SAME doors their later counterparts take
+ *
+ * `description` is what `ticket.field_set` writes under `fieldId: 'description'`
+ * — a rich-text DOC, and `checkTicketFieldSet` holds it to *"a document"* — and
+ * `assigneeId` is what `ticket.assigned` carries. Routing them through the same
+ * shapes is what keeps a birth value and a later edit indistinguishable to every
+ * reader downstream; a second spelling of either would be a second thing to keep
+ * in step.
+ */
+describe('13.1358 ticket.created writes the description CLAIM, or writes none at all', () => {
+  const DOC = {
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Leaks at the joint' }] }],
+  };
+
+  it('a description on the event becomes a claim attributed to the CREATOR and the creation clocks', () => {
+    const state = fold([createdWith({ description: DOC })]);
+    // Printed whole, so a failure shows which half of the claim moved rather
+    // than only that one did.
+    expect(state.fields.description).toEqual({
+      value: DOC,
+      actorId: createdWith({}).actorId,
+      clientTime: createdWith({}).clientTime,
+      serverTime: createdWith({}).serverTime,
+    });
+  });
+
+  it('NO description on the event writes NO claim — absent is not an empty document', () => {
+    // The load-bearing arm, and it is about the KEY rather than the value.
+    // Writing `claim(null, env)` for the absent case would put a claim on every
+    // ticket nobody described, and the sheet reads presence to answer "no
+    // description yet" versus "set by X on DATE" — so a null claim would
+    // attribute an empty description to whoever filed the ticket.
+    const state = fold([createdWith({})]);
+    expect(Object.keys(state.fields)).not.toContain('description');
+    expect(state.fields.description).toBeUndefined();
+  });
+
+  it('CONTROL — the title and priority claims are written beside it, so the absence above is one key and not a silent fold', () => {
+    // Without this, a reducer that dropped `title` too would satisfy the case
+    // above perfectly: "there is no description key" is also true of a state
+    // that folded nothing.
+    const state = fold([createdWith({ description: DOC })]);
+    expect(Object.keys(state.fields).sort()).toEqual(['description', 'priority', 'title']);
+    // …and the claim's value is the DOCUMENT, not a projection of it. jsonb
+    // round-trips the shape, and this reducer is also what the fixture suite
+    // and the offline replica fold, so a string here would be a different
+    // ticket to every reader of `docToPlainText`.
+    expect(state.fields.description?.value).toEqual(DOC);
+  });
+
+  it('a v1 event (a stored ticket.created with neither new member) still folds', () => {
+    // The compatibility half, stated as its own case: 441 fixtures and every
+    // ledger row written before today carry neither member, and a reducer that
+    // required either would throw on all of them.
+    const state = fold([createdWith({ start: 'backlog', priority: 'P3' })]);
+    expect(state.fields.description).toBeUndefined();
+    expect(state.assigneeId).toBeNull();
+  });
+});
+
+describe('13.1359 ticket.created carries the birth ASSIGNEE, and absent means nobody', () => {
+  it('an assigneeId on the event lands on the state', () => {
+    const state = fold([createdWith({ assigneeId: 'user-anselma' })]);
+    expect(state.assigneeId).toBe('user-anselma');
+  });
+
+  it('NO assigneeId on the event leaves assigneeId null — which is what every pre-existing event meant', () => {
+    // `null`, not absent and not `''`: `TicketState.assigneeId` is
+    // `string | null` in the domain type, the reducer hard-coded `null` here
+    // before this member existed, and `ticketAssignedPayload` uses the same
+    // `null` for "unassigned". A second spelling of nobody would be a second
+    // thing for the sheet's four-arm assignee row to tell apart.
+    const state = fold([createdWith({})]);
+    expect(state.assigneeId).toBeNull();
+  });
+
+  it('CONTROL — an explicit null on the event means the same as absence', () => {
+    // The two are equivalent BY DESIGN rather than by accident: both mean "no
+    // assignee was chosen", and the client omits the member rather than sending
+    // `null`. Pinned so a future schema that refused `null` would have to
+    // change this case deliberately rather than silently.
+    expect(fold([createdWith({ assigneeId: null })]).assigneeId).toBeNull();
+  });
+});
+
 /** 13.566 — the flag folds and unfolds; the state is untouched (spec §1.2). */
 describe('13.566 ticket.closed / ticket.reopened', () => {
   it('closed records the actor and the server time; reopened clears it; stateId never moves', () => {

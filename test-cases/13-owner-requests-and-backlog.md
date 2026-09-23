@@ -769,40 +769,45 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   second line of defence if `attemptMove` ever stops clearing on its own; `cp`/`sha256sum` restore
   performed after each of the three mutations above —
   (`packages/app-core/test/views/board-moves-ui.test.tsx`)
-- **13.591** ✅ New tickets are born in the backlog, with one exception (backlog/closed spec §5.4,
-  2026-09-17) — `NewTicketDialog` states "Starts in the backlog" under the title field, UNCONDITIONALLY.
-  `NewTicketDraft` gains a REQUIRED `start: 'backlog' | 'focus'` (never optional here, even though the
-  wire's `ticketCreatedPayload.start` is optional and an absent value means focus for events written
-  before the field existed — a rule about legacy compatibility, not about what a client built after the
-  field exists is allowed to leave out). With NO parent chosen, no checkbox renders and the draft leaves
-  with `start: 'backlog'`. Choosing an IN-FOCUS parent (`parentCandidates` now carry `inFocus: boolean`
-  beside `id`/`title`, a claim the CALLER computes — this component derives nothing from a candidate's own
-  state) renders a **"Start in focus"** checkbox, CHECKED BY DEFAULT, and the draft leaves with
-  `start: 'focus'`; unticking it flips the SAME draft to `'backlog'` without touching the chosen parent.
-  Choosing a BACKLOG parent (`inFocus: false`) renders no checkbox at all and the draft stays `'backlog'`
-  — the checkbox's visibility (`startCheckboxVisible`) and the draft's `start` both read the SAME
-  `chosenParent`/`noUsableParent` values computed once, so a checkbox can never be on screen while the
-  payload it claims to set is about to leave as `'backlog'` anyway, or absent while a `'focus'` claim
-  leaves with nothing on screen to explain it —
+- **13.591** ✅ **REWRITTEN 2026-09-23** (owner ruling lifting spec §5.4's parent condition) — the birth
+  state is now ONE control asking the inverse question: the shared `Switch`, always present and always
+  answerable. `NewTicketDraft.start` stays REQUIRED (never optional here, even though the wire's
+  `ticketCreatedPayload.start` is optional and an absent value means focus for events written before the
+  field existed — a rule about legacy compatibility, not about what a client built after the field exists
+  is allowed to leave out). The former text, kept here because the case ids below still name it: the
+  dialog **states** "Starts in the backlog" under the title field UNCONDITIONALLY, and an in-focus parent
+  (`parentCandidates` carrying `inFocus: boolean`, a claim the CALLER computed) revealed a CHECKED-BY-
+  DEFAULT **"Start in focus"** checkbox whose visibility (`startCheckboxVisible`) and the draft's `start`
+  both read the same `chosenParent`/`noUsableParent` values once, so a checkbox could never be on screen
+  while the payload claimed `'backlog'`, or absent while a `'focus'` claim left unexplained.
+  **`startCheckboxVisible` and `parentCandidates[].inFocus` are now deleted, not merely disabled** — the
+  parent has no bearing on where a ticket is born. `13.591a` (the question + the SHARED `Switch`, ON, and
+  the old sentence absent), `13.591b` (no parent → switch ON → `start: 'backlog'`), `13.591c` (an
+  in-focus parent is no longer a precondition: OFF under it → `'focus'`), `13.591d` (OFF then back ON →
+  `'backlog'`, so the control is answerable BOTH ways), `13.591e` (a BACKLOG parent no longer hides it) —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
-- **13.591f** ✅ The `inFocus` derivation itself, at its ONE real-data call site (`page.tsx`'s
-  `inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null`) — nothing in `packages/app-core`
-  can witness this, since every case there PASSES `inFocus` in as a literal fixture value; a wrong `!==`
-  or a dropped `row.closed === null` half would ship with 13.591a–e and every other gate reporting green.
-  Three list rows differing only in the two facts the formula reads: a BACKLOG row (`stateId: 'backlog'`,
-  never closed), a plain ACTIVE row (neither backlog nor closed), and a CLOSED terminal row (not backlog,
-  but closed). Only the ACTIVE row's pick renders the "Start in focus" checkbox; the BACKLOG and CLOSED
-  picks both render none. Mutation 1 (`row.closed === null` → `row.closed !== null`, `cp`/`sha256sum`
-  restore): kills exactly this case, on the CLOSED-row assertion (`PASS (9) FAIL (1)`). Mutation 2
-  (`row.stateId !== BACKLOG_STATE_ID` → `===`, same restore method): kills exactly this case again, on the
-  BACKLOG-row assertion — the two mutations redden the SAME case at two DIFFERENT assertions, proving both
-  halves of the formula are load-bearing and neither alone would catch the other's defect —
+- **13.591f** ✅ **REWRITTEN 2026-09-23** — the birth-state control's INDIFFERENCE to the parent, at the ONE
+  site that hands it real row data. The former subject was `page.tsx`'s own `inFocus` derivation
+  (`row.stateId !== BACKLOG_STATE_ID && row.closed === null`), which nothing in `packages/app-core` could
+  witness because every case there passes `inFocus` in as a literal; the ruling deleted the formula and
+  the field with it, so that claim is no longer made anywhere. The fixture is deliberately UNCHANGED —
+  a BACKLOG row, a plain ACTIVE row, and a CLOSED terminal row, told apart by the same two facts — and
+  what is asserted at each pick is that the switch is PRESENT and ENABLED; the CLOSED row is the one that
+  matters, because §5.4 forbade a focus birth under a closed parent OUTRIGHT. **The load-bearing assertion
+  reads the INGESTED PAYLOAD**: the switch is turned OFF under the closed parent and `ticket.created` must
+  carry `start: 'focus'` — so a dialog that painted an always-enabled switch and still sent `'backlog'`
+  fails here rather than passing on the screen alone. Control arms in the same `it`: the switch is ON
+  before it is flipped, so the case cannot pass against a control that was never ON. —
   (`apps/web/test/project-create-gate.test.tsx`)
 - **13.592** ✅ `CreateTicketFlow.create` never leaves `start` off the `ticket.created` payload it builds
   (backlog/closed spec §1.3), whatever the draft's own value: a create with no parent sends
-  `payload.start: 'backlog'`, and choosing an in-focus parent with the checkbox left checked sends
-  `payload.start: 'focus'` — proving the value travels from the DRAFT rather than a hardcoded constant.
-  The load-bearing assertion is `Object.keys(payload)` containing `'start'`, not a value comparison: a
+  `payload.start: 'backlog'`, and the birth-state switch turned OFF sends `payload.start: 'focus'` —
+  proving the value travels from the DRAFT rather than a hardcoded constant. **`13.592b` was rewritten
+  2026-09-23**: it used to reach `'focus'` by choosing an in-focus parent with the checkbox left checked,
+  and the parent no longer moves `start` at all, so it now flips the dialog's own switch — the honest way
+  to reach a value the draft is supposed to be the source of, and it asserts the switch was ON before the
+  flip so it cannot pass against a control that was never ON. The load-bearing assertion is
+  `Object.keys(payload)` containing `'start'`, not a value comparison: a
   mutated `create()` that drops the `start:` line from its payload object literal produces a payload with
   NO `start` key at all, and `toEqual`/`toBe`-style value checks treat a missing key the same as one
   holding `undefined` — they would not catch that mutation; only reading the key set does. Mutation
@@ -873,15 +878,19 @@ state of the ticket easily, and maybe even filter to see things." Then: "explici
   REFUSAL_RULES.notClosed` arm, `cp`/`sha256sum` restore): kills exactly this case, on the "exactly one
   event" assertion (`PASS (19) FAIL (1)` of the file's 20) —
   (`packages/app-core/test/views/reopen-flow.test.tsx`)
-- **13.591g** ✅ Fix round 1, Ruling 40 (coordinator, 2026-09-17; review Finding 3) — "checked by default"
-  (spec §5.4) is a promise PER CHOSEN PARENT, not a one-time initial value for the whole dialog session.
-  Unticking "Start in focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent,
-  renders the new parent's checkbox CHECKED (not inheriting the previous parent's untick) — the Parent
-  picker's own `onChange` now resets `startInFocus` to `true` on every selection. Mutation (dropping that
-  reset, `cp`/`sha256sum` restore): kills exactly this case, on the "checkbox B is checked" assertion
-  (`PASS (11) FAIL (1)`). Named `g` rather than the coordinator's literal `13.591a` — that id already
-  covers this file's own "states the note unconditionally" case, a different, already-cited behaviour;
-  continuing the block's own lettering avoids one checkmark covering two unrelated assertions —
+- **13.591g** ✅ **INVERTED 2026-09-23** (owner ruling lifting §5.4; supersedes Ruling 40) — the case now
+  pins that CHOOSING A PARENT CHANGES NOTHING about the birth state. Ruling 40's text, kept because the
+  ruling it records is what this case's new form removes: *"checked by default" (spec §5.4) is a promise
+  PER CHOSEN PARENT, not a one-time initial value for the whole dialog session — unticking "Start in
+  focus" for one in-focus parent, then switching to a DIFFERENT in-focus parent, renders the new parent's
+  checkbox CHECKED, and the Parent picker's own `onChange` resets `startInFocus` to `true` on every
+  selection.* **That reset is DELETED, and deleting it is a fix rather than a tidy-up:** it existed to
+  serve a control that TRACKED the parent, and the switch does not — it answers a question about the
+  ticket and the person's answer is REMEMBERED across sessions, so a surviving reset would silently
+  overwrite the very answer the dialog was just asked not to forget. Turn the switch OFF, pick in-focus
+  parent A, then pick a DIFFERENT in-focus parent B: it stays OFF, and the draft leaves `start: 'focus'`
+  under B. The id is kept deliberately — ids are never renumbered, and this is the same question (*what
+  does a parent change about the birth state?*) answered by the rule that replaced §5.4. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
 - **13.594** ✅ Task 10 (backlog/closed spec §5.4, 2026-09-17) — the Backlog tab. A FIFTH tab, `Backlog`,
   joins the project page's segmented rail FIRST — ahead of `Board`, since a ticket sits in the backlog
@@ -2868,3 +2877,603 @@ stylesheet, and an `indexOf` over the raw file finds the COMMENT.
   different bodies, which is the line-anchoring (`declarationsFor`) doing the job it exists for.
   **jsdom has no layout engine**, so this case asserts the declarations and NOT a line box — the paint is
   the controller's measurement, not a number invented here. — (`packages/app-core/test/views/ticket-list-css-binding.test.tsx`)
+- **13.1381** ✅ **THE SCOPE NOTE IS A STANDING ROW, NOT A CHILD OF THE CONTROLS ROW.** The owner
+  toggled *Only tickets in progress* on the live project page (two screenshots, Board tab, ~1000 CSS px)
+  and the ENTIRE controls row — search, workflow picker, switch, Filters, New ticket — dropped out from
+  beside the title and onto its own line. The note was the cause and it was the LAST child of
+  `.gn-project__header`, a `flex-wrap: wrap` row: **a wrapping flex container's max-content contribution
+  to its parent is all its children on ONE line**, so the ~770 px sentence pushed that row's intrinsic
+  width to ~1400 px against ~625 px without it, and `.gn-project__head` (`flex-wrap: wrap;
+  justify-content: space-between`) wrapped the whole row rather than shrinking the note. The docblock
+  that stood over the old span described the INNER wrap ("it takes its own line rather than pushing the
+  switch away") and missed the OUTER one — it was false and is replaced, not patched. The case asserts
+  the note is a direct child of the `.gn-project` column and the `nextElementSibling` of
+  `.gn-project__head`, before the `Project view` tablist; that it is PRESENT and EMPTY with the switch
+  off and carries the sentence once clicked; and that it is the SAME node across the toggle, so the row
+  is reserved rather than unmounted and remounted. **Controls, all in the same `it`:** the controls row
+  does not contain the note **in either state** — asserted twice, because with the switch off there was
+  nothing to find in the old defect, so a single on-state arm would pass whenever the switch was off and
+  a regression that restored the span would go unseen; and the count of the column's direct children is
+  identical before and after the click, which is what tells "reserved" from "inserted" and is the arm a
+  note written as `activeOnly ? <p…/> : null` — the obvious way to write the pinned markup — fails.
+  Red before the change on the note's absence when off. (Post-commit mutation: restoring
+  `activeOnly ? <p…/> : null` reddens it.) — (`apps/web/test/project-page-head.test.tsx`)
+- **13.1382** ✅ **THE RESERVED BAND IS ITS OWN RULE, PLACED AFTER THE SHARED NOTE RULE.**
+  `.gn-project__scope-row` declares `min-height: 1.125rem` — one line of the note's OWN `line-height`,
+  so the band is the same height in both switch states — and `margin: 0`, because `<p>` carries UA
+  margins and `.gn-project` already spaces its children with `gap: 0.875rem`. Asserted as its own
+  SINGLE-SELECTOR rule (a grouped selector would put the band on every class it named) and as declared
+  AFTER `.gn-project__scope-note` — the order another suite's witness depends on, since
+  `packages/ui/test/components.test.tsx` resolves a rule with an UNANCHORED `UI_CSS.match` (`:548-549`),
+  so a selector NAMING the note placed above `ui.css:5948` matches first and becomes the body its cases
+  read. (`ruleFor`, the shared `test/helpers/css-rule-scan.ts` this case also reads through, is a
+  first-match LINE scan and is safe only because its callers ANCHOR their patterns — the anchoring
+  protects it, not the helper.) **Control, same `it`:** the
+  `.gn-project__scope-note` rule is byte-identical to what it was — its whole declaration list pinned,
+  not just the two declarations this change adds elsewhere — because the one-line way to reserve a band
+  is a `min-height` on that rule itself, which would satisfy every assertion above while changing the
+  treatment of a class the BOARD tab also renders (`board-scope-note`). Both position reads and the
+  single-selector read run on COMMENT-STRIPPED text: `ui.css:5799` carries prose naming
+  `.gn-project__scope-note`, so a raw sweep can find a comment and report its position as the rule's.
+  (Post-commit mutation: dropping `min-height` from the new rule reddens it.) —
+  (`apps/web/test/project-page-head.test.tsx`)
+- **13.1383** 🧪 **THE PAINT: THE CONTROLS ROW NEVER MOVES; THE RAIL MOVES ONLY WHERE THE SENTENCE WRAPS.**
+  ⚠ This opening asserted "nothing moves … at **1000 px and 1280 px** … the note row is **18 px** tall in
+  both states" before anyone measured it, and the measurement below falsifies the 1000 px half. It is
+  rewritten rather than left standing with a correction bolted underneath, because the first sentence is
+  what a reader takes away. What is true at BOTH widths: `.gn-project__header`'s bounding rect is
+  IDENTICAL with the switch off and on. What is true only at 1280 px: the rail's `top` is identical too
+  and the note row is 18 px in both states. jsdom applies no layout, so this half
+  cannot be a jsdom case — `13.1381` asserts the DOM structure that makes the paint possible and
+  `13.1382` the declarations that reserve the band; this one is the measurement, taken by the controller
+  in the rebuilt dev stack (`ctl rebuild`), which records the numbers here. **Recipe:** sign in on
+  :3001, open a project, read `document.querySelector('.gn-project__header').getBoundingClientRect()`
+  and the rail's `getBoundingClientRect().top` with the switch off; click *Only tickets in progress*;
+  read both again. The two pairs must be equal at each width. A viewport narrow enough to wrap the
+  sentence onto two lines is OUT of scope by the owner's ruling — the rail shifts by one line there and
+  that is accepted. — (controller measurement; no test file)
+
+  **MEASURED 2026-09-23** by the controller on the dev stack rebuilt from `release/2026-09-23`
+  `91a82eefaff4`, Chrome, signed in on :3001, each width read after a full reload and driven switch OFF →
+  ON. **The case PASSES at 1280 px and FAILS at 1000 px**, and the failure is a defect in this section's
+  own PROSE, not in the change:
+
+  | width | note width | header rect (off → on) | railTop off → on | note height off → on | verdict |
+  |---|---|---|---|---|---|
+  | 1280 px | 1240 | `[136.09, 575.65, 684.35, 44]` → identical | `248.59` → `248.59` | 18 → 18 | ✅ nothing moves |
+  | 1000 px | 960 | `[136.09, 295.65, 684.35, 44]` → identical | `248.59` → **`266.59`** | 18 → **36** | ❌ rail moves 18 px |
+
+  **The header never moves at either width** — the owner's actual complaint (the note dropping the whole
+  controls row out from beside the title) is fixed, and that is what `13.1381`'s structure buys.
+
+  What is wrong is the claim, carried in this case's first sentence, in `page.tsx`'s docblock and in the
+  brief, that **1000 px holds a single line**. It does not: the note spans the `.gn-project` column, which
+  is **960 px** wide at a 1000 px viewport and **1240 px** at 1280 px — the content column is a fixed
+  width that CENTRES (`header.left` moves 295.65 → 575.65 while `header.width` stays 684.35), but the note
+  is not inside that column, so its own width tracks the viewport. The sentence needs somewhere between
+  960 and 1240 px. At 960 it wraps, the row becomes 36 px, and the single reserved line no longer covers
+  it, so the rail drops by exactly one line.
+  So 1000 px is a "viewport narrow enough to wrap" — the very case the original text called out of scope
+  while naming it as a width that holds.
+
+  **RULED 2026-09-23 (owner): the 18 px rail shift at ~1000 px is ACCEPTED.** The alternatives — reserving
+  two lines, or shortening the sentence — were offered and not taken. So the row reserves ONE line, and at
+  viewports where the sentence wraps the rail drops by exactly one line when the switch comes on. That is
+  the shipped behaviour, not an outstanding defect, and a future reader finding the 1000 px numbers above
+  should not "fix" them.
+
+  **STAYS 🧪 and is deliberately NOT flipped to ✅.** The acceptance settles the product question, not the
+  evidence question: this is a hand-run controller measurement with no test file, and `check-case-citations`
+  demands a citing test for a ✅. jsdom applies no layout, so the only instrument that could witness it is a
+  browser. `13.1381` (DOM structure) and `13.1382` (the declarations) are the automated halves and are ✅.
+
+## The New ticket form — the backlog question, its memory, and the two fields (owner request 2026-09-23)
+
+*Block `13.1351`–`13.1380`, allocated to `task/new-ticket-form-fields` against `release/2026-09-23`
+`fd114852` — the FIRST task branch cut off a release branch rather than `main` (see
+`13-hig-per-screen.md`'s block table). The case file is this one, and a wide block was reserved on
+purpose: the assignee and description asks reach the domain payload, the reducer, the projections and the
+permission rules, not only the dialog.*
+
+- **13.1351** ✅ The dialog asks **"Starts in the backlog?"** with the SHARED `Switch`, and it opens ON.
+  Three things asserted together because a lookalike satisfies any one of them alone: the control carries
+  `gn-switch` and sits inside a `gn-switch-row` label (so it IS `packages/ui/src/components/switch.tsx`
+  rather than a second on/off control for the product to keep in step); it is CHECKED, which is the
+  ruling's default and, because ON means BACKLOG, is also the draft's first assertion in 13.591b; and its
+  accessible name is the question itself — `Switch`'s `children` ARE the name, with no `aria-label` to
+  drift from the words on screen. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1352** ✅ The switch is present and **ENABLED for every parent** — §5.4's condition is lifted.
+  Three arms in one `it`, and all three are needed: with NO parent chosen (the state the owner was
+  looking at, where the old checkbox was absent and the sentence dangled), under an IN-FOCUS parent (the
+  only parent that ever revealed the old control), and under a BACKLOG parent (which hid it outright).
+  Dropping the middle or last arm leaves the case passing against a switch enabled only where the
+  checkbox used to appear. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1353** ✅ Turning it OFF with NO parent chosen sends `start: 'focus'` — a ticket may be born in
+  focus without a parent. **Its CONTROL is a separate `it` in the same block** and that is deliberate: the
+  pair pins the POLARITY, which is the one thing a rename could silently reverse. The switch means BACKLOG
+  when ON and the checkbox it replaced meant FOCUS when checked, so a control wired straight to the old
+  `startInFocus` sense would pass the ON-direction case while sending the opposite of what the OFF one
+  asserts. Both are red together or the direction is not being tested. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1354** ✅ The thing the switch replaced is **GONE** — the old unconditional sentence *and* the
+  `"Start in focus"` checkbox. The `?` is the whole difference in text and `getByText` matches normalised
+  text EXACTLY, so asserting the old string absent and the new question present cannot both be satisfied
+  by one node; a dialog that kept the `<p>` and added a switch beside it is exactly the pair the owner
+  asked to have replaced. A second control for the same fact is refused too: a leftover checkbox could
+  disagree with the switch, since the draft reads the switch alone. Final arm: exactly ONE `checkbox` role
+  remains, so "the old one is gone" cannot be satisfied by a dialog that lost the switch as well. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1355** ✅ The answer is **REMEMBERED for the user**: turning the switch OFF survives a close and a
+  reopen, and the stored record is `{userId, start}` read back and compared WHOLE — a record that kept the
+  answer without the user would still satisfy the reopen assertion while being precisely the leak the
+  key's shape exists to prevent. The reopen is the REAL path rather than a fresh mount: the flow mounts
+  this dialog for its whole life and only toggles `open`, so the seed has to survive `open: false → true`
+  on a SURVIVING instance — which a component seeding only in `useState`'s initialiser would fail. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1356** ✅ A record written for **ANOTHER user is not honoured**, and its CONTROL — in the same `it`,
+  and the reason the case can be trusted — reads the SAME BYTES for the user the record names and finds
+  them honoured, turning the switch OFF. Without that arm, "the other user's record was refused" is
+  indistinguishable from a reader that failed for an unrelated reason: a typo in the key, an unparsed
+  shape. Both halves are needed because they fail independently. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1357** ✅ **Blocked site data** still renders the dialog, at the default (backlog ON), and the switch
+  still toggles. The stub replaces `window.localStorage` itself rather than one method, because a browser
+  with site data blocked throws on the ACCESSOR — and the toggle arm is what proves the WRITE is guarded
+  as well as the read, since the write is the half that throws here. `configurable: true` plus a `finally`
+  restore, because leaving a throwing stub in place would poison every later case in the file. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+*The rest of block `13.1351`–`13.1380`: the description and the assignee. **`13.1360` and `13.1361` are
+UNUSED** — the payload-shape cases and the engine's field-kind parity were folded into `13.1358`/
+`13.1359` and into `13.1364` rather than split out, and ids are never renumbered, so they stay empty.*
+
+- **13.1358** ✅ A ticket's BIRTH description is a CLAIM on head state, attributed to the creator and the
+  creation clocks — or there is NO `description` key at all. The two halves are one case because they are
+  one decision: the reducer spreads the claim in only when the member is present, so
+  `Object.keys(state.fields)` is the assertion, not a value. A `claim(null, env)` for the absent member
+  would answer *"has anybody described this?"* YES for every ticket nobody described, and name the person
+  who filed it as the one who set an empty description — `ticket-sheet.tsx` reads that key's PRESENCE
+  (`descriptionClaim === undefined`) to choose between "no description yet" and "set by X on DATE".
+  Controls in the same case: the title and priority claims are written beside it (so the absence is one
+  key and not a fold that wrote nothing), the value is the DOCUMENT and not a projection of it, and a v1
+  `ticket.created` carrying neither new member still folds. Payload half: `description` is optional, is
+  held to the SAME `z.record` shape `ticketFieldSetPayload` demands of the field_set door — a string
+  REDDENS rather than reaching head state as a value the edit door would then refuse to replace — and an
+  explicit `null` is REFUSED, because at birth absent is the one spelling of none. —
+  (`packages/domain/test/ticket-state.test.ts`, `packages/domain/test/ticket-events.test.ts`)
+- **13.1359** ✅ A ticket's BIRTH ASSIGNEE lands on `state.assigneeId`; absent or explicit `null` leaves
+  it `null`, which is what every pre-existing `ticket.created` meant (the reducer hard-coded `null` there
+  before the member existed). The CONTROL pinning `null`-equals-absent is deliberate: the client OMITS
+  the member rather than sending `null`, and a future schema that refused `null` would have to change
+  that case on purpose rather than drift. `assigneeId` is `z.string().min(1).nullable()`, so an
+  EMPTY-STRING assignee — a named person who is nobody — is refused at the door, exactly as
+  `ticketAssignedPayload` refuses it. Payload round-trips are asserted through `parseEvent`, which
+  compares the PARSED payload to what was submitted, so a member the schema stripped would redden rather
+  than vanish. —
+  (`packages/domain/test/ticket-state.test.ts`, `packages/domain/test/ticket-events.test.ts`)
+- **13.1362** ✅ **THE BIRTH ASSIGNEE IS HELD TO THE SAME NAMED-PERSON RULE `ticket.assigned` IS** — a
+  `ticket.created` naming somebody with no role in the workspace is refused
+  `permission.role` / *"That person is not in this workspace."*, asserted as the WHOLE refusal object
+  because this module reports `permission.role` from four places and the actor here really is on the
+  project, so nothing else could have fired. **PLANTED DEFECT — measured before the fix:** the identical
+  name arriving on a `ticket.created` was `committed` while `ticket.assigned` refused it, because the
+  E6-17 lookup ran AFTER `canSee` and `ticket.created` returns before that block (there is no ticket to
+  see yet). The lookup is now ONE function called from both branches; writing it a second time inside
+  the `ticket.created` branch would have been two spellings of one rule, free to drift. The read side
+  would have served the typo as an assignee NAME (`roster.get(id) ?? id`), matched it in the list's
+  `assigneeId` filter, and made a `groupBy=assignee` column for it. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+- **13.1363** ✅ CONTROL for `13.1362`, in the same `describe` and its own `it` so the refusal cannot pass
+  against a build that refuses every birth assignee: a REAL member is admitted, and BOTH spellings of
+  nobody are admitted too (`null`, and the member omitted entirely) — without those two arms the fix
+  would have made the dialog's default, Unassigned, unsubmittable. —
+  (`apps/server/test/permissions/check-visibility-permission.test.ts`)
+- **13.1364** ✅ A ticket's BIRTH description reaches `proj_search.description`, **and reaches `tsv`** —
+  the second half is what an exact-column assertion cannot show, since a value written to the right place
+  but never indexed would satisfy the first. **Measured before the fix:** the `ticket.created` branch
+  inserted `(ticket_id, workspace_id, project_id, title)` and nothing else, so a description composed at
+  creation lived in head state and the sheet while the search column kept the table's own default — the
+  person found the ticket by its title and not by the words they had just typed. The extraction is the
+  `ticket.field_set` branch's own `docToPlainText` call, so the two doors cannot disagree about what a
+  description is as search text. Controls: the title still matches (the row exists and is indexed at
+  all), and a ticket born with NO description gets `''` rather than the string `'undefined'` or `'null'`
+  indexed instead. **In its own FILE rather than in `search.test.ts`**, whose docblock makes case order
+  part of its fixture and two of whose read-only cases assert the table's exact row count — a case that
+  ADDS rows would have forced edits to assertions belonging to cases about something else. —
+  (`apps/server/test/projections/search-birth-description.test.ts`)
+- **13.1365** ✅ The create dialog mounts the description composer from its `editorSlot` prop as a
+  `'description'` composer — empty (`doc: null`), editable, scoped to the caller's workspace, carrying a
+  REAL ULID for a ticket that does not exist yet, and with NO `submit` wired (there is nowhere to submit
+  to; Create is the one act). All renders are required to agree on the SCOPE, because a slot whose mode
+  or workspace changed between renders is a composer re-mounting under the person mid-typing. A document
+  the slot reports travels in the draft as `description`, **under the id the slot was scoped to** — the
+  scoping invariant, without which a dialog that showed the composer one id and created the ticket under
+  another would satisfy every other assertion here. The composer test doubles as the seam's proof: it
+  drives a FAKE slot, because what belongs to app-core is the contract and what belongs to
+  `packages/editor` is that package's own suite. Second half, in `packages/editor`: `onChange` carries
+  the document as it is typed and NOT before anything is typed (`TicketEditor` wires it to ProseMirror's
+  `onUpdate`), so a host can read "never reported" as "no description"; and it is the DOCUMENT, not a
+  plain-text projection, because the field_set door refuses a string. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`,
+  `packages/editor/test/ticket-editor-slot.test.tsx`)
+- **13.1365b** ✅ `submitSlot: 'none'` omits the slot's own submit control and KEEPS THE FOOTER, which
+  also carries the hint sentence — asserted on the footer rather than by counting children, since the
+  hint is a sibling the button's removal must not take with it. The composer is still editable, so "no
+  button" cannot be satisfied by a slot that rendered nothing. **Control in the SAME `it`** (a control in
+  a sibling case proves nothing about this one): the same mount WITHOUT the prop still draws the button,
+  so the case cannot pass against a component that lost its submit control for every mount. The prop is
+  seam-only on `TicketEditorSlotProps`, the `editorRef` precedent — it is a fact about mounting THAT
+  component, and the shared contract cannot carry it. —
+  (`packages/editor/test/ticket-editor-slot.test.tsx`)
+- **13.1366** ✅ An EMPTY description is OMITTED from the draft — the KEY is absent, not a document that
+  renders to nothing. The key set is the assertion, because `description: undefined` satisfies a
+  `toEqual` against an absent key. The decision is `docToPlainText(...).length === 0`, the domain's one
+  total projection, so an untouched composer (which reports nothing at all) and one emptied back to
+  nothing take the SAME arm. CONTROL in the same describe: with no `editorSlot` at all the dialog still
+  works and sends no description — without it, "an empty document is omitted" passes against a dialog
+  that omitted descriptions entirely. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1367** ✅ The Assignee picker offers **"Unassigned" plus the caller's roster**, and omitting it is
+  the default: `null` travels, not absent and not `''`, because `ticketCreatedPayload.assigneeId` is
+  nullable and `TicketState.assigneeId` is `string | null`, so `null` is the one spelling of nobody the
+  whole chain agrees on. "Unassigned" is an OPTION and not the absence of one — a picker with no way back
+  to it cannot un-assign. A chosen person travels as their id, asserted after reading the trigger back so
+  the label the person sees and the value the payload carries are both pinned. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1368** ✅ An UNREAD roster is STATED, and the draft carries `assigneeId: null` rather than a wrong
+  one — the discipline `parentCandidatesUnavailable` established one field over: an empty picker asserts
+  *nobody in this workspace can be assigned*, which is a claim made from a read that never answered, and
+  inside a modal the sentence that would correct it is on the page behind. The caller's own reason
+  travels VERBATIM and unparaphrased, so a person can tell a refusal from a read still in flight.
+  Enforced at the SUBMIT site as well as by hiding the picker, because the prop can arrive after a
+  selection has been made and hiding a control does not clear the state behind it (3.157's own
+  invariant). —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1369** ✅ **CREATING A TICKET OPENS IT** — measured before anything was written, because the
+  wiring was already present end to end and the ask read as a missing feature only because NOTHING
+  PINNED IT: an unpinned path is one refactor away from being a missing one, and the two are
+  indistinguishable by looking at the app. The case runs the ROUTED page (not the sheet mounted
+  directly): a real create through the real dialog reaches `router.push`, and the id it pushes is read
+  back off the `ticket.created` envelope that was actually ingested — so the URL cannot name a ticket
+  other than the one the ledger received, which a shape check could not tell. Then the sheet is opened
+  from that param and its title is read off `gn-ticket-sheet__title-input`, the sheet's own title
+  CONTROL; `getByText` would FAIL against a perfectly open sheet, measured, and that is recorded because
+  it is the mistake this case's first draft made. CONTROL, in its own `it`: with no `?ticket=` param no
+  sheet renders, asserted after the page has certainly loaded, so the arm above is not reading a page
+  that always shows one. **⚠ THIS WITNESSES THE CLIENT HALF ONLY.** `getTicket` is stubbed, so "the sheet
+  answered" means "the sheet renders when its read answers" — it says NOTHING about whether a read
+  against a live server, issued moments after the create, sees the row. That is the question the owner's
+  separately-reported live-update defect asks, and this case must not be read as evidence about it
+  either way. —
+  (`apps/web/test/new-ticket-opens-sheet.test.tsx`)
+- **13.1370** ✅ A person chosen BEFORE the roster was withheld does not reach the draft — 3.157's
+  defect, one field over. The transition is the thing: the picker works, a person is chosen, and THEN
+  the read fails, so React state survives while the control that set it stops rendering. **This needed
+  its OWN case, measured rather than tidy:** `13.1368` sets `assigneeCandidatesUnavailable` from the
+  FIRST render, so its picker is never usable and `assigneeId` is still `UNASSIGNED` at Create — it
+  exercises the `UNASSIGNED` arm and nothing else. **Mutation (dropping the
+  `assigneeCandidatesUnavailable !== undefined` term from the submit boundary) left all 39 cases in the
+  file GREEN**, i.e. the submit-site check was covered by no test at all while looking covered; with
+  this case it reddens exactly here and nowhere else. Asserted on the DRAFT and not the screen, because
+  the sentence was already correct and the payload was what contradicted it. Control in the same `it`:
+  the picker is opened and used first, since a case that started withheld could never build the state
+  this defect needs. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+## Two defects the owner found in the release branch before it shipped (2026-09-23)
+
+Ids `13.1384`–`13.1385`, minted from the §13 tip (`13.1383`). Both were found by the owner USING the
+app, not by any suite, and both are recorded here with what the suites failed to ask.
+
+- **13.1384** ✅ **A TICKET ASSIGNED AT BIRTH READS BACK.** The New ticket dialog's Assignee picker names
+  the person inside `ticket.created` and appends no `ticket.assigned`. `assignedProvenanceFor` queried
+  `type = 'ticket.assigned'` alone, so a birth-assigned ticket had an `assignee_id` in `proj_tickets` and
+  no claim behind it — which `assembleListCards` and `readTicket` are both built to read as "the
+  projection and the ledger disagree" and to THROW on. Measured live: **HTTP 500** on
+  `GET /v1/projects/:id/tickets` (taking out the List, Calendar, Timeline and Backlog tabs of the whole
+  project) and on `GET /v1/workspaces/:ws/tickets/:id` (taking out the sheet). One such ticket broke the
+  project for everyone who could see it.
+  The fix is a PREDICATE where the exclusion was: a `ticket.created` joins the candidates only when its
+  payload names somebody, so a birth with no assignee still contributes nothing and the original
+  argument — never attribute "nobody is assigned" to the creator — is preserved rather than traded away.
+  **Why nothing caught it:** `seedTicket`'s `assigneeId` writes the separate `ticket.assigned`, so the
+  fixture could only build the shape that already worked. `birthAssigneeId` builds the other one and
+  exists for this case. **Post-fix mutation:** reverting the predicate to `type = 'ticket.assigned'`
+  reddens this case and leaves the other 14 in the file green.
+  **Known gap, named rather than papered over:** the LIST door is not directly asserted — this seeded
+  world answers 404 on that route before reaching the provenance check, so an arm there would pass with
+  the fix reverted. Both doors resolve through the same `assignedProvenanceFor`. A direct list-door case
+  needs `seedWorkflowDef` and is owed. — (`apps/server/test/routes/tickets-read.test.ts`)
+- **13.1385** 🧪 **THE PROJECT HEADER DOES NOT FLICKER WHEN THE SCOPE SWITCH IS TOGGLED.** Owner:
+  *"the project header still has a flicker during transition."* Measured by sampling
+  `getBoundingClientRect()` on every animation frame across the toggle: the header went
+  `684.4×44.0` → **`797.2×55.2`** → `684.4×44.0` over three frames, ~40 ms, while the rail and the note
+  row did not move at all. The child that changed was the last one: `gn-button--primary@116×44` — the
+  New ticket button — replaced by `gn-new-ticket__gate@229×23`, its "Preparing the New ticket form…"
+  fallback, and back.
+  Cause: the gate tested `list.rows === null`, `rows` is nulled on every query-KEY change, and the list's
+  key carries the filter. So a re-read retracted the button. Not a CSS transition — there are none on
+  these rules. **Pre-existing**: the identical condition is on `main`, so neither the reserved scope row
+  nor the New-ticket work introduced it.
+  Fix: `LiveQueryResult.hasAnswered` — a LIFETIME flag the key-change effect deliberately does not reset
+  — surfaced as `TicketListState.rowsHaveAnswered`, and the gate asks that instead. An error counts as an
+  answer, so a failing read cannot hold the control hostage forever.
+  🧪 because the defect is a transient LAYOUT state and jsdom applies no layout; the acceptance is the
+  frame-by-frame measurement above, re-taken on the rebuilt stack. **An automated arm is owed** and is
+  writable in jsdom — render, toggle the switch, assert the New ticket button is still in the document —
+  which would have caught this without a browser. — (controller measurement; no test file yet)
+
+## Opening a ticket from My Work opens the sheet THERE (owner request, 2026-09-23)
+
+Owner: *"opening a ticket from my work should open the sheet on the my work page, not redirect to the
+project page."* Ids `13.1391`–`13.1401`, from this branch's block (`task/my-work-sheet-in-place`,
+allocated in `13-hig-per-screen.md`).
+
+Until this change every title button on `/w/:ws/my-work` pushed
+`/w/:ws/p/:projectId?ticket=…` and the reader arrived on the project page — a board they had not asked
+for — with the sheet open over it. The page now mounts its own `TicketSheet`, driven by a `?ticket=`
+param **on its own route**, and the click keeps the reader where they were.
+
+**Three decisions the change had to make, recorded because they are visible in the assertions below:**
+
+1. **The open ticket lives in the URL, not in component state.** A param survives a reload and is
+   shareable as a link; `useState` is neither. `13.1392` is the arm that only a param can pass — it
+   loads the page with the param already set and asserts the sheet is there, which a state-based
+   version fails on its first render.
+2. **`MyWork`'s `onOpenTicket` signature is unchanged.** The view still takes one
+   `(ticketId: string) => void` and knows nothing about what opening means; what changed is what the
+   PAGE does with the id.
+3. **The sheet's project-scoped props come from the OPEN TICKET.** My Work spans projects, so there is
+   no page-level project to read: the project is recovered from the rows the page already holds
+   (`assigned`/`inTransit`/`shared`, and every `AttentionItem` — the strip is mounted here) or, for a
+   ticket no section carries, asked of `TicketLocator` — the same one-shot gateway the inbox uses.
+   **A ticket the server will not place says so and mounts nothing**; it is not redirected somewhere
+   plausible, and no fallback project is guessed.
+
+- **13.1391** ✅ **A CLICK ON A MY WORK ROW OPENS THE SHEET ON THE MY WORK PAGE.** One push, to
+  `/w/:ws/my-work?ticket=<id>` with `{ scroll: false }` — asserted as `toHaveBeenCalledTimes(1)` plus a
+  negative on any `/p/` path, because the defect is a SECOND push to the project page — and the sheet is
+  then in the document with the clicked ticket's title, with My Work's own heading still on screen.
+  **Post-commit mutation (measured):** pushing the OPEN TICKET's project path instead of this page's —
+  i.e. the old redirect — reddens this case, `13.1163`, `13.1397` and `3.162`: every arm in the tree
+  that asserts where a click GOES. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1392** ✅ **THE PARAM IS THE STATE: a page loaded on `?ticket=` mounts the sheet with NO
+  navigation at all.** A reload — or a link somebody sent — reaches the same sheet, and the page pushes
+  nothing on mount (a page that pushed would fight the back button).
+  **Post-commit mutation (measured):** gating the sheet on a click-time `useRef` — which is what
+  `useState` would have given you, since the sheet then requires a click and a reload opens nothing —
+  reddens `13.1392`, `13.1395`, `13.1396`, `13.1397` and `13.1400` (5 of 13), and leaves `13.1391` and
+  `13.1393` green. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1393** ✅ **CONTROL for `13.1391`: with no `?ticket=` param the page renders NO sheet at all.**
+  Its own case rather than an arm, because "the sheet opened" would otherwise also be satisfied by a page
+  that mounts a sheet unconditionally — a different bug from the one the owner reported, and one that
+  would delete the page's subject.
+  **Post-commit mutation (measured):** defaulting the id when the param is absent
+  (`?? myWork.data?.assigned[0]?.ticketId`) reddens EXACTLY here — one case of the thirteen. (The
+  mutation the first draft of this entry named, *dropping the `openTicketId !== null` term*, does NOT
+  redden it: the sheet is also gated on a resolved project, which is `null` without an id, so that
+  mutation is a check that cannot fail and was replaced.) —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1394** ✅ **THE SHEET IS TOLD THE OPEN TICKET'S PROJECT, not the page's first row.** Two rows in
+  two projects, the second one clicked: the project crumb is an ADDRESS, so the assertion is the href
+  (`/w/:ws/p/<the open ticket's project>`) *and* the absence of the other row's project — a resolver
+  that fell through to the first list passes the href check while failing the absence. **Mutation:**
+  resolving the project from the first row of the first section — the wrong-project answer this case
+  names — reddens here, `13.1397`, `13.1398` and `3.162`: one wrong resolver is wrong from four
+  directions, which is why the assertion is the href AND the other project's absence. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1395** ✅ **CLOSING THE SHEET IS THE PARAM'S REMOVAL, and it stays on My Work**: one push, to
+  `/w/:ws/my-work` with no param and `{ scroll: false }` — not to the project page, which is where a
+  close would have to go if the sheet were living somewhere else. **Mutation:** making `onClose` a no-op
+  reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1396** ✅ **THE OPEN TICKET'S FILES ARE KEYED PER TICKET.** Swapping `?ticket=` in place — which
+  on this page happens without leaving the page, because the sheet's parent chip does exactly that —
+  re-asks `getTicketAttachments` per id, draws the second ticket's file and **not** the first's. The
+  measured half is the read count (`[<first>, <second>]`), because a DOM that happened to lose the old
+  entry could also be an accident of timing. **Mutation:** keying the read on a constant
+  (`'attachments'` instead of `` `${id}:attachments` ``) reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1397** ✅ **THE SHEET'S `Subtask of {parent}` CHIP OPENS THE PARENT HERE.** The chip is a BUTTON
+  only because this mount passes `onOpenTicket` — with none, the sheet renders the plain pill — so "the
+  chip is a control" is itself the assertion that the prop is wired, and the parent, which is in no
+  section of this page's view, is then placed by the locator with its crumb carrying the located
+  project. **Mutation:** dropping `onOpenTicket` from the mount reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1398** ✅ **THE ATTENTION STRIP'S ROWS OPEN HERE TOO, WITHOUT ASKING THE SERVER.** The strip is
+  mounted on this page and shares its `openTicket`, and its rows carry a `projectId`, so a click is
+  placed from data already in hand. The assertion is the locator NEVER being asked — with a locator
+  fixture that answers `null`, a resolver that had to ask would open nothing. **Mutation:** removing the
+  attention-row lookup reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1399** ✅ **AN ENDED SESSION MOUNTS NO SHEET.** With both reads answering 401 and `?ticket=` set,
+  the page draws the expired-session notice, mounts no dialog, and **asks nobody where the ticket is** —
+  the page's own `!expired` term, which is new code on this mount and would otherwise fire a locate at a
+  server that answers 401, painting an error about the wrong thing over the message that matters.
+  **Post-commit mutation (measured):** dropping the `expired` term at BOTH sites — the effect's guard
+  and the mount gate — reddens exactly here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1400** ✅ **A DELETION MADE FROM MY WORK LEAVES THE VIEW.** The sheet's footer Delete is driven
+  for real (two presses since E2-35), the `ticket.deleted` is committed, and then BOTH of the page's
+  reads are re-asked — the correction must not depend on the workspace stream, which is the defect the
+  project page's own handler records. **Mutation:** emptying `onDeleted` reddens here. —
+  (`apps/web/test/my-work-sheet-in-place.test.tsx`)
+- **13.1401** ❌ **OWED: a deletion made from My Work offers no toast and no Undo.** The project page's
+  deletion narration is a one-slot toast plus a durable-undo strip built on that page's own state
+  (`p/[projectId]/page.tsx:540`), and this task explicitly excludes extracting that machinery; an Undo
+  offered by a page that does not hold the ticket's project is a control the page could not honour. So
+  the row leaves the view and nothing is promised — which is honest but is a capability gap on a new
+  surface, recorded rather than left to be discovered. —
+  (no test file; the gap is the absence of one)
+
+## The board's workflow group is a disclosure (owner request, 2026-09-23) — ids `13.1406`–`13.1420`
+
+Owner: *"in the board, the workflow is collapsible. if the workflow has no tickets in it, it is shown
+collapsed by default."* Cases live in `packages/app-core/test/views/board-workflow-collapse.test.tsx`;
+the control's CSS is pinned by `13.1418` in that same file, which reads `packages/ui/src/ui.css`.
+
+**⚠ THE REQUEST'S PREMISE WAS FALSE, AND THAT IS THE FIRST THING THIS SECTION RECORDS.** The sentence
+above reads as though the group were already collapsible and only its default needed changing. Measured
+at the commit the branch is cut from (`45091f08`), it was neither: `board.tsx` rendered a bare
+`<h2 class="gn-board__workflow">`, only where a board had MORE THAN ONE workflow group, and the columns
+below it always rendered. So this block bought a new control, a new default AND a new store — not a
+default change.
+
+**TWO OWNER RULINGS ARRIVED MID-FLIGHT AND BOTH MOVED THE WORK.** They are recorded here because the
+cases answer to them rather than to the original brief:
+
+1. **Single workflow → UNCOLLAPSED, including when empty.** *"A lone workflow group starts expanded,
+   including when it is empty… The group is still collapsible — the control exists and the person may
+   collapse it by hand. Only the DEFAULT is pinned here."* Whether a lone workflow grew a heading was
+   left to the implementer **provided it ended up with something to click**, so the heading's old
+   `groups.length > 1` gate is GONE and every group is named and collapsible (`13.1412`, `13.1420`).
+2. **The choice PERSISTS — first as a server preference, then corrected to `localStorage`.**
+   *"by persist i didnt mean to database/server. only on the local storage, clientside."* The first
+   reading sent the work at `ProjectViewPrefs` and the server-owned `.strict()` document; that was
+   backed out unstarted, and `packages/app-core/src/preferences/workflow-collapse.ts` is the store,
+   following `new-ticket-start.ts`'s shape (keyed by user, `''` reads and writes nothing, `try`/`catch`
+   around the accessor AND the parse, a default that survives every failure).
+3. **A collapsed group that stops being empty AUTO-EXPANDS, and that expansion persists** (`13.1415`),
+   while a collapse a PERSON made is never undone by it (`13.1416`).
+
+**THE STORED SHAPE, AND WHY IT IS NOT THE OBVIOUS ONE.** The record holds ONLY the groups a person
+chose — `{userId, projects: {<projectId>: {"<workflowId>@<version>": boolean}}}`, `true` expanded,
+`false` collapsed. A group with NO entry has no choice recorded and its state is derived from the group
+itself. That absence is the whole reason the auto-expand rule is safe: it fires only for a group that is
+collapsed *by the default* (absent) and never for one collapsed *deliberately* (`false`), which is the
+distinction the owner asked to be answered explicitly rather than papered over. Keying is by user (a
+shared laptop must not inherit the previous person's collapse) AND by project (two projects can hold the
+same workflow at the same version, so a user-only key would share one collapsed set between two boards).
+
+- **13.1406** ✅ **EVERY GROUP HEADING IS A DISCLOSURE BUTTON CARRYING `aria-expanded`.** The tag is
+  asserted, not only the attribute: a `div` with a click handler would carry `aria-expanded` and still
+  not be a control. The button lives INSIDE the `<h2>` (the WAI-ARIA disclosure pattern), which is why
+  `heading-outline.test.ts` still counts exactly one heading of this family in the file.
+- **13.1407** ✅ **AN EMPTY GROUP STARTS COLLAPSED** — its rail carries `hidden` and its columns are gone
+  from the accessibility tree. The control arm is the sibling non-empty group, read through the SAME
+  `queryByRole('region', …)` in the same case, so a query that simply never matched cannot read as a pass.
+- **13.1408** ✅ **A NON-EMPTY GROUP STARTS EXPANDED**, both groups of a two-workflow board, both
+  directions of the same query — so "everything is visible" cannot be satisfied by a `hidden` attribute
+  that is never written at all.
+- **13.1409** ✅ **COLLAPSED HIDES THE COLUMNS, NOT MERELY THE CARDS.** The per-column `Add a ticket`
+  count goes 3 → 1 across the collapse, and the survivor is asserted to live in the SIBLING's rail. The
+  load-bearing probe is a button ROLE query: this environment measures `getAllByText` as still finding
+  text inside a `hidden` subtree, so a case counting `EMPTY_COLUMN_COPY` would pass over a collapsed
+  group (recorded at the assertion itself rather than left as an unwritten trap).
+- **13.1410** ✅ **A PERSON CAN COLLAPSE A NON-EMPTY GROUP**, and its card goes with it: `listitem` count
+  2 → 1, with the surviving column and the sibling rail asserted untouched.
+- **13.1411** ✅ **THE DISCLOSURE IS KEYBOARD-REACHABLE AND -OPERABLE.** Tabbing reaches it (a bounded
+  loop stopping on success, so the button is not pinned to a tab index) and Enter then Space each flip it.
+- **13.1412** ✅ **A LONE WORKFLOW GETS A HEADING AND A WORKING TOGGLE** — the widened half of the
+  ruling. The heading did not render at all for one group before this branch.
+- **13.1413** ✅ **A LONE EMPTY WORKFLOW STILL SHOWS SOMETHING TO ACT ON** (two arms). The trap the
+  ruling names: an empty group collapsed by default on a single-workflow board would hide the columns,
+  their `Add a ticket` and the board's own sentence — every door off the page. The second arm holds the
+  other half of the ruling apart from the first: the person MAY collapse it by hand, and then the
+  heading and the sentence are what remain, by their own choice.
+- **13.1414** ✅ **THE CHOICE IS REMEMBERED, PER USER AND PER PROJECT** (four arms). Survives a real
+  unmount/remount with the record read back WHOLE (the user id is what the key's shape is for); another
+  user's record is refused *with the control that the same bytes DO answer for the user they name*;
+  another project's record is refused the same way; and a record this build does not recognise — a
+  `"yes"` for a boolean — answers the default, while a signed-out board (`''`, the shell's sentinel)
+  writes nothing at all.
+- **13.1415** ✅ **A GROUP NOBODY COLLAPSED REVEALS NEW WORK** (two arms). A card arriving in an
+  empty-default collapsed group opens it AND writes the expansion through, so a reload cannot put the new
+  work back behind a heading. **The second arm counts WRITES** — the owner named this hazard by name
+  (*"the board re-reads on every stream frame — a naive effect here is a write storm"*) — asserting that
+  mounting writes nothing, the one transition writes once, and four re-reads of the same board (the same
+  object twice, then a fresh but EQUAL one twice) write nothing more. ⚠ The instrument is
+  `vi.spyOn(Storage.prototype, 'setItem')`: the instance-level forms record **0** calls while the write
+  succeeds, so a case built on either would report "no write storm" over any number of writes.
+- **13.1416** ✅ **A COLLAPSE THE PERSON MADE IS NOT UNDONE BY AN ARRIVAL** (two arms, the second added
+  after a mutation round — see below). The group stays collapsed and the STORE IS UNCHANGED, asserted by
+  comparing the whole record before and after, so the refusal to reopen is a refusal to WRITE rather than
+  a write the render ignored. **The second arm is the one that actually reaches the stored shape's
+  distinction:** collapse a group by hand, move its last ticket OUT — the group is now collapsed by the
+  DEFAULT as well, which arms the auto-expand rule's transition guard — then move a ticket back IN. Both
+  of the rule's other terms point at reopening it, so only the `false` the shape remembers keeps it shut.
+  A board reaches that sequence in ordinary use; the first arm alone could not see the term at all.
+- **13.1417** ✅ **THE CARET IS DRAWN, NEVER TYPED.** Each toggle's `textContent` is exactly the workflow
+  name and no `▸`/`▾` appears anywhere on the board, so the accessible name cannot pick up a direction
+  glyph — the defect `.gn-list__columns-caret`'s own rule exists to avoid.
+- **13.1418** ✅ **THE ATTRIBUTES THE STYLESHEET KEYS ON ARE THE ONES THE COMPONENT WRITES.** Reads
+  `[aria-expanded]` and `[hidden]` out of the `.gn-board__workflow*`/`.gn-board__rail*` rules (comments
+  stripped first) and requires the rendered board to write both — the two halves `13.671` gave the List's
+  tray. It also carries the extractor's own positive control, and it is the reason
+  `.gn-board__rail[hidden]` exists in `ui.css`: the rail is `display: flex`, so without that rule the
+  attribute would be decorative and the group visibly open.
+- **13.1419** ✅ **THE HOOK-OWNING PATH COLLAPSES WITH THE SAME RULES.** With `moves` wired,
+  `BoardGroupWithMoves` forwards the state one level down to `BoardGroupSection`; a prop added on the
+  plain path and forgotten on this one would leave the two boards disagreeing with every read-only case
+  above still green.
+- **13.1420** ✅ **A LONE GROUP RESTS EXPANDED EVEN WHEN EMPTY.** The default, asserted separately from
+  `13.1412`'s control (which proves the toggle exists and works, so this cannot pass by virtue of a board
+  that never collapsed anything) — and with its own control in the same case: the identical fixture with
+  a SECOND group added IS collapsed by the empty-group rule.
+
+**Mutation witnesses — MEASURED, not predicted.** Each was applied to the committed tree, run against
+`board-workflow-collapse.test.tsx`, and restored from the commit afterwards (`19–20` tests in the file, so
+the "passed" column is what stayed green). ⚠ **An earlier draft of this block carried PREDICTIONS written
+before the runs, and two of them were WRONG** — they are corrected here rather than quietly dropped,
+because a mutation table nobody re-measured is the "a check that cannot fail" shape one level up:
+
+| mutation | reddened |
+|---|---|
+| `defaultCollapsed`'s `groups.length > 1` term dropped | `13.1413`, `13.1420` (3 failed) |
+| `groupIsEmpty` → `return false` | `13.1406`, `13.1407`, `13.1409`, `13.1414`, `13.1415`, `13.1419`, `13.1420` (11 failed) |
+| the rail's `hidden` attribute never written | `13.1407`, `13.1409`, `13.1410`, `13.1411`, `13.1412`, `13.1413`, `13.1414`, `13.1415`, `13.1416`, `13.1418`, `13.1419`, `13.1420` (14 failed) |
+| `aria-expanded` pinned to `true` | `13.1406`, `13.1410`, `13.1411`, `13.1416` (4 failed) |
+| the auto-expand effect's `previous` guard dropped | `13.1414`, `13.1415`, `13.1416` (6 failed) |
+| the toggle's write-through removed | `13.1414`, `13.1416` (2 failed) |
+| `readWorkflowCollapse` ignores the stored user id | `13.1414` (1 failed) |
+| the caret typed into the button's text node | `13.1417` (1 failed) |
+| the toggle's `type="button"` changed | `13.1406` (1 failed) |
+| the toggle's `aria-controls` removed | `13.1406` (1 failed) |
+| `.gn-board__rail[hidden]` deleted from `ui.css` | `13.1418` (1 failed) |
+| the caret's `content` glyphs replaced with `none` | `13.1418` (1 failed) |
+
+**Three more mutations, run after the checkpoint, one of which found a real defect in a case:**
+
+| mutation | reddened |
+|---|---|
+| `defaultCollapsed`'s `groupIsEmpty` term dropped (every group on a multi-workflow board collapsed) | `13.1406`, `13.1407`, `13.1408`, `13.1410`, `13.1411`, `13.1414`, `13.1415`, `13.1416`, `13.1418`, `13.1419` (10 failed) |
+| the rail's `id` made to disagree with its `aria-controls` | `13.1406` (1 failed) |
+| the auto-expand effect's `Object.hasOwn(groupChoices, key)` term removed | `13.1416` (1 failed) — **but only after the case was strengthened; see below** |
+
+**⚠ THE LAST MUTATION SURVIVED FIRST TIME, AND THAT IS THE ROUND'S REAL FINDING.** Dropping the
+`Object.hasOwn(groupChoices, key)` term — the term that stops the auto-expand rule undoing a person's own
+collapse — left the whole file **20/20 GREEN**. `13.1416` as written could not see it, and the reason is
+structural rather than incidental: its fixture never lets the group become EMPTY, so the group never
+becomes *collapsed by the default* either, the rule's `previous` transition guard alone keeps it shut, and
+the term the case was supposed to witness is **never reached**. The case was asserting the right property
+about a scenario in which the property is not load-bearing — a control that cannot fail, one level up from
+the kind this file already guards against.
+
+The fix is a second arm on `13.1416` and the only sequence where the term decides anything — a sequence an
+ordinary board reaches: **collapse a group by hand → move its last ticket out (it is now ALSO collapsed by
+the default, so the guard is armed) → move a ticket back in.** Both of the rule's other terms point at
+reopening it; the stored `false` is the only thing that stops it. Re-run against the strengthened case:
+**1 failed / 20 passed, `13.1416` — KILLED.**
+
+**EVERY CASE IN THE BLOCK NOW HAS AT LEAST ONE KILLER, measured rather than intended**: `13.1406` (four
+mutations), `13.1407` (three), `13.1408` (one, from the `groupIsEmpty`-term mutation — it is the control arm
+of `13.1407` and true both before and after the feature, so it needs a mutation that INVERTS the default
+rather than removes it), `13.1409` (three), `13.1410` (three), `13.1411` (three), `13.1412` (one),
+`13.1413` (one), `13.1414` (five), `13.1415` (four), `13.1416` (five), `13.1417` (one), `13.1418` (three),
+`13.1419` (two), `13.1420` (two).
+
+**`13.1408` HAD no killer in the first twelve and now has one, which is why the second table carries a
+third row.** It is the control arm of `13.1407` and is true both before and after the feature, so no
+mutation that REMOVES the default can redden it — only one that INVERTS it for a group that is not empty,
+which is what `default-ignores-emptiness` does. Recorded rather than passed over, because "this case is
+true either way" is exactly the shape a reviewer should expect to find a witness for, not to be told about.
+
+**One case elsewhere was AMENDED, and the amendment is a behaviour change rather than a repair.**
+`apps/web/test/board-narrowing.test.tsx` `13.469` asserted that a one-workflow board renders NO level-2
+heading, using that absence as a cross-confirmation that its fixture carries one workflow. The heading
+now renders for a lone workflow by design, so the witness was replaced with a stronger one — exactly ONE
+group heading, naming that workflow — rather than deleted; the fact the line exists for is unchanged.

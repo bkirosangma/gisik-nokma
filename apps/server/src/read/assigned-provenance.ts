@@ -24,6 +24,32 @@ import type { Queryable } from '../db/queryable.js';
  * list: it always writes `null`, so including it would attribute "nobody is
  * assigned" to whoever created the ticket — an assignment claim nobody made.
  *
+ * ## ⚠ CORRECTED 2026-09-23 — the paragraph above was true and is now WRONG
+ *
+ * It is kept rather than deleted because the reasoning still decides the shape of
+ * the fix. `ticket.created` gained an optional `assigneeId` (owner request, the
+ * New ticket dialog's Assignee picker), so "it always writes `null`" is no longer
+ * a fact about that event: `applyTicketEvent` now sets the field from the
+ * payload's member when one is present. A BIRTH ASSIGNEE therefore produces no
+ * `ticket.assigned` at all, and this function answered ABSENT for it — which
+ * `assembleListCards` and `readTicket` are built to read as "the projection and
+ * the ledger disagree" and to THROW on.
+ *
+ * That is not a hypothetical. Measured on the dev stack the day the feature
+ * landed: every read of a ticket created with an assignee answered **HTTP 500** —
+ * `GET /v1/projects/:id/tickets` for the whole list, and
+ * `GET /v1/workspaces/:ws/tickets/:id` for the one ticket — so a single such
+ * ticket took out the List, Calendar, Timeline and Backlog tabs of its project
+ * and the sheet with them. The write door and the permission door were both
+ * updated for the new member; this read door was not, and no test drove a
+ * created-with-assignee ticket through a read.
+ *
+ * The exclusion becomes a PREDICATE: a `ticket.created` joins the candidates only
+ * when its payload actually names somebody. A birth with no assignee still
+ * contributes nothing, so the original argument — never attribute "nobody is
+ * assigned" to the creator — holds exactly as it did, and `DISTINCT ON … ORDER BY
+ * seq DESC` keeps a later `ticket.assigned` winning over the birth claim.
+ *
  * ## Total over its input, and the caller decides what an absence means
  *
  * An id with no `ticket.assigned` is ABSENT from the map, not mapped to a
@@ -66,11 +92,24 @@ export async function assignedProvenanceFor(
     client_time: Date;
     server_time: Date;
   }>(
+    // TWO types, not one, since 2026-09-23 — see the docblock's own correction.
+    // A `ticket.created` counts ONLY when it actually names somebody: a birth
+    // with no assignee still writes nothing here, which is what keeps "nobody is
+    // assigned" from being attributed to whoever created the ticket. That was the
+    // whole reason creation was excluded, and it survives as this predicate
+    // rather than as an exclusion.
+    //
+    // `payload->>'assigneeId' IS NOT NULL` is a JSON-null-safe test in Postgres:
+    // `->>` yields SQL NULL both for an absent key and for a JSON `null`, and the
+    // two mean the same thing here (absent means nobody — `ticket-events.ts`).
     `SELECT DISTINCT ON (entity_id) entity_id, actor_id, client_time, server_time
        FROM events
       WHERE entity_kind = 'ticket'
         AND entity_id = ANY ($1::text[])
-        AND type = 'ticket.assigned'
+        AND (
+          type = 'ticket.assigned'
+          OR (type = 'ticket.created' AND payload->>'assigneeId' IS NOT NULL)
+        )
       ORDER BY entity_id, seq DESC`,
     [ticketIds],
   );
