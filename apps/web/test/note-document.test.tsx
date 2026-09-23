@@ -1,5 +1,5 @@
 import { createElement } from 'react';
-import { cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
@@ -155,10 +155,18 @@ function renderDocument(opts: { note?: NoteDetail; role?: string } = {}) {
   );
 }
 
-/** What the slot was last rendered with. */
+/**
+ * What the NOTE editor's slot was last rendered with — `mode: 'note'`,
+ * specifically, and not merely the last entry pushed. Task 7 mounts a SECOND
+ * `TicketEditorSlot` in this tree (`NoteComments`' composer, `mode:
+ * 'comment'`), which renders AFTER the note editor and would otherwise be
+ * what `capturedSlotProps[capturedSlotProps.length - 1]` returns — reddening
+ * every case here that reads `slotProps().readOnly`/`.mode` for reasons that
+ * have nothing to do with what they test.
+ */
 function slotProps(): Record<string, unknown> {
-  const last = capturedSlotProps[capturedSlotProps.length - 1];
-  if (last === undefined) throw new Error('the slot was never rendered');
+  const last = [...capturedSlotProps].reverse().find((props) => props['mode'] === 'note');
+  if (last === undefined) throw new Error('the note-mode slot was never rendered');
   return last;
 }
 
@@ -406,7 +414,12 @@ describe('18.11 The Notes page — the document', () => {
     await waitFor(() =>
       expect(container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('false'),
     );
-    expect(screen.queryByRole('toolbar')).toBeNull();
+    // Scoped to the NOTE editor's own region: Task 7's comment composer is a
+    // SECOND `TicketEditorSlot` in this tree, and it is not `canEdit`-gated
+    // (spec §9.6: any reader may comment) — an unscoped query would find its
+    // toolbar too, on both arms of this case, for a reason that has nothing
+    // to do with the note's own read-only state.
+    expect(within(screen.getByTestId('note-editor')).queryByRole('toolbar')).toBeNull();
 
     // CONTROL, same case: the author gets all four the other way.
     cleanup();
@@ -418,7 +431,7 @@ describe('18.11 The Notes page — the document', () => {
     await waitFor(() =>
       expect(second.container.querySelector('.ProseMirror')?.getAttribute('contenteditable')).toBe('true'),
     );
-    expect(screen.getByRole('toolbar')).toBeInTheDocument();
+    expect(within(screen.getByTestId('note-editor')).getByRole('toolbar')).toBeInTheDocument();
   });
 });
 

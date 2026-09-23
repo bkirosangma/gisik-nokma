@@ -19,6 +19,7 @@ import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/
 import { useAppServices, useCurrentUser } from '../providers.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
+import { NoteComments } from './note-comments.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
 
@@ -258,6 +259,8 @@ export function NoteDocument({
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
         />
       </div>
+
+      <NoteComments workspaceId={note.workspaceId} noteId={note.noteId} nameOf={nameOf} canComment />
 
       <HistoryPanel
         open={historyOpen}

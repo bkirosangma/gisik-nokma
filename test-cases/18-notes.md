@@ -211,3 +211,6 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.210 — History lists `getNoteHistory` newest first with names; control: an empty history renders "No saved versions yet".** Mutation: oldest first. `apps/web/test/history-panel.test.tsx`.
 - ✅ **18.211 — selecting a row shows that version read-only with the banner; Back returns to the live editor without writing (control).** Mutation: write on Back. `apps/web/test/history-panel.test.tsx`.
 - ✅ **18.212 — Restore reports exactly the selected version's body to `onRestore`, once — never another version's** (the actual `note.body_set` write happens in `NoteDocument`'s own `write` helper, the same door renaming and detaching use). Mutation: report a different version's body. `apps/web/test/history-panel.test.tsx`.
+- ✅ **18.213 — a note's comments render in the thread with author names; control: none → the thread's own empty copy.** Mutation: drop `nameOf`. `apps/web/test/note-comments.test.tsx`.
+- ✅ **18.214 — posting writes one `comment.added` against `{ kind: 'note', id }`, and the thread reloads on commit.** Mutation: file it against a ticket. `apps/web/test/note-comments.test.tsx`.
+- ✅ **18.215 — a reader (non-author) can post; the composer is present for every reader.** Mutation: hide it. `apps/web/test/note-comments.test.tsx`.

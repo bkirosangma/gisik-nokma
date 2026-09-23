@@ -144,6 +144,18 @@ export {
 // extracted from `visibility-editor.tsx` so the two callers share ONE label
 // rule rather than two copies of it. See the component's own docblock.
 export { PeoplePicker } from './views/people-picker.js';
+// The comment thread (Notes series Plan 5 Task 7): `apps/web`'s note comments
+// mount reuses the TICKET sheet's own component rather than a second copy —
+// `TicketComment` names a ticket in its export only by history, not by the
+// shape (`commentId`/`authorId`/`body`/`recordedAt`/`files`), which a note's
+// own comment fits by mapping `files: []` at the call site (no note ever
+// names an attachment through a comment today).
+export {
+  CommentsThread,
+  type CommentsThreadProps,
+  type TicketComment,
+  type TicketCommentFile,
+} from './views/comments-thread.js';
 // Plan 9 Task 8 — the calendar view-model and the claim readers under it.
 // `FilterSpec` is deliberately absent from this block: it is declared in
 // `view-types.ts` and already leaves through the `export *` above. The
