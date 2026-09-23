@@ -132,6 +132,15 @@ export function EditorWebView(props: EditorWebViewProps) {
           send({ bridge: 1, kind: 'noteResults', requestId: message.requestId, candidates: [] });
           break;
         }
+        case 'ticketQuery': {
+          // THE SAME RULE `noteQuery` FOLLOWS, ABOVE, for the same reason: this
+          // app has no ticket search surface yet, so the honest answer is
+          // empty rather than a stub behind a promise nobody built. When
+          // mobile gains one, this is the seam to widen — an `onTicketQuery`
+          // prop, exactly as `onMentionQuery` does.
+          send({ bridge: 1, kind: 'ticketResults', requestId: message.requestId, candidates: [] });
+          break;
+        }
       }
     },
     [editable, initialDoc, onChange, onEditorError, onMentionQuery, onRequestUpload, onSubmit, send],

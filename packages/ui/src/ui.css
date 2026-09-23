@@ -7086,6 +7086,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the title (`renderNode`), so the ink is the only thing this adds — the
    accent and the wrap come from `.gn-comment__body a` above. */
 .gn-comment__wikilink { overflow-wrap: anywhere; }
+/* The ticket-ref chip (spec §14.2, Plan 7 Task 3): the same reasoning as the
+   wiki-link rule above — the link is what carries the accent and the wrap
+   (`.gn-comment__body a`), this rule only adds the one thing a span rendering
+   still needs. */
+.gn-comment__ticketref { overflow-wrap: anywhere; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {

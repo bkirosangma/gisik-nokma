@@ -418,3 +418,7 @@ assumed it would find.
 - ✅ **9.306 — `editor.css` styles `.editor-ticketref` and `.ticketref-popup`** (binding test). Mutation: delete the popup rule. `test/editor-css-binding.test.ts`.
 - ✅ **9.307 — `:note co` opens the wiki-link picker and Enter inserts the same `wikiLink { noteId, title }` node `[[co` would; control: `[[` still works.** Mutation: give the second plugin the first plugin's key (ProseMirror throws — the test asserts the editor constructs). `test/wiki-link.test.ts`.
 - ✅ **9.308 — `:notebook` in prose opens nothing.** Mutation: drop the whitespace requirement. `test/wiki-link.test.ts`.
+- ✅ **9.309 — the twin transcription covers `queryTickets` and `resolveTicketHref` in both files.** Mutation: drop one from app-core's twin. `packages/editor/test/ticket-editor-slot.test.tsx`.
+- ✅ **9.310 — the bridge parses `ticketResults` and serialises `ticketQuery`; control: an unknown type is refused.** Mutation: drop the `ticketResults` case. `packages/editor/test/webview-bridge.test.ts`.
+- ✅ **9.311 — `docToPlainText` renders `ticketRef` as `KEY title`; a missing key falls back to the title (control in the same `it`).** Mutation: render the ticket id. `packages/domain/test/doc-text.test.ts`, `packages/editor/test/doc-text-conformance.test.ts`.
+- ✅ **9.312 — `renderCommentBody` renders `ticketRef` as a link when `ticketHref` resolves and as a span otherwise; control: `wikiLink` unchanged.** Mutation: link with `href="#"`. `packages/app-core/test/views/comment-body.test.tsx`.
