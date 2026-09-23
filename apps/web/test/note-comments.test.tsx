@@ -297,4 +297,36 @@ describe('18.213-18.215 NoteComments', () => {
     expect(hits).toEqual([{ ticketId: 't1', projectId: 'p1', key: 'CCSO-1183', title: 'Renew the trade licence' }]);
     expect(resolveTicketHref({ ticketId: 't1', projectId: 'p1' })).toBe(`/w/${WS}/p/p1?ticket=t1`);
   });
+
+  /**
+   * 18.286 — a final-review finding (2026-09-23): `queryTickets`/
+   * `resolveTicketHref` reached this composer (18.273 above), but nothing
+   * ever supplied `queryNotes` — so a real note's OWN comment box could not
+   * type `:note`/`[[` and get a picker at all, the mirror image of the gap
+   * case 18.285 closed on the ticket side. `NoteComments` now takes the
+   * page's already-loaded note list (`note-document.tsx`'s own `treeNotes`,
+   * the SAME array its editor's `queryNotes` filters — no second fetch) and
+   * builds its composer's `queryNotes` from it the same way.
+   */
+  it('18.286 supplies queryNotes to the composer, built from the notes list the page passes, matching by title substring', async () => {
+    const services = stubServices({ getNoteComments: async () => [] });
+    render(
+      <Providers services={services}>
+        <NoteComments
+          workspaceId={WS}
+          noteId={NOTE}
+          nameOf={nameOf}
+          canComment
+          notes={[
+            { noteId: 'n1', title: 'Cold room' },
+            { noteId: 'n2', title: 'Compressor log' },
+          ]}
+        />
+      </Providers>,
+    );
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    const queryNotes = slotProps().queryNotes as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
+    expect(queryNotes).toBeDefined();
+    expect(await queryNotes('compr')).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);
+  });
 });

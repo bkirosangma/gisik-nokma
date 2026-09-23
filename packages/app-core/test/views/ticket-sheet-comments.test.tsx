@@ -1,5 +1,5 @@
 import { useState } from 'react';
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { NoteSummary } from '@gisik-nokma/domain';
@@ -560,6 +560,60 @@ describe('TicketSheet — the comment thread and its box', () => {
     const queryNotes = comment?.['queryNotes'] as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
     const hits = await queryNotes('compr');
     expect(hits).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);
+  });
+
+  /**
+   * 18.288 — a final-review finding (2026-09-23): `queryNotes`'s note list
+   * was fetched through `useLiveQuery`, which REFETCHES on every workspace
+   * stream frame while the sheet stays open (`use-live-query.ts`'s own
+   * docblock: "load once, then refetch (debounced) whenever the workspace
+   * stream moves") — a real cost paid on every unrelated ticket edit in a
+   * busy workspace, for a picker that may never be opened. It is now a
+   * ONE-TIME fetch on mount (`note-document.tsx`'s own established
+   * pattern for the identical picker), not a live subscription — so it is
+   * NOT one of `ticket-sheet.test.tsx`'s "nine live reads" (that ratchet
+   * stayed at eight; only `getNotesForTicket`, the ATTACHED-notes query,
+   * counts there).
+   */
+  it('18.288 getNotes for the picker is fetched once, not re-fetched on a workspace stream frame', async () => {
+    vi.useFakeTimers();
+    try {
+      const getNotes = vi.fn(async () => [{ noteId: 'n1', title: 'Cold room' } as NoteSummary]);
+      const src = source({ getNotes });
+      render(<TicketSheet dataSource={src} workspaceId={WS} ticketId={TICKET} currentUserId="user_kiro" onClose={vi.fn()} />);
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      expect(getNotes).toHaveBeenCalledTimes(1);
+
+      act(() => {
+        src.pushStreamItem({
+          type: 'event',
+          envelope: {
+            id: '01J9GEVT000000000000000099',
+            workspaceId: WS,
+            entity: { kind: 'ticket', id: TICKET },
+            type: 'ticket.field_set',
+            version: 1,
+            payload: {},
+            actorId: 'user_anselma',
+            origin: 'web',
+            clientTime: '2026-08-20T08:59:00.000Z',
+            serverTime: '2026-08-20T09:00:00.000Z',
+            seq: 4,
+            workspaceSeq: 9,
+          },
+        });
+      });
+      await act(async () => {
+        await vi.runAllTimersAsync();
+      });
+      // Still one — a stream frame that would refetch every OTHER live read
+      // on this sheet does not touch the note-picker list.
+      expect(getNotes).toHaveBeenCalledTimes(1);
+    } finally {
+      vi.useRealTimers();
+    }
   });
 });
 

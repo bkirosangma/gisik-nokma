@@ -354,7 +354,13 @@ export function NoteDocument({
         />
       </div>
 
-      <NoteComments workspaceId={note.workspaceId} noteId={note.noteId} nameOf={nameOf} canComment />
+      <NoteComments
+        workspaceId={note.workspaceId}
+        noteId={note.noteId}
+        nameOf={nameOf}
+        canComment
+        notes={treeNotes}
+      />
 
       <HistoryPanel
         open={historyOpen}

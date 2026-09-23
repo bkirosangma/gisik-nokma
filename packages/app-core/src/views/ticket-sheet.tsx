@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   PRIORITIES,
   newUlid,
@@ -854,15 +854,38 @@ export function TicketSheet({
    * stub editor in tests. Unlike `queryTickets`, this needs no page-supplied
    * prop: `dataSource` and `workspaceId` are already in scope, so it is built
    * the same way `note-document.tsx`'s own `queryNotes` is — a client-side
-   * substring filter over the workspace's notes.
+   * substring filter over a list fetched ONCE.
+   *
+   * A second final-review pass (case 18.288) caught that the first version
+   * fetched this list through `useLiveQuery`, which refetches on EVERY
+   * workspace stream frame for as long as the sheet stays open — a real
+   * cost paid on every unrelated ticket edit in a busy workspace, for a
+   * picker that may never open. `note-document.tsx`'s own `queryNotes` was
+   * already a one-time `useEffect` fetch, not a live query — this now
+   * matches it, and is therefore NOT one of `ticket-sheet.test.tsx`'s "live
+   * reads" (that ratchet counts `useLiveQuery`/stream subscriptions only).
    */
-  const workspaceNotes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:notes-search`, () =>
-    dataSource.query.getNotes(workspaceId),
+  const [workspaceNotesForPicker, setWorkspaceNotesForPicker] = useState<Array<{ noteId: string; title: string }>>(
+    [],
   );
+  useEffect(() => {
+    let cancelled = false;
+    dataSource.query.getNotes(workspaceId).then(
+      (rows) => {
+        if (!cancelled) setWorkspaceNotesForPicker(rows);
+      },
+      () => {
+        if (!cancelled) setWorkspaceNotesForPicker([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, workspaceId]);
   const queryNotes = async (query: string): Promise<Array<{ noteId: string; title: string }>> => {
     const needle = query.trim().toLowerCase();
     const hits: Array<{ noteId: string; title: string }> = [];
-    for (const candidate of workspaceNotes.data ?? []) {
+    for (const candidate of workspaceNotesForPicker) {
       if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
       hits.push({ noteId: candidate.noteId, title: candidate.title });
       if (hits.length === 8) break;
