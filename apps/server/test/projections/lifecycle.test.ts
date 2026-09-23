@@ -266,8 +266,18 @@ describe('19.010 workspace.archived / workspace.restored', () => {
     await applyLifecycle(restored);
     expect(await workspaceRow(WS)).toMatchObject({ archived: false });
 
-    // control: a workspace with no lifecycle event has no row at all
+    // control: a workspace with no LIFECYCLE event has no row at all, even
+    // one that WAS created — workspace.created is not a lifecycle event.
     const untouched = newUlid();
+    await applyLifecycle(
+      makeCommitted({
+        workspaceId: untouched,
+        entity: { kind: 'workspace', id: untouched },
+        type: 'workspace.created',
+        payload: { name: 'Untouched' },
+        actorId: ACTOR,
+      }),
+    );
     expect(await workspaceRow(untouched)).toBeUndefined();
   });
 });
