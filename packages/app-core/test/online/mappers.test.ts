@@ -6,6 +6,7 @@ import type { BoardView } from '../../src/view-types.js';
 import type {
   AttentionResponse,
   BoardResponse,
+  BoardTicketCard,
   MemberListResponse,
   ListCard,
   ListResponse,
@@ -93,6 +94,23 @@ function serverCard(overrides: Partial<TicketCard> = {}): TicketCard {
     // the default for every `3.4x` case in this file that is not about rank.
     rank: null,
     ...overrides,
+  };
+}
+
+/**
+ * `serverCard()`, widened onto `BoardTicketCard` — the wire shape ONLY the
+ * board serves (owner request, 2026-09-23: parent-key badge, epic chip).
+ * `parent`/`epic` default to `null` (a root ticket under no epic), the same
+ * "nothing to narrow by" default `boardCardSeed` (`test/helpers/seed.ts`)
+ * takes for the CLIENT-side fixture one layer over — a case that wants
+ * either badge passes one.
+ */
+function serverBoardCard(overrides: Partial<BoardTicketCard> = {}): BoardTicketCard {
+  const { parent, epic, ...cardOverrides } = overrides;
+  return {
+    ...serverCard(cardOverrides),
+    parent: parent ?? null,
+    epic: epic ?? null,
   };
 }
 
@@ -289,7 +307,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'Doing',
         category: 'active',
         blocked: false,
-        cards: [serverCard()],
+        cards: [serverBoardCard()],
       },
       {
         workflowId: 'wf-errand',
@@ -347,7 +365,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
           name: 'ancient',
           category: 'open',
           blocked: false,
-          cards: [serverCard({ ticketId: '01J9GTKB000000000000000000', stateId: 'ancient' })],
+          cards: [serverBoardCard({ ticketId: '01J9GTKB000000000000000000', stateId: 'ancient' })],
         },
       ],
     };
@@ -464,7 +482,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         {
           ...body.columns[0]!,
           cards: [
-            serverCard({
+            serverBoardCard({
               stateProvenance: {
                 actorId: ANSELMA,
                 clientTime: 'c',
@@ -479,6 +497,68 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
     const card = mapBoardView(reopened).groups[0]?.columns[0]?.cards[0];
     expect(card?.cause).toEqual({ kind: 'reopened-for-child', childTicketId: 'child_1' });
     expect(card?.stateProvenance).not.toHaveProperty('cause');
+  });
+
+  /**
+   * 13.1464 — `parent`/`epic` cross the wire (owner request, 2026-09-23,
+   * board-card badges). A MISSING key is a refusal, the same rule every other
+   * required field on this card already keeps — `null` is a real answer
+   * (no parent/no epic, or an unreadable one, `BoardCard.parent`'s own
+   * docblock) and an absent key is a body this client cannot read.
+   */
+  describe('13.1464 mapBoardCard carries parent/epic; an absent key is a refusal, not undefined', () => {
+    /** The `body` fixture above, its one card replaced by a fresh `serverBoardCard()`. */
+    const withCard = (overrides: Parameters<typeof serverBoardCard>[0]): BoardResponse => ({
+      ...body,
+      columns: [{ ...body.columns[0]!, cards: [serverBoardCard(overrides)] }],
+    });
+
+    it('null on the wire stays null — no parent, no epic', () => {
+      const view = mapBoardView(withCard({ parent: null, epic: null }));
+      const card = view.groups[0]?.columns[0]?.cards[0];
+      expect(card?.parent).toBeNull();
+      expect(card?.epic).toBeNull();
+    });
+
+    it('a real parent/epic object crosses whole, key included', () => {
+      const view = mapBoardView(
+        withCard({
+          parent: { ticketId: 'parent_1', key: 'CCSO-1' },
+          epic: { ticketId: 'epic_1', key: 'CCSO-2', title: 'Cold-chain rollout' },
+        }),
+      );
+      const card = view.groups[0]?.columns[0]?.cards[0];
+      expect(card?.parent).toEqual({ ticketId: 'parent_1', key: 'CCSO-1' });
+      expect(card?.epic).toEqual({ ticketId: 'epic_1', key: 'CCSO-2', title: 'Cold-chain rollout' });
+    });
+
+    it('a `key: null` on a real parent/epic survives — the ledger holds no prefix, which is a fact and not an absence', () => {
+      const view = mapBoardView(
+        withCard({
+          parent: { ticketId: 'parent_1', key: null },
+          epic: { ticketId: 'epic_1', key: null, title: 'Cold-chain rollout' },
+        }),
+      );
+      const card = view.groups[0]?.columns[0]?.cards[0];
+      expect(card?.parent).toEqual({ ticketId: 'parent_1', key: null });
+      expect(card?.epic).toEqual({ ticketId: 'epic_1', key: null, title: 'Cold-chain rollout' });
+    });
+
+    it("a MISSING `parent`/`epic` key refuses — an absent field is not this shape's spelling of null", () => {
+      const raw = withCard({}) as unknown as { columns: [{ cards: [Record<string, unknown>] }] };
+      const card = { ...raw.columns[0].cards[0] };
+      delete card['parent'];
+      raw.columns[0].cards = [card as never];
+      expect(() => mapBoardView(raw)).toThrow(/\.parent: expected an object/);
+    });
+
+    it("a `parent`/`epic` object missing ITS OWN `ticketId` refuses, naming the nested path", () => {
+      const raw = withCard({ parent: { ticketId: 'p1', key: null } }) as unknown as {
+        columns: [{ cards: [Record<string, unknown>] }];
+      };
+      raw.columns[0].cards[0]['parent'] = { key: null };
+      expect(() => mapBoardView(raw)).toThrow(/\.parent\.ticketId: expected a string/);
+    });
   });
 
   it('3.37 throws MappingError naming the path on a malformed response', () => {
@@ -1019,7 +1099,12 @@ describe('3.969 the priority claim crosses the wire as a claim; absence and an o
         name: 'Doing',
         category: 'active',
         blocked: false,
-        cards: [card],
+        // Widened to `BoardTicketCard` here rather than at every `serverCard()`
+        // call this helper wraps: `card` is a plain `TicketCard` because this
+        // describe is about the PRIORITY claim, not the board's two hierarchy
+        // facts — `null`/`null` is the same "nothing to narrow by" default
+        // `serverBoardCard` above takes.
+        cards: [{ ...card, parent: null, epic: null }],
       },
     ],
   });
@@ -2413,7 +2498,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             category: 'active',
             blocked: false,
             cards: [
-              serverCard({
+              serverBoardCard({
                 assigneeId: 'u2',
                 stateProvenance: { actorId: 'u2', clientTime: 'c', serverTime: 's', cause: null },
               }),
@@ -2486,7 +2571,7 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             name: 'Doing',
             category: 'active',
             blocked: false,
-            cards: [serverCard({ assigneeId: 'u1' })],
+            cards: [serverBoardCard({ assigneeId: 'u1' })],
           },
         ],
       },
@@ -3030,18 +3115,18 @@ describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body wi
  * forgot the field cannot look like a workspace without a prefix.
  */
 describe('13.1280 the board card key', () => {
-  const body = (card: Partial<TicketCard>) => ({
+  const body = (card: Partial<BoardTicketCard>) => ({
     workspaceId: '01J9GWS0000000000000000000',
     projectId: '01J9GPRJ000000000000000000',
-    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [serverCard(card)] }],
+    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [serverBoardCard(card)] }],
   });
   it('carries the key, keeps null, refuses absence', () => {
     const firstCard = (view: BoardView) => view.groups[0]!.columns[0]!.cards[0]!;
     expect(firstCard(mapBoardView(body({ key: 'CCSO-7' }))).key).toBe('CCSO-7');
     expect(firstCard(mapBoardView(body({ key: null }))).key).toBeNull();
-    const { key: _dropped, ...without } = serverCard();
+    const { key: _dropped, ...without } = serverBoardCard();
     const absent = body({});
-    absent.columns[0]!.cards = [without as TicketCard];
+    absent.columns[0]!.cards = [without as BoardTicketCard];
     expect(() => mapBoardView(absent)).toThrow(/key/);
   });
 });

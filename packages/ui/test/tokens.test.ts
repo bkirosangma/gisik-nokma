@@ -678,6 +678,76 @@ describe('tintWarning composites legibly on every surface it can reach', () => {
 });
 
 /**
+ * 13.1453 — the board card's priority tint (owner request, 2026-09-23,
+ * board-card badges). `priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint` are
+ * ALPHA — `primitives.priorityTintP1Light`'s own docblock has the full
+ * derivation and the twelve worst-case numbers this block re-derives — so
+ * no `CONTRAST_PAIRS` row may name them (the same rule `tintWarning`'s
+ * block states), and the obligation is against the COMPOSITE.
+ *
+ * `.gn-board-card` sits on `.gn-card`'s own ground, `surfaceRaised`
+ * (`ui.css:207`) — NOT `surface`, which is `tintWarning`'s page-level ground
+ * and the wrong one here. Checked against every foreground a tinted card
+ * actually draws: the priority's own ink/icon colour, the title/body text
+ * (`text`/`textMuted`), and the THIRD-LEVEL composite the move-arrows' ghost
+ * buttons make — `textAccent` on `fillTertiary`, itself composited over the
+ * SAME wash (`.gn-board-card__move`, `ui.css`) — the tightest of the four in
+ * every combination this block measures.
+ */
+describe('the priority tint composites legibly on every surface it can reach, for every foreground the card draws', () => {
+  /** `src` over `dst` — the compositing `relativeLuminance` deliberately lacks. */
+  const over = (src: string, dst: string): string => {
+    const hex = (h: string, i: number): number => Number.parseInt(h.slice(i, i + 2), 16);
+    const alpha = src.length === 9 ? hex(src, 7) / 255 : 1;
+    const channel = (i: number): number =>
+      Math.round(hex(src, i) * alpha + hex(dst, i) * (1 - alpha));
+    return `#${[1, 3, 5].map((i) => channel(i).toString(16).padStart(2, '0')).join('')}`;
+  };
+
+  const PRIORITIES: { tint: TokenRole; ink: TokenRole; label: string }[] = [
+    { tint: 'priorityP1Tint', ink: 'danger', label: 'P1' },
+    { tint: 'priorityP2Tint', ink: 'success', label: 'P2' },
+    { tint: 'priorityP3Tint', ink: 'priorityP3', label: 'P3' },
+  ];
+
+  for (const { tint, ink, label } of PRIORITIES) {
+    for (const style of STYLE_NAMES) {
+      for (const theme of THEME_NAMES) {
+        it(`${label} ${style}/${theme}: the badge ink, the card text, and the move-arrow ghost all clear 4.5 on the wash`, () => {
+          const ground = colorOf(theme, 'surfaceRaised', style);
+          const washed = over(colorOf(theme, tint, style), ground);
+
+          // THE ANTI-VACUOUS CONTROL — `tintWarning`'s own block's precedent:
+          // a fully transparent tint composites to `ground` itself, which
+          // would make every assertion below pass by measuring text on a
+          // bare surface that already passes.
+          expect(washed, `${label} ${style}/${theme}: the tint composites to nothing`).not.toBe(ground);
+
+          expect(
+            contrastRatio(colorOf(theme, ink, style), washed),
+            `${label} ${style}/${theme}: the priority ink no longer clears 4.5 on its own tint`,
+          ).toBeGreaterThanOrEqual(4.5);
+          expect(
+            contrastRatio(colorOf(theme, 'text', style), washed),
+            `${label} ${style}/${theme}: the card title no longer clears 4.5 on the wash`,
+          ).toBeGreaterThanOrEqual(4.5);
+          expect(
+            contrastRatio(colorOf(theme, 'textMuted', style), washed),
+            `${label} ${style}/${theme}: the card body no longer clears 4.5 on the wash`,
+          ).toBeGreaterThanOrEqual(4.5);
+
+          const fillOverWash = over(colorOf(theme, 'fillTertiary', style), washed);
+          expect(
+            contrastRatio(colorOf(theme, 'textAccent', style), fillOverWash),
+            `${label} ${style}/${theme}: the move-arrow ghost button no longer clears 4.5 on the tinted card`,
+          ).toBeGreaterThanOrEqual(4.5);
+        });
+      }
+    }
+  }
+});
+
+/**
  * RETRACTED, Ruling 24 (coordinator review, 2026-09-16) — case 11.213 was
  * minted here for a block that read:
  *

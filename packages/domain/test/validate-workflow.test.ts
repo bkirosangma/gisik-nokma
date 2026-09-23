@@ -314,6 +314,35 @@ describe('validateWorkflowDef — issue order and the branches nothing else pins
     ]);
   });
 
+  /**
+   * 4.58 — starting-status design: a start state that forbids creation would
+   * leave the workflow with no way any ticket ever gets onto it. Control: the
+   * same definition with `creatable` absent (every pre-existing workflow's
+   * shape) has no such issue.
+   */
+  it('4.58 a start state with creatable:false is refused — the workflow could never receive a ticket', () => {
+    const d = def({
+      states: [
+        { id: 'todo', name: 'To do', category: 'open', creatable: false },
+        { id: 'doing', name: 'Doing', category: 'active' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+    });
+    expect(codes(d)).toEqual(['start-state-not-creatable']);
+  });
+
+  it('4.58 control: a start state with creatable absent (or true) raises no such issue', () => {
+    expect(validateWorkflowDef(def({}))).toEqual([]);
+    const explicitlyTrue = def({
+      states: [
+        { id: 'todo', name: 'To do', category: 'open', creatable: true },
+        { id: 'doing', name: 'Doing', category: 'active' },
+        { id: 'done', name: 'Done', category: 'terminal' },
+      ],
+    });
+    expect(validateWorkflowDef(explicitlyTrue)).toEqual([]);
+  });
+
   it('a from-any inbound is not a way into the only state there is', () => {
     // '*' means "from any state", and in a one-state workflow the only state it
     // can mean is this one — which is the self-loop the case above rejects.

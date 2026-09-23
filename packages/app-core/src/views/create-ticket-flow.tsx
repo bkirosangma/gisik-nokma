@@ -256,7 +256,7 @@ export function CreateTicketFlow({
        * carries it here. `NewTicketDraft.ticketId` has the full argument,
        * including what the move buys: a duplicate create that somehow escapes the
        * dialog's `submittingRef` is now refused `ticket.already-exists`
-       * (`packages/rule-engine/src/checks/hierarchy.ts:80`) instead of filing a
+       * (`packages/rule-engine/src/checks/hierarchy.ts:95`) instead of filing a
        * second ticket, because the second claim names an id that already
        * resolves.
        *

@@ -35,7 +35,7 @@ import {
   ticketTransitionedPayloadSchema,
   type WorkflowDef,
 } from './workflow.js';
-import { stateCategoryOf } from './workflow-helpers.js';
+import { isCreatableState, stateCategoryOf } from './workflow-helpers.js';
 
 /**
  * What the reducer needs looked up, and nothing more.
@@ -135,8 +135,22 @@ export function applyTicketEvent(
     }
     // Spec §1.3: `start === 'backlog'` → the universal state; anything else —
     // `'focus'`, or the field absent on an event older than it — the
-    // workflow's initial state, which is what every v1 event meant.
-    const bornIn = p.start === 'backlog' ? BACKLOG_STATE_ID : wf.initialStateId;
+    // STARTING STATUS the payload names (starting-status design,
+    // 2026-09-23), or, absent that too, the workflow's initial state, which
+    // is what every v1 event (and every v2 event with no `stateId`) meant.
+    const bornIn = p.start === 'backlog' ? BACKLOG_STATE_ID : (p.stateId ?? wf.initialStateId);
+    // The engine's `ticket.created` check refuses a non-creatable `stateId`
+    // before this event is ever accepted (`checks/hierarchy.ts`) — reaching
+    // one here means ledger integrity is broken, exactly like the unknown
+    // type/workflow throws above. `isCreatableState` alone answers unknown,
+    // terminal and `creatable: false` in one test; `start === 'backlog'`
+    // already refused a `stateId` paired with it at the payload door, so this
+    // is reached only when `p.start !== 'backlog'`.
+    if (p.stateId !== undefined && !isCreatableState(wf, p.stateId)) {
+      throw new Error(
+        `applyTicketEvent: workflow "${wf.id}" cannot create a ticket in state "${p.stateId}" — the engine must refuse ticket.created before it reaches a projection`,
+      );
+    }
     const category = stateCategoryOf(wf, bornIn);
     if (!category) {
       throw new Error(`applyTicketEvent: workflow "${wf.id}" has no state "${bornIn}"`);
@@ -181,6 +195,12 @@ export function applyTicketEvent(
         // every ticket nobody described, and name the person who filed it as the
         // one who set an empty description.
         ...(p.description === undefined ? {} : { description: claim(p.description, env) }),
+        // The birth start/due date (starting-status design addendum,
+        // 2026-09-23), same treatment as `description` directly above and for
+        // the identical reason: no pre-existing `ticket.created` carried
+        // either, so absent writes NO KEY rather than a null clearing claim.
+        ...(p.startDate === undefined ? {} : { startDate: claim(p.startDate, env) }),
+        ...(p.dueDate === undefined ? {} : { dueDate: claim(p.dueDate, env) }),
       },
       transitions: [],
       closed: null,
@@ -488,7 +508,7 @@ export function foldTicketToWorkflowVersion(
     //
     // The message names the id at the point the chain BROKE and no version
     // beside it, because `foldStateIdForward` reports the break-point id, not
-    // the one it started from (workflow.ts:99-101): on a chain longer than two
+    // the one it started from (workflow.ts:158): on a chain longer than two
     // that id can belong to a version the ticket never sat in, and naming a
     // state and a version that never coexisted is worse than naming neither.
     // Same reasoning, same wording discipline as the engine's stranded-state

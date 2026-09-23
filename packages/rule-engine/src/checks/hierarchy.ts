@@ -1,18 +1,31 @@
 import type { EventEnvelope, TicketState } from '@gisik-nokma/domain';
-import { DEEPEST_RANK, ticketCreatedPayload, ticketReparentedPayload } from '@gisik-nokma/domain';
+import { DEEPEST_RANK, isCreatableState, label, ticketCreatedPayload, ticketReparentedPayload } from '@gisik-nokma/domain';
 import type { Accept, EngineContext, Refusal } from '../engine.js';
 import { REFUSAL_RULES, malformedPayloadDetail } from '../refusal-rules.js';
 import { getTicketState, getTicketTypeDef } from './context-helpers.js';
-import { ACCEPT, deepestRankParentRefusal, parentTerminalRefusal, rankRefusal, refuse } from './refusals.js';
+import {
+  ACCEPT,
+  deepestRankParentRefusal,
+  parentTerminalRefusal,
+  rankRefusal,
+  refuse,
+  workflowStateNotCreatableRefusal,
+} from './refusals.js';
 
 /**
  * Hierarchy sanity for ticket.created. Check order is deliberate — the most
  * fundamental truth names the refusal:
  *
- *   already exists → unknown type → workflow undefined
+ *   already exists → unknown type → workflow undefined → state not creatable
  *     → (root) deepest-rank rule
  *     → unknown parent (a parent in another WORKSPACE is one of these)
  *     → cross-project → parent's type unknown → rank → parent-terminal
+ *
+ * State-not-creatable (starting-status design, 2026-09-23) sits directly after
+ * the workflow resolves and BEFORE every parent branch: `isCreatableState` is
+ * a fact about the WORKFLOW and the payload's own `stateId`, true or false
+ * whatever the parent turns out to be, so a parent-shaped refusal earlier in
+ * this list would send the actor to fix a parent that was never the problem.
  *
  * Parent-terminal comes last because it is the only refusal whose remedy is an
  * OFFER rather than a correction: put it earlier and it offers a reopen that
@@ -86,6 +99,17 @@ export async function checkTicketCreated(env: EventEnvelope, ctx: EngineContext)
 
   const workflow = await ctx.getWorkflowDef(env, type.workflowId);
   if (!workflow) return refuse('ticket.workflow-undefined');
+
+  // Starting-status design (2026-09-23): `stateId`, when the payload names
+  // one, must be a state `isCreatableState` allows — not unknown, not the
+  // universal Backlog (the schema's own `.refine` already refused that
+  // pairing with `start: 'backlog'` at the door), not `category: 'terminal'`,
+  // not `creatable: false`. Placed here, the first line with the workflow in
+  // hand, because it is a fact about the workflow and the payload alone —
+  // true or false before any parent is even looked at.
+  if (p.stateId !== undefined && !isCreatableState(workflow, p.stateId)) {
+    return refuse('workflow.state-not-creatable', workflowStateNotCreatableRefusal(label(workflow, p.stateId)));
+  }
 
   if (p.parentId === null) {
     // Owner decision (2026-08-20): the parent requirement follows the RANK, not

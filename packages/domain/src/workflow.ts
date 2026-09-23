@@ -13,6 +13,21 @@ export const workflowStateSchema = z.object({
   // "blocked" bucket reads — templates set it on their Blocked states, the
   // builder exposes it as a checkbox; category stays one of the three.
   blocked: z.boolean().optional(),
+  /**
+   * Starting-status design (2026-09-23): whether a NEW ticket may be born
+   * here. ABSENT MEANS TRUE, mirroring `blocked` — every state authored
+   * before this field existed allowed creation, so an additive field must
+   * not narrow what those states already permit. The builder writes the key
+   * ONLY when `false` (mirror `blocked`'s own asymmetry), and this schema is
+   * what makes it survive `workflowDefinedPayloadSchema`'s non-strict parse
+   * at publish rather than being stripped as an undeclared key.
+   *
+   * Read through `isCreatableState` (`workflow-helpers.ts`), never directly:
+   * that helper also excludes the universal Backlog state and any state whose
+   * category is `terminal`, neither of which this flag alone says anything
+   * about.
+   */
+  creatable: z.boolean().optional(),
 });
 export type WorkflowState = z.infer<typeof workflowStateSchema>;
 

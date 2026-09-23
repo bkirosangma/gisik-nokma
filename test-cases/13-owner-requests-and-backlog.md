@@ -3477,3 +3477,168 @@ true either way" is exactly the shape a reviewer should expect to find a witness
 heading, using that absence as a cross-confirmation that its fixture carries one workflow. The heading
 now renders for a lone workflow by design, so the witness was replaced with a stronger one — exactly ONE
 group heading, naming that workflow — rather than deleted; the fact the line exists for is unchanged.
+
+## Start and due date at birth (starting-status design addendum, 2026-09-23: "put due date as well on the ticket creation form" … "both start and due date") — domain half
+
+*Block `13.1446`–`13.1450`, the DOMAIN half of `task/starting-status`'s `13.1431`–`13.1450` (the controller's
+split of a shared id space — see `13-hig-per-screen.md`'s block table; the UI half, `13.1431`–`13.1445`, is a
+later lane's work and is not this section). `13.1446`–`13.1449` are spent; `13.1450` is UNSPENT, not held.*
+
+- **13.1446** ✅ `ticketCreatedPayload` gains optional `startDate`/`dueDate`, sharing `dueDateValueSchema`
+  with `ticket.field_set` (one origin, not a copy — `packages/domain/src/ticket-types.ts`). Round-trips
+  both together, either alone, and neither — the shape every pre-existing `ticket.created` has. —
+  (`packages/domain/test/ticket-events.test.ts`)
+- **13.1447** ✅ A real day in `YYYY-MM-DD` form (`'2026-09-30'`) is accepted for either field (control);
+  a non-day string, and a shape-right day the calendar has none of (`'2026-02-30'`), are refused
+  `invalid-payload` for either field — by the same `dueDateValueSchema` that `ticket.field_set` checks,
+  not the same REFUSAL SHAPE (case 13.1449 holds that difference constant on purpose). —
+  (`packages/domain/test/ticket-events.test.ts`)
+- **13.1448** ✅ The reducer writes a `startDate`/`dueDate` claim ONLY when the payload carries one — the
+  identical treatment, and the identical reason, `description` already has: an absent claim writing
+  `null` would answer *"has this ticket got a due date?"* YES for every ticket nobody gave one, under the
+  creator's own name. Mutation-witnessed: writing `claim(p.startDate ?? null, env)` unconditionally
+  reddens the control half (`expected { value: null, … } to be undefined`), restored from the committed
+  tree. —
+  (`packages/domain/test/ticket-state.test.ts`)
+
+**⚠ ADDENDUM ITEM 3 WITHDRAWN (owner ruling via the plan author, 2026-09-23, relayed by the controller) —
+a defect in the addendum, not a gap in the build.** The addendum asked `checkTicketCreated` to apply
+`fields.ts:140-146`'s day-format validation to the birth values too, "BY THE SAME CODE, not a copy,"
+extracted into a helper both doors call. **THREE runs were made to test that, not merely argued, and all
+three were reverted afterward (nothing from any of them is in the committed tree):**
+
+1. **Wired.** `checkDueDateLikeValue` was extracted from `fields.ts:140-146` (exported), imported into
+   `checkTicketCreated`, and called on `p.startDate`/`p.dueDate` right after the state-creatable check.
+   A throwaway case sent `ticket.created` with `dueDate: { date: '2026-02-30' }` (`WF`/`TASK`, no parent,
+   root-legal rank). Actual verdict, printed and pinned in the run log:
+   `{"refused":true,"rule":"malformed-payload","reason":"This ticket.created event's payload is malformed:
+   at dueDate.date: a due date is a day the calendar has"}` — `checkDueDateLikeValue` would have answered
+   `field.type-mismatch` with a different sentence, and neither appears: the function returned at its own
+   `ticketCreatedPayload.safeParse` guard before the wired call was ever reached.
+2. **Mutation "skip the birth validation."** The wired call (both `if` blocks) was deleted and the same
+   case re-run. **Byte-identical verdict** — same rule, same reason, same JSON. A mutation that changes the
+   verdict not at all is a survivor: the call was dead code, not an untested behaviour.
+3. **Control, showing the schema is what is actually enforcing this.** `ticketCreatedPayload`'s
+   `startDate`/`dueDate` were changed from `dueDateValueSchema.optional()` to `z.unknown().optional()` and
+   case 13.1447 was re-run (no rebuild needed — vitest reads source): it **reddened**
+   (`expected true to be false` on `result.ok`), proving `dueDateValueSchema` at the payload door is the
+   live check a malformed birth date is actually caught by, not an inert type annotation.
+
+**The ruling, verified independently on this branch at `83725cd3`:** `fields.ts:140-146`'s day check IS
+`dueDateValueSchema.safeParse` and nothing else — no start-≤-due ordering, no second rule to extract — and
+`ticketCreatedPayload` already types `startDate`/`dueDate` with that SAME `dueDateValueSchema`. The
+addendum's own intent, "same code, not a copy," was ALREADY satisfied by the one shared schema at both
+doors; item 3 asked to extract a helper that would have duplicated what the schema already does, and the
+three runs above show precisely why that duplicate can never run. **Item 3 is withdrawn, not blocked** —
+there was never a gap for it to close. The identical argument applies to `precheckCreatableState`'s date
+counterpart (item 4's domain-lane note): a bad birth date already fails `ticketCreatedPayload.safeParse`
+inside that function too, so a per-field reason for the UI lane to render from THIS path was never
+buildable either way; per the ruling, the UI lane's form validates each non-empty date input client-side
+with the same `dueDateValueSchema` import and omits empty inputs, with no precheck branch for dates.
+
+- **13.1449** ✅ The PARITY case the addendum actually wanted, proven the honest way: one shared schema,
+  asserted independently at both doors. Four bad days (`'2026-13-01'`, `'2026-02-30'`, `'30-09-2026'`,
+  `''`) are refused by `ticketCreatedPayload.safeParse` at birth for both fields (asserted as ONE array
+  per field against `[false, false, false, false]`, so a mutation admitting even one bad day shows as a
+  changed array rather than a loop stopping at its first failure) AND by `checkTicketFieldSet` on
+  `ticket.field_set`, for either field; the real `checkTicketCreated` door is asserted too, for one of the
+  four, so the case witnesses the actual door's verdict and not only its schema precondition;
+  `'2026-09-30'` — a real day — is accepted by all three (control). **The two refusal SHAPES are
+  deliberately different and that is not what this case holds constant:** a bad birth date refuses
+  `malformed-payload` at the PAYLOAD door, before any business rule runs; a bad `field_set` value refuses
+  `field.type-mismatch` from `checkTicketFieldSet`'s own business logic, reached only after its payload has
+  already parsed. What the two doors agree on is the VERDICT — refused for the same four days, accepted
+  for the same one — because both ask the one schema the identical question. Mutation-witnessed: loosening
+  the birth fields to `z.object({ date: z.string() }).optional()` turns the birth array from
+  `[false, false, false, false]` to `[true, true, true, true]` (measured after rebuilding
+  `@gisik-nokma/domain`, since `rule-engine` reads its `dist`, not its source — the first run against
+  source-only left the cache stale and stayed green for the wrong reason), restored from the committed
+  tree. `13.1450` stays unspent. —
+  (`packages/rule-engine/test/fields.test.ts`)
+
+## 13.1451–13.1466 — board card badges: priority icon + tint, parent-key badge, epic chip (owner request, 2026-09-23)
+
+Block `13.1451`–`13.1470` (`13-hig-per-screen.md`'s allocation table has the row). `BoardTicketCard`
+(`packages/domain/src/read-models.ts`) gains `parent`/`epic`, each `null` unless BOTH visible and
+composable — no existence leak, the same rule `ListCard.epicId` already applies one ancestor further up,
+widened here to the immediate parent too. The server derives both from ONE recursive walk
+(`apps/server/src/read/ancestry.ts`'s `boardAncestryFor`, sharing `epicAncestors`' own `ancestryCte` —
+`epicAncestors` itself MOVED here verbatim from `routes/list.ts`, behaviour unchanged, pinned by its own
+case below); the offline replica mirrors it with a DELETED-safe walk of its own
+(`replica-data-source.ts`'s `boardHierarchyOf`) since `confirmedById`'s `byId` deliberately keeps a
+deleted ticket reachable for the LIST's own reasons. The priority badge draws a hand-drawn 24×24 glyph per
+level (fire/leaf/snowflake, `packages/ui/src/icons/priority-icons.tsx`) and the card's own surface is
+tinted by it — a scoped, owner-authorised reopening of the standing refusal against a general
+danger/success wash on record at `.gn-visibility__standing-mode` (`ui.css`), new roles named for this
+feature only. Supersedes `13.1237`–`13.1238` (only P1 took the tone) and `13.1281` (the keys row was
+conditional on key/due alone) in place — same ids, `packages/app-core/test/views/board.test.tsx`.
+
+- **13.1451** ✅ Every priority level renders its own icon (an `<svg>` as the badge's first child,
+  `aria-hidden`) and its own `--p1`/`--p2`/`--p3` modifier class, never another level's — and each of the
+  four icon components is a real 24×24 `currentColor` `aria-hidden` SVG with a `size` override. —
+  (`packages/app-core/test/views/board.test.tsx`, `packages/ui/test/priority-icons.test.tsx`)
+- **13.1452** ✅ The CARD itself (not only the badge) carries `gn-board-card--p1`/`--p2`/`--p3`, each
+  level distinct — the card's OWN tint modifier, separate from the badge's. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1453** ✅ For all three priorities, all three styles and both themes: the priority ink, the card's
+  `text`/`textMuted`, and the move-arrows' ghost button (`textAccent` on `fillTertiary`, itself composited
+  over the SAME wash) all clear WCAG AA 4.5:1 on `over(tint, surfaceRaised)` — with the anti-vacuous
+  control that the wash actually changes the ground. — (`packages/ui/test/tokens.test.ts`)
+- **13.1454**–**13.1455** ✅ The parent-key badge is the meta-line's first child (left of the card's own
+  key) and clicking it — `getByRole('button', {name: 'Open parent OPS-12'})` — calls `onOpenTicket` with
+  the PARENT's id exactly once. — (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1456**–**13.1457** ✅ The epic chip is the card's first element child (above the title) and
+  clicking it opens the EPIC once; a card with `epic: null` renders no chip at all and the title button
+  is the card's first child instead. — (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1458**–**13.1459** ✅ When the immediate parent IS the epic, no parent badge renders and the epic
+  chip alone names it; the control — a grandchild whose parent and epic differ — renders BOTH. —
+  (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1460** ✅ `boardAncestryFor` returns the SAME ticket as both `parent` and `epic` for a direct
+  child of the epic, and two DIFFERENT tickets for a grandchild; `epicAncestors` (moved, unchanged) still
+  finds the epic by name and title; `keysForAncestors` composes the derived `CCRE-<n>` key and
+  de-duplicates one ancestor shared by two cards to one lookup; the live HTTP response carries both
+  fields, keyed, for a real seeded hierarchy, and the epic's own card (a root, and its own nearest
+  ancestor-or-self) gets `parent: null` with `epic` naming itself. —
+  (`apps/server/test/read/ancestry.test.ts`, `apps/server/test/routes/board.test.ts`)
+- **13.1461** ✅ CORRECTED (controller mutation, 2026-09-23 — the first version PASSED with `AND
+  ${visible}` deleted from `ancestryCte`'s recursive term, because its child had no `visibility.set` of
+  its own and so INHERITED its hidden parent's audience, making the anchor exclude the row before the
+  recursive step ever ran). Rebuilt on `list.test.ts`'s own 7.80 shape: a child under an explicit-owner-
+  only parent, given its OWN `visibility.set` naming owner AND member — so the member CAN see the child
+  (asserted FIRST via the independent `canSee` oracle, not `boardAncestryFor` itself) but gets `parent:
+  null`, because the walk climbs into the parent and the parent is where it is stopped. CONTROL — the
+  owner, who may see the parent too, gets it named. Re-run against the controller's exact mutation:
+  RED (both this case and 13.1463 failed); restored from the committed tree, GREEN again. —
+  (`apps/server/test/read/ancestry.test.ts`)
+- **13.1462** ✅ A soft-deleted immediate parent is not named, even to the OWNER who could otherwise see
+  it — `LIVE_TICKET_WHERE` on the recursive term stops the walk exactly as an invisible link does; killed
+  by a planted mutation dropping that conjunct (measured: 1 failed, restored to green). —
+  (`apps/server/test/read/ancestry.test.ts`)
+- **13.1463** ✅ CORRECTED, the SAME defect and the SAME fix shape as 13.1461. Builds the real three-level
+  case: an epic (root) → a hidden middle ticket (explicit: owner only, child of the epic) → a visible
+  grandchild (its OWN `visibility.set` naming owner and member, child of the hidden middle ticket). The
+  member CAN see the grandchild (independent `canSee` control, first) but gets `epic: null`, because the
+  walk must climb THROUGH the hidden middle ticket to reach the epic and is stopped there. CONTROL — the
+  owner, who may see every hop, gets the real epic. Re-run against the controller's exact mutation: RED;
+  restored, GREEN. —
+  (`apps/server/test/read/ancestry.test.ts`)
+- **13.1464** ✅ `mapBoardCard` carries a real `parent`/`epic` object whole (key included, and a `key:
+  null` on a real object survives); a MISSING `parent`/`epic` key throws `MappingError` naming the path,
+  and a `parent` object missing its own `ticketId` throws naming the nested path — an absent field is not
+  this shape's spelling of `null`. — (`packages/app-core/test/online/mappers.test.ts`)
+- **13.1465** ✅ Offline: a direct child of the epic gets the epic as BOTH `parent` and `epic` (key
+  `null` on both, honestly — the replica cannot compose one); a grandchild's `parent`/`epic` differ, with
+  the epic's TITLE still resolving from the local ledger; a root ticket gets `null` for both. —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
+- **13.1466** ✅ Offline, DELETED-safe: a soft-deleted immediate parent is not named even though the
+  replica still holds the ticket, and an epic reachable only by walking THROUGH a deleted hop is not
+  named either — both killed by a planted mutation dropping the offline `isLive` check (measured: 2
+  failed, restored to green). — (`packages/app-core/test/replica/replica-data-source.test.ts`)
+
+`13.1467`–`13.1470` are unspent, held for a future round on this feature rather than borrowed elsewhere.
+
+**Regression, measured rather than assumed:** the full `apps/server` suite (1919 passed, 7 skipped), the
+full `packages/app-core` suite (2038 passed, including the pre-existing board suites — `board.test.tsx`,
+`board-workflow-collapse.test.tsx` (the `13.1409` collapse block), `board-filter.test.ts`), the full
+`packages/ui` suite (455 passed) and the full `apps/web` suite (838 passed) were each run green AFTER this
+block, under Node v22.23.2.

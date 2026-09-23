@@ -100,6 +100,31 @@ describe('state actions', () => {
     expect('blocked' in (store.getState().def.states.find((s) => s.id === 'doing') ?? {})).toBe(false);
   });
 
+  it('unchecking "Tickets can start here" removes the creatable flag rather than storing creatable: true', () => {
+    const store = storeWith(kanbanDef());
+    store.actions.setStateCreatable('doing', false);
+    store.actions.setStateCreatable('doing', true);
+    expect('creatable' in (store.getState().def.states.find((s) => s.id === 'doing') ?? {})).toBe(false);
+  });
+
+  /**
+   * 10.140 — starting-status design (2026-09-23): pointing the workflow's start
+   * state at a state carrying creatable: false flips validateWorkflowDef red
+   * (start-state-not-creatable, already shipped by the domain lane at
+   * packages/domain/src/validate-workflow.ts) — exercised here through the
+   * builder's own actions, not by hand-building a def.
+   */
+  it('setting the start state to a non-creatable state flips the validation red', () => {
+    const store = storeWith(kanbanDef());
+    store.actions.setStateCreatable('doing', false);
+    // Still clean: 'doing' carries the flag but is not (yet) the start state.
+    expect(selectIssues(store.getState()).map((issue) => issue.code)).not.toContain('start-state-not-creatable');
+    expect(selectCanPublish(store.getState())).toBe(true);
+    store.actions.setInitialState('doing');
+    expect(selectIssues(store.getState()).map((issue) => issue.code)).toContain('start-state-not-creatable');
+    expect(selectCanPublish(store.getState())).toBe(false);
+  });
+
   /**
    * 10.7 — deleting a state cascades its edges but leaves the start marker and rdu references dangling for validation to name.
    */
