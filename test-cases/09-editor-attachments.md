@@ -422,3 +422,18 @@ assumed it would find.
 - ✅ **9.310 — the bridge parses `ticketResults` and serialises `ticketQuery`; control: an unknown type is refused.** Mutation: drop the `ticketResults` case. `packages/editor/test/webview-bridge.test.ts`.
 - ✅ **9.311 — `docToPlainText` renders `ticketRef` as `KEY title`; a missing key falls back to the title (control in the same `it`).** Mutation: render the ticket id. `packages/domain/test/doc-text.test.ts`, `packages/editor/test/doc-text-conformance.test.ts`.
 - ✅ **9.312 — `renderCommentBody` renders `ticketRef` as a link when `ticketHref` resolves and as a span otherwise; control: `wikiLink` unchanged.** Mutation: link with `href="#"`. `packages/app-core/test/views/comment-body.test.tsx`.
+
+*(Block `9.313`–`9.337` allocated to `task/editor-polish` — see that branch's own reservation commit. Not
+duplicated here; the row below starts past it.)*
+
+## Editor skin: unstyled content/chips/chrome, escape-chip removal, tables + floating toolbar (owner request+ruling, 2026-09-24) — block `9.338`–`9.367`
+
+*Allocated 2026-09-24 by the controller against `origin/release/notes` `fc713961` (table tip `9.312`;
+`task/editor-polish` separately holds `9.313`–`9.337`, unspent as of this commit), for `task/editor-skin`:
+skinning every content node/mark/chip/in-document-chrome the editor can render (code blocks, chips,
+collapsible, images, etc.) in `apps/web/app/globals.css`, keeping `packages/editor/src/styles/editor.css`
+colour-free; removing the visible "Keep … as text" escape chip while KEEPING `escape-suggestion.ts`'s
+`undoInputRule` repair (owner ruling — spec §2's chip mechanic withdrawn); and skinning tables plus
+porting the owner's knowledge-base `TableFloatingToolbar` (9 row/column/header/delete actions). Explicitly
+excludes the suggestion popups and the main toolbar (`task/editor-polish`'s own scope). Cases file: this
+one. Minted: none yet — this is the reservation commit; the lane fills this block.*
