@@ -7,6 +7,9 @@ import { EMBEDDABLE_IMAGE_MIME, newUlid } from '@gisik-nokma/domain';
 import type { Auth } from '../auth/auth.js';
 import { makeRequireSession } from '../auth/require-session.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
+import { canReadNoteById } from '../visibility/can-read-note.js';
+import { getNoteStateFromDb } from '../projections/notes.js';
+import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { ticketIsLive } from '../read/live-ticket.js';
 import { getAttachment, insertAttachment } from '../attachments/attachment-repo.js';
 import { sha256Hex } from '../attachments/content-hash.js';
@@ -27,6 +30,26 @@ export type AttachmentRouteDeps = {
 
 /** The body for "no such ticket" and "not yours to see" — one constant, so they cannot drift apart. */
 const NOT_FOUND_BODY = { error: 'not-found' } as const;
+
+/**
+ * The one 403 on this surface: a reader of a note who may not put a file into
+ * it (notes series, spec §4.4).
+ *
+ * It is NOT the anonymous 404, and the asymmetry with the ticket branch above is
+ * deliberate. A ticket's upload authority IS its read authority — a viewer who
+ * can see a ticket may attach to it — so there the two questions collapse and
+ * one answer serves both. A note's does not: the author writes, every reader
+ * comments, and a reader asking to upload is making a legitimate request they
+ * are not entitled to, which deserves to be told apart from "the note you are
+ * looking at does not exist".
+ *
+ * A note that does not exist still gets `NOT_FOUND_BODY`: that half of the
+ * oracle rule is unchanged, and it is why the 404 is checked BEFORE this.
+ */
+const NOTE_UPLOAD_FORBIDDEN_BODY = {
+  error: 'forbidden',
+  reason: 'Only the note’s author, an admin who can read it, or the workspace owner can add files to it.',
+} as const;
 
 /**
  * One 404 for "does not exist" and "you may not see it".
@@ -331,27 +354,38 @@ export async function registerAttachmentRoutes(
     // client contract this handler cannot answer 400 for reliably, and no test
     // in this repo can observe the difference through `inject`. Stated here so
     // nobody later writes the test that proves it and watches it flake.
-    const rawTicketField = data.fields['ticketId'];
-    const ticketField = Array.isArray(rawTicketField) ? rawTicketField[0] : rawTicketField;
-    // `valueTruncated` is the flag `fieldSize` sets INSTEAD of erroring. Reading
-    // `.value` without it is how a size decision fails invisibly: a 300-byte
-    // `ticketId` would arrive as its first 256 bytes and be looked up as though
+    // A field part's value, or `null` when it is absent, truncated or the wrong
+    // shape. `valueTruncated` is the flag `fieldSize` sets INSTEAD of erroring.
+    // Reading `.value` without it is how a size decision fails invisibly: a
+    // 300-byte id would arrive as its first 256 bytes and be looked up as though
     // the client had sent that. The effect today is benign — no 256-character
     // string is a ULID, so it lands on the same 404 — but "benign because of a
-    // fact two files away" is exactly the shape that stops being benign when
-    // one of the two files changes. A truncated field is treated as no field.
-    const ticketId =
-      ticketField &&
-      ticketField.type === 'field' &&
-      typeof ticketField.value === 'string' &&
-      !ticketField.valueTruncated
-        ? ticketField.value
+    // fact two files away" is exactly the shape that stops being benign when one
+    // of the two files changes. A truncated field is treated as no field.
+    const fieldValue = (name: string): string | null => {
+      const raw = data.fields[name];
+      const part = Array.isArray(raw) ? raw[0] : raw;
+      return part &&
+        part.type === 'field' &&
+        typeof part.value === 'string' &&
+        !part.valueTruncated
+        ? part.value
         : null;
-    if (!ticketId) {
+    };
+    const ticketId = fieldValue('ticketId');
+    const noteId = fieldValue('noteId');
+
+    // EXACTLY ONE owner (spec §4.4). Neither is 400 — the request names nothing
+    // to file against — and BOTH is 400 rather than a silent preference, because
+    // a client that sent both meant something this door cannot honour, and
+    // choosing one would file their bytes under an owner they may not have
+    // intended while answering 201. The message names the rule rather than the
+    // field, since either field could be the one to remove.
+    if ((ticketId === null) === (noteId === null)) {
       discardUnreadFile(data.file);
       return reply.code(400).send({
         error: 'bad-request',
-        reason: 'a "ticketId" field is required before the file part',
+        reason: 'exactly one of "ticketId" or "noteId" is required, before the file part',
       });
     }
 
@@ -369,25 +403,69 @@ export async function registerAttachmentRoutes(
     // between them would file the object under the workspace of read #1 having
     // been permitted by read #2. Not a hole worth a transaction here, but Task
     // 10 copies this shape and should copy the caveat with it.
-    const visibility = await getResolvedVisibility(deps.pool, ticketId);
-    if (visibility === null || !(await canSee(deps.pool, request.currentUserId, ticketId))) {
-      discardUnreadFile(data.file);
-      return replyNotFound(reply);
-    }
+    // THE OWNER'S WORKSPACE, and who may put a file into it. Two branches, one
+    // per owner kind, and both end with `workspaceId` settled so everything
+    // below this point is owner-agnostic.
+    let workspaceId: string;
+    if (ticketId !== null) {
+      const visibility = await getResolvedVisibility(deps.pool, ticketId);
+      if (visibility === null || !(await canSee(deps.pool, request.currentUserId, ticketId))) {
+        discardUnreadFile(data.file);
+        return replyNotFound(reply);
+      }
 
-    // A TOMBSTONED ticket takes no new files, and this is the door where the
-    // refusal matters most: the read doors DISCLOSE, this one lets content
-    // ACCRETE onto a ticket the product has removed from every view. `canSee`
-    // above cannot answer it — the visibility predicate deliberately does not
-    // mean "not deleted" (`read/visible-where.ts`) — so the rule is asked
-    // separately, in its one spelling.
-    //
-    // `discardUnreadFile` runs on this path for the same reason as the refusal
-    // above it: the multipart file stream must be drained or destroyed before a
-    // handler returns, or the request is left holding a part nobody reads.
-    if (!(await ticketIsLive(deps.pool, visibility.workspaceId, ticketId))) {
-      discardUnreadFile(data.file);
-      return replyNotFound(reply);
+      // A TOMBSTONED ticket takes no new files, and this is the door where the
+      // refusal matters most: the read doors DISCLOSE, this one lets content
+      // ACCRETE onto a ticket the product has removed from every view. `canSee`
+      // above cannot answer it — the visibility predicate deliberately does not
+      // mean "not deleted" (`read/visible-where.ts`) — so the rule is asked
+      // separately, in its one spelling.
+      //
+      // `discardUnreadFile` runs on this path for the same reason as the refusal
+      // above it: the multipart file stream must be drained or destroyed before
+      // a handler returns, or the request is left holding a part nobody reads.
+      if (!(await ticketIsLive(deps.pool, visibility.workspaceId, ticketId))) {
+        discardUnreadFile(data.file);
+        return replyNotFound(reply);
+      }
+      workspaceId = visibility.workspaceId;
+    } else {
+      // `noteId !== null` is guaranteed by the exactly-one check above, and this
+      // is written as a non-null assertion ONLY because that check is four lines
+      // up in the same function; a helper would be the honest fix if a third
+      // owner kind ever lands.
+      const note = await getNoteStateFromDb(deps.pool, noteId!);
+      // 404 for a note that does not exist — the SAME anonymous answer the
+      // ticket branch gives, and for the same reason: an upload door that told
+      // a stranger "that note exists but is not yours" would be an existence
+      // oracle over the whole workspace.
+      if (note === null) {
+        discardUnreadFile(data.file);
+        return replyNotFound(reply);
+      }
+      const eff = await resolveEffectiveRole(deps.pool, request.currentUserId, note.workspaceId);
+      // AUTHOR, ADMIN-READER, OR OWNER (spec §4.4) — and MEMBERSHIP first, on
+      // top of the plan's expression. `note.authorId === userId` alone would
+      // admit an author who has since been REMOVED from the workspace, and
+      // `canReadNote`'s own first rule is that a non-member reads nothing; this
+      // door's authority may not be wider than the reader predicate's.
+      const isMember = eff.workspaceRole !== null;
+      const isAuthor = note.authorId === request.currentUserId;
+      const isOwner = eff.workspaceRole === 'owner';
+      const isAdminReader =
+        eff.workspaceRole === 'admin' && (await canReadNoteById(deps.pool, request.currentUserId, noteId!));
+      if (!isMember || !(isAuthor || isOwner || isAdminReader)) {
+        discardUnreadFile(data.file);
+        // 403 and NOT the anonymous 404 the ticket branch gives, and the
+        // difference is deliberate rather than an inconsistency: a note's
+        // upload authority is the author's, so the person asking is often a
+        // reader who simply may not write here — and telling a reader "that
+        // note does not exist" while they are looking at it would be a lie the
+        // ticket branch never has to tell, because there a readable ticket is
+        // an uploadable one.
+        return reply.code(403).send(NOTE_UPLOAD_FORBIDDEN_BODY);
+      }
+      workspaceId = note.workspaceId;
     }
 
     const read = await readAtMost(data.file, maxBytes);
@@ -403,7 +481,7 @@ export async function registerAttachmentRoutes(
     const attachmentId = newUlid();
     // ULID segments only: `assertValidObjectKey` inside every store re-checks
     // this, so a key is never trusted on the strength of where it was minted.
-    const objectKey = `w/${visibility.workspaceId}/a/${attachmentId}`;
+    const objectKey = `w/${workspaceId}/a/${attachmentId}`;
     const filename = sanitizeFilename(data.filename);
 
     // Hash the exact buffer that is about to be stored — not the client's
@@ -420,8 +498,11 @@ export async function registerAttachmentRoutes(
     });
     await insertAttachment(deps.pool, {
       id: attachmentId,
-      workspaceId: visibility.workspaceId,
-      ticketId,
+      workspaceId,
+      // The exactly-one check above guarantees one of these is a string; the
+      // other is spelled NULL rather than left absent, so the row cannot carry
+      // an undefined through a parameter array.
+      ...(ticketId !== null ? { ticketId, noteId: null } : { ticketId: null, noteId: noteId! }),
       uploaderId: request.currentUserId,
       filename,
       mime: sniffed.mime,
@@ -533,16 +614,35 @@ export async function registerAttachmentRoutes(
     const { id } = request.params as { id: string };
     const row = await getAttachment(deps.pool, id);
     if (!row) return replyNotFound(reply);
-    if (!(await canSee(deps.pool, request.currentUserId, row.ticketId))) {
-      return replyNotFound(reply);
-    }
-    // The ticket this attachment belongs to is ASKED FOR BY ID — a caller who
-    // already holds a URL from before the delete reaches this door without
-    // passing any ticket-scoped route — so the guard has to be asked here as
-    // well as at the list door. It IS the ticket's rule: the lookup resolves
-    // through `row.ticketId`, and the tombstone makes the bytes leave nothing,
-    // exactly as the ticket's own detail route refuses its name.
-    if (!(await ticketIsLive(deps.pool, row.workspaceId, row.ticketId))) {
+    // THE OWNER DECIDES WHO MAY ASK, and the two kinds ask different questions.
+    // A ticket-owned attachment is authorised by `canSee` on its ticket, plus
+    // the tombstone guard below; a note-owned one by `canReadNoteById`, which
+    // is the ONE reader predicate every other note read goes through. Nothing
+    // here is a second spelling of either rule.
+    if (row.noteId !== null) {
+      if (!(await canReadNoteById(deps.pool, request.currentUserId, row.noteId))) {
+        return replyNotFound(reply);
+      }
+    } else if (row.ticketId !== null) {
+      if (!(await canSee(deps.pool, request.currentUserId, row.ticketId))) {
+        return replyNotFound(reply);
+      }
+      // The ticket this attachment belongs to is ASKED FOR BY ID — a caller who
+      // already holds a URL from before the delete reaches this door without
+      // passing any ticket-scoped route — so the guard has to be asked here as
+      // well as at the list door. It IS the ticket's rule: the lookup resolves
+      // through `row.ticketId`, and the tombstone makes the bytes leave nothing,
+      // exactly as the ticket's own detail route refuses its name.
+      if (!(await ticketIsLive(deps.pool, row.workspaceId, row.ticketId))) {
+        return replyNotFound(reply);
+      }
+    } else {
+      // Unreachable through any door — `attachments_one_owner_check` refuses a
+      // row owned by neither — and answered as the anonymous 404 rather than
+      // thrown, so a hand-edited row cannot turn a download into a 500 that
+      // names the row's shape to the caller. That the branch is unreachable is
+      // the point: it costs one comparison and removes the only way this
+      // handler could dereference a null owner.
       return replyNotFound(reply);
     }
 

@@ -24,6 +24,8 @@ export * from './filter-spec.js';
 export * from './preferences.js';
 export * from './ticket-types.js';
 export * from './events/ticket-events.js';
+export * from './events/note-events.js';
+export * from './note-state.js';
 export * from './events/membership.js';
 export * from './events/visibility.js';
 export * from './events/invites.js';

@@ -3,7 +3,20 @@ import type { Queryable } from '../db/queryable.js';
 export type AttachmentRow = {
   id: string;
   workspaceId: string;
-  ticketId: string;
+  /**
+   * The owner pair, and exactly one of the two is set.
+   *
+   * Since the notes series (Plan 1 of 6, spec §4.4) a file may be uploaded into
+   * a ticket or into a note. `attachments_one_owner_check` refuses a row that
+   * sets neither or both, and `AttachmentOwner` refuses the same two shapes to
+   * a writer before Postgres ever sees them.
+   *
+   * `null` on both fields rather than a discriminated union on the ROW is
+   * deliberate: a row is what a SELECT returns, and a union would force every
+   * reader that only wants a filename to narrow first.
+   */
+  ticketId: string | null;
+  noteId: string | null;
   uploaderId: string;
   filename: string;
   mime: string;
@@ -13,12 +26,33 @@ export type AttachmentRow = {
   createdAt: string;
 };
 
-const COLUMNS = `id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key, sha256, created_at::text AS created_at`;
+/**
+ * A row KNOWN to be ticket-owned — what the ticket-scoped readers return,
+ * because their queries filter `ticket_id = $1`, so a row they hand back has a
+ * non-null ticket BY CONSTRUCTION.
+ *
+ * The narrowing is a TYPE rather than a runtime assert on purpose. Every
+ * consumer today reads `ticketId` as a string — the ticket route maps it, the
+ * image-embed gate compares it — and widening to the full row would oblige each
+ * of them to narrow a value that cannot be the other arm. The queries are what
+ * make it true; this type states that fact once, beside them.
+ */
+export type TicketOwnedAttachmentRow = AttachmentRow & { ticketId: string; noteId: null };
+
+/**
+ * Exactly one owner, as a type. A writer naming neither or both is a compile
+ * error here and a CHECK violation in the table — the same rule in the two
+ * places it can be enforced.
+ */
+export type AttachmentOwner = { ticketId: string; noteId?: null } | { ticketId?: null; noteId: string };
+
+const COLUMNS = `id, workspace_id, ticket_id, note_id, uploader_id, filename, mime, size, object_key, sha256, created_at::text AS created_at`;
 
 type DbRow = {
   id: string;
   workspace_id: string;
-  ticket_id: string;
+  ticket_id: string | null;
+  note_id: string | null;
   uploader_id: string;
   filename: string;
   mime: string;
@@ -33,6 +67,7 @@ function toRow(db: DbRow): AttachmentRow {
     id: db.id,
     workspaceId: db.workspace_id,
     ticketId: db.ticket_id,
+    noteId: db.note_id,
     uploaderId: db.uploader_id,
     filename: db.filename,
     mime: db.mime,
@@ -43,17 +78,41 @@ function toRow(db: DbRow): AttachmentRow {
   };
 }
 
+/**
+ * The ticket-owned reading of a row, for callers whose own query proved it.
+ *
+ * THROWS rather than casting: the only way a row from `SELECT … WHERE ticket_id
+ * = $1` is not ticket-owned is a driver or query that stopped applying the
+ * predicate, and a silent cast would hand that row to a ticket read as though
+ * the ticket id were the note's. A failure here is a broken query, and it should
+ * read like one.
+ */
+function asTicketOwned(row: AttachmentRow): TicketOwnedAttachmentRow {
+  if (row.ticketId === null || row.noteId !== null) {
+    throw new Error(
+      `attachment ${row.id} is not ticket-owned (ticket_id=${String(row.ticketId)}, note_id=${String(row.noteId)}) but was returned by a ticket-scoped query`,
+    );
+  }
+  return row as TicketOwnedAttachmentRow;
+}
+
 export async function insertAttachment(
   db: Queryable,
-  row: Omit<AttachmentRow, 'createdAt' | 'sha256'> & { sha256?: string },
+  row: Omit<AttachmentRow, 'createdAt' | 'sha256' | 'ticketId' | 'noteId'> & { sha256?: string } & AttachmentOwner,
 ): Promise<void> {
   await db.query(
-    `INSERT INTO attachments (id, workspace_id, ticket_id, uploader_id, filename, mime, size, object_key, sha256)
-     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9)`,
+    `INSERT INTO attachments (id, workspace_id, ticket_id, note_id, uploader_id, filename, mime, size, object_key, sha256)
+     VALUES ($1, $2, $3, $4, $5, $6, $7, $8, $9, $10)`,
     [
       row.id,
       row.workspaceId,
-      row.ticketId,
+      // `?? null` and not `undefined`: the driver sends `undefined` as the
+      // string 'undefined' inside a parameter array in some paths, and a
+      // CHECK-violating row would then name a note called 'undefined' instead
+      // of failing. `AttachmentOwner` already guarantees exactly one is a
+      // string, so this is a spelling of the absent arm rather than a default.
+      row.ticketId ?? null,
+      row.noteId ?? null,
       row.uploaderId,
       row.filename,
       row.mime,
@@ -73,12 +132,15 @@ export async function getAttachment(db: Queryable, id: string): Promise<Attachme
   return first ? toRow(first) : null;
 }
 
-export async function listTicketAttachments(db: Queryable, ticketId: string): Promise<AttachmentRow[]> {
+export async function listTicketAttachments(
+  db: Queryable,
+  ticketId: string,
+): Promise<TicketOwnedAttachmentRow[]> {
   const result = await db.query(
     `SELECT ${COLUMNS} FROM attachments WHERE ticket_id = $1 ORDER BY created_at, id`,
     [ticketId],
   );
-  return (result.rows as DbRow[]).map(toRow);
+  return (result.rows as DbRow[]).map(toRow).map(asTicketOwned);
 }
 
 /**
@@ -104,11 +166,11 @@ export async function listAttachmentsByIds(
   db: Queryable,
   ticketId: string,
   ids: readonly string[],
-): Promise<AttachmentRow[]> {
+): Promise<TicketOwnedAttachmentRow[]> {
   if (ids.length === 0) return [];
   const result = await db.query(
     `SELECT ${COLUMNS} FROM attachments WHERE ticket_id = $1 AND id = ANY($2::text[])`,
     [ticketId, [...ids]],
   );
-  return (result.rows as DbRow[]).map(toRow);
+  return (result.rows as DbRow[]).map(toRow).map(asTicketOwned);
 }

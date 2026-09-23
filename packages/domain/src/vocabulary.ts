@@ -28,6 +28,17 @@ import {
   ticketRestoredPayload,
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
+import {
+  noteAttachedPayload,
+  noteBodySetPayload,
+  noteCreatedPayload,
+  noteDeletedPayload,
+  noteDetachedPayload,
+  noteMovedPayload,
+  noteRenamedPayload,
+  noteRestoredPayload,
+  noteScopeSetPayload,
+} from './events/note-events.js';
 import { visibilitySetPayload } from './events/visibility.js';
 import { workspaceSettingsSetPayloadSchema } from './events/workspace-settings.js';
 import {
@@ -94,6 +105,11 @@ domainRegistry.register({
  * `comment.added` and `attachment.added` are about a TICKET: the comment and
  * the attachment are claims on the ticket's own history, not entities with
  * their own streams.
+ *
+ * ⚠ **That sentence covered two types and is now true of ONE.** The notes
+ * series (Plan 1 of 6) widened `comment.added` to `['ticket', 'note']` — see
+ * its registration below, which carries the reason. `attachment.added` is
+ * unchanged and still ticket-only.
  */
 domainRegistry.register({
   type: 'ticket-type.defined',
@@ -220,10 +236,24 @@ domainRegistry.register({
   payloadSchema: ticketRestoredPayload,
 });
 
+/**
+ * `comment.added` is the registry's FIRST two-kind type (notes series, Plan 1
+ * of 6, spec §3.2). A comment on a ticket and a comment on a note are the same
+ * claim — a body, filed against an entity the author can read — so the type is
+ * declared for both rather than re-registered under a second name, which the
+ * registry refuses anyway (`register` throws on a duplicate `type@version`).
+ *
+ * The LIST is the whole change and it does not widen the type: `parseEvent`
+ * still refuses `comment.added` against any third kind, and every other ticket
+ * type below stays bound to `'ticket'` alone. The prose above reads "are about
+ * a TICKET" for `comment.added` and that sentence is now false for exactly one
+ * of the two types it covered — `attachment.added` is untouched and still
+ * ticket-only.
+ */
 domainRegistry.register({
   type: 'comment.added',
   version: 1,
-  entityKind: 'ticket',
+  entityKind: ['ticket', 'note'],
   payloadSchema: commentAddedPayload,
 });
 
@@ -232,6 +262,86 @@ domainRegistry.register({
   version: 1,
   entityKind: 'ticket',
   payloadSchema: attachmentAddedPayload,
+});
+
+/**
+ * The note vocabulary (notes series, Plan 1 of 6, spec §3.2). Nine types, all
+ * version 1, all bound to entity kind `'note'`.
+ *
+ * Registered here rather than in a block of their own further down, because
+ * `comment.added` above is the type that spans into this vocabulary and the two
+ * are one reading: a reader who has just seen the note's own nine types meets
+ * the tenth — the one it shares with tickets — in the same paragraph rather
+ * than 200 lines away.
+ *
+ * `note.scope_set` reuses `note.created`'s `scope` schema under its own name
+ * (`events/note-events.ts` explains why they are one definition). The three
+ * types whose work is entirely in the reducer — `note.attached`,
+ * `note.detached`, `note.restored` — carry a payload of one ticket id or of
+ * nothing at all, and are refusals and state transitions in
+ * `note-state.ts` rather than anything the door could decide.
+ */
+domainRegistry.register({
+  type: 'note.created',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteCreatedPayload,
+});
+
+domainRegistry.register({
+  type: 'note.renamed',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteRenamedPayload,
+});
+
+domainRegistry.register({
+  type: 'note.body_set',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteBodySetPayload,
+});
+
+domainRegistry.register({
+  type: 'note.scope_set',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteScopeSetPayload,
+});
+
+domainRegistry.register({
+  type: 'note.moved',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteMovedPayload,
+});
+
+domainRegistry.register({
+  type: 'note.attached',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteAttachedPayload,
+});
+
+domainRegistry.register({
+  type: 'note.detached',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteDetachedPayload,
+});
+
+domainRegistry.register({
+  type: 'note.deleted',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteDeletedPayload,
+});
+
+domainRegistry.register({
+  type: 'note.restored',
+  version: 1,
+  entityKind: 'note',
+  payloadSchema: noteRestoredPayload,
 });
 
 /**

@@ -2,7 +2,7 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid, type EventEnvelope } from '@gisik-nokma/domain';
 import {
   checkPermission,
-  GUESTS_CANNOT_CREATE_TICKETS_REASON,
+  GUESTS_CANNOT_CREATE_REASON,
   NAMED_PERSON_NOT_IN_WORKSPACE_REASON,
   NOT_ON_PROJECT_REASON,
   PERMISSION_ROLE_RULE,
@@ -119,7 +119,7 @@ describe('check 2 — creating a ticket', () => {
     expect(await gate(createTicketEvent(workspaceId, projectId, guest), guest)).toEqual({
       refused: true,
       rule: PERMISSION_ROLE_RULE,
-      reason: GUESTS_CANNOT_CREATE_TICKETS_REASON,
+      reason: GUESTS_CANNOT_CREATE_REASON,
     });
   });
 

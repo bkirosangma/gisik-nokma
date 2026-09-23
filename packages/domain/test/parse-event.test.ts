@@ -265,3 +265,53 @@ describe('parseEvent — a membership event must be filed at its own (workspace,
     expect(parseEvent(raw).ok).toBe(true);
   });
 });
+
+/**
+ * 18.003 — the door's kind binding, seen from the two directions that matter for
+ * notes. `comment.added` is the ONE type that spans kinds (the registry now
+ * declares `['ticket', 'note']`), so it must be admitted on both; every
+ * `note.*` type stays bound to `'note'` alone, and the control is a note event
+ * filed against a ticket, refused as `entity-kind-mismatch`.
+ *
+ * The note id is `newUlid()` rather than a literal. The plan text's literal
+ * (`01J9GNOT…`) contains `O`, which Crockford base32 excludes (`ULID_REGEX`,
+ * `../src/ids.ts`), so the envelope would have been refused `malformed-envelope`
+ * — the refusal would have fired one gate EARLIER than the one this case is
+ * about, and the case would have passed while testing nothing it named.
+ */
+describe('18.003 the kind binding at the door', () => {
+  it('18.003 comment.added parses against a note entity; note.renamed against a ticket is a kind mismatch', () => {
+    const base = {
+      id: '01J9GEV0000000000000000000',
+      workspaceId: '01J9GWS0000000000000000000',
+      version: 1,
+      actorId: '01J9GACT000000000000000000',
+      origin: 'web',
+      clientTime: '2026-08-20T09:00:00.000Z',
+    };
+    expect(
+      parseEvent({
+        ...base,
+        entity: { kind: 'note', id: newUlid() },
+        type: 'comment.added',
+        payload: { body: { type: 'doc' } },
+      }).ok,
+    ).toBe(true);
+    expect(
+      parseEvent({
+        ...base,
+        entity: { kind: 'ticket', id: '01J9GTKA000000000000000000' },
+        type: 'comment.added',
+        payload: { body: { type: 'doc' } },
+      }).ok,
+    ).toBe(true);
+    const bad = parseEvent({
+      ...base,
+      entity: { kind: 'ticket', id: '01J9GTKA000000000000000000' },
+      type: 'note.renamed',
+      payload: { title: 'x' },
+    });
+    expect(bad.ok).toBe(false);
+    expect((bad as { code: string }).code).toBe('entity-kind-mismatch');
+  });
+});
