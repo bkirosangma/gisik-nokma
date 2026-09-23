@@ -556,7 +556,15 @@ describe('GET /v1/projects/:projectId/board', () => {
     });
     expect(res.statusCode).toBe(200);
 
-    const parentCard = expectedCard({
+    // `parent`/`epic` (owner request, 2026-09-23, board-card badges) are
+    // BOARD-ONLY — `expectedCard` stays untouched because `expectedListCard`
+    // below builds on it too, and `ListCard` carries neither field. Spread
+    // onto the board's own two card objects instead: the parent is a `story`
+    // (rank 2, not the epic rank) with no parent of its own, so BOTH are
+    // `null`; the child's parent is the story, key `RTSF-1` — the one the
+    // key comment above already names — and its epic is also `null`,
+    // for the same reason.
+    const parentCard = { ...expectedCard({
       ticketId: parentId,
       parentId: null,
       typeId: 'story',
@@ -570,8 +578,8 @@ describe('GET /v1/projects/:projectId/board', () => {
         uncategorizedChildren: 0,
         restrictedCount: 0,
       },
-    });
-    const childCard = expectedCard({
+    }), parent: null, epic: null };
+    const childCard = { ...expectedCard({
       ticketId: childId,
       parentId,
       typeId: 'task',
@@ -580,7 +588,7 @@ describe('GET /v1/projects/:projectId/board', () => {
       assigneeId: member.userId,
       title: 'Count the crates',
       rollup: null,
-    });
+    }), parent: { ticketId: parentId, key: 'RTSF-1' }, epic: null };
 
     expect(freezeClocks(res.json())).toEqual({
       projectId,

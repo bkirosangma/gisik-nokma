@@ -87,6 +87,12 @@ export function boardCardSeed(overrides: Partial<BoardCard> = {}): BoardCard {
     // own answer. A case that wants a key passes one.
     key: null,
     pending: false,
+    // Owner request, 2026-09-23: neither badge by default — a root ticket
+    // under no epic, the same "nothing to narrow by" default every other
+    // optional-looking fact on this seed already takes. A case that wants a
+    // parent or an epic passes one.
+    parent: null,
+    epic: null,
     ...overrides,
   };
 }

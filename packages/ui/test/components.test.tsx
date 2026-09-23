@@ -1192,6 +1192,51 @@ describe('13.464 — the board card declares no border-radius of its own (Ruling
 });
 
 /**
+ * 13.1451/13.1452 — the priority tint and the epic chip's truncation (owner
+ * request, 2026-09-23, board-card badges). A CSS-binding gate, the same
+ * shape 13.464 immediately above already uses: this proves the RULE exists
+ * with the right body, never that the class is wired onto anything real —
+ * `board.test.tsx`/`board-card-click.test.tsx` prove the wiring.
+ *
+ * `rule()` is a FIRST-MATCH substring regex with no selector parser
+ * (this file's own docblock on it), so every selector queried here is
+ * checked to be a plain, un-nested class — none of `.gn-board-card--p1`,
+ * `.gn-board-card__epic`, `.gn-board-card__epic-title` or
+ * `.gn-board-card__parent-key` is a compound descendant selector, so none
+ * can hijack a DIFFERENT rule's own `rule()` lookup the way
+ * `.gn-board-card--p1 .gn-board-card__priority` would have.
+ */
+describe('13.1451-13.1452 the priority tint and the epic chip truncation are real CSS rules', () => {
+  it('each priority modifier paints the tint OVER the opaque surface, never the wash alone', () => {
+    for (const level of ['p1', 'p2', 'p3'] as const) {
+      const body = rule(`.gn-board-card--${level}`);
+      expect(body, `.gn-board-card--${level}: ${body}`).toMatch(
+        new RegExp(`linear-gradient\\(var\\(--gn-priority-${level}-tint\\), var\\(--gn-priority-${level}-tint\\)\\), var\\(--gn-surface-raised\\)`),
+      );
+    }
+  });
+
+  it('the epic title truncates with an ellipsis rather than wrapping or overflowing the card', () => {
+    const body = rule('.gn-board-card__epic-title');
+    expect(body).toMatch(/overflow:\s*hidden/);
+    expect(body).toMatch(/text-overflow:\s*ellipsis/);
+    expect(body).toMatch(/white-space:\s*nowrap/);
+  });
+
+  it('the parent-key badge and the epic chip both carry a visible focus ring with no layout-affecting property', () => {
+    for (const selector of ['.gn-board-card__parent-key', '.gn-board-card__epic']) {
+      const focusBody = rule(`${selector}:focus-visible`);
+      expect(focusBody, `${selector}:focus-visible: ${focusBody}`).toMatch(/outline:\s*2px solid var\(--gn-focus-ring\)/);
+      // Outline, not border/margin/padding — an outline paints outside the box
+      // without reflowing it, which is the "no layout shift" half of the brief.
+      expect(focusBody.includes('border:') || focusBody.includes('margin') || focusBody.includes('padding')).toBe(
+        false,
+      );
+    }
+  });
+});
+
+/**
  * Case 13.513 — board-prototype-port Task 14, 2026-09-16. The spec's Board
  * metrics table "Card" row names `cursor:grab`; this task adds it beside the
  * drag-and-drop behaviour that makes it true (Ruling 15, cited at length in

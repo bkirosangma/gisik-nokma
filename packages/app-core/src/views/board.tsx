@@ -13,7 +13,7 @@ import {
   statesWithBacklog,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -1101,6 +1101,7 @@ function BoardGroupSection({
                   card={card}
                   stateName={column.name}
                   onOpen={() => onOpenTicket(card.ticketId)}
+                  onOpenTicket={onOpenTicket}
                   arrows={arrows === null ? null : arrows(card, column.stateId)}
                   today={today}
                 />
@@ -1381,12 +1382,22 @@ function BoardCardSlot({
   card,
   stateName,
   onOpen,
+  onOpenTicket,
   arrows,
   today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
+  /**
+   * `Board`'s own `onOpenTicket`, threaded through UNCHANGED from `onOpen`
+   * above (owner request, 2026-09-23: parent-key badge, epic chip). `onOpen`
+   * opens THIS card's own ticket and is what the `<li>`'s bail-guarded click
+   * handler calls; the parent badge and the epic chip open a DIFFERENT
+   * ticket, which needs the raw function rather than a closure already bound
+   * to `card.ticketId`.
+   */
+  onOpenTicket: (ticketId: string) => void;
   arrows: ReactNode;
   /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
   today?: string;
@@ -1416,7 +1427,14 @@ function BoardCardSlot({
         onOpen();
       }}
     >
-      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} today={today} />
+      <BoardCardView
+        card={card}
+        stateName={stateName}
+        onOpen={onOpen}
+        onOpenTicket={onOpenTicket}
+        arrows={arrows}
+        today={today}
+      />
     </li>
   );
 }
@@ -1445,12 +1463,15 @@ function BoardCardView({
   card,
   stateName,
   onOpen,
+  onOpenTicket,
   arrows,
   today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
+  /** `BoardCardSlot`'s own prop, threaded through unchanged; see its docblock. */
+  onOpenTicket: (ticketId: string) => void;
   arrows: ReactNode;
   today?: string;
 }) {
@@ -1480,8 +1501,71 @@ function BoardCardView({
    * The visible text is the date alone, exactly as the export draws it.
    */
   const late = card.dueDate !== null && today !== undefined && card.dueDate.date < today;
+  /**
+   * The priority badge's icon and tone (owner request, 2026-09-23: red fire
+   * P1, green leaf P2, frozen-blue snowflake P3). Every level is DRAWN — the
+   * level is a fact on every card, so there is no absence arm, exactly as
+   * spec 2026-09-22 already established — and now every level ALSO takes its
+   * own tone and icon, superseding that spec's "only P1 takes the tone"
+   * (a dense grid where every card is tinted by its own priority no longer
+   * has a reason to single P1 out; the tint IS the interruption).
+   */
+  const priorityIcon =
+    card.priority.value === 'P1' ? (
+      <FireIcon size={14} />
+    ) : card.priority.value === 'P2' ? (
+      <LeafIcon size={14} />
+    ) : (
+      <SnowflakeIcon size={14} />
+    );
+  const priorityLevel = card.priority.value.toLowerCase();
+  /**
+   * The immediate parent's badge, SUPPRESSED when it names the same ticket
+   * the epic chip already does (owner request, 2026-09-23: "when the
+   * immediate parent IS the epic, do not repeat it as a parent-key badge —
+   * the epic chip already says it"). The data stays honest either way —
+   * `card.parent` always names the true immediate parent (`BoardCard.parent`'s
+   * own docblock) — this is a VIEW-layer dedup, not a data-layer one, so every
+   * door that builds a `BoardCard` gets the rule for free without having to
+   * know about it.
+   *
+   * `parent.key === null` also does not draw: the same "a null key draws no
+   * separator and no placeholder" rule `card.key` itself already follows
+   * (the ledger holds no prefix, or — offline — the replica cannot compose
+   * one at all; `replica-data-source.ts`'s own `boardHierarchyOf` records
+   * that as narrower-than-the-truth on purpose).
+   */
+  const showParentBadge =
+    card.parent !== null &&
+    card.parent.key !== null &&
+    (card.epic === null || card.parent.ticketId !== card.epic.ticketId);
   return (
-    <Card className={card.pending ? 'gn-board-card gn-board-card--pending' : 'gn-board-card'}>
+    <Card
+      className={[
+        'gn-board-card',
+        `gn-board-card--${priorityLevel}`,
+        card.pending ? 'gn-board-card--pending' : null,
+      ]
+        .filter((name): name is string => name !== null)
+        .join(' ')}
+    >
+      {/* The epic chip (owner ruling, 2026-09-23): the card's TOP LINE, above
+          the title — epics are never drawn on the board as cards of their own
+          (owner ruling 2026-09-20), so this is the board's only way to say
+          which one a card belongs to. Absent when the card has none. */}
+      {card.epic !== null ? (
+        <button
+          type="button"
+          className="gn-board-card__epic"
+          aria-label={`Open epic ${card.epic.title}`}
+          onClick={() => onOpenTicket((card.epic as NonNullable<BoardCardData['epic']>).ticketId)}
+        >
+          <FlagIcon size={12} />
+          <span className="gn-board-card__epic-title" aria-hidden="true">
+            {card.epic.title}
+          </span>
+        </button>
+      ) : null}
       <button type="button" className="gn-board-card__title" onClick={onOpen}>
         {card.title}
       </button>
@@ -1498,42 +1582,45 @@ function BoardCardView({
         {card.rollup !== null ? (
           <span className="gn-board-card__progress">{formatRollup(card.rollup)}</span>
         ) : null}
-        {/* The priority badge (spec 2026-09-22), before the due label and
-            attributed like it. P2 is the birth default and is DRAWN — the level
-            is a fact on every card, so there is no absence arm — but only P1
-            takes the tone: on a dense grid the badge is the only priority
-            signal there is, and P1 is the one worth interrupting a scan for. */}
-        <span
-          className={
-            card.priority.value === 'P1'
-              ? 'gn-board-card__priority gn-board-card__priority--p1'
-              : 'gn-board-card__priority'
-          }
-          title={`${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
-        >
-          {card.priority.value}
-        </span>
       </div>
       {/* The prototype's META LINE (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
-          dueLabel].join(" · ")`), key first (owner, 2026-09-22). The due span is
-          the SAME element it was in the chips row, with its late tone (13.1177);
-          only its seat moved. A `null` key draws no separator and no placeholder
-          — a missing prefix is a fact about the ledger, not a blank to fill. The
-          line is omitted entirely when it would hold nothing. */}
-      {card.key !== null || card.dueDate !== null ? (
-        <p className="gn-board-card__meta-line">
-          {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
-          {card.key !== null && card.dueDate !== null ? <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span> : null}
-          {card.dueDate !== null ? (
+          dueLabel].join(" · ")`), key first (owner, 2026-09-22) — now "the KEYS
+          ROW" (owner request, 2026-09-23): `[parent key badge] key [priority
+          badge]`, then the due label. The priority badge MOVED here from the
+          chips row above — it is always present (spec 2026-09-22), so this row
+          is no longer conditional on `key`/`dueDate` the way it used to be. A
+          `null` card key still draws no separator and no placeholder.  */}
+      <p className="gn-board-card__meta-line">
+        {showParentBadge ? (
+          <button
+            type="button"
+            className="gn-board-card__parent-key"
+            aria-label={`Open parent ${card.parent?.key}`}
+            onClick={() => onOpenTicket((card.parent as NonNullable<BoardCardData['parent']>).ticketId)}
+          >
+            {card.parent?.key}
+          </button>
+        ) : null}
+        {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
+        <span
+          className={`gn-board-card__priority gn-board-card__priority--${priorityLevel}`}
+          title={`${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
+        >
+          {priorityIcon}
+          {card.priority.value}
+        </span>
+        {card.dueDate !== null ? (
+          <>
+            <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
               title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
             >
               {formatDate(card.dueDate.date)}
             </span>
-          ) : null}
-        </p>
-      ) : null}
+          </>
+        ) : null}
+      </p>
       <button
         type="button"
         className="gn-board-card__provenance"

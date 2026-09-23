@@ -3,6 +3,7 @@
 import { Avatar, Button, NoteBadge } from '@gisik-nokma/ui';
 import type { NoteDetail } from '@gisik-nokma/domain';
 import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import { ticketSheetPath } from '../ticket-location.js';
 import { ScopeEditor } from './scope-editor.js';
 
 /**
@@ -18,16 +19,18 @@ import { ScopeEditor } from './scope-editor.js';
  * place a note's state could be read from, and the two would disagree the moment
  * one of them was stale. It takes props and draws them.
  *
- * ## The ticket badge's `href`, and why it is My Work
+ * ## The ticket badge's `href`, and why it is the canonical sheet path
  *
- * `attachedTickets` carries `{ ticketId, key, title }` and NO project id, so the
- * board's own path (`/w/<ws>/p/<project>?ticket=<id>`, the shape
- * `project-page-head`'s neighbours use) cannot be built from it. `/w/<ws>/my-work`
- * is a real door that opens a ticket given only its id — it looks the project up
- * from its own rows and, on a miss, asks the server (`ticketLocation`) rather
- * than guessing one. The alternative that LOOKS tidier, filing the link under the
- * NOTE's home project, is the wrong-project answer the moment a note is pinned to
- * a ticket in another project.
+ * **CORRECTED (notes series, Plan 6 of 7, spec §10 Task 3).** This docblock
+ * used to read: *"`attachedTickets` carries `{ ticketId, key, title }` and NO
+ * project id, so the board's own path … cannot be built from it"* — true when
+ * written, and closed by adding `projectId` to `NoteSummary.attachedTickets`
+ * additively across the server read, both client mappers and the replica
+ * (`read/notes.ts`, `online/mappers.ts`, `replica-data-source.ts`). The badge
+ * now uses `ticketSheetPath`, the shell's one spelling of a ticket sheet's URL
+ * (`ticket-location.ts`) — the SAME door the board's own cards push, rather
+ * than the id-only My Work door, which stays correct but is a second spelling
+ * of one URL and a page hop `ticketSheetPath` skips.
  */
 export function NoteByline({
   note,
@@ -69,7 +72,7 @@ export function NoteByline({
               key={ticket.ticketId}
               title={ticket.title}
               scopeMode={note.scope.mode}
-              href={`/w/${workspace.id}/my-work?ticket=${ticket.ticketId}`}
+              href={ticketSheetPath({ workspaceId: workspace.id, projectId: ticket.projectId }, ticket.ticketId)}
               // Absent for a reader, which is what removes the × — the kit's own
               // rule (18.197), so there is one place that decides it.
               {...(canEdit ? { onDetach: () => onDetach(ticket.ticketId) } : {})}
