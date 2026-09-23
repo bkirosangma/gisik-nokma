@@ -1229,6 +1229,12 @@ describe('13.1237 the board card draws the priority badge; every level carries i
     // "present somewhere in the badge".
     expect(badge.firstElementChild?.tagName).toBe('svg');
     expect(badge.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    // WHICH icon, not merely "an icon": `FireIcon` draws exactly ONE `<path>`
+    // (`packages/ui/src/icons/priority-icons.tsx`) — `LeafIcon` draws two,
+    // `SnowflakeIcon` five — so the count alone tells the three apart. Without
+    // this, swapping P1's icon for P2's (measured: a planted swap left this
+    // whole file green) would pass every assertion here.
+    expect(badge.querySelectorAll('path')).toHaveLength(1);
     // The attribution travels with the level, the same `'s claim` sentence the
     // due label and every sheet claim line uses — a badge with no claimant
     // would read as a fact the system established.
@@ -1250,8 +1256,12 @@ describe('13.1237 the board card draws the priority badge; every level carries i
     expect(p3.className).toContain('--p3');
     expect(p3.className).not.toContain('--p1');
     expect(p3.className).not.toContain('--p2');
-    expect(p2.querySelector('svg')).not.toBeNull();
-    expect(p3.querySelector('svg')).not.toBeNull();
+    // WHICH icon each level draws — the same `<path>`-count discriminator
+    // 13.1237 uses: `LeafIcon` (P2) draws two, `SnowflakeIcon` (P3) draws
+    // five, so a P1↔P2 or P2↔P3 icon swap reddens here rather than passing
+    // on "an svg exists somewhere in the badge".
+    expect(p2.querySelectorAll('path')).toHaveLength(2);
+    expect(p3.querySelectorAll('path')).toHaveLength(5);
     // TWO badges for TWO cards — the positive half of "no absence arm", and the
     // assertion that stops the case passing on a board that drew one card.
     expect(screen.getAllByText(/^P[123]$/)).toHaveLength(2);
