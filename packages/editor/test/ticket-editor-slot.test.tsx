@@ -14,6 +14,7 @@ import {
   type TicketEditorSlotProps,
 } from '../src/components/TicketEditorSlot.js';
 import type { DocJson } from '../src/doc.js';
+import { uploadAttachmentHttp, uploadNoteAttachmentHttp } from '../src/upload.js';
 
 const DOC: DocJson = {
   type: 'doc',
@@ -92,6 +93,10 @@ type AppCoreEditorSlotProps = {
   readOnly: boolean;
   workspaceId: string;
   ticketId: string;
+  // 18.198 — the note an upload belongs to, in note mode (Plan 5, spec §4.4).
+  // Optional here because it is optional there: `ticketId` is required and this
+  // one is not, which is a fact about the two modes rather than a slip.
+  noteId?: string;
   placeholder?: string;
   autoFocus?: boolean;
   labelledBy?: string;
@@ -1056,5 +1061,73 @@ describe('13.1365 the slot reports the document, and can be mounted without a su
     expect(withButton.container.querySelector('.editor-slot__submit')).not.toBeNull();
     view.unmount();
     withButton.unmount();
+  });
+});
+
+/**
+ * 18.198 — the note owner field, and the upload that carries exactly one of the
+ * two (notes series Plan 5, spec §4.4).
+ *
+ * ## Why the assertion is on the FormData and not on a call
+ *
+ * `uploadAttachmentHttp(file, ticketId)` has been `form.append('ticketId', …)`
+ * since it was written, and the route refuses a request carrying BOTH owners or
+ * neither (`attachments/src/routes/attachments.ts:375-388`). A case asserting
+ * "it called fetch with a FormData" would pass on a request the server answers
+ * 400 to. Reading the body back is what makes the exactly-one rule the subject.
+ *
+ * The CONTROL is the ticket door in the same case, run through the same fake
+ * fetch: without it, an implementation that posted `noteId` for both owners — or
+ * for neither — would satisfy the note half alone.
+ */
+describe('18.198 the upload owner', () => {
+  const FILE = new File(['x'], 'a.png', { type: 'image/png' });
+
+  async function postedFields(
+    upload: (file: File, ownerId: string, fetchImpl: typeof fetch) => Promise<unknown>,
+    ownerId: string,
+  ): Promise<Record<string, unknown>> {
+    let body: FormData | null = null;
+    const fetchImpl = (async (_url: string, init: { body: FormData }) => {
+      body = init.body;
+      return {
+        ok: true,
+        status: 201,
+        json: async () => UPLOADED,
+      };
+    }) as unknown as typeof fetch;
+    await upload(FILE, ownerId, fetchImpl);
+    if (body === null) throw new Error('nothing was posted');
+    const entries: Record<string, unknown> = {};
+    for (const [key, value] of (body as FormData).entries()) entries[key] = value;
+    return entries;
+  }
+
+  it('posts exactly one owner: noteId for a note, ticketId for a ticket', async () => {
+    const noteFields = await postedFields(
+      uploadNoteAttachmentHttp as unknown as (
+        file: File,
+        ownerId: string,
+        fetchImpl: typeof fetch,
+      ) => Promise<unknown>,
+      '01J9NOTECOLDROOM000000000000',
+    );
+    expect(noteFields.noteId).toBe('01J9NOTECOLDROOM000000000000');
+    // MUTATION TARGET: a helper that appended both owners fails here, and the
+    // route it would send to answers 400.
+    expect(noteFields.ticketId).toBeUndefined();
+    expect(noteFields.file).toBeDefined();
+
+    // CONTROL, same case, same fake fetch: the ticket door still posts its own.
+    const ticketFields = await postedFields(
+      uploadAttachmentHttp as unknown as (
+        file: File,
+        ownerId: string,
+        fetchImpl: typeof fetch,
+      ) => Promise<unknown>,
+      '01J9TICKET00000000000000000',
+    );
+    expect(ticketFields.ticketId).toBe('01J9TICKET00000000000000000');
+    expect(ticketFields.noteId).toBeUndefined();
   });
 });

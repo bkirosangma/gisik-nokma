@@ -261,7 +261,7 @@ describe('AppNav — the mounts, not the components', () => {
       // oversight: an `<a role="menuitem">` has the menuitem role, not `link`,
       // so `getAllByRole('link')` cannot see them by design. Their reachability
       // is asserted where it now lives — the account-menu block below.
-      expect(hrefs).toEqual(['/workspaces', '/inbox']);
+      expect(hrefs).toEqual(['/workspaces', '/notes', '/inbox']);
     });
 
     it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
@@ -281,6 +281,10 @@ describe('AppNav — the mounts, not the components', () => {
         '/settings?workspaceId=ws_1',
         // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
         // menuitems, not links — see the first arm's comment.
+        // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
+        // `/inbox` in the nav's corner (spec §9.1) — this case reddened by name
+        // when it landed, which is the tripwire working.
+        '/notes',
         '/inbox',
       ]);
     });
@@ -334,6 +338,9 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1/my-work',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
+        // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
+        // `/inbox` (spec §9.1).
+        '/notes',
         '/inbox',
       ]);
     });
@@ -355,6 +362,10 @@ describe('AppNav — the mounts, not the components', () => {
         '/settings?workspaceId=ws_1',
         // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
         // menuitems, not links — see the first arm's comment.
+        // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
+        // `/inbox` in the nav's corner (spec §9.1) — this case reddened by name
+        // when it landed, which is the tripwire working.
+        '/notes',
         '/inbox',
       ]);
       // Named, so the failure says what came back rather than only that an
@@ -362,6 +373,64 @@ describe('AppNav — the mounts, not the components', () => {
       expect(hrefs).not.toContain('/w/ws_1/p/p_1');
       expect(screen.queryByRole('link', { name: 'Board' })).toBeNull();
     });
+  });
+});
+
+/**
+ * 18.182 — the Notes link, and the FIRST prefix match in this bar.
+ *
+ * **Every other item in this nav is measured by EXACT equality** (`current()` at
+ * `app-nav.tsx:230`), and that is correct for them: `/w/<id>` is not "inside"
+ * `/w/<id>/members`. A note is different in kind — `/notes/<id>` draws the SAME
+ * view, with a note open, that `/notes` draws with the tree alone — so the link
+ * must light on both or it is dark on the page the reader is actually on. It is
+ * stated here as an assertion rather than left to the code because the first
+ * prefix match in a bar of exact matches is exactly the line a later tidy-up
+ * "simplifies" back.
+ *
+ * The placement (`compareDocumentPosition`, then `nextElementSibling`) is the
+ * owner's: immediately LEFT of the inbox icon.
+ */
+describe('18.182 the Notes link sits before Inbox and lights for a note', () => {
+  function renderNav() {
+    return render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+  }
+
+  it('marks Notes current on /notes AND on /notes/<id>, but not on /inbox', () => {
+    currentPath = '/notes';
+    renderNav();
+    const onNotes = screen.getByRole('link', { name: 'Notes' });
+    expect(onNotes).toHaveAttribute('href', '/notes');
+    expect(onNotes).toHaveAttribute('aria-current', 'page');
+
+    // The note's own URL. MUTATION TARGET: `pathname === '/notes'` alone — the
+    // exact-equality form every sibling item uses — leaves this arm without a
+    // current item, and this is the only case in this file that walks it.
+    cleanup();
+    currentPath = '/notes/01J9NOTE00000000000000000';
+    renderNav();
+    expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page');
+
+    cleanup();
+    currentPath = '/inbox';
+    renderNav();
+    const onInbox = screen.getByRole('link', { name: 'Notes' });
+    expect(onInbox).toHaveAttribute('href', '/notes');
+    // CONTROL: the prefix is `/notes`, not `''`. Without this arm a link that
+    // lit on every route would pass everything above.
+    expect(onInbox).not.toHaveAttribute('aria-current', 'page');
+
+    // IMMEDIATELY LEFT of the inbox. `DOCUMENT_POSITION_FOLLOWING` (4) is the
+    // DOM's own order; `nextElementSibling` is the "immediately" half.
+    const inbox = screen.getByRole('link', { name: /Inbox/ });
+    expect(
+      onInbox.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(onInbox.nextElementSibling).toBe(inbox);
   });
 });
 
@@ -1102,6 +1171,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
     // this table, so a stale row here would fail as "nav does not render it"
     // rather than sitting unnoticed.
     ['/w/ws_1/my-work', 'app/w/[workspaceId]/my-work/page.tsx'],
+    ['/notes', 'app/notes/page.tsx'],
     ['/inbox', 'app/inbox/page.tsx'],
     ['/w/ws_1/members', 'app/w/[workspaceId]/members/page.tsx'],
     ['/settings?workspaceId=ws_1', 'app/settings/page.tsx'],

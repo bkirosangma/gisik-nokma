@@ -7119,3 +7119,78 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    DELETED rather than emptied: the sentence it painted is the composer's footer
    note now, drawn inside the slot (plan Task 7). */
 .gn-comments__composer { margin-top: 0.9rem; }
+
+/* ── `NoteBadge` (notes series Plan 5, spec §10.2) ──────────────────────────
+   A NEW block rather than an extension of `.gn-chip`, which the spec asks for
+   by name: a chip is a LABEL and this is a small composite of a link and a
+   button, and the two differ in exactly the ways a shared rule would have to
+   paper over (a chip has no interactive children to lay out, no per-scope
+   colour, and a pill radius that looks wrong around a ✕ that must keep a
+   square tap target).
+
+   The scope modifier is a tint rather than a different shape, because the
+   scope is a FACT about the note and the shape is the component's identity —
+   five shapes would be five things to recognise for one concept. */
+.gn-note-badge {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  padding: 0.125rem 0.25rem 0.125rem 0.5rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text);
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+}
+
+.gn-note-badge__title {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+  color: inherit;
+  text-decoration: none;
+}
+
+.gn-note-badge__title:hover {
+  text-decoration: underline;
+}
+
+/* The ✕. A 1.5rem square — under the 2.75rem tap floor the nav's own rule sets,
+   and deliberately: this control is a SECONDARY way to detach (spec §9.7 says
+   the × is never the only way), so it does not have to carry the primary tap
+   target the primary controls do. The square is what keeps its hit area from
+   collapsing to the glyph. */
+.gn-note-badge__remove {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1.5rem;
+  padding: 0;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+
+.gn-note-badge__remove:hover {
+  background: var(--gn-fill-secondary);
+  color: var(--gn-text);
+}
+
+.gn-note-badge__remove:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* One tint per scope, all from the token pairs `CONTRAST_PAIRS` already measures
+   at the 4.5:1 TEXT minimum — so a badge's word stays readable in every theme
+   and every style rather than only in the one it was picked against. */
+.gn-note-badge--private { background: var(--gn-fill-quaternary); }
+.gn-note-badge--workspace { background: var(--gn-fill-tertiary); }
+.gn-note-badge--project { background: var(--gn-tint-warning); }
+.gn-note-badge--inherit { background: var(--gn-fill-secondary); }
+.gn-note-badge--explicit { background: var(--gn-fill-quaternary); }
