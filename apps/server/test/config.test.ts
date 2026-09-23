@@ -28,6 +28,12 @@ describe('loadConfig', () => {
       webOrigin: 'http://localhost:3001',
       snapshotIntervalMs: 300000,
       snapshotMinEvents: 20,
+      // The notes series' search plan (Plan 3 of 6). Its `EMBED_WORKER_ENABLED`
+      // is the schema's SECOND string-boolean, and the boolean is made in
+      // `loadConfig` the same way `TRUST_PROXY`'s is — so this line pins that
+      // conversion as well as the default.
+      embedWorkerIntervalMs: 10000,
+      embedWorkerEnabled: true,
       // Plan 11 Task 1's nine. Listed here, in the exact-shape assertion,
       // because that is the guard that fails when a field is ADDED without
       // anyone deciding it should exist — a per-field `expect` would not.
@@ -74,6 +80,32 @@ describe('loadConfig', () => {
     );
     expect(() => loadConfig({ ...VALID_ENV, SNAPSHOT_MIN_EVENTS: '2.5' })).toThrowError(
       'invalid server configuration — check: SNAPSHOT_MIN_EVENTS',
+    );
+  });
+
+  /**
+   * The embedding worker's two knobs, named here for the same reason the
+   * snapshot pair is: the exact-shape assertion above states these defaults
+   * only as a side effect of stating everything.
+   *
+   * `EMBED_WORKER_ENABLED` is the schema's second string-boolean and the first
+   * whose FALSE branch has a consequence an operator would want — with the
+   * worker off, meaning search answers from chunks that stop being refreshed.
+   * So the `'false'` half is asserted, not only the default.
+   */
+  it('honours the embedding worker settings and refuses a non-positive interval', () => {
+    const config = loadConfig({ ...VALID_ENV, EMBED_WORKER_INTERVAL_MS: '60000', EMBED_WORKER_ENABLED: 'false' });
+    expect(config.embedWorkerIntervalMs).toBe(60000);
+    expect(config.embedWorkerEnabled).toBe(false);
+
+    expect(() => loadConfig({ ...VALID_ENV, EMBED_WORKER_INTERVAL_MS: '0' })).toThrowError(
+      'invalid server configuration — check: EMBED_WORKER_INTERVAL_MS',
+    );
+    // Any string that is neither 'true' nor 'false' is refused rather than
+    // coerced: `Boolean('no')` is true, so a laxer schema would turn a typo
+    // into "the worker runs", which is the opposite of what 'no' meant.
+    expect(() => loadConfig({ ...VALID_ENV, EMBED_WORKER_ENABLED: 'no' })).toThrowError(
+      'invalid server configuration — check: EMBED_WORKER_ENABLED',
     );
   });
 

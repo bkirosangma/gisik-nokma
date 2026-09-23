@@ -1,8 +1,10 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import {
+  NOTE_SCOPE_MODES,
   filterSpecSchema,
   searchTermSchema,
   type FilterSpec,
+  type NoteScopeMode,
   type SearchHit,
   type SearchResponse,
 } from '@gisik-nokma/domain';
@@ -10,6 +12,8 @@ import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
 import { FTS_CONFIG } from '../read/fts.js';
+import { HEADLINE_OPTIONS } from '../read/headline.js';
+import { lexicalNoteSearch, meaningNoteSearch } from '../read/note-search.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
@@ -22,8 +26,10 @@ import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js
  */
 const SEARCH_LIMIT = 50;
 
-/** The snippet window `ts_headline` is asked for. */
-const HEADLINE_OPTIONS = 'StartSel=**, StopSel=**, MaxWords=18, MinWords=6';
+// The snippet window `ts_headline` is asked for. MOVED to `read/headline.ts`
+// when the notes search plan needed the same string: that layer cuts snippets
+// too, and `read/` must not import `routes/`. One definition, two readers.
+// (No `const` here any more — the import below is the whole of it.)
 
 /**
  * A workspace's full text, filtered to what this caller may see, ranked, cut.
@@ -115,6 +121,58 @@ const HEADLINE_OPTIONS = 'StartSel=**, StopSel=**, MaxWords=18, MinWords=6';
  * NO TEST HERE CAN REDDEN by deleting it, it costs nothing, and it is the clause
  * that must be there on the day such a row exists. Do not let it read as covered.
  */
+export type SearchKinds = readonly ('ticket' | 'note')[];
+
+export type SearchMode = 'lexical' | 'meaning';
+
+export type ReadSearchOptions = {
+  /** Spec §7.7. Defaults to both, which is the pre-notes behaviour. */
+  kinds?: SearchKinds;
+  /** Spec §7.7. Defaults to `lexical`. */
+  mode?: SearchMode;
+  /** Notes only. */
+  authorId?: string;
+  /** Notes only. */
+  scopeMode?: NoteScopeMode;
+};
+
+const ALL_KINDS: SearchKinds = ['ticket', 'note'];
+
+/**
+ * The three parse helpers below share a return convention: `undefined` means
+ * the parameter was ABSENT (use the default), `null` means it was present and
+ * INVALID (400), and anything else is the value.
+ *
+ * Two sentinels rather than one because the two cases are different answers. A
+ * helper that returned `null` for both would make `?mode=` — present and empty —
+ * indistinguishable from `?mode=lexical`, and the route would answer 200 to a
+ * client that sent a typo.
+ */
+function parseKindsParam(value: unknown): SearchKinds | null | undefined {
+  if (value === undefined) return undefined;
+  if (typeof value !== 'string' || value.length === 0) return null;
+  const parts = value.split(',').map((part) => part.trim()).filter((part) => part !== '');
+  if (parts.length === 0) return null;
+  const kinds: ('ticket' | 'note')[] = [];
+  for (const part of parts) {
+    if (part !== 'ticket' && part !== 'note') return null;
+    if (!kinds.includes(part)) kinds.push(part);
+  }
+  return kinds;
+}
+
+function parseModeParam(value: unknown): SearchMode | null | undefined {
+  if (value === undefined) return undefined;
+  if (value === 'lexical' || value === 'meaning') return value;
+  return null;
+}
+
+function parseScopeParam(value: unknown): NoteScopeMode | null | undefined {
+  if (value === undefined) return undefined;
+  const found = NOTE_SCOPE_MODES.find((mode) => mode === value);
+  return found ?? null;
+}
+
 export async function readSearch(
   db: Queryable,
   eff: EffectiveRole,
@@ -122,7 +180,31 @@ export async function readSearch(
   workspaceId: string,
   query: string,
   spec: FilterSpec,
+  options: ReadSearchOptions = {},
 ): Promise<SearchResponse> {
+  const kinds = options.kinds ?? ALL_KINDS;
+  const mode = options.mode ?? 'lexical';
+  // Tickets have no chunks in v1, so `mode=meaning` is a NOTE mode and the
+  // ticket half answers `[]`. That is spec §7.7's decision and it is stated
+  // here rather than left to fall out of a query that would have returned the
+  // same rows as `lexical` — which would have been worse than empty: a client
+  // asking for meaning would get spelling matches labelled as meaning.
+  const wantTickets = kinds.includes('ticket') && mode === 'lexical';
+  const wantNotes = kinds.includes('note');
+
+  const noteOptions = { authorId: options.authorId, scopeMode: options.scopeMode };
+  const notesResult = wantNotes
+    ? mode === 'meaning'
+      ? { hits: await meaningNoteSearch(db, eff, viewerId, workspaceId, query, noteOptions) }
+      : await lexicalNoteSearch(db, eff, viewerId, workspaceId, query, noteOptions)
+    : { hits: [] };
+  const notes = notesResult.hits;
+  const corrected = 'corrected' in notesResult ? notesResult.corrected : undefined;
+
+  if (!wantTickets) {
+    return { workspaceId, query, hits: [], notes, ...(corrected === undefined ? {} : { corrected }) };
+  }
+
   const params = new SqlParams();
   const where = [
     `t.workspace_id = ${params.add(workspaceId)}`,
@@ -214,6 +296,8 @@ export async function readSearch(
   return {
     workspaceId,
     query,
+    notes,
+    ...(corrected === undefined ? {} : { corrected }),
     hits: rows.map((row) => {
       const card = cardById.get(row.ticket_id);
       if (card === undefined) {
@@ -300,7 +384,17 @@ export function registerSearchRoutes(
   deps: { pool: Queryable },
   requireSession: preHandlerHookHandler,
 ): void {
-  app.get<{ Querystring: { workspaceId?: string; q?: string; filter?: string } }>(
+  app.get<{
+    Querystring: {
+      workspaceId?: string;
+      q?: string;
+      filter?: string;
+      kinds?: string;
+      mode?: string;
+      author?: string;
+      scope?: string;
+    };
+  }>(
     '/v1/search',
     { preHandler: requireSession },
     async (request, reply) => {
@@ -345,7 +439,26 @@ export function registerSearchRoutes(
         spec = validated.data;
       }
 
-      return readSearch(deps.pool, eff, viewerId, raw.workspaceId, q.data, spec);
+      // Spec §7.7's four new parameters. Each is validated BEFORE anything is
+      // read, and an invalid value is `invalid_query` rather than a silent
+      // default: a client that asked for `mode=meanig` and got spelling results
+      // would be reading the wrong answer with no way to tell.
+      const kinds = parseKindsParam(raw.kinds);
+      if (kinds === null) return reply.status(400).send({ error: 'invalid_query' });
+      const mode = parseModeParam(raw.mode);
+      if (mode === null) return reply.status(400).send({ error: 'invalid_query' });
+      const scopeMode = parseScopeParam(raw.scope);
+      if (scopeMode === null) return reply.status(400).send({ error: 'invalid_query' });
+      if (raw.author !== undefined && (typeof raw.author !== 'string' || raw.author.length === 0)) {
+        return reply.status(400).send({ error: 'invalid_query' });
+      }
+
+      return readSearch(deps.pool, eff, viewerId, raw.workspaceId, q.data, spec, {
+        ...(kinds === undefined ? {} : { kinds }),
+        ...(mode === undefined ? {} : { mode }),
+        ...(raw.author === undefined ? {} : { authorId: raw.author }),
+        ...(scopeMode === undefined ? {} : { scopeMode }),
+      });
     },
   );
 }

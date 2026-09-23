@@ -31,6 +31,10 @@ import type {
   FilterSpec,
   Grouping,
   MyWorkView,
+  // The VIEW model, not `@gisik-nokma/domain`'s wire shape of the same name:
+  // this return carries `source`, which the server does not send (it is the
+  // mode of the request) and which the merged list (spec §7.8) needs per row.
+  NoteSearchHit,
   RosterMember,
   SearchHit,
   TicketHistoryEvent,
@@ -207,6 +211,34 @@ export type NoteListFilter = {
  * field the client needs is on the wire, pinned by case 7.38
  * (`apps/server/test/routes/builder-reads.test.ts:250`).
  */
+/**
+ * `searchNotes`'s two argument/return shapes, named and declared OUTSIDE the
+ * `DataSourceQuery` block.
+ *
+ * **That placement is REQUIRED, not stylistic.**
+ * `client-contract.test.ts:278` reads a method's parameters out of source by
+ * matching a fixed prefix, then a character class that stops at the first BRACE,
+ * then a closing brace — so a parameter object written inline would truncate the
+ * block and the extractor would report that the type does not exist at all
+ * (measured, case 7.201). The same file records the same trap for a comment: no
+ * brace may appear anywhere inside that block, comments included.
+ *
+ * **And this docblock is its own warning.** An earlier draft quoted the
+ * extractor's failure message verbatim, which put the matched PREFIX followed by
+ * a brace and a closing brace INSIDE these comments — above the real
+ * declaration. The scanner found the quotation first, captured the five
+ * characters between those braces, and reported that the type declares no
+ * method at all. The rule is not "do not write braces in the block"; it is "do
+ * not write braces anywhere before it either".
+ */
+export type NoteSearchQueryOptions = {
+  mode: 'lexical' | 'meaning';
+  authorId?: string;
+  scopeMode?: NoteScopeMode;
+};
+
+export type NoteSearchResult = { notes: NoteSearchHit[]; corrected?: string[] };
+
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
   /**
@@ -292,12 +324,22 @@ export type DataSourceQuery = {
    * draft wrote the call as a literal and the scanner read a truncated block —
    * measured, at case 7.201.)
    *
-   * ## `searchNotes` is NOT here
+   * ## `searchNotes` HAS LANDED, and the note that said it would not is kept
    *
-   * Notes search is Plan 3 of the series (spec §7.7) and lands with its own
-   * route, projection and worker. Declaring it now would oblige both sources to
-   * implement a method nothing can serve — the same trap `online/founding.ts`
-   * records for the founding reads.
+   * This block used to read: *"Notes search is Plan 3 of the series (spec §7.7)
+   * and lands with its own route, projection and worker. Declaring it now would
+   * oblige both sources to implement a method nothing can serve"* — which was
+   * right, and the day it named has arrived. The method is below, `searchNotes`.
+   *
+   * **It is a separate method rather than a `kinds` flag on `search`,** and that
+   * is the same decision `getDeletedNotes` makes one paragraph up: `search`
+   * returns `SearchHit[]`, whose `matchedIn` names one of three TICKET columns,
+   * while a note hit has no such field and carries `scopeMode` and
+   * `attachedTicketKeys` instead. One method returning a union would push the
+   * discrimination onto every caller, and every caller would do it by looking at
+   * which fields were present.
+   *
+   * The two CALLS share one route. This is the client's seam, not the server's.
    */
   getNotes(workspaceId: string, filter?: NoteListFilter): Promise<NoteSummary[]>;
   getDeletedNotes(workspaceId: string): Promise<NoteSummary[]>;
@@ -309,6 +351,30 @@ export type DataSourceQuery = {
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   getTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;
+  /**
+   * Note search (notes series, Plan 3 of 6, spec §7.7–§7.8).
+   *
+   * ## `mode` is REQUIRED, and it is not a defaulted option
+   *
+   * The two modes are two readings of the word "search" — `lexical` runs per
+   * keystroke and answers spelling; `meaning` runs after a typing pause and
+   * answers what the note is about. A default would make the cheap one happen
+   * when the expensive one was meant, silently, and the caller would have no way
+   * to tell the answer it got from the answer it wanted. The hook that drives
+   * this (spec §7.8) passes both explicitly.
+   *
+   * ## `corrected` is returned, not folded away
+   *
+   * Present exactly when the server corrected a misspelt query. The screen says
+   * "showing results for …" on its presence — a search that quietly answered a
+   * different question is a thing people cannot debug, so the substitution is
+   * reported rather than performed.
+   */
+  searchNotes(
+    workspaceId: string,
+    text: string,
+    options: NoteSearchQueryOptions,
+  ): Promise<NoteSearchResult>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
   /**

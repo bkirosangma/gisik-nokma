@@ -156,6 +156,22 @@ const configSchema = z.object({
   SNAPSHOT_INTERVAL_MS: z.coerce.number().int().positive().default(300000),
   SNAPSHOT_MIN_EVENTS: z.coerce.number().int().positive().default(20),
 
+  // ── The embedding worker (notes series, Plan 3 of 6) ─────────────────────
+  //
+  // The second background loop this server owns, and the same kind of knob as
+  // the pair above: neither is a correctness setting. The worker is also the
+  // backfill and the re-index after a model change, and both of those happen
+  // whether or not a commit ever nudges it — a longer interval only makes them
+  // later.
+  //
+  // `EMBED_WORKER_ENABLED` exists for the operator who needs to stop embedding
+  // WITHOUT stopping the server: the model is 130 MB resident (measured, case
+  // 18.129: Δ 274.8 MB on first use), and a box that is short on memory must be
+  // able to serve the rest of the product while somebody decides what to do
+  // about it. Search keeps answering lexically; only `mode=meaning` goes stale.
+  EMBED_WORKER_INTERVAL_MS: z.coerce.number().int().positive().default(10000),
+  EMBED_WORKER_ENABLED: z.enum(['true', 'false']).default('true'),
+
   // ── Deployment surface (Plan 11 Task 1) ──────────────────────────────────
   //
   // Nine variables `.env.example` has documented ahead of their reader since
@@ -237,6 +253,8 @@ export type AppConfig = {
   webOrigin: string;
   snapshotIntervalMs: number;
   snapshotMinEvents: number;
+  embedWorkerIntervalMs: number;
+  embedWorkerEnabled: boolean;
   trustProxy: boolean;
   rateLimitAuthMax: number;
   rateLimitEventsMax: number;
@@ -266,6 +284,10 @@ export function loadConfig(env: NodeJS.ProcessEnv | Record<string, string>): App
     webOrigin: parsed.data.WEB_ORIGIN,
     snapshotIntervalMs: parsed.data.SNAPSHOT_INTERVAL_MS,
     snapshotMinEvents: parsed.data.SNAPSHOT_MIN_EVENTS,
+    embedWorkerIntervalMs: parsed.data.EMBED_WORKER_INTERVAL_MS,
+    // `'true'`/`'false'` is what the schema accepts, and the boolean is made
+    // here once, matching `TRUST_PROXY` above.
+    embedWorkerEnabled: parsed.data.EMBED_WORKER_ENABLED === 'true',
     // `'true'`/`'false'` is what the SCHEMA accepts (see TRUST_PROXY above);
     // the boolean is made here, once, so no caller re-parses the string.
     trustProxy: parsed.data.TRUST_PROXY === 'true',

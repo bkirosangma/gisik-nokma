@@ -127,6 +127,12 @@ describe('proj_entity_heads', () => {
       // the spec's order rather than discharging a dependency. See
       // projection-order.test.ts, the pin of record.
       'proj_notes',
+      // The notes series, Plan 3 of 6 (search). INSERTED directly below
+      // `proj_notes`, and this entry is the first to make the note above it
+      // load-bearing rather than spec-followed: `proj_note_search.apply` reads
+      // proj_notes, proj_note_attachments, proj_tickets and proj_projects. See
+      // projection-order.test.ts, the pin of record.
+      'proj_note_search',
       'proj_contested',
       // Plan 5 Task 4. APPENDED, and NOT at a §8 position: §8's order ends at
       // proj_visibility and proj_contested already sits past it, so there is no

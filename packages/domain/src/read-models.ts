@@ -3,7 +3,7 @@ import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
 import type { Grouping } from './filter-spec.js';
 import type { Priority, TicketTypeDef } from './ticket-types.js';
 import type { WorkspaceSettings } from './events/workspace-settings.js';
-import type { NoteScope } from './note-state.js';
+import type { NoteScope, NoteScopeMode } from './note-state.js';
 
 /**
  * The read models every `/v1` read route serves and every client renders
@@ -406,7 +406,58 @@ export type SearchHit = {
   matchedIn: 'title' | 'description' | 'comment';
 };
 
-export type SearchResponse = { workspaceId: string; query: string; hits: SearchHit[] };
+/**
+ * One note in a search answer (notes series, Plan 3 of 6, spec §2).
+ *
+ * ## Why there is no `source` field here, although the spec's type has one
+ *
+ * The spec's `NoteSearchHit` carries `source: 'lexical' | 'meaning'`, and it is
+ * set on the CLIENT from the `mode` the client itself asked for — the server
+ * knows the mode of the REQUEST, so a per-row copy would be the request's own
+ * parameter echoed back on every row, with the two free to disagree the moment
+ * anything filtered or reordered. This is the WIRE shape and it stops at what
+ * the server knows per row; `packages/app-core`'s view model is where `source`
+ * appears. (`SearchHit` is split the same way, and for the same reason.)
+ *
+ * `title` is the RAW title, not the folded one the index matched: folding is an
+ * indexing detail and a reader shown `compressor log` for `Compressor Log` would
+ * be reading the search engine rather than their own note.
+ */
+export type NoteSearchHit = {
+  noteId: string;
+  title: string;
+  /** `ts_headline` output with `**` around matches (lexical), or the chunk text (meaning). */
+  snippet: string;
+  homeProjectId: string;
+  scopeMode: NoteScopeMode;
+  attachedTicketKeys: string[];
+  authorId: string;
+  updatedAt: string;
+};
+
+export type SearchResponse = {
+  workspaceId: string;
+  query: string;
+  hits: SearchHit[];
+  /**
+   * The note half of the answer. ALWAYS present — `[]` when no note matched,
+   * when `kinds` left notes out, or when `mode=meaning` found nothing.
+   *
+   * Required rather than optional, although the plan's route description writes
+   * it as a sibling of an unchanged `hits`: a client that had to handle
+   * `undefined` and `[]` as different states would be inventing a distinction
+   * the server does not draw. `hits` stays exactly what it was, which is what
+   * keeps an older client working.
+   */
+  notes: NoteSearchHit[];
+  /**
+   * The words a misspelt query was corrected TO, present exactly when a
+   * correction happened (spec §7.5). Absent rather than `[]` when nothing was
+   * corrected, so a UI can render "showing results for …" on the presence of
+   * this field alone.
+   */
+  corrected?: string[];
+};
 
 export type MyWorkResponse = {
   workspaceId: string;

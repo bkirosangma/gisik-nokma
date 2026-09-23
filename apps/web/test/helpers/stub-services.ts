@@ -168,6 +168,12 @@ export function stubServices(
     // workspace has no matching text — a claim about the world — and a page
     // under test would render an invented blank result and pass.
     search: unstubbed('search'),
+    // UNSTUBBED, and here the reason is not a serving gap at all: notes search
+    // worked from the first commit of its plan. `[]` would be this helper
+    // asserting the workspace contains no note matching the query — a claim
+    // about the world — and a page under test would render an invented blank
+    // result and pass, exactly as the `search` line above says.
+    searchNotes: unstubbed('searchNotes'),
     // UNSTUBBED since rulings P39 and P40 served them, and NOT `[]` — the same
     // treatment `getMyWorkspaces` got above, for the same reason and by the
     // same mechanism. `refuse()` THROWS when the gap it names disappears from

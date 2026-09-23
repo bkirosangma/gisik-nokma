@@ -2,6 +2,7 @@ import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
 import { projInvites } from './proj-invites.js';
 import { notesProjection } from './notes.js';
+import { noteSearchProjection } from './note-search.js';
 import { membershipsProjection } from './proj-memberships.js';
 import { projProjects } from './proj-projects.js';
 import { projVisibility } from './proj-visibility.js';
@@ -119,6 +120,21 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // be justified AS an adjacency — and Plan 3's search projection is the first
   // candidate, since `proj_note_search` will read notes.
   registry.register(notesProjection);
+  // The notes SEARCH projection (Plan 3 of 6, spec §7.3), and the first
+  // registrant for which the note above this one became load-bearing rather
+  // than merely named by the spec: `notesProjection`'s own comment said "Plan 3's search
+  // projection is the first candidate, since `proj_note_search` will read
+  // notes", and this is that. `apply` reads `proj_notes`,
+  // `proj_note_attachments`, `proj_tickets` and `proj_projects`, so it must sit
+  // below all four — in the ingest transaction, in `rebuildProjection`, and in
+  // the verifier's shadow rebuild, which replays projections in THIS order into
+  // `verify_shadow` and under `search_path` resolves each of those names to its
+  // shadow copy.
+  //
+  // Immediately after `proj_notes` rather than at the end: the adjacency that
+  // matters is the one with the note tables, and there is no reason to put
+  // `proj_contested` or the three appended tail entries between them.
+  registry.register(noteSearchProjection);
   registry.register(projContested);
   // APPENDED because no adjacency is load-bearing here — and appended is NOT a
   // §8 position, because §8 does not name one for this projection (see above).

@@ -12,6 +12,7 @@ import { createIngestService } from './ingest/ingest-service.js';
 import { buildProjectionRegistry } from './projections/index.js';
 import { installShutdownHandlers, isShuttingDown } from './shutdown.js';
 import { startSnapshotWriter } from './sync/snapshot-writer.js';
+import { startEmbedWorker } from './search/embed-worker.js';
 
 async function main(): Promise<void> {
   const config = loadConfig(process.env);
@@ -115,6 +116,14 @@ async function main(): Promise<void> {
     // compose stack, not inferred.
     webOrigin: config.webOrigin,
   });
+  // The embedding worker (notes series, Plan 3 of 6, spec §7.6) is created
+  // BELOW, beside the snapshot writer, but `buildApp` registers its commit
+  // listener at build time — so the callback has to exist first, and the loop
+  // wants `app.log` for its failures, which only exists afterwards. Hence a
+  // holder: it is null for exactly the few statements between here and its
+  // assignment, and nothing can call it in that window because nothing is
+  // listening yet.
+  let nudgeEmbedWorker: ((noteId: string) => void) | null = null;
   const app = buildApp(
     {
       db: pool,
@@ -126,6 +135,15 @@ async function main(): Promise<void> {
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: config.webOrigin,
+      // The commit-feed listener `app.ts` registers when this is given. It
+      // forwards to the worker created below; `EMBED_WORKER_ENABLED=false`
+      // leaves the worker uncreated, and this closure then drops the nudge on
+      // the floor — which is the honest behaviour, since there is nothing to
+      // nudge and the alternative (not passing the callback at all) would mean
+      // the boot path branched around a config knob it should read in one place.
+      onNoteBodyCommitted: (noteId) => {
+        nudgeEmbedWorker?.(noteId);
+      },
       // Where attachment bytes land, decided by `OBJECT_STORE` and nothing
       // else: local disk in dev, S3-compatible where one is configured.
       // `createObjectStoreFromEnv` is the ONE seam that reads those names, so
@@ -274,6 +292,37 @@ async function main(): Promise<void> {
   });
   app.addHook('onClose', () => {
     stopSnapshots();
+  });
+
+  // The embedding worker (notes series, Plan 3 of 6, spec §7.6), the second
+  // background loop beside the snapshot writer and here for the same three
+  // reasons its comment gives: not inside `buildApp` (around sixty test files
+  // call it), started before `listen` (an unref'd interval fires nothing for a
+  // whole interval), and stopped on `onClose` so `installShutdownHandlers`'
+  // `app.close()` reaches it.
+  //
+  // `EMBED_WORKER_ENABLED=false` is the operator's escape from the model's
+  // 130 MB: without this loop a box short on memory serves the whole product
+  // except `mode=meaning` search, which then answers from chunks that stop
+  // being refreshed rather than failing. The interval is ALSO the backfill and
+  // the re-index after a model change, so a disabled worker means a database
+  // that has never embedded anything stays that way until it is re-enabled.
+  const embedWorker = config.embedWorkerEnabled
+    ? startEmbedWorker(pool, {
+        intervalMs: config.embedWorkerIntervalMs,
+        log: (msg) => {
+          app.log.warn(msg);
+        },
+      })
+    : null;
+  nudgeEmbedWorker =
+    embedWorker === null
+      ? null
+      : (noteId) => {
+          embedWorker.nudge(noteId);
+        };
+  app.addHook('onClose', () => {
+    embedWorker?.stop();
   });
 
   // BEFORE `listen`, so there is no window in which this process is alive and

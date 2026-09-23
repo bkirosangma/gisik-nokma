@@ -30,6 +30,9 @@ import type {
   ListColumnId,
   ListRow,
   MyWorkView,
+  // The VIEW model, from `../view-types.js` and not from the domain: it is the
+  // one with `source` on it, and `mapNoteSearchHits` is where `source` is made.
+  NoteSearchHit,
   ParentRef,
   PriorityView,
   ProjectViewPrefs,
@@ -2203,6 +2206,65 @@ export function mapSearchHits(raw: unknown): SearchHit[] {
       matchedIn: matchedInOf(entry['matchedIn'], `${path}.matchedIn`),
     };
   });
+}
+
+/**
+ * The note half of a search answer (notes series, Plan 3 of 6, spec §7.7).
+ *
+ * ## `mode` is a PARAMETER, and it is what adds `source`
+ *
+ * The server sends no `source` on a note hit: the mode is the request's own
+ * parameter, so a per-row copy would be the caller's word echoed back. This
+ * mapper is given the mode it asked for and stamps it on every row, which is
+ * what lets the merged list (spec §7.8) label a result "spelling" or "meaning"
+ * without asking which call it came out of.
+ *
+ * ## `corrected` is MODE-DEPENDENT, and that is the server's rule
+ *
+ * Correction is a lexical idea: `mode=meaning` never sends the field, and this
+ * mapper returns `undefined` for it rather than `[]` — because the two are
+ * different facts ("nothing was corrected" against "correction does not apply
+ * here"), and the hook that drives the screen is a lexical call by then anyway.
+ *
+ * ## A row missing `noteId` REFUSES
+ *
+ * The same standard `mapNoteSummaries` holds: `noteId` is the hit's identity and
+ * the key the merge rule de-duplicates on, so defaulting it to `''` would merge
+ * every malformed row into one.
+ */
+export function mapNoteSearchHits(
+  raw: unknown,
+  mode: 'lexical' | 'meaning',
+): { notes: NoteSearchHit[]; corrected?: string[] } {
+  const record = asRecord(raw, 'search');
+  const notes = asArray(record['notes'], 'search.notes').map((hit, index) => {
+    const path = `search.notes[${index}]`;
+    const entry = asRecord(hit, path);
+    const scopeMode = asString(entry['scopeMode'], `${path}.scopeMode`);
+    if (!(NOTE_SCOPE_MODES as readonly string[]).includes(scopeMode)) {
+      throw new MappingError(`${path}.scopeMode`, `one of ${NOTE_SCOPE_MODES.join(', ')}`);
+    }
+    return {
+      noteId: asString(entry['noteId'], `${path}.noteId`),
+      title: asString(entry['title'], `${path}.title`),
+      snippet: asString(entry['snippet'], `${path}.snippet`),
+      homeProjectId: asString(entry['homeProjectId'], `${path}.homeProjectId`),
+      scopeMode: scopeMode as NoteScopeMode,
+      attachedTicketKeys: asArray(entry['attachedTicketKeys'], `${path}.attachedTicketKeys`).map((key, keyIndex) =>
+        asString(key, `${path}.attachedTicketKeys[${keyIndex}]`),
+      ),
+      authorId: asString(entry['authorId'], `${path}.authorId`),
+      updatedAt: asString(entry['updatedAt'], `${path}.updatedAt`),
+      source: mode,
+    };
+  });
+
+  const correctedRaw = record['corrected'];
+  if (correctedRaw === undefined) return { notes };
+  const corrected = asArray(correctedRaw, 'search.corrected').map((word, index) =>
+    asString(word, `search.corrected[${index}]`),
+  );
+  return { notes, corrected };
 }
 
 /** The three columns `matchedIn` may name, in the PRECEDENCE the route applies. */

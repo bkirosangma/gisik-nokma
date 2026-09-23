@@ -19,6 +19,8 @@ export * from './system-actors.js';
 export * from './display-name.js';
 export * from './ist-day.js';
 export * from './doc-text.js';
+export * from './doc-chunks.js';
+export * from './search-fold.js';
 export * from './doc-mentions.js';
 export * from './filter-spec.js';
 export * from './preferences.js';

@@ -298,7 +298,7 @@ The second direction is not theoretical — it is what this workstation does: Ho
 landed**. `restore.sh` propagating that non-zero exit is correct, so the suite does not paper over it: the
 round-trip describe gates on **client major ≤ server major**, not merely on the binaries existing, and skips
 with a stderr line naming both majors rather than reddening (the 13.36 failure shape, one cause over). CI runs
-it — `ci.yml` pins `postgres:16-alpine` beside `postgresql-client-16`, "pinned to the server's major version"
+it — `ci.yml` pins `pgvector/pgvector:pg16` beside `postgresql-client-16`, "pinned to the server's major version"
 — and that pin, not this suite, is what keeps the matched pair honest. The drill half was nonetheless executed
 green by hand on a matched pair (a throwaway `postgres:18-alpine`, client 18.4 / server 18.6 — port 54399 on
 the first pass, re-run on 54398 after the fixes below: `10 passed (10)`); the committed default remains 54329.

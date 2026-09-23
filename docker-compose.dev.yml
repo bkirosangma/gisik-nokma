@@ -98,7 +98,7 @@ name: gisik-nokma-dev
 
 services:
   postgres:
-    image: postgres:16-alpine
+    image: pgvector/pgvector:pg16
     command: ["postgres", "-c", "timezone=Asia/Kolkata"]
     environment:
       POSTGRES_USER: gisik

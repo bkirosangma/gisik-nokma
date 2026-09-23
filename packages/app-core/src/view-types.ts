@@ -1,4 +1,11 @@
-import type { FieldClaim, Priority, StateCategory, TicketState, VisibilityMode } from '@gisik-nokma/domain';
+import type {
+  FieldClaim,
+  NoteScopeMode,
+  Priority,
+  StateCategory,
+  TicketState,
+  VisibilityMode,
+} from '@gisik-nokma/domain';
 
 /**
  * The three levels, re-exported from their ONE origin (spec 2026-09-22): no
@@ -821,6 +828,33 @@ export type SearchHit = {
   title: string;
   snippet: string;
   matchedIn: 'title' | 'description' | 'comment';
+};
+
+/**
+ * A note in a search answer, as every client view holds it (notes series,
+ * Plan 3 of 6, spec §2).
+ *
+ * **`source` is the field that makes this a VIEW model and not the wire shape.**
+ * The server's `NoteSearchHit` (`@gisik-nokma/domain`) has no such field: the
+ * mode is the REQUEST's parameter, so a per-row copy on the wire would be the
+ * caller's own word echoed back on every row. Here it is set from the `mode`
+ * that was asked for, which is what lets the search screen label a result
+ * "spelling" or "meaning" without a second call to find out which list it is in.
+ *
+ * The merge rule (spec §7.8) puts BOTH kinds in one list, so `source` is the
+ * only thing that distinguishes them once they are merged — and it is why the
+ * field is required here rather than optional.
+ */
+export type NoteSearchHit = {
+  noteId: string;
+  title: string;
+  snippet: string;
+  homeProjectId: string;
+  scopeMode: NoteScopeMode;
+  attachedTicketKeys: string[];
+  authorId: string;
+  updatedAt: string;
+  source: 'lexical' | 'meaning';
 };
 
 export type SavedFilter = { id: string; name: string; filter: FilterSpec };

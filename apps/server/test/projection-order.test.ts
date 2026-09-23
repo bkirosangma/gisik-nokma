@@ -116,6 +116,15 @@ describe('projection registration order (coordination §8)', () => {
       // projection is the first candidate to make this position load-bearing,
       // since `proj_note_search` will read notes.
       'proj_notes',
+      // Plan 3 of 6 (the notes series' search plan). INSERTED directly below
+      // `proj_notes`, and this is the entry that turns the note above it from a
+      // forecast into a fact: `proj_note_search`'s `apply` reads `proj_notes`,
+      // `proj_note_attachments`, `proj_tickets` and `proj_projects`, so its
+      // position is load-bearing in the ingest transaction, in
+      // `rebuildProjection`, and in the verifier's shadow rebuild — where
+      // `search_path = verify_shadow, public` resolves each of those names to a
+      // shadow copy that exists only because those projections replayed first.
+      'proj_note_search',
       // Plan 10 Task 4. §8's order gains one TAIL entry, so appending is its §8
       // position here — a coincidence of where it falls, not an exception to
       // the insert-at-your-position rule above.
@@ -174,6 +183,12 @@ describe('projection registration order (coordination §8)', () => {
       // them here is what keeps `verify-projections` from replaying a note's
       // links into whichever live table the search_path happens to resolve.
       ['proj_notes', ['proj_notes', 'proj_note_attachments']],
+      // TWO tables, and BOTH must be declared or the verifier truncates the
+      // LIVE one. `proj_note_lexemes` is not a projection of its own: it is
+      // derived from the same notes in the same `apply`, and a projection whose
+      // unqualified `TRUNCATE` reached it with no shadow copy would empty the
+      // workspace vocabulary on every verify run.
+      ['proj_note_search', ['proj_note_search', 'proj_note_lexemes']],
       ['proj_contested', ['proj_contested']],
       ['proj_workspace_settings', ['proj_workspace_settings']],
       // ONE table. `tsv` is a GENERATED column of proj_search, not a table of

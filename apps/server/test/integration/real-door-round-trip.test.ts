@@ -1073,6 +1073,12 @@ describe('GET /v1/search', () => {
     expect(freezeClocks(body)).toEqual({
       workspaceId,
       query: 'crates',
+      // REQUIRED on the response since the notes series' search plan (Plan 3 of
+      // 6, spec §7.7), and empty here: `crates` is in a ticket title and in no
+      // note. Pinned as a whole-body `toEqual` rather than relaxed to
+      // `toMatchObject`, so the note half of this route is asserted in the same
+      // breath as the ticket half — which is the only place both are true at once.
+      notes: [],
       hits: [
         {
           card: expectedCard({
@@ -1121,7 +1127,7 @@ describe('GET /v1/search', () => {
       headers: member.headers,
     });
     expect(res.statusCode).toBe(200);
-    expect(freezeClocks(res.json())).toEqual({ workspaceId, query: 'zzzabsentterm', hits: [] });
+    expect(freezeClocks(res.json())).toEqual({ workspaceId, query: 'zzzabsentterm', hits: [], notes: [] });
   });
 
   /**

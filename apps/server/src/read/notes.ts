@@ -99,7 +99,7 @@ function summaryOf(row: NoteRow, attachedTickets: AttachedTicket[]): NoteSummary
  * is not worth refusing a read over, and dropping the ticket would hide an
  * attachment the viewer CAN see.
  */
-async function attachedTicketsByNote(
+export async function attachedTicketsByNote(
   db: Queryable,
   eff: EffectiveRole,
   userId: string,

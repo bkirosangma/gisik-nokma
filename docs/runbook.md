@@ -15,6 +15,36 @@ Merge to `main` with approval → App Platform builds and deploys (`deploy_on_pu
 container boot (entrypoint) before the server listens. Watch `doctl apps logs <app-id> server --follow`;
 confirm `GET /healthz` reports the new deploy sha.
 
+**Before the FIRST deploy that carries the notes search migration, run the pre-flight against the target
+database — from a repo checkout, never from a lane — with `DATABASE_URL` pointed at it, and
+`DATABASE_CA_CERT` set if that database presents a CA the system trust store does not carry (a managed
+one does):**
+
+```
+pnpm --filter @gisik-nokma/server run search:preflight
+```
+
+It prints whether `pg_trgm` and `vector` are installable there, what version of each `CREATE EXTENSION`
+would install, and whether the connected role may create them at all. **`vector` is not a trusted
+extension on PostgreSQL 16**, so on a managed database that role usually is not a superuser and the answer
+is `NO`; the exit status is non-zero in that case, which is the answer to act on — not a warning to read
+past. Nothing else in this runbook changes.
+
+**TLS: `DATABASE_URL` beside `DATABASE_CA_CERT`, the same two variables the server and the backup worker
+take.** The tool reads both, and hands the certificate to `createPool` exactly as `src/index.ts` and
+`ops/backup-daemon-main.ts` do — one reader for the variable (`ops/backup-env.ts`), so a PEM that one
+entry point accepts is not refused by another. A managed Postgres presents a CA the system trust store
+does not carry, and its URL carries `sslmode=require`, which `pg` treats as FULL verification: with no CA
+the CONNECTION fails, before any extension is looked at, in an error that looks nothing like the `NO` this
+section is about.
+
+The first line the tool prints says which mode the pool was built in —
+`{"msg":"database pool","tls":"ca"}` or `"tls":"none"` — and it is read back from the POOL rather than
+from the variable, so it reports the connection and not the environment. **Check that line first**: if it
+says `none` on a managed database, the rest of the output is not an answer about extensions at all.
+`deploy/do/README.md` owns the ordering rule the server applies here (an `ssl*` parameter in the URL
+replaces whatever CA a caller passed, which is why the pool rebuilds the string before connecting).
+
 ## Deploy (first time)
 
 See `deploy/do/README.md`. DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving
