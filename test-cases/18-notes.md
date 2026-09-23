@@ -275,3 +275,13 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.286 — a note's OWN comment composer also gets `queryNotes`, built from the page's already-loaded note list.** *(A fresh reviewer's finding on the whole branch, 2026-09-23: 18.285 closed the gap on the TICKET side, but `note-comments.tsx`'s composer had the mirror-image gap — `note-document.tsx`'s own `treeNotes` is now passed straight through, no second fetch.)* Mutation: drop the `queryNotes` prop from the composer. `apps/web/test/note-comments.test.tsx`.
 - ✅ **18.287 — My Work's open-ticket sheet also gets `queryTickets`/`resolveTicketHref`, keyed on the OPEN TICKET's own project (My Work spans projects, so there is no page-level "current project" the way the project page has one).** *(Same reviewer, same pass: the project page wired these at Task 4 (18.274); My Work's own `TicketSheet` mount never did, so its `:ticket` picker falsely reported "No tickets match" and a `ticketRef` chip rendered as a plain span.)* Mutation: drop the wiring. `apps/web/test/my-work-ticket-ref-callbacks.test.tsx`.
 - ✅ **18.288 — `queryNotes`'s note list is fetched ONCE on mount, not re-fetched on a workspace stream frame.** *(Same reviewer, same pass: `useLiveQuery` refetches on every stream frame for as long as the sheet stays open — a real cost for a picker that may never open. Matches `note-document.tsx`'s own one-time-fetch `queryNotes`, and is therefore not one of `ticket-sheet.test.tsx`'s "eight live reads" — that ratchet's count is unchanged by 18.285/18.288 together.)* Mutation: revert to `useLiveQuery`. `packages/app-core/test/views/ticket-sheet-comments.test.tsx`.
+
+## A note's ticket badge: no underline on hover, sheet opens in place (owner request, 2026-09-24) — block `18.321`–`18.335`
+
+*Allocated 2026-09-24 by the controller against `origin/release/notes` `fc713961` (table tip `18.288`; the
+planner separately named `18.301`–`18.320` for `task/editor-polish`'s Unit 6, on the notes search header —
+not yet written to this table as of this commit, so this block starts past it rather than at the tip to
+avoid a collision), for `task/notes-badge-sheet`: Unit 1 (the sheet opens on `/notes` via a URL param,
+copying My Work's own shape, rather than navigating to the project page) and Unit 2 (no underline on
+hover/focus for the badge's title, matching the house chip hover instead). Cases file: this one. Minted:
+none yet — this is the reservation commit; the lane fills this block.*
