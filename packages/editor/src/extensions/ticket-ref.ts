@@ -140,6 +140,19 @@ export const TicketRef = Node.create<TicketRefOptions>({
     // call, so a query typed after reconnecting shows the count-based status
     // again (case 18.272).
     let searchUnavailable = false;
+    // THE SEQUENCE GUARD (Unit 3 ruling, planner via owner, 2026-09-24 —
+    // Unit 3's styling draws this status line visibly, so a wrong one is now
+    // owner-visible, not only a screen-reader defect). `@tiptap/suggestion`'s
+    // own `fetch()` (dist `plugin/async.ts`) issues a NEW `items()` call on
+    // every keystroke without waiting for the previous one to settle, and its
+    // `AbortController` guard only protects the ITEMS it renders — it does
+    // not reach into this callback, so an EARLIER call's rejection can still
+    // resolve AFTER a LATER call's success and clobber `searchUnavailable`
+    // back to `true` next to a populated list. `requestId` pins each call to
+    // the `latestRequestId` at the moment IT STARTED; only a call still the
+    // latest one when it SETTLES may write the flag, so a stale rejection
+    // arriving after a newer success is a no-op.
+    let latestRequestId = 0;
     return [
       Suggestion<TicketRefCandidate, TicketRefCandidate>({
         editor: this.editor,
@@ -167,9 +180,11 @@ export const TicketRef = Node.create<TicketRefOptions>({
           return query.length === 0 || /^\s/.test(query);
         },
         items: async ({ query }) => {
-          searchUnavailable = false;
+          const requestId = (latestRequestId += 1);
           try {
-            return (await this.options.queryTickets(query.trim())).slice(0, 8);
+            const results = (await this.options.queryTickets(query.trim())).slice(0, 8);
+            if (requestId === latestRequestId) searchUnavailable = false;
+            return results;
           } catch {
             // A REJECTED, NOT A THROWN, RESULT: @tiptap/suggestion's own
             // catch (async.ts) would have swallowed this identically, minus
@@ -177,7 +192,7 @@ export const TicketRef = Node.create<TicketRefOptions>({
             // popup say why the list is empty. An empty resolved array is
             // exactly as benign to the library as a real zero-match answer,
             // which is the whole of "the editor still mounts" (case 18.272).
-            searchUnavailable = true;
+            if (requestId === latestRequestId) searchUnavailable = true;
             return [];
           }
         },
