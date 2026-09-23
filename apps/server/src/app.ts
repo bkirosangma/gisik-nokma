@@ -32,6 +32,7 @@ import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './ro
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
+import { registerNoteRoutes } from './routes/notes.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import { registerSyncRoutes } from './sync/sync-routes.js';
@@ -826,6 +827,12 @@ export function buildApp(
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.
   registerTicketRoutes(app, { pool: deps.pool }, requireSession);
+  // The note read surface (notes series, Plan 1 of 6) — list, one note, a
+  // ticket's notes, comments, history and one version. Same preHandler by
+  // parameter, same reason: every handler reads `request.currentUserId`, and the
+  // three note-addressed paths learn their workspace from the note's own row
+  // rather than from the URL (see `routes/notes.ts`).
+  registerNoteRoutes(app, { pool: deps.pool }, requireSession);
   // One ticket's history at a workspace-free path (Plan 3 Task 13) — the ledger
   // filtered to that ticket, paged by `afterSeq`/`limit`, as
   // `TicketHistoryEvent`s. It is NOT a duplicate of the `/events` door

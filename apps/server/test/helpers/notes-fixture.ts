@@ -218,3 +218,87 @@ export async function seedNotesFixture(pool: Pool): Promise<NotesFixture> {
 
   return { WS, P, TP, TE, ids, NOTES };
 }
+
+/**
+ * The SAME five notes, seeded into a world that already exists — the read-app's
+ * (`helpers/read-app.ts`), whose workspace, project, roster, workflow and ticket
+ * types are already in the ledger and whose `seedReadScenario` refuses a second
+ * seeding of them.
+ *
+ * ## Why the deps are passed in rather than derived
+ *
+ * This helper must not mint a workspace: the notes have to land in the world the
+ * signed-in roles belong to, or every route case would 404 for the wrong reason.
+ * So the caller hands over the ids and the helper seeds nothing else — no
+ * workspace, no project, no membership, no ticket type. It also does NOT call
+ * `resetEntitySeqs`: the caller's seeding already spent the process-local
+ * counter, and resetting it here would re-mint seqs that are already in the
+ * ledger.
+ *
+ * ## The author is the OWNER, and that is load-bearing
+ *
+ * Every note here is authored by `owner` rather than by `member`, so the
+ * `member` cell can be a genuine NON-reader of an inherited note (18.032) — the
+ * author arm admits the author whatever the scope, so a fixture that authored
+ * these by `member` could not tell "member may not read this" from "member wrote
+ * this". `owner` is on the read scenario's project AND is its project admin, so
+ * the author is also a legitimate member of the note's home project.
+ *
+ * `TP` should be the world's PROJECT-mode ticket and `TE` its
+ * explicit-to-guest one. In `seedReadScenario` those are `taskInEpicId` and
+ * `guestTaskId`; its `sharedTaskId` is NOT project-mode (it carries
+ * `visibility.set explicit [owner, member]`), which is the one thing about that
+ * world a reader is most likely to assume wrong.
+ */
+export type ReadWorldNotes = {
+  NOTES: NotesFixture['NOTES'] & { nDeleted: string };
+  TP: string;
+  TE: string;
+};
+
+export async function seedNotesIntoReadWorld(
+  pool: Pool,
+  deps: { workspaceId: string; projectId: string; authorId: string; guestUserId: string; TP: string; TE: string },
+): Promise<ReadWorldNotes> {
+  const { workspaceId, projectId, authorId, guestUserId, TP, TE } = deps;
+  const NOTES = {
+    nPrivate: newUlid(),
+    nWorkspace: newUlid(),
+    nProject: newUlid(),
+    nExplicit: newUlid(),
+    nInherit: newUlid(),
+    nDeleted: newUlid(),
+  };
+  const ws = { workspaceId, actorId: authorId };
+  const noteEv = (id: string, type: string, payload: unknown) =>
+    makeCommitted({ ...ws, entity: { kind: 'note', id }, type, payload });
+
+  await applyCommitted(pool, [
+    noteEv(NOTES.nPrivate, 'note.created', { title: 'Private', homeProjectId: projectId, scope: { mode: 'private' } }),
+    noteEv(NOTES.nWorkspace, 'note.created', {
+      title: 'Workspace',
+      homeProjectId: projectId,
+      scope: { mode: 'workspace' },
+    }),
+    noteEv(NOTES.nProject, 'note.created', { title: 'Project', homeProjectId: projectId, scope: { mode: 'project' } }),
+    noteEv(NOTES.nExplicit, 'note.created', {
+      title: 'Explicit',
+      homeProjectId: projectId,
+      scope: { mode: 'explicit', userIds: [guestUserId] },
+    }),
+    noteEv(NOTES.nInherit, 'note.created', {
+      title: 'Inherit',
+      homeProjectId: projectId,
+      scope: { mode: 'inherit' },
+      attachTicketId: TE,
+    }),
+    // A workspace-scope note that is then DELETED: workspace scope so that a
+    // plain member can READ it, which is what makes 18.030's negative ("a
+    // member sees [] among the deleted") a statement about the deleted rule
+    // rather than about readability.
+    noteEv(NOTES.nDeleted, 'note.created', { title: 'Deleted', homeProjectId: projectId, scope: { mode: 'workspace' } }),
+    noteEv(NOTES.nDeleted, 'note.deleted', {}),
+  ]);
+
+  return { NOTES, TP, TE };
+}

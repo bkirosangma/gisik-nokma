@@ -3080,3 +3080,4 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ⚙️ **Notes are projected into `proj_notes`, `proj_note_attachments`, `proj_note_comments`** — whole-row writes from the reducer, verifier-clean, no history table (versions are read from `events`).
 - ⚙️ **One reader predicate, two spellings, asserted equal** — `canReadNote` and `visibleNotesWhere` (spec §4.1, §4.3).
 - ⚙️ **Note writes are gated by `checkNotePermission`** — author/admin-reader/owner edit; readers attach on tickets they can see; readers comment (spec §4.2; admins have no override beyond what they can read, per `can-see.ts`).
+- ✅ **Notes can be read back through the API** — list, one note, a ticket's notes, comments, history and a version, every read filtered by the reader predicate; an unreadable note is a 404 identical to an absent one (spec §6.4).
