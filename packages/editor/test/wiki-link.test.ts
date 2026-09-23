@@ -1,6 +1,7 @@
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
+import { wikiLinkResultAnnouncement } from '../src/extensions/wiki-link-popup.js';
 
 /**
  * 9.276–9.279 — spec §8.5, wiki-links to notes.
@@ -13,6 +14,21 @@ import { typeText } from './helpers/type-text.js';
  * the other (storing the resolved title, say) would leave every rendering case
  * green while making the document wrong.
  */
+/**
+ * THE POPUP AND THE HOVER CARD LIVE ON `document.body`, NOT IN THE EDITOR'S
+ * OWN DOM, so a case that throws before its `editor.destroy()` leaves one
+ * behind — and the NEXT case then fails for a reason that is not its subject.
+ * Observed: a mutation failed 9.276 early and 9.297's "no popup opened" arm
+ * found the abandoned popup and went red too, which reads as one mutation
+ * killing two cases when it killed one.
+ *
+ * Cleaning up here makes each case independent of the previous one's
+ * cleanliness, so a failure names its own cause.
+ */
+afterEach(() => {
+  for (const el of document.querySelectorAll('.wikilink-popup, .wikilink-preview')) el.remove();
+});
+
 const NOTES = [
   { noteId: 'n1', title: 'Cold room' },
   { noteId: 'n2', title: 'Compressor log' },
@@ -53,6 +69,17 @@ describe('9.276-9.279 wiki-links', () => {
     await vi.waitFor(() => {
       expect(document.querySelector('.wikilink-popup__item')).not.toBeNull();
     });
+    // THE STATUS LINE THE POPUP ANNOUNCES, asserted against the RENDERED
+    // element as well as as a function — the mention popup's counterpart is
+    // tested this way, and its docblock says why it exists as "a function with
+    // a test rather than three template literals": it is screen-reader-only
+    // copy, which is the kind that rots unnoticed. This one shipped WITHOUT
+    // one while claiming "the same reason as `mentionResultAnnouncement`",
+    // found by the plan-close audit. 'co' matches both fixture notes.
+    expect(document.querySelector('.wikilink-popup__status')?.textContent).toBe('2 notes match');
+    expect(wikiLinkResultAnnouncement(0)).toBe('No notes match');
+    expect(wikiLinkResultAnnouncement(1)).toBe('1 note matches');
+    expect(wikiLinkResultAnnouncement(2)).toBe('2 notes match');
     editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     const para = asJson(editor).content?.[0];
     const link = para?.content?.find((n) => n.type === 'wikiLink');
