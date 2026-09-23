@@ -23,10 +23,19 @@ const WORDS_PER_MINUTE = 200;
  *
  * Accents are stripped through NFKD so `Café` and `Cafe` do not produce two
  * different anchors for one word, and the punctuation sweep is what makes the
- * result usable as a fragment. `.normalize` is the one method here that can
- * throw (on a lone surrogate), and it does not in practice — but the caller
- * treats an empty slug as "no id" and falls back, so a heading made entirely
- * of punctuation is handled rather than producing `id=""`.
+ * result usable as a fragment.
+ *
+ * **AN EARLIER VERSION OF THIS PARAGRAPH SAID `.normalize` "is the one method
+ * here that can throw (on a lone surrogate)". That is false, and it was
+ * measured**: `'\uD800'.normalize('NFKD')` returns the same lone surrogate
+ * rather than throwing, as does `'a\uDFFFb'` and a doubled `'\uD800\uD800'`.
+ * None of them throws, so this function is TOTAL on its input — no method in it
+ * can throw at all.
+ *
+ * The fallback it really needs is for a DIFFERENT case, and the caller has it:
+ * a heading made entirely of punctuation slugs to the empty string, and
+ * `extractReadingMeta` substitutes `heading-N` rather than stamping `id=""` on
+ * every such heading (which would put them all on one anchor).
  */
 export function headerSlug(text: string): string {
   return text
