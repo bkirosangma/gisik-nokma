@@ -19,6 +19,7 @@ import { getTicketStateFromDb } from '../projections/tickets.js';
 import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
 import { canReadNote, loadNoteForVisibility } from '../visibility/can-read-note.js';
+import { checkLifecycle } from './check-lifecycle.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
 /**
@@ -1722,6 +1723,14 @@ export async function checkPermission(
   const prefixRefusal = await checkProjectPrefixUnique(ctx.db, env);
   if (prefixRefusal !== null) {
     return prefixRefusal;
+  }
+  // SIXTH — trash series, Plan 1 Task 4 (spec §4). State refusals ("already
+  // deleted", "delete it first", "unmark it first") for the eight lifecycle
+  // types, answered from the item's own row. `now` is the wall clock at the
+  // door; `checkLifecycle` itself takes it as a parameter so a test can pin it.
+  const lifecycleRefusal = await checkLifecycle(ctx.db, env, new Date());
+  if (lifecycleRefusal !== null) {
+    return lifecycleRefusal;
   }
   return checkVisibilityPermission(env, permissionContext);
 }

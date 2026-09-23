@@ -97,13 +97,19 @@ describe('19.020 workspace acts: refused for an admin, accepted for the owner', 
     const admin = await signedIn();
     await seedMember(db.pool, workspaceId, admin.userId, 'admin');
 
+    // STATE-COHERENT order (Task 4's checkLifecycle enforces real transitions
+    // now: mark needs deleted, undelete needs unmarked) — the admin half is
+    // refused by ROLE regardless of order, but the owner's acceptance half
+    // needs a sequence a live door could actually walk: archive, restore
+    // (still live), delete, mark (needs deleted), unmark (undoes the mark),
+    // undelete (needs deleted AND unmarked).
     const workspaceActs: Seed[] = [
       { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.archived', payload: {} },
       { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.restored', payload: {} },
       { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.deleted', payload: {} },
-      { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.undeleted', payload: {} },
       { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'purge.marked', payload: {} },
       { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'purge.unmarked', payload: {} },
+      { workspaceId, entity: { kind: 'workspace', id: workspaceId }, type: 'workspace.undeleted', payload: {} },
     ];
 
     const refused = await submitBatch(admin, workspaceActs);
@@ -255,6 +261,11 @@ describe('19.023 a note mark: refused for a non-author member, accepted for the 
     expect(deleted[0]?.status).toBe('committed');
 
     const markSeed: Seed = { workspaceId, entity: { kind: 'note', id: noteId }, type: 'purge.marked', payload: {} };
+    // Task 4's checkLifecycle now refuses a SECOND purge.marked on an
+    // already-marked note (ALREADY_MARKED_REASON), so each accepted mark
+    // below is followed by an unmark (by the author, always authorized) —
+    // this case is testing AUTHORITY per actor, not accumulating marks.
+    const unmarkSeed: Seed = { workspaceId, entity: { kind: 'note', id: noteId }, type: 'purge.unmarked', payload: {} };
 
     const refused = await submitBatch(otherMember, [markSeed]);
     expect(refused[0]?.status, 'a non-author member').toBe('refused');
@@ -263,10 +274,12 @@ describe('19.023 a note mark: refused for a non-author member, accepted for the 
     // control: the author is accepted.
     const byAuthor = await submitBatch(author, [markSeed]);
     expect(byAuthor[0]?.status, 'the author').toBe('committed');
+    await submitBatch(author, [unmarkSeed]);
 
     // An admin who can read it (workspace-scope, so every non-guest reads it).
     const byAdmin = await submitBatch(admin, [markSeed]);
     expect(byAdmin[0]?.status, 'an admin who can read it').toBe('committed');
+    await submitBatch(author, [unmarkSeed]);
 
     // The owner.
     const byOwner = await submitBatch(owner, [markSeed]);
