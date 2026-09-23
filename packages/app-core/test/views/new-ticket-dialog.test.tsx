@@ -91,7 +91,7 @@ async function openPicker(
  * shown, narrowly, and every offered option is real.
  */
 describe('12.388 a narrowed parent picker names its narrowing', () => {
-  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
   const CANDIDATES = [
     { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
   ];
@@ -100,6 +100,7 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
     const user = userEvent.setup();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -143,6 +144,7 @@ describe('12.388 a narrowed parent picker names its narrowing', () => {
     const user = userEvent.setup();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -164,8 +166,8 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
   // assertions all expect `typeId: 'task'` — so the fixture has to say which of
   // these two is the everyday type rather than leaving it to list order.
   const TYPES = [
-    { id: 'epic', name: 'Epic', rank: 1 },
-    { id: 'task', name: 'Task', rank: 3 },
+    { id: 'epic', name: 'Epic', rank: 1, workflowId: 'wf-errand' },
+    { id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' },
   ];
   // `inFocus: false`: this describe block is about the WITHHELD-parent
   // invariant, not the checkbox, so the candidate stays one that never shows
@@ -187,6 +189,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
       open: true,
       typeOptions: TYPES,
       parentCandidates: CANDIDATES,
+      workflowStates: () => null,
       onCreate,
       onClose: () => undefined,
     };
@@ -323,7 +326,7 @@ describe('3.157 the dialog never submits a parent it has stopped showing', () =>
  * and the `''` → `null` translation at the submit boundary is what the payload carries.
  */
 describe('3.164–3.165 the parent picker offers project root as a real, selectable option', () => {
-  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
   const CANDIDATES = [
     { id: '01J9TICKET00000000000000EP', title: 'Rewire the shop sign', inFocus: false },
   ];
@@ -332,6 +335,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
     const onCreate = vi.fn();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -451,7 +455,7 @@ describe('3.164–3.165 the parent picker offers project root as a real, selecta
  *   stale reset would silently overwrite the person's remembered answer.
  */
 describe('13.591 the backlog question is a Switch, and it is always answerable', () => {
-  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
   const CANDIDATES = [
     { id: 'parent_focus', title: 'In-focus parent', inFocus: true },
     { id: 'parent_backlog', title: 'Backlog parent', inFocus: false },
@@ -465,6 +469,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
     const onCreate = vi.fn();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId={userId}
         workspaceId="ws_1"
@@ -792,7 +797,7 @@ describe('13.591 the backlog question is a Switch, and it is always answerable',
  * the same "a state you did not set" defect this file's `E2-37` block is about.
  */
 describe('13.1355–13.1357 the backlog answer is remembered, per user', () => {
-  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
   const QUESTION = 'Starts in the backlog?';
 
   const props = (userId: string) => ({
@@ -801,6 +806,7 @@ describe('13.1355–13.1357 the backlog answer is remembered, per user', () => {
     typeOptions: TYPES,
     parentCandidates: [],
     assigneeCandidates: [],
+    workflowStates: () => null,
     onCreate: vi.fn(),
     onClose: () => undefined,
   });
@@ -902,7 +908,7 @@ describe('13.1355–13.1357 the backlog answer is remembered, per user', () => {
  * creation control.
  */
 describe('V10 the Create control cannot file two tickets from two presses', () => {
-  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
 
   function slowDialog(): { onCreate: ReturnType<typeof vi.fn>; release: () => void } {
     let release: () => void = () => undefined;
@@ -914,6 +920,7 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
     );
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -1014,13 +1021,14 @@ describe('V10 the Create control cannot file two tickets from two presses', () =
  * draft is the whole reason the last one is safe to discard.
  */
 describe('E2-37 a reopened New-ticket dialog is EMPTY', () => {
-  const TYPES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
   const props = {
     userId: 'usr_ada',
     workspaceId: 'ws_1',
     typeOptions: TYPES,
     parentCandidates: [],
     assigneeCandidates: [],
+    workflowStates: () => null,
     onClose: () => undefined,
   };
 
@@ -1058,10 +1066,10 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
   // is the entry the root-rank rule must EXCLUDE (a type at `DEEPEST_RANK` or
   // below cannot sit at project root).
   const LADDER = [
-    { id: 'epic', name: 'Epic', rank: 1 },
-    { id: 'story', name: 'Story', rank: 2 },
-    { id: 'task', name: 'Task', rank: 3 },
-    { id: 'sub-task', name: 'Sub-task', rank: 4 },
+    { id: 'epic', name: 'Epic', rank: 1, workflowId: 'wf-errand' },
+    { id: 'story', name: 'Story', rank: 2, workflowId: 'wf-errand' },
+    { id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' },
+    { id: 'sub-task', name: 'Sub-task', rank: 4, workflowId: 'wf-errand' },
   ];
 
   /**
@@ -1075,18 +1083,18 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     // …and not a rank the root rule refuses outright (rank >= DEEPEST_RANK
     // needs a parent), even when it is the deepest on offer.
     expect(defaultRootTypeFor([
-      { id: 'epic', name: 'Epic', rank: 1 },
-      { id: 'sub-task', name: 'Sub-task', rank: 4 },
+      { id: 'epic', name: 'Epic', rank: 1, workflowId: 'wf-errand' },
+      { id: 'sub-task', name: 'Sub-task', rank: 4, workflowId: 'wf-errand' },
     ])?.id).toBe('epic');
     // A workspace whose every type needs a parent has NO root-legal type, and
     // the honest answer is none — the caller then starts empty.
-    expect(defaultRootTypeFor([{ id: 'sub-task', name: 'Sub-task', rank: 4 }])).toBeNull();
+    expect(defaultRootTypeFor([{ id: 'sub-task', name: 'Sub-task', rank: 4, workflowId: 'wf-errand' }])).toBeNull();
     // Ties are broken by id, so the answer does not depend on the order the
     // server happened to return the ladder in.
     expect(
       defaultRootTypeFor([
-        { id: 'errand', name: 'Errand', rank: 3 },
-        { id: 'chore', name: 'Chore', rank: 3 },
+        { id: 'errand', name: 'Errand', rank: 3, workflowId: 'wf-errand' },
+        { id: 'chore', name: 'Chore', rank: 3, workflowId: 'wf-errand' },
       ])?.id,
     ).toBe('chore');
   });
@@ -1095,6 +1103,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     const onCreate = vi.fn();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -1157,6 +1166,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     const onCreate = vi.fn();
     const { rerender } = render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -1176,11 +1186,12 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     // this list cannot resolve.
     rerender(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
         assigneeCandidates={[]}
-        typeOptions={[{ id: 'errand', name: 'Errand', rank: 3 }]}
+        typeOptions={[{ id: 'errand', name: 'Errand', rank: 3, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         onCreate={onCreate}
         onClose={() => undefined}
@@ -1217,6 +1228,7 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     const onCreate = vi.fn();
     const { rerender } = render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -1233,11 +1245,12 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     // the person can still pick.
     rerender(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
         assigneeCandidates={[]}
-        typeOptions={[...LADDER, { id: 'errand', name: 'Errand', rank: 3 }]}
+        typeOptions={[...LADDER, { id: 'errand', name: 'Errand', rank: 3, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         onCreate={onCreate}
         onClose={() => undefined}
@@ -1250,11 +1263,12 @@ describe('3.188 (E5-16) the Type picker does not start at the top of the hierarc
     const onCreate = vi.fn();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
         assigneeCandidates={[]}
-        typeOptions={[{ id: 'sub-task', name: 'Sub-task', rank: 4 }]}
+        typeOptions={[{ id: 'sub-task', name: 'Sub-task', rank: 4, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         onCreate={onCreate}
         onClose={() => undefined}
@@ -1299,11 +1313,12 @@ describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () 
   const renderDialog = () =>
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
         assigneeCandidates={[]}
-        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         onCreate={vi.fn()}
         onClose={() => undefined}
@@ -1343,11 +1358,12 @@ describe('13.1139 the Title field is a .gn-field__input, not raw UA chrome', () 
  * fixture and neither is about anything the describes above measure.
  */
 describe('13.1234 the new-ticket dialog offers P1/P2/P3, preselected at P2', () => {
-  const CHOICES = [{ id: 'task', name: 'Task', rank: 3 }];
+  const CHOICES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
 
   const renderDialog = (onCreate: (draft: unknown) => void | Promise<void> = vi.fn()) => {
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
@@ -1449,11 +1465,12 @@ describe('13.1365 the dialog composes a description through the editorSlot seam'
     const { slot, seen } = fakeSlot(reported);
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
         assigneeCandidates={[]}
-        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         editorSlot={slot}
         onCreate={onCreate}
@@ -1554,11 +1571,12 @@ describe('13.1365 the dialog composes a description through the editorSlot seam'
     const onCreate = vi.fn();
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
         assigneeCandidates={[]}
-        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         onCreate={onCreate}
         onClose={() => undefined}
@@ -1581,10 +1599,11 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
   const renderDialog = (onCreate = vi.fn(), unavailable?: string) => {
     render(
       <NewTicketDialog
+        workflowStates={() => null}
         open
         userId="usr_ada"
         workspaceId="ws_1"
-        typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }]}
         parentCandidates={[]}
         assigneeCandidates={PEOPLE}
         {...(unavailable === undefined ? {} : { assigneeCandidatesUnavailable: unavailable })}
@@ -1671,9 +1690,10 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
       open: true,
       userId: 'usr_ada',
       workspaceId: 'ws_1',
-      typeOptions: [{ id: 'task', name: 'Task', rank: 3 }],
+      typeOptions: [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }],
       parentCandidates: [],
       assigneeCandidates: PEOPLE,
+      workflowStates: () => null,
       onCreate,
       onClose: () => undefined,
     };
@@ -1702,5 +1722,215 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
     // correct, so a case reading the screen would have passed against the defect
     // (3.157's own lesson, which is why it is repeated here rather than cited).
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ assigneeId: null }));
+  });
+});
+
+/**
+ * Cases 13.1435–13.1441 — the STARTING STATUS select (starting-status
+ * design, 2026-09-23; `DESIGN-starting-status-2026-09-23.md`'s "FORM"
+ * section). `wf-errand` carries FOUR states: `todo` (open, creatable),
+ * `doing` (active, creatable), `done` (terminal, NOT creatable) and `locked`
+ * (active, NOT creatable) — the last one is what proves the select's filter
+ * keys on `creatable` itself rather than on `category === 'terminal'`, which
+ * `done` alone could not distinguish. `wf-chore` carries one state, `queued`,
+ * so a type change that crosses workflows has an unambiguous single answer
+ * to land on. Ranks are DISTINCT (`task` 3, `errand` 2, `chore` 1) so
+ * `defaultRootTypeFor`'s tie-break never has to fire — the default type is
+ * always `task` when nothing else says otherwise.
+ */
+describe('13.1435–13.1441 the Starting status select', () => {
+  const TYPES = [
+    { id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' },
+    { id: 'errand', name: 'Errand', rank: 2, workflowId: 'wf-errand' },
+    { id: 'chore', name: 'Chore', rank: 1, workflowId: 'wf-chore' },
+  ];
+  const ERRAND_STATES = {
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open', creatable: true },
+      { id: 'doing', name: 'Doing', category: 'active', creatable: true },
+      { id: 'done', name: 'Done', category: 'terminal', creatable: false },
+      // `creatable: false` on a NON-terminal state — a workflow setting can
+      // forbid creation in a state that is not otherwise finished — so the
+      // filter this select applies is proven to key on `creatable` itself,
+      // not on `category === 'terminal'` (which `done` alone could not
+      // distinguish).
+      { id: 'locked', name: 'Locked', category: 'active', creatable: false },
+    ],
+  };
+  const CHORE_STATES = {
+    initialStateId: 'queued',
+    states: [{ id: 'queued', name: 'Queued', category: 'open', creatable: true }],
+  };
+  function workflowStates(workflowId: string) {
+    if (workflowId === 'wf-errand') return ERRAND_STATES;
+    if (workflowId === 'wf-chore') return CHORE_STATES;
+    return null;
+  }
+  function baseProps(extra: Record<string, unknown> = {}) {
+    return {
+      open: true,
+      userId: 'usr_ada',
+      workspaceId: 'ws_1',
+      assigneeCandidates: [],
+      typeOptions: TYPES,
+      parentCandidates: [],
+      workflowStates,
+      onCreate: vi.fn(),
+      onClose: () => undefined,
+      ...extra,
+    };
+  }
+  const statusTrigger = (): HTMLElement => screen.getByRole('button', { name: /Starting status/ });
+  const backlogSwitch = (): HTMLElement => screen.getByRole('checkbox', { name: 'Starts in the backlog?' });
+
+  it('13.1435 lists only creatable states and defaults to the workflow’s initial state', async () => {
+    const user = userEvent.setup();
+    render(<NewTicketDialog {...baseProps()} />);
+    // `task` is the default type (highest rank), bound to `wf-errand`, whose
+    // `initialStateId` is `todo` — the select must show it without any pick.
+    expect(statusTrigger()).toHaveTextContent('To do');
+    // Backlog defaults to ON, which disables the select (13.1436) — OFF it
+    // to open the list this case is actually about.
+    await user.click(backlogSwitch());
+    await user.click(statusTrigger());
+    const listbox = await screen.findByRole('listbox');
+    // Neither the terminal `done` nor the merely-uncreatable `locked` reach
+    // the list — this is the case the design's own "list terminal states"
+    // mutation (dropping `creatableStates`'s filter) reddens: with the
+    // filter gone this assertion sees FOUR options instead of two.
+    expect(within(listbox).getAllByRole('option').map((option) => option.textContent)).toEqual([
+      'To do',
+      'Doing',
+    ]);
+    expect(within(listbox).queryByRole('option', { name: 'Done' })).toBeNull();
+    expect(within(listbox).queryByRole('option', { name: 'Locked' })).toBeNull();
+  });
+
+  it('13.1436 is disabled with a helper sentence while "Starts in the backlog?" is ON', () => {
+    // No record in storage: the switch's own default is ON (backlog), so
+    // this is the ordinary open with nothing touched.
+    render(<NewTicketDialog {...baseProps()} />);
+    expect(backlogSwitch()).toBeChecked();
+    expect(statusTrigger()).toBeDisabled();
+    expect(screen.getByRole('status')).toHaveTextContent(
+      'A backlog ticket starts in To do when it enters focus',
+    );
+  });
+
+  it('13.1437 re-enables with the PREVIOUS value when the switch is switched back OFF', async () => {
+    const user = userEvent.setup();
+    render(<NewTicketDialog {...baseProps()} />);
+    await user.click(backlogSwitch()); // OFF — the select is now live.
+    await user.click(statusTrigger());
+    await user.click(await screen.findByRole('option', { name: 'Doing' }));
+    expect(statusTrigger()).toHaveTextContent('Doing');
+    await user.click(backlogSwitch()); // ON — disabled, but the value is not cleared.
+    expect(statusTrigger()).toBeDisabled();
+    await user.click(backlogSwitch()); // OFF again.
+    expect(statusTrigger()).not.toBeDisabled();
+    expect(statusTrigger()).toHaveTextContent('Doing');
+  });
+
+  it('13.1438 a type change resets to the new workflow’s initial state UNLESS the value already exists there', async () => {
+    const user = userEvent.setup();
+    render(<NewTicketDialog {...baseProps()} />);
+    await user.click(backlogSwitch()); // OFF, so the select is live for this case.
+    await user.click(statusTrigger());
+    await user.click(await screen.findByRole('option', { name: 'Doing' }));
+    expect(statusTrigger()).toHaveTextContent('Doing');
+
+    // `errand` shares `wf-errand` with `task` — `doing` still exists there,
+    // so the value is KEPT. Picked through a REAL click, not
+    // `fireEvent.change`: this file's own 3.157 docblock records that
+    // `fireEvent.change` against a searchable Select's combobox input sets
+    // the FILTER TEXT and selects nothing, which would leave `typeId`
+    // unmoved and pass this case for the wrong reason (nothing would ever
+    // reset, on EITHER assertion).
+    await user.click(within(await openPicker(user, 'Type')).getByRole('option', { name: 'Errand' }));
+    expect(statusTrigger()).toHaveTextContent('Doing');
+
+    // `chore` is on `wf-chore`, which has no `doing` at all — the value
+    // RESETS to that workflow's own initial state, `queued`.
+    await user.click(within(await openPicker(user, 'Type')).getByRole('option', { name: 'Chore' }));
+    expect(statusTrigger()).toHaveTextContent('Queued');
+  });
+
+  it('13.1439 the draft omits stateId in the two cases that say nothing new, and carries it otherwise', async () => {
+    const user = userEvent.setup();
+    const onCreate = vi.fn();
+    render(<NewTicketDialog {...baseProps({ onCreate })} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+
+    // Backlog ON (the default): omitted, whatever the select underneath says.
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('stateId');
+
+    // Backlog OFF, value left at the workflow's own initial state: omitted —
+    // the wire's own absence-means-initial rule, kept minimal.
+    onCreate.mockClear();
+    await user.click(backlogSwitch());
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    expect(onCreate.mock.calls[0]?.[0]).not.toHaveProperty('stateId');
+
+    // Backlog OFF, a DIFFERENT value chosen: carried.
+    onCreate.mockClear();
+    await user.click(statusTrigger());
+    await user.click(await screen.findByRole('option', { name: 'Doing' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ stateId: 'doing' }));
+  });
+
+  it('13.1440 initialSelection pre-fills the type and status and switches "Starts in the backlog?" OFF', () => {
+    render(
+      <NewTicketDialog
+        {...baseProps({ initialSelection: { workflowId: 'wf-errand', stateId: 'doing' } })}
+      />,
+    );
+    // `task` and `errand` both share `wf-errand`; `task` is listed FIRST in
+    // `typeOptions` (the planner default: "the first is pre-selected").
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+    expect(statusTrigger()).toHaveTextContent('Doing');
+    expect(backlogSwitch()).not.toBeChecked();
+  });
+
+  it('13.1440 CONTROL — an initialSelection naming a workflow no type shares is ignored entirely', () => {
+    render(
+      <NewTicketDialog
+        {...baseProps({ initialSelection: { workflowId: 'wf-nonexistent', stateId: 'x' } })}
+      />,
+    );
+    // The ordinary open, exactly as if no selection had been passed: the
+    // default type (`task`, highest rank), its own initial state, and the
+    // switch at ITS ordinary default (backlog ON, nothing stored).
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+    expect(statusTrigger()).toHaveTextContent('To do');
+    expect(backlogSwitch()).toBeChecked();
+  });
+
+  it('13.1441 the remembered backlog preference is NOT overwritten by a board-initiated open', () => {
+    window.localStorage.setItem(
+      NEW_TICKET_START_KEY,
+      JSON.stringify({ userId: 'usr_ada', start: 'backlog' }),
+    );
+    const { rerender } = render(<NewTicketDialog {...baseProps({ open: false })} />);
+
+    // Opened FROM a board column: the switch answers OFF, per the design's
+    // own ruling, whatever is remembered.
+    rerender(
+      <NewTicketDialog
+        {...baseProps({ initialSelection: { workflowId: 'wf-errand', stateId: 'doing' } })}
+      />,
+    );
+    expect(backlogSwitch()).not.toBeChecked();
+
+    // Closed, then reopened UNSCOPED (the header's own "New ticket") — if the
+    // board-initiated open above had called `rememberNewTicketStart`, this
+    // would read 'focus' and the switch would be OFF here too.
+    rerender(<NewTicketDialog {...baseProps({ open: false })} />);
+    rerender(<NewTicketDialog {...baseProps()} />);
+    expect(backlogSwitch()).toBeChecked();
   });
 });

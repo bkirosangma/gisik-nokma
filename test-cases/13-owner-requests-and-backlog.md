@@ -3594,3 +3594,67 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   half); the server's `isCreatableState(def, state.id)` hardcoded to `true` reddens the `done` row's
   `creatable: false` expectation. Both restored from the committed tree. —
   (`packages/app-core/test/online/mappers.test.ts`, `apps/server/test/routes/board.test.ts`)
+
+- **13.1435** ✅ The Starting-status select lists only `creatable` states and defaults to the workflow's
+  own `initialStateId`. `NewTicketDialog` filters `workflowStates`'s FULL per-state list itself
+  (`creatableStates`, keyed on each state's own `creatable` boolean) rather than trusting the caller to
+  pre-filter — the fixture's `wf-errand` carries a terminal `done` AND a merely-`creatable: false` `locked`
+  (active category), so the case proves the filter keys on the flag itself, not on `category === 'terminal'`
+  alone, which `done` could not distinguish on its own. Mutation-witnessed: dropping the filter (`.filter
+  ((state) => state.creatable)` → the bare unfiltered array) reddens with FOUR options where two were
+  expected, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1436** ✅ The select is DISABLED while "Starts in the backlog?" is ON, with a helper sentence naming
+  the state a backlog ticket actually starts in ("A backlog ticket starts in To do when it enters focus") —
+  the owner's own ruling, *"the state selection is disabled if starting from backlog."* Mutation-witnessed:
+  dropping `startInBacklog` from the `disabled` expression leaves the select enabled under the switch's
+  default ON, reddening `toBeDisabled()`, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1437** ✅ Switching "Starts in the backlog?" back OFF re-enables the select with the PREVIOUS value —
+  `stateId` is its own `useState`, never cleared by the switch, so disabling only hides the control rather
+  than resetting what it holds. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1438** ✅ A TYPE change resets Starting status to the new workflow's own `initialStateId` UNLESS the
+  standing value already exists there: picking a sibling type on the SAME workflow (`errand`, sharing
+  `wf-errand` with `task`) keeps a chosen `doing`; picking a type on a DIFFERENT workflow (`chore`, on
+  `wf-chore`, which has no `doing` at all) resets to that workflow's own `queued`. **Picked through a real
+  click, not `fireEvent.change`** — this file's own 3.157 docblock already records that `fireEvent.change`
+  against a searchable Select's combobox input sets the filter text and selects nothing, which the first
+  draft of this case fell into: both assertions passed for the wrong reason (`typeId` never actually moved,
+  so nothing was ever exercised) until the interaction was corrected to a real option click. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1439** ✅ The draft omits `stateId` in the two cases that say nothing new — backlog ON (asserted via
+  `not.toHaveProperty('stateId')`, since a `toEqual`-style comparison cannot tell a dropped key from one
+  holding `undefined`), and backlog OFF with the value left at the workflow's own initial state — and
+  carries it otherwise (`stateId: 'doing'`, backlog OFF, a value that is NOT the initial state). Three
+  submits, one dialog instance, `onCreate` cleared between them. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1440** ✅ `initialSelection` pre-fills the type (the FIRST `typeOption` whose `workflowId` matches —
+  the planner default, "when several types share the column's workflow the first is pre-selected"; `task`
+  and `errand` both share `wf-errand` and `task` is listed first) and the status (`doing`), and switches
+  "Starts in the backlog?" OFF. **Control, same block:** an `initialSelection` naming a workflow NO type on
+  this project shares is ignored ENTIRELY — the type, status and switch all read their ordinary,
+  no-selection defaults, not merely a type-less half-fill. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1441** ✅ The remembered backlog preference is NOT overwritten by a board-initiated open. Storage
+  seeded to `'backlog'`; opened from a board column (`initialSelection`) — the switch answers OFF, per the
+  design's own ruling, regardless of what is remembered; closed, then reopened UNSCOPED (the header's own
+  "New ticket") — the switch answers ON again, proving the board-initiated open never called
+  `rememberNewTicketStart` (which the design's own open-effect docblock states explicitly: that write
+  belongs to the person's own deliberate toggle, not to a board click answering a different question). —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+**A same-commit effect-ordering defect, found and fixed before any of the above landed, worth recording
+because it would have reproduced for any caller who opens with a resolved `workflowStates`.** The "empty on
+OPEN" effect (E2-37) and the Starting-status reseed effect both fire in the SAME commit on every open — and
+both are declared as separate `useEffect`s that call `setStateId`. The open effect's original text set a
+bare `''` ("nothing chosen yet, the reseed effect will fill it in"), relying on the reseed effect — declared
+EARLIER in the component — to correct it a render later. React batches same-tick `setState` calls to one
+piece of state: the reseed effect's `setStateId('todo')` and the open effect's later `setStateId('')` within
+the SAME flush coalesce to whichever ran LAST (the open effect), and because the NET value across the whole
+pass was `'' → ''` (the initial value, unchanged), React saw no state change to re-render for and the reseed
+effect never got a second pass. Measured directly: 13.1435 and 13.1440's control both showed the select's
+placeholder ("Choose a status") instead of the workflow's initial state on a plain mount. **Fix:** the open
+effect now computes the correct seed value DIRECTLY (`seedStateIdFor`, a small helper closing over
+`workflowStates`) rather than deferring to the reseed effect for the ordinary case; the reseed effect stays,
+now genuinely needed only for a LATE `workflowStates` load or a truly stale value reached some other way.

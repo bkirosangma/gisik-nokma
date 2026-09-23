@@ -98,6 +98,7 @@ const BOARD_WITH_DONE = {
           name: 'Done',
           category: 'terminal' as const,
           blocked: false,
+          creatable: false,
           cards: [
             {
               ticketId: '01J9TICKET00000000000000DN',

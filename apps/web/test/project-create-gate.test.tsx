@@ -103,6 +103,7 @@ const BOARD: BoardView = {
           name: 'Doing',
           category: 'active',
           blocked: false,
+          creatable: true,
           cards: [
             {
               ticketId: '01J9TICKET00000000000000TS',
