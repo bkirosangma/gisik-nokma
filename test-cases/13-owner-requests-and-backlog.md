@@ -3810,9 +3810,11 @@ conditional on key/due alone) in place — same ids, `packages/app-core/test/vie
 - **13.1454**–**13.1455** ✅ The parent-key badge is the meta-line's first child (left of the card's own
   key) and clicking it — `getByRole('button', {name: 'Open parent OPS-12'})` — calls `onOpenTicket` with
   the PARENT's id exactly once. — (`packages/app-core/test/views/board-card-click.test.tsx`)
-- **13.1456**–**13.1457** ✅ The epic chip is the card's first element child (above the title) and
-  clicking it opens the EPIC once; a card with `epic: null` renders no chip at all and the title button
-  is the card's first child instead. — (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1456**–**13.1457** ✅ The epic chip is the card's first element child (DOM order only —
+  jsdom does no layout, so this is not itself a claim about the rendered line the chip draws on; see
+  13.1467/13.1468 for that) and clicking it opens the EPIC once; a card with `epic: null` renders no
+  chip at all and the title button is the card's first child instead. —
+  (`packages/app-core/test/views/board-card-click.test.tsx`)
 - **13.1458**–**13.1459** ✅ When the immediate parent IS the epic, no parent badge renders and the epic
   chip alone names it; the control — a grandchild whose parent and epic differ — renders BOTH. —
   (`packages/app-core/test/views/board-card-click.test.tsx`)
@@ -3858,7 +3860,50 @@ conditional on key/due alone) in place — same ids, `packages/app-core/test/vie
   named either — both killed by a planted mutation dropping the offline `isLive` check (measured: 2
   failed, restored to green). — (`packages/app-core/test/replica/replica-data-source.test.ts`)
 
-`13.1467`–`13.1470` are unspent, held for a future round on this feature rather than borrowed elsewhere.
+## 13.1467–13.1468 — the epic chip draws on its OWN line, above the title (owner bug report, 2026-09-23)
+
+A board card read "⚑ Open questionsHSN digit count" — the epic chip and the title ran together on
+one line, contradicting owner ruling #720 ("the epic chip is the card's TOP LINE, ABOVE the title").
+CAUSE: `.gn-board-card__epic` was `display: inline-flex`, and `.gn-board-card` (`ui.css`) sets only
+`padding` — no `display: flex` of its own — so the chip shared a line with its next sibling,
+`.gn-board-card__title`, an inline-level `<button>` by default (`board.tsx`), whenever both fit.
+13.1456/13.1457 (immediately above) had asserted only DOM order, which jsdom cannot turn into a
+layout claim — this is why that CSS-binding gate never caught it. FIX: `display: flex` (not
+`inline-flex`) plus `width: fit-content` so the now-block-level chip stays sized to its own content
+rather than stretching to the card's full width. Swept PR #720's own `ui.css` diff
+(`git diff cb92c633^1...cb92c633 -- packages/ui/src/ui.css`) for every OTHER `display: inline*` it
+added: `.gn-board-card__parent-key` and `.gn-board-card__priority` are both children of
+`.gn-board-card__meta-line`, itself `display: flex` — a flex ITEM's own `inline-flex` vs `flex`
+makes no layout difference, so both are correctly left alone. `apps/mobile/src/screens/board-screen.tsx:67`
+renders only `{item.title} · {item.stateId}` — grepped for `epic` across `apps/mobile/src` (excluding
+the generated editor HTML): zero hits, so mobile draws no epic chip and nothing there needed fixing.
+
+- **13.1467** ✅ `.gn-board-card__epic` is `display: flex` (not `inline-flex` or any other
+  `inline-*`) and `width: fit-content`, asserted alongside the one declaration (`margin: 0 0 0.3rem`)
+  unique to this rule in the whole file, so a `rule()` mismatch fails loudly rather than silently
+  reading a namesake. Mutation: reverting to `inline-flex` reddened this case alone (`Tests 1
+  failed | 82 skipped (83)`, Node v22.23.2, raw `rtk proxy` output — the compressed summary this
+  proxy otherwise prints does not carry the `Test Files`/`Tests` lines a kill needs); restored via a
+  second edit (never `git checkout`, since the fix itself was still uncommitted), green again
+  (`Tests 1 passed | 82 skipped (83)`). — (`packages/ui/test/components.test.tsx`)
+- 🧪 **13.1468 — a real browser lays the epic chip on its own line, above the title, sized to its
+  content rather than the card's full width.** Painted this worktree's `apps/web` on a lane port
+  (`next dev -p 3050`, `SERVER_ORIGIN` pointing at the running dev stack's API on `:3000`, session
+  cookie carried from `:3001`) against the real seeded board, card `CCSO-5` "HSN digit count" under
+  the "Open questions" epic — the exact card from the owner's screenshot. BEFORE (CSS reverted to
+  `inline-flex` via a live edit, picked up by Fast Refresh with no reload): `getComputedStyle(chip).display`
+  `"inline-flex"`, chip box `{top: 726.97, bottom: 750.97, left: 766, width: 108.61}`, title box
+  `{top: 727.47, left: 874.61}` — same line, title flush against the chip's right edge
+  (`874.61 = 766 + 108.61`), `chipBottom <= titleTop` **false**. AFTER (fix restored): chip box
+  `{top: 726.97, bottom: 750.97, left: 766, width: 108.61}` (unchanged — the chip itself doesn't
+  move), title box `{top: 755.77, left: 766}` — dropped to its own line directly under the chip,
+  `chipBottom(750.97) <= titleTop(755.77)` **true**; chip width 108.6px against a 264px card content
+  width, proving `fit-content` rather than a full-width stretch. Viewport 1512×829 (desktop), real
+  Chrome via `mcp__claude-in-chrome`, instrument `getBoundingClientRect`/`getComputedStyle` in-page.
+  Confirmed visually across every card on the board carrying an "Open questions" chip
+  (`CCSO-3`/`4`/`5`/`6`/`11`/`12`), not just the one card. `packages/ui/src/ui.css`
+
+`13.1469`–`13.1470` are unspent, held for a future round on this feature rather than borrowed elsewhere.
 
 **Regression, measured rather than assumed:** the full `apps/server` suite (1919 passed, 7 skipped), the
 full `packages/app-core` suite (2038 passed, including the pre-existing board suites — `board.test.tsx`,
