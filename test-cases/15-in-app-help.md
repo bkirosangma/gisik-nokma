@@ -403,10 +403,13 @@ starting-status and board-card-badges in the existing sections. Cases file: this
   proved the trap by quoting a baselined example and rotting the baseline the moment the file existed.
   Mutation: alter one checked quote to an invented string → red, naming the string; verified and
   reverted 2026-09-23 — (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`)
-- **15.3** (pre-existing case, re-witnessed) — the due-date correction case now pins the RE-corrected,
-  scoped sentence ("This particular box will not get you a due date") rather than the wider claim Unit
-  4d's `docs/manual.md` edit replaced, plus a guard against the wider claim returning — updated in the
-  same commit as the manual edit it tracks (`packages/app-core/test/help/search.test.ts`).
+
+Case 15.3 (`test-cases/15-in-app-help.md:21`) was re-witnessed the same way, not re-minted: help-notes
+Unit 4d's `docs/manual.md` edit made the sentence it pins ("It will not get you a due date") read as a
+wider claim than true once starting-status gave the New ticket window its own date inputs, so the case
+now pins the RE-corrected, scoped sentence ("This particular box will not get you a due date") instead,
+plus a guard against the wider claim returning — updated in the same commit as the manual edit it
+tracks (`packages/app-core/test/help/search.test.ts`).
 
 Minted: 15.36–15.37. 15.38–15.50 remain for any further cases this lane needs.
 
