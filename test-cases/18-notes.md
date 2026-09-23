@@ -10,7 +10,7 @@ in the table below. Take from your block, never from the tip.
 
 | Plan | Block |
 |---|---|
-| 1 Backend core | `18.001`–`18.060` |
+| 1 Backend core | `18.001`–`18.060` — **minted: `18.001`–`18.042`**, so the next plan takes the table's next row or continues at `18.043` if it is drawn from this block |
 
 **Write cases as `- ❌ **18.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
