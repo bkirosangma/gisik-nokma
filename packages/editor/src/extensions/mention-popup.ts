@@ -1,4 +1,5 @@
 import type { MentionCandidate } from './mention.js';
+import { bindSuggestionPopupPosition, type SuggestionPopupPositionBinding } from './suggestion-popup-position.js';
 
 export type MentionPopupProps = {
   items: MentionCandidate[];
@@ -76,6 +77,7 @@ export function createMentionPopup(): MentionPopupRenderer {
   let items: MentionCandidate[] = [];
   let command: (item: MentionCandidate) => void = () => {};
   let selectedIndex = 0;
+  let positionBinding: SuggestionPopupPositionBinding | null = null;
 
   function paint(): void {
     if (!listbox || !status) return;
@@ -104,14 +106,6 @@ export function createMentionPopup(): MentionPopupRenderer {
     } else {
       editorDom?.removeAttribute('aria-activedescendant');
     }
-  }
-
-  function position(clientRect?: (() => DOMRect | null) | null): void {
-    if (!container) return;
-    const rect = clientRect?.();
-    if (!rect) return; // jsdom / detached: leave it unpositioned but present
-    container.style.left = `${rect.left}px`;
-    container.style.top = `${rect.bottom}px`;
   }
 
   function claimEditor(dom: Element): void {
@@ -143,6 +137,8 @@ export function createMentionPopup(): MentionPopupRenderer {
 
   function destroy(): void {
     releaseEditor();
+    positionBinding?.unbind();
+    positionBinding = null;
     container?.remove();
     container = null;
     listbox = null;
@@ -153,7 +149,6 @@ export function createMentionPopup(): MentionPopupRenderer {
     onStart(props) {
       container = document.createElement('div');
       container.className = 'mention-popup';
-      container.style.position = 'absolute';
 
       listbox = document.createElement('div');
       listbox.id = listboxId;
@@ -177,14 +172,15 @@ export function createMentionPopup(): MentionPopupRenderer {
       command = props.command;
       selectedIndex = 0;
       paint();
-      position(props.clientRect);
+      positionBinding = bindSuggestionPopupPosition(container);
+      positionBinding.reposition(props.clientRect);
     },
     onUpdate(props) {
       items = props.items;
       command = props.command;
       if (selectedIndex >= items.length) selectedIndex = 0;
       paint();
-      position(props.clientRect);
+      positionBinding?.reposition(props.clientRect);
     },
     onKeyDown({ event }) {
       // NOTHING TO NAVIGATE MEANS DECLINE, and this is not a nicety. `items`

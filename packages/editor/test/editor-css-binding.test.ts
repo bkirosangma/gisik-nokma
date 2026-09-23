@@ -341,6 +341,28 @@ describe('9.306 the ticket-ref chip and its picker are styled', () => {
 });
 
 /**
+ * 9.322 — the popups' `z-index` outranks a ticket sheet's own scrim (bug
+ * fix, 2026-09-24, measured live on :3047 in a ticket sheet's comment box).
+ * `.gn-sheet__scrim` is `position: fixed; z-index: 40` (`packages/ui/src/
+ * ui.css`); every popup here is ALSO `position: fixed`, appended straight to
+ * `document.body` as a sibling of the scrim — so a popup opened from inside
+ * a sheet (the reported bug's own reproduction: "in a ticket-sheet comment")
+ * is a real stacking-context comparison against it, not a DOM-order one.
+ * `.wikilink-popup`/`.ticketref-popup` carried 50 before the three popup
+ * families were consolidated into one shared block, and the consolidation
+ * accidentally dropped all three to `.mention-popup`'s old 30 — invisible
+ * behind the scrim, measured live before this case existed.
+ */
+describe('9.322 the suggestion popups outrank a sheet scrim', () => {
+  it('9.322 .mention-popup, .wikilink-popup and .ticketref-popup each declare z-index: 50, above .gn-sheet__scrim\'s 40', () => {
+    for (const selector of ['.mention-popup', '.wikilink-popup', '.ticketref-popup']) {
+      const body = ruleBody(EDITOR_CSS, selector);
+      expect(declared(body, 'z-index'), `${selector}'s z-index`).toBe('50');
+    }
+  });
+});
+
+/**
  * 9.288–9.290 — THE READING RAIL'S STYLES (Plan 4 Task 7). Same split as
  * everything above: the markup is asserted in `reading-toc.test.tsx`, and what
  * makes the rail READ as an outline is the per-level indent and the weight on
