@@ -73,3 +73,9 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.036 — `mapNoteSummaries` maps the server's `{ notes: [...] }` shape and refuses a row missing `noteId` with a `MappingError` naming the path.** Mutation: default `noteId` to `''`.
 - ✅ **18.037 — `mapNoteDetail` carries `body` through untouched (as `unknown`) and `schemaVersion` as a number.** Mutation: `JSON.stringify` the body.
 - ✅ **18.038 — every note method on the replica data source rejects with `ReplicaGapError`** naming the method; control: `getTicketSummary` (or another implemented read) resolves. Mutation: return `[]` from `getNotes`.
+
+## 18.7 Server — file attachments on notes
+
+- ✅ **18.039 — upload with `noteId` succeeds for the author and is 403 for a non-author reader;** control: upload with `ticketId` is unchanged. Mutation: skip the author check.
+- ✅ **18.040 — download of a note-owned attachment is 200 for a reader and 404 for a non-reader** (same body as an unknown id). Mutation: authorise by ticket only.
+- ✅ **18.041 — a request naming both `ticketId` and `noteId`, or neither, is 400.** Mutation: prefer `ticketId` silently.
