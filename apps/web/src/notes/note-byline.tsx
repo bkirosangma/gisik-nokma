@@ -31,6 +31,16 @@ import { ScopeEditor } from './scope-editor.js';
  * (`ticket-location.ts`) — the SAME door the board's own cards push, rather
  * than the id-only My Work door, which stays correct but is a second spelling
  * of one URL and a page hop `ticketSheetPath` skips.
+ *
+ * ## The href stays canonical; the CLICK does not (owner request, 2026-09-24)
+ *
+ * `onOpenTicket` opens the ticket's sheet IN PLACE on the Notes page, the same
+ * `?ticket=` shape My Work's own sheet mount uses — `NoteDocument` builds it
+ * from `note.attachedTickets`, falling back to the same `TicketLocator` a
+ * parent chip inside the mounted sheet would need. `href` is left exactly as
+ * it was: `NoteBadge`'s own `onOpen` intercept only swallows a plain,
+ * unmodified left click, so a modifier click or a middle click still follows
+ * the real link — open-in-new-tab keeps working.
  */
 export function NoteByline({
   note,
@@ -41,6 +51,8 @@ export function NoteByline({
   canEdit,
   onScopeChanged,
   onDetach,
+  onOpenTicket,
+  onBadgeRef,
   readingLabel,
   onCopyMarkdown,
   onOpenHistory,
@@ -53,6 +65,15 @@ export function NoteByline({
   canEdit: boolean;
   onScopeChanged: () => void;
   onDetach: (ticketId: string) => void;
+  onOpenTicket: (ticketId: string) => void;
+  /**
+   * Registers each badge's own DOM node by ticket id, so `NoteDocument` can
+   * return focus to the EXACT badge that opened a ticket once its sheet
+   * closes. `NoteBadge` renders its own `<a>` with no ref of its own — this
+   * wraps it rather than growing the shared kit component's API for the one
+   * caller that needs an imperative handle.
+   */
+  onBadgeRef?: (ticketId: string, element: HTMLSpanElement | null) => void;
   readingLabel: string;
   onCopyMarkdown: () => void;
   onOpenHistory: () => void;
@@ -68,15 +89,17 @@ export function NoteByline({
       {note.attachedTickets.length > 0 ? (
         <span className="gn-notes__badges">
           {note.attachedTickets.map((ticket) => (
-            <NoteBadge
-              key={ticket.ticketId}
-              title={ticket.title}
-              scopeMode={note.scope.mode}
-              href={ticketSheetPath({ workspaceId: workspace.id, projectId: ticket.projectId }, ticket.ticketId)}
-              // Absent for a reader, which is what removes the × — the kit's own
-              // rule (18.197), so there is one place that decides it.
-              {...(canEdit ? { onDetach: () => onDetach(ticket.ticketId) } : {})}
-            />
+            <span key={ticket.ticketId} ref={(element) => onBadgeRef?.(ticket.ticketId, element)}>
+              <NoteBadge
+                title={ticket.title}
+                scopeMode={note.scope.mode}
+                href={ticketSheetPath({ workspaceId: workspace.id, projectId: ticket.projectId }, ticket.ticketId)}
+                onOpen={() => onOpenTicket(ticket.ticketId)}
+                // Absent for a reader, which is what removes the × — the kit's own
+                // rule (18.197), so there is one place that decides it.
+                {...(canEdit ? { onDetach: () => onDetach(ticket.ticketId) } : {})}
+              />
+            </span>
           ))}
         </span>
       ) : null}

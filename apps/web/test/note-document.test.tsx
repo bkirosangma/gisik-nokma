@@ -218,6 +218,32 @@ describe('18.11 The Notes page — the document', () => {
   });
 
   /**
+   * 18.334 — an absent breadcrumb level renders no segment and no
+   * separator (owner report, 2026-09-24): a note's crumb read "Convenience
+   * Corner /  / Furniture", an empty middle segment with its own separator
+   * either side. Root cause: a WORKSPACE-scoped note's `homeProjectId` is
+   * legitimately `''` (`note-state.ts` refuses an empty one only for
+   * `scope.mode === 'project'`), `.find()` over that finds no project, and
+   * the OLD JSX rendered the `<li>` regardless of whether it had a name —
+   * `?? ''` painted over the miss with an empty string instead of omitting
+   * the slot. `.gn-breadcrumb__item + .gn-breadcrumb__item::before` draws
+   * `/` only between two RENDERED siblings, so omitting the `<li>` removes
+   * its separator for free.
+   */
+  it('18.334 a workspace-scoped note (no project) shows exactly the two non-empty levels', async () => {
+    renderDocument({ note: noteDetail({ homeProjectId: '' }) });
+
+    const crumb = await screen.findByRole('navigation', { name: 'Breadcrumb' });
+    const items = within(crumb).getAllByRole('listitem');
+    // MUTATION TARGET: reverting to `?? ''` on the project slot puts a
+    // THIRD, empty `<li>` back — this fails on COUNT, not merely on text,
+    // so an empty item hiding behind a passing `toHaveTextContent` cannot
+    // slip through.
+    expect(items.map((item) => item.textContent)).toEqual(['Garo Hills Logistics', 'Compressor log']);
+    expect(items).toHaveLength(2);
+  });
+
+  /**
    * 18.200 — renaming: when, and what counts as a change.
    *
    * The three arms are the three gates: Enter with a change writes; blur with a

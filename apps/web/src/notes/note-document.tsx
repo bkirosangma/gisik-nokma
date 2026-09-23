@@ -1,17 +1,19 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import {
   TicketEditorSlot,
   exportMarkdown,
   extractReadingMeta,
   readingTimeMinutes,
+  uploadAttachmentHttp,
   type ReadingMeta,
   type TicketEditorSlotProps,
 } from '@gisik-nokma/editor';
 import { Button } from '@gisik-nokma/ui';
 import {
+  TicketSheet,
   makeSubmittedFactory,
   useLiveQuery,
   type DataSource,
@@ -19,13 +21,32 @@ import {
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
-import { useAppServices, useCurrentUser } from '../providers.js';
-import { ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
+import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { buildProjectPageQueryTickets, ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
+
+/**
+ * What a ticket the locator will not place is told — the same frozen
+ * sentence `app/w/[workspaceId]/my-work/page.tsx` uses for its own
+ * unplaceable tickets, and for the same reason: a 404 that could mean "gone"
+ * or "not yours" must not guess which of the two it was.
+ */
+const NOT_PLACEABLE =
+  'That ticket cannot be opened from here — the server will not place it for you, and this page will not guess whether it is gone or simply not yours.';
+
+/**
+ * What the locator said about the currently open ticket — keyed by the
+ * ticket it answers for, exactly as `MyWorkBoard`'s own `Placement` is: the
+ * page asks the server about SOME ticket and the answer arrives a render
+ * later, so the key travels with the answer and every read of it goes
+ * through `asked` below, which is `null` unless the answer is about the
+ * ticket on screen.
+ */
+type Placement = { ticketId: string; projectId: string | null; notice: string | null };
 
 /**
  * The note itself (notes series Plan 5, spec §9.2, §9.6).
@@ -49,6 +70,21 @@ import { useNoteAutosave } from './use-note-autosave.js';
  * permission: every write below goes through `dataSource.ingest` and
  * `checkNotePermission` refuses at the door regardless. A client that computed
  * this wrongly loses a control, not a boundary.
+ *
+ * ## The ticket sheet opens HERE, not on the project page (owner request, 2026-09-24)
+ *
+ * A ticket badge's plain click no longer navigates — it opens that ticket's
+ * `TicketSheet` in place, over this page, through the SAME `?ticket=` shape
+ * `app/w/[workspaceId]/my-work/page.tsx` already ships (its own docblock
+ * argues the three decisions this shape makes; this file inherits all three
+ * rather than re-arguing them). The open ticket's PROJECT comes from
+ * `note.attachedTickets` when the ticket is one of this note's own — no
+ * request — and from `TicketLocator` otherwise (a reload on a stale
+ * `?ticket=` after a detach, or the sheet's own parent chip naming a ticket
+ * this note is not attached to), exactly the fallback My Work's resolver
+ * uses for its `contested` section. A ticket the locator will not place
+ * draws the same frozen sentence My Work draws, for the same reason: a 404
+ * that could mean "gone" or "not yours" must not guess which.
  */
 export function NoteDocument({
   noteId,
@@ -69,9 +105,19 @@ export function NoteDocument({
    */
   onLostAccess?: () => void;
 }) {
-  const { dataSource } = useAppServices();
+  const { dataSource, cache, ticketLocation } = useAppServices();
   const user = useCurrentUser();
+  /**
+   * `useSessionStatus`, not `useCurrentUser`, for the reason
+   * `app/w/[workspaceId]/my-work/page.tsx`'s own mount states: this value
+   * reaches a WRITE — `TicketSheet` builds submitted events from
+   * `currentUserId`, and `useCurrentUser()` answers `null` both while the
+   * session request is in flight and when nobody is signed in.
+   */
+  const session = useSessionStatus();
+  const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
   const router = useRouter();
+  const searchParams = useSearchParams();
 
   const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
@@ -126,6 +172,124 @@ export function NoteDocument({
 
   const note = live.data;
   const workspace = workspaces.find((candidate) => candidate.id === note?.workspaceId) ?? null;
+
+  const openTicketId = searchParams.get('ticket');
+  const [placement, setPlacement] = useState<Placement | null>(null);
+
+  /**
+   * THE OPEN TICKET'S PROJECT, off this note's own attached tickets — no
+   * request, since `note.attachedTickets` already carries `projectId`
+   * (Plan 6 of 7, spec §10 Task 3; see `NoteByline`'s own docblock). A MISS
+   * answers `null`, never a fallback project: only the locator below is
+   * licence to ask the server, and a project read off a different ticket
+   * would be the wrong-project answer one row over.
+   */
+  const attachedTicketProjectId =
+    note?.attachedTickets.find((ticket) => ticket.ticketId === openTicketId)?.projectId ?? null;
+  /** The locator's answer, but only when it is about the ticket on screen. */
+  const asked = placement !== null && placement.ticketId === openTicketId ? placement : null;
+  const openTicketProjectId = attachedTicketProjectId ?? asked?.projectId ?? null;
+  const openNotice = asked?.notice ?? null;
+
+  /**
+   * ASK THE SERVER ONLY WHEN THIS NOTE CANNOT ANSWER — and only once per
+   * ticket. `asked` is what stops a re-render turning one click into a
+   * stream of requests; a ticket this note attaches needs no request at all
+   * (`attachedTicketProjectId`), so the locator is asked only for a ticket
+   * this note does not carry — a stale `?ticket=` after a detach, or the
+   * mounted sheet's own parent chip naming a ticket outside this note.
+   */
+  useEffect(() => {
+    if (openTicketId === null || note === null) return;
+    if (attachedTicketProjectId !== null) return;
+    if (asked !== null) return;
+    const workspaceId = note.workspaceId;
+    let cancelled = false;
+    void ticketLocation.locate(workspaceId, openTicketId).then(
+      (located) => {
+        if (cancelled) return;
+        setPlacement(
+          located === null
+            ? { ticketId: openTicketId, projectId: null, notice: NOT_PLACEABLE }
+            : { ticketId: openTicketId, projectId: located.projectId, notice: null },
+        );
+      },
+      (cause: unknown) => {
+        if (cancelled) return;
+        setPlacement({
+          ticketId: openTicketId,
+          projectId: null,
+          notice: `That ticket could not be opened — ${cause instanceof Error ? cause.message : String(cause)}`,
+        });
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [asked, attachedTicketProjectId, note, openTicketId, ticketLocation]);
+
+  /**
+   * THE OPEN TICKET'S FILES — the read behind `TicketSheet`'s `attachments`
+   * prop, keyed on the ticket id so swapping to a second ticket refetches
+   * rather than showing the first one's files under the new heading (the
+   * same key My Work's own mount uses, for the same reason).
+   */
+  const openTicketAttachments = useLiveQuery(
+    dataSource,
+    resolvedWorkspaceId ?? workspaces[0]?.id ?? '',
+    `${openTicketId ?? 'none'}:attachments`,
+    async () =>
+      openTicketId === null || note === null
+        ? []
+        : dataSource.query.getTicketAttachments(note.workspaceId, openTicketId),
+  );
+
+  /**
+   * THE ONE DOOR EVERY BADGE AND THE MOUNTED SHEET'S OWN PARENT CHIP GO
+   * THROUGH. It sets the param and nothing else — which project the ticket
+   * is in is answered above. `{ scroll: false }` for the reason the project
+   * page and My Work both record: the sheet is a query on the page under the
+   * reader, so a navigation that stays on it must not move it.
+   */
+  const openTicket = (ticketId: string) => {
+    router.push(`/notes/${noteId}?ticket=${ticketId}`, { scroll: false });
+  };
+
+  /**
+   * Every badge's own DOM node, by ticket id — `NoteByline`'s `onBadgeRef`
+   * populates it. This is what makes "focus returns to the badge on close"
+   * (owner request, 2026-09-24) a fact this page controls, rather than a bet
+   * on a third-party `FocusScope`'s own restore surviving the SHEET's full
+   * unmount (this page's own conditional render, not an internal open flag
+   * `Sheet` keeps toggled) — measured to not reach the badge reliably.
+   */
+  const badgeRefs = useRef(new Map<string, HTMLSpanElement>());
+
+  /** Closing is the same navigation with the param gone. */
+  const closeTicket = () => {
+    router.push(`/notes/${noteId}`, { scroll: false });
+  };
+
+  /**
+   * THE REFOCUS ITSELF — deliberately NOT inline in `closeTicket` above.
+   * `Sheet`'s `FocusScope` uses `contain`, which redirects any focus attempt
+   * OUTSIDE the scope back into it for as long as the scope is still
+   * mounted — measured: an inline `.focus()` called from the Close button's
+   * own click handler loses to it every time, because the sheet has not
+   * unmounted yet at that point (`router.push` is async in the real app, and
+   * this page's own render has not dropped `openTicketId` yet either). This
+   * effect instead fires the render AFTER `openTicketId` actually becomes
+   * `null` — by which point `TicketSheet` (and its `FocusScope`) is gone
+   * from the tree — and reads the ticket id from a ref because the id
+   * itself, and therefore the lookup key, is what just disappeared.
+   */
+  const lastOpenTicketIdRef = useRef<string | null>(null);
+  useEffect(() => {
+    if (openTicketId === null && lastOpenTicketIdRef.current !== null) {
+      badgeRefs.current.get(lastOpenTicketIdRef.current)?.querySelector('a')?.focus();
+    }
+    lastOpenTicketIdRef.current = openTicketId;
+  }, [openTicketId]);
 
   /**
    * Whether THIS `noteId` has ever answered non-null, reset per note. Without
@@ -295,14 +459,39 @@ export function NoteDocument({
     );
   }
 
+  /**
+   * The MIDDLE crumb, and why it can legitimately be absent (owner report,
+   * 2026-09-24: a note's breadcrumb showed "Convenience Corner /  /
+   * Furniture" — an empty segment with its own separator either side).
+   *
+   * `homeProjectId` is a plain `string`, and `''` is not a bug in it: a
+   * WORKSPACE-scoped note (`CreateNoteDialog`'s own default home,
+   * `{ projectId: '' }`) has no project, ever — `note-state.ts` refuses an
+   * EMPTY `homeProjectId` only for `scope.mode === 'project'`, which is the
+   * domain's own confirmation that the workspace level is real and not an
+   * oversight. `.find()` over `''` naturally finds nothing, so this was
+   * ALWAYS `undefined` for such a note; the defect was `?? ''` painting
+   * over that with an EMPTY STRING instead of leaving the crumb unrendered,
+   * and the OLD JSX always rendering the `<li>` regardless. (The planner's
+   * own alternate guess — a reserved `parent_note_id` column — does not
+   * exist anywhere in this codebase; ruled out, not merely unmentioned.)
+   */
+  const homeProjectName =
+    workspace?.projects.find((project) => project.id === note.homeProjectId)?.name ?? null;
+
   return (
     <div className="gn-note-document" data-testid="note-document">
+      {/* An absent level renders NO `<li>` at all, not an empty one — the
+          stylesheet's own separator rule (`.gn-breadcrumb__item +
+          .gn-breadcrumb__item::before`) draws `/` only BETWEEN two
+          rendered siblings, so omitting the `<li>` is what removes its
+          separator too, with no second rule needed. */}
       <nav aria-label="Breadcrumb" className="gn-breadcrumb">
         <ol className="gn-breadcrumb__list">
-          <li className="gn-breadcrumb__item">{workspace?.name ?? ''}</li>
-          <li className="gn-breadcrumb__item">
-            {workspace?.projects.find((project) => project.id === note.homeProjectId)?.name ?? ''}
-          </li>
+          {workspace !== null && workspace.name !== '' ? (
+            <li className="gn-breadcrumb__item">{workspace.name}</li>
+          ) : null}
+          {homeProjectName !== null ? <li className="gn-breadcrumb__item">{homeProjectName}</li> : null}
           <li className="gn-breadcrumb__item gn-breadcrumb__item--current">{note.title}</li>
         </ol>
       </nav>
@@ -322,6 +511,11 @@ export function NoteDocument({
         canEdit={canEditNow}
         onScopeChanged={() => live.reload()}
         onDetach={(ticketId) => void write('note.detached', { ticketId })}
+        onOpenTicket={openTicket}
+        onBadgeRef={(ticketId, element) => {
+          if (element === null) badgeRefs.current.delete(ticketId);
+          else badgeRefs.current.set(ticketId, element);
+        }}
         readingLabel={readingLabel(wordCount)}
         onCopyMarkdown={() => {
           void navigator.clipboard.writeText(
@@ -403,6 +597,62 @@ export function NoteDocument({
           });
         }}
       />
+
+      {/* A ticket the locator will not place mounts no sheet at all and
+          leaves this sentence in its place — the same arm My Work draws for
+          its own `contested` section. */}
+      {openNotice !== null ? (
+        <p role="alert" className="gn-notes__refusal">
+          {openNotice}
+        </p>
+      ) : null}
+
+      {/*
+        THE TICKET SHEET, ON THE PAGE THE CLICK HAPPENED ON.
+
+        Gated on the param, on the ticket having a project, and on the
+        session — the third for the reason `app/w/[workspaceId]/my-work/
+        page.tsx`'s own mount states: a sheet that would write with an ended
+        session is a refusal the reader has to read twice.
+      */}
+      {openTicketId !== null && openTicketProjectId !== null && session.kind === 'signed-in' ? (
+        <TicketSheet
+          dataSource={dataSource}
+          cache={cache}
+          workspaceId={note.workspaceId}
+          ticketId={openTicketId}
+          currentUserId={currentUserId}
+          attachments={openTicketAttachments.data ?? undefined}
+          attachmentsUnavailable={openTicketAttachments.error ?? undefined}
+          onClose={closeTicket}
+          editorSlot={TicketEditorSlot}
+          queryTickets={buildProjectPageQueryTickets(dataSource, note.workspaceId, openTicketProjectId)}
+          resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
+          workspaceName={workspace?.name ?? null}
+          projectName={workspace?.projects.find((project) => project.id === openTicketProjectId)?.name ?? null}
+          workspaceHref={`/w/${note.workspaceId}`}
+          projectHref={`/w/${note.workspaceId}/p/${openTicketProjectId}`}
+          onNavigate={(href) => router.push(href, { scroll: true })}
+          uploadEvidence={(file: File) => uploadAttachmentHttp(file, openTicketId)}
+          uploadAttachment={(file: File) => uploadAttachmentHttp(file, openTicketId)}
+          /*
+            THE PARENT CHIP'S DOOR, and it is this page's own `openTicket` —
+            the same door every badge already uses, so a parent chip inside
+            this mounted sheet swaps `?ticket=` in place too, placed by
+            `attachedTicketProjectId` when the parent happens to be attached
+            to this note and by the locator effect above otherwise.
+          */
+          onOpenTicket={openTicket}
+          /*
+            THE SOFT DELETE. A deleted ticket stays attached — Features.md
+            §15 records that deleting a job does not detach it — so nothing
+            here removes the badge; reloading is only for whatever ELSE the
+            delete may have changed about this note's own reach (a `Same as
+            the ticket` scope tied to the now-deleted job).
+          */
+          onDeleted={() => live.reload()}
+        />
+      ) : null}
     </div>
   );
 }

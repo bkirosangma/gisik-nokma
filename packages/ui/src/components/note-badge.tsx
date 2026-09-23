@@ -35,6 +35,20 @@ export type NoteBadgeProps = {
   href: string;
   /** Absent → no × is rendered at all, which is how a reader's badge differs. */
   onDetach?: () => void;
+  /**
+   * A plain, unmodified left click opens IN PLACE instead of following `href`
+   * (notes series, task/notes-badge-sheet, owner request 2026-09-24). Absent
+   * → the link navigates exactly as before, which is how a caller that has no
+   * "in place" destination (the ticket sheet's own Notes section, which links
+   * to a note's PAGE, not a sheet) keeps the plain link it already had.
+   *
+   * The intercept lives HERE, not in each caller, so the modifier check is
+   * written once: a middle click, or Cmd/Ctrl/Shift/Alt-click, is left alone
+   * — `href` stays the real destination, so open-in-new-tab and open-in-new-
+   * window keep working — and only the plain click `preventDefault`s and
+   * calls this instead.
+   */
+  onOpen?: () => void;
 };
 
 /** The spec's truncation point (§10.2), INCLUDING the ellipsis. */
@@ -47,10 +61,25 @@ export function truncateNoteTitle(title: string): string {
     : `${title.slice(0, NOTE_BADGE_TITLE_MAX - 1)}…`;
 }
 
-export function NoteBadge({ title, scopeMode, href, onDetach }: NoteBadgeProps) {
+export function NoteBadge({ title, scopeMode, href, onDetach, onOpen }: NoteBadgeProps) {
   return (
     <span className={`gn-note-badge gn-note-badge--${scopeMode}`}>
-      <a href={href} title={title} className="gn-note-badge__title">
+      <a
+        href={href}
+        title={title}
+        className="gn-note-badge__title"
+        onClick={
+          onOpen === undefined
+            ? undefined
+            : (event) => {
+                if (event.button !== 0 || event.metaKey || event.ctrlKey || event.shiftKey || event.altKey) {
+                  return;
+                }
+                event.preventDefault();
+                onOpen();
+              }
+        }
+      >
         {truncateNoteTitle(title)}
       </a>
       {onDetach === undefined ? null : (
