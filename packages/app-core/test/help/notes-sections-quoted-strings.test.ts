@@ -1,7 +1,8 @@
+import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { productText, quotedSpans } from '../../../../scripts/help-content.mjs';
+import { compareAbsent, productText, quotedSpans } from '../../../../scripts/help-content.mjs';
 import { HELP_CONTENT } from '../../src/help/content.generated.js';
 import { entryText } from '../../src/help/types.js';
 import type { HelpEntry } from '../../src/help/types.js';
@@ -22,7 +23,8 @@ import type { HelpEntry } from '../../src/help/types.js';
  * the notes sections, and (from Unit 4) the starting-status and board-badge
  * passages — rather than the whole corpus. `check:help` already covers the
  * whole corpus in CI; this pins the sub-claim that matters for review: the
- * strings THIS TASK introduced are genuine.
+ * strings THIS TASK introduced are genuine — the notes sections (Units 1-2)
+ * and the starting-status / board-badge passages (Unit 4).
  *
  * ## Why the strings are never written as literals here
  *
@@ -55,7 +57,17 @@ function entries(documentId: 'manual' | 'faq', sectionId: string, titles?: reado
   const section = doc.sections.find((s) => s.id === sectionId);
   if (section === undefined) throw new Error(`no section "${sectionId}" in "${documentId}"`);
   if (titles === undefined) return [...section.entries];
-  return section.entries.filter((entry) => titles.includes(entry.title));
+  const found = section.entries.filter((entry) => titles.includes(entry.title));
+  // A title that no longer matches (a rename, a typo here) would silently
+  // shrink the checked set rather than error — that is a false GREEN this
+  // case exists to prevent, so a mismatch fails loudly instead.
+  if (found.length !== titles.length) {
+    throw new Error(
+      `entries(${documentId}, ${sectionId}): expected ${titles.length} titles, found ${found.length} — ` +
+        `have: ${section.entries.map((entry) => entry.title).join(' | ')}`,
+    );
+  }
+  return found;
 }
 
 /**
@@ -69,11 +81,45 @@ function touchedEntries(): HelpEntry[] {
   return [
     ...entries('manual', '15-notes'),
     ...entries('faq', 'notes'),
+    // Unit 4 (starting-status, board card badges): the specific ### entries
+    // and FAQ questions this task edited, not their untouched siblings.
+    ...entries('manual', '5-adding-a-job-and-what-you-can-change-about-it', [
+      'Adding a job',
+      'The things you cannot do to a job',
+    ]),
+    ...entries('manual', '8-looking-at-the-work', ['Board']),
+    ...entries('manual', '11-setting-up-your-own-stages-owners-and-admins', ['Building one']),
+    ...entries('faq', 'jobs', [
+      'Can I set the dates when I create the job, instead of afterwards?',
+      'Can I choose which stage a new job starts in?',
+    ]),
+    ...entries('faq', 'boards-lists-and-dates', [
+      'Can a new job start in a column other than the first?',
+      'Why is there no Add button on this column?',
+      'What do the coloured badges on a card mean?',
+    ]),
   ];
 }
 
 describe('15.37 every quoted UI string the help-notes task wrote is real product copy', () => {
-  it('15.37 no quoted span in the task’s entries is absent from apps/ + packages/', () => {
+  /**
+   * Same rule `check:help` applies to the whole corpus (`compareAbsent`,
+   * ratcheted against the real `help-quoted-strings-absent.json`), not a
+   * stricter one — a touched ### entry carries pre-existing prose this task
+   * never wrote too, including the manual's own worked examples (fictional
+   * job titles and the like), and those are legitimately in the baseline
+   * already. Naming this without quoting it is deliberate, for the same
+   * reason `corpus-vs-product.test.ts`'s own docblock gives and demonstrates
+   * the hard way: this file is itself under `packages/`, inside the real
+   * gate's haystack, so a literal quote in a comment here would make the
+   * baseline read as rotted the moment this file exists — which is exactly
+   * what happened the first time this docblock named one by quoting it.
+   * A blanket "must-be-in-product" check over the whole entry ALSO flagged
+   * eight such pre-existing, already-baselined spans as failures the first
+   * time this case was written — not a defect in the prose, a defect in the
+   * check, fixed by matching `check:help`'s own ratcheted rule instead.
+   */
+  it('15.37 no quoted span in the task’s entries is undeclared-absent from apps/ + packages/', () => {
     const text = touchedEntries()
       .map((entry) => entryText(entry))
       .join('\n');
@@ -82,9 +128,13 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
     // above broke and the assertion below would pass vacuously.
     expect(spans.length).toBeGreaterThan(0);
 
-    const product = productText(REPO_ROOT);
-    const missing = spans.filter((span) => !product.includes(span));
-    expect(missing).toEqual([]);
+    const baseline = JSON.parse(readFileSync(resolve(REPO_ROOT, 'scripts/help-quoted-strings-absent.json'), 'utf8'));
+    const { undeclared } = compareAbsent({
+      documents: [{ source: 'help-notes task entries', text }],
+      product: productText(REPO_ROOT),
+      baseline,
+    });
+    expect(undeclared).toEqual([]);
   });
 
   /**
@@ -99,12 +149,14 @@ describe('15.37 every quoted UI string the help-notes task wrote is real product
    * control find itself, the exact defect 15.35's own docblock records for
    * its first draft (`corpus-vs-product.test.ts`'s docblock names it too).
    */
-  it('15.37 control: an invented quoted string the product does not contain is caught by the same comparison', () => {
-    const product = productText(REPO_ROOT);
+  it('15.37 control: an invented quoted string, undeclared in the baseline, is caught by the SAME compareAbsent call', () => {
     const half1 = 'a string nothing';
     const half2 = 'in the product says';
-    const invented = quotedSpans(`This sentence quotes "${half1} ${half2}".`);
-    const missing = invented.filter((span) => !product.includes(span));
-    expect(missing).toEqual([`${half1} ${half2}`]);
+    const { undeclared } = compareAbsent({
+      documents: [{ source: 'control', text: `This sentence quotes "${half1} ${half2}".` }],
+      product: productText(REPO_ROOT),
+      baseline: { absent: [] },
+    });
+    expect(undeclared).toEqual([{ source: 'control', span: `${half1} ${half2}` }]);
   });
 });

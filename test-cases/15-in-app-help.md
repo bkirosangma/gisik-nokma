@@ -392,12 +392,22 @@ starting-status and board-card-badges in the existing sections. Cases file: this
 - **15.36** ✅ The generated corpus carries the manual's "§15 — Notes" section (last in document order,
   its nine subsections) and the FAQ's "Notes" section (8–12 real questions) — against the real generated
   content, not a fixture — (`packages/app-core/test/help/notes-sections.test.ts`)
-- **15.37** ✅ Every quoted UI string the help-notes task wrote (Units 1–2 so far; extended in Unit 4) is
-  real product copy, checked against `apps/` + `packages/` via `productText`/`quotedSpans`
-  (`scripts/help-content.mjs`) rather than hand-typed literals in the test — mutation: alter one checked
-  quote to an invented string → red, naming the string; verified and reverted 2026-09-23 —
-  (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`)
+- **15.37** ✅ Every quoted UI string the help-notes task wrote — the notes sections (Units 1–2) AND, from
+  Unit 4, the starting-status/board-badge passages it touched in §5, §8, §11 and two FAQ sections — is
+  real product copy or a legitimate declared-absent worked example, checked with `check:help`'s own
+  `compareAbsent` ratchet against the real `help-quoted-strings-absent.json`, not a stricter ad hoc rule
+  (an earlier draft's blanket "must be in product" flagged eight pre-existing, already-baselined spans
+  in the touched-but-not-authored parts of those entries as false failures). Strings are read out of the
+  already-parsed content at runtime, never typed as literals in the test file itself — the file lives
+  under `packages/`, inside the real gate's own haystack, and one draft of this docblock's own prose
+  proved the trap by quoting a baselined example and rotting the baseline the moment the file existed.
+  Mutation: alter one checked quote to an invented string → red, naming the string; verified and
+  reverted 2026-09-23 — (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`)
+- **15.3** (pre-existing case, re-witnessed) — the due-date correction case now pins the RE-corrected,
+  scoped sentence ("This particular box will not get you a due date") rather than the wider claim Unit
+  4d's `docs/manual.md` edit replaced, plus a guard against the wider claim returning — updated in the
+  same commit as the manual edit it tracks (`packages/app-core/test/help/search.test.ts`).
 
-Minted so far: 15.36–15.37. 15.38–15.50 remain for Units 3–4 and any further cases this lane needs.
+Minted: 15.36–15.37. 15.38–15.50 remain for any further cases this lane needs.
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*

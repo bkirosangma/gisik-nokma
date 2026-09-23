@@ -226,6 +226,15 @@ ever look at the built-in due date. So it will put a day on a calendar and it wi
 Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how
 you set the built-in due date.
 
+**Can I set the dates when I create the job, instead of afterwards?**
+Yes. The New ticket window has its own **Start date** and **Due date** boxes — real date pickers, empty
+by default, not the typing box above. Leave either blank to create the job with no claim on that date.
+
+**Can I choose which stage a new job starts in?**
+Yes, if your workflow allows it. The New ticket window has a **Starting status** picker, defaulting to
+the workflow's first stage; it is disabled while **Starts in the backlog?** is on, since a backlog job
+has no starting stage yet. A stage your admin marked as not allowing new jobs is never offered.
+
 **Can I rename a job?**
 Yes. Open the job and type into the title at the top of the sheet. **Enter** or clicking away saves it;
 **Escape** abandons the change.
@@ -584,6 +593,21 @@ You are taken back to the Notes list with a message: "That note is no longer sha
 
 ## Boards, lists and dates
 
+**Can a new job start in a column other than the first?**
+Yes — press **Add a ticket** in the empty column you want, rather than the top-level **New ticket**
+button, and the window opens with that column's stage already chosen and the backlog switch off.
+
+**Why is there no Add button on this column?**
+Your admin turned off "Tickets can start here" for that stage (the manual's stage-setup section) — a
+job cannot be born there, so the column offers no way to try. It can still receive jobs moved into it
+from elsewhere; only starting a brand new one there is blocked.
+
+**What do the coloured badges on a card mean?**
+Three, when they apply. The **priority badge** — a coloured icon and P1/P2/P3, tinting the whole card
+— is always there: red fire for P1, green leaf for P2, frozen-blue snowflake for P3. An **epic chip**
+on the card's top line names the epic it belongs to, if any. A **parent-key badge** beside the job's key
+names its immediate parent, if that parent is not already the epic chip's own job.
+
 **Why doesn't the "Only tickets in progress" switch change the Board?**
 Because it does not narrow the Board — only the List, Calendar and Timeline. There is a note on screen
 saying so, and the note is important, because **a project opens on the Board the first time you look at
@@ -828,9 +852,9 @@ narrowing boxes let you read theirs.
 Three places now, and only one of them is the deep search. On the **phone app's board screen** — where,
 offline, it says "searching offline copy" underneath, so you know the results might be a little out of
 date — and on the **website's project board**, in the box above the tabs, both only narrow something
-already on screen. The `:ticket ` picker (§15) reaches the deep search described just above, narrowed
-to jobs and only from inside a comment or a note — still not a screen of its own. Notes (§15) have a
-separate search again, on the Notes page: its own engine, and it only searches notes.
+already on screen. The `:ticket ` picker reaches the deep search described just above, narrowed to jobs
+and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own.
+Notes have a separate search again, on the Notes page: its own engine, and it only searches notes.
 
 **If I use the deep search through the `:ticket` picker, what would catch me out?**
 Two things, on the ticket-search half at least — the picker inherits the engine's own limits:

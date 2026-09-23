@@ -336,14 +336,19 @@ settings are kept for about a month in case they come back.
    empty stage on the Board, which starts the job in THAT stage instead (see "Starting status" below).
 3. A small window opens with these things:
    - **Title** — what the job is. "Fix Mrs. Patel's leaking pipe."
+   - **Starts in the backlog?** — a switch, remembered from your last answer. On means the job waits,
+     unordered work with a Start button, until somebody starts it (§8); off means it is born straight
+     into a stage.
    - **Type** — what kind of job this is, from your workspace's list.
    - **Starting status** — which stage of the workflow the job is born in, defaulting to the workflow's
      own first stage. Disabled, with a note explaining where the job will actually start, while "Starts
      in the backlog?" is switched on — a backlog job has no starting stage.
    - **Start date** and **Due date** — optional, empty by default. Leave either blank to claim no date.
    - **Priority** — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5).
+   - **Description** — the same editor a job's own description box uses (§5, below).
    - **Parent** — which bigger job this sits under. It defaults to **None (project root)**. Leave it
      alone unless this job is part of a bigger one (§6).
+   - **Assignee** — who the job is on, or leave it unassigned.
 4. Press **Create**.
 
 **On the title:** a blank title, or one that is only spaces, is refused. But extra spaces around real
@@ -450,10 +455,12 @@ This is the honest list. Each one is an absence, not a hidden button.
 > What you type is recorded as your claim. That is currently the only place in the whole product that
 > accepts a field value typed by a person.
 >
-> **It will not get you a due date.** The box is a plain typing box, and the built-in "needed by" and
-> "start" dates do not accept plain typed text — they expect a day *and* an optional note about it,
-> together, and there is no way to type that into one box. Try it and you will be refused with
-> something like *"Due date needs a day in YYYY-MM-DD form (a note is optional)."*
+> **This particular box will not get you a due date.** It is a plain typing box, and the built-in
+> "needed by" and "start" dates do not accept plain typed text — they expect a day *and* an optional
+> note about it, together, and there is no way to type that into one box. Try it and you will be
+> refused with something like *"Due date needs a day in YYYY-MM-DD form (a note is optional)."* (You
+> can still set both dates properly — as a real date box, no typing — when you create the job, or
+> afterwards on its own panel; §5.)
 >
 > **It will accept a custom date field** your admin created, if you type the day as four-digit year,
 > two-digit month, two-digit day — `2026-08-30`. That claim will show up as a marker on the Calendar
@@ -738,8 +745,19 @@ A card shows the title, who it is on, whether it is blocked, its progress, the *
 that carry it to the stages it may move to, and a small "who · when" button. Press that button and it
 tells you who moved it and when: *"marked Doing by Anselma Marak on 19 Aug 2026"*.
 
+Three more badges, when they apply: an **epic chip** on the card's own top line, above the title, when
+the job belongs to one — press it to open that epic. A **parent-key badge** beside the job's own key,
+when it sits under a job that is not already named by the epic chip — press it to open that parent. And
+every card carries its **priority badge** — a coloured icon and P1/P2/P3, tinting the whole card: red
+fire for P1, green leaf for P2, frozen-blue snowflake for P3.
+
 Columns are grouped by which set of stages they belong to, so if two job types use different
 arrangements you get two clearly separated groups rather than one confusing mess.
+
+**An empty column's own Add button starts the job there.** Press **Add a ticket** in an empty column
+and the New ticket window opens with that column's status already chosen, the backlog switch off, and
+a job type from that workflow pre-picked. A column whose stage does not allow a job to start there —
+your admin can turn this off per stage (§11) — shows no Add button at all, even empty.
 
 **"Blocked" is a property of the column, not of one job.** Whoever built your workflow can mark a stage
 as a waiting or blocked one — "Waiting on parts", "Waiting on customer". Every job in that column is
@@ -1167,6 +1185,11 @@ It is a drawing canvas. Each stage is a box. **Add state** makes a new one. Each
 - **A Category** dropdown — whether that stage counts as *not started*, *in progress*, or *finished*.
 - **A blocked tick box** — for stages that mean "we are stuck waiting on someone".
 - **A start marker** — which stage new jobs begin in.
+- **A "Tickets can start here" tick box** — on by default; untick it to stop a job being born straight
+  into that stage (the Starting status picker on the New ticket window will not offer it, §5). Greyed
+  out and stuck on for the stage your start marker points to, with the note *"The start state always
+  allows new tickets"*, and for a finished stage, with the note *"A done state can't be a starting
+  status"*.
 
 **To connect two stages, drag from the edge of one box to the edge of another.** That makes an arrow,
 which means "a job can go this way".

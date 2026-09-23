@@ -1825,6 +1825,14 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
+                      "text": "Starts in the backlog?"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — a switch, remembered from your last answer. On means the job waits, unordered work with a Start button, until somebody starts it (§8); off means it is born straight into a stage. - "
+                    },
+                    {
+                      "kind": "bold",
                       "text": "Type"
                     },
                     {
@@ -1865,6 +1873,14 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
+                      "text": "Description"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the same editor a job's own description box uses (§5, below). - "
+                    },
+                    {
+                      "kind": "bold",
                       "text": "Parent"
                     },
                     {
@@ -1877,7 +1893,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". Leave it alone unless this job is part of a bigger one (§6)."
+                      "text": ". Leave it alone unless this job is part of a bigger one (§6). - "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Assignee"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — who the job is on, or leave it unassigned."
                     }
                   ],
                   [
@@ -2608,11 +2632,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "It will not get you a due date."
+                    "text": "This particular box will not get you a due date."
                   },
                   {
                     "kind": "text",
-                    "text": " The box is a plain typing box, and the built-in \"needed by\" and \"start\" dates do not accept plain typed text — they expect a day "
+                    "text": " It is a plain typing box, and the built-in \"needed by\" and \"start\" dates do not accept plain typed text — they expect a day "
                   },
                   {
                     "kind": "italic",
@@ -2628,7 +2652,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": "  "
+                    "text": " (You can still set both dates properly — as a real date box, no typing — when you create the job, or afterwards on its own panel; §5.)  "
                   },
                   {
                     "kind": "bold",
@@ -3918,7 +3942,61 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
+                    "text": "Three more badges, when they apply: an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "epic chip"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the card's own top line, above the title, when the job belongs to one — press it to open that epic. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "parent-key badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside the job's own key, when it sits under a job that is not already named by the epic chip — press it to open that parent. And every card carries its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "priority badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — a coloured icon and P1/P2/P3, tinting the whole card: red fire for P1, green leaf for P2, frozen-blue snowflake for P3."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
                     "text": "Columns are grouped by which set of stages they belong to, so if two job types use different arrangements you get two clearly separated groups rather than one confusing mess."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "An empty column's own Add button starts the job there."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add a ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in an empty column and the New ticket window opens with that column's status already chosen, the backlog switch off, and a job type from that workflow pre-picked. A column whose stage does not allow a job to start there — your admin can turn this off per stage (§11) — shows no Add button at all, even empty."
                   }
                 ]
               },
@@ -6147,6 +6225,32 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — which stage new jobs begin in."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "A \"Tickets can start here\" tick box"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — on by default; untick it to stop a job being born straight into that stage (the Starting status picker on the New ticket window will not offer it, §5). Greyed out and stuck on for the stage your start marker points to, with the note "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"The start state always allows new tickets\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and for a finished stage, with the note "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"A done state can't be a starting status\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
                     }
                   ]
                 ]
@@ -9240,6 +9344,68 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "can-i-set-the-dates-when-i-create-the-job-instead-of-afterwa",
+            "title": "Can I set the dates when I create the job, instead of afterwards?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes. The New ticket window has its own "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start date"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due date"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " boxes — real date pickers, empty by default, not the typing box above. Leave either blank to create the job with no claim on that date."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-choose-which-stage-a-new-job-starts-in",
+            "title": "Can I choose which stage a new job starts in?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes, if your workflow allows it. The New ticket window has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Starting status"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker, defaulting to the workflow's first stage; it is disabled while "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Starts in the backlog?"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is on, since a backlog job has no starting stage yet. A stage your admin marked as not allowing new jobs is never offered."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "can-i-rename-a-job",
             "title": "Can I rename a job?",
             "blocks": [
@@ -10690,6 +10856,91 @@ export const HELP_CONTENT: HelpContent = [
         "intro": [],
         "entries": [
           {
+            "id": "can-a-new-job-start-in-a-column-other-than-the-first",
+            "title": "Can a new job start in a column other than the first?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes — press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add a ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the empty column you want, rather than the top-level "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button, and the window opens with that column's stage already chosen and the backlog switch off."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-is-there-no-add-button-on-this-column",
+            "title": "Why is there no Add button on this column?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Your admin turned off \"Tickets can start here\" for that stage (the manual's stage-setup section) — a job cannot be born there, so the column offers no way to try. It can still receive jobs moved into it from elsewhere; only starting a brand new one there is blocked."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-do-the-coloured-badges-on-a-card-mean",
+            "title": "What do the coloured badges on a card mean?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Three, when they apply. The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "priority badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — a coloured icon and P1/P2/P3, tinting the whole card — is always there: red fire for P1, green leaf for P2, frozen-blue snowflake for P3. An "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "epic chip"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the card's top line names the epic it belongs to, if any. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "parent-key badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside the job's key names its immediate parent, if that parent is not already the epic chip's own job."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "why-doesn-t-the-only-tickets-in-progress-switch-change-the-b",
             "title": "Why doesn't the \"Only tickets in progress\" switch change the Board?",
             "blocks": [
@@ -11693,7 +11944,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " picker (§15) reaches the deep search described just above, narrowed to jobs and only from inside a comment or a note — still not a screen of its own. Notes (§15) have a separate search again, on the Notes page: its own engine, and it only searches notes."
+                    "text": " picker reaches the deep search described just above, narrowed to jobs and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own. Notes have a separate search again, on the Notes page: its own engine, and it only searches notes."
                   }
                 ]
               }
