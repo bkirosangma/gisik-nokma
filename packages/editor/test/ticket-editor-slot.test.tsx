@@ -116,6 +116,12 @@ type AppCoreEditorSlotProps = {
   // assignment below asserts: `Promise<void>` here would stop representing the
   // other half, and the assignment would pass while the two genuinely differed.
   submit?: (submission: AppCoreEditorSlotSubmission) => Promise<boolean>;
+  // 2026-09-23 — the CREATE dialog's half. It needs the document BEFORE any
+  // submit, because there is nothing to submit to yet: the ticket does not exist
+  // until Create is pressed. Mirrored here for the same reason every other field
+  // is — the parity case below compares the three name sets, and a one-sided
+  // addition fails it.
+  onChange?: (doc: unknown) => void;
   onDone?: () => void;
   onError?: (err: unknown) => void;
 };
@@ -970,5 +976,85 @@ describe('9.294 the mobile bundle is regenerated', () => {
     // …and a node this schema does NOT have is absent, so the assertion above
     // cannot pass on a bundle that merely contains arbitrary text.
     expect(bundle.includes('rawBlock')).toBe(false);
+  });
+});
+
+/**
+ * 13.1365 — THE SLOT CAN REPORT THE DOCUMENT, AND CAN BE MOUNTED WITHOUT ITS OWN
+ * SUBMIT CONTROL.
+ *
+ * Both halves exist for ONE caller: the New ticket dialog (owner request
+ * 2026-09-23). It composes a description at creation, and it is a different
+ * mount from every one this component has had until now in two ways that each
+ * break an assumption the slot was built on.
+ *
+ * **The document must leave the editor BEFORE any submit.** Until today the only
+ * way a document ever escaped this component was `submit(...)`, on the press of
+ * its own button — but the dialog's description has no ticket to submit to: the
+ * ticket is created by the dialog's OWN Create control, and a rich-text edit is
+ * not a claim until then. So the host needs the document as it stands, and
+ * `onChange` is that channel. It is on the shared `EditorSlotProps` rather than
+ * on this package's seam-only extras because app-core is the caller and may not
+ * name this package at all — the same constraint that widened `doc`.
+ *
+ * **The slot's own submit control is wrong there.** A "Submit" beside a create
+ * form's Create is two controls for one act, and the inner one would send a
+ * `ticket.field_set` for a ticket that does not exist. So `submitSlot: 'none'`
+ * omits it — a seam-only prop, exactly as `editorRef` is, because only a host
+ * that knows which component it is mounting can ask for it.
+ */
+describe('13.1365 the slot reports the document, and can be mounted without a submit control', () => {
+  it('13.1365 onChange receives the document as it is typed, and it is the DOCUMENT rather than a projection', async () => {
+    const onChange = vi.fn();
+    // No `submit` at all, deliberately: this is the dialog's mount, where there
+    // is nowhere to submit to. The slot must still be EDITABLE and must still
+    // report — a component that only reported when a submit handler was wired
+    // would be useless to the one caller this exists for.
+    const { editor } = await mountSlot(makeProps({ doc: null, onChange, submit: undefined }));
+
+    // Nothing is reported before anything is typed. `TicketEditor` wires this to
+    // ProseMirror's `onUpdate` and NOT to init, so an untouched composer reports
+    // nothing — which is what lets the dialog treat "never reported" as "no
+    // description" instead of having to guess whether an empty doc means empty.
+    expect(onChange).not.toHaveBeenCalled();
+
+    editor.commands.insertContent('the laminate is peeling');
+    await vi.waitFor(() => expect(onChange).toHaveBeenCalled());
+
+    const reported = onChange.mock.calls.at(-1)?.[0];
+    // The DOCUMENT, asserted structurally rather than by identity: a slot that
+    // reported `docToPlainText(...)` would satisfy "onChange was called with a
+    // string containing the words" and would hand the dialog a value its own
+    // `ticket.field_set` door refuses ('Description' needs a document).
+    expect(reported).toMatchObject({ type: 'doc' });
+    expect(JSON.stringify(reported)).toContain('the laminate is peeling');
+  });
+
+  it("13.1365b submitSlot: 'none' omits the footer's submit control — and its ABSENCE is a control arm of its own", async () => {
+    const view = render(<TicketEditorSlot {...makeProps({ submitSlot: 'none' })} />);
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull();
+    });
+
+    expect(view.container.querySelector('.editor-slot__submit')).toBeNull();
+    // …and the composer is still a composer: the FIELD is there and editable, so
+    // "no submit button" cannot be satisfied by a slot that rendered nothing.
+    expect(view.container.querySelector('.ProseMirror')).not.toBeNull();
+    // …and the footer itself survives, because it also carries the hint
+    // sentence. Asserted on the FOOTER rather than by counting children, since
+    // the hint is a sibling the button's removal must not take with it.
+    expect(view.container.querySelector('.editor-slot__footer')).not.toBeNull();
+
+    // CONTROL, in the SAME `it` because a control in a sibling case proves
+    // nothing about this one: the same mount WITHOUT the prop still draws the
+    // button. Without this arm, the assertions above pass against a component
+    // that had simply lost its submit control for every mount.
+    const withButton = render(<TicketEditorSlot {...makeProps()} />);
+    await vi.waitFor(() => {
+      expect(withButton.container.querySelector('.ticket-editor .ProseMirror')).not.toBeNull();
+    });
+    expect(withButton.container.querySelector('.editor-slot__submit')).not.toBeNull();
+    view.unmount();
+    withButton.unmount();
   });
 });

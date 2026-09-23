@@ -612,8 +612,14 @@ describe('a refused read is rendered as the refusal, never as a spinner or an em
     // and the Backlog is the one the toggle empties rather than narrows. The
     // assertion names all four now, because the note's whole job is to name the
     // surfaces, and a surface it forgets is one this test would not catch.
+    // The capital `T` moved with the note's own placement (owner request,
+    // 2026-09-23, cases `13.1381`–`13.1383`): the note is no longer a fragment
+    // hanging off the controls row but a standing line of its own between the
+    // head row and the view rail, so it reads as the sentence it is. The words
+    // are otherwise unchanged — this arm still asserts all four surfaces, which
+    // is the thing it exists for.
     expect(screen.getByTestId('list-filter-note')).toHaveTextContent(
-      'the list, calendar, timeline and backlog are asking only for tickets in progress',
+      'The list, calendar, timeline and backlog are asking only for tickets in progress',
     );
     expect(screen.getByTestId('list-filter-note')).toHaveTextContent('the backlog is emptied');
   });
