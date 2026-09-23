@@ -1,6 +1,7 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { makeEnvelope, newUlid } from '@gisik-nokma/domain';
 import { checkPermission, PERMISSION_ROLE_RULE } from '../../src/permissions/check-permission.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedNotesFixture, NOTES_USERS, type NotesUser } from '../helpers/notes-fixture.js';
 
@@ -122,6 +123,56 @@ describe('18.025 note.created', () => {
     // person who can see TE cannot reach this clause. The pair that witnesses it
     // is `memberIn` refused for TE and allowed for TP — same actor, same event,
     // the ticket the only variable.
+  });
+});
+
+describe('18.042 note.created needs a project that EXISTS', () => {
+  it('18.042 refuses a home project nobody founded, even for the owner and even for a forged member', async () => {
+    const GHOST = newUlid();
+    const base = { title: 'Cold room', scope: { mode: 'project' as const } };
+
+    // The OWNER first, because it is the cell that shows the rule is not a
+    // role question at all: `checkNotePermission`'s membership arm exempts the
+    // owner (`role !== 'owner'`), so without the existence check an owner may
+    // file a note under ANY ULID — the cheapest possible version of the hole.
+    const ownerOnGhost = await permits(
+      'note.created',
+      { ...base, homeProjectId: GHOST },
+      'none',
+      newUlid(),
+      'owner',
+    );
+    expect(ownerOnGhost).not.toBeNull();
+    expect(ownerOnGhost?.rule).toBe('project.unknown');
+
+    // CONTROL: the same owner, the same event, a project that WAS founded.
+    expect(await permits('note.created', { ...base, homeProjectId: P }, 'none', newUlid(), 'owner')).toBeNull();
+
+    // THE FORGED-MEMBERSHIP PATH, which is the one the hole is actually
+    // reachable through. `project.member_added` accepts any ULID as a project
+    // scope without validating it, so `memberOut` can be made a "member" of a
+    // project nobody founded — and then the MEMBERSHIP arm alone would admit
+    // them. Seeded here rather than in `notes-fixture.ts` because it is a fact
+    // about this case; `applyCommitted` continues the same seq counters the
+    // fixture started, so the two cannot collide.
+    await applyCommitted(db.pool, [
+      makeCommitted({
+        workspaceId: WS,
+        actorId: ids.owner,
+        entity: { kind: 'project', id: GHOST },
+        type: 'project.member_added',
+        payload: { userId: ids.memberOut, projectAdmin: false },
+      }),
+    ]);
+    const forged = await permits('note.created', { ...base, homeProjectId: GHOST }, 'none', newUlid(), 'memberOut');
+    expect(forged).not.toBeNull();
+    expect(forged?.rule).toBe('project.unknown');
+    // CONTROL for the same actor: a REAL project they are NOT on is refused by
+    // the MEMBERSHIP arm with the note rule, which is a different sentence — so
+    // the refusal above is about existence and not about `memberOut` being
+    // refused everything.
+    const offProject = await permits('note.created', { ...base, homeProjectId: P }, 'none', newUlid(), 'memberOut');
+    expect(offProject?.rule).toBe('permission.note');
   });
 });
 

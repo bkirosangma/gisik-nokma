@@ -860,6 +860,27 @@ function projectsNamedBy(env: EventEnvelope): readonly string[] {
       return [env.entity.id];
     case 'invite.sent':
       return inviteSentPayload.parse(env.payload).projectIds ?? [];
+    // The note's HOME project (notes series, Plan 1 of 6, spec §3.3: "the
+    // project in `homeProjectId` exists in `env.workspaceId`"). It belongs in
+    // this function rather than in `checkNotePermission`'s membership arm for
+    // the reason this function's own docblock gives: existence must be asked
+    // BEFORE membership, so a person filing a note under a project nobody
+    // founded is told the project does not exist rather than that they are not
+    // a member of it — and the honest reason is the one that names the actual
+    // fault.
+    //
+    // `''` is filtered out and is NOT a missing value to guard elsewhere:
+    // `homeProjectId: ''` is the claim "this note lives at workspace level", a
+    // real and common answer, and asking whether the empty string is a founded
+    // project would refuse every workspace-level note.
+    //
+    // MEASURED before this line existed, by case 18.042: an OWNER could file a
+    // note under any ULID at all, because the membership arm exempts owners; and
+    // any member could, by first granting themselves `project.member_added` on a
+    // project nobody founded — which accepts any ULID without validating it,
+    // exactly as this docblock records one entity kind over.
+    case 'note.created':
+      return [noteCreatedPayload.parse(env.payload).homeProjectId].filter((id) => id !== '');
     default:
       return [];
   }
@@ -1134,20 +1155,27 @@ const NOTE_AUTHOR_EVENTS = new Set([
  * sentence would confirm the note exists. And the `note.created` branch comes
  * first because it is the only event with no note to load.
  *
- * ## What is deliberately NOT here
+ * ## Where the two SERVER-ONLY preconditions are met, one of them elsewhere
  *
- * Spec §3.3's server-only preconditions for a note's events are that the ticket
- * named exists, is in this workspace and is not deleted, and that the project in
- * `homeProjectId` exists and is not archived. The TICKET half is discharged by
- * `canSee`, which answers false for a ticket that does not exist or is not in
- * the workspace, and by `loadNoteForVisibility`'s `ticketIsLive` filter. The
- * PROJECT half is discharged here only as MEMBERSHIP (`eff.projects.has`), which
- * is what spec §4.2's own row for `note.created` says; `projectsNamedBy` returns
- * `[]` for note types, so `checkProjectExists` does not fire for a note and a
- * forged `project.member_added` naming an unfounded project id would let a note
- * be filed under a dangling home. That gap is the one `checkProjectExists`'s own
- * docblock records for tickets, one entity kind over, and it is REPORTED rather
- * than closed here: closing it means a new case, and this task's block is spent.
+ * Spec §3.3's preconditions for a note's events are that the ticket named exists,
+ * is in this workspace and is not deleted, and that the project in
+ * `homeProjectId` exists and is not archived.
+ *
+ * - The TICKET half is discharged by `canSee`, which answers false for a ticket
+ *   that does not exist or is not in the workspace, plus
+ *   `loadNoteForVisibility`'s `ticketIsLive` filter — the `attachTicketId` arm
+ *   below and the attach/detach arm.
+ * - The PROJECT half is discharged in TWO places, and the split is the ordering
+ *   rule `checkProjectExists`'s docblock states: EXISTENCE is asked there, which
+ *   is why `projectsNamedBy` gained a `note.created` case, and MEMBERSHIP is
+ *   asked here (`eff.projects.has`). Existence first is what makes the refusal
+ *   honest — someone filing under a project nobody founded is told that, not
+ *   that they are not a member of it.
+ * - **The archived half is NOT implemented, for notes or for tickets.** Nothing
+ *   in this chain refuses a write under an archived project — `projectExists`
+ *   does not read the column and no call site does — so closing it for notes
+ *   alone would make notes stricter than tickets on a rule the product does not
+ *   enforce anywhere. Recorded rather than quietly half-done.
  */
 export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityContext): Promise<Refusal | null> {
   if (env.entity.kind !== 'note') return null;

@@ -3083,3 +3083,4 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ✅ **Notes can be read back through the API** — list, one note, a ticket's notes, comments, history and a version, every read filtered by the reader predicate; an unreadable note is a 404 identical to an absent one (spec §6.4).
 - ⚙️ **The client data source exposes seven note reads** (`getNotes`, `getDeletedNotes`, `getNote`, `getNotesForTicket`, `getNoteComments`, `getNoteHistory`, `getNoteVersion`); the replica rejects them as gaps until Plan 2.
 - ⚙️ **Files uploaded into a note are owned by the note** — upload needs author/admin-reader/owner, download needs a reader (spec §4.4).
+- ⚙️ **A note cannot be filed under a project nobody founded** — spec §3.3's existence precondition, asked in `checkProjectExists` (existence) before `checkNotePermission` (membership), so the refusal names the actual fault. The archived half is deliberately NOT enforced, for notes or for tickets.

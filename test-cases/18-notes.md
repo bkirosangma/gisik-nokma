@@ -79,3 +79,4 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.039 — upload with `noteId` succeeds for the author and is 403 for a non-author reader;** control: upload with `ticketId` is unchanged. Mutation: skip the author check.
 - ✅ **18.040 — download of a note-owned attachment is 200 for a reader and 404 for a non-reader** (same body as an unknown id). Mutation: authorise by ticket only.
 - ✅ **18.041 — a request naming both `ticketId` and `noteId`, or neither, is 400.** Mutation: prefer `ticketId` silently.
+- ✅ **18.042 — `note.created` refuses a `homeProjectId` no project was founded under, even for the owner and even when the actor holds a forged membership on it** (spec §3.3's existence precondition); control: a real project is accepted. Mutation: drop the `note.created` case from `projectsNamedBy`.
