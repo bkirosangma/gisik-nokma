@@ -241,7 +241,16 @@ it stayed in `apps/web` when the gateway left.*
   which is what names the fault. Two explicit negatives sit beside the array (nothing points at
   `/w/ws_1/p/p_1`; no link is named `Board`) so a failure says what came back rather than only that an
   array grew. The shapes are now: without a workspace, four links; with one, eight; with one AND a
-  project, the same eight. — (`app-nav.test.tsx`)
+  project, the same eight. **AMENDED AGAIN 2026-09-23 (Plan 5 of the notes series): `/notes` joined
+  every arm, immediately LEFT of `/inbox` in the nav's corner — the owner's placement, spec §9.1. The
+  four arms reddened by name when the link landed, which is the tripwire working, and all four
+  expected arrays were widened in the SAME change set that added the link.** Two things about the
+  prose ABOVE that amendment are worth stating rather than leaving for a reader to trip over: the
+  counts it gives ("four links" without a workspace) are from BEFORE Round 24 moved `/help` and
+  `/account` into `AccountMenu`, so the arrays in `app-nav.test.tsx` — not the sentences here — are
+  the authority today (without a workspace they are `/workspaces`, `/notes`, `/inbox`); and the new
+  link is a prefix match (`/notes/<id>` keeps it current), which is a ROUTE rule and not a link-set
+  one, so it is 18.182's subject rather than this case's. — (`app-nav.test.tsx`)
 
 ## Project calendar/timeline mount (`apps/web`)
 - **11.186** ✅ The Calendar tab says "Loading…" and draws NO grid before the list read answers — the

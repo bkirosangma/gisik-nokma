@@ -5,6 +5,7 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
+import { NotesNavLink } from "./notes-nav-link.js";
 import { useCurrentUser } from "./providers.js";
 import { LastProjectNav } from "./last-project-nav.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
@@ -464,6 +465,14 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           third of the dead controls this ruling names. */}
       {user !== null ? (
         <div className="gn-nav__corner">
+          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1).
+              Every other item is measured by `current()` above, which is exact
+              equality — and that is right for them: `/w/<id>` is not "inside"
+              `/w/<id>/members`. A note is different in kind. `/notes/<id>` is
+              the SAME view as `/notes`, with a note open, so exact equality
+              would leave the link dark on the page the reader is actually on.
+              Case 18.182 walks both spellings and the control. */}
+          <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
           <InboxNavLink active={pathname === "/inbox"} />
           <AccountMenu />
         </div>

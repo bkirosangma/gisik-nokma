@@ -3091,3 +3091,122 @@ input, textarea, select { font-family: inherit; }
   justify-content: space-between;
   gap: 0.75rem;
 }
+
+/* ── THE NOTES PAGE (Plan 5 of 6, spec §9.1–9.2) ────────────────────────────
+   HERE and not in `ui.css`, for the reason the `.gn-inbox__header` rule above
+   records in its own words: `ui.css` is the stylesheet for what
+   `packages/app-core` renders, and `app-core`'s case 11.95 asserts SET EQUALITY
+   between the classes its components render and the rules that style them. The
+   notes page is `apps/web`'s own page — no component in `app-core` renders a
+   `.gn-notes*` class — so a rule for one in `ui.css` would be "a rule written
+   for a class no component renders" and 11.95 reddens on it.
+
+   The BREAKPOINTS are the two this file already owns, deliberately reused
+   rather than invented: `60rem` is the point `.gn-shell` itself steps down at
+   (`:142`, and the paragraph at `:204-208`), so the page's columns and the
+   shell's gutter change together, and `64rem` is the point the workflow
+   builder's two-rail layout collapses at (`packages/ui/src/ui.css:3836`) — the
+   reading width at which a THIRD column stops being an addition and starts
+   being a squeeze. A new value here would be a third place the product's
+   "narrow" means something. */
+.gn-notes {
+  max-width: 73.75rem;
+  margin: 0 auto;
+  padding-top: 1.625rem;
+}
+
+/* The header ROW — the title now, and Task 8's search box beside it. `wrap`
+   because 390px cannot hold "Notes" and a search input on one line, and
+   `space-between` so the box takes the room the title does not. */
+.gn-notes__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* The margin reset is SCOPED, exactly as `.gn-workspaces__head .gn-page-title`
+   above is: `.gn-page-title` is shared by every page that carries the class, and
+   zeroing it globally would collapse the heading spacing on all of them. Only
+   this page hands its spacing to a flex row. */
+.gn-notes__header .gn-page-title {
+  margin: 0;
+}
+
+/* Two columns at rest: the tree at a FIXED 18rem so it does not breathe with the
+   viewport, and the document on `minmax(0, 1fr)` — a ZERO floor, which is what
+   lets a wide code block scroll inside the document instead of pushing the grid
+   past the viewport. A bare `1fr` track's automatic minimum is `auto`
+   (content-based), the trap `.gn-workspaces`' own comment names. */
+.gn-notes__body {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.gn-notes__tree,
+.gn-notes__document {
+  min-width: 0;
+}
+
+/* The TOC is not drawn at all below 64rem — an empty `<aside>` occupying a
+   zero-width track would still be a landmark a screen reader announces, and
+   "On this page" over nothing is a claim. Task 9 fills it. */
+.gn-notes__toc {
+  display: none;
+}
+
+.gn-notes__section-title,
+.gn-notes__group-title {
+  margin: 0;
+}
+
+.gn-notes__section-title {
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+}
+
+.gn-notes__group-title {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-notes__group {
+  margin-top: 0.5rem;
+}
+
+/* The four sentences the tree can say about a READ rather than about notes:
+   loading, refused, empty, and your-session-is-not-here. Muted because every
+   one of them is the page telling the reader something in passing, and none is
+   the page's subject. */
+.gn-notes__loading,
+.gn-notes__empty,
+.gn-notes__session,
+.gn-notes__hint {
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+
+/* ONE COLUMN below 60rem, and the tree stays ABOVE the document in the flow:
+   the tree is how you reach a note, so it is the thing a reader with no open
+   note needs first. Task 9 turns this block into the drawer; at this task the
+   two stack. */
+@media (max-width: 60rem) {
+  .gn-notes__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+}
+
+/* The third column, at and above the reading width. `14rem` and not `18rem`:
+   this one is a table of contents, not a destination list. */
+@media (min-width: 64rem) {
+  .gn-notes__body {
+    grid-template-columns: 18rem minmax(0, 1fr) 14rem;
+  }
+  .gn-notes__toc {
+    display: block;
+  }
+}
