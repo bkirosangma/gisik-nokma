@@ -3,11 +3,13 @@ import {
   BACKLOG_STATE_ID,
   type BoardColumn,
   type BoardResponse,
+  type BoardTicketCard,
   type PublishedWorkflowDef,
   type TicketCard,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
+import { boardAncestryFor, keysForAncestors } from '../read/ancestry.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
@@ -119,6 +121,7 @@ export async function readBoard(
   );
 
   const cards = await assembleTicketCards(db, viewerId, rows);
+  const boardCards = await withBoardAncestry(db, eff, viewerId, workspaceId, cards);
   const defs = await latestWorkflowDefs(
     db,
     workspaceId,
@@ -134,7 +137,7 @@ export async function readBoard(
   const placed = new Set<string>();
   for (const [workflowId, def] of defs) {
     for (const state of def.states) {
-      const columnCards = cards.filter(
+      const columnCards = boardCards.filter(
         (card) => card.workflowId === workflowId && card.stateId === state.id,
       );
       for (const card of columnCards) {
@@ -161,8 +164,64 @@ export async function readBoard(
     }
   }
 
-  appendStragglerColumns(columns, cards, placed, defs);
+  appendStragglerColumns(columns, boardCards, placed, defs);
   return { projectId, workspaceId, columns };
+}
+
+/**
+ * `TicketCard[]` → `BoardTicketCard[]` — the board's own two hierarchy facts
+ * (owner request, 2026-09-23: parent-key badge, epic chip), attached per card.
+ *
+ * ONE call to `boardAncestryFor`, over every card's id at once — it already
+ * batches the whole recursive walk in one round trip (`ancestry.ts`'s own
+ * docblock). What THIS function adds is the KEY composition the walk itself
+ * does not do: `boardAncestryFor` reads only what the walk needs
+ * (`ticketId`/`projectId`), and a badge draws a KEY, not an id.
+ *
+ * `keysForAncestors` is called ONCE for the whole DISTINCT set of ancestors
+ * this page's cards named — a card's epic is very often shared by several
+ * siblings, and a parent can repeat too (two cards under the same parent) —
+ * de-duplicated by `Map` before the read rather than composing the same key
+ * twice.
+ */
+async function withBoardAncestry(
+  db: Queryable,
+  eff: EffectiveRole,
+  viewerId: string,
+  workspaceId: string,
+  cards: TicketCard[],
+): Promise<BoardTicketCard[]> {
+  const ancestry = await boardAncestryFor(
+    db,
+    eff,
+    viewerId,
+    workspaceId,
+    cards.map((card) => card.ticketId),
+  );
+
+  const distinctAncestors = new Map<string, { ticketId: string; projectId: string }>();
+  for (const found of ancestry.values()) {
+    if (found.parent !== null) distinctAncestors.set(found.parent.ticketId, found.parent);
+    if (found.epic !== null) {
+      distinctAncestors.set(found.epic.epicId, { ticketId: found.epic.epicId, projectId: found.epic.epicProjectId });
+    }
+  }
+  const keys = await keysForAncestors(db, workspaceId, [...distinctAncestors.values()]);
+
+  return cards.map((card) => {
+    const found = ancestry.get(card.ticketId) ?? { epic: null, parent: null };
+    return {
+      ...card,
+      parent:
+        found.parent === null
+          ? null
+          : { ticketId: found.parent.ticketId, key: keys.get(found.parent.ticketId) ?? null },
+      epic:
+        found.epic === null
+          ? null
+          : { ticketId: found.epic.epicId, key: keys.get(found.epic.epicId) ?? null, title: found.epic.title },
+    };
+  });
 }
 
 /**
@@ -231,11 +290,11 @@ export async function readBoard(
  */
 function appendStragglerColumns(
   columns: BoardColumn[],
-  cards: TicketCard[],
+  cards: BoardTicketCard[],
   placed: Set<string>,
   defs: Map<string, PublishedWorkflowDef>,
 ): void {
-  const byColumn = new Map<string, TicketCard[]>();
+  const byColumn = new Map<string, BoardTicketCard[]>();
   for (const card of cards) {
     if (placed.has(card.ticketId)) {
       continue;
