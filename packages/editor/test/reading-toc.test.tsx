@@ -1,7 +1,7 @@
 import { createRef } from 'react';
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import { ReadingTOC } from '../src/reading/ReadingTOC.js';
+import { MIN_HEADINGS, ReadingTOC } from '../src/reading/ReadingTOC.js';
 import type { ReadingMeta } from '../src/reading/reading-meta.js';
 
 /**
@@ -44,5 +44,17 @@ describe('9.290 ReadingTOC', () => {
     // only reason the two halves work together.
     expect(links.map((link) => link.getAttribute('href'))).toEqual(['#one', '#two', '#three']);
     three.unmount();
+  });
+
+  /**
+   * 13.1478 — `MIN_HEADINGS` is EXPORTED (owner request 2026-09-23's floating
+   * table-of-contents button, `test-cases/13-owner-requests-and-backlog.md`):
+   * the button that opens the panel this component renders must gate on the
+   * SAME threshold 9.290 above pins, not a second `3` copied into `apps/web`
+   * that could drift from this one. Value pinned rather than merely
+   * "exported", so a change here is a decision, not a silent drift.
+   */
+  it('13.1478 MIN_HEADINGS is exported and equals the gate this component itself applies', () => {
+    expect(MIN_HEADINGS).toBe(3);
   });
 });

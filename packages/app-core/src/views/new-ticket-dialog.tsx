@@ -4,6 +4,7 @@ import {
   DEEPEST_RANK,
   PRIORITIES,
   docToPlainText,
+  dueDateValueSchema,
   newUlid,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -22,8 +23,8 @@ import type { EditorSlotComponent } from './editor-slot.js';
 const UNASSIGNED = '__unassigned__';
 
 /**
- * A ticket type as this dialog is handed it: the label to paint, and the RANK
- * the root-creation rule turns on.
+ * A ticket type as this dialog is handed it: the label to paint, the RANK
+ * the root-creation rule turns on, and the WORKFLOW it is bound to.
  *
  * `rank` is required, and that is the point rather than tidiness. The default
  * below cannot be derived from an id and a name — the previous default was
@@ -32,8 +33,17 @@ const UNASSIGNED = '__unassigned__';
  * sits at leaves this dialog with no honest way to choose one. An optional
  * `rank` would compile at every call site and silently restore that defect
  * wherever it was omitted.
+ *
+ * `workflowId` is REQUIRED for the identical reason (starting-status design,
+ * 2026-09-23): the Starting-status select needs to know which workflow's
+ * states to offer for whatever type is currently chosen, and `TicketTypeDef`
+ * — what `page.tsx` builds this from — always carries one. The page's
+ * LOADING fallback (`BUILTIN_TYPE_LADDER`) has no real workspace to bind to
+ * yet, so it carries `''` — "no workflow known" — which `workflowStates('')`
+ * answers `null` for, the same "not loaded" state the select already shows
+ * while `typeOptions` itself is the fallback.
  */
-export type TypeOption = { id: string; name: string; rank: number };
+export type TypeOption = { id: string; name: string; rank: number; workflowId: string };
 
 /**
  * The type a ROOT-LEVEL new ticket starts on: the deepest one that may sit at
@@ -164,6 +174,27 @@ export type NewTicketDraft = {
    * so there is no "unset" state for it to send.
    */
   priority: Priority;
+  /**
+   * The STARTING STATUS (starting-status design, 2026-09-23) — OPTIONAL, and
+   * OMITTED in the two cases where it would say nothing new: when "Starts in
+   * the backlog?" is ON (a backlog ticket has no starting status — the
+   * domain's own `.refine` refuses the pair, spec's own ruling) and when the
+   * chosen value equals the workflow's `initialStateId` (the wire's own
+   * absence-means-initial rule, kept minimal rather than restating the
+   * default on every payload). Carried otherwise, whatever the select shows.
+   */
+  stateId?: string;
+  /**
+   * The birth START and DUE date (addendum, 2026-09-23), each `YYYY-MM-DD` or
+   * OMITTED when its input is empty — the SAME "absent means no claim" rule
+   * `description` follows, one field over, and for the identical reason: a
+   * ticket may genuinely have no start or due date, and an empty string is
+   * not a day. `create-ticket-flow.tsx` wraps a present value as `{date:
+   * ...}` for the wire; this type keeps the bare string, the shape the two
+   * `<input type="date">` controls themselves hold.
+   */
+  startDate?: string;
+  dueDate?: string;
 };
 
 export type NewTicketDialogProps = {
@@ -288,6 +319,66 @@ export type NewTicketDialogProps = {
    */
   assigneeCandidatesUnavailable?: string;
   /**
+   * The workflow states a Starting-status control may offer, keyed by
+   * workflow id (starting-status design, 2026-09-23) — the CALLER's read, the
+   * same "this component derives nothing" precedent `parentCandidates` and
+   * `assigneeCandidates` already set.
+   *
+   * `null` for a workflow this caller has not resolved yet — the LOADING
+   * state, distinct from a workflow with no legal starting state at all
+   * (which answers a real object whose `states` is empty). The select reads
+   * this by the CURRENT type's own `workflowId` and shows "Loading states…",
+   * disabled, while it is `null`.
+   *
+   * `states` carries EVERY state of the workflow, each with its OWN
+   * `creatable` — `isCreatableState`'s own answer, computed by the caller —
+   * rather than a pre-filtered list: THIS component is the one that filters
+   * to `creatable` when it builds the Select's options and when it
+   * validates the standing `stateId` (below), so the invariant holds for
+   * every caller rather than depending on each one filtering correctly.
+   */
+  workflowStates: (workflowId: string) => { initialStateId: string; states: Array<{ id: string; name: string; category: string; creatable: boolean }> } | null;
+  /**
+   * A board column's own identity, when the dialog was opened FROM one
+   * (starting-status design, 2026-09-23) — `Board`'s `onCreateTicket`
+   * selection, threaded down through `CreateTicketFlow`. Pre-fills the type
+   * — `defaultRootTypeFor` over the `typeOption`s sharing the column's
+   * `workflowId`, NOT the design's literal "the first is pre-selected"
+   * (planner default, unobjected: "when several types share the column's
+   * workflow the first is pre-selected and the form lets you change it").
+   * **Measured deviation:** the ladder arrives rank-ascending, so a bare
+   * first-match is always that workflow's epic — a root ticket, since a
+   * board-column create carries no parent — and an epic created into a
+   * column vanishes from every column the board draws (`isEpic`'s filter,
+   * owner ruling 2026-09-20), leaving the very column the person clicked
+   * "Add a ticket" in empty. `defaultRootTypeFor` is E5-16's own answer to
+   * "which type by default", asked again here rather than re-decided; see
+   * the open effect below for the full argument. Pre-fills the starting
+   * status too (that column's `stateId`), and turns "Starts in the
+   * backlog?" OFF — a board-column click asks for a ticket IN that column,
+   * not in the backlog.
+   *
+   * An unmatched `workflowId` (no `typeOption` on this project uses it) is
+   * IGNORED — the dialog opens exactly as it would with no selection at all,
+   * rather than a picker naming a type that is not on offer. This can only
+   * happen from a stale caller; the board can never pass a workflow this
+   * project's own types do not share.
+   */
+  initialSelection?: { workflowId: string; stateId: string };
+  /**
+   * Why the currently-implied starting status is refused, when it is
+   * (starting-status design, 2026-09-23) — the SAME distinction
+   * `parentCandidatesUnavailable`/`assigneeCandidatesUnavailable` draw, one
+   * door over: the reason is computed by the FLOW (`CreateTicketFlow`, which
+   * holds the `ClientStateCache` and the project id this dialog does not),
+   * from the SAME `precheckEvent`/`isCreatableState` path the engine itself
+   * runs, and handed down to render under the select. `undefined` — no
+   * refusal to show — is the ordinary case; the select's own options are
+   * already filtered to `creatable`, so this renders only when the flow's
+   * cached definition disagrees with what `workflowStates` offered.
+   */
+  stateRefusal?: string;
+  /**
    * The claim, handed up. May be ASYNCHRONOUS, and the dialog waits on it: that
    * returning promise is the only thing that can tell the Create control when
    * the attempt has settled, and without that this dialog cannot state the
@@ -324,6 +415,9 @@ export function NewTicketDialog({
   editorSlot,
   assigneeCandidates,
   assigneeCandidatesUnavailable,
+  workflowStates,
+  initialSelection,
+  stateRefusal,
   onCreate,
   onClose,
 }: NewTicketDialogProps) {
@@ -354,6 +448,23 @@ export function NewTicketDialog({
    */
   const [priority, setPriority] = useState<Priority>(DEFAULT_PRIORITY);
   /**
+   * The STARTING STATUS control's own value (starting-status design,
+   * 2026-09-23) — `''` until the reseed effect below has something to seed it
+   * WITH, exactly as `typeId`'s own `''` means "nothing chosen yet". Never
+   * cleared when "Starts in the backlog?" is ON: the Select is merely
+   * `disabled` then, so switching it back OFF restores whatever value was
+   * here, which is the "re-enabled with the previous value" case.
+   */
+  const [stateId, setStateId] = useState('');
+  /**
+   * The birth START and DUE date inputs (addendum, 2026-09-23) — bare
+   * `YYYY-MM-DD` strings, empty by default, the same shape the two `<input
+   * type="date">` controls themselves hold. Reset to `''` with the rest of
+   * the draft on every OPEN (E2-37's rule, two fields over).
+   */
+  const [startDate, setStartDate] = useState('');
+  const [dueDate, setDueDate] = useState('');
+  /**
    * ⚠ THE SEED RUNS ONCE, AND THE LADDER'S IDENTITY LEGITIMATELY CHANGES UNDER
    * IT (E2-33a, 2026-09-21).
    *
@@ -376,6 +487,68 @@ export function NewTicketDialog({
     if (typeOptions.some((option) => option.id === typeId)) return;
     setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
   }, [typeOptions, typeId]);
+  /**
+   * The workflow the CURRENT type is bound to, and that workflow's own
+   * creatable-filtered states — `null` while `workflowStates` has not
+   * resolved it yet, or while no type is chosen at all. Read at render time
+   * rather than cached in state: `workflowStates` is the caller's own read
+   * (`page.tsx`'s memoised map, in production), so this is always the
+   * CURRENT answer, never a stale one a missed effect dependency could leave
+   * behind.
+   */
+  const currentWorkflowId = typeOptions.find((option) => option.id === typeId)?.workflowId;
+  const currentStates = currentWorkflowId === undefined ? null : workflowStates(currentWorkflowId);
+  /**
+   * THE FILTER (starting-status design, 2026-09-23) — `workflowStates`
+   * hands over EVERY state with its own `creatable`, and THIS is the one
+   * place that narrows it to the states a new ticket may actually start in.
+   * Both the Select's own options and the reseed effect below read this,
+   * never the unfiltered `currentStates.states`, so the two can never
+   * disagree about which states are on offer.
+   */
+  const creatableStates = currentStates === null ? null : currentStates.states.filter((state) => state.creatable);
+  /**
+   * ONE RULE, and it covers three triggers at once (starting-status design,
+   * 2026-09-23): if `stateId` is not among the CURRENT type's loaded
+   * creatable states, seed it to that workflow's `initialStateId`. That
+   * single rule is what happens on a TYPE CHANGE (the design's own "resets
+   * to the new workflow's initial state unless the current value exists
+   * there"), on a LATE `workflowStates` load (nothing was creatable to check
+   * against a moment ago), and on an `initialSelection` naming a state that
+   * turns out not to be creatable (the design's own "cannot happen from the
+   * board but the form must not trust it") — all three are "the standing
+   * value is not one of the states this workflow currently offers", the
+   * SAME question `typeId`'s own reseed effect above asks of the ladder.
+   *
+   * Deliberately does NOT run while `currentStates` is `null`: there is
+   * nothing yet to validate `stateId` against, and seeding an empty string
+   * here would overwrite whatever the open effect (or `initialSelection`)
+   * just set, one render before this effect gets a real answer to check it
+   * against.
+   */
+  useEffect(() => {
+    if (currentStates === null || creatableStates === null) return;
+    if (creatableStates.some((state) => state.id === stateId)) return;
+    setStateId(currentStates.initialStateId);
+  }, [currentStates, stateId]);
+  /**
+   * The open effect's own helper (starting-status design, 2026-09-23): a
+   * workflow id and an optional preferred state in, the state to actually
+   * seed out — `preferred` when it names a real, CREATABLE state of that
+   * workflow, that workflow's own `initialStateId` otherwise, and `''` when
+   * `workflowStates` has not resolved the workflow at all yet (the reseed
+   * effect above corrects that the moment it does). Not a `useCallback`: it
+   * closes over nothing but props and is called at most twice per open.
+   */
+  const seedStateIdFor = (workflowId: string | undefined, preferred: string | undefined): string => {
+    if (workflowId === undefined) return '';
+    const states = workflowStates(workflowId);
+    if (states === null) return '';
+    if (preferred !== undefined && states.states.some((state) => state.creatable && state.id === preferred)) {
+      return preferred;
+    }
+    return states.initialStateId;
+  };
   /**
    * ⚠ A CLOSED DIALOG HOLDS NOTHING (E2-37, 2026-09-21).
    *
@@ -402,24 +575,97 @@ export function NewTicketDialog({
   useEffect(() => {
     if (!open) return;
     setTitle('');
-    setTypeId(defaultRootTypeFor(typeOptions)?.id ?? '');
     setParentId('');
-    // ⚠ NOT `true`, and not a resettable default either: the switch opens at
-    // whatever this PERSON last chose (owner ruling 2026-09-23 — *"same as how
-    // workspace and project is remembered"*). Resetting it to ON here would be
-    // the stale-draft rule applied to a value that is not part of the draft:
-    // the answer belongs to the person, not to the ticket being composed, and a
-    // Cancel is not a reason to forget it.
-    //
-    // Read HERE rather than in `useState`'s initialiser, and that placement is
-    // load-bearing twice over. This effect runs only on the client, after a user
-    // action — so there is no server render in which `window` is missing and no
-    // hydration mismatch between a server that answered ON and a client that
-    // answered OFF. And it re-reads on every OPEN, which is what makes the read
-    // honest for a person who signed in as somebody else since the last time:
-    // `readNewTicketStart` refuses a record belonging to another user, and the
-    // refusal can only happen if it is asked again.
-    setStartInBacklog(readNewTicketStart(userId) === 'backlog');
+    /**
+     * `initialSelection` (starting-status design, 2026-09-23) — a board
+     * column's own identity, present only when THIS open came from a
+     * column's "Add a ticket" rather than the header's unscoped one.
+     *
+     * ⚠ **DEVIATES from the design's literal text, and the deviation is
+     * measured, not a guess.** The design says "the first is pre-selected" —
+     * a bare `typeOptions.find`. Read literally, that is `typeOptions[0]`
+     * among the types sharing the column's workflow, which is EXACTLY
+     * E5-16's own defect (`defaultRootTypeFor`'s docblock, `:57`): the ladder
+     * arrives rank-ascending, so the "first" type sharing any workflow is
+     * whichever epic sits on it. **A root ticket, every time** — a
+     * board-column create carries no parent — so `defaultRootTypeFor`'s
+     * root-legality question DOES apply here, contrary to this component's
+     * own earlier reasoning (corrected, not merely superseded): an epic
+     * created into a column is accepted by the engine and then vanishes from
+     * every column that receives it, because `isEpic(card.typeId)` filters it
+     * out of `column.cards` before the board ever draws it (owner ruling,
+     * 2026-09-20, `page.tsx`'s `isEpic` filter) — the empty column stays
+     * empty, defeating the request's own point. `matchedType` therefore asks
+     * `defaultRootTypeFor` over the types sharing that workflow — the SAME
+     * "deepest legal type is the everyday one" answer E5-16 already gives the
+     * header's own default, not a second opinion — and falls back to the
+     * first SHARING type only when none of them is root-legal at all (every
+     * type on that workflow needs a parent): something pre-filled is still
+     * better than nothing, and a person who dislikes the pick can still
+     * change it by hand.
+     *
+     * An unmatched `workflowId` — no type on this project shares that
+     * workflow — falls through to the ordinary, no-selection path below
+     * rather than pre-filling half of one: "if none matches, ignore the
+     * selection" is a statement about the WHOLE selection, not the type
+     * alone.
+     */
+    const sharingTypes =
+      initialSelection === undefined
+        ? []
+        : typeOptions.filter((option) => option.workflowId === initialSelection.workflowId);
+    const matchedType =
+      sharingTypes.length === 0 ? undefined : (defaultRootTypeFor(sharingTypes) ?? sharingTypes[0]);
+    if (initialSelection !== undefined && matchedType !== undefined) {
+      setTypeId(matchedType.id);
+      // Computed DIRECTLY here rather than left as a bare `''` for the
+      // reseed effect to fill in a render later — this effect and that one
+      // fire in the SAME commit on every open, and React batches same-tick
+      // `setStateId` calls: the reseed effect's own `useState` closure still
+      // reads the PRE-open `stateId`, so a bare `setStateId('')` here would
+      // OVERWRITE its correction with the two calls coalescing to no net
+      // change (`'' → '' `), which React then bails out of re-rendering for
+      // — the reseed effect would never get a second pass to run. Computing
+      // the right value here, once, sidesteps the race entirely; the reseed
+      // effect stays for what only IT can still catch — a `workflowStates`
+      // answer that has not loaded yet at this exact instant, corrected the
+      // moment it does (the design's own "cannot happen from the board but
+      // the form must not trust it").
+      setStateId(seedStateIdFor(matchedType.workflowId, initialSelection.stateId));
+      // A board-column click asks for a ticket IN that column, never in the
+      // backlog — and this does NOT call `rememberNewTicketStart`: the
+      // remembered preference belongs to the PERSON, and a board-initiated
+      // open answering a different question (which column) must not
+      // overwrite it (design's own ruling, and case 13.1441).
+      setStartInBacklog(false);
+    } else {
+      const seededTypeId = defaultRootTypeFor(typeOptions)?.id ?? '';
+      setTypeId(seededTypeId);
+      // Same reasoning as the `initialSelection` branch above — computed
+      // directly to avoid the same same-commit batching race.
+      setStateId(seedStateIdFor(typeOptions.find((option) => option.id === seededTypeId)?.workflowId, undefined));
+      // ⚠ NOT `true`, and not a resettable default either: the switch opens
+      // at whatever this PERSON last chose (owner ruling 2026-09-23 —
+      // *"same as how workspace and project is remembered"*). Resetting it
+      // to ON here would be the stale-draft rule applied to a value that is
+      // not part of the draft: the answer belongs to the person, not to the
+      // ticket being composed, and a Cancel is not a reason to forget it.
+      //
+      // Read HERE rather than in `useState`'s initialiser, and that
+      // placement is load-bearing twice over. This effect runs only on the
+      // client, after a user action — so there is no server render in which
+      // `window` is missing and no hydration mismatch between a server that
+      // answered ON and a client that answered OFF. And it re-reads on
+      // every OPEN, which is what makes the read honest for a person who
+      // signed in as somebody else since the last time: `readNewTicketStart`
+      // refuses a record belonging to another user, and the refusal can
+      // only happen if it is asked again.
+      setStartInBacklog(readNewTicketStart(userId) === 'backlog');
+    }
+    // The birth dates (addendum, 2026-09-23) — empty on OPEN, the same rule
+    // every other field on this list follows.
+    setStartDate('');
+    setDueDate('');
     // The rest of the draft (owner request 2026-09-23). A NEW id with them: the
     // previous ticket's id already resolves, and reusing it would be refused.
     setDraftTicketId(newUlid());
@@ -505,6 +751,18 @@ export function NewTicketDialog({
   // only value the payload is allowed to carry for a parent this dialog has
   // told the person it will not use.
   const noUsableParent = parentCandidatesUnavailable !== undefined || parentId === '';
+
+  /**
+   * The birth start/due date inputs' own validity (addendum, 2026-09-23) —
+   * an EMPTY input is not invalid, it is simply omitted at submit, so both
+   * checks are gated on the input being non-empty first. `dueDateValueSchema`
+   * is the SAME import `ticketCreatedPayload` and `ticket.field_set` are
+   * checked with (no copy of the regex, per the plan author's ruling); this
+   * is the client-side half of the parity the RULING asks for, and there is
+   * no precheck branch for either field.
+   */
+  const startDateInvalid = startDate !== '' && !dueDateValueSchema.safeParse({ date: startDate }).success;
+  const dueDateInvalid = dueDate !== '' && !dueDateValueSchema.safeParse({ date: dueDate }).success;
 
   /**
    * TWO flags, on purpose, because they answer different questions at different
@@ -595,6 +853,26 @@ export function NewTicketDialog({
           assigneeCandidatesUnavailable !== undefined || assigneeId === UNASSIGNED
             ? null
             : assigneeId,
+        // The STARTING STATUS (starting-status design, 2026-09-23) — OMITTED
+        // in the two cases that would say nothing new: backlog ON (a backlog
+        // ticket has no starting status) and a value equal to this workflow's
+        // own `initialStateId` (the wire's own absence-means-initial rule).
+        // `currentStates` can be `null` here only if `workflowStates` never
+        // resolved this workflow at all, in which case there is nothing to
+        // compare against and the value is left out rather than guessed.
+        ...(startInBacklog ||
+        currentStates === null ||
+        stateId === '' ||
+        stateId === currentStates.initialStateId
+          ? {}
+          : { stateId }),
+        // The birth START and DUE date (addendum, 2026-09-23) — OMITTED when
+        // their input is empty, the SAME rule `description` follows above.
+        // Client-side validity is enforced by the Create button's own
+        // `disabled` condition, not here: a submit this handler reaches
+        // always carries a real day or nothing.
+        ...(startDate === '' ? {} : { startDate }),
+        ...(dueDate === '' ? {} : { dueDate }),
       }),
     ).finally(() => {
       submittingRef.current = false;
@@ -684,6 +962,104 @@ export function NewTicketDialog({
           placeholder="Choose a type"
           aria-label="Type"
         />
+      </label>
+      {/*
+        THE STARTING STATUS (starting-status design, 2026-09-23) — below Type,
+        the design's own placement, since a status is a state of the workflow
+        the chosen type is bound to. `currentStates === null` is the LOADING
+        arm: `workflowStates` has not answered for this workflow yet, so the
+        control is disabled with placeholder copy rather than offering a list
+        it does not actually have. Options are `creatableStates` — THIS
+        component's own filter over the workflow's full state list (see its
+        own docblock above) — so a terminal or `creatable: false` state can
+        never be offered, whatever the caller handed over.
+
+        DISABLED while "Starts in the backlog?" is ON (owner ruling — "the
+        state selection is disabled if starting from backlog"), with the
+        helper sentence naming the state a backlog ticket actually starts in.
+        Turning the switch back OFF re-enables it with whatever value was
+        already here (`stateId` is never cleared by the switch, see its own
+        docblock).
+      */}
+      <label className="gn-new-ticket__field">
+        Starting status
+        <Select
+          options={
+            creatableStates === null
+              ? []
+              : creatableStates.map((state) => ({ value: state.id, label: state.name }))
+          }
+          value={currentStates === null || stateId === '' ? null : stateId}
+          onChange={setStateId}
+          disabled={startInBacklog || currentStates === null}
+          placeholder={currentStates === null ? 'Loading states…' : 'Choose a status'}
+          aria-label="Starting status"
+        />
+        {startInBacklog ? (
+          <p role="status" className="gn-new-ticket__status-hint">
+            A backlog ticket starts in{' '}
+            {currentStates === null
+              ? 'the workflow’s initial state'
+              : (currentStates.states.find((state) => state.id === currentStates.initialStateId)
+                  ?.name ?? currentStates.initialStateId)}{' '}
+            when it enters focus
+          </p>
+        ) : null}
+        {/*
+          THE INLINE REFUSAL (starting-status design, 2026-09-23) — computed
+          by `CreateTicketFlow`, which holds the `ClientStateCache` and the
+          project id this dialog does not, from the same `precheckEvent`/
+          `isCreatableState` path the engine itself runs. `undefined` is the
+          ordinary case: `creatableStates` above already filters to
+          `creatable`, so this renders only when the flow's cached
+          definition disagrees with what `workflowStates` offered.
+        */}
+        {stateRefusal !== undefined ? (
+          <p role="alert" className="gn-refusal gn-refusal--preview">
+            {stateRefusal}
+          </p>
+        ) : null}
+      </label>
+      {/*
+        THE BIRTH START AND DUE DATE (addendum, 2026-09-23: "put due date as
+        well on the ticket creation form" … "both start and due date") —
+        below the Starting status select, the addendum's own placement. The
+        SAME native `<input type="date">` the sheet's own due-date row uses
+        (`ticket-sheet.tsx:3261-3287`), empty by default. Validated
+        client-side with the SAME `dueDateValueSchema` import (no copy of the
+        regex, per the plan author's ruling) — there is NO precheck branch
+        for dates, so an invalid day is caught here or not at all before
+        submit.
+      */}
+      <label className="gn-new-ticket__field">
+        Start date
+        <input
+          className="gn-field__input"
+          type="date"
+          aria-label="Start date"
+          value={startDate}
+          onChange={(event) => setStartDate(event.target.value)}
+        />
+        {startDateInvalid ? (
+          <p role="alert" className="gn-refusal gn-refusal--preview">
+            Start date must be a real day in YYYY-MM-DD form.
+          </p>
+        ) : null}
+      </label>
+      <label className="gn-new-ticket__field">
+        Due date
+        <input
+          className="gn-field__input"
+          type="date"
+          aria-label="Due date"
+          value={dueDate}
+          onChange={(event) => setDueDate(event.target.value)}
+        />
+        {dueDateInvalid ? (
+          <p role="alert" className="gn-refusal gn-refusal--preview">
+            Due date must be a real day in YYYY-MM-DD form.
+          </p>
+        ) : null}
       </label>
       <div className="gn-new-ticket__field">
         <span>Priority</span>
@@ -925,7 +1301,13 @@ export function NewTicketDialog({
             title.trim() === '' ||
             typeId === '' ||
             !typeOptions.some((option) => option.id === typeId) ||
-            submitting
+            submitting ||
+            // The two date inputs (addendum, 2026-09-23): a submit this
+            // handler reaches must carry a real day or nothing, since there
+            // is no precheck branch to catch a malformed one server-side
+            // before it reaches the payload door.
+            startDateInvalid ||
+            dueDateInvalid
           }
           onClick={create}
         >

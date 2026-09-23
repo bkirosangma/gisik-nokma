@@ -1799,13 +1799,21 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " button, near the top by the view tabs."
+                      "text": " button, near the top by the view tabs — or click "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Add a ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " in an empty stage on the Board, which starts the job in THAT stage instead (see \"Starting status\" below)."
                     }
                   ],
                   [
                     {
                       "kind": "text",
-                      "text": "A small window opens with four things: - "
+                      "text": "A small window opens with these things: - "
                     },
                     {
                       "kind": "bold",
@@ -1822,6 +1830,30 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "text",
                       "text": " — what kind of job this is, from your workspace's list. - "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Starting status"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — which stage of the workflow the job is born in, defaulting to the workflow's own first stage. Disabled, with a note explaining where the job will actually start, while \"Starts in the backlog?\" is switched on — a backlog job has no starting stage. - "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Start date"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Due date"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — optional, empty by default. Leave either blank to claim no date. - "
                     },
                     {
                       "kind": "bold",

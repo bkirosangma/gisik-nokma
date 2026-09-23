@@ -332,10 +332,15 @@ settings are kept for about a month in case they come back.
 ### Adding a job
 
 1. Open the project you want the job in.
-2. Find the **New ticket** button, near the top by the view tabs.
-3. A small window opens with four things:
+2. Find the **New ticket** button, near the top by the view tabs — or click **Add a ticket** in an
+   empty stage on the Board, which starts the job in THAT stage instead (see "Starting status" below).
+3. A small window opens with these things:
    - **Title** — what the job is. "Fix Mrs. Patel's leaking pipe."
    - **Type** — what kind of job this is, from your workspace's list.
+   - **Starting status** — which stage of the workflow the job is born in, defaulting to the workflow's
+     own first stage. Disabled, with a note explaining where the job will actually start, while "Starts
+     in the backlog?" is switched on — a backlog job has no starting stage.
+   - **Start date** and **Due date** — optional, empty by default. Leave either blank to claim no date.
    - **Priority** — P1, P2 or P3; starts at P2. Every job has one, and you can change it later (§5).
    - **Parent** — which bigger job this sits under. It defaults to **None (project root)**. Leave it
      alone unless this job is part of a bigger one (§6).

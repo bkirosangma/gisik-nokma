@@ -8,6 +8,7 @@ import {
   extractReadingMeta,
   readingTimeMinutes,
   type ReadingMeta,
+  type TicketEditorSlotProps,
 } from '@gisik-nokma/editor';
 import { Button } from '@gisik-nokma/ui';
 import {
@@ -176,6 +177,16 @@ export function NoteDocument({
   const editorRoot = editorRootRef ?? ownEditorRoot;
   const [wordCount, setWordCount] = useState(0);
 
+  /**
+   * Imperative access to the live Tiptap instance (owner, 2026-09-23: the
+   * page should "feel like its a note" — `.gn-notes__editor`'s own
+   * `min-height` pads the area below short text, and this is what a click
+   * there does). Threaded through `TicketEditorSlot`'s existing `editorRef`
+   * prop rather than a new one, so the twin-contract tests
+   * (`ticket-editor-slot.test.tsx`) see no new surface.
+   */
+  const editorInstanceRef = useRef<NonNullable<TicketEditorSlotProps['editorRef']>['current']>(null);
+
   // The reading time AND the TOC's headings come off the RENDERED node
   // (`extractReadingMeta` reads a DOM element), so both are recomputed after
   // each paint that a draft changed. The headings are reported UP to
@@ -341,7 +352,20 @@ export function NoteDocument({
         </div>
       ) : null}
 
-      <div className="gn-notes__editor" ref={editorRoot} data-testid="note-editor">
+      {/* `onClick` only when the click LANDS ON THIS DIV — a click inside the
+          editor's own content has `event.target` somewhere in `.ProseMirror`
+          or the toolbar, never this element, so ProseMirror's own
+          click-to-position-caret is untouched; what this catches is the
+          padded empty space the `min-height` rule adds below short text. */}
+      <div
+        className="gn-notes__editor"
+        ref={editorRoot}
+        data-testid="note-editor"
+        onClick={(event) => {
+          if (event.target !== event.currentTarget) return;
+          editorInstanceRef.current?.commands.focus('end');
+        }}
+      >
         <NoteEditorPane
           key={`${note.noteId}:${editorGeneration}`}
           note={note}
@@ -351,6 +375,7 @@ export function NoteDocument({
           userId={user?.id ?? ''}
           onDraftChange={setDraft}
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
+          editorRef={editorInstanceRef}
         />
       </div>
 
@@ -398,6 +423,7 @@ function NoteEditorPane({
   userId,
   onDraftChange,
   onNavigateNote,
+  editorRef,
 }: {
   note: NoteDetail;
   treeNotes: NoteSummary[];
@@ -406,6 +432,7 @@ function NoteEditorPane({
   userId: string;
   onDraftChange: (doc: unknown) => void;
   onNavigateNote: (id: string) => void;
+  editorRef: TicketEditorSlotProps['editorRef'];
 }) {
   const autosave = useNoteAutosave({
     dataSource,
@@ -437,6 +464,7 @@ function NoteEditorPane({
       ticketId=""
       noteId={note.noteId}
       submitSlot="none"
+      editorRef={editorRef}
       onDraft={(doc) => {
         onDraftChange(doc);
         autosave.onDraft(doc);

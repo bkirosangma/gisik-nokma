@@ -3556,6 +3556,229 @@ with the same `dueDateValueSchema` import and omits empty inputs, with no preche
   tree. `13.1450` stays unspent. —
   (`packages/rule-engine/test/fields.test.ts`)
 
+## Board read + view, the New ticket form, and the page (starting-status design, 2026-09-23) — UI half
+
+*Block `13.1431`–`13.1445`, the UI half of `task/starting-status`'s `13.1431`–`13.1450` (the controller's
+split of a shared id space — see `13-hig-per-screen.md`'s block table; the DOMAIN half, `13.1446`–`13.1450`,
+is the section immediately above and is not this one). Branch `task/starting-status-ui`, cut from
+`origin/release/notes` after the domain half landed.*
+
+- **13.1431** ✅ A `creatable` empty column shows "Add a ticket", and the click passes that column's own
+  `{workflowId, stateId}` — not the unscoped handler the button used to call. `board.tsx`'s `BoardProps.
+  onCreateTicket?` widens to `(selection?: {workflowId, stateId}) => void`; the empty-column card reads
+  `group.workflowId`/`column.stateId`, both already in scope from the `.map` that renders it. Mutation-
+  witnessed: always rendering the button (dropping the `column.creatable` term from the gate) reddens
+  `13.1432`'s PRIMARY assertion — the `creatable: false` `Done` column now shows the button too,
+  `expected <button>… to be null` — restored from the committed tree. (`13.1432`'s own sibling-column
+  control, that `To do` still shows the button, is unaffected by this mutation either way, since it was
+  never the arm in question.) —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1432** ✅ A `creatable: false` empty column shows the empty copy only — no `+` icon, no button —
+  while its `creatable: true` sibling in the SAME render still shows the button (control, same `it`, so a
+  gate that suppressed the button everywhere could not pass). This is the case the mutation above reddens. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1433** ✅ The empty-BOARD "Create a ticket" button calls `onCreateTicket` with **zero** arguments,
+  not `[undefined]` and not the click event. `onClick={onCreateTicket}` would hand React's click event
+  through as `selection` the moment the prop widened — MEASURED, not assumed: reverting to that exact line
+  and running this case shows `calls[0][0]` as a `SyntheticBaseEvent` wrapping a `PointerEvent` (`_reactName:
+  'onClick'`, `type: 'click'`), which the assertion catches by comparing `calls` (built from the handler's
+  own rest-args) to `[[]]` — that event payload and an explicit `undefined` argument both fail this assertion
+  differently than an assertion on `selection` alone would. **Control, same render, same `it`:** a DIFFERENT
+  button on the SAME screen — the empty, creatable 'To do' column's own "Add a ticket" — calls the SAME
+  handler WITH its column's own `{workflowId, stateId}`, so the zero-argument assertion above is not
+  vacuously true of a handler nothing ever calls with an argument. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1434** ✅ `creatable` is REQUIRED on the wire `BoardColumn` (`packages/domain/src/read-models.ts`)
+  for the identical reason `blocked` already is: `mapBoardColumn` REFUSES an unreadable or absent flag
+  (`asBoolean`) rather than defaulting it, and both real booleans travel — proven with `body.columns[0]`
+  `creatable: true` against `body.columns[1]` `creatable: false`, independent of `blocked` (a workflow
+  setting can forbid creation in a non-terminal state too, so the two flags are asserted as independent
+  axes rather than one standing in for the other). The SERVER half of the same fact is asserted separately
+  against a real published workflow (`todo`/`doing`/`waiting` — open or active, `creatable: true` — against
+  the terminal `done`, `creatable: false`): `readBoard`'s column loop reads `isCreatableState(def, state.
+  id)`, and `appendStragglerColumns` — no published definition to read the flag off — is always `false`,
+  mirroring `blocked`'s own straggler convention. Mutation-witnessed twice: the mapper's `asBoolean` call
+  loosened to `record['creatable'] === true` reddens `expected [Function] to throw an error` (the REFUSAL
+  half); the server's `isCreatableState(def, state.id)` hardcoded to `true` reddens the `done` row's
+  `creatable: false` expectation. Both restored from the committed tree. —
+  (`packages/app-core/test/online/mappers.test.ts`, `apps/server/test/routes/board.test.ts`)
+- **13.1434a** ✅ (suffixed — the UI block is fully spent; `check-case-citations`' ratchet skips suffixed
+  ids, so this citation is by hand.) The REPLICA's own `isCreatableState` derivation
+  (`replica-data-source.ts`'s `getBoard`), UNWITNESSED by any assertion on the VALUE until this case — the
+  earlier fixture edits this branch needed only satisfied the typecheck each `creatable` addition required.
+  `wfV1` (this file's own fixture): three non-terminal states (`todo`, `doing`, `waiting` — the last
+  `blocked` too, independent axis) read `creatable: true`; the terminal `done` reads `false`.
+  Mutation-witnessed: hardcoding the derivation to `creatable: true` reddens the `done` expectation,
+  restored from the committed tree (`git checkout -- packages/app-core/src/replica/replica-data-source.ts`,
+  since only that one file was touched by this mutation). —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
+
+- **13.1435** ✅ The Starting-status select lists only `creatable` states and defaults to the workflow's
+  own `initialStateId`. `NewTicketDialog` filters `workflowStates`'s FULL per-state list itself
+  (`creatableStates`, keyed on each state's own `creatable` boolean) rather than trusting the caller to
+  pre-filter — the fixture's `wf-errand` carries a terminal `done` AND a merely-`creatable: false` `locked`
+  (active category), so the case proves the filter keys on the flag itself, not on `category === 'terminal'`
+  alone, which `done` could not distinguish on its own. Mutation-witnessed: dropping the filter (`.filter
+  ((state) => state.creatable)` → the bare unfiltered array) reddens with FOUR options where two were
+  expected, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1436** ✅ The select is DISABLED while "Starts in the backlog?" is ON, with a helper sentence naming
+  the state a backlog ticket actually starts in ("A backlog ticket starts in To do when it enters focus") —
+  the owner's own ruling, *"the state selection is disabled if starting from backlog."* **Control, same
+  dialog, same `it`:** switched OFF, the select re-enables and the helper sentence disappears — the disabled
+  state above is the switch's doing, not a permanently disabled control. Mutation-witnessed: dropping
+  `startInBacklog` from the `disabled` expression leaves the select enabled under the switch's default ON,
+  reddening `toBeDisabled()`, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1437** ✅ Switching "Starts in the backlog?" back OFF re-enables the select with the PREVIOUS value —
+  `stateId` is its own `useState`, never cleared by the switch, so disabling only hides the control rather
+  than resetting what it holds. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1438** ✅ A TYPE change resets Starting status to the new workflow's own `initialStateId` UNLESS the
+  standing value already exists there: picking a sibling type on the SAME workflow (`errand`, sharing
+  `wf-errand` with `task`) keeps a chosen `doing`; picking a type on a DIFFERENT workflow (`chore`, on
+  `wf-chore`, which has no `doing` at all) resets to that workflow's own `queued`. **Picked through a real
+  click, not `fireEvent.change`** — this file's own 3.157 docblock already records that `fireEvent.change`
+  against a searchable Select's combobox input sets the filter text and selects nothing, which the first
+  draft of this case fell into: both assertions passed for the wrong reason (`typeId` never actually moved,
+  so nothing was ever exercised) until the interaction was corrected to a real option click. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1439** ✅ The draft omits `stateId` in the two cases that say nothing new — backlog ON (asserted via
+  `not.toHaveProperty('stateId')`, since a `toEqual`-style comparison cannot tell a dropped key from one
+  holding `undefined`), and backlog OFF with the value left at the workflow's own initial state — and
+  carries it otherwise (`stateId: 'doing'`, backlog OFF, a value that is NOT the initial state). Three
+  submits, one dialog instance, `onCreate` cleared between them. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1440** ✅ `initialSelection` pre-fills the type — `defaultRootTypeFor` over the `typeOption`s sharing
+  the column's workflow, NOT the design's literal "the first is pre-selected" (planner default, unobjected:
+  "when several types share the column's workflow the first is pre-selected"). **MEASURED DEVIATION,** and
+  this is the case that proves it: `epic` is listed FIRST on `wf-errand` (this block's own `TYPES` fixture,
+  built that way on purpose), `task` is listed second but has the higher rank — `task` is what renders,
+  because an epic created into a column vanishes from every column the board draws (`isEpic`'s filter, owner
+  ruling 2026-09-20), which "the first is pre-selected" read literally would have shipped. Also pre-fills the
+  status (`doing`), and switches "Starts in the backlog?" OFF. **Control, same block:** an `initialSelection`
+  naming a workflow NO type on this project shares is ignored ENTIRELY — the type, status and switch all read
+  their ordinary, no-selection defaults, not merely a type-less half-fill. Mutation-witnessed (the deviation
+  itself, not merely the ordinary reseed logic): restoring the design's literal `typeOptions.find((o) =>
+  o.workflowId === initialSelection.workflowId)` in the open effect reddens with `expected Task, received
+  Epic`, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1441** ✅ The remembered backlog preference is NOT overwritten by a board-initiated open. Storage
+  seeded to `'backlog'`; opened from a board column (`initialSelection`) — the switch answers OFF, per the
+  design's own ruling, regardless of what is remembered; closed, then reopened UNSCOPED (the header's own
+  "New ticket") — the switch answers ON again, proving the board-initiated open never called
+  `rememberNewTicketStart` (which the design's own open-effect docblock states explicitly: that write
+  belongs to the person's own deliberate toggle, not to a board click answering a different question). —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1441a** ✅ (suffixed — the UI block is fully spent; cited by hand, the ratchet skips suffixed ids.)
+  The INLINE `stateRefusal` precheck — `CreateTicketFlow.create`'s own state-creatable branch, `setStateRefusal`,
+  the reason rendered under the dialog's Starting-status select — UNWITNESSED by any test until this case,
+  despite being real, shipped code. REACHABLE IN PRODUCTION, not dormant: `apps/web/src/providers.tsx` wires
+  `cache-feed.ts`'s `cache.upsertWorkflowDef(def)` into the real `ClientStateCache` on every mount, so the web
+  app's `CreateTicketFlow` genuinely holds workflow defs this precheck can disagree with `workflowStates`
+  about. New file `create-ticket-flow.test.tsx`: a cache whose def marks `locked` `creatable: false` while
+  `workflowStates` offers it as creatable (the one way this branch can fire — the select's own options are
+  already filtered, so an ordinary session cannot pick a state its own `workflowStates` refused); pressing
+  Create submits NOTHING and the sentence `workflowStateNotCreatableRefusal` builds renders inside the open
+  dialog. Mutation-witnessed: gating the branch on `false && ...` (skip it entirely) reddens with the event
+  actually reaching `source.ingested`, restored from the committed tree (`git checkout --`). —
+  (`packages/app-core/test/views/create-ticket-flow.test.tsx`)
+
+**A same-commit effect-ordering defect, found and fixed before any of the above landed, worth recording as
+measured rather than as a general claim about every caller.** Measured against THIS file's own fixtures,
+whose `workflowStates` functions close over a stable, describe-scoped constant — `page.tsx`'s own
+`workflowStatesFor` builds a fresh object literal on every call instead, and whether that difference changes
+the reproduction was not separately tested; the mechanism below (same-commit `setState` batching across two
+effects) does not obviously depend on `workflowStates`'s object identity, but that is reasoning, not a
+second measurement. The "empty on
+OPEN" effect (E2-37) and the Starting-status reseed effect both fire in the SAME commit on every open — and
+both are declared as separate `useEffect`s that call `setStateId`. The open effect's original text set a
+bare `''` ("nothing chosen yet, the reseed effect will fill it in"), relying on the reseed effect — declared
+EARLIER in the component — to correct it a render later. React batches same-tick `setState` calls to one
+piece of state: the reseed effect's `setStateId('todo')` and the open effect's later `setStateId('')` within
+the SAME flush coalesce to whichever ran LAST (the open effect), and because the NET value across the whole
+pass was `'' → ''` (the initial value, unchanged), React saw no state change to re-render for and the reseed
+effect never got a second pass. Measured directly: 13.1435 and 13.1440's control both showed the select's
+placeholder ("Choose a status") instead of the workflow's initial state on a plain mount. **Fix:** the open
+effect now computes the correct seed value DIRECTLY (`seedStateIdFor`, a small helper closing over
+`workflowStates`) rather than deferring to the reseed effect for the ordinary case; the reseed effect stays,
+now genuinely needed only for a LATE `workflowStates` load or a truly stale value reached some other way.
+
+## The board-to-form pre-fill, end to end (starting-status design, 2026-09-23) — UI half
+
+- **13.1442** ✅ The ONE site that mounts the whole chain at once — `Board`'s `onCreateTicket` selection,
+  through `page.tsx`'s `createSelection` state, to `CreateTicketFlow.initialSelection`, to the actual
+  `ticket.created` payload. `apps/web/test/project-create-gate.test.tsx`, the file that already exists to
+  stop the New-ticket control from making claims nothing backs. Clicking the (real, non-`todo`) `Doing`
+  column's own "Add a ticket" pre-fills Type — `Task`, NOT `epic` (`WORKSPACE_TYPES`' first entry sharing
+  `wf-errands`): this dialog asks `defaultRootTypeFor` over the types sharing the workflow, the SAME
+  measured deviation 13.1440 pins, closing here at the one site that proves the real workspace fixture
+  (`epic` genuinely listed first) hits it too — and Starting status (`Doing`), switches the backlog switch
+  OFF, and a submit from there carries `stateId: 'doing'` on the wire. **CONTROL, same render:** the create
+  closes the dialog on its own (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on a committed outcome
+  — no explicit Cancel needed, and the first draft of this case tried to click one that was no longer there),
+  and reopening from the HEADER's own unscoped "New ticket" carries no selection at all — no `stateId` key on
+  the wire, the same omission rule 13.1439 pins at the dialog level, now exercised through the real page. The
+  EMPTY, creatable column deliberately used is `doing`, NOT the workflow's own `todo`: a click on `todo` would
+  produce a `stateId` the omission rule (13.1439) drops again, making the case indistinguishable from the
+  control. Mutation-witnessed: `page.tsx`'s `onCreateTicket` handler with `setCreateSelection(selection ??
+  null)` hardcoded to `setCreateSelection(null)` reddens the pre-fill assertion, `expected element to have
+  value Task, received Chore` (the ordinary rank-tie-broken default among ALL of `WORKSPACE_TYPES`, proving
+  the selection never reached the dialog at all), restored from the committed tree — rebuilding
+  `packages/app-core` first, since `apps/web` reads its `dist`, not its source (measured the hard way earlier
+  in this same session: the FIRST run of this exact case after the `defaultRootTypeFor` fix still showed
+  `Epic` until the rebuild). —
+  (`apps/web/test/project-create-gate.test.tsx`)
+
+## The birth Start and Due date inputs (addendum, 2026-09-23) — UI half
+
+*Cases `13.1443`–`13.1445`, the remainder of the UI block. `13.1442` is the page e2e case, below.*
+
+- **13.1443** ✅ Both `<input type="date">` controls (`aria-label="Start date"`/`"Due date"`) exist, empty by
+  default, and `NewTicketDraft` omits whichever is left empty rather than carrying an empty string — the
+  SAME "absent means no claim" rule `description` already follows, asserted with `not.toHaveProperty`
+  rather than a `toEqual`-style comparison, which cannot tell a dropped key from one holding `undefined`.
+  Mutation-witnessed: dropping the `=== '' ? {} : {...}` guard in `new-ticket-dialog.tsx`'s own draft
+  construction (sending the bare, possibly-empty string unconditionally) reddens with `dueDate: ""` present
+  where the assertion expected the key gone, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1444** ✅ The ACTUAL `ticket.created` payload — not the dialog's own bare-string draft, which
+  13.1443 already covers, but what `CreateTicketFlow.create` sends to `DataSource.ingest` — wraps a filled
+  input as `{date: '...'}` (the wire's own `dueDateValueSchema` shape) and carries NO key at all for an
+  empty one, in three arms: one filled, both filled, neither filled. New file
+  `create-ticket-flow.test.tsx` (this component had none), because this is the one place that can see the
+  wire shape at all — `new-ticket-dialog.tsx` never builds `{date: ...}`, only the bare string.
+  Mutation-witnessed: replacing the `...(draft.startDate === undefined ? {} : {...})` spreads with an
+  unconditional `startDate: {date: draft.startDate ?? ''}` reddens BOTH the "one filled" case (`dueDate:
+  {date: ''}` present where absent was expected) and the "neither filled" case (`startDate: {date: ''}`
+  present), restored from the committed tree. —
+  (`packages/app-core/test/views/create-ticket-flow.test.tsx`)
+- **13.1445** ✅ An invalid day disables Create with an inline reason under the field, checked by the SAME
+  `dueDateValueSchema` import `ticketCreatedPayload`/`ticket.field_set` use (no copy of the regex, per the
+  plan author's ruling) — there is no precheck branch for dates. **MEASURED, not assumed, which value can
+  even reach the check:** jsdom's own `<input type="date">` sanitizes a malformed value to `''` BEFORE React
+  ever sees a change event, for every shape tried except one — `2026-13-01` (bad month), `2026-02-30`
+  (out-of-calendar day), `30-09-2026` (wrong field order) and a bare non-date string all vanish to `''`
+  on `fireEvent.change`; a 5-digit year (`99999-01-01`) survives, because `IST_DAY_REGEX` is `^\d{4}-\d{2}
+  -\d{2}$` and jsdom's own sanitizer does not enforce THAT particular width. That is the one value this case
+  can use to exercise the component's own validation at all — a probe script confirmed this empirically
+  before the case was written, not inferred. Clearing the field back to empty removes the refusal and
+  re-enables Create (empty is omitted, not invalid — the same distinction 13.1443 draws). Mutation-witnessed:
+  dropping `startDateInvalid || dueDateInvalid` from the Create button's `disabled` expression reddens
+  (`toBeDisabled()` fails), restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+**Addendum item 6 — "the created ticket appears on the calendar for its due day" — is 🧪, deliberately, and
+spends no id.** The UI block (`13.1431`–`13.1445`) is fully spent by the cases above; the addendum's own
+text allows this ("if a calendar assertion is cheap [...] else 🧪 with the recipe"). Considered rather than
+dropped silently: the design's own FACTS section records that the calendar/timeline/filters already read
+`fields -> 'dueDate' -> 'value' ->> 'date'` (`compile-filter.ts:133-137`) with NO projection change needed —
+the birth claim lands in `fields` through machinery `13.1444` already proves reaches the wire, and the
+calendar's OWN read of that path is existing, already-tested code this feature introduces no new version of.
+Recipe, if picked up later: seed a board/page world whose ticket carries a `dueDate` claim from
+`ticket.created` (not a later `field_set`), switch to the Calendar tab, and assert the ticket renders under
+its due day — mirroring whatever fixture `project-calendar-timeline.test.tsx` already uses for a `field_set`
+due date, with the ONE difference that the claim originates at birth.
 ## 13.1451–13.1466 — board card badges: priority icon + tint, parent-key badge, epic chip (owner request, 2026-09-23)
 
 Block `13.1451`–`13.1470` (`13-hig-per-screen.md`'s allocation table has the row). `BoardTicketCard`
@@ -3642,3 +3865,34 @@ full `packages/app-core` suite (2038 passed, including the pre-existing board su
 `board-workflow-collapse.test.tsx` (the `13.1409` collapse block), `board-filter.test.ts`), the full
 `packages/ui` suite (455 passed) and the full `apps/web` suite (838 passed) were each run green AFTER this
 block, under Node v22.23.2.
+
+## The brand glyph, the favicon, the nav tile, and a wide/tall Notes page (owner request 2026-09-23 ~20:20 IST, relayed by the planner)
+
+*Block `13.1471`–`13.1490`, allocated by the controller before this lane started (`13-hig-per-screen.md`'s block table). Five units: `BrandMark` (one origin for the glyph), the favicon, a non-interactive nav brand tile, a wide/tall `/notes` page (Confluence-style, one document column), and a floating table-of-contents button replacing the right-hand TOC column.*
+
+- **13.1471** ✅ `BrandMark({ size })` renders the sign-in page's glyph unchanged — THREE `<path>` elements (the folder outline plus its two crossbars, not one — a miscount the brief itself made), `stroke="currentColor"`, `aria-hidden="true"`, `focusable="false"`, sized from the prop rather than a fixed literal. Asserted as the ordered `d` array with its length pinned first, so a regex that matches nothing cannot pass two empty arrays against each other. Mutation-witnessed: changing one path's `d` string reddens (`h8` → `h9`), restored from the committed tree. — (`apps/web/test/brand-mark.test.tsx`)
+- **13.1472** ✅ `app/layout.tsx`'s `metadata` names `/favicon.svg` as the icon — read as SOURCE, the same mechanism `document-title.test.tsx`/case `18.185` already use for this file, since `export const metadata` is applied by Next's runtime and a bare `render()` never invokes it. Mutation-witnessed: dropping the `icons` key reddens, restored from the committed tree. — (`apps/web/test/favicon.test.tsx`)
+- **13.1473** ✅ PARITY: `public/favicon.svg` draws the SAME glyph `BrandMark` draws — the ordered array of every `d` string in the file, compared against `BrandMark`'s own rendered array, each side's length asserted before the comparison so two empty arrays cannot pass each other. The tile is the product's one fixed brand hue (`#ee7733`, `tokens.ts`'s `brandOrange`) behind the dark stroke (`#141a2e`, `onColorWarmDark`) rather than a theme-varying `var()` — a static favicon carries no `data-theme` to vary by, and the dark ink is the one that clears contrast on the fixed orange (the sign-in tile's own `textInverted`-on-`brand` composition is the recorded exemption below 3:1 in light theme; this glyph does not inherit that trade-off). Neither literal is caught by the colour-discipline scan — `public/` and `.svg` are outside `CLIENT_SOURCE_ROOTS`/`SCANNED_EXTENSIONS`, and the test file itself lives under `test/`, also unscanned. Mutation-witnessed: editing one favicon coordinate (`h8` → `h9`) reddens, restored from the committed tree. — (`apps/web/test/favicon.test.tsx`)
+- **13.1474** ✅ The nav's own brand tile (owner: "put it on the nav bar of the far left as well") renders `<span className="gn-nav__brand" aria-hidden="true"><BrandMark size={18} /></span>` as the FIRST child of `.gn-nav__inner`, immediately before `.gn-nav__links` — asserted in BOTH session states (signed in and signed out with `mockSessionUser = null`), since the tile sits outside the session-gated links group on purpose. — (`apps/web/test/app-nav.test.tsx`)
+- **13.1475** ✅ The tile is NOT a control (owner: "not clickable") — `.closest('a, button, [tabindex]')` and `.querySelector('a, button, [tabindex]')` both `null`, no `tabindex` attribute. DOM checks rather than `queryByRole`, because `aria-hidden="true"` removes the whole subtree from the accessibility tree Testing Library's role queries read, so a role query would report `null` whether or not a `<Link>` sat inside it. Mutation-witnessed: wrapping the tile in `<Link href="/workspaces">` reddens, restored from the committed tree. — (`apps/web/test/app-nav.test.tsx`)
+- **13.1476** ✅ The accessible-name ratchet (Features.md:33) stays green BY CONSTRUCTION — the tile and every descendant carry none of the ratchet's four counted attributes (`aria-label`, `role`, `aria-selected`, `aria-describedby`), swept over the whole subtree rather than asserted absent on the span alone (a name on `BrandMark`'s own svg would pass a span-only check). Mutation-witnessed: adding `aria-label="Gisik Nokma"` to the tile reddens, restored from the committed tree. — (`apps/web/test/app-nav.test.tsx`)
+- **13.1477** 🧪 RISK, owed to the controller's browser check (jsdom cannot lay out flex box widths): E4-11 promises the signed-in phone bar (`nav-phone-disclosure.test.ts`, case `13.1137`) fits `Workspaces` + the `Menu` toggle + the corner on ONE line at 390px. The brand tile adds a fixed `1.75rem` item plus its `1rem` gap (~44px) ahead of `.gn-nav__links` inside the same flex row, narrowing what is left for that line. Measure at 390px, signed in, with a workspace: does the line still hold, or does `Workspaces`/`Menu` wrap a second line? — no jsdom case exists for this; `nav-phone-disclosure.test.ts`'s own suite (CSS-source, cascade-only) is unaffected and stays green regardless.
+- **13.1478** ✅ `MIN_HEADINGS` (`packages/editor/src/reading/ReadingTOC.tsx`) is EXPORTED and re-exported from the package index — prep for the floating table-of-contents button (Unit 5), which must gate on the SAME threshold `ReadingTOC` itself already applies rather than a copied literal `3` that could drift from it. Value pinned (`toBe(3)`), not merely presence-checked. The mobile WebView bundle was rebuilt and `generate-editor-html --check` confirmed `ok` — byte-identical output, since the change adds a named export nothing in that bundle imports. — (`packages/editor/test/reading-toc.test.tsx`)
+
+**`13.1479`–`13.1484`: `TocLauncher` (`apps/web/src/notes/toc-launcher.tsx`), STANDALONE.** Built and tested ahead of its wiring into `notes-page.tsx`'s `.gn-notes__toc` `<aside>` — that wiring, and the CSS repurposing `.gn-notes__toc` from `display:none` to `position:fixed`, collide with the unmerged `task/notes-7-inline-references` and are on hold (see the lane's own report). Nothing below depends on that wiring: the component takes the same `headings`/`scrollContainerRef` pair `ReadingTOC` itself takes, wraps it rather than reimplementing scrollspy or scroll-to-heading, and follows `account-menu.tsx`'s own established `close(returnFocus: boolean)` disclosure pattern (Escape and picking a heading return focus; an outside click does not).
+
+- **13.1479** ✅ No button renders under `MIN_HEADINGS` (control: 2 headings — reuses the OWN `MIN_HEADINGS` export from 13.1478, not a copied `3`). Mutation-witnessed: gating on `headings.length < 2` instead reddens (the control fixture then clears the gate), restored from the committed tree. — (`apps/web/test/toc-launcher.test.tsx`)
+- **13.1480** ✅ The button renders at `MIN_HEADINGS` (3 headings), `aria-expanded="false"`, `aria-controls` naming a real (hidden) panel — the panel stays MOUNTED rather than unmounted while closed, so the id is never dangling. — (`apps/web/test/toc-launcher.test.tsx`)
+- **13.1481** ✅ Opening the button shows the TOC entries — `aria-expanded` flips to `"true"` and the panel's `ReadingTOC` renders its `navigation "On this page"` with one link per heading, in order. — (`apps/web/test/toc-launcher.test.tsx`)
+- **13.1482** ✅ Escape closes the panel and returns focus to the button — CONTROL first: a TOC link is focused by hand and `toHaveFocus()` asserted, so the mutation-tested arm proves focus actually LEFT the button and came back, rather than never having left it. Mutation-witnessed: dropping `close`'s `buttonRef.current?.focus()` reddens only this case (13.1483's own close-on-choice case does not redden, since it does not assert focus — recorded rather than left to look like broader coverage), restored from the committed tree. — (`apps/web/test/toc-launcher.test.tsx`)
+- **13.1483** ✅ Choosing a heading closes the panel — `ReadingTOC`'s own click handler runs first (its scroll-to-heading behaviour is 9.290's own coverage, not re-proven here); this case adds only that the bubbled click, recognised by `closest('.reading-toc__link')`, closes the launcher. — (`apps/web/test/toc-launcher.test.tsx`)
+- **13.1484** ✅ A pointerdown outside the launcher closes the panel WITHOUT stealing focus — `account-menu.tsx`'s own `returnFocus: false` arm for "closed by clicking elsewhere," reused rather than a new pattern. Asserted by focusing a third element, clicking it, and confirming focus stayed there. — (`apps/web/test/toc-launcher.test.tsx`)
+
+**Unit 4/5 COMPLETION — the collision cleared by owner instruction (2026-09-23), not by `task/notes-7-inline-references` landing.** The controller flagged `notes-page.tsx` and the `.gn-notes` rules in `globals.css` as colliding with that unmerged lane; it still has no open PR as of this block. The owner instructed the session to proceed rather than continue holding, on the basis that a later merge conflict against a release branch is a normal, resolvable outcome in this workflow (the controller's own procedure already names the merge step) — recorded here for whoever reviews the merge into `release/notes` next, since the usual "collision cleared, Plan 7 landed, merged clean" story does not apply.
+
+- **13.1485** ✅ The notes page is WIDE (owner: "the width is too narrow ... basically the entire page minus the left pane") — `.gn-shell--wide` (`max-width: none`) lifts `.gn-shell`'s shared `80rem` cap, declared AFTER `.gn-shell` in source (equal specificity; source order is the only tiebreaker — mutation-witnessed: moving it above `.gn-shell` reddens, restored from the committed tree) and applied only to the notes page's own `<main>`; `.gn-notes`'s own `73.75rem` cap is dropped directly (already page-scoped). The CSS-source half and the rendered `<main class="gn-shell gn-shell--wide">` half are both asserted, since the source rule proves nothing on its own. — (`apps/web/test/notes-css.test.tsx`)
+- **13.1486** ✅ The editor area carries a real MINIMUM height (owner: "the height should also be enough to feel like its a note") — `.gn-notes__editor { min-height: calc(100dvh - var(--app-nav-offset, 0px) - 12rem); }`, reusing `--app-nav-offset` (`:root`) with its own `0px` fallback rather than a second magic number for the nav bar's height; `12rem` approximates the page's own chrome above the editor (title, byline, breadcrumb, paddings) — a floor, not a pixel-exact fit. — (`apps/web/test/notes-css.test.tsx`)
+- **13.1487** 🧪 RISK, owed to the controller's browser check (jsdom has no layout engine to measure a real column width): at a 1600px viewport, EXPECTED arithmetic (not measured) — `.gn-shell` padding is `0 1.25rem` (unchanged by `--wide`), so content width is `1600 - 40 = 1560px`; the tree column stays a fixed `18rem` (288px) with a `1.5rem` (24px) gap; the document column should measure `1560 - 288 - 24 = 1248px`, against the OLD three-column arithmetic's `620px` (`.gn-notes`'s old `73.75rem`/1180px cap minus `18rem`/288px tree minus `14rem`/224px TOC minus two `1.5rem`/48px gaps). Confirm the rendered width is at least the new figure and that no third column reappears.
+- **13.1488** ✅ Clicking the padded empty area below short text focuses the editor at its end (owner: "feel like its a note" — the OTHER half of 13.1486) — `TicketEditorSlot`'s EXISTING `editorRef` prop threaded from `NoteDocument` through `NoteEditorPane` (no new prop surface on `packages/editor`, so the twin-contract tests see nothing new); the wrapper's `onClick` fires `editorInstanceRef.current?.commands.focus('end')` only when `event.target === event.currentTarget`, so a click inside the editor's own content (ProseMirror's own click-to-position-caret) never reaches it. Mutation-witnessed: dropping the focus call reddens, restored from the committed tree. — (`apps/web/test/note-document.test.tsx`)
+- **13.1489** ✅ Confluence-style inner padding on the document column (owner: "take inspiration from confluence") — `.gn-notes__document { padding: 0 clamp(1rem, 3vw, 3rem); }`, generous and viewport-proportional. — (`apps/web/test/notes-css.test.tsx`)
+- **13.1490** ✅ `.gn-notes__toc` — the SAME `<aside aria-label="On this page">` case 18.181 already requires present with no note open — is REPURPOSED (owner: "a small floating icon at the left bottom of the screen") from `display: none`/`display: block` above `64rem` to `position: fixed`, bottom-left, `env(safe-area-inset-*)`-aware, `z-index: 30` (`.gn-select__panel`/`.gn-popover`'s own tier — below `.gn-dialog__scrim`/`.gn-sheet__scrim` at 40 and `.gn-toast-layer` at 60, mutation-witnessed by raising it to 50, restored from the committed tree). Wired: `NotesPage`'s `<aside>` now renders `TocLauncher` (13.1479–13.1484) in place of a bare `ReadingTOC` — case 18.225 is AMENDED IN PLACE (id unchanged) to open the launcher before asserting the rail's links, and to assert the launcher BUTTON's absence (not merely the links') for the under-threshold control, since that is the stronger, already-verified `TocLauncher` gate. 18.181's own landmark assertion needed no change: the `<aside>` element carries the name regardless of what renders inside it. — (`apps/web/test/notes-css.test.tsx`, `apps/web/test/notes-page.test.tsx`)

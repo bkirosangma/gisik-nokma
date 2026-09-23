@@ -297,6 +297,15 @@ export type BoardColumn = {
   name: string;
   category: StateCategory;
   blocked: boolean;
+  /**
+   * Whether a NEW ticket may be born in this state (starting-status design,
+   * 2026-09-23) — `isCreatableState(def, stateId)`, read straight off the
+   * published definition the same way `blocked` is, immediately above. The
+   * board's empty-column "Add a ticket" button reads this rather than
+   * re-deriving it, so the client and the server can never disagree about
+   * which columns may receive a new ticket.
+   */
+  creatable: boolean;
   cards: BoardTicketCard[];
 };
 

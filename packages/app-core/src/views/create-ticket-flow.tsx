@@ -38,6 +38,15 @@ export type CreateTicketFlowProps = {
   assigneeCandidates: ReadonlyArray<{ id: string; name: string }>;
   /** See `NewTicketDialogProps.assigneeCandidatesUnavailable`. */
   assigneeCandidatesUnavailable?: string;
+  /** See `NewTicketDialogProps.workflowStates` — this flow only passes it through. */
+  workflowStates: (workflowId: string) => { initialStateId: string; states: Array<{ id: string; name: string; category: string; creatable: boolean }> } | null;
+  /**
+   * A board column's own identity, when this flow was opened FROM one
+   * (starting-status design, 2026-09-23) — `Board`'s `onCreateTicket`
+   * selection, passed straight through to `NewTicketDialogProps.
+   * initialSelection`. See that prop's own docblock.
+   */
+  initialSelection?: { workflowId: string; stateId: string };
   onCreated: (ticketId: string) => void;
   /**
    * V1 (round-2 ruling, 2026-09-21) — the flow's open state, LIFTABLE.
@@ -160,6 +169,8 @@ export function CreateTicketFlow({
   editorSlot,
   assigneeCandidates,
   assigneeCandidatesUnavailable,
+  workflowStates,
+  initialSelection,
   onCreated,
   open,
   onOpenChange,
@@ -178,12 +189,25 @@ export function CreateTicketFlow({
   const [parentRefusal, setParentRefusal] = useState<Refusal | null>(null);
   const [failure, setFailure] = useState<Failure | null>(null);
   const [trouble, setTrouble] = useState<string | null>(null);
+  /**
+   * The Starting-status select's own inline refusal (starting-status design,
+   * 2026-09-23) — `undefined` (never shown) unless a submit reached the
+   * state-creatable check and it refused. This is deliberately a SEPARATE
+   * piece of state from `failure`: `failure` renders OUTSIDE the dialog
+   * (below it, in this component's own JSX), and the design asks for this
+   * one to render UNDER THE SELECT, inside `NewTicketDialog` — a caller
+   * mistake the select's own options being pre-filtered to `creatable`
+   * makes RARE rather than impossible (the cache this flow previews against
+   * can disagree with whatever `workflowStates` most recently offered).
+   */
+  const [stateRefusal, setStateRefusal] = useState<string | undefined>(undefined);
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
 
   const clearAnswers = () => {
     setFailure(null);
     setTrouble(null);
     setParentRefusal(null);
+    setStateRefusal(undefined);
   };
 
   const openReopenPrompt = async (
@@ -301,12 +325,42 @@ export function CreateTicketFlow({
         // holds a named person to the same membership rule `ticket.assigned` is
         // held to, so this member is not a way around it.
         assigneeId: draft.assigneeId,
+        // The STARTING STATUS (starting-status design, 2026-09-23) — the
+        // dialog has already made the omission decision (backlog ON, or
+        // equal to the workflow's initial state); this door just carries it
+        // through, the identical "spread, don't name" treatment `description`
+        // gets above, for the identical reason.
+        ...(draft.stateId === undefined ? {} : { stateId: draft.stateId }),
+        // The birth START and DUE date (addendum, 2026-09-23) — the dialog's
+        // bare `YYYY-MM-DD` string wrapped as the `{date}` object the wire
+        // expects (`dueDateValueSchema`'s own shape), omitted when the
+        // dialog omitted it.
+        ...(draft.startDate === undefined ? {} : { startDate: { date: draft.startDate } }),
+        ...(draft.dueDate === undefined ? {} : { dueDate: { date: draft.dueDate } }),
       },
     });
 
-    if (cache !== undefined && draft.parentId !== null) {
-      const preview = await precheckEvent(childEvent, cache);
-      if (preview.kind === 'refused' && preview.rule === PARENT_TERMINAL_RULE) {
+    if (cache !== undefined) {
+      // The STATE-CREATABLE check runs FIRST, with or without a parent —
+      // mirroring `precheckEvent`'s own order (state, then parent-terminal),
+      // and the engine's (`checks/hierarchy.ts`: the state check reads the
+      // workflow before any parent branch runs at all). Rare in practice,
+      // since the dialog's own `workflowStates` prop already filters the
+      // select to `creatable` states — this only fires when this flow's
+      // cached definition disagrees with whatever the select most recently
+      // offered (design's own "cannot happen from the board but the form
+      // must not trust it").
+      const workflowId = typeOptions.find((option) => option.id === draft.typeId)?.workflowId;
+      const preview = await precheckEvent(childEvent, cache, { workflowId });
+      if (preview.kind === 'refused' && preview.rule === 'workflow.state-not-creatable') {
+        // NOTHING submitted, and the dialog STAYS OPEN — `setStateRefusal`
+        // renders the reason under the Starting-status select, and the
+        // person may pick a different one without losing the rest of the
+        // draft (the dialog's own state is untouched by a refused create()).
+        setStateRefusal(preview.reason);
+        return;
+      }
+      if (preview.kind === 'refused' && preview.rule === PARENT_TERMINAL_RULE && draft.parentId !== null) {
         // The instant offer: no round trip, and NOTHING submitted — so nothing
         // here can be mistaken for the server having spoken.
         await openReopenPrompt(
@@ -467,6 +521,9 @@ export function CreateTicketFlow({
         editorSlot={editorSlot}
         assigneeCandidates={assigneeCandidates}
         assigneeCandidatesUnavailable={assigneeCandidatesUnavailable}
+        workflowStates={workflowStates}
+        initialSelection={initialSelection}
+        stateRefusal={stateRefusal}
         onCreate={(draft) => {
           void create(draft).catch(report);
         }}

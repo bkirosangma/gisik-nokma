@@ -1492,3 +1492,76 @@ describe('E4-11 — the workspace links sit behind one disclosure', () => {
     expect(document.querySelector('nav.gn-nav a.gn-nav__signin')).toHaveTextContent('Sign in');
   });
 });
+
+/**
+ * 13.1474–13.1476 — the nav's own brand tile (owner request 2026-09-23: "put
+ * it on the nav bar of the far left as well. not clickable."). `BrandMark`
+ * (13.1471), not a second copy of the glyph — a non-interactive `<span
+ * aria-hidden="true">`, the FIRST child of `.gn-nav__inner`, before the links,
+ * rendered whether or not a session exists.
+ */
+describe('the nav brand tile', () => {
+  function renderNav() {
+    return render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+  }
+
+  it('13.1474 renders first inside .gn-nav__inner, in both session states', () => {
+    currentPath = '/workspaces';
+    const { container } = renderNav();
+    const inner = container.querySelector('.gn-nav__inner');
+    const brand = inner?.firstElementChild ?? null;
+    expect(brand?.className).toBe('gn-nav__brand');
+    expect(brand?.querySelector('svg')).not.toBeNull();
+    // BEFORE `.gn-nav__links` — immediately, not merely somewhere in the bar.
+    expect(brand?.nextElementSibling?.className).toContain('gn-nav__links');
+
+    cleanup();
+    currentPath = '/help';
+    mockSessionUser = null;
+    const { container: signedOutContainer } = renderNav();
+    const signedOutBrand = signedOutContainer.querySelector('.gn-nav__brand');
+    expect(signedOutBrand).not.toBeNull();
+    expect(signedOutBrand?.querySelector('svg')).not.toBeNull();
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+  });
+
+  /**
+   * NOT a link, NOT a button, no tabindex — DOM checks rather than role
+   * queries: `aria-hidden="true"` removes the whole subtree from the
+   * accessibility tree, so `within(brand).queryByRole('link')` would report
+   * `null` whether or not a `<Link>` sat inside it. MUTATION TARGET: wrap the
+   * tile in `<Link href="/workspaces">`.
+   */
+  it('13.1475 is not focusable and is not a link or a button', () => {
+    currentPath = '/workspaces';
+    const { container } = renderNav();
+    const brand = container.querySelector('.gn-nav__brand');
+    expect(brand).not.toBeNull();
+    expect(brand?.closest('a, button, [tabindex]')).toBeNull();
+    expect(brand?.querySelector('a, button, [tabindex]')).toBeNull();
+    expect(brand?.hasAttribute('tabindex')).toBe(false);
+  });
+
+  /**
+   * The accessible-name ratchet (Features.md:33) counts exactly four
+   * attributes product-wide — `aria-label`, `role`, `aria-selected`,
+   * `aria-describedby` — one way per route, so a rise nothing else catches
+   * ships silently. This tile must introduce NONE of them. MUTATION TARGET:
+   * add `aria-label` to the tile.
+   */
+  it("13.1476 introduces none of the accessible-name ratchet's four counted attributes", () => {
+    currentPath = '/workspaces';
+    const { container } = renderNav();
+    const brand = container.querySelector('.gn-nav__brand');
+    expect(brand).not.toBeNull();
+    for (const el of [brand!, ...Array.from(brand!.querySelectorAll('*'))]) {
+      for (const attr of ['aria-label', 'role', 'aria-selected', 'aria-describedby']) {
+        expect(el.hasAttribute(attr), `${el.tagName} carries ${attr}`).toBe(false);
+      }
+    }
+  });
+});
