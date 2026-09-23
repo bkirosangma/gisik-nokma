@@ -378,4 +378,12 @@ aimed at a deleted selector would have turned a firing check into a silently SKI
 discriminator moved to `.gn-help__h2`'s font-size, the other declaration already in the same media
 query. Cases 13.266–13.267 and the mutation record at 13.x name the old class as history.*
 
+## Notes manual & FAQ sections (owner request, 2026-09-23) — block `15.36`–`15.50`
+
+*Allocated 2026-09-23 by the controller against `origin/release/notes` `4d12ae02` (table tip `15.35`),
+for `task/help-notes`: the manual's new "§15 — Notes" section, the FAQ's new "Notes" section, the
+correction of the FAQ's now-false "Finding things" claims, and (addendum, owner "yes pls") documenting
+starting-status and board-card-badges in the existing sections. Cases file: this one. Minted: none yet
+— this is the reservation commit; the lane fills this block.*
+
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*
