@@ -525,6 +525,42 @@ describe('TicketSheet — the comment thread and its box', () => {
     expect(comment?.['queryTickets']).toBeDefined();
     expect(comment?.['resolveTicketHref']).toBeDefined();
   });
+
+  /**
+   * 18.285 — the gap a final review caught: `queryTickets`/`resolveTicketHref`
+   * reach both `<EditorSlot>` mounts (18.274 above), but nothing ever built or
+   * forwarded a `queryNotes` — so `:note`/`[[` in a REAL ticket description or
+   * comment offered nothing, and D27's headline ("tag a note in a ticket
+   * comment") had no first-class way to happen: every green Task 5 test drove
+   * it through a stub editor that posts a fixed body, never through the real
+   * picker. `TicketSheet` now builds `queryNotes` itself from
+   * `dataSource.query.getNotes(workspaceId)` — the same client-side
+   * substring filter `note-document.tsx`'s own `queryNotes` uses — and
+   * forwards it to both mounts, with no new prop on `TicketSheetProps`
+   * (unlike `queryTickets`, nothing page-specific is needed: `dataSource` and
+   * `workspaceId` are already in scope).
+   */
+  it('18.285 builds queryNotes from dataSource.query.getNotes and forwards it to both EditorSlot mounts, matching by title substring', async () => {
+    const getNotes = vi.fn(async () => [
+      { noteId: 'n1', title: 'Cold room' } as NoteSummary,
+      { noteId: 'n2', title: 'Compressor log' } as NoteSummary,
+    ]);
+    const captured: Array<Record<string, unknown>> = [];
+    const StubSlot: EditorSlotComponent = (props) => {
+      captured.push(props as unknown as Record<string, unknown>);
+      return <div data-testid={`stub-${props.mode}-editor`} />;
+    };
+    renderSheet(source({ getNotes }), { editorSlot: StubSlot });
+    await screen.findByTestId('stub-comment-editor');
+    const description = captured.find((p) => p['mode'] === 'description');
+    const comment = captured.find((p) => p['mode'] === 'comment');
+    expect(description?.['queryNotes']).toBeDefined();
+    expect(comment?.['queryNotes']).toBeDefined();
+
+    const queryNotes = comment?.['queryNotes'] as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
+    const hits = await queryNotes('compr');
+    expect(hits).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);
+  });
 });
 
 /**

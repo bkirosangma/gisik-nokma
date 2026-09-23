@@ -845,6 +845,31 @@ export function TicketSheet({
     dataSource.query.getNotesForTicket(workspaceId, ticketId),
   );
   /**
+   * `queryNotes` for the shared editor's `:note`/`[[` picker (spec §14, D26),
+   * on BOTH `<EditorSlot>` mounts below — caught by a final review (case
+   * 18.285): `queryTickets`/`resolveTicketHref` reached both mounts, but
+   * nothing built or forwarded a `queryNotes`, so a REAL ticket description
+   * or comment could not insert a note reference at all, leaving D27's own
+   * headline ("tag a note in a ticket comment") reachable only through a
+   * stub editor in tests. Unlike `queryTickets`, this needs no page-supplied
+   * prop: `dataSource` and `workspaceId` are already in scope, so it is built
+   * the same way `note-document.tsx`'s own `queryNotes` is — a client-side
+   * substring filter over the workspace's notes.
+   */
+  const workspaceNotes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:notes-search`, () =>
+    dataSource.query.getNotes(workspaceId),
+  );
+  const queryNotes = async (query: string): Promise<Array<{ noteId: string; title: string }>> => {
+    const needle = query.trim().toLowerCase();
+    const hits: Array<{ noteId: string; title: string }> = [];
+    for (const candidate of workspaceNotes.data ?? []) {
+      if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+      hits.push({ noteId: candidate.noteId, title: candidate.title });
+      if (hits.length === 8) break;
+    }
+    return hits;
+  };
+  /**
    * The ticket's CHILDREN (door F, 2026-09-19) — derived from the list read the
    * client already makes, NOT from a new route.
    *
@@ -3187,6 +3212,7 @@ export function TicketSheet({
                 placeholder="No description yet"
                 submit={submitDescription}
                 queryUsers={queryUsers}
+                queryNotes={queryNotes}
                 {...(queryTickets === undefined ? {} : { queryTickets })}
                 {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
                 onError={reportEditorError}
@@ -3856,6 +3882,7 @@ export function TicketSheet({
                   placeholder="Add a comment — @ to mention someone"
                   submit={submitComment}
                   queryUsers={queryUsers}
+                  queryNotes={queryNotes}
                   {...(queryTickets === undefined ? {} : { queryTickets })}
                   {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
                   uploadAttachment={uploadAttachment}

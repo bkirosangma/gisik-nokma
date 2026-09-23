@@ -36,10 +36,27 @@ async function openFirstSeededTicket(page: Parameters<typeof openSeededBoard>[0]
   return { workspaceId, projectId, ticketId };
 }
 
+/**
+ * A per-run-unique tag for note titles this file creates. This is the
+ * SEEDED BOARD's first ticket — the same one `notes-ticket.spec.ts`'s
+ * `openFirstSeededTicket` opens for 18.254–18.256 — so a fixed title (and a
+ * `Notes · N` COUNT) would be two different fragilities at once: stale
+ * across a rerun of this file alone (strict-mode duplicate matches on the
+ * second run's `getByRole('option'/'link', { name: <fixed title> })`), and
+ * wrong whenever Plan 6's specs have also attached notes to this ticket
+ * (the section's count is shared fixture state, not this spec's own). Both
+ * are avoided by (a) a unique title per run and (b) asserting the presence
+ * of THAT SPECIFIC badge, never a count.
+ */
+function uniqueTag(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 test('18.282 posting a ticket comment with :note Compressor attaches the note; its badge appears in the Notes section with no page.reload()', async ({
   page,
 }) => {
   await signIn(page, OWNER_EMAIL);
+  const title = `Compressor log ${uniqueTag()}`;
 
   // A fresh, unattached note this spec owns — created via /notes so :note's
   // own queryNotes (a workspace-wide search) has something new to find,
@@ -47,7 +64,7 @@ test('18.282 posting a ticket comment with :note Compressor attaches the note; i
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'New note' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill('Compressor log 18.282');
+  await page.getByRole('textbox', { name: 'Title' }).fill(title);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   const noteId = /\/notes\/([^/]+)$/.exec(page.url())?.[1] ?? '';
@@ -55,27 +72,29 @@ test('18.282 posting a ticket comment with :note Compressor attaches the note; i
 
   await openFirstSeededTicket(page);
 
-  // POSITIVE CONTROL FIRST: no notes attached to this ticket yet.
-  await expect(page.getByTestId('ticket-notes').getByText('Notes · 0')).toBeVisible({ timeout: 20_000 });
+  // POSITIVE CONTROL FIRST: this specific note is not attached yet — a count
+  // ("Notes · 0") would be false whenever Plan 6's own specs (or a prior run
+  // of this one) have already attached OTHER notes to this shared ticket.
+  await expect(page.getByTestId('ticket-notes').getByRole('link', { name: title })).toHaveCount(0);
 
   const composer = page.getByTestId('sheet-comments').getByRole('textbox', { name: 'Comment' });
   await composer.click();
-  await composer.pressSequentially('see :note Compressor log 18.282');
-  await page.getByRole('option', { name: 'Compressor log 18.282' }).click();
+  await composer.pressSequentially(`see :note ${title}`);
+  await page.getByRole('option', { name: title }).click();
   await page.getByRole('button', { name: 'Post' }).click();
 
   // The comment's own wikiLink chip — always a link (comment-body.tsx builds
   // wikiLink's href from the id, with no resolver dependency).
-  await expect(
-    page.getByTestId('sheet-comments').getByRole('link', { name: 'Compressor log 18.282' }),
-  ).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('sheet-comments').getByRole('link', { name: title })).toBeVisible({
+    timeout: 10_000,
+  });
 
   // The section reloads ON ITS OWN (submitComment's implied-attachment
-  // ingest + notes.reload()) — no page.reload() anywhere in this spec.
-  await expect(page.getByTestId('ticket-notes').getByText('Notes · 1')).toBeVisible({ timeout: 10_000 });
-  await expect(
-    page.getByTestId('ticket-notes').getByRole('link', { name: 'Compressor log 18.282' }),
-  ).toHaveAttribute('href', `/notes/${noteId}`);
+  // ingest + notes.reload()) — no page.reload() anywhere in this spec. This
+  // specific badge is now present, whatever else the ticket already held.
+  const badge = page.getByTestId('ticket-notes').getByRole('link', { name: title });
+  await expect(badge).toBeVisible({ timeout: 10_000 });
+  await expect(badge).toHaveAttribute('href', `/notes/${noteId}`);
 });
 
 test('18.283 :ticket in a note comment inserts a chip that opens the ticket', async ({ page }) => {
@@ -84,15 +103,18 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
   const { workspaceId, projectId, ticketId } = await openFirstSeededTicket(page);
   const key = (await page.getByTestId('sheet-crumb-ticket').textContent())?.trim() ?? '';
   expect(key, 'the ticket key must be readable off the sheet crumb').not.toBe('');
-  const title = (await page.getByRole('textbox', { name: 'Ticket title' }).inputValue()).trim();
-  expect(title, 'the ticket title must be readable off the sheet').not.toBe('');
+  const ticketTitle = (await page.getByRole('textbox', { name: 'Ticket title' }).inputValue()).trim();
+  expect(ticketTitle, 'the ticket title must be readable off the sheet').not.toBe('');
   const expectedHref = `/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`;
 
-  // A fresh note this spec owns, so it does not depend on 18.282 having run.
+  // A fresh note this spec owns (a unique title, so a rerun of this file
+  // never collides with an earlier run's own note), so it does not depend
+  // on 18.282 having run either.
+  const noteTitle = `Ticket reference check ${uniqueTag()}`;
   await page.goto('/notes');
   await expect(page.getByRole('heading', { name: SEEDED_WORKSPACE_NAME })).toBeVisible({ timeout: 20_000 });
   await page.getByRole('button', { name: 'New note' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill('Ticket reference check 18.283');
+  await page.getByRole('textbox', { name: 'Title' }).fill(noteTitle);
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
 
@@ -101,13 +123,13 @@ test('18.283 :ticket in a note comment inserts a chip that opens the ticket', as
 
   const composer = page.getByTestId('sheet-comments').getByRole('textbox', { name: 'Comment' });
   await composer.click();
-  await composer.pressSequentially(`see :ticket ${title}`);
-  await page.getByRole('option', { name: `${key} ${title}` }).click();
+  await composer.pressSequentially(`see :ticket ${ticketTitle}`);
+  await page.getByRole('option', { name: `${key} ${ticketTitle}` }).click();
   await page.getByRole('button', { name: 'Post' }).click();
 
   // The comment's own ticketRef chip: a link to the ticket's canonical sheet
   // path (the note page supplies resolveTicketHref, Task 4).
-  const chip = page.getByTestId('sheet-comments').getByRole('link', { name: `${key} ${title}` });
+  const chip = page.getByTestId('sheet-comments').getByRole('link', { name: `${key} ${ticketTitle}` });
   await expect(chip).toBeVisible({ timeout: 10_000 });
   await expect(chip).toHaveAttribute('href', expectedHref);
 

@@ -293,25 +293,28 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: eight live reads means eight stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: nine live reads means nine stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. EIGHT reads ride this sheet — ticket, workflow,
+    // REFETCH on the query key. NINE reads ride this sheet — ticket, workflow,
     // members, history, the project's rows from which the SUBTASKS are derived
     // (door F, 2026-09-19), the ticket's TYPE LADDER (door G), the comment
-    // THREAD, and the ticket's NOTES section (notes series, Plan 6 of 7,
-    // `18.241`) — and each opens its own subscription.
+    // THREAD, the ticket's NOTES section (notes series, Plan 6 of 7, `18.241`),
+    // and the WORKSPACE'S notes (Plan 7 Task 6, case `18.285`) — the list
+    // `queryNotes` searches for the shared editor's `:note`/`[[` picker on
+    // both `<EditorSlot>` mounts — and each opens its own subscription.
     //
     // **The count was four until door F, five until door G, six until the
-    // comment thread, seven until the notes section, and each change is
-    // deliberate.** This assertion is a planted defect: it exists so that
-    // adding a read is a decision somebody makes rather than a side effect.
-    // The eighth read is a real cost — a subscription per open sheet — and it
-    // is paid because a note attached elsewhere must appear on this sheet
-    // without a reload (spec §10.4).
+    // comment thread, seven until the notes section, eight until 18.285's
+    // `queryNotes`, and each change is deliberate.** This assertion is a
+    // planted defect: it exists so that adding a read is a decision somebody
+    // makes rather than a side effect. The ninth read is a real cost — a
+    // subscription per open sheet — and it is paid because a real ticket
+    // comment could not otherwise insert a note reference at all (spec §14,
+    // D26–D27).
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(8);
+    expect(source.subscriptions).toHaveLength(9);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
