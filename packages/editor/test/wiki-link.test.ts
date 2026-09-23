@@ -1,3 +1,6 @@
+import { readFileSync } from 'node:fs';
+import { dirname, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
@@ -356,5 +359,96 @@ describe('9.300 the note-link hover card', () => {
     } finally {
       vi.useRealTimers();
     }
+  });
+});
+
+/**
+ * THE STYLESHEET IS A SPELLING OF THE BEM CONTRACT THAT TYPESCRIPT CANNOT SEE —
+ * the same guard `mention.test.ts` carries for the mention popup, and the
+ * reason it exists is recorded there: *"a rename on either side leaves correct
+ * markup with no styling and nothing red."* The notes port shipped WITHOUT it,
+ * so `wikilink-popup__status` could have been renamed on either side and the
+ * whole suite stayed green; found by the plan-close audit sweeping the CLASS
+ * rather than the instance.
+ *
+ * The mention's docblock also records that its own emit half was an OVERCLAIM
+ * until measured — it spot-checked three of six names. So the emit side here
+ * COLLECTS every matching class the code actually puts in the DOM (node view,
+ * missing pill, popup and hover card) rather than asserting a list someone
+ * typed, and both directions compare against the same `WIKILINK_BEM`.
+ */
+const WIKILINK_BEM = [
+  'editor-wikilink',
+  'editor-wikilink--missing',
+  'wikilink-popup',
+  'wikilink-popup__item',
+  'wikilink-popup__item--selected',
+  'wikilink-popup__list',
+  'wikilink-popup__status',
+  'wikilink-preview',
+];
+
+const CLASS_RE = /\.((?:wikilink-popup|wikilink-preview|editor-wikilink)[a-z_-]*)\s*\{/g;
+
+describe('9.282 the BEM classes the wiki-link surface names', () => {
+  it('9.282 the stylesheet declares exactly the wiki-link classes the code emits', () => {
+    const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css'), 'utf8');
+    const declared = [...css.matchAll(CLASS_RE)].map((m) => m[1]!);
+    expect(declared.sort()).toEqual([...WIKILINK_BEM].sort());
+  });
+
+  it('9.282 and the code emits every one of them, collected rather than named', async () => {
+    const emitted = new Set<string>();
+    const collect = (root: ParentNode): void => {
+      for (const el of root.querySelectorAll('*')) {
+        for (const token of el.classList) {
+          if (WIKILINK_BEM.includes(token)) emitted.add(token);
+        }
+      }
+    };
+
+    // The node view, live and missing.
+    const live = createTestEditor(
+      { resolveNoteTitle: () => 'Cold room' },
+      { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] }] },
+    );
+    collect(live.view.dom);
+    live.destroy();
+    const missing = createTestEditor(
+      { resolveNoteTitle: () => null },
+      { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] }] },
+    );
+    collect(missing.view.dom);
+    missing.destroy();
+
+    // The popup, opened through the real suggestion path — every class it puts
+    // in the DOM, not the three a hand might name.
+    const editor = createTestEditor({ queryNotes: async () => NOTES });
+    typeText(editor, '[[co');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.wikilink-popup__item')).not.toBeNull();
+    });
+    collect(document);
+    editor.destroy();
+
+    // …and the hover card.
+    vi.useFakeTimers();
+    try {
+      const card = createTestEditor(
+        { previewNote: async () => 'text', resolveNoteTitle: () => 'Cold room' },
+        { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] }] },
+      );
+      card.view.dom.querySelector('a.editor-wikilink')!.dispatchEvent(new MouseEvent('mouseenter'));
+      await vi.advanceTimersByTimeAsync(500);
+      await vi.waitFor(() => {
+        expect(document.querySelector('.wikilink-preview')).not.toBeNull();
+      });
+      collect(document);
+      card.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+
+    expect([...emitted].sort()).toEqual([...WIKILINK_BEM].sort());
   });
 });
