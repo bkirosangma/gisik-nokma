@@ -2437,7 +2437,7 @@ describe('F — the subtasks section', () => {
  * **`DEEPEST_RANK` does NOT bound a child's rank** and these cases say so by
  * construction: the rule is `childRank > parentRank`, unbounded above.
  * `DEEPEST_RANK` (= 4) governs the ROOT-creation rule alone — a type at that
- * rank or below may not sit at project root (`hierarchy.ts:108`) — and the
+ * rank or below may not sit at project root (`hierarchy.ts:133`) — and the
  * domain docblock contemplates "a type defined at rank 7, smaller work still"
  * (`packages/domain/src/ticket-types.ts:126`).
  */

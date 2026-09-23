@@ -217,7 +217,7 @@ describe('precheckEvent — instant named-reason previews from the same engine t
    * cache can offer: a parent cached, alive, and contradicting nothing. It
    * still defers, because a `passed` would have to be an accept, and every
    * engine accept for `ticket.created` is decided behind the ticket's own type
-   * definition (`checks/hierarchy.ts:84`) — which this cache has no store for.
+   * definition (`checks/hierarchy.ts:97`) — which this cache has no store for.
    */
   it('defers a create under a cached non-terminal parent — the accept reads a type rank this cache cannot serve', async () => {
     const cache = createClientStateCache();
@@ -229,8 +229,8 @@ describe('precheckEvent — instant named-reason previews from the same engine t
   });
 
   /**
-   * The no-parent path is not the exception it looks like. `hierarchy.ts:84`
-   * resolves the type BEFORE the no-parent branch at `:90`, and `:108` refuses
+   * The no-parent path is not the exception it looks like. `hierarchy.ts:97`
+   * resolves the type BEFORE the no-parent branch at `:114`, and `:133` refuses
    * `hierarchy.deepest-rank-parent-required` off `type.rank` — so the old
    * unconditional `passed` was false for every type at or below the deepest
    * rank, not merely unproven.
@@ -259,7 +259,7 @@ describe('precheckEvent — instant named-reason previews from the same engine t
    * The narrow-refusal claim above is unchanged and still true. What changed
    * (Plan 3 Chain A, 2026-08-31) is the other half: NOT REFUSING is not the
    * same as passing, once the engine's accept for `ticket.reparented` reads a
-   * definition (`checks/hierarchy.ts:215`) this cache cannot serve.
+   * definition (`checks/hierarchy.ts:251`) this cache cannot serve.
    */
   it('does not refuse a FINISHED ticket reparented under a terminal parent — but defers rather than passing', async () => {
     const cache = createClientStateCache();
@@ -942,8 +942,8 @@ describe('precheckEvent — coverage it does not have downgrades, and never fake
  *
  * THE HONEST MECHANISM, stated because the designed one is not quite what
  * happened: it did not trip on a hierarchy RULE refusing a planted claim. It
- * trips at the ticket's own type lookup (`checks/hierarchy.ts:84` for creation,
- * `:215` for a reparent), which sits ahead of every hierarchy rule. So this
+ * trips at the ticket's own type lookup (`checks/hierarchy.ts:97` for creation,
+ * `:251` for a reparent), which sits ahead of every hierarchy rule. So this
  * successor must not claim to witness the rules — it witnesses the DOOR, and
  * says so.
  *

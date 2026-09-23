@@ -297,7 +297,7 @@ describe('checkTicketFieldSet', () => {
    * `packages/domain/test/ticket-events.test.ts`); this is the same refusal
    * seen from where the fixture suite and Plan 10's offline replica stand,
    * which is the only door those two ever pass. The coalesce is gone as well —
-   * `ticket-state.ts:211` reads `claim(p.value, env)`, because once the key is
+   * `ticket-state.ts:343` reads `claim(p.value, env)`, because once the key is
    * required the fold could only restate the closed hole as the design.
    */
   /**

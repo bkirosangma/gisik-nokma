@@ -136,8 +136,8 @@ function notEvaluated(): PrecheckResult {
  *  4. a hierarchy claim — `ticket.created`, `ticket.reparented` — defers
  *     ENTIRELY through `precheckParentTerminal`. Plan 3 landed both as engine
  *     cases (`evaluate.js`), and every engine ACCEPT for either is decided
- *     behind the ticket's own type definition (`checks/hierarchy.ts:84` for
- *     creation, `:215` for a reparent), which is read BEFORE even the
+ *     behind the ticket's own type definition (`checks/hierarchy.ts:97` for
+ *     creation, `:251` for a reparent), which is read BEFORE even the
  *     no-parent branch. This cache holds no ticket-type definitions at all,
  *     so there is no accept for those two types left to derive from what it
  *     holds. What survives FROM THAT FUNCTION is the `hierarchy.parent-terminal`
@@ -323,8 +323,8 @@ export function contextFromCache(cache: ClientStateCache, overlay?: PendingOverl
     // would mean "I do not hold it", which this cache spells `undefined`
     // everywhere else and which the gates above turn into `not-evaluated`.
     // Answering `null` would let the engine convert that absence into
-    // `ticket.unknown-type` (`checks/hierarchy.ts:84-85`, `:215-216`,
-    // `checks/fields.ts:145-146`) — a REFUSAL manufactured out of absence, the
+    // `ticket.unknown-type` (`checks/hierarchy.ts:97-98`, `:251-252`,
+    // `checks/fields.ts:159-160`) — a REFUSAL manufactured out of absence, the
     // exact mirror of the `passed` this module's whole invariant forbids, and
     // one that fails this module's own definition of `refused`: "the facts it
     // read were server-served state this client holds".
@@ -374,7 +374,8 @@ export function contextFromCache(cache: ClientStateCache, overlay?: PendingOverl
  *
  * Returns `null` — no verdict from THIS check, not `not-evaluated` — when
  * there is nothing to say: the payload names no `stateId` (absent means the
- * workflow's initial state, always creatable), `workflowId` was not supplied,
+ * workflow's initial state — this check has nothing to say about it either
+ * way), `workflowId` was not supplied,
  * or this cache has not cached that definition. `null` lets `precheckEvent`
  * fall through to `precheckParentTerminal` for the rest of `ticket.created`'s
  * preview instead of manufacturing an answer this function does not have.
@@ -433,8 +434,8 @@ function precheckParentTerminal(submitted: SubmittedEvent, cache: ClientStateCac
   // — including whether a parent is named at all.
   if (parentId === undefined) return notEvaluated();
   // NOT `passed`, and the no-parent case is not the exception it looks like:
-  // `checks/hierarchy.ts:84` resolves the ticket's own type BEFORE the
-  // no-parent branch at `:90`, and `:108` then refuses
+  // `checks/hierarchy.ts:97` resolves the ticket's own type BEFORE the
+  // no-parent branch at `:114`, and `:133` then refuses
   // `hierarchy.deepest-rank-parent-required` off `type.rank`. An unconditional
   // `passed` here was false for every type at or below the deepest rank.
   if (parentId === null) return notEvaluated();

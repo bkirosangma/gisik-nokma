@@ -3505,26 +3505,43 @@ UNSPENT, not held — see the BLOCKED note below.*
 **⚠ BLOCKED, not built: the rule-engine extraction (addendum item 3) and its precheck counterpart (item
 4's domain-lane note).** The addendum asks `checkTicketCreated` to apply `fields.ts:140`'s day-format
 validation to the birth values too, "BY THE SAME CODE, not a copy," extracted into a helper both doors
-call — and asks the app-core precheck's `ticket.created` branch to run that same helper. **Measured, not
-merely argued:** `ticketCreatedPayload` (per this same addendum's item 1) types `startDate`/`dueDate` as
-`dueDateValueSchema.optional()`, so a malformed birth date already fails `ticketCreatedPayload.safeParse`
-— confirmed directly: `ticketCreatedPayload.safeParse({ ...base, dueDate: { date: '2026-02-30' } }).success
-=== false`. `checkTicketCreated`'s own `parsed = ticketCreatedPayload.safeParse(env.payload)` guard (right
-at its own door, before the state-creatable check and before any parent branch) returns the
-`malformed-payload` refusal on that same failure — a `return` statement, not a warning — so no line later
-in the function, including a call to an extracted date-validation helper, can ever run for a value that
-reaches it: the schema already excluded the only input the helper could refuse. The identical argument
-applies to `precheckCreatableState` (`packages/app-core/src/precheck.ts`), which parses the same schema at
-its own top. **Verified empirically**, not left as a plausible-sounding argument: `checkDueDateLikeValue`
-was extracted from `fields.ts:140` and wired into `checkTicketCreated` as a spike, and every case
-submitting a malformed birth date still resolved to `malformed-payload` from the schema-level parse — the
-extracted call was never reached in any run, which is what "unreachable" is being used to mean here. The
-spike was reverted rather than left in place, because a call site that cannot execute is dead code, not a
-tested behaviour. **What IS true, and is NOT the same claim item 5 asks for:** both doors refuse a
-malformed birth date (`malformed-payload` on `ticket.created`, `field.type-mismatch` on `ticket.field_set`)
-— agreement on the VERDICT, never on the rule id or the reason text, which item 5's "exactly what it
-refuses on field_set" wording asks for and which items 1 and 3 together make structurally impossible.
-Building item 3 as written would require EITHER loosening `ticketCreatedPayload`'s schema to a shape-only
-check (contradicting item 1's literal type) or accepting that the extracted call never fires (contradicting
-item 5's mutation, "skip the birth validation," which needs something skippable to redden). Owner ruling
-needed on which of items 1/3/5 gives way; `13.1449`–`13.1450` are reserved for whatever that resolves to.
+call — and asks the app-core precheck's `ticket.created` branch to run that same helper. **THREE runs were
+actually made, not argued, and reverted afterward (nothing from this spike is in the committed tree):**
+
+1. **Wired.** `checkDueDateLikeValue` was extracted from `fields.ts:140` (exported), imported into
+   `checkTicketCreated`, and called on `p.startDate`/`p.dueDate` right after the state-creatable check.
+   A throwaway case sent `ticket.created` with `dueDate: { date: '2026-02-30' }` (`WF`/`TASK`, no parent,
+   root-legal rank). Actual verdict, printed and pinned in the run log:
+   `{"refused":true,"rule":"malformed-payload","reason":"This ticket.created event's payload is malformed:
+   at dueDate.date: a due date is a day the calendar has"}` — `checkDueDateLikeValue` would have answered
+   `field.type-mismatch` with a different sentence, and neither appears: the function returned at its own
+   `ticketCreatedPayload.safeParse` guard before the wired call was ever reached.
+2. **Mutation "skip the birth validation."** The wired call (both `if` blocks) was deleted and the same
+   case re-run. **Byte-identical verdict** — same rule, same reason, same JSON. A mutation that changes the
+   verdict not at all is a survivor: the call was dead code, not an untested behaviour.
+3. **Control, showing the schema is what is actually enforcing this.** `ticketCreatedPayload`'s
+   `startDate`/`dueDate` were changed from `dueDateValueSchema.optional()` to `z.unknown().optional()` and
+   case 13.1447 was re-run (no rebuild needed — vitest reads source): it **reddened**
+   (`expected true to be false` on `result.ok`), proving `dueDateValueSchema` at the payload door is the
+   live check a malformed birth date is actually caught by, not an inert type annotation.
+
+Runs 1 and 2 together are the proof: a malformed birth date is refused by the SCHEMA before `checkTicketCreated`
+reaches any later line, so a business-rule call placed after that guard — extracted or not — cannot ever see
+an invalid value to refuse. The identical argument applies to `precheckCreatableState`
+(`packages/app-core/src/precheck.ts`), which parses the same schema at its own top for the same reason.
+**What IS true, and is NOT the same claim item 5 asks for:** both doors refuse a malformed birth date
+(`malformed-payload` on `ticket.created`, `field.type-mismatch` on `ticket.field_set`) — agreement on the
+VERDICT, never on the rule id or the reason text, which item 5's "exactly what it refuses on field_set"
+wording asks for and which items 1 and 3 together make structurally impossible. Building item 3 as written
+would require EITHER loosening `ticketCreatedPayload`'s schema to a shape-only check (contradicting item 1's
+literal type, and run 3 above shows exactly what that loosening would cost) or accepting that the extracted
+call never fires (contradicting item 5's mutation, "skip the birth validation," which needs something
+skippable to redden — run 2 shows it does not). Owner ruling needed on which of items 1/3/5 gives way;
+`13.1449`–`13.1450` are reserved for whatever that resolves to. **The consequence for the UI lane, item 4's
+other half:** `precheckCreatableState` cannot preview a nice per-field reason for a malformed birth date
+either, for the identical structural reason — a bad date makes `ticketCreatedPayload.safeParse` fail inside
+that function too, so it returns `null` (no verdict from that check) and `precheckEvent` falls through to
+`precheckParentTerminal`, which answers `not-evaluated` for a root ticket. There is no `field.type-mismatch`-
+shaped reason for the form to render from this path; date-input validation belongs to the UI lane's own
+client-side check (e.g. validating the raw string before it is even built into a payload), not to a date
+helper reused from the engine.

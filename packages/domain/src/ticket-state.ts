@@ -508,7 +508,7 @@ export function foldTicketToWorkflowVersion(
     //
     // The message names the id at the point the chain BROKE and no version
     // beside it, because `foldStateIdForward` reports the break-point id, not
-    // the one it started from (workflow.ts:99-101): on a chain longer than two
+    // the one it started from (workflow.ts:158): on a chain longer than two
     // that id can belong to a version the ticket never sat in, and naming a
     // state and a version that never coexisted is worse than naming neither.
     // Same reasoning, same wording discipline as the engine's stranded-state

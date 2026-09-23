@@ -315,7 +315,7 @@ describe('ticket event vocabulary', () => {
  * then-`p.value ?? null` folded that absence into a null CLEARING claim: a
  * field wiped under the actor's name and both their clocks, into an append-only
  * table, on the strength of a claim nobody made. The coalesce has since been
- * dropped too — `src/ticket-state.ts:211` reads `claim(p.value, env)` — because
+ * dropped too — `src/ticket-state.ts:343` reads `claim(p.value, env)` — because
  * with the key required the `parse` throws first and `null ?? null` is
  * identity, so the fold could only have restated the defect as the design.
  *

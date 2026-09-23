@@ -36,7 +36,7 @@ import { ReadOnlyBanner } from './read-only-banner.js';
  *   only published definitions, so a field that can hold exactly one value would
  *   be a badge that lies by omission the moment a second state exists.
  *   `PublishedWorkflowDef` stays `{id,version,name,initialStateId,states,
- *   transitions,stateMapping?}` (`packages/domain/src/workflow.ts:83-116`) with
+ *   transitions,stateMapping?}` (`packages/domain/src/workflow.ts:100-133`) with
  *   no status anywhere on the wire; `"Published"` is derivable from the read
  *   itself, and the prototype's other two badge values (`"Superseded"`,
  *   `"Draft · N issues"`, `:3175-3178`) are not.
