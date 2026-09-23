@@ -1,19 +1,23 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
-import { env } from '@huggingface/transformers';
 import type { TestDatabase } from '../helpers/db.js';
 
 /**
  * The embedding backend (spec §7.6, cases 18.126–18.129, Plan 3 of 6).
  *
- * ## Why the offline flag is set BEFORE the import
+ * ## Why 18.126 breaks `fetch` instead of asserting a flag
  *
- * `HF_HUB_OFFLINE=1` is set on the first line and the module under test is
- * loaded with a DYNAMIC import below it. A static import would be hoisted above
- * this statement, so the flag would be set too late to be part of what was
- * measured — and the case's claim is precisely "never touches the network",
- * which a flag set after the module loaded cannot support. `env.allowRemoteModels
- * = false` is asserted as well, because that is the flag the module itself owns;
- * `HF_HUB_OFFLINE` is the belt to that braces, and neither is trusted alone.
+ * Until task/notes-3-runtime-fix, "never touches the network" was asserted by
+ * reading `@huggingface/transformers`'s `env.allowRemoteModels` — a flag on a
+ * module `embedding.ts` no longer imports (that import is exactly the bug the
+ * fix closes; see `embedding.ts`'s own docblock). The PROPERTY under test did
+ * not change — this module still never fetches — only the instrument did:
+ * `globalThis.fetch` is replaced with a function that THROWS before the first
+ * `embedTexts` call below, and the assertion is that embedding still succeeds.
+ * That is a behavioural check rather than a flag on a since-removed
+ * dependency, and it is a STRONGER one: it fails if ANY code path in the
+ * module ever reaches for the network, not only the one flag this used to
+ * read. `test/search/tokenizer-equivalence.test.ts` (18.165) covers the
+ * tokenizer swap itself — this case is only about network access.
  *
  * ## Why 18.127 is the only case that can catch a WRONG model
  *
@@ -25,8 +29,6 @@ import type { TestDatabase } from '../helpers/db.js';
  * are in the assertion's messages, so a future failure says which pair drifted
  * rather than only that something did.
  */
-
-process.env['HF_HUB_OFFLINE'] = '1';
 
 const embedding = await import('../../src/search/embedding.js');
 const { CURRENT_MODEL, EMBEDDING_DIM, embedTexts, embedQuery, queryCacheSize } = embedding;
@@ -58,12 +60,22 @@ describe('18.126–18.129 the embedding backend', () => {
    * Mutation: skip normalisation.
    */
   it('18.126 — embedTexts returns unit-length vectors of EMBEDDING_DIM, deterministically, offline', async () => {
-    expect(env.allowRemoteModels, 'the module configures itself never to fetch').toBe(false);
     expect(CURRENT_MODEL).toBe('minishlab/potion-base-32M@static');
     expect(EMBEDDING_DIM).toBe(512);
 
-    const [first] = await embedTexts(['the compressor stopped in the cold room']);
-    expect(first).toBeInstanceOf(Float32Array);
+    const originalFetch = globalThis.fetch;
+    globalThis.fetch = (() => {
+      throw new Error('18.126: embedding must never call fetch');
+    }) as typeof fetch;
+    let first: Float32Array | undefined;
+    try {
+      [first] = await embedTexts(['the compressor stopped in the cold room']);
+    } finally {
+      globalThis.fetch = originalFetch;
+    }
+    expect(first, 'embedding succeeded with fetch throwing — nothing on this path reaches the network').toBeInstanceOf(
+      Float32Array,
+    );
     expect(first?.length).toBe(EMBEDDING_DIM);
     expect(norm(first as Float32Array), 'unit length').toBeCloseTo(1, 5);
 

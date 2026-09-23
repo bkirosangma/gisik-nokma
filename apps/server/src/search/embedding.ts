@@ -1,6 +1,6 @@
 import { readdir, readFile } from 'node:fs/promises';
 import { fileURLToPath } from 'node:url';
-import { env, AutoTokenizer } from '@huggingface/transformers';
+import { Tokenizer } from '@huggingface/tokenizers';
 
 /**
  * The in-process embedding backend (spec §7.6, Plan 3 of 6).
@@ -22,15 +22,60 @@ import { env, AutoTokenizer } from '@huggingface/transformers';
  * Dockerfile base image was NOT changed to make it: that is a deploy change
  * nobody asked for. The static-embedding backend is what runs.
  *
+ * ## The first fix still crashed the image — a SECOND, measured bug
+ *
+ * The tokenizer was believed to be a safe reason to keep
+ * `@huggingface/transformers` as a runtime dependency: `AutoTokenizer` runs no
+ * ONNX op, so the assumption was that importing only it would not touch
+ * `onnxruntime-node`. That was wrong. The package's `package.json` `exports`
+ * map has no subpaths — only the whole-package `node`/`default` conditions —
+ * so importing ANYTHING from `@huggingface/transformers`, including just
+ * `AutoTokenizer`, resolves to `dist/transformers.node.mjs`, whose TOP-LEVEL
+ * module body (not a function called on demand) runs
+ * `createRequire(import.meta.url)("onnxruntime-node")`
+ * (`dist/transformers.node.mjs:8497`, from `src/backends/onnx-node.js`). The
+ * `dlopen` happens at import time no matter which export is used, so the same
+ * `ERR_DLOPEN_FAILED` that killed the ONNX spike also killed the
+ * tokenizer-only import in the real image (measured 2026-09-23, controller,
+ * task/notes-3-runtime-fix) — the server died at boot before ever reaching a
+ * search request.
+ *
+ * ## The fix is `@huggingface/tokenizers` — the SAME code, not a rewrite
+ *
+ * `AutoTokenizer`'s WordPiece/BertNormalizer/BertPreTokenizer machinery is not
+ * homegrown inside `@huggingface/transformers`: `dist/transformers.node.mjs`
+ * bundles `@huggingface/tokenizers@0.2.0`'s own `dist/tokenizers.mjs`
+ * verbatim (its source-comment names that exact path). That package is also
+ * published standalone — zero `dependencies`, no `.node` binaries anywhere
+ * under it, no `fetch(` call in its bundle, Apache-2.0 licensed — and
+ * importing it directly reaches the identical tokenizer implementation
+ * through a public entry point that never links `onnxruntime-node`.
+ * `test/search/tokenizer-equivalence.test.ts` proves the two produce
+ * identical token-id sequences over 200+ strings on this (glibc) host, where
+ * both can load; it is the evidence that swapping the import does not
+ * silently change the vectors already stored in `search_note_chunks`.
+ *
+ * `Tokenizer`'s constructor takes the ALREADY-PARSED `tokenizer.json` and
+ * `tokenizer_config.json` (read below with the same `readFile` used for the
+ * safetensors shards) rather than a `from_pretrained(id)` loader — there is no
+ * fetch path to disable here, which is a STRONGER "no network" guarantee than
+ * the flag this module used to set on `@huggingface/transformers`'s `env`: the
+ * capability to fetch a model is not linked into the process at all.
+ *
+ * `@huggingface/transformers` stays a `devDependency` of `apps/server`, kept
+ * ONLY so the host-only equivalence test above can still import
+ * `AutoTokenizer` for comparison. `pnpm deploy --prod` (what builds the
+ * runtime image; see the Dockerfile's `build` stage) does not install
+ * `devDependencies`, so `onnxruntime-node` never reaches the image — verified
+ * in this change by listing `/app/node_modules/@huggingface` inside the built
+ * image.
+ *
  * ## What a static model is, and why it needs no native code
  *
  * `minishlab/potion-base-32M` is a model2vec distillation: one 512-dimensional
  * vector PER TOKEN and nothing else. There is no transformer to execute, so
  * there is no ONNX runtime to load — a text's vector is the mean of its token
- * vectors, L2-normalised. The tokenizer still comes from
- * `@huggingface/transformers`, whose `AutoTokenizer` is pure JavaScript over
- * `tokenizer.json`, which is why the dependency is still here and why `onnxruntime`
- * is never imported on this path.
+ * vectors, L2-normalised.
  *
  * ## The table is TWO committed files, and that is a GitHub limit
  *
@@ -45,11 +90,16 @@ import { env, AutoTokenizer } from '@huggingface/transformers';
  *
  * ## No network, ever
  *
- * `env.allowRemoteModels = false` is set at module load, not inside the loader:
- * a server that silently downloads a model on first search would make its
- * first query slow, its startup unpredictable and its image's contents not the
- * thing that was tested. `test/search/embedding.test.ts` asserts this flag and
- * the model files are loaded from `apps/server/models/` alone.
+ * Nothing in this module — or in `@huggingface/tokenizers` — holds a `fetch`
+ * call or a remote-model id: `loadTable` and `loadTokenizer` both read fixed
+ * paths under `MODEL_DIR` with `readFile` and nothing else. A server that
+ * silently downloaded a model on first search would make its first query
+ * slow, its startup unpredictable and its image's contents not the thing that
+ * was tested, and that failure mode requires a networking code path to exist
+ * in the first place — here it does not. `test/search/embedding.test.ts`
+ * asserts this behaviourally (a `fetch` that throws does not stop
+ * `embedTexts` from succeeding) and the model files are loaded from
+ * `apps/server/models/` alone.
  */
 
 /** `'<name>@<variant>'` — the variant is what `search_note_chunks.model` stores. */
@@ -58,7 +108,7 @@ export const CURRENT_MODEL = 'minishlab/potion-base-32M@static';
 /** potion-base-32M's `hidden_dim`. The migration's `vector(EMBEDDING_DIM)` follows it. */
 export const EMBEDDING_DIM = 512;
 
-/** The directory name under `apps/server/models/`, and the tokenizer's `from_pretrained` id. */
+/** The directory name under `apps/server/models/`. */
 const MODEL_DIR_NAME = 'potion-base-32M';
 
 const MODELS_ROOT = fileURLToPath(new URL('../../models', import.meta.url));
@@ -70,12 +120,6 @@ const BATCH_SIZE = 16;
 /** Spec §7.6: an LRU of 256 entries with a 60 s life. */
 const QUERY_CACHE_MAX = 256;
 const QUERY_CACHE_TTL_MS = 60_000;
-
-// Set at LOAD, before anything can read a model, so no code path can observe a
-// state in which a fetch is allowed.
-env.allowRemoteModels = false;
-env.allowLocalModels = true;
-env.localModelPath = MODELS_ROOT;
 
 type SafetensorsHeader = {
   embeddings?: { dtype?: string; shape?: number[]; data_offsets?: number[] };
@@ -141,10 +185,17 @@ function loadTable(): Promise<Float32Array> {
   return tablePromise;
 }
 
-let tokenizerPromise: Promise<Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>> | null = null;
+let tokenizerPromise: Promise<Tokenizer> | null = null;
 
-function loadTokenizer(): Promise<Awaited<ReturnType<typeof AutoTokenizer.from_pretrained>>> {
-  tokenizerPromise ??= AutoTokenizer.from_pretrained(MODEL_DIR_NAME, { local_files_only: true });
+/** Reads `tokenizer.json` and `tokenizer_config.json` from `MODEL_DIR` — no `from_pretrained` fetch path exists to disable. */
+function loadTokenizer(): Promise<Tokenizer> {
+  tokenizerPromise ??= (async () => {
+    const [tokenizerJson, tokenizerConfig] = await Promise.all([
+      readFile(`${MODEL_DIR}/tokenizer.json`, 'utf8').then((text) => JSON.parse(text) as object),
+      readFile(`${MODEL_DIR}/tokenizer_config.json`, 'utf8').then((text) => JSON.parse(text) as object),
+    ]);
+    return new Tokenizer(tokenizerJson, tokenizerConfig);
+  })();
   return tokenizerPromise;
 }
 
@@ -183,10 +234,7 @@ function meanVector(table: Float32Array, ids: number[]): Float32Array {
 
 async function embedBatch(texts: string[]): Promise<Float32Array[]> {
   const [table, tokenizer] = await Promise.all([loadTable(), loadTokenizer()]);
-  return texts.map((text) => {
-    const encoded = tokenizer(text).input_ids.tolist() as unknown as number[][];
-    return meanVector(table, (encoded[0] ?? []).map(Number));
-  });
+  return texts.map((text) => meanVector(table, tokenizer.encode(text).ids));
 }
 
 /** Embeds texts in batches of at most 16, in order. Units: `texts.length` vectors. */
