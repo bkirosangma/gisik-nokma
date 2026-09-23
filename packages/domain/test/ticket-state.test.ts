@@ -608,8 +608,21 @@ describe('applyTicketEvent', () => {
 
 describe('TICKET_EVENT_TYPES', () => {
   it('lists exactly the registered types whose entity kind is a ticket', () => {
+    // MEMBERSHIP, not identity, since the notes series (Plan 1 of 6): the
+    // registry's `entityKind` may now name a LIST, and `comment.added` — the one
+    // type in this list that has one — declares `['ticket', 'note']` because a
+    // comment on a note is the same claim about a different subject.
+    //
+    // The property this loop exists to hold is unchanged and is what the
+    // normalisation below states: every type a REPLAY reader iterates over the
+    // ticket vocabulary must still be ADMITTED against a ticket at the door. An
+    // identity assertion would have reddened for the widening while saying
+    // nothing about the property; membership keeps the property and admits the
+    // union. Tightening this back to `toBe('ticket')` silently narrows what the
+    // registry may declare, which is the direction that hides a change.
     for (const type of TICKET_EVENT_TYPES) {
-      expect(domainRegistry.get(type, 1)?.entityKind).toBe('ticket');
+      const kind = domainRegistry.get(type, 1)?.entityKind;
+      expect(Array.isArray(kind) ? kind : [kind], type).toContain('ticket');
     }
     // ticket-type.defined is registered against 'ticket-type' and folds into no
     // ticket: a type's workflow binding changes what NEW tickets get, never

@@ -12,6 +12,19 @@ import type {
 // spelling of one contract that `attachment-list.tsx`'s own docblock forbids.
 import type { AttachmentListEntry } from './views/attachment-list.js';
 import type { TicketComment } from './views/comments-thread.js';
+// The note read models come straight from the DOMAIN, not from a view type
+// here: `NoteSummary` and its siblings describe the wire body the routes send
+// (spec §2), no component reshapes them, and a client-side copy would be a
+// second definition of a body only the server can produce. `TicketComment` is
+// the opposite case and lives in `views/comments-thread.js` because the union
+// IS the component's — a note's read models have no such component in Plan 1.
+import type {
+  NoteComment,
+  NoteDetail,
+  NoteScopeMode,
+  NoteSummary,
+  NoteVersion,
+} from '@gisik-nokma/domain';
 import type {
   AttentionItem,
   BoardView,
@@ -82,6 +95,36 @@ import type {
 export type { ServerStreamFrame };
 
 export type Unsubscribe = () => void;
+
+/**
+ * The note list's filters — a NAMED type rather than an inline object literal,
+ * which is this file's existing style (`FilterSpec`, `Grouping`) and also a
+ * HARD REQUIREMENT of a gate rather than a preference.
+ *
+ * `apps/server/test/integration/client-contract.test.ts`'s `clientMethodParameters`
+ * reads this file with a pattern anchored on `DataSourceQuery`'s own declaration
+ * whose body class EXCLUDES braces. So an inline object literal in a method
+ * signature makes the block unmatchable and the scanner throws rather than
+ * skipping. That was measured, not assumed: the first version of `getNotes` used
+ * an inline filter type and case 7.201 failed.
+ *
+ * ⚠ **This docblock must not spell that pattern out, and the first draft did.**
+ * The scanner's regex is unanchored, so a brace-bearing LITERAL anywhere in the
+ * file matches FIRST if it appears before the real declaration — and an earlier
+ * version of this paragraph quoted the pattern and the scanner's own error
+ * message, both of which contain braces, and the regex duly captured the prose
+ * and reported `DataSourceQuery declares no getMyWork`. Measured at case 7.201,
+ * twice. Prose that describes a scanner is inside the scanner's haystack.
+ *
+ * It is a better signature either way — a caller can name the filter, and the
+ * replica's local implementation can take the same type rather than restating
+ * three optional strings.
+ */
+export type NoteListFilter = {
+  homeProjectId?: string;
+  authorId?: string;
+  scopeMode?: NoteScopeMode;
+};
 
 /**
  * Typed read functions mirroring the server read surface (Plan 5 + earlier).
@@ -191,6 +234,51 @@ export type DataSourceQuery = {
    * the union is the component's, and only the component's props describe it.
    */
   getTicketComments(workspaceId: string, ticketId: string): Promise<TicketComment[]>;
+  /**
+   * The note reads (notes series, Plan 1 of 6, spec §6.4) — seven methods, the
+   * same seven the server's note routes serve.
+   *
+   * ## `null` on 404, `[]` on an empty list, and the difference is the product's
+   *
+   * `getNote` answers `null` rather than throwing, matching `getTicket` and
+   * NOT `getTicketComments`: the note routes answer 404 for an invisible note
+   * and a nonexistent one INDISTINGUISHABLY (spec §6.4's existence-oracle rule),
+   * so a caller that folded the 404 into `null` anyway would be inventing a
+   * distinction the server deliberately does not draw. The two list reads answer
+   * `[]` for a 404 on the same argument `getMembers` and `getTicketHistory` take
+   * for theirs — emptiness is a true answer here with a stated cost, and the
+   * notes list is a screen where "nothing here" and "we could not read it" are
+   * drawn by the same empty state.
+   *
+   * ## `getDeletedNotes` is its own method although the route is the same one
+   *
+   * `?deleted=1` is a query parameter on the list route, so this could have been
+   * a flag on `getNotes`. It is separate because the two reads are gated
+   * DIFFERENTLY (spec §4.1: only the author, an admin or the owner may go
+   * looking for deleted notes) and a flag would put two authorisation rules
+   * behind one name — a caller passing a deleted flag would have no hint that it
+   * can answer `[]` for a reason the plain call cannot.
+   *
+   * (That sentence is written WITHOUT braces deliberately: no brace may appear
+   * anywhere inside this block, comments included, because
+   * `client-contract.test.ts`'s scanner matches up to the first one. An earlier
+   * draft wrote the call as a literal and the scanner read a truncated block —
+   * measured, at case 7.201.)
+   *
+   * ## `searchNotes` is NOT here
+   *
+   * Notes search is Plan 3 of the series (spec §7.7) and lands with its own
+   * route, projection and worker. Declaring it now would oblige both sources to
+   * implement a method nothing can serve — the same trap `online/founding.ts`
+   * records for the founding reads.
+   */
+  getNotes(workspaceId: string, filter?: NoteListFilter): Promise<NoteSummary[]>;
+  getDeletedNotes(workspaceId: string): Promise<NoteSummary[]>;
+  getNote(workspaceId: string, noteId: string): Promise<NoteDetail | null>;
+  getNotesForTicket(workspaceId: string, ticketId: string): Promise<NoteSummary[]>;
+  getNoteComments(workspaceId: string, noteId: string): Promise<NoteComment[]>;
+  getNoteHistory(workspaceId: string, noteId: string): Promise<NoteVersion[]>;
+  getNoteVersion(workspaceId: string, noteId: string, eventId: string): Promise<unknown | null>;
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   getTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;

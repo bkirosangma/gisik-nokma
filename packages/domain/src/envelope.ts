@@ -20,6 +20,15 @@ export const ENTITY_KINDS = [
   'ticket-type',
   'membership',
   'invite',
+  // The notes series (Plan 1 of 6, spec §3.1). A note is a rich-text document
+  // with its own stream: nine `note.*` types are registered against it in
+  // `vocabulary.ts`, and `comment.added` — until now a ticket-only type — is
+  // declared for BOTH kinds. It joins the list here rather than in Plan 2
+  // because `envelope.ts` is the file every lane imports and a second amendment
+  // late in the series would make three sibling lanes rebase onto the same
+  // schema twice. `'notebook'` is deliberately NOT a member: the case that
+  // proves the closed set is closed (18.001) asserts it is absent.
+  'note',
 ] as const;
 export type EntityKind = (typeof ENTITY_KINDS)[number];
 

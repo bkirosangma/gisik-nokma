@@ -70,7 +70,7 @@ describe('submittedEventSchema', () => {
     expect(rejectionIssues(result)).toContainEqual({
       path: ['entity', 'kind'],
       message:
-        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership' | 'invite', received 'shop'",
+        "Invalid enum value. Expected 'workspace' | 'project' | 'ticket' | 'workflow' | 'ticket-type' | 'membership' | 'invite' | 'note', received 'shop'",
     });
   });
 
@@ -291,6 +291,12 @@ describe('entity id, kind by kind', () => {
  * the envelope admits the kind, and `parseEvent` still has nothing to file
  * against it. Both halves are asserted so "additive and inert" is checked, not
  * assumed.
+ *
+ * `'note'` joined the list in the notes series (Plan 1 of 6, spec §3.1) and is
+ * NOT inert in the same sense: nine `note.*` types are registered against it in
+ * the same commit. It appears in this exact-list assertion because the list is
+ * closed, which is the property this case exists to pin — an added kind that
+ * nothing registered against would still show here, and that is deliberate.
  */
 describe("ENTITY_KINDS admits 'invite'", () => {
   it('accepts an invite entity with a bare ULID id', () => {
@@ -298,7 +304,7 @@ describe("ENTITY_KINDS admits 'invite'", () => {
     expect(submittedEventSchema.safeParse(event).success).toBe(true);
   });
 
-  it('lists exactly the seven kinds', () => {
+  it('lists exactly the eight kinds', () => {
     expect([...ENTITY_KINDS]).toEqual([
       'workspace',
       'project',
@@ -307,6 +313,7 @@ describe("ENTITY_KINDS admits 'invite'", () => {
       'ticket-type',
       'membership',
       'invite',
+      'note',
     ]);
   });
 });

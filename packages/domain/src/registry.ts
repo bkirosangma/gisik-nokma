@@ -12,8 +12,25 @@ export type EventTypeRegistration = {
    * once, beside the type it belongs to, and enforced for every event type at
    * the door (parseEvent) — coordination doc §11. Optional: a type that
    * genuinely spans kinds simply omits it, and then any kind is admitted.
+   *
+   * ## One kind, or an explicit LIST of them — never a bare omission
+   *
+   * Widened from a single kind by the notes series (Plan 1 of 6, spec §3.2),
+   * for exactly ONE type: `comment.added`. A comment on a ticket and a comment
+   * on a note are the same claim about different subjects, so the registry
+   * names both rather than the type being re-registered (the registry refuses a
+   * second registration of the same `type@version`, so a second `comment.added`
+   * is not even available) or its binding being dropped.
+   *
+   * **`undefined` is still not the same statement as a list.** A type that
+   * omits `entityKind` is admitted against ANY kind — including kinds that do
+   * not exist yet — which is what the `'a registration that declares no entity
+   * kind still admits any kind'` case pins. A type that names kinds is refused
+   * against every other one. `comment.added` names `['ticket', 'note']` and is
+   * therefore still refused against, say, a `project`; the difference is the
+   * whole reason this is a union and not a deletion.
    */
-  entityKind?: EventEnvelope['entity']['kind'];
+  entityKind?: EventEnvelope['entity']['kind'] | readonly EventEnvelope['entity']['kind'][];
 };
 
 export type EventTypeRegistry = {

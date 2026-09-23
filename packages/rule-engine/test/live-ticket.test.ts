@@ -91,17 +91,25 @@ describe('17.121 E6-2 — the live-ticket gate refuses every ordinary write agai
     // hand. Each `domainRegistry.register({ … })` block yields its `type` and
     // its `entityKind`; the two tables above must be exactly the ticket-scoped
     // ones. The two controls beside the equality say the parse found the
-    // registrations at all (34 blocks, 18 of them ticket-scoped, at the time of
-    // writing) rather than matching an empty file against an empty table.
+    // registrations at all (MEASURED at this commit: 43 blocks, 18 of them
+    // ticket-scoped) rather than matching an empty file against an empty table.
+    //
+    // ⚠ **A block counts as ticket-scoped when its `entityKind` expression
+    // NAMES `'ticket'`, not when it EQUALS it**, and the widening is the notes
+    // series' doing rather than a loosening for its own sake. Until Plan 1 of 6
+    // every registration spelled one kind — `entityKind: 'ticket'` — so a
+    // single-quote-only regex was exactly right. `comment.added` now declares
+    // `entityKind: ['ticket', 'note']`, and the narrow pattern silently dropped
+    // it from the universe: the case then failed with 18 covered against 17
+    // scoped, and a looser fix — deleting `comment.added` from `GATED` — would
+    // have removed a REAL ticket-scoped write from the gate's coverage. The
+    // pattern reads the whole expression for the word, so `comment.added` stays
+    // in the universe and still has to pick a side.
     const source = readFileSync(new URL('../../domain/src/vocabulary.ts', import.meta.url), 'utf8');
     const blocks = source.split('domainRegistry.register({').slice(1);
     const ticketScoped = blocks
-      .map((block) => ({
-        type: /\btype: '([^']+)'/.exec(block)?.[1],
-        kind: /\bentityKind: '([^']+)'/.exec(block)?.[1],
-      }))
-      .filter((entry) => entry.kind === 'ticket')
-      .map((entry) => entry.type)
+      .filter((block) => /entityKind: [^\n]*'ticket'/.test(block))
+      .map((block) => /\btype: '([^']+)'/.exec(block)?.[1])
       .sort();
     expect(blocks.length).toBeGreaterThan(20);
     expect(ticketScoped.length).toBeGreaterThan(10);

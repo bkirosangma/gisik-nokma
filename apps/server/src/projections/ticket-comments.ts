@@ -3,23 +3,33 @@ import { commentAddedPayload, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Projection } from './registry.js';
 
 /**
- * A ticket's comments, one row per `comment.added` (executor 2's comment-thread
- * dispatch). This is the READ the event has never had: `comment.added` was
- * fully wired — vocabulary, reducer, mention fan-out, sync, a `require-comment`
- * seed rule — and the only place its text landed was `proj_search.comments`, a
+ * Comments, one row per `comment.added` — a ticket's in `proj_ticket_comments`
+ * and a NOTE's in `proj_note_comments` (the notes series, Plan 1 of 6, spec
+ * §6.3). This is the READ the event has never had: `comment.added` was fully
+ * wired — vocabulary, reducer, mention fan-out, sync, a `require-comment` seed
+ * rule — and the only place its text landed was `proj_search.comments`, a
  * concatenated TEXT column built for full-text search with no author, no time
  * and no per-comment identity.
+ *
+ * ## Why ONE projection owns two tables
+ *
+ * Because the event is one TYPE with two kinds (`entityKind: ['ticket',
+ * 'note']`, `packages/domain/src/vocabulary.ts`). Two projections would put the
+ * same event in front of two `apply` functions, each of which would have to
+ * re-state which kind it takes — and the second one's guard is the kind of
+ * belt-and-braces branch that is easy to get backwards and invisible when it is.
+ * One `apply`, one branch, one place to read the rule.
  *
  * ## Determinism
  *
  * Per-entity `seq` order is the only ordering replay guarantees, and it is
- * enough here: a comment is filed against the TICKET (`entityKind: 'ticket'`,
- * `packages/domain/src/vocabulary.ts:224`), so every event this projection
- * applies belongs to one entity and arrives in that entity's own order. The
- * projection reads NO other table — not another projection's, not its own — so
- * nothing above it must run first, and nothing below it must run after; that is
- * why it APPENDS in `index.ts` rather than inserting at a §8 position (whose
- * list ends at `proj_visibility` and names none for this).
+ * enough here: a comment is filed against the entity it is about — a ticket or
+ * a note, and still exactly one of them — so every event this projection applies
+ * belongs to one entity and arrives in that entity's own order. The projection
+ * reads NO other table — not another projection's, not its own — so nothing
+ * above it must run first, and nothing below it must run after; that is why it
+ * APPENDS in `index.ts` rather than inserting at a §8 position (whose list ends
+ * at `proj_visibility` and names none for this).
  *
  * The two stored non-payload facts are both properties of the EVENT, never of
  * the moment it was applied: `serverTime` was assigned at ingest and is on the
@@ -45,20 +55,27 @@ import type { Projection } from './registry.js';
  */
 export const ticketCommentsProjection: Projection = {
   name: 'proj_ticket_comments',
-  tables: ['proj_ticket_comments'],
+  tables: ['proj_ticket_comments', 'proj_note_comments'],
 
   async apply(event: LedgerEvent, tx: PoolClient): Promise<void> {
     if (event.type !== 'comment.added') {
       return;
     }
 
-    // Belt-and-braces rather than a reachable branch, for `search.ts`'s reason:
-    // the registry binds `comment.added` to `entityKind: 'ticket'` and
-    // `parseEvent` refuses a mismatch, but `apply` is also called by replay
-    // paths that read the ledger directly — and a comment filed against a
-    // non-ticket entity would put a row in this table that no route could ever
-    // scope to a ticket.
-    if (event.entity.kind !== 'ticket') {
+    // The TWO kinds `comment.added` may be filed against, since the notes series
+    // (Plan 1 of 6): a comment on a ticket and a comment on a note are the same
+    // claim about a different subject, and the registry now declares both
+    // (`vocabulary.ts`, `entityKind: ['ticket', 'note']`). ONE projection owns
+    // both tables because the event is one type: splitting them would put the
+    // same event in front of two `apply` functions, each of which would have to
+    // re-state which kind it takes.
+    //
+    // Anything else still returns, and that guard is still belt-and-braces for
+    // `search.ts`'s reason: `parseEvent` refuses a third kind at the door, but
+    // `apply` is also called by replay paths that read the ledger directly, and
+    // a comment filed against, say, a project would put a row in the ticket
+    // table that no route could ever scope to a ticket.
+    if (event.entity.kind !== 'ticket' && event.entity.kind !== 'note') {
       return;
     }
 
@@ -69,10 +86,19 @@ export const ticketCommentsProjection: Projection = {
     // here is a replay-integrity break and should read like one.
     const payload = commentAddedPayload.parse(event.payload);
 
+    // The two tables differ in ONE column's NAME and in nothing else — the
+    // owning entity — which is why this is a branch over the owner rather than
+    // one parameterised table name. Interpolating the table and the column from
+    // `event.entity.kind` would put caller-adjacent bytes into SQL text, and the
+    // read layer's own rule (`SqlParams`) is that nothing does.
     await tx.query(
-      `INSERT INTO proj_ticket_comments
-         (comment_id, workspace_id, ticket_id, author_id, body, recorded_at, workspace_seq)
-       VALUES ($1, $2, $3, $4, $5, $6, $7)`,
+      event.entity.kind === 'note'
+        ? `INSERT INTO proj_note_comments
+             (comment_id, workspace_id, note_id, author_id, body, recorded_at, workspace_seq)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`
+        : `INSERT INTO proj_ticket_comments
+             (comment_id, workspace_id, ticket_id, author_id, body, recorded_at, workspace_seq)
+           VALUES ($1, $2, $3, $4, $5, $6, $7)`,
       [
         event.id,
         event.workspaceId,
@@ -88,6 +114,6 @@ export const ticketCommentsProjection: Projection = {
   async reset(tx: PoolClient): Promise<void> {
     // TRUNCATE, not DELETE (controller ruling P4), matching every shipped
     // projection.
-    await tx.query('TRUNCATE proj_ticket_comments');
+    await tx.query('TRUNCATE proj_ticket_comments, proj_note_comments');
   },
 };

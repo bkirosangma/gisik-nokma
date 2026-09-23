@@ -3,6 +3,7 @@ import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
 import type { Grouping } from './filter-spec.js';
 import type { Priority, TicketTypeDef } from './ticket-types.js';
 import type { WorkspaceSettings } from './events/workspace-settings.js';
+import type { NoteScope } from './note-state.js';
 
 /**
  * The read models every `/v1` read route serves and every client renders
@@ -731,3 +732,46 @@ export type TicketCountsResponse = {
 export type MigrationOutcome =
   | { status: 'migrated'; count: number }
   | { status: 'refused'; rule: string; reason: string };
+
+/**
+ * The note read models (notes series, Plan 1 of 6, spec §2).
+ *
+ * `NoteSummary` is what a LIST serves and `NoteDetail` adds the two fields only
+ * a single-note read can afford: the `body` itself and the `schemaVersion` that
+ * says which document schema wrote it (the version rides INSIDE the doc —
+ * `DocJson`'s `attrs.schemaVersion` — but a reader that had to open the document
+ * to learn it would be parsing JSON to decide whether it can parse JSON).
+ *
+ * `attachedTickets` carries the ticket's `key` and `title`, not just its id,
+ * because the notes page shows "CCSO-1183 Renew the trade licence" on the row
+ * and a caller that had only ids would need N more reads to paint the list. The
+ * server builds it with the viewer's own ticket visibility applied — a reader of
+ * a note who cannot see one of its tickets does not learn that ticket's key —
+ * which is why the field is on the READ model and not derived client-side from
+ * an id list.
+ *
+ * `NoteVersion` is a POINTER, not a snapshot: a version is an event, and the
+ * history screen lists pointers until one is opened, at which point
+ * `getNoteVersion` fetches that event's body. Storing every version's body in
+ * this shape would ship the whole document history on every history read.
+ *
+ * `NoteComment` is deliberately narrower than the ticket comment read: no
+ * files, no mentions. Notes get images in Plan 4 of the series, and a field
+ * that is always empty today would read as "this note has no files" rather than
+ * "this read does not carry files yet".
+ */
+export type NoteSummary = {
+  noteId: string;
+  workspaceId: string;
+  homeProjectId: string;
+  authorId: string;
+  title: string;
+  scope: NoteScope;
+  attachedTickets: { ticketId: string; key: string; title: string }[];
+  deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type NoteDetail = NoteSummary & { body: unknown; schemaVersion: number };
+export type NoteVersion = { eventId: string; authorId: string; recordedAt: string; seq: number };
+export type NoteComment = { commentId: string; authorId: string; body: unknown; recordedAt: string };

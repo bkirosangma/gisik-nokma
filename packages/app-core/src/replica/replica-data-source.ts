@@ -486,6 +486,16 @@ const ATTACHMENTS_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+const NOTES_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'NoteSummary / NoteDetail / NoteComment / NoteVersion (all seven note reads)',
+    because:
+      'Notes are not held locally yet, and the reason is a TABLE rather than a fold: `184_spec.md` §5.3\'s `notes` and `note_comments` tables (with `LOCAL_SCHEMA_VERSION` raised to 2) are what a local note read would select from, and Plan 1 of the notes series deliberately ships no replica tables — it ships the entity, the projections and the reads, and leaves the replica to the plan whose whole subject is sync. Answering `[]` from `getNotes` today would be rule P24\'s failure with a different subject: a client with no local ledger for notes would report every workspace as having none, and the screen would draw "no notes here" over a set it never read',
+    owner:
+      'Plan 2 of the notes series — the replica tables in `packages/sync-client/src/storage/schema.ts` (spec §5.3) plus the `ReplicaDataSource` implementations',
+  },
+];
+
 const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'UserPreferences (the whole document)',
@@ -589,6 +599,19 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
   getTicketComments: COMMENTS_ABSENCES,
+  // The SEVEN note reads share ONE absence, and share it by REFERENCE rather
+  // than by seven copies of the same three strings: `NOTES_ABSENCES` names the
+  // replica tables as the single fix, and seven entries would let one of them
+  // drift into naming a different owner. They are seven KEYS because a caller
+  // enumerating `REPLICA_GAPS` must see every method that refuses; they are one
+  // VALUE because the reason is one.
+  getNotes: NOTES_ABSENCES,
+  getDeletedNotes: NOTES_ABSENCES,
+  getNote: NOTES_ABSENCES,
+  getNotesForTicket: NOTES_ABSENCES,
+  getNoteComments: NOTES_ABSENCES,
+  getNoteHistory: NOTES_ABSENCES,
+  getNoteVersion: NOTES_ABSENCES,
   search: SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
@@ -994,6 +1017,13 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getTicketComments: () =>
       Promise.reject(new ReplicaGapError('getTicketComments', COMMENTS_ABSENCES)),
+    getNotes: () => Promise.reject(new ReplicaGapError('getNotes', NOTES_ABSENCES)),
+    getDeletedNotes: () => Promise.reject(new ReplicaGapError('getDeletedNotes', NOTES_ABSENCES)),
+    getNote: () => Promise.reject(new ReplicaGapError('getNote', NOTES_ABSENCES)),
+    getNotesForTicket: () => Promise.reject(new ReplicaGapError('getNotesForTicket', NOTES_ABSENCES)),
+    getNoteComments: () => Promise.reject(new ReplicaGapError('getNoteComments', NOTES_ABSENCES)),
+    getNoteHistory: () => Promise.reject(new ReplicaGapError('getNoteHistory', NOTES_ABSENCES)),
+    getNoteVersion: () => Promise.reject(new ReplicaGapError('getNoteVersion', NOTES_ABSENCES)),
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>

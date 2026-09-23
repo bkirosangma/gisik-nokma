@@ -76,11 +76,26 @@ export function parseEvent(
   // condition, and deliberately the same sentence — a person who meets this
   // refusal twice should not have to work out whether it is the same refusal.
   const kind = envelope.data.entity.kind;
-  if (registration.entityKind !== undefined && registration.entityKind !== kind) {
+  // A registration may name ONE kind or a LIST of them (the notes series,
+  // Plan 1 of 6). Normalising to an array first is what keeps the two spellings
+  // one rule: `undefined` still admits anything, and a list of one still refuses
+  // exactly what a bare string refused. `comment.added` is the list's first
+  // user, admitted against both a ticket and a note.
+  //
+  // The refusal sentence reads the same in both directions — a single kind
+  // joins into a one-element string with no separator, so the message every
+  // existing test pins is unchanged to the byte.
+  const allowedKinds =
+    registration.entityKind === undefined
+      ? undefined
+      : Array.isArray(registration.entityKind)
+        ? registration.entityKind
+        : [registration.entityKind];
+  if (allowedKinds !== undefined && !allowedKinds.includes(kind)) {
     return {
       ok: false,
       code: 'entity-kind-mismatch',
-      message: `This ${type} event does not point at a ${registration.entityKind}; it points at a ${kind}.`,
+      message: `This ${type} event does not point at a ${allowedKinds.join(' or ')}; it points at a ${kind}.`,
       eventId: envelope.data.id,
     };
   }
