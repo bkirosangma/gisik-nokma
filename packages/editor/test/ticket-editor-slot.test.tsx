@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import type { Editor } from '@tiptap/core';
@@ -74,6 +74,7 @@ describe('composeEditorSubmission', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 type AppCoreEditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }
+  | { type: 'note.body_set'; payload: { body: unknown } }
   | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: unknown } };
 
 type AppCoreEditorSlotUpload = {
@@ -86,7 +87,7 @@ type AppCoreEditorSlotUpload = {
 };
 
 type AppCoreEditorSlotProps = {
-  mode: 'comment' | 'description';
+  mode: 'comment' | 'description' | 'note';
   doc: unknown;
   readOnly: boolean;
   workspaceId: string;
@@ -100,6 +101,11 @@ type AppCoreEditorSlotProps = {
   // names and inline shapes so the case below, which compares THIS type's field
   // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if
   // either half gains a prop the other does not have.
+  // 9.291-9.293 — the note-mode autosave hooks (Plan 4 Task 8), transcribed
+  // with the same names and types as the editor's own declaration.
+  onDraft?: (doc: unknown) => void;
+  onSave?: (doc: unknown) => void;
+  saveState?: 'saved' | 'saving' | 'unsaved';
   queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
@@ -148,7 +154,7 @@ describe('the <EditorSlot> contract, written twice', () => {
   /**
    * 9.75 — neither half of the twice-written contract carries a field the other lacks: THREE sets are compared for equality, not two, because assignability alone never rejects extra properties on a type.
    */
-  it('neither half of the contract has a field the other lacks', () => {
+  it('9.293 neither half of the contract has a field the other lacks', () => {
     const source = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
     const appCoreFields = fieldNamesOf(source, 'export type EditorSlotProps = {');
     const transcribedFields = fieldNamesOf(
@@ -798,5 +804,115 @@ describe('13.1315 the slot names its mode and the fill rule can match', () => {
         view.unmount();
       }
     }
+  });
+});
+
+/**
+ * 9.291–9.292 — THE `note` SLOT MODE (spec §8.3 consequence 4, Plan 4 Task 8).
+ *
+ * A note saves itself: the host receives every change through `onDraft` and a
+ * write on blur through `onSave`, and the footer reports the state. So the
+ * three things this pins are the three that a copy of the comment composer
+ * would get wrong — a submit button that has no event to write, a Markdown
+ * hint addressed to a reader who is not choosing to submit, and a `saveState`
+ * that never reaches the screen.
+ */
+describe('9.291-9.292 the note slot mode', () => {
+  it('9.291 note mode has no submit control and no hint, drafts every change, and saves on blur', async () => {
+    const onDraft = vi.fn();
+    const onSave = vi.fn();
+    const note = await mountSlot(
+      makeProps({ mode: 'note', onDraft, onSave, saveState: 'saved' }),
+    );
+    // The toolbar IS present: the notes page is an editor, not a viewer.
+    expect(note.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
+    // …and there is no submit control and no Markdown hint.
+    expect(note.view.container.querySelector('.editor-slot__submit')).toBeNull();
+    expect(note.view.container.querySelector('.editor-slot__hint')?.textContent).toBe('');
+
+    // EVERY CHANGE IS A DRAFT, read off the serialized document rather than
+    // off the call count — a handler wired to the wrong event would still fire
+    // once here, and the assertion below is what says which event it was.
+    // TWO changes, not one: with a single change the two hooks have the same
+    // count under either wiring, and the control below could not tell them
+    // apart.
+    note.editor.commands.insertContent('hello');
+    note.editor.commands.insertContent(' there');
+    await vi.waitFor(() => {
+      expect(onDraft.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(JSON.stringify(onDraft.mock.calls.at(-1)?.[0])).toContain('hello there');
+
+    // …and a blur is a save, carrying the same document.
+    const slot = note.view.container.querySelector('.editor-slot');
+    expect(slot).not.toBeNull();
+    fireEvent.focusOut(slot!);
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenCalled();
+    });
+    expect(JSON.stringify(onSave.mock.calls.at(-1)?.[0])).toContain('hello there');
+    // THE CONTROL FOR THE SAVE HOOK, and it can now FAIL: two changes were
+    // typed and `onSave` fired ONCE. The plan's named mutation — call `onSave`
+    // on every change — makes these two counts equal, which is precisely what
+    // the comparison catches.
+    expect(onDraft.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(onSave.mock.calls.length).toBe(1);
+    note.view.unmount();
+
+    // THE CONTROL ARM: comment mode still renders the submit control, so a
+    // slot that had stopped rendering it everywhere fails here.
+    const comment = await mountSlot(makeProps({ mode: 'comment' }));
+    expect(comment.view.container.querySelector('.editor-slot__submit')).not.toBeNull();
+    comment.view.unmount();
+  });
+
+  it('9.292 saveState renders its three texts, each one distinct', async () => {
+    const seen: Record<string, string | null> = {};
+    for (const state of ['saved', 'saving', 'unsaved'] as const) {
+      const slot = await mountSlot(makeProps({ mode: 'note', saveState: state }));
+      seen[state] =
+        slot.view.container.querySelector('[data-testid="editor-save-state"]')?.textContent ?? null;
+      slot.view.unmount();
+    }
+    expect(seen['saved']).toBe('Saved');
+    expect(seen['saving']).toBe('Saving…');
+    expect(seen['unsaved']).toBe('Not saved (kept on this device)');
+    // THE THREE ARE DISTINCT, which is the whole claim — a map that returned
+    // the same string for two states would satisfy every assertion above and
+    // tell the reader nothing.
+    expect(new Set(Object.values(seen)).size).toBe(3);
+  });
+});
+
+/**
+ * 9.294 — THE MOBILE WEBVIEW BUNDLE CARRIES SCHEMA v2 (Plan 4 Task 8).
+ *
+ * The bundle is a BUILD ARTEFACT — one self-contained HTML string inlined into
+ * `apps/mobile/src/editor/editor-html.generated.ts` — so nothing in this
+ * package would notice if it went stale, and `apps/mobile`'s own `test` script
+ * is the only thing that checks it (`generate-editor-html.mjs --check`). This
+ * case is the fast half: it reads the committed file and fails when the
+ * schema moved without a regeneration.
+ *
+ * Read across packages, the same way the twin-transcription case reads
+ * `../app-core`. That is not a dependency — no import, just a file read — and
+ * it is the only place in this package where the artefact matters.
+ */
+describe('9.294 the mobile bundle is regenerated', () => {
+  it('9.294 the generated bundle carries the v2 nodes, and is not stale', () => {
+    const bundlePath = resolve(process.cwd(), '../../apps/mobile/src/editor/editor-html.generated.ts');
+    // POSITIVE CONTROL FIRST: a missing file must fail here rather than read as
+    // an empty string somewhere downstream.
+    expect(existsSync(bundlePath), `not found: ${bundlePath}`).toBe(true);
+    const bundle = readFileSync(bundlePath, 'utf8');
+    // `grep -c` counts LINES, and this file is one very long line — so the
+    // count is 1 for a needle that is THERE and 0 for one that is not, which
+    // is exactly what `>= 1` distinguishes.
+    for (const needle of ['detailsSummary', 'taskList', 'wikiLink']) {
+      expect(bundle.includes(needle), `the bundle does not carry "${needle}"`).toBe(true);
+    }
+    // …and a node this schema does NOT have is absent, so the assertion above
+    // cannot pass on a bundle that merely contains arbitrary text.
+    expect(bundle.includes('rawBlock')).toBe(false);
   });
 });

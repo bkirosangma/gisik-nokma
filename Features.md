@@ -1465,6 +1465,11 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   from the spec's wording rather than an omission: `editor.css`'s header forbids every colour form and
   packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
   a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
+- ⚙️ **The editor slot has a `note` mode** — autosave hooks (`onDraft` on every change, `onSave` on
+  blur, `saveState` reported in the footer as `Saved` / `Saving…` / `Not saved (kept on this device)`)
+  instead of a submit button, and no Markdown hint: a note saves itself. The mobile WebView bundle is
+  regenerated and carries schema v2. `packages/editor/src/components/TicketEditorSlot.tsx`,
+  `apps/mobile/src/editor/editor-html.generated.ts`
 - ✅ **Reading extras for long documents** — word count, reading time (200 wpm, floored at a
   minute for any non-empty text) and a table of contents that renders at three headings or more.
   `packages/editor/src/reading/reading-meta.ts`, `ReadingTOC.tsx`

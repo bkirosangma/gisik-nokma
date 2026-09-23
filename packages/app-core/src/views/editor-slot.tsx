@@ -78,6 +78,7 @@ import { docToPlainText } from '@gisik-nokma/domain';
  */
 export type EditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }
+  | { type: 'note.body_set'; payload: { body: unknown } }
   | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: unknown } };
 
 /** What an upload answers with — the SERVER-sniffed truth, echoed into `attachment.added`. */
@@ -92,7 +93,7 @@ export type EditorSlotUpload = {
 
 export type EditorSlotProps = {
   /** Which ledger event a submit becomes. */
-  mode: 'comment' | 'description';
+  mode: 'comment' | 'description' | 'note';
   /** ProseMirror JSON — opaque outside `packages/editor`; null → empty. */
   doc: unknown;
   readOnly: boolean;
@@ -147,6 +148,11 @@ export type EditorSlotProps = {
   // case in `packages/editor/test/ticket-editor-slot.test.tsx` compares this
   // declaration's field names against its own copy, so adding a prop here
   // without adding it there fails a test before it fails a build.
+  // The AUTOSAVE hooks of `note` mode (Plan 4 Task 8), the twin of the block
+  // in `packages/editor/src/components/TicketEditorSlot.tsx`.
+  onDraft?: (doc: unknown) => void;
+  onSave?: (doc: unknown) => void;
+  saveState?: 'saved' | 'saving' | 'unsaved';
   queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;

@@ -399,3 +399,7 @@ assumed it would find.
 - ✅ **9.288 — `extractReadingMeta` counts words and lists h1–h3 with stable slug ids; two headings with the same text get `-2` suffixes; the ids are stamped on the elements.** Mutation: stop suffixing.
 - ✅ **9.289 — `readingTimeMinutes`: 0→0, 1→1, 199→1, 300→2.** Mutation: drop the `max(1, …)`.
 - ✅ **9.290 — `ReadingTOC` renders nothing under 3 headings and a `nav[aria-label="On this page"]` with one link per heading otherwise.** Mutation: render at 2.
+- ✅ **9.291 — note mode: toolbar present, no submit button, no Markdown hint; `onDraft` fires on each change with the current `getJSON()`; `onSave` fires on blur.** Control: comment mode still renders the submit button. Mutation: call `onSave` on every change.
+- ✅ **9.292 — `saveState` renders the three texts under `data-testid="editor-save-state"`.** Mutation: swap two texts.
+- ✅ **9.293 — the twin transcription in `ticket-editor-slot.test.tsx` covers `mode: 'note'`, `onDraft`, `onSave`, `saveState` in both files.** Mutation: drop `saveState` from app-core's twin.
+- ✅ **9.294 — the regenerated WebView bundle contains the v2 nodes (`grep -c 'detailsSummary' apps/mobile/src/editor/editor-html.generated.ts` ≥ 1) and `apps/mobile`'s `--check` passes.** Mutation: revert the generated file.
