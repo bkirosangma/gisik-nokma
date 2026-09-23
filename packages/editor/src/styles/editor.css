@@ -525,13 +525,24 @@
   cursor: pointer;
   font-weight: 600;
 }
-/* An empty summary is a fold control with no label, which reads as a bug
-   rather than as a thing to fill in. Same affordance as the editor's
-   `Placeholder`, without a second implementation of it. */
-.editor-details > summary:empty::before {
-  content: 'Title';
-  opacity: 0.5;
-}
+/* ⚠ A PLACEHOLDER RULE STOOD HERE AND WAS REMOVED AS DEAD CSS, and the way it
+   failed is the reason this note is this long.
+   It read `.editor-details > summary:empty::before { content: 'Title' }`, from
+   the plan's CSS snippet, justified as "same affordance as the editor's
+   `Placeholder`". MEASURED, and it renders NOTHING: an empty textblock carries
+   prosemirror-view's `<br class="ProseMirror-trailingBreak">` — that element is
+   how the caret gets a home — so an empty `<summary>` has an ELEMENT child and
+   `:empty` does not match. The rule could never apply, in this test or in a
+   browser.
+   The sentence about the editor's `Placeholder` was false too, and it is the
+   reason a pseudo-class was the wrong instrument: the product's placeholder is
+   a CLASS the extension adds (`is-editor-empty`, plus `data-placeholder`, and
+   `showOnlyWhenEditable`) — JS, not CSS. Matching that affordance means adding
+   a decoration, which is a different job from a stylesheet rule.
+   **SO THE COLLAPSIBLE HAS NO EMPTY-SUMMARY HINT, and that is a recorded gap
+   rather than a hidden one**: §8.4 does not require one, and a reader or an
+   author sees an empty summary. Recorded here so the next hand either builds
+   it the product's way or leaves it deliberately. */
 
 /* The code block's Copy button (spec §8.2, Plan 4 Task 4). `position:
    relative` here is what makes the button's `absolute` mean "in this block's
