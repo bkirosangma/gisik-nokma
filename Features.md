@@ -3047,6 +3047,7 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   `.github/workflows/ci.yml`, cases 13.902–13.906
 
 - ⚙️ **The backup worker's pool trusts the managed cluster's CA** (hotfix 2026-09-23) — `apps/server/src/ops/backup-env.ts` reads `DATABASE_CA_CERT` with `loadConfig`'s rules (blank = none, non-PEM refused by name) and the daemon announces `{"msg":"database pool","tls":"ca"|"none"}` from the pool it built; before this every pool-backed job (`sweep-notifications`, `auto-close`, the ledger export) failed against DigitalOcean with "self-signed certificate in certificate chain". Cases 13.1421–13.1423.
+- ⚙️ **The live-update socket is dialled at the web host, and the edge routes the API paths** (hotfix 2026-09-23) — the session cookie belongs to `pm.artsourced.in` only, so a WebSocket dialled at `pm-api.artsourced.in` was refused `401` at the upgrade and new tickets appeared only on refresh. `deploy/do/app.yaml` now sets the web build's `NEXT_PUBLIC_SERVER_URL` to `https://pm.artsourced.in` and adds two ingress rules ahead of the web catch-all — `pm.artsourced.in` + `/v1` and + `/api/auth` → `server`, both `preserve_path_prefix: true` (App Platform trims a matched prefix by default). `SERVER_ORIGIN` (Next's build-time rewrite target) is unchanged. Cases 13.1424–13.1425 (`test-cases/13-deploy-and-ops.md`).
 
 ## 14. MCP server
 
