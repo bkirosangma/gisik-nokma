@@ -197,6 +197,41 @@ describe('ticket event vocabulary', () => {
     });
   });
 
+  /**
+   * 4.59 — starting-status design (2026-09-23): `ticketCreatedPayload` gains an
+   * optional `stateId` (the ticket's starting status), absent meaning the
+   * workflow's initial state, exactly the additive-field rule 13.1358–13.1359
+   * follows for `description`/`assigneeId`. A `.refine` refuses `stateId`
+   * together with `start: 'backlog'` — the owner's ruling that a backlog
+   * ticket has no starting status.
+   */
+  describe('4.59 ticketCreatedPayload gains stateId, refused together with start: backlog', () => {
+    const BASE = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' };
+
+    it('round-trips a stateId, and round-trips with it absent — the shape every pre-existing event has', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, stateId: 'doing' });
+      roundTrips('ticket.created', 'ticket', { ...BASE });
+    });
+
+    it('control: stateId alongside start: "focus" is accepted', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, start: 'focus', stateId: 'doing' });
+    });
+
+    it('refuses stateId paired with start: "backlog" — a backlog ticket has no starting status', () => {
+      expect(refuses('ticket.created', 'ticket', { ...BASE, start: 'backlog', stateId: 'doing' })).toBe(
+        'invalid-payload',
+      );
+      expect(refusalMessage('ticket.created', { ...BASE, start: 'backlog', stateId: 'doing' })).toContain(
+        'a backlog ticket has no starting status',
+      );
+    });
+
+    it('refuses a non-string, and an empty-string, stateId', () => {
+      expect(refuses('ticket.created', 'ticket', { ...BASE, stateId: 3 })).toBe('invalid-payload');
+      expect(refuses('ticket.created', 'ticket', { ...BASE, stateId: '' })).toBe('invalid-payload');
+    });
+  });
+
   it('refuses an upload with a negative size', () => {
     expect(
       refuses('attachment.added', 'ticket', {

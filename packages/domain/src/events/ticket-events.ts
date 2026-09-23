@@ -39,78 +39,108 @@ import { prioritySchema } from '../ticket-types.js';
  * the wrong noun here, and it belongs to the workspace/membership vocabulary.
  * The construction is what is shared, deliberately, so the two doors read alike.
  */
-export const ticketCreatedPayload = z.object({
-  typeId: z.string().min(1),
-  projectId: ulidString,
-  parentId: ulidString.nullable(),
-  title: z
-    .string()
-    .min(1)
-    .refine((value) => value.trim() !== '', 'must not be blank — a title of only spaces names nothing'),
-  /**
-   * Where the ticket is born (spec §1.3): `'backlog'` — the universal state —
-   * or `'focus'` — the workflow's initial state. OPTIONAL, and ABSENT MEANS
-   * FOCUS: that is what every v1 event meant, and an additive field must not
-   * change the meaning of events written before it existed. The product's own
-   * client always sends it.
-   */
-  start: z.enum(['backlog', 'focus']).optional(),
-  /**
-   * The birth priority (spec 2026-09-22). OPTIONAL, and ABSENT MEANS `DEFAULT_PRIORITY`
-   * (P2): every event written before this member existed meant P2, and an additive
-   * field must not change the meaning of stored events — the same rule `start` above
-   * follows. The default is applied by `applyTicketEvent`, NOT here: a parse-time
-   * default would write `P2` into every stored payload as a claim its author never
-   * made (see `ticket-types.ts`'s `required` docblock for the same argument). The
-   * product's own client always sends it.
-   */
-  priority: prioritySchema.optional(),
-  /**
-   * The ticket's birth DESCRIPTION (owner request 2026-09-23) — the same
-   * DOCUMENT `ticket.field_set` writes under `fieldId: 'description'`, which is
-   * why the shape is `z.record` rather than a string: `checkTicketFieldSet`
-   * holds that built-in to *"a document"*, and a birth value that reached head
-   * state in a shape the edit door would refuse is the "two doors that disagree"
-   * defect this repository keeps re-finding.
-   *
-   * OPTIONAL, AND ABSENT MEANS NO DESCRIPTION — the same additive-field rule
-   * `start` and `priority` follow. No pre-existing `ticket.created` carried one,
-   * and the reducer writes NO claim at all for an absent member rather than a
-   * null one: a null claim is the explicit CLEARING claim `ticket.field_set`
-   * sanctions, which at birth would record a clearing nobody made (invariant 4).
-   *
-   * `null` is deliberately NOT accepted. `ticket.field_set` admits it because a
-   * field that has a value needs a way to lose it; at birth there is nothing to
-   * clear, so "absent" is the one spelling of none and a second one would invite
-   * a reader to think the two meant different things.
-   *
-   * Shape-only, like `ticketFieldSetPayload`'s `value`: whether this document is
-   * well-formed for ProseMirror is `packages/editor`'s question, and the domain
-   * has no vocabulary for it (amendment 12). What the door can honestly say is
-   * that it is `{}`-like and not a string.
-   */
-  description: z.record(z.string(), z.unknown()).optional(),
-  /**
-   * The ticket's birth ASSIGNEE (owner request 2026-09-23) — the same member
-   * `ticket.assigned` carries, with the same `nullable()` for "nobody".
-   *
-   * OPTIONAL, AND ABSENT MEANS NOBODY, which is what every pre-existing
-   * `ticket.created` meant: the reducer hard-coded `assigneeId: null` here
-   * before this member existed. The two spellings are equivalent on purpose —
-   * the product's own client OMITS the member rather than sending `null`.
-   *
-   * ⚠ **A birth assignee must not become a way around the assign permission**,
-   * and that is not a comment about this schema: `checkVisibilityPermission`
-   * refuses a `ticket.assigned` naming a person with no role in the workspace
-   * (E6-17), and the SAME lookup runs for this member in the `ticket.created`
-   * branch — which is a different branch of that module, because
-   * `ticket.created` returns before the `canSee` check (there is no ticket to
-   * see yet). Adding this member here without that check would have made the
-   * dialog's Assignee picker the one door in the product through which a typo
-   * could name nobody.
-   */
-  assigneeId: z.string().min(1).nullable().optional(),
-});
+export const ticketCreatedPayload = z
+  .object({
+    typeId: z.string().min(1),
+    projectId: ulidString,
+    parentId: ulidString.nullable(),
+    title: z
+      .string()
+      .min(1)
+      .refine((value) => value.trim() !== '', 'must not be blank — a title of only spaces names nothing'),
+    /**
+     * Where the ticket is born (spec §1.3): `'backlog'` — the universal state —
+     * or `'focus'` — the workflow's initial state. OPTIONAL, and ABSENT MEANS
+     * FOCUS: that is what every v1 event meant, and an additive field must not
+     * change the meaning of events written before it existed. The product's own
+     * client always sends it.
+     */
+    start: z.enum(['backlog', 'focus']).optional(),
+    /**
+     * The birth priority (spec 2026-09-22). OPTIONAL, and ABSENT MEANS `DEFAULT_PRIORITY`
+     * (P2): every event written before this member existed meant P2, and an additive
+     * field must not change the meaning of stored events — the same rule `start` above
+     * follows. The default is applied by `applyTicketEvent`, NOT here: a parse-time
+     * default would write `P2` into every stored payload as a claim its author never
+     * made (see `ticket-types.ts`'s `required` docblock for the same argument). The
+     * product's own client always sends it.
+     */
+    priority: prioritySchema.optional(),
+    /**
+     * The ticket's birth DESCRIPTION (owner request 2026-09-23) — the same
+     * DOCUMENT `ticket.field_set` writes under `fieldId: 'description'`, which is
+     * why the shape is `z.record` rather than a string: `checkTicketFieldSet`
+     * holds that built-in to *"a document"*, and a birth value that reached head
+     * state in a shape the edit door would refuse is the "two doors that disagree"
+     * defect this repository keeps re-finding.
+     *
+     * OPTIONAL, AND ABSENT MEANS NO DESCRIPTION — the same additive-field rule
+     * `start` and `priority` follow. No pre-existing `ticket.created` carried one,
+     * and the reducer writes NO claim at all for an absent member rather than a
+     * null one: a null claim is the explicit CLEARING claim `ticket.field_set`
+     * sanctions, which at birth would record a clearing nobody made (invariant 4).
+     *
+     * `null` is deliberately NOT accepted. `ticket.field_set` admits it because a
+     * field that has a value needs a way to lose it; at birth there is nothing to
+     * clear, so "absent" is the one spelling of none and a second one would invite
+     * a reader to think the two meant different things.
+     *
+     * Shape-only, like `ticketFieldSetPayload`'s `value`: whether this document is
+     * well-formed for ProseMirror is `packages/editor`'s question, and the domain
+     * has no vocabulary for it (amendment 12). What the door can honestly say is
+     * that it is `{}`-like and not a string.
+     */
+    description: z.record(z.string(), z.unknown()).optional(),
+    /**
+     * The ticket's birth ASSIGNEE (owner request 2026-09-23) — the same member
+     * `ticket.assigned` carries, with the same `nullable()` for "nobody".
+     *
+     * OPTIONAL, AND ABSENT MEANS NOBODY, which is what every pre-existing
+     * `ticket.created` meant: the reducer hard-coded `assigneeId: null` here
+     * before this member existed. The two spellings are equivalent on purpose —
+     * the product's own client OMITS the member rather than sending `null`.
+     *
+     * ⚠ **A birth assignee must not become a way around the assign permission**,
+     * and that is not a comment about this schema: `checkVisibilityPermission`
+     * refuses a `ticket.assigned` naming a person with no role in the workspace
+     * (E6-17), and the SAME lookup runs for this member in the `ticket.created`
+     * branch — which is a different branch of that module, because
+     * `ticket.created` returns before the `canSee` check (there is no ticket to
+     * see yet). Adding this member here without that check would have made the
+     * dialog's Assignee picker the one door in the product through which a typo
+     * could name nobody.
+     */
+    assigneeId: z.string().min(1).nullable().optional(),
+    /**
+     * The ticket's STARTING STATUS (starting-status design, 2026-09-23) — a
+     * state id in the workflow the ticket's TYPE is bound to, checked against
+     * that workflow once it resolves (`ticket-state.ts`'s `bornIn`, the rule
+     * engine's `ticket.created` check).
+     *
+     * OPTIONAL, AND ABSENT MEANS THE WORKFLOW'S INITIAL STATE — the same
+     * additive-field rule `start`, `priority`, `description` and `assigneeId`
+     * above all follow: no `ticket.created` written before this member existed
+     * meant anything else, so its absence must keep meaning exactly that. The
+     * product's own client omits it whenever the picked status IS the initial
+     * one (keeps the payload minimal), and omits it always when `start` is
+     * `'backlog'` — see the refusal below.
+     *
+     * Shape-only here: WHICH states this ticket's workflow allows a new ticket
+     * to start in — not the universal Backlog, not `category: 'terminal'`, not
+     * `creatable: false` — is `isCreatableState`'s question
+     * (`workflow-helpers.ts`), asked once the workflow resolves, never at this
+     * door.
+     */
+    stateId: z.string().min(1).optional(),
+  })
+  .refine((p) => !(p.start === 'backlog' && p.stateId !== undefined), {
+    // The owner's ruling (starting-status design): a backlog ticket has no
+    // starting status. The client's own form disables the status picker
+    // while "Starts in the backlog?" is on and never sends both; this refusal
+    // is the domain's own door for a payload built some other way.
+    message: 'a backlog ticket has no starting status — a ticket.created cannot carry both start: "backlog" and stateId',
+    path: ['stateId'],
+  });
 
 export const ticketAssignedPayload = z.object({ assigneeId: z.string().min(1).nullable() });
 
