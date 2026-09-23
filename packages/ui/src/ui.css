@@ -2318,6 +2318,11 @@ a.gn-ticket-sheet__crumb--link {
    change. A distinct class keeps both rules addressable, and `.gn-field__input`
    still supplies the box itself. */
 .gn-ticket-sheet__subtask-add .gn-ticket-sheet__subtask-input { flex: 1; min-width: 12.5rem; }
+/* The ticket's Notes section (notes series, Plan 6 of 7, spec §10.1) — the
+   caption is `.gn-ticket-sheet__caption`, already shared with Subtasks and
+   Comments, so only the badge row and the Attach button need their own rule. */
+.gn-ticket-sheet__note-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0.5rem 0; }
+.gn-ticket-sheet__attach { margin-top: 0.5rem; }
 button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }

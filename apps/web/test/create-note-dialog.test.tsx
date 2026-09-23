@@ -434,7 +434,7 @@ describe('18.11 The Notes page — creating a note', () => {
         <ScopeEditor
           note={{
             ...NOTE_DETAIL,
-            attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+            attachedTickets: [{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }],
           }}
           members={MEMBERS}
           canEdit

@@ -28,6 +28,7 @@ import {
 } from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
+import { TicketNotesSection } from './ticket-notes-section.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
@@ -3705,6 +3706,25 @@ export function TicketSheet({
               </p>
             )}
           </section>
+
+          {/*
+            THE NOTES SECTION — Subtasks → Notes → Comments, the prototype's
+            own order (spec §10.1). `canEdit` is `editorSlot !== undefined`,
+            the same expression `canEditDescription` below uses for the same
+            reason: no client-side edit flag exists, and the ingest door is
+            the one place that actually knows.
+          */}
+          <TicketNotesSection
+            dataSource={dataSource}
+            workspaceId={workspaceId}
+            ticketId={ticketId}
+            projectId={ticketRead.ticket.projectId}
+            currentUserId={currentUserId}
+            canEdit={editorSlot !== undefined}
+            make={make}
+            onNavigate={onNavigate}
+            onRefusal={(r) => setServerRefusal(r)}
+          />
 
           {/*
             THE COMMENT THREAD AND ITS BOX — the block at

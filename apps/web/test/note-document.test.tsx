@@ -95,7 +95,7 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
     authorId: 'u_kiro',
     title: 'Compressor log',
     scope: { mode: 'private' },
-    attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+    attachedTickets: [{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }],
     deleted: false,
     createdAt: '2026-09-23T06:00:00.000Z',
     updatedAt: '2026-09-23T06:00:00.000Z',
@@ -202,8 +202,9 @@ describe('18.11 The Notes page — the document', () => {
     expect(await screen.findByText('Kiro')).toBeInTheDocument();
     expect(screen.getByText(/edited/i)).toBeInTheDocument();
     expect(screen.getByTestId('note-scope')).toHaveTextContent('Private');
+    // 18.253 — the canonical sheet path, not the id-only My Work door.
     const badge = screen.getByRole('link', { name: 'Renew the trade licence' });
-    expect(badge).toHaveAttribute('href', `${'/w/' + WS_A}/my-work?ticket=${TICKET}`);
+    expect(badge).toHaveAttribute('href', `/w/${WS_A}/p/${P_COLD}?ticket=${TICKET}`);
     expect(screen.getByTestId('note-reading-time')).toBeInTheDocument();
 
     // The editor, over the loaded body. MUTATION TARGET: an empty `doc` empties
