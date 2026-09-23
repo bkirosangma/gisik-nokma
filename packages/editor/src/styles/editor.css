@@ -484,6 +484,21 @@
   opacity: 0.7;
 }
 
+/* The note mode's save state (Plan 4 Task 8). It had NO RULE while all three of
+   its siblings did — the family was `footer`/`hint`/`submit` declared and
+   `footer`/`hint`/`submit`/`save-state` emitted, which the plan-close audit
+   measured by listing both sides. The one declaration that matters is the SIZE:
+   `.editor-slot__hint` beside it is 0.75rem, so a span with no rule inherited
+   the page's size and the footer row drew two different text sizes.
+   IT DELIBERATELY DOES NOT TAKE THE HINT'S OTHER TWO DECLARATIONS. Not
+   `flex: 1` — the hint holds the row's left half so the right-hand control
+   stays pinned, and a state that grew would move it. Not `opacity: 0.7` —
+   that marks the hint as secondary, and "Not saved (kept on this device)" is
+   information the reader needs rather than a whisper. */
+.editor-slot__save-state {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
 .editor-slot__submit {
   /* 44px floor. The prototype draws 40 (`:1330`) and this product's own
      tap-target rule is the floor that wins; `packages/ui/test/

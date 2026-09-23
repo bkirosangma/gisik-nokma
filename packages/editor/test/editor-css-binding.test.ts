@@ -330,3 +330,26 @@ describe('9.290 the reading rail is styled', () => {
     expect(declared(active, 'font-weight')).toBe('600');
   });
 });
+
+/**
+ * 9.292 — THE NOTE MODE'S SAVE STATE HAS A RULE (Plan 4 Task 8), which it did
+ * not until the plan-close audit listed the `editor-slot__*` classes DECLARED
+ * against those EMITTED: three declared, four emitted, and mine was the fourth.
+ *
+ * The assertion is the SIZE, because that is the declaration that changes what a
+ * reader sees: `.editor-slot__hint` in the same row is 0.75rem, so a span with
+ * no rule draws at the page's size and the row shows two.
+ */
+describe('9.292 the save state is styled with its row', () => {
+  it('9.292 .editor-slot__save-state takes the hint’s size and not its flex or opacity', () => {
+    const state = ruleBody(EDITOR_CSS, '.editor-slot__save-state');
+    expect(declared(state, 'font-size')).toBe('0.75rem');
+    expect(declared(state, 'line-height')).toBe('1rem');
+    // CONTROL, same `it`: it must NOT have taken the hint's two other
+    // declarations. `flex: 1` would make the state grow and push the row's
+    // right-hand control out of place, and `opacity: 0.7` would mark a
+    // save-state warning as a whisper.
+    expect(declared(state, 'flex')).toBeNull();
+    expect(declared(state, 'opacity')).toBeNull();
+  });
+});
