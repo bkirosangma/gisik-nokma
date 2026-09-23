@@ -422,3 +422,11 @@ assumed it would find.
 - ✅ **9.310 — the bridge parses `ticketResults` and serialises `ticketQuery`; control: an unknown type is refused.** Mutation: drop the `ticketResults` case. `packages/editor/test/webview-bridge.test.ts`.
 - ✅ **9.311 — `docToPlainText` renders `ticketRef` as `KEY title`; a missing key falls back to the title (control in the same `it`).** Mutation: render the ticket id. `packages/domain/test/doc-text.test.ts`, `packages/editor/test/doc-text-conformance.test.ts`.
 - ✅ **9.312 — `renderCommentBody` renders `ticketRef` as a link when `ticketHref` resolves and as a span otherwise; control: `wikiLink` unchanged.** Mutation: link with `href="#"`. `packages/app-core/test/views/comment-body.test.tsx`.
+
+## Editor polish: `:ticket` open bug, picker/toolbar styling, Attach button (owner request+bug, 2026-09-23) — block `9.313`–`9.337`
+
+*Allocated 2026-09-23 by the controller against `origin/release/notes` `fc713961` (table tip `9.312`), for
+`task/editor-polish`: Unit 1 (`:ticket` does not open the picker — bug), Unit 2 (Attach-note button/menu
+styling), Unit 3 (inline `:note`/`:ticket` picker positioning + styling), Unit 4 (editor toolbar restyle,
+tooltips, Insert note/Insert ticket buttons, no @), Unit 5 (an Attach button reaching the existing upload
+path). Cases file: this one. Minted: none yet — this is the reservation commit; the lane fills this block.*
