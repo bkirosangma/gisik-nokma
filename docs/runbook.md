@@ -16,7 +16,9 @@ container boot (entrypoint) before the server listens. Watch `doctl apps logs <a
 confirm `GET /healthz` reports the new deploy sha.
 
 **Before the FIRST deploy that carries the notes search migration, run the pre-flight against the target
-database — from a repo checkout, never from a lane — with `DATABASE_URL` pointed at it:**
+database — from a repo checkout, never from a lane — with `DATABASE_URL` pointed at it, and
+`DATABASE_CA_CERT` set if that database presents a CA the system trust store does not carry (a managed
+one does):**
 
 ```
 pnpm --filter @gisik-nokma/server run search:preflight
@@ -28,14 +30,20 @@ extension on PostgreSQL 16**, so on a managed database that role usually is not 
 is `NO`; the exit status is non-zero in that case, which is the answer to act on — not a warning to read
 past. Nothing else in this runbook changes.
 
-**TLS: this tool reads `DATABASE_URL` and NOTHING else.** It is not the server, so it does not read
-`DATABASE_CA_CERT` — that is a server-config variable (`apps/server/src/config.ts`) which the boot path
-and the migrator apply, and neither of them is running here. A managed Postgres presents a CA the system
-trust store does not carry, so every way of supplying that anchor has to be inside the connection string
-itself; `deploy/do/README.md` owns the detailed rule (an `ssl*` parameter in the URL replaces whatever CA
-a caller passed, which is why the server rebuilds the string before connecting). A URL that asks for
-verification without its anchor fails the CONNECTION, before any extension is looked at — and that failure
-looks nothing like the `NO` this section is about, so it is worth recognising.
+**TLS: `DATABASE_URL` beside `DATABASE_CA_CERT`, the same two variables the server and the backup worker
+take.** The tool reads both, and hands the certificate to `createPool` exactly as `src/index.ts` and
+`ops/backup-daemon-main.ts` do — one reader for the variable (`ops/backup-env.ts`), so a PEM that one
+entry point accepts is not refused by another. A managed Postgres presents a CA the system trust store
+does not carry, and its URL carries `sslmode=require`, which `pg` treats as FULL verification: with no CA
+the CONNECTION fails, before any extension is looked at, in an error that looks nothing like the `NO` this
+section is about.
+
+The first line the tool prints says which mode the pool was built in —
+`{"msg":"database pool","tls":"ca"}` or `"tls":"none"` — and it is read back from the POOL rather than
+from the variable, so it reports the connection and not the environment. **Check that line first**: if it
+says `none` on a managed database, the rest of the output is not an answer about extensions at all.
+`deploy/do/README.md` owns the ordering rule the server applies here (an `ssl*` parameter in the URL
+replaces whatever CA a caller passed, which is why the pool rebuilds the string before connecting).
 
 ## Deploy (first time)
 

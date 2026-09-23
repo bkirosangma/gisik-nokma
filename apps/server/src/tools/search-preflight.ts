@@ -1,6 +1,7 @@
 import { pathToFileURL } from 'node:url';
 import type { Pool } from 'pg';
 import { createPool } from '../db.js';
+import { optionalDatabaseCaCert } from '../ops/backup-env.js';
 
 /**
  * The note search pre-flight (Plan 3 of 6, spec §7.1).
@@ -221,7 +222,32 @@ async function main(): Promise<void> {
     console.error('DATABASE_URL is required');
     process.exit(2);
   }
-  const pool = createPool(databaseUrl);
+  /**
+   * The CA the managed cluster presents, when the deploy binds one — read with
+   * the SAME reader the backup worker uses (`ops/backup-env.ts`, #705), because
+   * a second PEM parser would be a second place to be wrong.
+   *
+   * **This tool was pointed at a managed database with NO CA, which is the
+   * defect #705 hot-fixed for the worker and is the same defect class.** A
+   * managed URL carries `sslmode=require`; pg treats that as full verification;
+   * the cluster's chain is not in the system trust store — so the CONNECTION
+   * fails, before a single extension is looked at, with an error that looks
+   * nothing like the `NO` this tool exists to report.
+   */
+  const caCert = optionalDatabaseCaCert(process.env);
+  const pool = createPool(databaseUrl, { caCert });
+  // Read back from the POOL and not from `caCert`, which is #705's correction
+  // and is what makes the announce evidence: `createPool` sets `ssl` only when
+  // it was given a CA (`src/db.ts`), so a mutation that drops `{ caCert }` from
+  // the call above prints "none" here. Announced from the VARIABLE it would
+  // describe the environment rather than the connection.
+  //
+  // Printed BEFORE the first query, deliberately: on a target that needs the CA
+  // and has not got it, the connection is what fails, and a reader opening this
+  // log needs to see which mode the pool was built in before the error.
+  // MEASURED against a TLS-off local server with a dummy PEM: this line, then
+  // `Error: The server does not support SSL connections`, exit 1.
+  console.log(JSON.stringify({ msg: 'database pool', tls: pool.options.ssl ? 'ca' : 'none' }));
   try {
     // Imported HERE rather than at the top of the file so that `searchPreflight`
     // — the surface 18.124 drives — carries no dependency on the embedding

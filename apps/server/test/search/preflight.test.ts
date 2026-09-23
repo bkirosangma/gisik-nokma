@@ -1,5 +1,7 @@
+import { spawn } from 'node:child_process';
 import { readFileSync } from 'node:fs';
-import { resolve } from 'node:path';
+import { dirname, join, resolve } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
 import { newUlid } from '@gisik-nokma/domain';
@@ -209,5 +211,71 @@ describe('18.121–18.124 postgres images, extensions and the pre-flight', () =>
     expect(control.get('hstore')?.installedVersion, 'control: ...and reports no installed version').toBeNull();
 
     expect(formatPreflight(report)).toContain('vector');
+  });
+
+  /**
+   * 18.163 — the pool the CLI builds carries the CA.
+   *
+   * ## Spawned, not imported, and #705's shape on purpose
+   *
+   * The CA is read in `main()`, which the `executedDirectly` guard keeps out of
+   * an import — so the only way to observe it is to run the CLI. `#705`
+   * (`test/ops/backup-daemon-main.test.ts`, case 13.1422) runs its daemon the
+   * same way and for the same reason, and this case reuses its exact observable:
+   * the `{"msg":"database pool","tls":…}` line.
+   *
+   * **The line is read back from the POOL, not from the variable**, and that is
+   * what makes the mutation killable: `createPool` sets `ssl` only when it was
+   * given a CA (`src/db.ts`), so dropping `{ caCert }` from the call makes the
+   * WITH-CA run print `none`. A line printed from `process.env` would report the
+   * environment and pass under the mutation — the correction #705 records in its
+   * own source comment after its first version did exactly that.
+   *
+   * ## The fixture CANNOT complete the connection, and it is not being asked to
+   *
+   * The test database is a plain local container with TLS off, so a pool built
+   * with `ssl: { ca }` is refused the moment it asks for TLS. That is why the
+   * announce is printed BEFORE the first query: what this case measures is which
+   * mode the pool was built in, and the without-CA CONTROL is what proves the
+   * tool still runs to a real report on a target it can reach.
+   *
+   * Mutation: drop the `{ caCert }` argument from `createPool` in the CLI.
+   */
+  it('18.163 — the pre-flight builds its pool with DATABASE_CA_CERT, and says which mode it built', async () => {
+    const RAN = 'search-preflight: database';
+    const PEM = '-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----\n';
+    const SERVER_DIR = join(dirname(fileURLToPath(import.meta.url)), '../..');
+
+    const runPreflight = (caCert: string): Promise<{ stdout: string; code: number | null }> =>
+      new Promise((settle) => {
+        const child = spawn('pnpm', ['exec', 'tsx', 'src/tools/search-preflight.ts'], {
+          cwd: SERVER_DIR,
+          env: { ...process.env, DATABASE_URL: db.url, DATABASE_CA_CERT: caCert },
+        });
+        let stdout = '';
+        child.stdout.on('data', (chunk: Buffer) => (stdout += chunk.toString()));
+        child.stderr.on('data', () => undefined);
+        // The with-CA run is EXPECTED to fail its connection here (see the
+        // docblock), so this waits for the process rather than for a report.
+        const hardStop = setTimeout(() => child.kill('SIGKILL'), 30_000);
+        child.on('close', (code) => {
+          clearTimeout(hardStop);
+          settle({ stdout, code });
+        });
+      });
+
+    const withCa = await runPreflight(PEM);
+    expect(
+      withCa.stdout,
+      'the pool was built with the CA, read back from the POOL',
+    ).toContain('"msg":"database pool","tls":"ca"');
+
+    // CONTROL, same case: unbound → "none", AND the tool runs to a real report,
+    // so the assertion above is about the CA and not about a CLI that prints a
+    // banner and dies.
+    const withoutCa = await runPreflight('');
+    expect(withoutCa.stdout).toContain('"msg":"database pool","tls":"none"');
+    expect(withoutCa.stdout, 'the tool completes against a target it can reach').toContain(RAN);
+    expect(withoutCa.code, 'and exits on the verdict, not on a crash').toBe(0);
   });
 });
