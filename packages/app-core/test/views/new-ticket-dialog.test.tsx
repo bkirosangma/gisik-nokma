@@ -1934,3 +1934,68 @@ describe('13.1435–13.1441 the Starting status select', () => {
     expect(backlogSwitch()).toBeChecked();
   });
 });
+
+/**
+ * Cases 13.1443, 13.1445 — the birth START and DUE date inputs (addendum,
+ * 2026-09-23: "put due date as well on the ticket creation form" … "both
+ * start and due date"). `13.1444` — the `{date}` object `create-ticket-
+ * flow.tsx` wraps a filled input into on the wire, and the same mutation on
+ * THAT door — lives in `test/views/create-ticket-flow.test.tsx`, the one
+ * place that can see the actual `ticket.created` payload rather than this
+ * dialog's own bare-string draft.
+ */
+describe('13.1443, 13.1445 the birth Start/Due date inputs', () => {
+  const TYPES = [{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }];
+  function baseProps(extra: Record<string, unknown> = {}) {
+    return {
+      open: true,
+      userId: 'usr_ada',
+      workspaceId: 'ws_1',
+      assigneeCandidates: [],
+      typeOptions: TYPES,
+      parentCandidates: [],
+      workflowStates: () => null,
+      onCreate: vi.fn(),
+      onClose: () => undefined,
+      ...extra,
+    };
+  }
+
+  it('13.1443 both inputs exist, empty by default, and the draft omits whichever is left empty', () => {
+    const onCreate = vi.fn();
+    render(<NewTicketDialog {...baseProps({ onCreate })} />);
+    expect(screen.getByLabelText('Start date')).toHaveValue('');
+    expect(screen.getByLabelText('Due date')).toHaveValue('');
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    fireEvent.change(screen.getByLabelText('Start date'), { target: { value: '2026-09-30' } });
+    // Due date left empty.
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+    expect(onCreate).toHaveBeenCalledTimes(1);
+    const draft = onCreate.mock.calls[0]?.[0] as Record<string, unknown>;
+    expect(draft['startDate']).toBe('2026-09-30');
+    expect(draft).not.toHaveProperty('dueDate');
+  });
+
+  it('13.1445 an invalid day disables Create with an inline reason, checked by the SAME dueDateValueSchema import', () => {
+    render(<NewTicketDialog {...baseProps()} />);
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Order the tent' } });
+    // A 5-digit year — MEASURED as the one malformed shape jsdom's own `<input
+    // type="date">` does NOT sanitize to `''` before React ever sees a change
+    // event. Every other shape tried (a bad month `2026-13-01`, an
+    // out-of-calendar day `2026-02-30`, a wrong field order `30-09-2026`, and
+    // a non-date string) is silently reset to `''` by the input itself, so
+    // none of them can reach this component's own validation at all — this is
+    // the only value that can actually exercise it.
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '99999-01-01' } });
+    expect(screen.getByText('Due date must be a real day in YYYY-MM-DD form.')).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Create' })).toBeDisabled();
+
+    // Clearing it back to empty removes the refusal and re-enables Create —
+    // an EMPTY input is omitted, not invalid, the same distinction the draft
+    // itself draws (13.1443).
+    fireEvent.change(screen.getByLabelText('Due date'), { target: { value: '' } });
+    expect(screen.queryByText('Due date must be a real day in YYYY-MM-DD form.')).toBeNull();
+    expect(screen.getByRole('button', { name: 'Create' })).not.toBeDisabled();
+  });
+});

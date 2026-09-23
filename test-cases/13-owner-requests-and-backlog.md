@@ -3658,3 +3658,41 @@ placeholder ("Choose a status") instead of the workflow's initial state on a pla
 effect now computes the correct seed value DIRECTLY (`seedStateIdFor`, a small helper closing over
 `workflowStates`) rather than deferring to the reseed effect for the ordinary case; the reseed effect stays,
 now genuinely needed only for a LATE `workflowStates` load or a truly stale value reached some other way.
+
+## The birth Start and Due date inputs (addendum, 2026-09-23) — UI half
+
+*Cases `13.1443`–`13.1445`, the remainder of the UI block. `13.1442` is the page e2e case, below.*
+
+- **13.1443** ✅ Both `<input type="date">` controls (`aria-label="Start date"`/`"Due date"`) exist, empty by
+  default, and `NewTicketDraft` omits whichever is left empty rather than carrying an empty string — the
+  SAME "absent means no claim" rule `description` already follows, asserted with `not.toHaveProperty`
+  rather than a `toEqual`-style comparison, which cannot tell a dropped key from one holding `undefined`.
+  Mutation-witnessed: dropping the `=== '' ? {} : {...}` guard in `new-ticket-dialog.tsx`'s own draft
+  construction (sending the bare, possibly-empty string unconditionally) reddens with `dueDate: ""` present
+  where the assertion expected the key gone, restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1444** ✅ The ACTUAL `ticket.created` payload — not the dialog's own bare-string draft, which
+  13.1443 already covers, but what `CreateTicketFlow.create` sends to `DataSource.ingest` — wraps a filled
+  input as `{date: '...'}` (the wire's own `dueDateValueSchema` shape) and carries NO key at all for an
+  empty one, in three arms: one filled, both filled, neither filled. New file
+  `create-ticket-flow.test.tsx` (this component had none), because this is the one place that can see the
+  wire shape at all — `new-ticket-dialog.tsx` never builds `{date: ...}`, only the bare string.
+  Mutation-witnessed: replacing the `...(draft.startDate === undefined ? {} : {...})` spreads with an
+  unconditional `startDate: {date: draft.startDate ?? ''}` reddens BOTH the "one filled" case (`dueDate:
+  {date: ''}` present where absent was expected) and the "neither filled" case (`startDate: {date: ''}`
+  present), restored from the committed tree. —
+  (`packages/app-core/test/views/create-ticket-flow.test.tsx`)
+- **13.1445** ✅ An invalid day disables Create with an inline reason under the field, checked by the SAME
+  `dueDateValueSchema` import `ticketCreatedPayload`/`ticket.field_set` use (no copy of the regex, per the
+  plan author's ruling) — there is no precheck branch for dates. **MEASURED, not assumed, which value can
+  even reach the check:** jsdom's own `<input type="date">` sanitizes a malformed value to `''` BEFORE React
+  ever sees a change event, for every shape tried except one — `2026-13-01` (bad month), `2026-02-30`
+  (out-of-calendar day), `30-09-2026` (wrong field order) and a bare non-date string all vanish to `''`
+  on `fireEvent.change`; a 5-digit year (`99999-01-01`) survives, because `IST_DAY_REGEX` is `^\d{4}-\d{2}
+  -\d{2}$` and jsdom's own sanitizer does not enforce THAT particular width. That is the one value this case
+  can use to exercise the component's own validation at all — a probe script confirmed this empirically
+  before the case was written, not inferred. Clearing the field back to empty removes the refusal and
+  re-enables Create (empty is omitted, not invalid — the same distinction 13.1443 draws). Mutation-witnessed:
+  dropping `startDateInvalid || dueDateInvalid` from the Create button's `disabled` expression reddens
+  (`toBeDisabled()` fails), restored from the committed tree. —
+  (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
