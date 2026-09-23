@@ -10,6 +10,7 @@ import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
 import { FTS_CONFIG } from '../read/fts.js';
+import { HEADLINE_OPTIONS } from '../read/headline.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { SqlParams } from '../read/sql-params.js';
 import { assembleTicketCards, PROJ_TICKET_COLUMNS, type ProjTicketRow } from '../read/ticket-cards.js';
@@ -22,8 +23,10 @@ import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js
  */
 const SEARCH_LIMIT = 50;
 
-/** The snippet window `ts_headline` is asked for. */
-const HEADLINE_OPTIONS = 'StartSel=**, StopSel=**, MaxWords=18, MinWords=6';
+// The snippet window `ts_headline` is asked for. MOVED to `read/headline.ts`
+// when the notes search plan needed the same string: that layer cuts snippets
+// too, and `read/` must not import `routes/`. One definition, two readers.
+// (No `const` here any more — the import below is the whole of it.)
 
 /**
  * A workspace's full text, filtered to what this caller may see, ranked, cut.
