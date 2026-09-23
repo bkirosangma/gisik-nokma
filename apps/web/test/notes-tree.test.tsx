@@ -94,7 +94,7 @@ const COLD_NEW = note({
   noteId: N_COLD_NEW,
   homeProjectId: 'p_cold',
   title: 'Cold compressor log',
-  attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+  attachedTickets: [{ ticketId: TICKET, projectId: 'p_cold', key: 'CCSO-1183', title: 'Renew the trade licence' }],
   updatedAt: '2026-09-22T10:00:00.000Z',
 });
 const COLD_OLD = note({ noteId: N_COLD_OLD, homeProjectId: 'p_cold', title: 'Older note', updatedAt: '2026-09-18T10:00:00.000Z' });
