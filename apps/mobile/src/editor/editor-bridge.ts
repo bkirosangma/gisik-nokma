@@ -72,6 +72,14 @@ export function parseEditorMessage(raw: unknown): EditorToHostMessage | null {
     case 'mentionQuery':
       if (typeof record.requestId !== 'string' || typeof record.query !== 'string') return null;
       return { bridge: 1, kind: 'mentionQuery', requestId: record.requestId, query: record.query };
+    // The SECOND request/response pair (Plan 4's notes port). Named here
+    // because the `default` arm REFUSES an unrecognised kind — which is right
+    // for forward compatibility and was wrong for this one: the editor sent
+    // `noteQuery` and this host dropped it, so the `[[` picker's pending
+    // promise never settled. `editor-web-view.tsx` answers it.
+    case 'noteQuery':
+      if (typeof record.requestId !== 'string' || typeof record.query !== 'string') return null;
+      return { bridge: 1, kind: 'noteQuery', requestId: record.requestId, query: record.query };
     default:
       return null;
   }
