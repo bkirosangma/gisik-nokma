@@ -44,35 +44,52 @@ import { TextSelection } from '@tiptap/pm/state';
  * ## WHICH OF THE THREE BEHAVIOURS ARE ACTUALLY THIS FILE'S — measured
  *
  * "The package has a handler" does not answer "the package delivers the
- * behaviour", so each branch was deleted on its own and `test/collapsible.test.ts`
- * re-run:
+ * behaviour", so each branch was deleted on its own and
+ * `test/collapsible.test.ts` re-run:
  *
  *   - **Enter in the summary (9.269) — THIS FILE'S.** Delete the branch and
- *     the case fails: as above, the base keymap keeps the key. The package's
- *     `Details.Enter` is reached only after the base keymap declines, and it
- *     does not decline here.
+ *     the case fails: the cursor lands outside the block instead of in the
+ *     content.
  *   - **Enter to exit the block (9.270) — THE PACKAGE'S.** Delete the branch
- *     and the case stays GREEN: `DetailsContent.Enter` DOES run at that
- *     position, because every base-keymap handler returns false on the last
- *     empty paragraph of a body. The branch that stood here was a duplicate
- *     and was REMOVED — the plan asks for exactly this when the package
- *     already satisfies a case. The case stayed and now witnesses the
- *     package. **Its stated mutation therefore SURVIVES against this file**,
- *     and that is recorded rather than papered over: there is no longer a
- *     branch here to kill.
+ *     and the case stays GREEN, so `DetailsContent.Enter` is what delivers
+ *     that exit. The branch that stood here was a duplicate and was REMOVED —
+ *     the plan asks for exactly this when the package already satisfies a
+ *     case. The case stayed and now witnesses the package. **Its stated
+ *     mutation therefore SURVIVES against this file**, recorded rather than
+ *     papered over: there is no longer a branch here to kill.
  *   - **Backspace (9.295) — THIS FILE'S, and NARROWER than the package's.**
  *     The package's `unsetDetails` also removes the block, but it merges the
  *     summary content and inserts a fresh block, so an EMPTY collapsible
  *     becomes two empty paragraphs plus `TrailingNode`'s — three where §8.4
  *     says one. Delete this handler and 9.295 goes red at 3 vs 2.
  *
- * ## EVERY ACTION IS ONE TRANSACTION, AND `replaceWith` IS WHY
+ * AN EARLIER VERSION OF THE TWO ENTRIES ABOVE EXPLAINED BOTH BY THE BASE
+ * KEYMAP, and said opposite things about it: that it "does not decline" at the
+ * summary, and that "every base-keymap handler returns false" at the exit.
+ * **Both are false, and both were measured**: the base keymap's
+ * `first([newlineInCode, createParagraphNear, liftEmptyBlock, splitBlock])`
+ * returns FALSE at the summary position and TRUE at the exit position. Whatever
+ * decides those two keys, it is not that predicate — it is the order the 67
+ * `handleKeyDown` plugins are consulted in, which this file has NOT determined.
+ * The two DELETIONS above are what these claims rest on, and those are effects,
+ * not causes.
  *
- * Delete-then-insert is not equivalent to a single replacement here. Deleting
- * the only block of a document is not representable — `block+` — so ProseMirror
- * leaves an empty paragraph behind and the insert adds a second one. Two of
- * the three handlers below were written that way first and both produced a
- * document with a paragraph nobody asked for.
+ * ## ONE TRANSACTION PER ACTION — A CHOICE, NOT A REPAIR
+ *
+ * An earlier version of this section claimed `replaceWith` was a FIX: that
+ * delete-then-insert left "a document with a paragraph nobody asked for",
+ * because deleting a document's only block is not representable under `block+`
+ * and ProseMirror supplies one. **Measured, and it is false.** Both handlers
+ * were reverted to delete-then-insert and the documents printed: the input rule
+ * gave `[details, paragraph]`, Backspace gave `[paragraph, paragraph]` —
+ * exactly what `replaceWith` gives. That trailing paragraph belongs to
+ * `TrailingNode`, which keeps a paragraph as a document's last block, and it is
+ * there under EITHER spelling. The "paragraph nobody asked for" that prompted
+ * the change was that node, misattributed.
+ *
+ * `replaceWith` is kept because it states one intent in one step, which is the
+ * smaller thing to read. It is NOT load-bearing: no case reddens if it is
+ * reverted.
  */
 
 /** The block the input rule inserts: an open collapsible, empty summary, one empty paragraph. */
