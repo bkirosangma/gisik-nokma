@@ -13,6 +13,17 @@ import { OWNER_EMAIL, signIn } from './helpers/sign-in.js';
  * flow's own assertions are trusted.
  */
 
+/*
+ * Titles carry a per-run suffix: the dev stack's database PERSISTS between runs, so a fixed title from an earlier run
+ * would make every `getByRole('link', { name })` below resolve to several notes (strict-mode violation) — measured
+ * 2026-09-23 on the first run against the built stack. The dialog's inputs are scoped to the dialog with an exact name
+ * because the page's own "Filter by title" box also matches a substring `name: 'Title'` query.
+ */
+const RUN = Date.now().toString(36);
+const COLD = `Cold room ${RUN}`;
+const FREEZER = `Freezer audit ${RUN}`;
+const FREEZER_Q4 = `Freezer audit ${RUN} — Q4`;
+
 test('18.228 create a note, save it, and find it in the tree after a reload', async ({ page }) => {
   await signIn(page, OWNER_EMAIL);
   await page.goto('/notes');
@@ -24,12 +35,12 @@ test('18.228 create a note, save it, and find it in the tree after a reload', as
   // Home defaults to the first workspace, at the WORKSPACE level
   // (homeProjectId ''), and Scope defaults to Private — this note is meant
   // to stay both, so neither select is touched.
-  await page.getByRole('textbox', { name: 'Title' }).fill('Cold room');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('dialog', { name: 'New note' }).getByRole('textbox', { name: 'Title', exact: true }).fill(COLD);
+  await page.getByRole('dialog', { name: 'New note' }).getByRole('button', { name: 'Create', exact: true }).click();
 
   // The dialog's own Create navigates to `/notes/<id>` on success.
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
-  await expect(page.getByTestId('note-title')).toHaveText('Cold room');
+  await expect(page.getByTestId('note-title')).toHaveText(COLD);
 
   const body = page.getByTestId('note-editor').locator('.ProseMirror');
   await body.click();
@@ -40,7 +51,7 @@ test('18.228 create a note, save it, and find it in the tree after a reload', as
 
   // The tree row, under the workspace it was filed in — the create flow's
   // Home default proven from the reader's side, not the dialog's.
-  await expect(page.getByRole('link', { name: 'Cold room' })).toBeVisible({ timeout: 20_000 });
+  await expect(page.getByRole('link', { name: COLD })).toBeVisible({ timeout: 20_000 });
   // The body survived the reload — a fresh `getNote`, not a cached draft.
   await expect(page.getByTestId('note-editor').locator('.ProseMirror')).toContainText(
     'The compressor needs a filter change next week.',
@@ -53,24 +64,24 @@ test('18.229 renaming updates the tree row and the document title without a relo
   await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole('button', { name: 'New note' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill('Freezer audit');
-  await page.getByRole('button', { name: 'Create' }).click();
+  await page.getByRole('dialog', { name: 'New note' }).getByRole('textbox', { name: 'Title', exact: true }).fill(FREEZER);
+  await page.getByRole('dialog', { name: 'New note' }).getByRole('button', { name: 'Create', exact: true }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
 
   // POSITIVE CONTROL: the pre-rename title, in both places, before touching it.
-  await expect(page.getByTestId('note-title')).toHaveText('Freezer audit');
-  await expect(page.getByRole('link', { name: 'Freezer audit' })).toBeVisible();
+  await expect(page.getByTestId('note-title')).toHaveText(FREEZER);
+  await expect(page.getByRole('link', { name: FREEZER })).toBeVisible();
 
   const title = page.getByTestId('note-title');
   await title.click();
   await title.press('ControlOrMeta+A');
-  await title.pressSequentially('Freezer audit — Q4');
+  await title.pressSequentially(FREEZER_Q4);
   await title.press('Enter');
 
   // NO RELOAD BETWEEN HERE AND THE ASSERTIONS — this is the live query, not
   // a page refresh: the tree row is a sibling render fed by its own
   // `getNotes` subscription, not the document's own state.
-  await expect(page.getByTestId('note-title')).toHaveText('Freezer audit — Q4');
-  await expect(page.getByRole('link', { name: 'Freezer audit — Q4' })).toBeVisible({ timeout: 10_000 });
-  await expect(page.getByRole('link', { name: 'Freezer audit', exact: true })).toHaveCount(0);
+  await expect(page.getByTestId('note-title')).toHaveText(FREEZER_Q4);
+  await expect(page.getByRole('link', { name: FREEZER_Q4 })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByRole('link', { name: FREEZER, exact: true })).toHaveCount(0);
 });
