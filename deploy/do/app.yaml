@@ -28,7 +28,9 @@
 #     never sent to the browser) and NEXT_PUBLIC_SERVER_URL (baked into the
 #     bundle, the origin the WebSocket dials directly -- streamUrl() appends
 #     /v1/stream and rewrites http->ws itself, so this is an origin, not a
-#     socket URL). Neither NEXT_PUBLIC_API_URL nor NEXT_PUBLIC_WS_URL has a
+#     socket URL). In production that origin is the WEB host, and the
+#     ingress rules route its /v1 and /api/auth paths to the server, so the
+#     socket carries the session cookie (see the ingress block). Neither NEXT_PUBLIC_API_URL nor NEXT_PUBLIC_WS_URL has a
 #     reader anywhere in apps/web.
 name: gisik-nokma
 region: blr
@@ -226,16 +228,23 @@ services:
     envs:
       # Read by apps/web/next.config.ts at build time for the /v1/* and
       # /api/auth/* rewrites; never sent to the browser. BUILD_TIME because
-      # Next resolves rewrites at build, not at request time.
+      # Next resolves rewrites at build, not at request time. In production
+      # the ingress rules below route those two prefixes on the web host to
+      # the server before Next sees them, so the rewrites are a fallback, not
+      # the path; unchanged, and pinned as the control in 13.1425.
       - key: SERVER_ORIGIN
         value: https://pm-api.artsourced.in
         scope: BUILD_TIME
       # Baked into the bundle (NEXT_PUBLIC_ means exactly that) -- the
       # origin the browser dials the WebSocket at directly, since Next's
-      # production server does not proxy protocol upgrades. An https://
-      # origin, not wss:// -- streamUrl() does that rewrite itself.
+      # production server does not proxy protocol upgrades. It is the WEB
+      # host, not pm-api: the session cookie belongs to pm.artsourced.in
+      # only, so a socket dialled anywhere else is refused (401) at the
+      # upgrade. The ingress rules at the bottom of this file route /v1 on
+      # this host to the server component. An https:// origin, not wss://
+      # -- streamUrl() does that rewrite itself. Pinned by 13.1425.
       - key: NEXT_PUBLIC_SERVER_URL
-        value: https://pm-api.artsourced.in
+        value: https://pm.artsourced.in
         scope: BUILD_TIME
 
 workers:
@@ -335,6 +344,36 @@ ingress:
           exact: pm-api.artsourced.in
       component:
         name: server
+    # The API paths of the WEB host go to the server, ahead of the web
+    # catch-all below. The browser dials the live-update WebSocket at the web
+    # host (NEXT_PUBLIC_SERVER_URL) because that is the host that holds the
+    # session cookie -- crossSubDomainCookies is deliberately off
+    # (apps/server/src/auth/auth.ts), so a socket dialled at pm-api carries no
+    # cookie and requireSession answers 401 at the upgrade (measured in
+    # production 2026-09-23: every /v1/stream handshake 401 in ~1 ms). Next's
+    # server cannot proxy the upgrade, so the edge must route it. /api/auth
+    # rides along for the same reason: one host, one cookie.
+    #
+    # preserve_path_prefix is load-bearing: App Platform TRIMS the matched
+    # prefix before forwarding by default (/v1/stream would reach the server
+    # as /stream and 404). Rule order is precedence -- these must stay above
+    # the authority-only web rule. Pinned by 13.1424.
+    - match:
+        authority:
+          exact: pm.artsourced.in
+        path:
+          prefix: /v1
+      component:
+        name: server
+        preserve_path_prefix: true
+    - match:
+        authority:
+          exact: pm.artsourced.in
+        path:
+          prefix: /api/auth
+      component:
+        name: server
+        preserve_path_prefix: true
     - match:
         authority:
           exact: pm.artsourced.in

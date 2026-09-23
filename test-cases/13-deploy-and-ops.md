@@ -445,3 +445,26 @@ The ledger export shares that pool and failed the same way; `pg_dump` goes throu
 - 13.1423 ✅ A non-PEM `DATABASE_CA_CERT` aborts the whole scheduler (no `backup daemon scheduled` line)
   and stderr names the variable, the same shape as a refused sweep interval.
   `apps/server/test/ops/backup-daemon-main.test.ts`.
+
+## Live-update socket routing (`hotfix/stream-same-origin`, 2026-09-23)
+
+A ticket created in production did not appear on the board or list without a manual refresh (#694's socket
+multiplex, shipped in #700, did not change it). Measured in the production server log: every
+`GET /v1/stream` handshake from host `pm-api.artsourced.in` answered `401` in ~1 ms, repeating on the
+client's backoff. Cause: the browser dials the socket directly at `NEXT_PUBLIC_SERVER_URL` (Next cannot
+proxy an upgrade), which was `https://pm-api.artsourced.in`; the stream authenticates at the upgrade with
+the session cookie; that cookie belongs to `pm.artsourced.in` only (`crossSubDomainCookies` is deliberately
+off). The dev stack hides it — both hosts are `localhost`, and cookies ignore ports. The fix is the deploy
+spec alone: the web host's `/v1` and `/api/auth` route to the server at the edge, and the socket is dialled
+at the web host.
+
+- 13.1424 ✅ In `deploy/do/app.yaml`'s ingress, `/v1` and `/api/auth` on the primary domain `pm.artsourced.in`
+  route to `server` and sit BEFORE that domain's authority-only `web` catch-all, and both set
+  `preserve_path_prefix: true` — App Platform trims a matched prefix by default, so without it `/v1/stream`
+  reaches the server as `/stream` and 404s. CONTROL: `pm-api.artsourced.in` still routes to `server`.
+  `apps/server/test/deploy/app-spec-ingress.test.ts`. Mutations: remove the `/v1` rule → red; drop the
+  `/v1` rule's `preserve_path_prefix` → red.
+- 13.1425 ✅ The `web` component's `NEXT_PUBLIC_SERVER_URL` is `https://` + the PRIMARY domain, so the socket
+  is dialled at the host that holds the cookie; CONTROL: `SERVER_ORIGIN` is still `https://pm-api.artsourced.in`
+  (the build-time rewrite target). `apps/server/test/deploy/app-spec-ingress.test.ts`. Mutation: restore
+  `pm-api` in `NEXT_PUBLIC_SERVER_URL` → red.
