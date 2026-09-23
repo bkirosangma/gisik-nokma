@@ -17,6 +17,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser } from '../providers.js';
+import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
@@ -190,6 +191,17 @@ export function NoteDocument({
     return author?.name?.trim() || author?.email?.trim() || note.authorId;
   }, [note, members]);
 
+  /** Any author's name from the SAME roster `authorName` reads — History rows name whoever recorded each version, not just the note's own author. */
+  const nameOf = useMemo(
+    () => (authorId: string) => {
+      const member = members.find((candidate) => candidate.id === authorId);
+      return member?.name?.trim() || member?.email?.trim() || authorId;
+    },
+    [members],
+  );
+
+  const [historyOpen, setHistoryOpen] = useState(false);
+
   if (note === null) {
     return (
       <p className="gn-notes__hint" data-testid="note-document-missing">
@@ -231,6 +243,7 @@ export function NoteDocument({
             exportMarkdown(draft ?? note.body),
           );
         }}
+        onOpenHistory={() => setHistoryOpen(true)}
       />
 
       <div className="gn-notes__editor" ref={editorRoot} data-testid="note-editor">
@@ -245,6 +258,20 @@ export function NoteDocument({
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
         />
       </div>
+
+      <HistoryPanel
+        open={historyOpen}
+        onClose={() => setHistoryOpen(false)}
+        workspaceId={note.workspaceId}
+        noteId={note.noteId}
+        canEdit={canEdit}
+        nameOf={nameOf}
+        onRestore={(body) => {
+          void write('note.body_set', { body }).then((wrote) => {
+            if (wrote) setHistoryOpen(false);
+          });
+        }}
+      />
     </div>
   );
 }

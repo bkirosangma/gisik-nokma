@@ -3486,3 +3486,46 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__editor {
   min-width: 0;
 }
+
+/* ── Task 6: the History panel ──────────────────────────────────────────── */
+
+.gn-notes__history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gn-notes__history-row {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  text-align: left;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.gn-notes__history-row:hover {
+  background: var(--gn-fill-secondary);
+}
+
+.gn-notes__history-banner {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+  font-size: 0.8125rem;
+}
+
+.gn-notes__history-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}

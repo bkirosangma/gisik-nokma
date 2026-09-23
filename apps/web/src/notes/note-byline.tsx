@@ -40,6 +40,7 @@ export function NoteByline({
   onDetach,
   readingLabel,
   onCopyMarkdown,
+  onOpenHistory,
 }: {
   note: NoteDetail;
   workspace: WorkspaceRef;
@@ -51,6 +52,7 @@ export function NoteByline({
   onDetach: (ticketId: string) => void;
   readingLabel: string;
   onCopyMarkdown: () => void;
+  onOpenHistory: () => void;
 }) {
   return (
     <div className="gn-notes__byline">
@@ -82,11 +84,12 @@ export function NoteByline({
 
       <span className="gn-notes__byline-actions">
         <Button onClick={onCopyMarkdown}>Copy as Markdown</Button>
-        {/* THE HISTORY BUTTON IS NOT HERE YET, and its absence is deliberate.
-            The plan's file map gives `HistoryPanel` to Task 6, and a button in
-            this commit would toggle a panel that does not exist — the
-            dead-control shape this repo refuses to draw (E5-31). It arrives
-            with the thing it opens. */}
+        {/* Open to every viewer, not just an editor: spec §9.6 makes History
+            "view only" for a reader — RESTORE is what `canEdit` gates, inside
+            the panel itself, not the door to it. */}
+        <Button variant="ghost" onClick={onOpenHistory}>
+          History
+        </Button>
       </span>
     </div>
   );
