@@ -150,6 +150,22 @@ export type StreamErrorCode = (typeof STREAM_ERROR_CODES)[number];
  */
 export type ReachGrantedTicket = { id: string; headSeq: number };
 
+/**
+ * One note a reach notice names, and the server's head position for it
+ * (notes series, Plan 2 of 6, spec §5.1).
+ *
+ * Structurally identical to `ReachGrantedTicket` and deliberately a separate
+ * name: the two arms carry the SAME two facts for the same reason — `headSeq`
+ * answers "is the copy I hold complete, or stale and partial", which
+ * `reconcile` structurally cannot answer for an entity the reader may see — and
+ * keeping the names apart is what lets a later change move one arm's shape
+ * without silently moving the other's. The pull each arm drives is different
+ * (`GET /v1/sync/bootstrap/ticket` against `GET /v1/notes/:id/events`), and a
+ * reader who meets `notes` on the wire should be able to find the route from
+ * the type.
+ */
+export type ReachGrantedNote = { id: string; headSeq: number };
+
 export type ServerStreamFrame =
   | { type: 'event'; envelope: LedgerEvent }
   | { type: 'purge'; workspaceId: string; entityId: string }
@@ -223,8 +239,35 @@ export type ServerStreamFrame =
    * know a device's holdings and must not model them. Each entry carries that
    * ticket's head position so the client can tell a copy it holds COMPLETELY
    * from a stale partial one; see `ReachGrantedTicket`.
+   *
+   * ## `notes` is the same notice, one entity kind over (Plan 2 of 6)
+   *
+   * Notes reach a device under the identical argument, so they are the
+   * identical wire shape: a widening — a note scoped to its workspace, a ticket
+   * becoming visible and bringing its `inherit` notes with it (spec §5.2) —
+   * names the note ids the reader may now read IN FULL, each with its head
+   * position, and the client pulls the ones it lacks through
+   * `GET /v1/notes/:id/events`. Narrowing is the same client-driven shape it is
+   * for tickets and for the same reason (ruling P23: this repo emits no
+   * server-initiated per-entity purge), so nothing here is a `purge` in
+   * disguise either.
+   *
+   * The two arms are independent members rather than one tagged list: a ticket
+   * trigger that also widens notes carries both, and the client's two pull
+   * queues differ.
    */
-  | { type: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] }
+  | {
+      type: 'reach-granted';
+      workspaceId: string;
+      tickets: ReachGrantedTicket[];
+      /**
+       * The notes this reader's reach now admits, absent when there are none
+       * (Plan 2 of 6, spec §5.1 and §5.2). `tickets` is carried and empty when
+       * a notice is entirely about notes, so the frame's shape does not change
+       * with its content.
+       */
+      notes?: ReachGrantedNote[];
+    }
   | { type: 'caught-up'; workspaceId: string; seq: number }
   | { type: 'error'; workspaceId: string | null; code: StreamErrorCode; message: string };
 
@@ -264,6 +307,18 @@ export type ServerStreamFrame =
  * consumer that only imports this file. A consumer that needs the guarantee
  * should `.strict()` the envelope on its own side rather than assume it here.
  */
+/**
+ * One entry of a notice's list — a ticket or a note, the same two facts either
+ * way (Plan 2 of 6 shared this between the frame's two arms rather than
+ * spelling the object twice).
+ *
+ * `headSeq` is a WORKSPACE sequence and therefore `>= 1`: it is assigned inside
+ * the appending transaction under `lockWorkspace`, so a mock that has not
+ * spoken to a ledger has nothing true to put here — the same property that
+ * makes `envelope.workspaceSeq` hard to fake.
+ */
+const reachGrantedItemSchema = z.object({ id: ulidString, headSeq: z.number().int().min(1) }).strict();
+
 export const serverStreamFrameSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('event'), envelope: ledgerEventSchema }).strict(),
   z
@@ -272,18 +327,22 @@ export const serverStreamFrameSchema = z.discriminatedUnion('type', [
   z.object({ type: z.literal('scope-revoked'), workspaceId: ulidString }).strict(),
   z
     .object({
-      // `ulidString` per element, not `z.string()`: a notice is a list of
-      // TICKET ids and nothing else, so a mock that put a slug or a name in
-      // here fails at this schema rather than at the client's pull.
+      // `ulidString` per element, not `z.string()`: a notice is a list of ids
+      // and nothing else, so a mock that put a slug or a name in here fails at
+      // this schema rather than at the client's pull.
       type: z.literal('reach-granted'),
       workspaceId: ulidString,
-      // `headSeq` is a WORKSPACE sequence and therefore `>= 1`: it is assigned
-      // inside the appending transaction under `lockWorkspace`, so a mock that
-      // has not spoken to a ledger has nothing true to put here — the same
-      // property that makes `envelope.workspaceSeq` hard to fake.
-      tickets: z
-        .array(z.object({ id: ulidString, headSeq: z.number().int().min(1) }).strict())
-        .min(1),
+      // `tickets` LOST its `.min(1)` in Plan 2 of 6, and the guarantee it
+      // carried moved rather than vanished. The old `.min(1)` said "a notice
+      // names something"; a note notice names no ticket, so the schema can no
+      // longer say it. What holds it now is the two emission sites
+      // (`visible-events-for.ts`: the ticket branch yields only when
+      // `tickets.length > 0 || notes.length > 0`, the note branch only when
+      // `notes.length > 0`) — a CALLER's guard, not this schema's, and stated
+      // here because a reader looking for the invariant will come looking in
+      // this object first.
+      tickets: z.array(reachGrantedItemSchema),
+      notes: z.array(reachGrantedItemSchema).optional(),
     })
     .strict(),
   z

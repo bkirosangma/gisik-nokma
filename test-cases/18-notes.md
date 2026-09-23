@@ -11,6 +11,7 @@ in the table below. Take from your block, never from the tip.
 | Plan | Block |
 |---|---|
 | 1 Backend core | `18.001`–`18.060` — **minted: `18.001`–`18.042`**, so the next plan takes the table's next row or continues at `18.043` if it is drawn from this block |
+| 2 Sync | `18.061`–`18.120` |
 
 **Write cases as `- ❌ **18.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -80,3 +81,12 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.040 — download of a note-owned attachment is 200 for a reader and 404 for a non-reader** (same body as an unknown id). Mutation: authorise by ticket only.
 - ✅ **18.041 — a request naming both `ticketId` and `noteId`, or neither, is 400.** Mutation: prefer `ticketId` silently.
 - ✅ **18.042 — `note.created` refuses a `homeProjectId` no project was founded under, even for the owner and even when the actor holds a forged membership on it** (spec §3.3's existence precondition); control: a real project is accepted. Mutation: drop the `note.created` case from `projectsNamedBy`.
+
+## 18.8 Sync — server
+
+- ✅ **18.061 — `audienceClassOf('note')` is `'note'` and every switch over `AudienceClass` compiles with the arm** (the build is the test); control: `'invite'` is still `'admin'`. Mutation: return `'withheld'`.
+- ✅ **18.062 — a note event reaches a reader and not a non-reader:** on the notes fixture, `visibleEventsFor` for `memberIn` yields the `note.created` of `nWorkspace` and not of `nPrivate`; for `author` both. Mutation: drop the `canReadNote` guard.
+- ✅ **18.063 — a grant trigger precedes its event with a `reach-granted` notice carrying `notes: [{ id, headSeq }]`:** after `note.scope_set` widens `nPrivate` to `workspace`, `memberIn`'s drain yields `{ kind: 'reach-granted', notes: [{ id: nPrivate, headSeq: <that event's workspace_seq> }] }` immediately before the `note.scope_set` envelope; control: a `note.renamed` (not a trigger) yields no notice. Mutation: remove `note.scope_set` from `NOTE_GRANT_TRIGGERS`.
+- ✅ **18.064 — the notice is emitted once per drain** (`backfilled`): two triggers on the same note in one drain produce one notice. Mutation: skip the `backfilled` check.
+- ✅ **18.065 — the hub forwards `notes` on the `reach-granted` frame unchanged.** Mutation: drop the field in `drain`.
+- ✅ **18.066 — a `comment.added` filed against a note follows the note's audience, not the ticket rule.** Mutation: route note comments through the ticket branch.
