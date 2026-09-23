@@ -1199,9 +1199,17 @@ a.gn-ticket-sheet__crumb--link {
    disclosure on the densest surface in the product, not this card's own
    open control. `max-width: 100%` plus the title span's own
    `text-overflow` is what keeps a long epic name from pushing the card
-   wider than its column. */
+   wider than its column.
+   `display: flex` — CORRECTED 2026-09-23 (owner bug report, case
+   13.1467/13.1468): this was `inline-flex`, and `.gn-board-card` itself
+   sets only padding (no `display: flex` of its own), so the chip shared a
+   line with the next sibling — `.gn-board-card__title`, a `<button>`,
+   inline-level by default — whenever both fit. `width: fit-content` keeps
+   the now-block-level chip's own hit area (and its focus ring) sized to
+   its content instead of stretching to the card's full width. */
 .gn-board-card__epic {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 0.25rem;
   max-width: 100%;
