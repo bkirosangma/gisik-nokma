@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { docToPlainText } from '@gisik-nokma/domain';
+import { DOC_SCHEMA_VERSION } from '../src/doc.js';
 import { createTestEditor } from './helpers/create-editor.js';
 import { typeText } from './helpers/type-text.js';
 
@@ -44,11 +45,11 @@ const IMG = '01J9GIMA000000000000000000';
  * Stated at this length so a later reader does not mistake these cases for
  * whole-set coverage and build on a guarantee they do not give.
  */
-describe('schema v1 output conforms to the shipped plain-text walker', () => {
+describe('schema v2 output conforms to the shipped plain-text walker', () => {
   /**
    * 9.39 — a document this editor produces round-trips through the domain's `docToPlainText` with the same text the editor renders, the conformance direction between the editor and the search projection.
    */
-  it('renders every block node the schema names as its own line', () => {
+  it('9.266 renders every block node the schema names as its own line', () => {
     const editor = createTestEditor(undefined, {
       type: 'doc',
       content: [
@@ -72,6 +73,32 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
           content: [{ type: 'paragraph', content: [{ type: 'text', text: 'CA said wait' }] }],
         },
         { type: 'codeBlock', content: [{ type: 'text', text: 'npm run gst' }] },
+        // Schema v2's blocks, added by the notes editor port (Plan 4 Task 2).
+        // Both are placed ABOVE the final paragraph for the same reason
+        // codeBlock is: a textblock that ends the document has its trailing
+        // newline trimmed, so a v2 block placed last could lose a line
+        // boundary and still agree with the expected string.
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'buy milk' }] }],
+            },
+          ],
+        },
+        {
+          type: 'details',
+          attrs: { open: false },
+          content: [
+            { type: 'detailsSummary', content: [{ type: 'text', text: 'Why' }] },
+            {
+              type: 'detailsContent',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'because' }] }],
+            },
+          ],
+        },
         // Deliberately NOT the last block. A textblock that ends the document
         // has its trailing newline trimmed away, so putting codeBlock last
         // would let the walker forget codeBlock is a block and still produce
@@ -80,7 +107,7 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
       ],
     });
     expect(docToPlainText(editor.getJSON())).toBe(
-      'GST filing\ndue soon\ncollect invoices\nfile GSTR-1\nCA said wait\nnpm run gst\nthen reconcile',
+      'GST filing\ndue soon\ncollect invoices\nfile GSTR-1\nCA said wait\nnpm run gst\nbuy milk\nWhy\nbecause\nthen reconcile',
     );
     editor.destroy();
   });
@@ -288,7 +315,10 @@ describe('schema v1 output conforms to the shipped plain-text walker', () => {
     const editor = createTestEditor();
     typeText(editor, '# GST filing');
     const json = editor.getJSON() as { attrs?: { schemaVersion?: number } };
-    expect(json.attrs?.schemaVersion).toBe(1);
+    // The value is the constant, not a literal. Plan 4 Task 1 moved it 1 → 2;
+    // this assertion's claim is "the attrs this schema stamps do not reach the
+    // walker", which is a claim about the CONSTANT, so it reads the constant.
+    expect(json.attrs?.schemaVersion).toBe(DOC_SCHEMA_VERSION);
     expect(editor.getText()).toBe('GST filing\n\n');
     expect(docToPlainText(json)).toBe('GST filing');
     editor.destroy();

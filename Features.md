@@ -1433,26 +1433,74 @@ assigns `Features.md` sections one per implementation plan, so numbering is clai
 rather than taken next-free. (§6 and §7 were named here as absent too; both have since been opened,
 by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is unchanged.)*
 
-- ⚙️ **Document schema v1** — `DOC_SCHEMA_VERSION = 1`, `emptyDoc()`, `isDocJson()`, and
+- ⚙️ **Document schema v2** — `DOC_SCHEMA_VERSION = 2`, `emptyDoc()`, `isDocJson()`, and
   `VersionedDocument`, a replacement for Tiptap's `Document` that carries `schemaVersion` on the doc
   node. The vocabulary is CLOSED: a set-equality test over node and mark types fails when an extension
-  adds one, so a new vocabulary item cannot arrive unnoticed. `packages/editor/src/doc.ts`,
+  adds one, so a new vocabulary item cannot arrive unnoticed. A version-1 document contains none of
+  v2's nodes and renders unchanged under v2. `packages/editor/src/doc.ts`,
   `packages/editor/src/schema/versioned-document.ts`
 - ⚙️ **One extension set for every client** — `buildEditorExtensions(options)` / `EditorSchemaOptions`
-  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`). The single origin of schema v1: web, desktop,
-  the RN webview bundle and every test build their list here, so the schema cannot drift between
-  clients. Everything StarterKit contributes that v1 does not name is switched off by an explicit
-  `false` rather than left to a default — `document` because it is replaced, `link` because it is
-  reconfigured, `underline` because it is not this product's vocabulary.
+  (`queryUsers`, `resolveAttachmentUrl`, `placeholder`, `readOnly`, `queryNotes`, `resolveNoteTitle`,
+  `previewNote`, `onNavigateNote`). The single origin of schema v2:
+  web, desktop, the RN webview bundle and every test build their list here, so the schema cannot drift
+  between clients. Everything StarterKit contributes that v2 does not name is switched off by an
+  explicit `false` rather than left to a default — `document` because it is replaced, `link` because it
+  is reconfigured, `underline` because it is not this product's vocabulary.
   `packages/editor/src/schema/extensions.ts`
+- ✅ **Task lists in every document** — `[ ] ` / `[x] ` at a line start; schema is version 2
+  (`DOC_SCHEMA_VERSION`), version-1 documents render unchanged.
+- ⚙️ **Plain text and the read-only comment renderer understand every v2 node** (task items,
+  collapsibles, wiki-links) — search indexing and comment display never drop content silently. Both
+  walk the same three shapes and take the same preference: a wiki-link contributes its stored TITLE,
+  never its note id, and an unknown node renders its CHILDREN rather than nothing. The comment
+  renderer gives each node its chrome — a disabled checkbox reading the stored `checked`, a
+  `<details>` that can be folded, a link to `/notes/<id>`. `packages/domain/src/doc-text.ts`,
+  `packages/app-core/src/views/comment-body.tsx`
+- ✅ **A collapsible block** — start a line with `< `, the rest of the line is the title, Enter moves
+  into the body, Enter on an empty last line leaves the block, Backspace in an empty summary removes
+  it; the folded state is saved with the document for an editor and is view-only for a reader
+  (spec §8.4). `packages/editor/src/extensions/collapsible.ts`
+- ✅ **Wiki-links between notes** — type `[[` to pick a note; the link stores the note id and the title
+  it had, follows renames through `resolveNoteTitle`, hovers a preview card, and renders as a missing
+  pill when the target is gone or unreadable (spec §8.5). **The pill is not red**, which is a deviation
+  from the spec's wording rather than an omission: `editor.css`'s header forbids every colour form and
+  packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
+  a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
+- ⚙️ **The editor slot has a `note` mode** — autosave hooks (`onDraft` on every change, `onSave` on
+  blur, `saveState` reported in the footer as `Saved` / `Saving…` / `Not saved (kept on this device)`,
+  or nothing at all when the host supplies none — it does not default to the reassuring arm)
+  instead of a submit button, and no Markdown hint: a note saves itself. The mobile WebView bundle is
+  regenerated and carries schema v2. `packages/editor/src/components/TicketEditorSlot.tsx`,
+  `apps/mobile/src/editor/editor-html.generated.ts`
+- ✅ **Reading extras for long documents** — word count, reading time (200 wpm, floored at a
+  minute for any non-empty text) and a table of contents that renders at three headings or more.
+  `packages/editor/src/reading/reading-meta.ts`, `ReadingTOC.tsx`
+- ✅ **Markdown in and out** — pasting plain text that looks like Markdown converts it (a clipboard carrying
+  `text/html` is left to the default handler); copying formatted content puts Markdown in the PLAIN-TEXT
+  clipboard flavour only; `exportMarkdown` renders a whole document through the editor's own schema.
+  Ported from the knowledge-base app, with `data-raw-block` dropped (§8.7) and the note-link form re-keyed
+  to `[[title]]`. **Two things do NOT survive the round trip, recorded here rather than left to be
+  discovered**: a note link re-imports as TEXT (markdown cannot spell a note id — the spec's own note), and
+  a task list's words survive while its item TYPE and its CHECKED STATE do not: CommonMark merges two
+  same-marker lists separated by a blank line, and a Tiptap task item is `li[data-type="taskItem"]`, an
+  attribute markdown cannot carry. `packages/editor/src/markdown/serializer.ts`,
+  `packages/editor/src/extensions/markdown-clipboard.ts`
+- ✅ **Code blocks carry a Copy button, and the toolbar gained four controls** — the strip keeps the
+  prototype's six (`B i code link list quote`) and appends Task item, Code block, Collapsible and
+  Link a note (which inserts the `[[` trigger rather than opening a picker of its own). The
+  code block's node view keeps its name (`codeBlock`) and its two input rules, so the document is
+  unchanged and only its chrome is new. `packages/editor/src/extensions/code-block-copy.ts`,
+  `packages/editor/src/components/EditorToolbar.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
-  `**due soon**` arrives bold whether typed, pasted or dropped. `autolink`, `linkOnPaste` and
-  `markdownLinks` are all `false`, and they are not sufficient: **seven paste rules across five
-  extensions** and **eighteen input rules across ten** remain live, counted against the built
-  extension list at tiptap 3.30.5, and the two sets sit behind `enablePasteRules` /
-  `enableInputRules` — `Editor` options this function returns `Extensions` for and therefore cannot
-  reach. In tension with spec §2's "nothing silently becomes markup"; **left as it is, deliberately
-  and unruled**, with the census pinned by a test so the number cannot drift silently.
+  `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
+  (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
+  fires), and they are not sufficient: **seven paste rules across five extensions** and
+  **twenty-one input rules across thirteen** remain live, counted against the built extension list at
+  tiptap 3.30.5, and the
+  two sets sit behind `enablePasteRules` / `enableInputRules` — `Editor` options this function returns
+  `Extensions` for and therefore cannot reach. In tension with spec §2's "nothing silently becomes
+  markup"; **left as it is, deliberately and unruled**, with the census pinned by a test so the number
+  cannot drift silently.
   `packages/editor/src/schema/extensions.ts`, `packages/editor/test/rule-census.test.ts`
 - ⚙️ **Ticket image node** — `TicketImage`, `IMAGE_WRAP_MODES` (`inline-left` · `inline-right` ·
   `block`), `ImageWrapMode`, `TicketImageOptions`. Wrap is validated per-attribute at the parse door

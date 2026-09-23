@@ -13,13 +13,33 @@ describe('editor bridge protocol — host side', () => {
   });
 
   it('round-trips every host→editor kind through the REAL editor-side parser (packages/editor), not just this file\'s own inverse', () => {
+    // ⚠ A `Record` KEYED BY `kind`, NOT A HAND-WRITTEN ARRAY, and the
+    // difference is the whole point of this case's NAME. The array it replaced
+    // was typed `HostToEditorMessage[]`, which does NOT force exhaustiveness —
+    // and it had drifted: the case said "every host→editor kind" while omitting
+    // `noteResults`, which Plan 4's notes port had added to the union. A
+    // `Record<HostToEditorMessage['kind'], …>` makes a missing or unknown kind a
+    // COMPILE ERROR — MEASURED: deleting one key gives `TS2741: Property
+    // 'uploadFailed' is missing in type …` — so "every" is enforced by the type
+    // rather than by a list somebody has to remember to extend.
+    const oneOfEachKind: Record<HostToEditorMessage['kind'], HostToEditorMessage> = {
+      loadDoc: { bridge: 1, kind: 'loadDoc', doc: null, editable: true },
+      insertImage: { bridge: 1, kind: 'insertImage', attachmentId: 'a1', mime: 'image/png' },
+      requestSubmit: { bridge: 1, kind: 'requestSubmit' },
+      mentionResults: { bridge: 1, kind: 'mentionResults', requestId: 'r1', users: [] },
+      noteResults: {
+        bridge: 1,
+        kind: 'noteResults',
+        requestId: 'r2',
+        candidates: [{ noteId: 'n1', title: 'Cold room' }],
+      },
+      uploadFailed: { bridge: 1, kind: 'uploadFailed', requestId: 'r1', message: 'boom' },
+    };
     const messages: HostToEditorMessage[] = [
-      { bridge: 1, kind: 'loadDoc', doc: null, editable: true },
+      ...Object.values(oneOfEachKind),
+      // A second `loadDoc`, because the interesting half of that kind is the
+      // two shapes its `doc` takes and the Record can carry only one.
       { bridge: 1, kind: 'loadDoc', doc: { type: 'doc', content: [] }, editable: false },
-      { bridge: 1, kind: 'insertImage', attachmentId: 'a1', mime: 'image/png' },
-      { bridge: 1, kind: 'requestSubmit' },
-      { bridge: 1, kind: 'mentionResults', requestId: 'r1', users: [] },
-      { bridge: 1, kind: 'uploadFailed', requestId: 'r1', message: 'boom' },
     ];
     for (const message of messages) {
       expect(parseHostMessage(JSON.parse(serializeHostMessage(message)))).toEqual(message);
@@ -42,6 +62,24 @@ describe('editor bridge protocol — host side', () => {
       requestId: 'r2',
       query: 'ki',
     });
+    // `noteQuery` is the SECOND request/response pair the editor can send, and
+    // this host IGNORED it until Plan 4's closing audit: the kind was added to
+    // the protocol for the notes editor's `[[` picker, and a host that does not
+    // name it falls to `default: return null` — so the request was dropped and
+    // the picker's pending promise never settled. The sibling arm's own comment
+    // states the rule ("an unanswered mentionQuery leaves the popup pending
+    // forever — always reply in-protocol"); this pair needed it too.
+    expect(parseEditorMessage({ bridge: 1, kind: 'noteQuery', requestId: 'r3', query: 'co' })).toEqual({
+      bridge: 1,
+      kind: 'noteQuery',
+      requestId: 'r3',
+      query: 'co',
+    });
+  });
+
+  it('refuses a noteQuery missing its query, like every other partial message', () => {
+    expect(parseEditorMessage({ bridge: 1, kind: 'noteQuery', requestId: 'r3' })).toBeNull();
+    expect(parseEditorMessage({ bridge: 1, kind: 'noteQuery', query: 'co' })).toBeNull();
   });
 
   it('rejects the wrong bridge version rather than coercing it', () => {

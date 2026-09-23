@@ -57,7 +57,14 @@ export function parseEditorMessage(raw: unknown): EditorToHostMessage | null {
   if (raw === null || typeof raw !== 'object' || Array.isArray(raw)) return null;
   const record = raw as Record<string, unknown>;
   if (record.bridge !== EDITOR_BRIDGE_VERSION) return null;
-  switch (record.kind) {
+  // THE DISCRIMINANT IS TYPED, AND ONLY THE DISCRIMINANT. `record.kind` is
+  // `unknown` because this function validates untrusted JSON, and a switch on
+  // `unknown` cannot be exhaustive — there is no `never` for a `default` to
+  // assert. Naming the union here is a TYPE claim, not a runtime guard: a
+  // value outside it still matches no `case` and reaches the `default`, which
+  // refuses it, exactly as before. What it buys is the check below.
+  const kind = record.kind as EditorToHostMessage['kind'];
+  switch (kind) {
     case 'ready':
       return { bridge: 1, kind: 'ready' };
     case 'change':
@@ -72,7 +79,27 @@ export function parseEditorMessage(raw: unknown): EditorToHostMessage | null {
     case 'mentionQuery':
       if (typeof record.requestId !== 'string' || typeof record.query !== 'string') return null;
       return { bridge: 1, kind: 'mentionQuery', requestId: record.requestId, query: record.query };
+    // The SECOND request/response pair (Plan 4's notes port). Named here
+    // because the `default` arm REFUSES an unrecognised kind — which is right
+    // for forward compatibility and was wrong for this one: the editor sent
+    // `noteQuery` and this host dropped it, so the `[[` picker's pending
+    // promise never settled. `editor-web-view.tsx` answers it.
+    case 'noteQuery':
+      if (typeof record.requestId !== 'string' || typeof record.query !== 'string') return null;
+      return { bridge: 1, kind: 'noteQuery', requestId: record.requestId, query: record.query };
     default:
+      // ⚠ EXHAUSTIVENESS MADE A COMPILE ERROR. This switch had NO such check,
+      // and a kind added to `EditorToHostMessage` without a branch above was
+      // matched by nothing and refused in silence — which is exactly what
+      // happened to `noteQuery`, whose request then never settled and left the
+      // editor's `[[` picker pending forever.
+      //
+      // At RUNTIME this branch still refuses an unknown kind, which is the
+      // documented forward-compatibility path. At COMPILE TIME `kind` is
+      // `never` only while every kind is handled above; add one and it becomes
+      // a non-never, failing the build at the line that must decide what the
+      // new kind does. MEASURED by adding a seventh kind to the union.
+      kind satisfies never;
       return null;
   }
 }

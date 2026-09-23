@@ -42,6 +42,23 @@ const BLOCK_NODE_TYPES = new Set([
   'ordered_list',
   'listItem',
   'list_item',
+  // Schema v2's blocks (spec §8.3, added by the notes editor port). One is
+  // load-bearing and the rest are not, and the difference is worth naming
+  // because the list reads as uniform: `detailsSummary` holds TEXT directly,
+  // so without its entry the summary fuses onto the first line of the content
+  // ('Whybecause'). The other four are inert for this schema — a task item,
+  // a details content and a details each contain only other blocks, and a
+  // task list contains only task items — so their newlines come from the
+  // child regardless. They are listed anyway for the same reason
+  // `bullet_list` is: the walker carries spellings for documents from other
+  // producers, and a node that later gains direct text must not silently
+  // fuse. `packages/editor/test/doc-text-conformance.test.ts` measures the
+  // load-bearing one by deleting it.
+  'taskList',
+  'taskItem',
+  'details',
+  'detailsSummary',
+  'detailsContent',
 ]);
 
 export function docToPlainText(doc: unknown): string {
@@ -68,6 +85,17 @@ function render(node: unknown, depth: number): string {
     return `@${label}`;
   }
   if (candidate.type === 'hardBreak' || candidate.type === 'hard_break') return '\n';
+  // A wiki-link (spec §3.5) contributes its stored TITLE, never its noteId.
+  // The id is what the editor navigates by; the title is what a person read,
+  // and a search index that carried `01J9GNOTE…` would match nothing anyone
+  // typed. An absent or non-string title renders '', the same safe branch the
+  // mention node takes for a missing label.
+  if (candidate.type === 'wikiLink') {
+    const attrs = (
+      typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
+    ) as { title?: unknown };
+    return typeof attrs.title === 'string' ? attrs.title : '';
+  }
   const children = Array.isArray(candidate.content)
     ? candidate.content.map((child) => render(child, depth + 1)).join('')
     : '';

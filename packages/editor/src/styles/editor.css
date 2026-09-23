@@ -484,6 +484,21 @@
   opacity: 0.7;
 }
 
+/* The note mode's save state (Plan 4 Task 8). It had NO RULE while all three of
+   its siblings did — the family was `footer`/`hint`/`submit` declared and
+   `footer`/`hint`/`submit`/`save-state` emitted, which the plan-close audit
+   measured by listing both sides. The one declaration that matters is the SIZE:
+   `.editor-slot__hint` beside it is 0.75rem, so a span with no rule inherited
+   the page's size and the footer row drew two different text sizes.
+   IT DELIBERATELY DOES NOT TAKE THE HINT'S OTHER TWO DECLARATIONS. Not
+   `flex: 1` — the hint holds the row's left half so the right-hand control
+   stays pinned, and a state that grew would move it. Not `opacity: 0.7` —
+   that marks the hint as secondary, and "Not saved (kept on this device)" is
+   information the reader needs rather than a whisper. */
+.editor-slot__save-state {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
 .editor-slot__submit {
   /* 44px floor. The prototype draws 40 (`:1330`) and this product's own
      tap-target rule is the floor that wins; `packages/ui/test/
@@ -507,3 +522,135 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
+
+/* The collapsible block (spec §8.4, Plan 4 Task 3). `renderHTML` in
+   `../schema/extensions.ts` puts the `editor-details` class on the node via
+   the Details extension's `HTMLAttributes`, so this is the box the whole
+   block wears and `.editor-details > summary` is the fold control.
+   The edge is `currentColor` like every other visible edge in this file: the
+   colour is whatever the surrounding text already proves, and naming a token
+   here would make packages/editor depend on packages/ui. */
+.editor-details {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 8px 0;
+}
+/* ⚠ THE SELECTOR HERE WAS `.editor-details > summary` AND IT MATCHED NOTHING.
+   The Details extension renders a NODE VIEW, and its DOM is
+
+     <div class="editor-details"> <button …></button> <div><summary>…</summary>…
+
+   — the summary is a GRANDCHILD, so the child combinator never matched it, and
+   neither `cursor` nor `font-weight` ever applied. MEASURED from the rendered
+   DOM, and the case did not catch it because a css-binding assertion reads the
+   STYLESHEET: it can see a declaration and cannot see whether the selector
+   matches anything the editor draws.
+   `collapsible.test.ts` now asserts `element.matches(<selector>)` for each
+   selector below, against a real mounted editor, so a selector that matches
+   nothing is red rather than merely present. */
+.editor-details summary {
+  font-weight: 600;
+}
+/* THE FOLD CONTROL IS THE BUTTON, NOT THE SUMMARY — measured: clicking the
+   button dispatches the document change, and the summary is not clickable at
+   all. It arrives with NO class of its own, so nothing styled it and it painted
+   the user agent's own chrome — the defect class `bare-control-coverage` exists
+   for, on a control its fixed list does not name. The reset is that file's own
+   shape (`border: none; background: none; padding: 0`). */
+.editor-details > button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+/* ⚠ A PLACEHOLDER RULE STOOD HERE AND WAS REMOVED AS DEAD CSS, and the way it
+   failed is the reason this note is this long.
+   It read `.editor-details > summary:empty::before { content: 'Title' }`, from
+   the plan's CSS snippet, justified as "same affordance as the editor's
+   `Placeholder`". MEASURED, and it renders NOTHING: an empty textblock carries
+   prosemirror-view's `<br class="ProseMirror-trailingBreak">` — that element is
+   how the caret gets a home — so an empty `<summary>` has an ELEMENT child and
+   `:empty` does not match. The rule could never apply, in this test or in a
+   browser.
+   The sentence about the editor's `Placeholder` was false too, and it is the
+   reason a pseudo-class was the wrong instrument: the product's placeholder is
+   a CLASS the extension adds (`is-editor-empty`, plus `data-placeholder`, and
+   `showOnlyWhenEditable`) — JS, not CSS. Matching that affordance means adding
+   a decoration, which is a different job from a stylesheet rule.
+   **SO THE COLLAPSIBLE HAS NO EMPTY-SUMMARY HINT, and that is a recorded gap
+   rather than a hidden one**: §8.4 does not require one, and a reader or an
+   author sees an empty summary. Recorded here so the next hand either builds
+   it the product's way or leaves it deliberately. */
+
+/* The code block's Copy button (spec §8.2, Plan 4 Task 4). `position:
+   relative` here is what makes the button's `absolute` mean "in this block's
+   corner" rather than "in the page's" — the pair is one placement, and the
+   binding case asserts them together for that reason. No colour: this file's
+   standing rule, and the button inherits the block's ink. */
+.editor-codeblock { position: relative; }
+.editor-codeblock__copy {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The wiki-link node and its picker (spec §8.5, Plan 4 Task 5). Structure
+   only, like everything above: this file names no colour. */
+.editor-wikilink { overflow-wrap: anywhere; }
+/* THE MISSING PILL, drawn apart from a live link without an ink — this file's
+   header forbids every colour form and packages/editor must not reach
+   packages/ui's tokens. A wavy underline is the affordance a reader already
+   reads as "this reference does not resolve", and `cursor: help` says the
+   element is still worth hovering (it carries the stored title). */
+.editor-wikilink--missing {
+  text-decoration: underline wavy;
+  cursor: help;
+}
+.wikilink-popup {
+  background: Canvas;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 50;
+}
+.wikilink-popup__list { display: flex; flex-direction: column; }
+.wikilink-popup__item { padding: 4px 8px; cursor: pointer; }
+/* Selection is never colour alone (spec): the active row is outlined, and
+   `aria-selected` carries the same fact to a screen reader. */
+.wikilink-popup__item--selected { outline: 2px solid currentColor; }
+.wikilink-popup__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+.wikilink-preview {
+  position: absolute;
+  max-width: 24rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: Canvas;
+  z-index: 50;
+}
+
+/* The reading rail (spec §8.2, Plan 4 Task 7). Structure only, like everything
+   above — and NO width rule: the source gated on a 1100px viewport inside the
+   component, and the port moved that decision out to the page, because a
+   breakpoint hidden in a component cannot be overridden by a stylesheet. */
+.reading-toc { padding: 0.5rem 0; }
+.reading-toc__list { list-style: none; margin: 0; padding: 0; }
+.reading-toc__item { margin: 0; }
+/* Indent by level so the outline reads as one — `padding-left` rather than a
+   margin, so the click target spans the full row. */
+.reading-toc__item--h1 .reading-toc__link { padding-left: 0; }
+.reading-toc__item--h2 .reading-toc__link { padding-left: 1rem; }
+.reading-toc__item--h3 .reading-toc__link { padding-left: 2rem; }
+.reading-toc__link { display: block; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+/* The active entry is marked by WEIGHT, not by colour: this file may not name
+   a colour, and colour alone is never the only indicator anyway. */
+.reading-toc__link[aria-current='true'] { font-weight: 600; }

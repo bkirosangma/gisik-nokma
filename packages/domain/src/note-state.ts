@@ -57,12 +57,13 @@ export type NoteScope =
  * asserts the two are deep-equal, so a change to either that is not made to
  * both is a red.
  *
- * `schemaVersion` matches `DOC_SCHEMA_VERSION` (1) at this commit. Plan 4 of
- * the series raises it to 2 when the new node types land and must raise both.
+ * `schemaVersion` matches `DOC_SCHEMA_VERSION` (2) at this commit: Plan 4 of the
+ * series raised the editor's version to 2 and raised this copy with it. A
+ * further raise must move both again, or case 18.013 goes red.
  */
 export const EMPTY_NOTE_DOC = {
   type: 'doc',
-  attrs: { schemaVersion: 1 },
+  attrs: { schemaVersion: 2 },
   content: [{ type: 'paragraph' }],
 } as const;
 

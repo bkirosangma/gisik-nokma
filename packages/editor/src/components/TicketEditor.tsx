@@ -5,6 +5,7 @@ import { Extension } from '@tiptap/core';
 import { buildEditorExtensions } from '../schema/extensions.js';
 import { createAttachmentPasteExtension } from '../extensions/attachment-paste.js';
 import type { MentionCandidate } from '../extensions/mention.js';
+import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
 import { emptyDoc, type DocJson } from '../doc.js';
 import type { UploadResult } from '../upload.js';
 import { ImageWrapMenu } from './ImageWrapMenu.js';
@@ -16,6 +17,17 @@ export type TicketEditorProps = {
   editable?: boolean;
   placeholder?: string;
   queryUsers(query: string): Promise<MentionCandidate[]>;
+  /**
+   * Wiki-link capabilities (Plan 4 Task 5), the same four that reach
+   * `buildEditorExtensions` and the same four app-core's twin declares. All
+   * optional: a mount with none of them still renders and round-trips
+   * `wikiLink` nodes, it just offers no picker, follows no renames, shows no
+   * hover card and does not navigate.
+   */
+  queryNotes?(query: string): Promise<NoteLinkCandidate[]>;
+  resolveNoteTitle?(noteId: string): string | null;
+  previewNote?(noteId: string): Promise<string | null>;
+  onNavigateNote?(noteId: string): void;
   uploadAttachment(file: File): Promise<UploadResult>;
   /** Emit attachment.added — runs after upload, before any node insertion. */
   onAttachmentAdded(result: UploadResult): Promise<void> | void;
@@ -81,6 +93,42 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         resolveAttachmentUrl:
           props.resolveAttachmentUrl ?? ((attachmentId) => `/v1/attachments/${attachmentId}`),
         ...(props.placeholder === undefined ? {} : { placeholder: props.placeholder }),
+        // SPEC §8.4's reader rule. Spelled as `=== false` rather than
+        // `!props.editable` so it takes the SAME absent-default as the
+        // `editable` binding below (`props.editable ?? true`): an absent prop
+        // means a writable composer, and `!undefined` would have made every
+        // caller that passes nothing a reader.
+        //
+        // Read ONCE, at mount, like every other extension option in this memo
+        // (the deps array is `[]`). That is right for this product's caller —
+        // `TicketEditorSlot` passes `editable={!props.readOnly}` off the SLOT's
+        // `readOnly`, a permission that decides the same way for the life of a
+        // mounted editor — and a host that needs it to change must remount
+        // rather than expect the option to follow.
+        //
+        // ⚠ NAMED BY SYMBOL, NOT BY LINE, and this very sentence is why: it
+        // first read `TicketEditorSlot.tsx:264`, and that line had ALREADY
+        // moved to 330 by Plan 4 Task 5 — in this same branch, a few commits
+        // later — leaving a citation that resolved to a line inside the submit
+        // handler's catch block. A line number is a reading that expires; a
+        // symbol name is not.
+        readOnly: props.editable === false,
+        // Threaded through `propsRef` like `queryUsers` above, and for the same
+        // reason: Tiptap snapshots extension options at construction, so a
+        // closure over the CURRENT prop is what keeps a re-rendering parent's
+        // new callbacks reachable. The three conditionals are the same pattern
+        // `extensions.ts` uses, one layer up — an explicitly-passed `undefined`
+        // would read as "no resolver" rather than "not supplied yet".
+        queryNotes: (query) => propsRef.current.queryNotes?.(query) ?? Promise.resolve([]),
+        ...(props.resolveNoteTitle === undefined
+          ? {}
+          : { resolveNoteTitle: (noteId: string) => propsRef.current.resolveNoteTitle?.(noteId) ?? null }),
+        ...(props.previewNote === undefined
+          ? {}
+          : { previewNote: (noteId: string) => propsRef.current.previewNote?.(noteId) ?? Promise.resolve(null) }),
+        ...(props.onNavigateNote === undefined
+          ? {}
+          : { onNavigateNote: (noteId: string) => propsRef.current.onNavigateNote?.(noteId) }),
       }),
       createAttachmentPasteExtension({
         uploadAttachment: (file) => propsRef.current.uploadAttachment(file),

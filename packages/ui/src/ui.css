@@ -6996,6 +6996,23 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   overflow-x: auto;
 }
 .gn-comment__body a { color: var(--gn-text-accent); overflow-wrap: anywhere; }
+/* SCHEMA V2'S NODES IN A COMMENT BODY (spec §8.3 consequence 1, Plan 4 Task 2).
+   `renderCommentBody` grew chrome for a task item, a collapsible and a
+   wiki-link; these are its hooks. The class names deliberately EXTEND the
+   existing family rather than spelling their own, so the block above still
+   applies to them — which is why the rules here carry only what a plain list
+   or code block does not already say. */
+/* The marker goes, because the checkbox replaces it. */
+.gn-comment__list--tasks { list-style: none; padding-left: 0; }
+.gn-comment__task { display: flex; gap: 0.45rem; align-items: flex-start; }
+/* Nudged down onto the first line of text rather than the top of the item box. */
+.gn-comment__task > input[type='checkbox'] { margin: 0.15rem 0 0; flex: none; }
+.gn-comment__details { margin: 0; }
+.gn-comment__details > summary { cursor: pointer; font-weight: 600; }
+/* The destination of a wiki-link is a route, not a note's words; the label is
+   the title (`renderNode`), so the ink is the only thing this adds — the
+   accent and the wrap come from `.gn-comment__body a` above. */
+.gn-comment__wikilink { overflow-wrap: anywhere; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {

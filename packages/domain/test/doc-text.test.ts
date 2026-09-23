@@ -115,4 +115,28 @@ describe('docToPlainText', () => {
     const shared = text('reused');
     expect(docToPlainText(doc(p(shared), p(shared)))).toBe('reused\nreused');
   });
+
+  /**
+   * 9.265 — spec §3.5 names four v2 shapes that must reach the search index and
+   * every notification. Each contributes its TEXT and nothing else: the task
+   * item's paragraph, the collapsible's summary then its content, the code
+   * block's text; a wiki-link contributes its stored `title`, never its
+   * `noteId`. The control (the trailing paragraph and the `see ` text before
+   * the link) is in the same document as the new shapes, so a walker that
+   * started emitting separators or dropping prose would fail here too.
+   */
+  it('9.265 v2 blocks get their own lines; wiki-link contributes its title', () => {
+    const v2doc = { type: 'doc', content: [
+      { type: 'taskList', content: [
+        { type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'buy milk' }] }] },
+        { type: 'taskItem', attrs: { checked: true }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'call CA' }] }] },
+      ] },
+      { type: 'details', attrs: { open: false }, content: [
+        { type: 'detailsSummary', content: [{ type: 'text', text: 'Why' }] },
+        { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'because' }] }] },
+      ] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'see ' }, { type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] },
+    ] };
+    expect(docToPlainText(v2doc)).toBe('buy milk\ncall CA\nWhy\nbecause\nsee Cold room');
+  });
 });

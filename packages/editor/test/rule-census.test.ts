@@ -60,6 +60,22 @@ const EXPECTED_INPUT_RULES: Record<string, number> = {
   // owner's ruling on the schema side, and it is stated as a per-extension count so
   // that a future upgrade moving it cannot reconcile 19 === 19.
   link: 1,
+  // ADDED 2026-09-23 with the notes editor port (Plan 4 Task 1): `taskItem`
+  // registers the typed `[ ] ` / `[x] ` rule, joining as a TWELFTH extension and
+  // moving the total 19 -> 20. Stated as a per-extension count for the same
+  // reason as `link` above — and the name matters: the rule belongs to
+  // `taskItem`, not to `taskList`, so a future Tiptap release that moved it
+  // between the two siblings would be caught here rather than reconciling
+  // 20 === 20.
+  taskItem: 1,
+  // ADDED 2026-09-23 with the notes editor port (Plan 4 Task 3): `collapsible`
+  // registers the `< ` rule, joining as a THIRTEENTH extension and moving the
+  // total 20 -> 21. This is the entry the plan's Task 3 names, and it is the
+  // only one the collapsible block contributes — the Enter/Backspace keymap
+  // that ships with it is a KEYBOARD SHORTCUT, not a rule, and does not appear
+  // in either census. A later reader who expects the block to cost two lines
+  // here should read `collapsible.ts`'s `addKeyboardShortcuts` instead.
+  collapsible: 1,
 };
 
 function census(field: 'addInputRules' | 'addPasteRules'): Record<string, number> {
@@ -96,18 +112,18 @@ describe('the rule census the schema origin states in prose', () => {
   /**
    * 9.40 — the paste-rule census is exact and per-extension, not a total: seven paste rules across exactly five extensions, so an upgrade that adds or moves one fails here naming the extension.
    */
-  it('registers exactly the paste rules the comment block enumerates', () => {
+  it('9.263 registers exactly the paste rules the comment block enumerates', () => {
     const counts = census('addPasteRules');
     expect(counts).toEqual(EXPECTED_PASTE_RULES);
     expect(total(counts)).toBe(7);
     expect(Object.keys(counts)).toHaveLength(5);
   });
 
-  it('registers exactly the input rules the comment block enumerates', () => {
+  it('9.263 registers exactly the input rules the comment block enumerates', () => {
     const counts = census('addInputRules');
     expect(counts).toEqual(EXPECTED_INPUT_RULES);
-    expect(total(counts)).toBe(19);
-    expect(Object.keys(counts)).toHaveLength(11);
+    expect(total(counts)).toBe(21);
+    expect(Object.keys(counts)).toHaveLength(13);
   });
 
   /**
@@ -123,7 +139,7 @@ describe('the rule census the schema origin states in prose', () => {
    * measurement, not a broken assertion**, and the disjointness that carries the
    * argument is by PLUGIN, which the two counts above still witness separately.
    */
-  it('keeps the two rule sets in separate plugins, which is why neither lever settles §2', () => {
+  it('9.263 keeps the two rule sets in separate plugins, which is why neither lever settles §2', () => {
     const pasted = new Set(Object.keys(census('addPasteRules')));
     const typed = new Set(Object.keys(census('addInputRules')));
     // Disjoint as SETS OF RULES, not as sets of extensions: five extensions now
