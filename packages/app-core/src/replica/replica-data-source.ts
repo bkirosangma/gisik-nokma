@@ -1097,7 +1097,23 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     },
     getDeletedNotes: async (workspaceId) => {
       const notes = await replica.listDeletedNotes(workspaceId);
-      return summariesOf(notes, await attachedTicketsOf(notes));
+      // THE DELETED-NOTE GATE, which is NOT `canReadNote` and must not be
+      // folded into it. A deleted note is still READABLE — that is what the
+      // undo window means, and `canReadNote` deliberately ignores `deleted` —
+      // but going LOOKING for deleted notes is narrower: only the author, a
+      // workspace admin or the owner. The server states it in one line
+      // (`read/notes.ts`: the `?deleted=1` arm adds `author_id = me` for anyone
+      // else) and the replica applied NOTHING here, so a plain member's device
+      // listed, and offered to undo, notes the server would refuse to show.
+      //
+      // The role comes from `me`, the workspace role the bootstrap recorded.
+      // A device with no `me` has never bootstrapped and its `listDeletedNotes`
+      // is empty anyway; treating that as a plain member is the fail-closed
+      // direction.
+      const me = await replica.getMe();
+      const mayLook = me !== null && (me.workspaceRole === 'owner' || me.workspaceRole === 'admin');
+      const visible = mayLook ? notes : notes.filter((n) => n.authorId === me?.userId);
+      return summariesOf(visible, await attachedTicketsOf(visible));
     },
     getNote: async (workspaceId, noteId) => {
       const note = await replica.getNote(noteId);

@@ -78,6 +78,34 @@ export function backoffDelayMs(attempt: number, random: () => number): number {
  * resume cursor into `NaN` on the next `Math.max`. Refusing is the only honest
  * answer, and the schema agrees.
  */
+/**
+ * The well-formed `{id, headSeq}` entries of a notice's list, either arm.
+ *
+ * A DELIBERATE TWIN of the same function in
+ * `packages/sync-client/src/net/http-transport.ts`, for the reason this file's
+ * header gives about `WebSocketLike`: the two packages share no code today and
+ * ten lines of structural type cost less than an edge between them. The two
+ * must move together — the note-only widening defect they were both fixed for
+ * was ONE omission made twice, and it was invisible in both.
+ *
+ * Filtered rather than refused whole on a bad element: a dropped id costs one
+ * un-pulled entity that the next widening names again, while refusing the frame
+ * discards the good ids with it. `headSeq` decides whether an entity is fetched
+ * at all and `NaN < n` is false — so a junk value would SILENTLY skip the pull
+ * this notice exists to cause. Checked, not trusted.
+ */
+function noticeEntries(value: unknown): { id: string; headSeq: number }[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (t: unknown): t is { id: string; headSeq: number } =>
+      typeof t === 'object' &&
+      t !== null &&
+      typeof (t as { id?: unknown }).id === 'string' &&
+      (t as { id: string }).id !== '' &&
+      Number.isInteger((t as { headSeq?: unknown }).headSeq),
+  );
+}
+
 export function parseFrame(data: unknown): ServerStreamFrame | null {
   if (typeof data !== 'string') return null;
   let raw: unknown;
@@ -123,20 +151,22 @@ export function parseFrame(data: unknown): ServerStreamFrame | null {
   // transport's handling and for its reason: a dropped id costs one un-pulled
   // ticket that the next widening names again, where refusing the frame would
   // discard the good ids with the bad one.
-  if (frame.type === 'reach-granted' && typeof frame.workspaceId === 'string' && Array.isArray(frame.tickets)) {
-    const tickets = frame.tickets.filter(
-      (t): t is { id: string; headSeq: number } =>
-        typeof t === 'object' &&
-        t !== null &&
-        typeof (t as { id?: unknown }).id === 'string' &&
-        (t as { id: string }).id !== '' &&
-        // `headSeq` decides whether a ticket is fetched at all, and `NaN < n` is
-        // false — so a junk value would SILENTLY skip the pull this notice
-        // exists to cause, rather than failing loudly. Checked, not trusted.
-        Number.isInteger((t as { headSeq?: unknown }).headSeq),
-    );
-    if (tickets.length === 0) return null;
-    return { type: 'reach-granted', workspaceId: frame.workspaceId, tickets };
+  if (frame.type === 'reach-granted' && typeof frame.workspaceId === 'string') {
+    // BOTH ARMS. Plan 2 of the notes series made the server emit
+    // `{ tickets: [], notes: [...] }` for a note-only widening; this arm read
+    // `tickets` alone and returned `null` on an empty list, so a note widening
+    // was dropped here in silence — the same defect as the twin ladder in
+    // `packages/sync-client/src/net/http-transport.ts`, and the reason both were
+    // fixed together.
+    const tickets = noticeEntries(frame.tickets);
+    const notes = noticeEntries((frame as { notes?: unknown }).notes);
+    if (tickets.length === 0 && notes.length === 0) return null;
+    return {
+      type: 'reach-granted',
+      workspaceId: frame.workspaceId,
+      tickets,
+      ...(notes.length > 0 ? { notes } : {}),
+    };
   }
   if (frame.type === 'caught-up' && typeof frame.seq === 'number' && typeof frame.workspaceId === 'string') {
     return { type: 'caught-up', workspaceId: frame.workspaceId, seq: frame.seq };

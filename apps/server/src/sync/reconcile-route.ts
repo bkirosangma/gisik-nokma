@@ -225,11 +225,23 @@ export function registerReconcileRoute(
           type: 'object',
           required: ['workspaceId', 'heldIds'],
           additionalProperties: false,
+          // A BODY MUST NAME SOMETHING, and the `anyOf` is the enforcement that
+          // `heldIds.minItems` used to be. Plan 2 of the notes series split this
+          // body into two independent arms, and a device holding NOTES BUT NO
+          // TICKETS is an ordinary device — it sends `heldIds: []`, which the old
+          // `minItems: 1` refused with a 400. That failure was silent: the
+          // engine's automatic reconcile catches it, so every note a user lost
+          // reach of stayed on their device for ever, with nothing on screen
+          // saying so. Measured by `test/sync/notes-client-seam.test.ts` (18.099),
+          // which runs the engine's own request through this schema.
+          anyOf: [
+            { required: ['heldIds'], properties: { heldIds: { type: 'array', minItems: 1 } } },
+            { required: ['heldNoteIds'], properties: { heldNoteIds: { type: 'array', minItems: 1 } } },
+          ],
           properties: {
             workspaceId: { type: 'string' },
             heldIds: {
               type: 'array',
-              minItems: 1,
               maxItems: MAX_BATCH_SIZE,
               items: { type: 'string' },
             },

@@ -46,6 +46,36 @@ export type WebSocketLike = {
  * the alternative — the bootstrap handing the replica ROWS and the pull handing
  * it ENVELOPES — would give the fold two input shapes.
  */
+/**
+ * The well-formed `{id, headSeq}` entries of a notice's list, either arm.
+ *
+ * Filtered rather than refused WHOLE on a bad element, and the asymmetry with
+ * `caught-up` below is a consequence rather than a preference: a bad cursor is
+ * terminal and survives restarts, whereas a dropped id costs one un-pulled
+ * entity that the NEXT widening names again. Refusing the whole frame over one
+ * bad entry would discard the good ids with it.
+ *
+ * `headSeq` decides whether an entity is FETCHED, so a junk value must not reach
+ * the comparison: `NaN < n` is false, which would silently SKIP the pull this
+ * notice exists to cause. Integer-checked here rather than trusted — the same
+ * reason `caught-up.seq` is checked.
+ *
+ * A non-array (an absent `notes`, or a malformed `tickets`) yields the empty
+ * list, so the caller's `both empty` test covers "the frame carried nothing
+ * usable" in one line.
+ */
+function noticeEntries(value: unknown): { id: string; headSeq: number }[] {
+  if (!Array.isArray(value)) return [];
+  return value.filter(
+    (t: unknown): t is { id: string; headSeq: number } =>
+      typeof t === 'object' &&
+      t !== null &&
+      typeof (t as { id?: unknown }).id === 'string' &&
+      (t as { id: string }).id !== '' &&
+      Number.isInteger((t as { headSeq?: unknown }).headSeq),
+  );
+}
+
 /** The same derivation `app-core/src/online/stream.ts` uses — one wire, one URL rule. */
 export function streamUrl(baseUrl: string): string {
   return `${baseUrl.replace(/^http/, 'ws')}/v1/stream`;
@@ -301,22 +331,27 @@ export function createHttpTransport(opts: {
           // a dropped id costs one un-pulled ticket that the NEXT widening
           // names again. Refusing the whole frame over one bad element would
           // discard the good ids with it.
-          if (!Array.isArray(frame.tickets)) return;
-          const tickets = frame.tickets.filter(
-            (t: unknown): t is { id: string; headSeq: number } =>
-              typeof t === 'object' &&
-              t !== null &&
-              typeof (t as { id?: unknown }).id === 'string' &&
-              (t as { id: string }).id !== '' &&
-              // `headSeq` decides whether a ticket is FETCHED, so a junk value
-              // must not reach the comparison: `NaN < n` is false, which would
-              // silently SKIP the pull this notice exists to cause. Integer and
-              // finite, checked here rather than trusted — the same reason
-              // `caught-up.seq` is checked one branch down.
-              Number.isInteger((t as { headSeq?: unknown }).headSeq),
-          );
-          if (tickets.length === 0) return;
-          handlers.onItem({ kind: 'reach-granted', workspaceId, tickets });
+          // BOTH ARMS, and an empty `tickets` is NOT "nothing here". Plan 2 of
+          // the notes series made the server emit `{ tickets: [], notes: [...] }`
+          // for a note-only widening, and this arm read `frame.tickets`, returned
+          // when the filtered list was empty and never looked at `frame.notes` —
+          // so a note widening was dropped WHOLE: the notice never reached the
+          // replica, no pull was queued, and the note's own `note.scope_set`
+          // arrived next with no `note.created` under it and stalled the device
+          // (`applyNoteEvent` refuses it, `recoverByPull` answers `false` for a
+          // non-ticket entity). Measured by `test/sync/notes-client-seam.test.ts`
+          // (18.098), which the compile-time `HandledFrameType` assertion above
+          // could not catch BY ITS OWN STATEMENT — it pins frame TYPE STRINGS,
+          // "it says nothing about whether each branch reads the right fields".
+          const tickets = noticeEntries(frame.tickets);
+          const notes = noticeEntries(frame.notes);
+          if (tickets.length === 0 && notes.length === 0) return;
+          handlers.onItem({
+            kind: 'reach-granted',
+            workspaceId,
+            tickets,
+            ...(notes.length > 0 ? { notes } : {}),
+          });
           return;
         }
         if (frame.type === 'caught-up') {

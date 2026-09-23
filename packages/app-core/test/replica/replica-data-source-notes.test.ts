@@ -325,6 +325,55 @@ describe('the replica data source answers the note reads (Plan 2 of 6)', () => {
     expect(history).toHaveLength(3);
   });
 
+  it('18.101 getDeletedNotes applies the deleted-note gate, which is NOT canReadNote', async () => {
+    // A deleted note is still READABLE — `canReadNote` ignores `deleted` on
+    // purpose, it is in the undo window — but only the AUTHOR, a workspace
+    // admin or the owner may go LOOKING for deleted notes. The server applies
+    // exactly that (`read/notes.ts`: the `?deleted=1` arm adds
+    // `author_id = me` for anyone else). The replica applied nothing, so a
+    // plain member's device offered an undo the server refuses.
+    //
+    // Reachable in one step: `note.deleted` travels to every reader, because
+    // the note is still readable. B is a plain member and not the author, so
+    // B's replica holds the row — and must not list it here.
+    const { ds, replica } = await fixture();
+    const mine = newUlid();
+    const theirs = newUlid();
+    await replica.loadNoteEvents([
+      // Authored by the local user (USER_A)...
+      noteCreated(mine, { mode: 'workspace' }, { seq: 1, workspaceSeq: 40 }),
+      // ...and by somebody ELSE, which is the whole distinction: `noteCreated`
+      // defaults its actor to USER_A, so a second call to it would have made
+      // both notes the caller's own and the gate below would have had nothing
+      // to refuse.
+      envelope(
+        { kind: 'note', id: theirs },
+        'note.created',
+        { title: 'Theirs', homeProjectId: P, scope: { mode: 'workspace' } },
+        { seq: 1, workspaceSeq: 41, actorId: USER_B },
+      ),
+    ]);
+    await replica.applyServerItem(
+      envelope({ kind: 'note', id: mine }, 'note.deleted', {}, { seq: 2, workspaceSeq: 42 }),
+    );
+    await replica.applyServerItem(
+      envelope({ kind: 'note', id: theirs }, 'note.deleted', {}, { seq: 2, workspaceSeq: 43, actorId: USER_B }),
+    );
+
+    // Both are DELETED and both are held — the second asserts the row is
+    // genuinely there, so the gate below is a filter rather than a miss.
+    expect((await replica.listDeletedNotes(WS)).map((n) => n.noteId).sort()).toEqual(
+      [mine, theirs].sort(),
+    );
+
+    const deleted = await ds.query.getDeletedNotes(WS);
+    // The author's own, and NOT the other one.
+    expect(deleted.map((n) => n.noteId)).toEqual([mine]);
+    // Control: the live list is a different read and is unaffected — the note
+    // the caller may not UNDO is still one they may READ.
+    expect(await ds.query.getNotes(WS)).toEqual([]);
+  });
+
   it('18.091 subscribe forwards a landed pull as a refresh frame', async () => {
     const pulled = [noteCreated(NOTE, { mode: 'workspace' }, { seq: 1, workspaceSeq: 40 })];
     const { ds, engine, script } = await fixture(pulled);

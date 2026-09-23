@@ -302,7 +302,16 @@ describe('the engine pulls notes (Plan 2 of 6)', () => {
         workspaceId,
         // Control: the ticket arm still answers as it always did.
         restricted: heldIds.slice(0, 1).map((id) => ({ kind: 'restricted' as const, id })),
-        restrictedNotes: (heldNoteIds ?? []).slice(0, 1).map((id) => ({ kind: 'restricted' as const, id })),
+        // NAMED, not "the first one presented". `listNoteIds` orders by
+        // `note_id`, and two ULIDs minted in the same millisecond do NOT sort
+        // in creation order — so `slice(0, 1)` picked a different note from run
+        // to run and this case failed intermittently. Measured: it failed,
+        // passed and failed again across three consecutive full-file runs with
+        // no source change between them. A fake that names the id it refuses is
+        // deterministic whatever the ordering is.
+        restrictedNotes: (heldNoteIds ?? [])
+          .filter((id) => id === NOTE)
+          .map((id) => ({ kind: 'restricted' as const, id })),
       }),
     });
     await replica.applyServerItem(ticketCreated(TICKET, 1));
@@ -332,6 +341,38 @@ describe('the engine pulls notes (Plan 2 of 6)', () => {
     expect(await replica.listEntityEvents(NOTE)).toEqual([]);
     expect(await replica.getTicket(TICKET)).toBeNull();
     expect(await replica.getNote(NOTE_2)).not.toBeNull();
+  });
+
+  it('18.100 an event for a note this device does NOT hold is a PULL, not a stall', async () => {
+    // The rule `grant-backfill.ts` states for tickets — "bootstrap-before-apply
+    // on any event for an entity not held" — was never extended to notes, so an
+    // unfoldable note event reached `stall`, whose latch only `start()` clears.
+    //
+    // Reachable with no defect in the widening: a reader added to a project
+    // sees that project's notes' events for the first time, with their
+    // `note.created` below their cursor and never delivered. The event arrives,
+    // `applyNoteEvent` refuses it ("no note.created precedes it"),
+    // `recoverByPull` answered `false` for anything that was not a ticket
+    // entity, the replica's transaction rejects, and the device is bricked.
+    const noteId = newUlid();
+    const { script, replica, engine } = await fixture({
+      notePullImpl: async () => ({ events: [noteCreated(noteId, { seq: 1, workspaceSeq: 40 })] }),
+    });
+    expect(await replica.getNote(noteId)).toBeNull();
+
+    script.handlers!.onItem(
+      envelope({ kind: 'note', id: noteId }, 'note.scope_set', { mode: 'workspace' }, { seq: 2, workspaceSeq: 41 }),
+    );
+    await engine.settled();
+
+    // NOT stalled — the half that matters, because a stalled device needs a
+    // deliberate `start()` to recover and resumes at the same cursor, so the
+    // same pair arrives again and it stalls again.
+    expect(engine.lastApplyFailure()).toBeNull();
+    // And the recovery was a PULL: the history is here, so the event that could
+    // not be folded now folds against the state it needs.
+    expect(script.notePullCalls).toEqual([{ workspaceId: WS, noteId }]);
+    expect(await replica.getNote(noteId)).not.toBeNull();
   });
 
   it('18.087 exactly one note pull per notice per note, and none once satisfied', async () => {

@@ -713,6 +713,27 @@ export function createSyncEngine(deps: {
    */
   async function recoverByPull(item: SyncItem): Promise<boolean> {
     if (isSyncInstruction(item)) return false;
+    // NOTES TOO, and the omission cost the device outright (Plan 2 of 6). The
+    // rule this function implements — "bootstrap-before-apply on any event for
+    // an entity not held" — was written for tickets and never extended, so an
+    // unfoldable note event reached `stall`, whose latch only `start()` clears
+    // and which resumes at the same cursor: the same pair arrives again and the
+    // device stalls again, permanently.
+    //
+    // Reachable with no defect in the widening. A reader added to a PROJECT is
+    // the ordinary case: that project's notes become readable, their
+    // `note.created` sits below the cursor and was never delivered, and the
+    // next event for one of them arrives to a replica that cannot fold it.
+    if (item.entity.kind === 'note') {
+      if ((await replica.getNote(item.entity.id)) !== null) return false;
+      await replica.addPendingPulls(
+        item.workspaceId,
+        [{ id: item.entity.id, headSeq: item.workspaceSeq }],
+        'note',
+      );
+      await drainPendingPulls(item.workspaceId);
+      return true;
+    }
     if (item.entity.kind !== 'ticket') return false;
     if ((await replica.getTicket(item.entity.id)) !== null) return false;
     // Keyed by the failing event's own `workspaceSeq` — the server's position
