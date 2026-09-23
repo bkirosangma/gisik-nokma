@@ -1,6 +1,6 @@
 import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
 import type { BootstrapResponse, TicketBootstrap } from '../replica/replica.js';
-import { TicketPullNotFound } from '../engine/sync-engine.js';
+import { NotePullNotFound, TicketPullNotFound } from '../engine/sync-engine.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
   ReconcileAnswer,
@@ -35,6 +35,61 @@ export type WebSocketLike = {
   onclose: ((event: unknown) => void) | null;
   onerror: ((event: unknown) => void) | null;
 };
+
+/**
+ * One ledger row as `GET /v1/notes/:noteId/events` serves it — a MIRROR of the
+ * server's `LedgerEventView` (`apps/server/src/routes/tickets.ts`), declared
+ * here for the same reason `sync-item.ts` mirrors `SyncItem`: this package may
+ * not depend on `apps/server`.
+ *
+ * ## Why the note pull needs a conversion and the ticket pull does not
+ *
+ * The ticket pull goes to `/v1/sync/bootstrap/ticket`, a SYNC door, which
+ * serves `LedgerEvent` envelopes. The note pull goes to the note-events READ
+ * route, which is in the row dialect (snake_case columns, ISO-string clocks) —
+ * the one `GET /v1/tickets/:id/events` uses, because the web app's history view
+ * reads both. The engine folds envelopes, so the conversion belongs HERE, at
+ * the transport edge, rather than in the engine: an engine that accepted either
+ * dialect would be an engine whose `loadNoteEvents` had two shapes to keep in
+ * step, and the fold is the one place that must not guess.
+ *
+ * The move is total and lossless — `replica.ts`'s private `rowToEnvelope` is
+ * the same function over the same columns, and its docblock states the one
+ * property that matters: both clocks already arrive as the server's own ISO 'Z'
+ * strings, so they are carried through untouched rather than re-parsed.
+ */
+type LedgerEventView = {
+  id: string;
+  workspace_id: string;
+  entity_kind: string;
+  entity_id: string;
+  type: string;
+  version: number;
+  payload: unknown;
+  actor_id: string;
+  origin: string;
+  client_time: string;
+  server_time: string;
+  seq: number;
+  workspace_seq: number;
+};
+
+function viewToEnvelope(row: LedgerEventView): LedgerEvent {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    entity: { kind: row.entity_kind as LedgerEvent['entity']['kind'], id: row.entity_id },
+    type: row.type,
+    version: row.version,
+    payload: row.payload,
+    actorId: row.actor_id,
+    origin: row.origin as LedgerEvent['origin'],
+    clientTime: row.client_time,
+    serverTime: row.server_time,
+    seq: row.seq,
+    workspaceSeq: row.workspace_seq,
+  };
+}
 
 /** The same derivation `app-core/src/online/stream.ts` uses — one wire, one URL rule. */
 export function streamUrl(baseUrl: string): string {
@@ -163,11 +218,21 @@ export function createHttpTransport(opts: {
       return ((await res.json()) as { results: SyncEventResult[] }).results;
     },
 
-    async reconcile(workspaceId: string, heldIds: string[]): Promise<ReconcileAnswer> {
+    async reconcile(workspaceId: string, heldIds: string[], heldNoteIds?: string[]): Promise<ReconcileAnswer> {
       const res = await doFetch(`${opts.baseUrl}/v1/sync/reconcile`, {
         method: 'POST',
         headers,
-        body: JSON.stringify({ workspaceId, heldIds }),
+        // `heldNoteIds` is OMITTED rather than sent as `[]` when there are none.
+        // The server declares it outside `required` and answers
+        // `restrictedNotes: []` either way, so the two are equivalent to it —
+        // but a body that spells out an empty array is a body that looks like
+        // it asked a question, and a reader comparing two request logs should
+        // be able to see which device holds notes.
+        body: JSON.stringify(
+          heldNoteIds === undefined || heldNoteIds.length === 0
+            ? { workspaceId, heldIds }
+            : { workspaceId, heldIds, heldNoteIds },
+        ),
       });
       // Same shape as the two doors above: a non-2xx is a throw, never a silent
       // empty answer. An empty `restricted` means "everything you named is still
@@ -195,6 +260,22 @@ export function createHttpTransport(opts: {
       if (res.status === 404) throw new TicketPullNotFound(ticketId);
       if (!res.ok) throw new Error(`bootstrapTicket failed: ${res.status}`);
       return (await res.json()) as TicketBootstrap;
+    },
+
+    async bootstrapNote(_workspaceId: string, noteId: string): Promise<{ events: LedgerEvent[] }> {
+      // `_workspaceId` is UNUSED and that is the route's shape, not an
+      // oversight: `/v1/notes/:noteId/events` has no workspace in its path, and
+      // the server LEARNS the note's workspace from the note's own row so a
+      // caller cannot answer a question about workspace B with a role held in
+      // workspace A (`routes/notes.ts` states this at the top of the file). The
+      // parameter stays in the signature because every other door takes one and
+      // a transport whose methods disagreed about their arguments would be the
+      // shape that makes a caller pass the wrong string.
+      const res = await doFetch(`${opts.baseUrl}/v1/notes/${encodeURIComponent(noteId)}/events`, { headers });
+      if (res.status === 404) throw new NotePullNotFound(noteId);
+      if (!res.ok) throw new Error(`bootstrapNote failed: ${res.status}`);
+      const body = (await res.json()) as { events: LedgerEventView[] };
+      return { events: body.events.map(viewToEnvelope) };
     },
 
     openStream(workspaceId: string, afterSeq: number, handlers: StreamHandlers): StreamHandle {

@@ -109,3 +109,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.080 — `revokeScope` (workspace) removes only that workspace's notes.** Mutation: delete unscoped.
 - ✅ **18.081 — `loadNoteEvents` is idempotent:** loading the same events twice leaves one row per event and the same `notes` row. Mutation: `INSERT` without `OR IGNORE`.
 - ✅ **18.082 — `listNotesForTicket` returns the notes whose `attached_ticket_ids` JSON contains the ticket.** Mutation: match on `home_project_id`.
+- ✅ **18.083 — a `reach-granted` with `notes` queues a note pull when the local head is behind, and not when it is current.** Mutation: always queue.
+- ✅ **18.084 — `drainPendingPulls` pulls a queued note through `bootstrapNote`, loads its events, clears the entry, and fires `onPullApplied({ kind: 'note', id })`.** Mutation: skip the listener.
+- ✅ **18.085 — a 404 on a note pull drops the entry if unchanged, as for tickets.** Mutation: retry forever.
+- ✅ **18.086 — `runReconcile` presents every held note id and purges each `restrictedNotes` entry;** control: ticket purges unchanged. Mutation: present tickets only.
+- ✅ **18.087 — an in-process fake transport records exactly one `bootstrapNote` call for a note a single notice names twice, and none on a catch-up after it is satisfied.** Mutation: `addPendingPulls` appends instead of superseding. *(Re-scoped from "per catch-up": `applyOne` drains after EVERY `reach-granted` frame by design, so two notices naming two different heads legitimately cost two pulls. Recorded in the SDD ledger.)*

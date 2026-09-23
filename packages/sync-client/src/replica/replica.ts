@@ -129,6 +129,22 @@ export type ReplicaTicket = { ticketId: string; confirmed: TicketState | null; c
  * whose comparison happens to work, and depending on that here would be a
  * second spelling of "when this happened".
  */
+/**
+ * Which pending set a workspace's owed ids live in (Plan 2 of 6).
+ *
+ * **TWO KEYS, not one key with a discriminated entry, and the reason is a
+ * migration rather than a taste.** `parsePendingPulls` filters on SHAPE — an
+ * entry missing `id` or `headSeq` is dropped — so a stored ticket entry whose
+ * shape changed (gaining a required `kind`) would fail that filter on an
+ * existing device, and every in-flight pending ticket pull would be discarded
+ * SILENTLY on the first run after an upgrade. Two keys leave the ticket entries
+ * byte-identical to what they always were, and a note set simply starts empty.
+ *
+ * The ticket key is unchanged, deliberately; do not "tidy" the two spellings
+ * into one.
+ */
+export type PendingPullKind = 'ticket' | 'note';
+
 export type LocalNoteComment = {
   commentId: string;
   authorId: string;
@@ -144,17 +160,31 @@ export type Replica = {
    * touching the workspace cursor. Ruling P37.1 / closure 5b(d).
    */
   loadTicketBootstrap(data: TicketBootstrap): Promise<void>;
-  /** Tickets this device has been told it may now read but has not pulled yet. */
-  listPendingPulls(workspaceId: string): Promise<ReachGrantedTicket[]>;
   /**
-   * Record tickets as owed. Idempotent; a re-record for the same id UPDATES its
+   * Entities this device has been told it may now read but has not pulled yet.
+   *
+   * `kind` selects WHICH pending set — `'ticket'` by default, `'note'` for the
+   * notes a `reach-granted` notice named (Plan 2 of 6). The two sets are
+   * separate durable keys rather than one discriminated list, and
+   * `pendingPullsKey` carries the reason: a stored ticket entry whose SHAPE
+   * changed would be dropped by `parsePendingPulls`'s filter on an existing
+   * device, silently discarding every in-flight pull on the first run after an
+   * upgrade.
+   */
+  listPendingPulls(workspaceId: string, kind?: PendingPullKind): Promise<ReachGrantedTicket[]>;
+  /**
+   * Record entities as owed. Idempotent; a re-record for the same id UPDATES its
    * `headSeq`, because a later notice supersedes an earlier one — which is what
    * makes `dropPendingPullIfUnchanged` able to tell a stale 404 from a fresh
    * grant (ruling P37.3).
    */
-  addPendingPulls(workspaceId: string, tickets: readonly ReachGrantedTicket[]): Promise<void>;
-  /** Forget one owed ticket — called only after its pull has actually landed. */
-  clearPendingPull(workspaceId: string, ticketId: string): Promise<void>;
+  addPendingPulls(
+    workspaceId: string,
+    entities: readonly ReachGrantedTicket[],
+    kind?: PendingPullKind,
+  ): Promise<void>;
+  /** Forget one owed entity — called only after its pull has actually landed. */
+  clearPendingPull(workspaceId: string, entityId: string, kind?: PendingPullKind): Promise<void>;
   /**
    * Forget one owed ticket ONLY IF no newer notice has re-named it since —
    * ruling P37.3, and the whole of what makes dropping on a 404 safe.
@@ -167,7 +197,12 @@ export type Replica = {
    * already replaced the recorded value — the entry stays and the next catch-up
    * fetches it. A 404 is never the last word; the next notice is.
    */
-  dropPendingPullIfUnchanged(workspaceId: string, ticketId: string, headSeq: number): Promise<void>;
+  dropPendingPullIfUnchanged(
+    workspaceId: string,
+    entityId: string,
+    headSeq: number,
+    kind?: PendingPullKind,
+  ): Promise<void>;
   /** `{ applied: false }` means a duplicate event id was ignored — delivery is at-least-once. */
   applyServerItem(item: SyncItem): Promise<{ applied: boolean }>;
   purgeEntity(entityId: string): Promise<void>;
@@ -767,17 +802,21 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
  * unfolded events still has a real position — and because the snapshot row's
  * `seq` is a per-entity counter, not the workspace one the notice speaks in.
  */
-async function localHeadSeq(tx: SyncStorage, ticketId: string): Promise<number> {
+async function localHeadSeq(
+  tx: SyncStorage,
+  entityId: string,
+  entityKind: 'ticket' | 'note' = 'ticket',
+): Promise<number> {
   const rows = await tx.all(
-    "SELECT MAX(workspace_seq) AS head FROM events WHERE entity_kind = 'ticket' AND entity_id = ?",
-    [ticketId],
+    'SELECT MAX(workspace_seq) AS head FROM events WHERE entity_kind = ? AND entity_id = ?',
+    [entityKind, entityId],
   );
   const head = rows[0]?.['head'];
   return typeof head === 'number' ? head : Number(head ?? 0);
 }
 
-function pendingPullsKey(workspaceId: string): string {
-  return `pending-pulls:${workspaceId}`;
+function pendingPullsKey(workspaceId: string, kind: PendingPullKind = 'ticket'): string {
+  return kind === 'note' ? `pending-note-pulls:${workspaceId}` : `pending-pulls:${workspaceId}`;
 }
 
 /**
@@ -1157,55 +1196,57 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
      * together — but a design that leaned on re-delivery would be leaning on
      * that ladder staying exhaustive forever.
      */
-    async listPendingPulls(workspaceId) {
-      const rows = await storage.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+    async listPendingPulls(workspaceId, kind = 'ticket') {
+      const rows = await storage.all('SELECT value FROM meta WHERE key = ?', [
+        pendingPullsKey(workspaceId, kind),
+      ]);
       return parsePendingPulls(rows[0]?.['value']);
     },
 
-    async addPendingPulls(workspaceId, tickets) {
+    async addPendingPulls(workspaceId, tickets, kind = 'ticket') {
       if (tickets.length === 0) return;
       await storage.transaction(async (tx) => {
         // Read-modify-write INSIDE the transaction. Two notices in one drain are
         // applied one after another on the engine's serial chain, but the set is
         // public API and a shell may add to it too; a read outside the
         // transaction would lose one writer's entries to the other's write.
-        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+        const key = pendingPullsKey(workspaceId, kind);
+        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [key]);
         const held = new Map(parsePendingPulls(rows[0]?.['value']).map((t) => [t.id, t.headSeq]));
         // A later notice SUPERSEDES an earlier one for the same id, and that
         // overwrite is load-bearing: it is what a 404's drop compares against.
         for (const t of tickets) held.set(t.id, t.headSeq);
         await tx.run(
           'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-          [pendingPullsKey(workspaceId), JSON.stringify([...held].map(([id, headSeq]) => ({ id, headSeq })))],
+          [key, JSON.stringify([...held].map(([id, headSeq]) => ({ id, headSeq })))],
         );
       });
     },
 
-    async clearPendingPull(workspaceId, ticketId) {
+    async clearPendingPull(workspaceId, entityId, kind = 'ticket') {
       await storage.transaction(async (tx) => {
-        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
-        const held = parsePendingPulls(rows[0]?.['value']).filter((t) => t.id !== ticketId);
+        const key = pendingPullsKey(workspaceId, kind);
+        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [key]);
+        const held = parsePendingPulls(rows[0]?.['value']).filter((t) => t.id !== entityId);
         await tx.run(
           'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-          [pendingPullsKey(workspaceId), JSON.stringify(held)],
+          [key, JSON.stringify(held)],
         );
       });
     },
 
-    async dropPendingPullIfUnchanged(workspaceId, ticketId, headSeq) {
+    async dropPendingPullIfUnchanged(workspaceId, entityId, headSeq, kind = 'ticket') {
       await storage.transaction(async (tx) => {
-        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [pendingPullsKey(workspaceId)]);
+        const key = pendingPullsKey(workspaceId, kind);
+        const rows = await tx.all('SELECT value FROM meta WHERE key = ?', [key]);
         const held = parsePendingPulls(rows[0]?.['value']);
-        const current = held.find((t) => t.id === ticketId);
+        const current = held.find((t) => t.id === entityId);
         // A NEWER notice has re-named it since the pull was issued, so the 404
         // answered a question that is no longer the one being asked. Keep it.
         if (current === undefined || current.headSeq !== headSeq) return;
         await tx.run(
           'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
-          [
-            pendingPullsKey(workspaceId),
-            JSON.stringify(held.filter((t) => t.id !== ticketId)),
-          ],
+          [key, JSON.stringify(held.filter((t) => t.id !== entityId))],
         );
       });
     },
@@ -1614,6 +1655,25 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           if ((await localHeadSeq(storage, id)) < headSeq) missing.push({ id, headSeq });
         }
         await replica.addPendingPulls(instruction.workspaceId, missing);
+
+        // THE NOTE ARM (Plan 2 of 6). The same ruling, the same comparison, a
+        // different door on the other side: `bootstrapNote` fetches
+        // `GET /v1/notes/:id/events`, and the head compared is the note's own
+        // `MAX(workspace_seq)`.
+        //
+        // A note held only as events folds to a row the moment the events
+        // arrive, so unlike the ticket arm there is no "held but unfolded"
+        // case to over-deliver for — the head IS the row's basis, and a note
+        // whose row is missing but whose events are present still compares
+        // equal and is not pulled. That is correct: it needs no history, only
+        // a refold, and `listNotes` reads the row (a note with no row and a
+        // complete event history is a state only a crash between two writes
+        // produces — the fold is in the same transaction as the insert).
+        const missingNotes: ReachGrantedTicket[] = [];
+        for (const { id, headSeq } of instruction.notes ?? []) {
+          if ((await localHeadSeq(storage, id, 'note')) < headSeq) missingNotes.push({ id, headSeq });
+        }
+        await replica.addPendingPulls(instruction.workspaceId, missingNotes, 'note');
         return { applied: true };
       }
     }
