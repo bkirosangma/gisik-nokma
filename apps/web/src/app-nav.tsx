@@ -4,6 +4,7 @@ import Link from "next/link";
 import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
+import { BrandMark } from "./brand-mark.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
 import { NotesNavLink } from "./notes-nav-link.js";
 import { useCurrentUser } from "./providers.js";
@@ -263,6 +264,15 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           what mirrors `.gn-shell`'s max-width/centring, so the bar's content
           still lines up with the page content beneath it. */}
       <div className="gn-nav__inner">
+      {/* The brand tile (owner request 2026-09-23): decorative and NOT a
+          control — no link, no button, no tabindex — rendered whether or not
+          a session exists, which is why it sits here rather than inside
+          `.gn-nav__links` (gated content below). `aria-hidden` on both this
+          span and `BrandMark`'s own svg is belt-and-suspenders, matching the
+          `.gn-notes__toc`/`ReadingTOC` nesting elsewhere in this product. */}
+      <span className="gn-nav__brand" aria-hidden="true">
+        <BrandMark size={18} />
+      </span>
       {/* Everything that may need a second (or third) line at a narrow
           viewport — the destination links and the scope note. Sign-out is
           deliberately OUTSIDE this div: see `.gn-nav__signout`'s own

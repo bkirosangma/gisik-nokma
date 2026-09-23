@@ -1875,6 +1875,24 @@ input, textarea, select { font-family: inherit; }
 .gn-nav__links { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; flex: 1 1 auto; min-width: 0; }
 .gn-nav__spacer { flex: 1; }
 
+/* The brand tile (owner request 2026-09-23) — the sign-in page's own tile
+   (`.gn-page-header__icon`, packages/ui/src/ui.css:5810) scaled down, same
+   tokens: `--gn-brand` fill, `--gn-text-inverted` glyph, `--gn-radius-card`
+   scaled to the tile's own size rather than reused literally (a 20px/14px
+   card radius on a 1.75rem tile reads as a circle, not a tile). Not a link,
+   not a button — decorative furniture the tile's own `aria-hidden` covers. */
+.gn-nav__brand {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: var(--gn-brand);
+  color: var(--gn-text-inverted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+
 /* PHONE: THE WORKSPACE LINKS COLLAPSE INTO ONE DISCLOSURE (E4-11).
 
    At 390 px this bar measured **390×310** — the links wrapped to five 44-px
