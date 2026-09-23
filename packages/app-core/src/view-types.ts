@@ -1,4 +1,11 @@
-import type { FieldClaim, Priority, StateCategory, TicketState, VisibilityMode } from '@gisik-nokma/domain';
+import type {
+  FieldClaim,
+  NoteScopeMode,
+  Priority,
+  StateCategory,
+  TicketState,
+  VisibilityMode,
+} from '@gisik-nokma/domain';
 
 /**
  * The three levels, re-exported from their ONE origin (spec 2026-09-22): no
@@ -285,6 +292,39 @@ export type BoardCard = {
   key: string | null;
   /** True only between submit and the server's answer (web is online-only). */
   pending: boolean;
+  /**
+   * The IMMEDIATE parent's key badge (owner request, 2026-09-23), or `null`
+   * for a root ticket OR one whose parent this viewer may not see.
+   *
+   * **NO EXISTENCE LEAK, unlike `ParentRef` above.** That type's `restricted`
+   * arm discloses the parent's ID even when the viewer may not open it — the
+   * single deliberate leak spec §6 allows, reachable only through a child the
+   * viewer already holds. A board badge is different: it is drawn on a GRID a
+   * person scans, not read one ticket at a time, and a badge naming a ticket
+   * that opens to nothing would be a leak with no bound on how many cards
+   * carry it. So this field follows `epic`'s own rule below instead —
+   * unreadable folds to `null`, indistinguishable from no parent at all.
+   *
+   * `key: null` on a NON-null `parent` is the ordinary "ledger holds no
+   * prefix" case every other key on this card already has (see `key` above)
+   * — the badge then has nothing to print and is not drawn, the same "a null
+   * key draws no separator and no placeholder" rule.
+   */
+  parent: { ticketId: string; key: string | null } | null;
+  /**
+   * The nearest ancestor-or-self whose TYPE carries the epic rank, and which
+   * this viewer may see — `null` when there is none or the walk is stopped by
+   * a link this viewer may not follow (owner request, 2026-09-23; epics are
+   * never drawn as cards of their own, owner ruling 2026-09-20, so this is
+   * the board's only way to say which one a card belongs to).
+   *
+   * The SAME rule `parent` above follows and for the same reason: no
+   * existence leak. `title` travels WITH the id, unlike `ListRow.epicId`
+   * below (a bare id), because the list draws an epic's title exactly once,
+   * on the GROUP heading; the board draws it once PER CARD, so the card
+   * needs to carry it rather than the caller resolving it from a side map.
+   */
+  epic: { ticketId: string; key: string | null; title: string } | null;
 };
 
 /** Columns are exactly the attached workflow's states, never invented (spec §7). */
@@ -293,6 +333,14 @@ export type BoardColumn = {
   name: string;
   category: StateCategory;
   blocked: boolean;
+  /**
+   * Whether a NEW ticket may be born in this state (starting-status design,
+   * 2026-09-23) — `isCreatableState(def, stateId)`, carried down from the
+   * server's `BoardColumn` (`packages/domain/src/read-models.ts`) exactly as
+   * `blocked` already is. `board.tsx`'s empty-column card reads this to decide
+   * whether "Add a ticket" renders at all.
+   */
+  creatable: boolean;
   cards: BoardCard[];
   /**
    * Whether the ONLY reason `cards` is empty is the epic rule (owner ruling,
@@ -821,6 +869,35 @@ export type SearchHit = {
   title: string;
   snippet: string;
   matchedIn: 'title' | 'description' | 'comment';
+  /** The ticket's key, or `null` when the ledger holds no prefix (Plan 7 Task 4, spec §14.2). */
+  key: string | null;
+};
+
+/**
+ * A note in a search answer, as every client view holds it (notes series,
+ * Plan 3 of 6, spec §2).
+ *
+ * **`source` is the field that makes this a VIEW model and not the wire shape.**
+ * The server's `NoteSearchHit` (`@gisik-nokma/domain`) has no such field: the
+ * mode is the REQUEST's parameter, so a per-row copy on the wire would be the
+ * caller's own word echoed back on every row. Here it is set from the `mode`
+ * that was asked for, which is what lets the search screen label a result
+ * "spelling" or "meaning" without a second call to find out which list it is in.
+ *
+ * The merge rule (spec §7.8) puts BOTH kinds in one list, so `source` is the
+ * only thing that distinguishes them once they are merged — and it is why the
+ * field is required here rather than optional.
+ */
+export type NoteSearchHit = {
+  noteId: string;
+  title: string;
+  snippet: string;
+  homeProjectId: string;
+  scopeMode: NoteScopeMode;
+  attachedTicketKeys: string[];
+  authorId: string;
+  updatedAt: string;
+  source: 'lexical' | 'meaning';
 };
 
 export type SavedFilter = { id: string; name: string; filter: FilterSpec };

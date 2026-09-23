@@ -22,6 +22,16 @@ export { AVATAR_TINTS, Avatar, initialsOf, tintIndexOf, type AvatarProps } from 
 export { Button, type ButtonProps, type ButtonVariant } from './components/button.js';
 export { Card, type CardProps } from './components/card.js';
 export { Chip, type ChipProps, type ChipTone } from './components/chip.js';
+// `NoteBadge` (notes series Plan 5, spec §10.2) — a note named on another
+// surface: the ticket's Notes section (Plan 6) and the note's own byline. The
+// truncation constant and `truncateNoteTitle` leave with it so a caller that
+// needs the rule does not re-spell it.
+export {
+  NoteBadge,
+  NOTE_BADGE_TITLE_MAX,
+  truncateNoteTitle,
+  type NoteBadgeProps,
+} from './components/note-badge.js';
 export { Dialog, type DialogProps } from './components/dialog.js';
 export { InfoTip, type InfoTipProps } from './components/info-tip.js';
 export { Popover, type PopoverProps } from './components/popover.js';
@@ -41,3 +51,17 @@ export { Select, type SelectOption, type SelectProps } from './select/select.js'
 // icons stay internal because nothing outside the Select has asked for them; a
 // barrel that exports a family "for symmetry" is a surface nobody chose.
 export { RemoveIcon } from './select/select-icons.js';
+// The Notes destination's glyph (notes series Plan 5, spec §9.1), exported on
+// the same terms and for the same reason as `RemoveIcon` above: the consumer is
+// `apps/web`'s nav, which cannot reach into a package's `select/` directory, and
+// a second inline copy of the path data is the two-spellings defect with no
+// visible symptom. A barrel that exports a family "for symmetry" is a surface
+// nobody chose — so this is one glyph, and the other new consumers ask.
+export { PageIcon } from './select/select-icons.js';
+// The board card's priority badge and epic chip (owner request, 2026-09-23).
+// Same precedent as `RemoveIcon`/`PageIcon` immediately above: the real
+// consumer, `packages/app-core`'s `board.tsx`, cannot reach into `icons/`
+// directly, and a second inline copy of any one of these paths is the
+// two-spellings defect this barrel exists to avoid. All four ship together
+// because the one consumer needs all four, not "for symmetry".
+export { FireIcon, LeafIcon, SnowflakeIcon, FlagIcon } from './icons/priority-icons.js';

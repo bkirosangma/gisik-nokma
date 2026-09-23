@@ -1,9 +1,22 @@
-import type { EntityKind, LedgerEvent, ReachGrantedTicket } from '@gisik-nokma/domain';
+import type {
+  EntityKind,
+  LedgerEvent,
+  ReachGrantedNote,
+  ReachGrantedTicket,
+} from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
+import { canReadNote, loadNoteForVisibility } from './can-read-note.js';
 import { canSee } from './can-see.js';
-import { grantNoticeFor, isGrantBackfillTrigger, readerReachNoticeFor } from './grant-backfill.js';
+import {
+  grantNoticeFor,
+  isGrantBackfillTrigger,
+  isNoteGrantTrigger,
+  noteGrantNoticeFor,
+  notesAttachedTo,
+  readerReachNoticeFor,
+} from './grant-backfill.js';
 
 /**
  * "This ticket is gone — delete whatever you hold for it."
@@ -192,7 +205,19 @@ export interface ScopeRevokedInstruction {
  * local copy from a stale partial one, which is the one thing `canSee` can never
  * answer: it is about audience, and staleness here is about content.
  */
-export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] };
+export type ReachGrantedInstruction = {
+  kind: 'reach-granted';
+  workspaceId: string;
+  /**
+   * Empty when the notice is entirely about notes — the ticket branch yields
+   * `tickets` and may or may not add `notes`, the note branch yields `[]` here
+   * and `notes` beside it. The hub passes both through unchanged, so the two
+   * fields reach the wire in the shape they are built in.
+   */
+  tickets: ReachGrantedTicket[];
+  /** Present only when non-empty, as on the wire (Plan 2 of 6, spec §5.1). */
+  notes?: ReachGrantedNote[];
+};
 
 export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 
@@ -216,7 +241,7 @@ export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction 
  * Do not add a `default:` to quiet a linter. That restores exactly the silent
  * fall-through this shape exists to prevent.
  */
-type AudienceClass = 'ticket' | 'roster' | 'workspace' | 'definition' | 'admin' | 'withheld';
+type AudienceClass = 'ticket' | 'roster' | 'workspace' | 'definition' | 'admin' | 'withheld' | 'note';
 
 function audienceClassOf(kind: EntityKind): AudienceClass {
   switch (kind) {
@@ -248,6 +273,31 @@ function audienceClassOf(kind: EntityKind): AudienceClass {
       // default-deny shape already supported a new class, which is why adding
       // one is three lines rather than a redesign.
       return 'admin';
+    case 'note':
+      // The notes series' own class (Plan 2 of 6, spec §5.1). Plan 1 returned
+      // `'withheld'` here and said why: it shipped no `notes` replica table, so
+      // every note event streamed before this plan landed would have reached a
+      // client that cannot fold it. That reason is gone — Task 5 of this plan
+      // adds the table and the fold — and the class is now the one the entity
+      // genuinely has: a note is readable by exactly the people `canReadNote`
+      // admits, which is NOT a boolean over the entity alone and so cannot be
+      // spelled as any of the classes above.
+      //
+      // ## Why `'note'` is a class rather than `'ticket'` with a note arm
+      //
+      // The ticket branch asks `canSee(db, userId, env.entity.id)` — a question
+      // about `proj_visibility`, keyed by ticket. A note has no row there, so
+      // `canSee` answers false for every note and for every reader: the author's
+      // own copy of their own note disappears along with everyone else's. The
+      // two audience questions are genuinely different functions over different
+      // tables (`can-read-note.ts` holds the argument for why the note one is
+      // its own definition rather than a call into the ticket one), and the
+      // class is what keeps them from being conflated at this switch.
+      //
+      // The `inherit` scope is where they meet, and they meet ONE WAY: a note
+      // inherits from its attached tickets, by asking `canSeeResolved` of each
+      // — the note's own `loadNoteForVisibility` does that, not this file.
+      return 'note';
   }
 }
 
@@ -461,7 +511,51 @@ export async function* visibleEventsFor(
           // dies before the client finishes pulling.
           if (isGrantBackfillTrigger(env.type)) {
             const tickets = await grantNoticeFor(db, userId, env.entity.id, afterSeq, backfilled);
-            if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
+            // THE CASCADE (spec §5.2). A ticket's audience just widened, and an
+            // `inherit`-scoped note's readership IS its attached tickets' — so
+            // the same event can widen a note the reader could not read a
+            // moment ago, and the note's own stream will never say so (its
+            // `note.created` sits below the reader's cursor and the widening
+            // event is filed against the TICKET, not the note).
+            //
+            // The candidate set is every ticket this notice would name —
+            // including the trigger ticket itself, which is why `dependents`
+            // starts with it rather than using `tickets` alone. `notesAttachedTo`
+            // then keeps only `inherit`-scoped, non-deleted notes, and
+            // `noteGrantNoticeFor` decides which of those this reader may
+            // actually read.
+            //
+            // **That second question is redundant on THIS path and is kept
+            // anyway, which is worth stating rather than leaving to be
+            // re-derived.** Every id in `dependents` came either from the
+            // trigger ticket — already `canSee`-admitted by the `if` above — or
+            // from `grantNoticeFor`, which `canSee`s each candidate itself. And
+            // an `inherit` note attached to a ticket the reader may see is
+            // readable BY DEFINITION of `canReadNote`'s `inherit` arm, which
+            // asks the same `canSeeResolved` of the same ticket. So on this path
+            // the filter cannot change an answer. It is kept because
+            // `noteGrantNoticeFor` is also the note branch's filter (Task 1),
+            // where it is load-bearing — a note event reaches that call for a
+            // note whose readability nothing else has asked about — and because
+            // a function whose safety argument holds only at one of its two call
+            // sites is the shape this repository has already paid for. The one
+            // path where it is NOT redundant here is a ticket in another
+            // workspace: `audienceDependents` carries no workspace predicate
+            // (its own docblock records this, owner unassigned).
+            const dependents = [env.entity.id, ...tickets.map((t) => t.id)];
+            const noteIds = await notesAttachedTo(db, dependents);
+            const notes =
+              noteIds.length === 0
+                ? []
+                : await noteGrantNoticeFor(db, userId, noteIds, afterSeq, backfilled);
+            if (tickets.length > 0 || notes.length > 0) {
+              yield {
+                kind: 'reach-granted',
+                workspaceId,
+                tickets,
+                ...(notes.length > 0 ? { notes } : {}),
+              };
+            }
           }
           yield env;
         }
@@ -590,6 +684,42 @@ export async function* visibleEventsFor(
         // and deriving another plan's projection inside a query here is the ban
         // case 6.82 already recorded.
         // *Owner: Plan 3 Task 12 (`proj_tickets`), case 6.94.*
+        yield env;
+        break;
+      }
+      case 'note': {
+        // `env.entity.id` is the NOTE the event is about — `comment.added`
+        // included, because a comment filed against a note is filed against the
+        // note (`NOTE_EVENT_TYPES` names it for exactly this reason) and so
+        // follows the note's audience rather than any ticket's. Routing note
+        // comments through the ticket branch would ask `canSee` about a note id
+        // and withhold them from everybody, the author included.
+        const loaded = await loadNoteForVisibility(db, env.entity.id);
+        if (loaded === null) break;
+        if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities)) break;
+        // The grant half, one entity kind over from the ticket branch above and
+        // under the same ruling: a note event that can change this note's
+        // resolved audience, reaching a reader who may read it NOW, hands back
+        // the id and head position of the note whose pre-cursor history their
+        // cursor ran past while it was invisible to them.
+        //
+        // Notes have no `audienceDependents` walk and need none: a note's
+        // audience depends on its SCOPE and, for `inherit`, on its attached
+        // tickets — and the ticket side of that already fires from the ticket
+        // branch (this plan's Task 2). Within a note's own stream the trigger
+        // set is the scope-affecting event types, which is what
+        // `isNoteGrantTrigger` names.
+        //
+        // Before-and-not-after, as above: the client must hold the note before
+        // the event that changed it arrives, or its fold replays a transition
+        // with no `note.created` and the reducer REFUSES it rather than stalling
+        // silently — `applyNoteEvent` throws where `applyTicketEvent` stalls, so
+        // the ordering is load-bearing in a slightly different way and just as
+        // much.
+        if (isNoteGrantTrigger(env.type)) {
+          const notes = await noteGrantNoticeFor(db, userId, [env.entity.id], afterSeq, backfilled);
+          if (notes.length > 0) yield { kind: 'reach-granted', workspaceId, tickets: [], notes };
+        }
         yield env;
         break;
       }

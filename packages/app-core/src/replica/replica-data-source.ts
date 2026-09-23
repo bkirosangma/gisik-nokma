@@ -1,6 +1,8 @@
 import type {
   IngestResult,
   LedgerEvent,
+  NoteState,
+  NoteSummary,
   PublishedWorkflowDef,
   StateCategory,
   SubmittedEvent,
@@ -12,6 +14,7 @@ import {
   BACKLOG_STATE_ID,
   IST_DAY_REGEX,
   PRIORITIES,
+  isCreatableState,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -28,11 +31,18 @@ import {
   type SyncStorage,
   type SnapshotProvenanceBlock,
 } from '@gisik-nokma/sync-client';
-import type { DataSource, DataSourceQuery, ServerStreamFrame, Unsubscribe } from '../data-source.js';
-import { EPIC_RANK, epicAncestorOf } from '../hierarchy/epic-ancestor.js';
+import type {
+  ClientStreamFrame,
+  DataSource,
+  DataSourceQuery,
+  NoteListFilter,
+  Unsubscribe,
+} from '../data-source.js';
+import { EPIC_RANK, epicAncestorOf, type IsEpicType } from '../hierarchy/epic-ancestor.js';
 import { matchesFilter } from '../filter/matches-filter.js';
 import type {
   Actor,
+  BoardCard,
   BoardColumn,
   BoardGroup,
   BoardView,
@@ -357,6 +367,32 @@ const SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+/**
+ * Notes series, Plan 3 of 6. Unlike `SEARCH_ABSENCES` — which is about two
+ * FIELDS of a hit the replica can otherwise produce — this is the whole method.
+ *
+ * The reason is that note search is two different indexes and the device has
+ * neither. `Replica.searchLocal` scans ticket titles and comment bodies for a
+ * LIKE match, and a note's body is a ProseMirror document that has to be
+ * flattened and FOLDED before it can be matched at all (spec §7.2), with a
+ * vocabulary for the correction pass that nothing local builds. And the meaning
+ * mode has no offline story whatsoever: its whole index is the output of a
+ * 130 MB model.
+ *
+ * Answering the lexical half alone would be worse than refusing. `mode` is
+ * required on the call (see `data-source.ts`), so a replica that served lexical
+ * and threw on meaning would make the search screen work while typing and fail
+ * after the pause — a screen that breaks depending on how long the user waited.
+ */
+const NOTE_SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'NoteSearchHit (every field)',
+    because:
+      'the device has neither index. The lexical one needs a note body flattened to text and FOLDED (spec §7.2) plus a workspace vocabulary for the correction pass, none of which the local schema or `Replica.searchLocal` builds; the meaning one needs the 130 MB model\'s output, which cannot exist offline at all. Serving the lexical half alone would make the screen work while typing and fail after the pause',
+    owner: 'Plan 10 — a folded local note index and a chosen offline answer for `mode=meaning`',
+  },
+];
+
 const MY_WORK_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'WorkItem.projectName',
@@ -589,7 +625,16 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
   getTicketComments: COMMENTS_ABSENCES,
+  // THE SEVEN NOTE ENTRIES ARE GONE, and their absence is now the measured
+  // state rather than a promise. Plan 1 listed all seven here behind one shared
+  // `NOTES_ABSENCES` naming the replica tables as the single fix; Plan 2 landed
+  // those tables (`notes`, `note_comments`, local schema version 2) and the
+  // implementations below, so the entries are deleted rather than reworded —
+  // a gap entry that outlives its gap is a screen telling a user a feature is
+  // missing when it is not. `search` is STILL absent and unrelated: local note
+  // search is Plan 3's.
   search: SEARCH_ABSENCES,
+  searchNotes: NOTE_SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
   getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
@@ -793,6 +838,90 @@ function actorOf(assigneeId: string | null): Actor | null {
 export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDataSource {
   const { workspaceId: ownWorkspaceId, replica, outbox, engine, storage } = deps;
 
+  /**
+   * A note's attachments, as the BADGE sees them: `{ticketId, key, title}`.
+   *
+   * ## Tickets this device does not hold are OMITTED, and that is the reader predicate for free
+   *
+   * The replica holds only the tickets this user may see — a ticket the server
+   * never sent is not here — so resolving the badge from local rows is
+   * automatically "the tickets this reader can see". Emitting an id this device
+   * does not hold would put an untitled, unkeyable row on a screen and assert a
+   * relationship to something the device has no evidence exists.
+   *
+   * ## `key: ''`, and the server does the same thing
+   *
+   * `key` is composed from a workspace prefix, a project prefix and a
+   * per-project number. The replica holds NONE of the three — its other local
+   * reads answer `key: null` for that stated reason (`getTickets` and the
+   * board's rows) — and `NoteSummary.attachedTickets` types the field
+   * non-nullable, so the honest answer is the EMPTY STRING, which is exactly
+   * what the server falls back to when any of the three components is missing
+   * (`read/notes.ts`'s `attachedTicketsByNote`). One spelling for "no key
+   * available", on both sides. *Owner: whoever gives the replica project
+   * numbers — Plan 3's surface, if anything.*
+   *
+   * `projectId` (notes series, Plan 6 of 7) has no such gap: it is a plain
+   * column of `TicketState` the confirmed ticket already carries, so — unlike
+   * `key` — the replica always answers it, not a fallback.
+   */
+  async function attachedTicketsOf(
+    notes: readonly NoteState[],
+  ): Promise<Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>> {
+    const grouped = new Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>();
+    for (const note of notes) {
+      const list: { ticketId: string; projectId: string; key: string; title: string }[] = [];
+      for (const ticketId of note.attachedTicketIds) {
+        const ticket = await replica.getTicket(ticketId);
+        if (ticket === null || ticket.confirmed === null) continue;
+        const title = ticket.confirmed.fields['title']?.value;
+        list.push({
+          ticketId,
+          projectId: ticket.confirmed.projectId,
+          key: '',
+          title: typeof title === 'string' ? title : '',
+        });
+      }
+      grouped.set(note.noteId, list);
+    }
+    return grouped;
+  }
+
+  /** The domain shape `getNotes` and its siblings answer in. */
+  function summariesOf(
+    notes: readonly NoteState[],
+    attached: Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>,
+  ): NoteSummary[] {
+    return notes.map((note) => ({
+      noteId: note.noteId,
+      workspaceId: note.workspaceId,
+      homeProjectId: note.homeProjectId,
+      authorId: note.authorId,
+      title: note.title,
+      scope: note.scope,
+      attachedTickets: attached.get(note.noteId) ?? [],
+      deleted: note.deleted,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    }));
+  }
+
+  /**
+   * The list filters, applied in memory.
+   *
+   * `?deleted=` is NOT here: a deleted note is a different READ
+   * (`getDeletedNotes`), because the two are gated by different rules on the
+   * server and a flag that could cross them would let one door answer for the
+   * other.
+   */
+  function noteMatchesFilter(note: NoteState, filter: NoteListFilter | undefined): boolean {
+    if (filter === undefined) return true;
+    if (filter.homeProjectId !== undefined && note.homeProjectId !== filter.homeProjectId) return false;
+    if (filter.authorId !== undefined && note.authorId !== filter.authorId) return false;
+    if (filter.scopeMode !== undefined && note.scope.mode !== filter.scopeMode) return false;
+    return true;
+  }
+
   async function ticketTypesById(): Promise<Map<string, TicketTypeDef>> {
     const rows = await storage.all('SELECT type_id, def FROM ticket_types');
     return new Map(
@@ -866,6 +995,59 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     if (state.parentId === null) return false;
     if (engine.status() !== 'live') return false;
     return !byId.has(state.parentId);
+  }
+
+  /**
+   * `BoardCard.parent`/`.epic`, offline (owner request, 2026-09-23) —
+   * DELETED-SAFE, unlike `epicAncestorOf` and `confirmedById`'s own `byId`
+   * above, which deliberately keep a deleted ticket reachable for the LIST's
+   * reasons (`confirmedById`'s own docblock a few lines up: pulling a deleted
+   * parent out of `byId` would turn every deleted epic into a
+   * `hasRestrictedParent` on its live children — a DIFFERENT statement than
+   * the true one). The server's board read stops its own walk at a
+   * soft-deleted hop (`ancestryCte`'s `LIVE_TICKET_WHERE` conjunct,
+   * `apps/server/src/read/ancestry.ts`), so a live device must not disagree —
+   * this wrapper re-applies that same check at every hop it takes, which is
+   * why it is a SEPARATE function from `epicAncestorOf` rather than a shared
+   * one: changing that function's own behaviour would move the List too.
+   *
+   * `key: null` on both — the replica holds no workspace or project prefix and
+   * no per-project number, so it cannot compose either badge's key, the same
+   * under-claim every other key on this card already makes (`cardOf`'s own
+   * `key: null`, above). The board's parent badge is therefore never drawn
+   * offline (`board.tsx`'s "a null key draws nothing" rule) — narrower than
+   * the truth, never wrong about it, `epicAncestorOf`'s own rule.
+   */
+  function boardHierarchyOf(
+    state: TicketState,
+    byId: ReadonlyMap<string, TicketState>,
+    isEpicType: IsEpicType,
+  ): { parent: BoardCard['parent']; epic: BoardCard['epic'] } {
+    const isLive = (candidate: TicketState): boolean => (candidate.deleted ?? null) === null;
+
+    let parent: BoardCard['parent'] = null;
+    if (state.parentId !== null) {
+      const parentState = byId.get(state.parentId);
+      if (parentState !== undefined && isLive(parentState)) {
+        parent = { ticketId: state.parentId, key: null };
+      }
+    }
+
+    let epic: BoardCard['epic'] = null;
+    let current: TicketState | undefined = state;
+    const seen = new Set<string>();
+    while (current !== undefined) {
+      if (isEpicType(current.typeId)) {
+        epic = { ticketId: current.id, key: null, title: titleOf(current) };
+        break;
+      }
+      if (current.parentId === null || seen.has(current.id)) break;
+      seen.add(current.id);
+      const next = byId.get(current.parentId);
+      current = next !== undefined && isLive(next) ? next : undefined;
+    }
+
+    return { parent, epic };
   }
 
   async function rowOf(
@@ -994,6 +1176,95 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getTicketComments: () =>
       Promise.reject(new ReplicaGapError('getTicketComments', COMMENTS_ABSENCES)),
+    getNotes: async (workspaceId, filter) => {
+      // Filters applied IN MEMORY over `listNotes`, and not pushed into SQL.
+      // That is a deliberate cost rather than an oversight: `listNotes` is the
+      // one local read that answers "which notes exist here", and a filtered
+      // second query would be a second place that decides what a workspace
+      // holds. The sets are small — a device holds what it was sent — and the
+      // alternative is the drift `can-read-note.ts` has a whole case against.
+      const notes = await replica.listNotes(workspaceId);
+      return summariesOf(notes.filter((n) => noteMatchesFilter(n, filter)), await attachedTicketsOf(notes));
+    },
+    getDeletedNotes: async (workspaceId) => {
+      const notes = await replica.listDeletedNotes(workspaceId);
+      // THE DELETED-NOTE GATE, which is NOT `canReadNote` and must not be
+      // folded into it. A deleted note is still READABLE — that is what the
+      // undo window means, and `canReadNote` deliberately ignores `deleted` —
+      // but going LOOKING for deleted notes is narrower: only the author, a
+      // workspace admin or the owner. The server states it in one line
+      // (`read/notes.ts`: the `?deleted=1` arm adds `author_id = me` for anyone
+      // else) and the replica applied NOTHING here, so a plain member's device
+      // listed, and offered to undo, notes the server would refuse to show.
+      //
+      // The role comes from `me`, the workspace role the bootstrap recorded.
+      // A device with no `me` has never bootstrapped and its `listDeletedNotes`
+      // is empty anyway; treating that as a plain member is the fail-closed
+      // direction.
+      const me = await replica.getMe();
+      const mayLook = me !== null && (me.workspaceRole === 'owner' || me.workspaceRole === 'admin');
+      const visible = mayLook ? notes : notes.filter((n) => n.authorId === me?.userId);
+      return summariesOf(visible, await attachedTicketsOf(visible));
+    },
+    getNote: async (workspaceId, noteId) => {
+      const note = await replica.getNote(noteId);
+      // A note from ANOTHER workspace answers `null`, exactly as an absent one
+      // does: the replica's reads are keyed by note id, and a caller that could
+      // tell "not yours" from "not here" would have the existence oracle the
+      // server's note routes are built to deny.
+      if (note === null || note.workspaceId !== workspaceId) return null;
+      const attached = await attachedTicketsOf([note]);
+      const summary = summariesOf([note], attached)[0]!;
+      // `schemaVersion` is READ from the stored body, never assumed — the
+      // docblock inside the body is the only authority, and Plan 4 of the
+      // series raises it to 2 when the new node types land.
+      const body = note.body as { attrs?: { schemaVersion?: unknown } } | null;
+      const raw = body?.attrs?.schemaVersion;
+      return { ...summary, body: note.body, schemaVersion: typeof raw === 'number' ? raw : 1 };
+    },
+    getNotesForTicket: async (workspaceId, ticketId) => {
+      const notes = await replica.listNotesForTicket(workspaceId, ticketId);
+      return summariesOf(notes, await attachedTicketsOf(notes));
+    },
+    getNoteComments: async (workspaceId, noteId) => {
+      const note = await replica.getNote(noteId);
+      if (note === null || note.workspaceId !== workspaceId) return [];
+      return (await replica.listNoteComments(noteId)).map((c) => ({
+        commentId: c.commentId,
+        authorId: c.authorId,
+        body: c.body,
+        recordedAt: c.recordedAt,
+      }));
+    },
+    getNoteHistory: async (workspaceId, noteId) => {
+      const note = await replica.getNote(noteId);
+      if (note === null || note.workspaceId !== workspaceId) return [];
+      // Read from the local `events` table, and filtered to the two types that
+      // ARE versions — exactly what the server's `listNoteHistory` does over
+      // the same rows. `note.renamed` is deliberately out: it moves the title,
+      // which the current row already carries, and a version that changed no
+      // body would appear as a duplicate.
+      const events = await replica.listEntityEvents(noteId, 'note');
+      return events
+        .filter((e) => e.type === 'note.created' || e.type === 'note.body_set')
+        .map((e) => ({ eventId: e.id, authorId: e.actorId, recordedAt: e.serverTime, seq: e.seq }));
+    },
+    getNoteVersion: async (workspaceId, noteId, eventId) => {
+      const note = await replica.getNote(noteId);
+      if (note === null || note.workspaceId !== workspaceId) return null;
+      const events = await replica.listEntityEvents(noteId, 'note');
+      const event = events.find((e) => e.id === eventId);
+      if (event === undefined) return null;
+      // `payload.body ?? null`, EXACTLY as the server's `getNoteVersionBody`
+      // does — no fallback to the current row. A `note.created` with no body
+      // (a note born empty carries the reducer's `EMPTY_NOTE_DOC` and no
+      // payload body) therefore answers `null` on both sides. **A fallback
+      // here would have been the more helpful answer and the WRONG one**: it
+      // would let the offline copy show a body the online read calls absent,
+      // which is this series' whole failure mode one package over.
+      if (event.type !== 'note.created' && event.type !== 'note.body_set') return null;
+      return (event.payload as { body?: unknown }).body ?? null;
+    },
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>
@@ -1001,6 +1272,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     getPreferences: () => Promise.reject(new ReplicaGapError('getPreferences', PREFERENCES_ABSENCES)),
     putPreferences: () => Promise.reject(new ReplicaGapError('putPreferences', PREFERENCES_ABSENCES)),
     search: () => Promise.reject(new ReplicaGapError('search', SEARCH_ABSENCES)),
+    searchNotes: () => Promise.reject(new ReplicaGapError('searchNotes', NOTE_SEARCH_ABSENCES)),
 
     /**
      * `grouping` is READ AND NOT USED, and that is the shipped view type rather
@@ -1083,6 +1355,15 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       for (const state of inProject) {
         if ((await outbox.pendingFor(state.id)) !== null) pendingIds.add(state.id);
       }
+      // The SAME rank-based `isEpicType` `getTickets` builds, above — the
+      // workspace's own roster, so this device agrees with the server about
+      // which type is an epic exactly, rather than falling back to
+      // `isBuiltinEpicType`'s narrower built-in-id test.
+      const types = await ticketTypesById();
+      const epicTypeIds = new Set(
+        [...types.values()].filter((type) => type.rank === EPIC_RANK).map((type) => type.id),
+      );
+      const isEpicType = (typeId: string): boolean => epicTypeIds.has(typeId);
 
       async function cardOf(state: TicketState) {
         const events = await replica.listEntityEvents(state.id);
@@ -1130,6 +1411,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // under-claim `rollup: null` above makes, for the same reason.
           key: null,
           pending: pendingIds.has(state.id),
+          ...boardHierarchyOf(state, byId, isEpicType),
         };
       }
 
@@ -1157,6 +1439,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
               name: state.stateId,
               category: state.stateCategory,
               blocked: false,
+              // `false`, the SAME straggler convention `blocked` sets one line
+              // up: the flag lives on a definition and there is none here
+              // (starting-status design, 2026-09-23).
+              creatable: false,
               cards: [card],
             });
           } else {
@@ -1177,6 +1463,11 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
               name: s.name,
               category: s.category,
               blocked: s.blocked === true,
+              // THE ONE HELPER, USED EVERYWHERE (starting-status design,
+              // 2026-09-23) — the same `isCreatableState` the server board
+              // read and the client mapper ask, so the offline replica cannot
+              // answer this question differently.
+              creatable: isCreatableState(def, s.id),
               cards: [],
             })),
           };
@@ -1537,7 +1828,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * from `replica.getCursor`. A second cursor here would be a second opinion
      * about where this device is.
      */
-    subscribe(workspaceId: string, _afterSeq: number, cb: (item: ServerStreamFrame) => void): Unsubscribe {
+    subscribe(workspaceId: string, _afterSeq: number, cb: (item: ClientStreamFrame) => void): Unsubscribe {
       const offItem = engine.onItem((item) => {
         if (!isSyncInstruction(item)) {
           if (item.workspaceId === workspaceId) cb({ type: 'event', envelope: item });
@@ -1559,12 +1850,18 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // got both halves wrong and the branch review caught it.** Item
           // listeners run AFTER the engine's drain, so by the time a subscriber
           // sees this frame the successful pulls have already landed and those
-          // tickets ARE readable. And no `event` frame follows a pull:
-          // `loadTicketBootstrap` calls `notify()` only, and nothing routes a
-          // pulled ticket through `onItem`. What refreshes a view is the
-          // ordinary TRIGGER envelope arriving behind this frame — the right
-          // outcome by a different mechanism, and a consumer waiting for a
-          // per-pull frame would wait for one that never comes.
+          // tickets ARE readable.
+          //
+          // **And the sentence that used to end this paragraph — "a consumer
+          // waiting for a per-pull frame would wait for one that never comes" —
+          // WAS TRUE and is now FALSE.** Plan 2 of the notes series added
+          // exactly that frame: `refresh`, forwarded below from the engine's
+          // `onPullApplied`. It is the reason a note reached by pull refreshes
+          // the screen showing it, because nothing on the ordinary stream
+          // announces it. The ticket half keeps its older mechanism as well —
+          // the trigger envelope that follows this frame IS an `event` — but a
+          // note's pull has no such follower, so the frame is load-bearing
+          // there and merely useful here.
           if (item.workspaceId === workspaceId) {
             cb({ type: 'reach-granted', workspaceId, tickets: item.tickets });
           }
@@ -1573,6 +1870,24 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         if (item.workspaceId === workspaceId && item.projectId === undefined) {
           cb({ type: 'scope-revoked', workspaceId });
         }
+      });
+      // A LANDED PULL, as a frame. `refresh` is client-only (`data-source.ts`
+      // argues why it is not a member of the published protocol), and it exists
+      // for the case no other frame covers: a note pulled in response to a
+      // `reach-granted` notice arrives AFTER the stream has gone quiet, so
+      // there is no `event` and no `caught-up` behind it. Without this the note
+      // is in the replica and the screen showing it keeps the stale answer.
+      //
+      // No workspace check, unlike every arm above, and the reason is the
+      // SIGNAL rather than an omission: `onPullApplied` carries `{kind, id}`
+      // and no workspace, because the engine drains one workspace — the one it
+      // was subscribed to — and this data source was built for that same
+      // workspace (`ReplicaDataSourceDeps.workspaceId`). The ID is
+      // deliberately not echoed either: a `refresh` says "re-read", and WHICH
+      // entity moved would tempt a view into a partial update, which is the
+      // shape the debounced refetch exists to avoid.
+      const offPull = engine.onPullApplied(() => {
+        cb({ type: 'refresh', workspaceId });
       });
       const offStatus = engine.onStatus((status) => {
         // `live` is set immediately after the cursor is written, so the value
@@ -1588,6 +1903,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       });
       return () => {
         offItem();
+        offPull();
         offStatus();
       };
     },

@@ -28,7 +28,8 @@ const BLOCK_TRIGGERS: Trigger[] = [
   { typed: '+ ', label: 'bullet (plus)', formatted: (e) => firstBlock(e).type === 'bulletList' },
   { typed: '1. ', label: 'ordered list', formatted: (e) => firstBlock(e).type === 'orderedList' },
   { typed: '> ', label: 'blockquote', formatted: (e) => firstBlock(e).type === 'blockquote' },
-  { typed: '``` ', label: 'code block', formatted: (e) => firstBlock(e).type === 'codeBlock' },
+  { typed: '``` ', label: 'code block (backtick fence)', formatted: (e) => firstBlock(e).type === 'codeBlock' },
+  { typed: '~~~ ', label: 'code block (tilde fence)', formatted: (e) => firstBlock(e).type === 'codeBlock' },
   {
     typed: '---',
     label: 'horizontal rule',
@@ -41,6 +42,8 @@ const BLOCK_TRIGGERS: Trigger[] = [
       return found;
     },
   },
+  { typed: '[] ', label: 'task item', formatted: (e) => firstBlock(e).type === 'taskList' },
+  { typed: '< ', label: 'collapsible', formatted: (e) => firstBlock(e).type === 'details' },
 ];
 
 const MARK_TRIGGERS: Trigger[] = [
@@ -66,30 +69,136 @@ const MARK_TRIGGERS: Trigger[] = [
 
 describe('escape suggestion — every reserved sequence, planted-defect style', () => {
   /**
-   * 9.88 — every reserved autoformat sequence (13 block triggers, 7 mark triggers, 20 total, table-driven) applies its formatting AND surfaces the escape suggestion, and accepting via `undoInputRule` reverses the formatting and leaves the literal typed characters.
+   * 9.88 — every reserved autoformat sequence (16 block triggers, 7 mark
+   * triggers, 23 rows, table-driven) applies its formatting AND leaves an
+   * internal undo-able record, and accepting via `undoInputRule` reverses the
+   * formatting and leaves the literal typed characters. 23 rows exercise all
+   * 21 registered input rules (bullet's 3 marker variants and codeBlock's 2
+   * fence variants each collapse to one registered rule). No visible chip
+   * is asserted here any more — the offer is withdrawn (owner ruling
+   * 2026-09-24); see 9.338 for the no-chip assertion.
    */
   it.each([...BLOCK_TRIGGERS, ...MARK_TRIGGERS])(
-    '$label: formatting applies, the suggestion appears, accepting yields literal text',
+    '$label: formatting applies, accepting yields literal text',
     ({ typed, formatted }) => {
       const editor = createTestEditor();
       typeText(editor, typed);
 
-      // The autoformat happened (dismissing would keep exactly this)…
+      // The autoformat happened (accepting would revert exactly this)…
       expect(formatted(editor), `"${typed}" should have autoformatted`).toBe(true);
-      // …and the suggestion is on offer, with a chip in the DOM.
+      // …and an internal undo-able record exists.
       const suggestion = getEscapeSuggestion(editor.state);
-      expect(suggestion, `no suggestion after typing "${typed}"`).not.toBeNull();
-      expect(editor.view.dom.querySelector('[data-escape-chip]')).not.toBeNull();
+      expect(suggestion, `no pending record after typing "${typed}"`).not.toBeNull();
 
       // Accept: the literal typed characters stand, the formatting is gone.
       expect(editor.commands.undoInputRule()).toBe(true);
       expect(formatted(editor), `accepting the escape must undo "${typed}"`).toBe(false);
       expect(editor.state.doc.textContent).toContain(typed.trim());
       expect(getEscapeSuggestion(editor.state)).toBeNull();
-      expect(editor.view.dom.querySelector('[data-escape-chip]')).toBeNull();
       editor.destroy();
     },
   );
+
+  /**
+   * 9.338 — no visible escape affordance for ANY markdown shortcut (owner
+   * ruling 2026-09-24, withdrawing spec §2's chip mechanic): no
+   * `[data-escape-chip]` and no `.escape-chip` element in the DOM after any
+   * of the 23 rows above, with the SAME positive control 9.88 already
+   * proves (formatting fired) so this case cannot pass on a no-op
+   * `typeText`. Escape performs no special handling any more, on any row.
+   */
+  it.each([...BLOCK_TRIGGERS, ...MARK_TRIGGERS])(
+    '9.338 $label: no chip in the DOM, Escape does nothing special',
+    ({ typed, formatted }) => {
+      const editor = createTestEditor();
+      typeText(editor, typed);
+      expect(formatted(editor), `"${typed}" should have autoformatted`).toBe(true);
+      expect(editor.view.dom.querySelector('[data-escape-chip]')).toBeNull();
+      expect(editor.view.dom.querySelector('.escape-chip')).toBeNull();
+      expect(pressEscape(editor)).toBe(false);
+      editor.destroy();
+    },
+  );
+
+  /**
+   * 9.339 — Backspace immediately after a BLOCK-type shortcut still reverts
+   * it to literal text (the owner's ADDENDUM), via a REAL keydown — not
+   * `editor.commands.undoInputRule()` directly (which 9.88 already proves),
+   * because a real keydown is routed through core's Backspace keymap, which
+   * is a different code path (see escape-suggestion.ts's docblock on why
+   * `keyboardShortcut('Backspace')` cannot substitute for it either).
+   *
+   * COLLAPSIBLE AND BOTH CODE-BLOCK ROWS ARE DELIBERATELY EXCLUDED from this
+   * table — see the ledger's Task 1 ruling. Measured: two OTHER, pre-existing
+   * Backspace handlers win the real-keydown race before escape-suggestion's
+   * override ever runs, for the identical "cursor at the start of the
+   * freshly-created empty block" state:
+   *   - collapsible.ts's OWN keymap (case 9.295, spec §8.4) deletes the
+   *     empty summary's whole block, leaving one paragraph.
+   *   - `@tiptap/extension-code-block`'s OWN upstream `Backspace` shortcut
+   *     (installed dist, not this repo's code) exits an empty code block
+   *     back to a paragraph, the same way.
+   * Neither is literal "< "/"``` " text; both are pre-existing, more
+   * specific handlers this lane does not override. The two regression
+   * cases below confirm both are unchanged.
+   *
+   * Mark triggers are the CONTROL, in their own `it` beneath: the mutation
+   * this case names (removing the `undoInputRule` override) must leave them
+   * green, proving the override is what the REMAINING block triggers depend
+   * on and not some other mechanism.
+   */
+  const BLOCK_UNDO_CASES: Trigger[] = BLOCK_TRIGGERS.filter(
+    (t) => t.label !== 'collapsible' && !t.label.startsWith('code block'),
+  );
+  it.each(BLOCK_UNDO_CASES)('9.339 $label: Backspace immediately reverts to literal text (real keydown)', ({ typed }) => {
+    const editor = createTestEditor();
+    typeText(editor, typed);
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    const handled = editor.view.someProp('handleKeyDown', (h) => h(editor.view, event));
+    expect(handled, `Backspace after "${typed}" should be handled`).toBe(true);
+    expect(editor.state.doc.textContent).toContain(typed.trim());
+    editor.destroy();
+  });
+
+  it('9.339 CONTROL — a mark trigger stays green under the same real-keydown path', () => {
+    const editor = createTestEditor();
+    typeText(editor, 'x **bold**');
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    expect(editor.view.someProp('handleKeyDown', (h) => h(editor.view, event))).toBe(true);
+    expect(editor.getHTML()).not.toContain('<strong');
+    expect(editor.state.doc.textContent).toContain('**bold**');
+    editor.destroy();
+  });
+
+  /**
+   * 9.339 REGRESSION — collapsible's OWN Backspace behaviour (case 9.295,
+   * unaffected by the chip removal): an empty summary right after "< " is
+   * deleted along with the whole block, leaving one paragraph — not
+   * literal "< " text. Mutation: this case reddens if the escape-suggestion
+   * rewrite accidentally lets its own `undoInputRule` override win that
+   * race instead.
+   */
+  it('9.339 REGRESSION — collapsible still deletes the empty block on Backspace, not revert-to-literal', () => {
+    const editor = createTestEditor();
+    typeText(editor, '< ');
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    editor.view.someProp('handleKeyDown', (h) => h(editor.view, event));
+    const json = editor.state.doc.toJSON();
+    expect(JSON.stringify(json)).not.toContain('"details"');
+    expect(editor.state.doc.textContent).not.toContain('<');
+    editor.destroy();
+  });
+
+  it('9.339 REGRESSION — an empty code block still exits to a paragraph on Backspace, not revert-to-literal', () => {
+    const editor = createTestEditor();
+    typeText(editor, '``` ');
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    editor.view.someProp('handleKeyDown', (h) => h(editor.view, event));
+    const json = editor.state.doc.toJSON();
+    expect(JSON.stringify(json)).not.toContain('"codeBlock"');
+    expect(editor.state.doc.textContent).not.toContain('```');
+    editor.destroy();
+  });
 
   /**
    * 9.89 — Backspace accepts through a real `keydown` (core's Backspace keymap routes it through `undoInputRule`), proven with a genuine event rather than the `keyboardShortcut` test helper.
@@ -114,35 +223,6 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     const handled = editor.view.someProp('handleKeyDown', (h) => h(editor.view, event));
     expect(handled).toBe(true);
     expect(firstBlock(editor)).toEqual({ type: 'paragraph', text: '# ' });
-    editor.destroy();
-  });
-
-  /**
-   * 9.90 — clicking the chip accepts: the formatting is gone from the rendered HTML and the typed markup stands as literal text.
-   */
-  it('clicking the chip accepts', () => {
-    const editor = createTestEditor();
-    typeText(editor, 'x **bold**');
-    const chip = editor.view.dom.querySelector('[data-escape-chip]') as HTMLButtonElement;
-    expect(chip).not.toBeNull();
-    expect(chip.textContent).toContain('**bold**');
-    chip.dispatchEvent(new MouseEvent('mousedown', { bubbles: true, cancelable: true }));
-    expect(editor.getHTML()).not.toContain('<strong');
-    expect(editor.state.doc.textContent).toContain('**bold**');
-    editor.destroy();
-  });
-
-  /**
-   * 9.91 — Escape dismisses: the suggestion and the chip both disappear and the formatting stays applied.
-   */
-  it('Escape dismisses: the formatting stays, the chip goes', () => {
-    const editor = createTestEditor();
-    typeText(editor, '# ');
-    expect(getEscapeSuggestion(editor.state)).not.toBeNull();
-    expect(pressEscape(editor)).toBe(true);
-    expect(getEscapeSuggestion(editor.state)).toBeNull();
-    expect(editor.view.dom.querySelector('[data-escape-chip]')).toBeNull();
-    expect(firstBlock(editor).type).toBe('heading');
     editor.destroy();
   });
 
@@ -204,15 +284,6 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     expect(read(`${BOLD} tail`)).toBeNull();
   });
 
-  /**
-   * 9.93 — Escape with no active suggestion is not consumed — `handleKeyDown` returns `false`, leaving the key free for whatever else wants it.
-   */
-  it('Escape without an active suggestion is not consumed', () => {
-    const editor = createTestEditor();
-    typeText(editor, 'plain');
-    expect(pressEscape(editor)).toBe(false);
-    editor.destroy();
-  });
 });
 
 describe('non-triggers stay literal with no suggestion', () => {

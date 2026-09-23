@@ -98,6 +98,7 @@ const BOARD_WITH_DONE = {
           name: 'Done',
           category: 'terminal' as const,
           blocked: false,
+          creatable: false,
           cards: [
             {
               ticketId: '01J9TICKET00000000000000DN',
@@ -116,6 +117,11 @@ const BOARD_WITH_DONE = {
               // Spec 2026-09-22: `null` is "the ledger holds no prefix".
               key: null,
               pending: false,
+              // Owner request, 2026-09-23: REQUIRED on `BoardCard`;
+              // `null`/`null` is a root ticket under no epic, the same
+              // default `boardCardSeed` uses.
+              parent: null,
+              epic: null,
             },
           ],
         },

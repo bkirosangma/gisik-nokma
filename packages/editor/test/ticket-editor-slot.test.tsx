@@ -1,6 +1,6 @@
 import { existsSync, readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import { render } from '@testing-library/react';
+import { fireEvent, render } from '@testing-library/react';
 import { describe, expect, it, vi } from 'vitest';
 import type { ReactElement } from 'react';
 import type { Editor } from '@tiptap/core';
@@ -14,6 +14,7 @@ import {
   type TicketEditorSlotProps,
 } from '../src/components/TicketEditorSlot.js';
 import type { DocJson } from '../src/doc.js';
+import { uploadAttachmentHttp, uploadNoteAttachmentHttp } from '../src/upload.js';
 
 const DOC: DocJson = {
   type: 'doc',
@@ -74,6 +75,7 @@ describe('composeEditorSubmission', () => {
 // ─────────────────────────────────────────────────────────────────────────────
 type AppCoreEditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }
+  | { type: 'note.body_set'; payload: { body: unknown } }
   | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: unknown } };
 
 type AppCoreEditorSlotUpload = {
@@ -86,16 +88,39 @@ type AppCoreEditorSlotUpload = {
 };
 
 type AppCoreEditorSlotProps = {
-  mode: 'comment' | 'description';
+  mode: 'comment' | 'description' | 'note';
   doc: unknown;
   readOnly: boolean;
   workspaceId: string;
   ticketId: string;
+  // 18.198 — the note an upload belongs to, in note mode (Plan 5, spec §4.4).
+  // Optional here because it is optional there: `ticketId` is required and this
+  // one is not, which is a fact about the two modes rather than a slip.
+  noteId?: string;
   placeholder?: string;
   autoFocus?: boolean;
   labelledBy?: string;
   footerNote?: string;
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
+  // 9.280 — the wiki-link four (Plan 4 Task 5). Transcribed here with the same
+  // names and inline shapes so the case below, which compares THIS type's field
+  // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if
+  // either half gains a prop the other does not have.
+  // 9.291-9.293 — the note-mode autosave hooks (Plan 4 Task 8), transcribed
+  // with the same names and types as the editor's own declaration.
+  onDraft?: (doc: unknown) => void;
+  onSave?: (doc: unknown) => void;
+  saveState?: 'saved' | 'saving' | 'unsaved';
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
+  // 9.309 — the ticket-ref two (Plan 7 Task 1), transcribed with the same name
+  // and inline shape so the case above, which compares this type's field
+  // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if
+  // either half gains a prop the other does not have.
+  queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
   // V7 — mirrored from app-core's seam, and the TYPE is part of the parity the
@@ -181,6 +206,31 @@ describe('the <EditorSlot> contract, written twice', () => {
     // NOT here — it lives on `TicketEditorSlotProps`, a separate type, which is
     // the whole reason app-core never has to name `@tiptap/core`'s `Editor`.
     expect([...thisHalfFields].sort()).toEqual([...appCoreFields].sort());
+  });
+
+  /**
+   * 9.309 — Plan 7 Task 1's two ticket-reference options, threaded through
+   * this twice-written contract the same way the wiki-link four are: named in
+   * all three declarations the set-equality case above already compares.
+   */
+  it('9.309 the twin transcription covers queryTickets and resolveTicketHref in both files', () => {
+    const appCoreFields = fieldNamesOf(
+      readFileSync(APP_CORE_SLOT_SOURCE, 'utf8'),
+      'export type EditorSlotProps = {',
+    );
+    const transcribedFields = fieldNamesOf(
+      readFileSync(OWN_SOURCE, 'utf8'),
+      'type AppCoreEditorSlotProps = {',
+    );
+    const thisHalfFields = fieldNamesOf(
+      readFileSync(THIS_HALF_SOURCE, 'utf8'),
+      'export type EditorSlotProps = {',
+    );
+    for (const field of ['queryTickets', 'resolveTicketHref']) {
+      expect(appCoreFields, `app-core's own declaration is missing ${field}`).toContain(field);
+      expect(transcribedFields, `the transcription is missing ${field}`).toContain(field);
+      expect(thisHalfFields, `this package's own declaration is missing ${field}`).toContain(field);
+    }
   });
 });
 
@@ -800,6 +850,172 @@ describe('13.1315 the slot names its mode and the fill rule can match', () => {
 });
 
 /**
+ * 9.293 — THE note-MODE FIELDS ARE IN BOTH HALVES, AND `'note'` IS A MODE.
+ *
+ * Its own case rather than a second id on the field-name case above: that one
+ * is 9.75's, and this file's header records "two ids on one test at two
+ * granularities" as the defect a fix round closed. The plan-close review
+ * raised it for exactly that reason — and also because the field-name case
+ * alone is not enough for this claim: it compares NAMES, so a `mode` union
+ * that lost `'note'` while keeping the field would still pass it.
+ */
+describe('9.293 the note-mode contract', () => {
+  it("9.293 the note-mode fields are transcribed and app-core's mode union carries note", () => {
+    const appCore = readFileSync(APP_CORE_SLOT_SOURCE, 'utf8');
+    const editorHalf = readFileSync(THIS_HALF_SOURCE, 'utf8');
+    const transcription = fieldNamesOf(
+      readFileSync(OWN_SOURCE, 'utf8'),
+      'type AppCoreEditorSlotProps = {',
+    );
+    for (const field of ['onDraft', 'onSave', 'saveState']) {
+      expect(appCore, `app-core's half is missing ${field}`).toContain(field);
+      expect(editorHalf, `the editor's half is missing ${field}`).toContain(field);
+      expect(transcription, `the transcription is missing ${field}`).toContain(field);
+    }
+    // …and the MODE UNION, which a field-name comparison cannot see.
+    expect(appCore).toContain("mode: 'comment' | 'description' | 'note'");
+  });
+});
+
+/**
+ * 9.291–9.292 — THE `note` SLOT MODE (spec §8.3 consequence 4, Plan 4 Task 8).
+ *
+ * A note saves itself: the host receives every change through `onDraft` and a
+ * write on blur through `onSave`, and the footer reports the state. So the
+ * three things this pins are the three that a copy of the comment composer
+ * would get wrong — a submit button that has no event to write, a Markdown
+ * hint addressed to a reader who is not choosing to submit, and a `saveState`
+ * that never reaches the screen.
+ */
+describe('9.291-9.292 the note slot mode', () => {
+  it('9.291 note mode has no submit control and no hint, drafts every change, and saves on blur', async () => {
+    const onDraft = vi.fn();
+    const onSave = vi.fn();
+    const note = await mountSlot(
+      makeProps({ mode: 'note', onDraft, onSave, saveState: 'saved' }),
+    );
+    // The toolbar IS present: the notes page is an editor, not a viewer.
+    expect(note.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
+    // …and there is no submit control and no Markdown hint.
+    expect(note.view.container.querySelector('.editor-slot__submit')).toBeNull();
+    expect(note.view.container.querySelector('.editor-slot__hint')?.textContent).toBe('');
+
+    // EVERY CHANGE IS A DRAFT, read off the serialized document rather than
+    // off the call count — a handler wired to the wrong event would still fire
+    // once here, and the assertion below is what says which event it was.
+    // TWO changes, not one: with a single change the two hooks have the same
+    // count under either wiring, and the control below could not tell them
+    // apart.
+    note.editor.commands.insertContent('hello');
+    note.editor.commands.insertContent(' there');
+    await vi.waitFor(() => {
+      expect(onDraft.mock.calls.length).toBeGreaterThanOrEqual(2);
+    });
+    expect(JSON.stringify(onDraft.mock.calls.at(-1)?.[0])).toContain('hello there');
+
+    // …and a blur is a save, carrying the same document.
+    const slot = note.view.container.querySelector('.editor-slot');
+    expect(slot).not.toBeNull();
+    fireEvent.focusOut(slot!);
+    await vi.waitFor(() => {
+      expect(onSave).toHaveBeenCalled();
+    });
+    expect(JSON.stringify(onSave.mock.calls.at(-1)?.[0])).toContain('hello there');
+    // THE CONTROL FOR THE SAVE HOOK, and it can now FAIL: two changes were
+    // typed and `onSave` fired ONCE. The plan's named mutation — call `onSave`
+    // on every change — makes these two counts equal, which is precisely what
+    // the comparison catches.
+    expect(onDraft.mock.calls.length).toBeGreaterThanOrEqual(2);
+    expect(onSave.mock.calls.length).toBe(1);
+    note.view.unmount();
+
+    // THE CONTROL ARM: comment mode still renders the submit control, so a
+    // slot that had stopped rendering it everywhere fails here.
+    const comment = await mountSlot(makeProps({ mode: 'comment' }));
+    expect(comment.view.container.querySelector('.editor-slot__submit')).not.toBeNull();
+    comment.view.unmount();
+  });
+
+  it('9.292 saveState renders its three texts, each one distinct', async () => {
+    const seen: Record<string, string | null> = {};
+    for (const state of ['saved', 'saving', 'unsaved'] as const) {
+      const slot = await mountSlot(makeProps({ mode: 'note', saveState: state }));
+      seen[state] =
+        slot.view.container.querySelector('[data-testid="editor-save-state"]')?.textContent ?? null;
+      slot.view.unmount();
+    }
+    expect(seen['saved']).toBe('Saved');
+    expect(seen['saving']).toBe('Saving…');
+    expect(seen['unsaved']).toBe('Not saved (kept on this device)');
+    // THE THREE ARE DISTINCT, which is the whole claim — a map that returned
+    // the same string for two states would satisfy every assertion above and
+    // tell the reader nothing.
+    expect(new Set(Object.values(seen)).size).toBe(3);
+  });
+
+  /**
+   * 9.299 — NO STATE SUPPLIED MEANS NO STATE REPORTED.
+   *
+   * The first cut defaulted to `'saved'`, which is the one arm of the three
+   * that makes a CLAIM: it tells the reader their work is on the server when
+   * the host has said nothing at all. Found by the Task 9 review. A mount that
+   * supplies no `saveState` now renders no state element — silence, which is
+   * what the host gave it.
+   */
+  it('9.299 a note mount with no saveState renders no state rather than claiming Saved', async () => {
+    const slot = await mountSlot(makeProps({ mode: 'note' }));
+    expect(slot.view.container.querySelector('[data-testid="editor-save-state"]')).toBeNull();
+    // ⚠ AND NO SUBMIT CONTROL. This assertion is why the FIRST cut of the fix
+    // was wrong and the suite was green: the condition was written
+    // `isNote && saveState !== undefined ? <state/> : <submit/>`, so a note
+    // mount WITHOUT a saveState fell into the ELSE arm and got the very button
+    // note mode exists to remove. 9.291 passes `saveState: 'saved'` and so
+    // never reached that arm. Silence about the save state must not become a
+    // submit button.
+    expect(slot.view.container.querySelector('.editor-slot__submit')).toBeNull();
+    // THE CONTROL, in the same `it`: neither element is missing because the
+    // footer stopped rendering — the toolbar and the field are both there.
+    expect(slot.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
+    expect(slot.view.container.querySelector('.ProseMirror')).not.toBeNull();
+    expect(slot.view.container.querySelector('.editor-slot__footer')).not.toBeNull();
+    slot.view.unmount();
+  });
+});
+
+/**
+ * 9.294 — THE MOBILE WEBVIEW BUNDLE CARRIES SCHEMA v2 (Plan 4 Task 8).
+ *
+ * The bundle is a BUILD ARTEFACT — one self-contained HTML string inlined into
+ * `apps/mobile/src/editor/editor-html.generated.ts` — so nothing in this
+ * package would notice if it went stale, and `apps/mobile`'s own `test` script
+ * is the only thing that checks it (`generate-editor-html.mjs --check`). This
+ * case is the fast half: it reads the committed file and fails when the
+ * schema moved without a regeneration.
+ *
+ * Read across packages, the same way the twin-transcription case reads
+ * `../app-core`. That is not a dependency — no import, just a file read — and
+ * it is the only place in this package where the artefact matters.
+ */
+describe('9.294 the mobile bundle is regenerated', () => {
+  it('9.294 the generated bundle carries the v2 nodes, and is not stale', () => {
+    const bundlePath = resolve(process.cwd(), '../../apps/mobile/src/editor/editor-html.generated.ts');
+    // POSITIVE CONTROL FIRST: a missing file must fail here rather than read as
+    // an empty string somewhere downstream.
+    expect(existsSync(bundlePath), `not found: ${bundlePath}`).toBe(true);
+    const bundle = readFileSync(bundlePath, 'utf8');
+    // `grep -c` counts LINES, and this file is one very long line — so the
+    // count is 1 for a needle that is THERE and 0 for one that is not, which
+    // is exactly what `>= 1` distinguishes.
+    for (const needle of ['detailsSummary', 'taskList', 'wikiLink']) {
+      expect(bundle.includes(needle), `the bundle does not carry "${needle}"`).toBe(true);
+    }
+    // …and a node this schema does NOT have is absent, so the assertion above
+    // cannot pass on a bundle that merely contains arbitrary text.
+    expect(bundle.includes('rawBlock')).toBe(false);
+  });
+});
+
+/**
  * 13.1365 — THE SLOT CAN REPORT THE DOCUMENT, AND CAN BE MOUNTED WITHOUT ITS OWN
  * SUBMIT CONTROL.
  *
@@ -876,5 +1092,73 @@ describe('13.1365 the slot reports the document, and can be mounted without a su
     expect(withButton.container.querySelector('.editor-slot__submit')).not.toBeNull();
     view.unmount();
     withButton.unmount();
+  });
+});
+
+/**
+ * 18.198 — the note owner field, and the upload that carries exactly one of the
+ * two (notes series Plan 5, spec §4.4).
+ *
+ * ## Why the assertion is on the FormData and not on a call
+ *
+ * `uploadAttachmentHttp(file, ticketId)` has been `form.append('ticketId', …)`
+ * since it was written, and the route refuses a request carrying BOTH owners or
+ * neither (`attachments/src/routes/attachments.ts:375-388`). A case asserting
+ * "it called fetch with a FormData" would pass on a request the server answers
+ * 400 to. Reading the body back is what makes the exactly-one rule the subject.
+ *
+ * The CONTROL is the ticket door in the same case, run through the same fake
+ * fetch: without it, an implementation that posted `noteId` for both owners — or
+ * for neither — would satisfy the note half alone.
+ */
+describe('18.198 the upload owner', () => {
+  const FILE = new File(['x'], 'a.png', { type: 'image/png' });
+
+  async function postedFields(
+    upload: (file: File, ownerId: string, fetchImpl: typeof fetch) => Promise<unknown>,
+    ownerId: string,
+  ): Promise<Record<string, unknown>> {
+    let body: FormData | null = null;
+    const fetchImpl = (async (_url: string, init: { body: FormData }) => {
+      body = init.body;
+      return {
+        ok: true,
+        status: 201,
+        json: async () => UPLOADED,
+      };
+    }) as unknown as typeof fetch;
+    await upload(FILE, ownerId, fetchImpl);
+    if (body === null) throw new Error('nothing was posted');
+    const entries: Record<string, unknown> = {};
+    for (const [key, value] of (body as FormData).entries()) entries[key] = value;
+    return entries;
+  }
+
+  it('posts exactly one owner: noteId for a note, ticketId for a ticket', async () => {
+    const noteFields = await postedFields(
+      uploadNoteAttachmentHttp as unknown as (
+        file: File,
+        ownerId: string,
+        fetchImpl: typeof fetch,
+      ) => Promise<unknown>,
+      '01J9NOTECOLDROOM000000000000',
+    );
+    expect(noteFields.noteId).toBe('01J9NOTECOLDROOM000000000000');
+    // MUTATION TARGET: a helper that appended both owners fails here, and the
+    // route it would send to answers 400.
+    expect(noteFields.ticketId).toBeUndefined();
+    expect(noteFields.file).toBeDefined();
+
+    // CONTROL, same case, same fake fetch: the ticket door still posts its own.
+    const ticketFields = await postedFields(
+      uploadAttachmentHttp as unknown as (
+        file: File,
+        ownerId: string,
+        fetchImpl: typeof fetch,
+      ) => Promise<unknown>,
+      '01J9TICKET00000000000000000',
+    );
+    expect(ticketFields.ticketId).toBe('01J9TICKET00000000000000000');
+    expect(ticketFields.noteId).toBeUndefined();
   });
 });

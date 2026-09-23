@@ -19,7 +19,7 @@ import {
   type SyncTransport,
 } from '@gisik-nokma/sync-client';
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
-import type { DataSource, ServerStreamFrame } from '../../src/data-source.js';
+import type { ClientStreamFrame, DataSource } from '../../src/data-source.js';
 import {
   OFFLINE_BORN_ABSENCE,
   OfflineAcceptError,
@@ -147,7 +147,8 @@ const idleTransport: SyncTransport = {
   sync: () => Promise.reject(new Error('offline')),
   openStream: () => ({ close: () => undefined }),
   bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
-      reconcile: () => Promise.reject(new Error('offline')),
+  bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
+  reconcile: () => Promise.reject(new Error('offline')),
 };
 
 type Fixture = {
@@ -276,6 +277,29 @@ describe('12.172-12.177 the ruling P30 contract: one interface, two implementati
     const cards = board.groups.flatMap((group) => group.columns.flatMap((column) => column.cards));
     expect(cards.find((card) => card.ticketId === taskId)?.pending).toBe(true);
     expect(cards.find((card) => card.ticketId === epicId)?.pending).toBe(false);
+  });
+
+  /**
+   * 13.1434a — starting-status design, 2026-09-23. The REPLICA's own
+   * `isCreatableState` derivation (`replica-data-source.ts`'s `getBoard`,
+   * `columns: def.states.map(...)`), UNWITNESSED until this case: earlier
+   * fixture edits in this file only satisfied the typecheck each `creatable`
+   * addition required, without asserting the VALUE the replica actually
+   * computes. Suffixed because the UI block (`13.1431`–`13.1445`) is fully
+   * spent; cited by hand, since `check-case-citations`' ratchet skips
+   * suffixed ids.
+   */
+  it('13.1434a getBoard carries creatable per column, read off the SAME workflow def every other query answers from', async () => {
+    const { ds } = await fixture();
+    const board = await ds.query.getBoard(PROJECT);
+    const columns = board.groups.flatMap((group) => group.columns);
+    const byState = new Map(columns.map((column) => [column.stateId, column.creatable]));
+    // `wfV1` (this file's own fixture, above): three non-terminal states —
+    // creatable regardless of `blocked` — and one terminal state — not.
+    expect(byState.get('todo')).toBe(true);
+    expect(byState.get('doing')).toBe(true);
+    expect(byState.get('waiting')).toBe(true);
+    expect(byState.get('done')).toBe(false);
   });
 
   it('12.176 a rule violation refuses instantly with the named rule, RETURNS a real IngestResult, and queues nothing', async () => {
@@ -476,7 +500,19 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       // `toEqual(Object.keys(REPLICA_GAPS))`, which is order-sensitive, and
       // `REPLICA_GAPS` gained this key directly under `getTicketAttachments`.
       ['getTicketComments', () => ds.query.getTicketComments(WS, newUlid())],
+      // THE SEVEN NOTE ENTRIES WERE HERE, and they left when Plan 2 of the notes
+      // series landed the replica tables and the implementations. Deleting them
+      // was forced by the assertion below rather than remembered: this list is
+      // compared against `Object.keys(REPLICA_GAPS)`, so a gap that outlives its
+      // gap fails here — which is the property 18.038 now pins from the other
+      // side. `search` is STILL in the list and unrelated: local note search is
+      // Plan 3's.
       ['search', () => ds.query.search(WS, 'x')],
+      // Added by the notes series' search plan (Plan 3 of 6). This entry is the
+      // list announcing itself, exactly as the comment below describes: the
+      // replica gained the method and this case, which compares the list against
+      // `Object.keys(REPLICA_GAPS)`, reddened until it was named here.
+      ['searchNotes', () => ds.query.searchNotes(WS, 'x', { mode: 'lexical' })],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
       // Added by second wave Task 6. This list is enumerated rather than
@@ -507,8 +543,14 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
           'field',
           'owner',
         ]);
-        // And every owner is something the CLIENT would have to change.
-        expect(absence.owner, `${name}: ${absence.field}`).toMatch(/^Plan 10 — /);
+        // And every owner is something the CLIENT would have to change. The
+        // notes series (Plan 1 of 6) added a SECOND such owner and named it
+        // honestly rather than writing "Plan 10" over Plan 2's work: the
+        // property this line holds is that the owner is a NAMED plan the client
+        // must change, which was a one-plan set until the notes replica landed.
+        // Widening it to the two plans that will actually do the work keeps the
+        // property; hard-coding `Plan 10` would have made the sentence false.
+        expect(absence.owner, `${name}: ${absence.field}`).toMatch(/^(Plan 10|Plan 2 of the notes series) — /);
       }
       names.push(name);
     }
@@ -520,7 +562,57 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     await expect(ds.query.getTicketHistory(newUlid())).resolves.toEqual([]);
   });
 
-  it('12.186 subscribe hands its callback a real ServerStreamFrame — the kind useLiveQuery acts on', async () => {
+  /**
+   * 18.038 — the same seven doors as 12.185's list, asserted as ONE case with
+   * its own id.
+   *
+   * It is deliberately a second pass over ground 12.185 already walks: 12.185 is
+   * the ENUMERATION case (it compares the whole refusal list against
+   * `REPLICA_GAPS`), and this is the notes series' own witness that the seven
+   * note reads are among them. A case id belongs to the plan that mints it, and
+   * 12.185 cannot cite 18.038 for the same reason it cannot cite any other
+   * later plan's id.
+   *
+   * The CONTROL is in the same `it` because a rejection list on its own is
+   * satisfied by a source that rejects everything: `getTicketTypes` resolves.
+   */
+  it('18.038 the seven note reads ANSWER, and the gap list is what says so', async () => {
+    // INVERTED, not deleted. Plan 1 wrote this case as "note reads are replica
+    // gaps until Plan 2" and Plan 2 landed the tables and the implementations —
+    // so the same claim, read one plan later, is now FALSE in the direction it
+    // was written and TRUE in the direction that matters. Rewriting it to pin
+    // the reconciled state is the move `client-contract.test.ts` made for
+    // `scope-revoked`: a divergence that closed is a divergence that can
+    // silently re-open, and the machinery that caught the closing is what
+    // catches the regression.
+    const { ds } = await fixture();
+    for (const [m, args] of [
+      ['getNotes', [WS]],
+      ['getDeletedNotes', [WS]],
+      ['getNote', [WS, newUlid()]],
+      ['getNotesForTicket', [WS, newUlid()]],
+      ['getNoteComments', [WS, newUlid()]],
+      ['getNoteHistory', [WS, newUlid()]],
+      ['getNoteVersion', [WS, newUlid(), newUlid()]],
+    ] as const) {
+      // Not "does not throw" — an ANSWER. Every one of these is a local read
+      // over an empty replica, and the honest answer to all seven is an empty
+      // one; a read that threw a `ReplicaGapError` would be the screen saying a
+      // feature is missing when it is not.
+      await expect((ds.query[m] as (...a: readonly string[]) => Promise<unknown>)(...args)).resolves.toBeDefined();
+      expect(REPLICA_GAPS[m], `${m} is still listed as a gap`).toBeUndefined();
+    }
+    // CONTROL, and it is the same one the case carried before inversion: an
+    // implemented read still answers, so the seven above are about the note
+    // group and not about a source that resolves everything.
+    await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
+    // ...and the gap list still has teeth: `search` refuses, which is what
+    // separates "the note reads were implemented" from "the gap machinery was
+    // switched off".
+    await expect(ds.query.search(WS, 'x')).rejects.toBeInstanceOf(ReplicaGapError);
+  });
+
+  it('12.186 subscribe hands its callback a real ClientStreamFrame — the kind useLiveQuery acts on', async () => {
     // A transport that hands the engine one stream, so a frame can be delivered
     // through the door a production stream uses.
     let handlers: StreamHandlers | null = null;
@@ -539,12 +631,13 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
           return { close: () => undefined };
         },
         bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
-      reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [] }),
+        bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
+        reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [], restrictedNotes: [] }),
       },
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
 
-    const seen: ServerStreamFrame[] = [];
+    const seen: ClientStreamFrame[] = [];
     const off = ds.subscribe(WS, 0, (item) => seen.push(item));
     await engine.start(WS);
     const streamed = envelope({ kind: 'ticket', id: newUlid() }, 'ticket.created', {
@@ -1266,5 +1359,134 @@ describe('16.56 the attachments read refuses although the local ledger holds the
     expect(absence?.field).toContain('AttachmentListEntry');
     expect(absence?.because).toContain('attachments table');
     expect(absence?.owner).toMatch(/^Plan 10 — /);
+  });
+});
+
+/**
+ * Owner request, 2026-09-23 (board-card badges) — the offline board's own
+ * `parent`/`epic`, via `boardHierarchyOf` (`replica-data-source.ts`).
+ *
+ * `fixture()` already gives every case `epicId` (`TYPE_EPIC`, root, titled
+ * "Registrations") and `taskId` (its DIRECT child) for free — the exact
+ * shape `apps/server/test/read/ancestry.test.ts` builds from `world.epicId`/
+ * `world.taskInEpicId`, so this suite is that one's offline mirror.
+ *
+ * Case ids from the task's own block, §13 (13.1451-13.1470).
+ */
+describe('13.1465 boardHierarchyOf — the offline board draws parent/epic, deleted-safe', () => {
+  it("13.1465 a direct child of the epic: parent and epic are the SAME ticket — key null on both, honestly (the replica cannot compose one)", async () => {
+    const { ds, epicId, taskId } = await fixture();
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === taskId);
+    expect(card?.parent).toEqual({ ticketId: epicId, key: null });
+    expect(card?.epic).toEqual({ ticketId: epicId, key: null, title: 'Registrations' });
+  });
+
+  it('13.1465 a grandchild of the epic: parent and epic DIFFER — the epic title still resolves offline, from the local ledger', async () => {
+    const { ds, replica, epicId, taskId } = await fixture();
+    const grandchildId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: grandchildId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: taskId,
+        title: 'Chase the stamp duty office',
+      }),
+    );
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === grandchildId);
+    expect(card?.parent).toEqual({ ticketId: taskId, key: null });
+    expect(card?.epic).toEqual({ ticketId: epicId, key: null, title: 'Registrations' });
+  });
+
+  it('13.1465 a root ticket (no parent) gets null for both', async () => {
+    const { ds, replica } = await fixture();
+    const rootId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: rootId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'A root errand',
+      }),
+    );
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === rootId);
+    expect(card?.parent).toBeNull();
+    expect(card?.epic).toBeNull();
+  });
+
+  /**
+   * 13.1466 — DELETED-SAFE, unlike `epicAncestorOf`/`confirmedById`'s own
+   * `byId`, which deliberately keep a deleted ticket reachable for the LIST's
+   * own reasons (`boardHierarchyOf`'s own docblock). A live device must not
+   * name a deleted parent, or walk THROUGH a deleted hop to an epic beyond
+   * it — mirrors `apps/server/test/read/ancestry.test.ts`'s 13.1462/13.1463,
+   * which pin the server's identical rule over `LIVE_TICKET_WHERE`.
+   */
+  it('13.1466 a soft-deleted immediate parent is not named, even though the replica still holds the ticket', async () => {
+    const { ds, replica } = await fixture();
+    const parentId = newUlid();
+    const childId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: parentId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Renamed the till float',
+      }),
+    );
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: childId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId,
+        title: 'Balance the till',
+      }),
+    );
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: parentId }, 'ticket.deleted', {}));
+
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === childId);
+    expect(card?.parent).toBeNull();
+  });
+
+  it('13.1466 an epic reached only by walking through a soft-deleted hop is not named', async () => {
+    const { ds, replica, epicId, taskId } = await fixture();
+    const grandchildId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: grandchildId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: taskId,
+        title: 'Chase the stamp duty office',
+      }),
+    );
+    // `taskId` is the hop between the grandchild and `epicId` — deleting it
+    // must stop the epic walk, exactly as it stops the parent badge.
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.deleted', {}));
+
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === grandchildId);
+    expect(card?.parent).toBeNull();
+    expect(card?.epic).toBeNull();
+    // Positive control: `epicId` itself is untouched, so a walk that ignored
+    // the deleted hop and jumped straight to it would still (wrongly) find it.
+    expect(epicId).not.toBe(taskId);
   });
 });

@@ -40,16 +40,17 @@ function errandGroupWithCardIn(stateId: string, cards = [boardCardSeed()]): Boar
     workflowVersion: 1,
     workflowName: 'Errand',
     columns: [
-      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: cardsFor('todo') },
-      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: cardsFor('doing') },
+      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: cardsFor('todo') },
+      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: cardsFor('doing') },
       {
         stateId: 'waiting',
         name: 'Waiting on counterparty',
         category: 'active',
         blocked: true,
+        creatable: true,
         cards: cardsFor('waiting'),
       },
-      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: cardsFor('done') },
+      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: cardsFor('done') },
     ],
   };
 }
@@ -503,12 +504,13 @@ describe('Board Close all (N) — a terminal column’s bulk close (spec §8.3, 
           ...base,
           columns: [
             ...base.columns.filter((column) => column.stateId !== 'done'),
-            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [alpha, beta] },
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [alpha, beta] },
             {
               stateId: 'archived',
               name: 'Archived',
               category: 'terminal',
               blocked: false,
+              creatable: false,
               cards: [gamma],
             },
           ],

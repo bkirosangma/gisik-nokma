@@ -53,6 +53,15 @@ function WebviewEditorApp(): React.JSX.Element {
   return (
     <TicketEditor
       queryUsers={(query) => bridgeRef.current?.resolveMentions(query) ?? Promise.resolve([])}
+      // The note picker's data source, over the same round trip: the note list
+      // lives on the host, and the WebView has no access to it.
+      queryNotes={(query) => bridgeRef.current?.resolveNotes(query) ?? Promise.resolve([])}
+      // The ticket picker's data source (Plan 7 Task 3, spec §14.4), the same
+      // round trip. `resolveTicketHref` does not cross the bridge — no caller
+      // has asked for it yet, the same gap `resolveNoteTitle`/`previewNote`/
+      // `onNavigateNote` leave open above — so a ticket chip in the webview
+      // renders as a plain span with no link.
+      queryTickets={(query) => bridgeRef.current?.resolveTickets(query) ?? Promise.resolve([])}
       // Files never cross the bridge: the host owns uploads end to end.
       uploadAttachment={() => Promise.reject(new Error('uploads are host-mediated in the webview'))}
       onAttachmentAdded={() => {}}

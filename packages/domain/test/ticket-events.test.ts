@@ -197,6 +197,74 @@ describe('ticket event vocabulary', () => {
     });
   });
 
+  /**
+   * 4.59 — starting-status design (2026-09-23): `ticketCreatedPayload` gains an
+   * optional `stateId` (the ticket's starting status), absent meaning the
+   * workflow's initial state, exactly the additive-field rule 13.1358–13.1359
+   * follows for `description`/`assigneeId`. A `.refine` refuses `stateId`
+   * together with `start: 'backlog'` — the owner's ruling that a backlog
+   * ticket has no starting status.
+   */
+  describe('4.59 ticketCreatedPayload gains stateId, refused together with start: backlog', () => {
+    const BASE = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' };
+
+    it('round-trips a stateId, and round-trips with it absent — the shape every pre-existing event has', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, stateId: 'doing' });
+      roundTrips('ticket.created', 'ticket', { ...BASE });
+    });
+
+    it('control: stateId alongside start: "focus" is accepted', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, start: 'focus', stateId: 'doing' });
+    });
+
+    it('refuses stateId paired with start: "backlog" — a backlog ticket has no starting status', () => {
+      expect(refuses('ticket.created', 'ticket', { ...BASE, start: 'backlog', stateId: 'doing' })).toBe(
+        'invalid-payload',
+      );
+      expect(refusalMessage('ticket.created', { ...BASE, start: 'backlog', stateId: 'doing' })).toContain(
+        'a backlog ticket has no starting status',
+      );
+    });
+
+    it('refuses a non-string, and an empty-string, stateId', () => {
+      expect(refuses('ticket.created', 'ticket', { ...BASE, stateId: 3 })).toBe('invalid-payload');
+      expect(refuses('ticket.created', 'ticket', { ...BASE, stateId: '' })).toBe('invalid-payload');
+    });
+  });
+
+  /**
+   * 13.1446–13.1447 — starting-status design addendum (2026-09-23, "put due
+   * date as well on the ticket creation form" … "both start and due date"):
+   * `ticketCreatedPayload` gains optional `startDate`/`dueDate`, sharing
+   * `dueDateValueSchema` with `ticket.field_set` (one origin, not a copy).
+   */
+  describe('13.1446 ticketCreatedPayload gains startDate/dueDate, sharing dueDateValueSchema', () => {
+    const BASE = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' };
+    const NOTE_2026_09_30 = { date: '2026-09-30' };
+    const NOTE_2026_10_01 = { date: '2026-10-01', note: 'per the filing calendar' };
+
+    it('13.1446 round-trips both, either alone, and neither — the shape every pre-existing event has', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, startDate: NOTE_2026_09_30, dueDate: NOTE_2026_10_01 });
+      roundTrips('ticket.created', 'ticket', { ...BASE, startDate: NOTE_2026_09_30 });
+      roundTrips('ticket.created', 'ticket', { ...BASE, dueDate: NOTE_2026_10_01 });
+      roundTrips('ticket.created', 'ticket', { ...BASE });
+    });
+
+    it("13.1447 control: '2026-09-30' — a real day in YYYY-MM-DD form — is accepted for either field", () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, startDate: { date: '2026-09-30' } });
+      roundTrips('ticket.created', 'ticket', { ...BASE, dueDate: { date: '2026-09-30' } });
+    });
+
+    it('13.1447 refuses a non-day string for either field — wrong shape, and a shape-right day the calendar has none of', () => {
+      expect(refuses('ticket.created', 'ticket', { ...BASE, startDate: { date: '30/09/2026' } })).toBe(
+        'invalid-payload',
+      );
+      expect(refuses('ticket.created', 'ticket', { ...BASE, dueDate: { date: '2026-02-30' } })).toBe(
+        'invalid-payload',
+      );
+    });
+  });
+
   it('refuses an upload with a negative size', () => {
     expect(
       refuses('attachment.added', 'ticket', {
@@ -247,7 +315,7 @@ describe('ticket event vocabulary', () => {
  * then-`p.value ?? null` folded that absence into a null CLEARING claim: a
  * field wiped under the actor's name and both their clocks, into an append-only
  * table, on the strength of a claim nobody made. The coalesce has since been
- * dropped too — `src/ticket-state.ts:211` reads `claim(p.value, env)` — because
+ * dropped too — `src/ticket-state.ts:343` reads `claim(p.value, env)` — because
  * with the key required the `parse` throws first and `null ?? null` is
  * identity, so the fold could only have restated the defect as the design.
  *

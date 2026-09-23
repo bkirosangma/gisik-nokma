@@ -75,6 +75,7 @@ function column(name: string, cards: BoardCard[] = []): BoardColumn {
     name,
     category: 'active',
     blocked: false,
+    creatable: true,
     cards,
   };
 }

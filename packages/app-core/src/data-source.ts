@@ -12,12 +12,29 @@ import type {
 // spelling of one contract that `attachment-list.tsx`'s own docblock forbids.
 import type { AttachmentListEntry } from './views/attachment-list.js';
 import type { TicketComment } from './views/comments-thread.js';
+// The note read models come straight from the DOMAIN, not from a view type
+// here: `NoteSummary` and its siblings describe the wire body the routes send
+// (spec §2), no component reshapes them, and a client-side copy would be a
+// second definition of a body only the server can produce. `TicketComment` is
+// the opposite case and lives in `views/comments-thread.js` because the union
+// IS the component's — a note's read models have no such component in Plan 1.
+import type {
+  NoteComment,
+  NoteDetail,
+  NoteScopeMode,
+  NoteSummary,
+  NoteVersion,
+} from '@gisik-nokma/domain';
 import type {
   AttentionItem,
   BoardView,
   FilterSpec,
   Grouping,
   MyWorkView,
+  // The VIEW model, not `@gisik-nokma/domain`'s wire shape of the same name:
+  // this return carries `source`, which the server does not send (it is the
+  // mode of the request) and which the merged list (spec §7.8) needs per row.
+  NoteSearchHit,
   RosterMember,
   SearchHit,
   TicketHistoryEvent,
@@ -81,7 +98,64 @@ import type {
 // surface for a client that never depends on the domain package directly.
 export type { ServerStreamFrame };
 
+/**
+ * What a `DataSource.subscribe` callback actually receives: every frame the
+ * SERVER can send, plus one the server never will (notes series, Plan 2 of 6).
+ *
+ * ## `refresh` is CLIENT-ONLY, and that is why this is a union rather than a
+ * ## widened `ServerStreamFrame`
+ *
+ * `ServerStreamFrame` is the published wire protocol — `serverStreamFrameSchema`
+ * and the hub build it, and the compiler asserts this package handles every
+ * member. Adding a member to it for a frame no server sends would make that
+ * assertion say something false about the wire and would put a field in the
+ * protocol that a later server author could innocently try to emit.
+ *
+ * `refresh` means ONE thing: a PULL landed. A note reaches a device after its
+ * `reach-granted` notice and after the stream has gone quiet, so no `event`
+ * frame announces it and no `caught-up` follows — a view showing that note
+ * would keep a stale answer until something unrelated moved. The engine is the
+ * only component that knows a pull completed, so it is the only component that
+ * can say so.
+ *
+ * `ClientStreamFrame` EXTENDS the server union rather than being redeclared
+ * beside it: the file above states at length why a second spelling of the
+ * server's union was deleted once, and a union that is a superset of the real
+ * one cannot drift from it.
+ */
+export type ClientStreamFrame = ServerStreamFrame | { type: 'refresh'; workspaceId: string };
+
 export type Unsubscribe = () => void;
+
+/**
+ * The note list's filters — a NAMED type rather than an inline object literal,
+ * which is this file's existing style (`FilterSpec`, `Grouping`) and also a
+ * HARD REQUIREMENT of a gate rather than a preference.
+ *
+ * `apps/server/test/integration/client-contract.test.ts`'s `clientMethodParameters`
+ * reads this file with a pattern anchored on `DataSourceQuery`'s own declaration
+ * whose body class EXCLUDES braces. So an inline object literal in a method
+ * signature makes the block unmatchable and the scanner throws rather than
+ * skipping. That was measured, not assumed: the first version of `getNotes` used
+ * an inline filter type and case 7.201 failed.
+ *
+ * ⚠ **This docblock must not spell that pattern out, and the first draft did.**
+ * The scanner's regex is unanchored, so a brace-bearing LITERAL anywhere in the
+ * file matches FIRST if it appears before the real declaration — and an earlier
+ * version of this paragraph quoted the pattern and the scanner's own error
+ * message, both of which contain braces, and the regex duly captured the prose
+ * and reported `DataSourceQuery declares no getMyWork`. Measured at case 7.201,
+ * twice. Prose that describes a scanner is inside the scanner's haystack.
+ *
+ * It is a better signature either way — a caller can name the filter, and the
+ * replica's local implementation can take the same type rather than restating
+ * three optional strings.
+ */
+export type NoteListFilter = {
+  homeProjectId?: string;
+  authorId?: string;
+  scopeMode?: NoteScopeMode;
+};
 
 /**
  * Typed read functions mirroring the server read surface (Plan 5 + earlier).
@@ -137,6 +211,34 @@ export type Unsubscribe = () => void;
  * field the client needs is on the wire, pinned by case 7.38
  * (`apps/server/test/routes/builder-reads.test.ts:250`).
  */
+/**
+ * `searchNotes`'s two argument/return shapes, named and declared OUTSIDE the
+ * `DataSourceQuery` block.
+ *
+ * **That placement is REQUIRED, not stylistic.**
+ * `client-contract.test.ts:278` reads a method's parameters out of source by
+ * matching a fixed prefix, then a character class that stops at the first BRACE,
+ * then a closing brace — so a parameter object written inline would truncate the
+ * block and the extractor would report that the type does not exist at all
+ * (measured, case 7.201). The same file records the same trap for a comment: no
+ * brace may appear anywhere inside that block, comments included.
+ *
+ * **And this docblock is its own warning.** An earlier draft quoted the
+ * extractor's failure message verbatim, which put the matched PREFIX followed by
+ * a brace and a closing brace INSIDE these comments — above the real
+ * declaration. The scanner found the quotation first, captured the five
+ * characters between those braces, and reported that the type declares no
+ * method at all. The rule is not "do not write braces in the block"; it is "do
+ * not write braces anywhere before it either".
+ */
+export type NoteSearchQueryOptions = {
+  mode: 'lexical' | 'meaning';
+  authorId?: string;
+  scopeMode?: NoteScopeMode;
+};
+
+export type NoteSearchResult = { notes: NoteSearchHit[]; corrected?: string[] };
+
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
   /**
@@ -191,9 +293,88 @@ export type DataSourceQuery = {
    * the union is the component's, and only the component's props describe it.
    */
   getTicketComments(workspaceId: string, ticketId: string): Promise<TicketComment[]>;
+  /**
+   * The note reads (notes series, Plan 1 of 6, spec §6.4) — seven methods, the
+   * same seven the server's note routes serve.
+   *
+   * ## `null` on 404, `[]` on an empty list, and the difference is the product's
+   *
+   * `getNote` answers `null` rather than throwing, matching `getTicket` and
+   * NOT `getTicketComments`: the note routes answer 404 for an invisible note
+   * and a nonexistent one INDISTINGUISHABLY (spec §6.4's existence-oracle rule),
+   * so a caller that folded the 404 into `null` anyway would be inventing a
+   * distinction the server deliberately does not draw. The two list reads answer
+   * `[]` for a 404 on the same argument `getMembers` and `getTicketHistory` take
+   * for theirs — emptiness is a true answer here with a stated cost, and the
+   * notes list is a screen where "nothing here" and "we could not read it" are
+   * drawn by the same empty state.
+   *
+   * ## `getDeletedNotes` is its own method although the route is the same one
+   *
+   * `?deleted=1` is a query parameter on the list route, so this could have been
+   * a flag on `getNotes`. It is separate because the two reads are gated
+   * DIFFERENTLY (spec §4.1: only the author, an admin or the owner may go
+   * looking for deleted notes) and a flag would put two authorisation rules
+   * behind one name — a caller passing a deleted flag would have no hint that it
+   * can answer `[]` for a reason the plain call cannot.
+   *
+   * (That sentence is written WITHOUT braces deliberately: no brace may appear
+   * anywhere inside this block, comments included, because
+   * `client-contract.test.ts`'s scanner matches up to the first one. An earlier
+   * draft wrote the call as a literal and the scanner read a truncated block —
+   * measured, at case 7.201.)
+   *
+   * ## `searchNotes` HAS LANDED, and the note that said it would not is kept
+   *
+   * This block used to read: *"Notes search is Plan 3 of the series (spec §7.7)
+   * and lands with its own route, projection and worker. Declaring it now would
+   * oblige both sources to implement a method nothing can serve"* — which was
+   * right, and the day it named has arrived. The method is below, `searchNotes`.
+   *
+   * **It is a separate method rather than a `kinds` flag on `search`,** and that
+   * is the same decision `getDeletedNotes` makes one paragraph up: `search`
+   * returns `SearchHit[]`, whose `matchedIn` names one of three TICKET columns,
+   * while a note hit has no such field and carries `scopeMode` and
+   * `attachedTicketKeys` instead. One method returning a union would push the
+   * discrimination onto every caller, and every caller would do it by looking at
+   * which fields were present.
+   *
+   * The two CALLS share one route. This is the client's seam, not the server's.
+   */
+  getNotes(workspaceId: string, filter?: NoteListFilter): Promise<NoteSummary[]>;
+  getDeletedNotes(workspaceId: string): Promise<NoteSummary[]>;
+  getNote(workspaceId: string, noteId: string): Promise<NoteDetail | null>;
+  getNotesForTicket(workspaceId: string, ticketId: string): Promise<NoteSummary[]>;
+  getNoteComments(workspaceId: string, noteId: string): Promise<NoteComment[]>;
+  getNoteHistory(workspaceId: string, noteId: string): Promise<NoteVersion[]>;
+  getNoteVersion(workspaceId: string, noteId: string, eventId: string): Promise<unknown | null>;
   getWorkflowDef(workspaceId: string, workflowId: string, version?: number): Promise<WorkflowDef | null>;
   getTicketTypes(workspaceId: string): Promise<TicketTypeDef[]>;
   search(workspaceId: string, text: string, filter?: FilterSpec): Promise<SearchHit[]>;
+  /**
+   * Note search (notes series, Plan 3 of 6, spec §7.7–§7.8).
+   *
+   * ## `mode` is REQUIRED, and it is not a defaulted option
+   *
+   * The two modes are two readings of the word "search" — `lexical` runs per
+   * keystroke and answers spelling; `meaning` runs after a typing pause and
+   * answers what the note is about. A default would make the cheap one happen
+   * when the expensive one was meant, silently, and the caller would have no way
+   * to tell the answer it got from the answer it wanted. The hook that drives
+   * this (spec §7.8) passes both explicitly.
+   *
+   * ## `corrected` is returned, not folded away
+   *
+   * Present exactly when the server corrected a misspelt query. The screen says
+   * "showing results for …" on its presence — a search that quietly answered a
+   * different question is a thing people cannot debug, so the substitution is
+   * reported rather than performed.
+   */
+  searchNotes(
+    workspaceId: string,
+    text: string,
+    options: NoteSearchQueryOptions,
+  ): Promise<NoteSearchResult>;
   getMyWork(workspaceId: string): Promise<MyWorkView>;
   getAttention(workspaceId: string): Promise<AttentionItem[]>;
   /**
@@ -235,5 +416,5 @@ export type DataSourceQuery = {
 export type DataSource = {
   ingest(events: SubmittedEvent[]): Promise<IngestResult[]>;
   query: DataSourceQuery;
-  subscribe(workspaceId: string, afterSeq: number, cb: (item: ServerStreamFrame) => void): Unsubscribe;
+  subscribe(workspaceId: string, afterSeq: number, cb: (item: ClientStreamFrame) => void): Unsubscribe;
 };

@@ -12,7 +12,7 @@ import { parentTerminalRefusal } from '@gisik-nokma/rule-engine';
 const PARENT_TERMINAL_REASON =
   '"Registrations" is finished (Done). Adding live work reopens it — choose a state to reopen it to, then add this ticket.';
 import type { SubmittedEvent } from '@gisik-nokma/domain';
-import type { DataSource, ServerStreamFrame } from '../src/data-source.js';
+import type { ClientStreamFrame, DataSource } from '../src/data-source.js';
 import { DEFAULT_GROUPING, DEFAULT_LIST_COLUMNS, DEFAULT_VIEW_PREFS } from '../src/view-types.js';
 import { createFakeDataSource } from './helpers/fake-data-source.js';
 import { submittedTicketCreated } from './helpers/seed.js';
@@ -56,7 +56,7 @@ describe('the fake DataSource (the harness every view test rides on)', () => {
 
   it('fans stream items out to subscribers and honours unsubscribe', () => {
     const source = createFakeDataSource();
-    const seen: ServerStreamFrame[] = [];
+    const seen: ClientStreamFrame[] = [];
     const unsubscribe = source.subscribe('ws_1', 0, (item) => seen.push(item));
     expect(source.subscriptions).toEqual([{ workspaceId: 'ws_1', afterSeq: 0 }]);
     source.pushStreamItem({ type: 'caught-up', workspaceId: 'ws_1', seq: 7 });

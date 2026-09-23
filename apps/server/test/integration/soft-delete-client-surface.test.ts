@@ -39,7 +39,7 @@ import { signInWithPhone } from '../helpers/session.js';
  *
  * So the enumeration here is **self-maintaining**. `absenceTripwire` returns its
  * argument typed as `AbsenceDecision`; `keyof DataSourceQuery` widening past
- * those sixteen members makes that return unassignable and `tsc` refuses it with
+ * those twenty-three members makes that return unassignable and `tsc` refuses it with
  * TS2322. The device is not new — it is `paginationTripwire`
  * (`packages/app-core/test/views/list-model.test.ts:68`), which this file copies
  * in shape for the same reason: its docblock records that a widened
@@ -172,6 +172,18 @@ let sharedDeadId: string;
 let parent2Id: string;
 let live2Id: string;
 let dead2Id: string;
+/**
+ * Two NOTES attached to {@link childId} — one live, one soft-deleted.
+ *
+ * ⚠ **These exist because the notes series' four `carries: true` rows would
+ * otherwise be vacuous.** `NoteSummary.attachedTickets` carries the attached
+ * ticket's title, which is where {@link MARKER} reaches the note reads; without
+ * a note attached to the child, four rows would claim coverage and constrain
+ * nothing. The DELETED one is what makes `getDeletedNotes` a carrier as well:
+ * that read lists only deleted notes, so a live note cannot reach it.
+ */
+let noteId: string;
+let deletedNoteId: string;
 
 /** Every ticket this file deletes. The count assertions are derived from it. */
 const TOMBSTONES: string[] = [];
@@ -395,6 +407,39 @@ beforeAll(async () => {
     },
   });
 
+  // ⚠ TWO NOTES, and they are here for the same reason the comment above is:
+  // WITHOUT them the four note rows in `DECIDED` would be `carries: true` rows
+  // that construe nothing. `NoteSummary.attachedTickets` carries each attached
+  // ticket's key AND title, so a note attached to the child carries the marker —
+  // and the deleted note is what makes `getDeletedNotes` a carrier too, since a
+  // read that lists only deleted notes cannot carry anything from a note that is
+  // still live.
+  noteId = newUlid();
+  await post({
+    workspaceId,
+    entity: { kind: 'note', id: noteId },
+    type: 'note.created',
+    payload: {
+      title: 'Boundary note live',
+      homeProjectId: projectId,
+      scope: { mode: 'workspace' },
+      attachTicketId: childId,
+    },
+  });
+  deletedNoteId = newUlid();
+  await post({
+    workspaceId,
+    entity: { kind: 'note', id: deletedNoteId },
+    type: 'note.created',
+    payload: {
+      title: 'Boundary note deleted',
+      homeProjectId: projectId,
+      scope: { mode: 'workspace' },
+      attachTicketId: childId,
+    },
+  });
+  await post({ workspaceId, entity: { kind: 'note', id: deletedNoteId }, type: 'note.deleted', payload: {} });
+
   TOMBSTONES.push(childId, sharedDeadId, dead2Id);
   baselineProjectTicketCount = await directoryTicketCount();
   baselineParentRollup = await parentRollup();
@@ -433,7 +478,22 @@ type AbsenceDecision =
   | 'getAttention'
   | 'getWorkspaceSettings'
   | 'getPreferences'
-  | 'putPreferences';
+  | 'putPreferences'
+  // The notes series, Plan 1 of 6. The four SUMMARY reads are carriers and the
+  // three single-document reads are not — see their rows in `DECIDED` for why,
+  // which is the decision this tripwire exists to force.
+  | 'getNotes'
+  | 'getDeletedNotes'
+  | 'getNote'
+  | 'getNotesForTicket'
+  | 'getNoteComments'
+  | 'getNoteHistory'
+  | 'getNoteVersion'
+  // The notes series, Plan 3 of 6 (search). A carrier: a deleted note must not
+  // come back through search, in EITHER mode, and 18.148 is the case that
+  // holds the queries to it — so this row is `carries: true` and the verdict
+  // is the one that matters here.
+  | 'searchNotes';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -521,6 +581,30 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getWorkflowDef: { verdict: 'excluded', carries: false },
   getTicketTypes: { verdict: 'excluded', carries: false },
   search: { verdict: 'excluded', carries: true },
+  searchNotes: {
+    verdict: 'excluded',
+    // `false`, and the reason is a property of the ANSWER rather than a gap in
+    // the read. A note's search hit shows the NOTE's own fields — its raw title,
+    // a snippet cut from its body, and the KEYS (not the titles) of its attached
+    // tickets — so the deleted ticket's title reaches this surface only as a
+    // MATCH, through `proj_note_search.ticket_text`, and never as text a caller
+    // reads. `carries: true` would be the claim that the marker appears in the
+    // answer, which it does not: `attachedTicketKeys` holds `CCSO-7`, a key
+    // composed from a project's prefix, and the fixture's ticket title is
+    // nowhere in the row.
+    //
+    // The delete still reaches it, which is what `excluded` says and what the
+    // after-pass measures: `ticket.deleted` re-derives the note's row, the line
+    // for that ticket leaves `ticket_text`, and a query on the deleted ticket's
+    // OWN WORD stops finding the note. That is the exclusion — a filter on the
+    // match rather than a removal from the text.
+    //
+    // (`n.deleted = FALSE` is the other half and it is 18.148's: a note that is
+    // itself deleted is in neither mode, in the meaning one especially, where
+    // the chunk rows outlive the note until the worker catches up.)
+    carries: false,
+    why: 'a note hit shows the note’s own text and its tickets’ KEYS; the deleted ticket’s title reaches it as a match, not as content',
+  },
   getMyWork: { verdict: 'excluded', carries: true },
   getAttention: { verdict: 'excluded', carries: true },
   getWorkspaceSettings: { verdict: 'excluded', carries: false },
@@ -530,6 +614,58 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     carries: false,
     why: 'A WRITE, declared rather than skipped so the table stays total over the union. It is called with the document `getPreferences` just returned, so it cannot fail on a shape this file invented.',
   },
+  /**
+   * THE NOTES SERIES' FOUR CARRIERS, and they are carriers for a reason worth
+   * reading before anyone "simplifies" them to `false`.
+   *
+   * `NoteSummary.attachedTickets` carries each attached ticket's `key` AND
+   * `title`, so a note attached to a ticket carries that ticket's title — the
+   * marker — on every summary-returning read. All four are `excluded`, and the
+   * guard is ONE line rather than four: `attachedTicketsByNote`
+   * (`read/notes.ts`) joins `proj_tickets` with `LIVE_TICKET_WHERE`, so a
+   * tombstoned ticket's title is dropped from the attachment list while the note
+   * itself stays readable. Delete that constant from the join and the marker
+   * reappears here — which is precisely the leak this arm exists to catch, and
+   * the reason these rows are not vacuous.
+   *
+   * The fixture PLANTS the marker's route into them: two notes attached to the
+   * child, one live and one deleted, so `getNotes`/`getNote`/`getNotesForTicket`
+   * carry it through the live one and `getDeletedNotes` through the deleted one.
+   * Without that seeding, all four rows would be `carries: true` rows that
+   * construe nothing — the shape this file's own docblock names as worse than no
+   * row at all.
+   */
+  getNotes: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'Guarded by `LIVE_TICKET_WHERE` inside `read/notes.ts`’s `attachedTicketsByNote` — the attachment join FILTERS the tombstoned ticket out of `attachedTickets`, so the note is still listed and the deleted ticket’s title is not in it. NOT a route guard: this read has nothing to 404 over, because the note it returns is not the deleted thing.',
+  },
+  getDeletedNotes: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'The same `attachedTicketsByNote` guard, reached through the `?deleted=1` branch. It is its own member rather than a flag on `getNotes` because the two are gated differently (only the author, an admin or the owner may look at deleted notes, spec §4.1) — and it is a carrier for the same reason `getNotes` is, which the fixture proves by deleting one of its two seeded notes.',
+  },
+  getNote: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'The same `attachedTicketsByNote` guard. It returns `null` rather than throwing for an unreadable or absent note, so it always ANSWERS — the `getTicket` shape, not the `getTicketAttachments` one — and a `REFUSED` from it would be a client change rather than a server one.',
+  },
+  getNotesForTicket: {
+    verdict: 'excluded',
+    carries: true,
+    why: 'The same `attachedTicketsByNote` guard. Worth naming what it does NOT do: it does not refuse a tombstoned ticket, and does not need to — it lists NOTES attached to that ticket, and what it must not do is hand back the deleted ticket’s own key and title, which the attachment filter is what prevents.',
+  },
+  /**
+   * The three NON-carriers, declared rather than skipped so the table stays
+   * total. Each is a note surface whose every field is the NOTE's own — a
+   * comment body, a version pointer, a document — so the deleted ticket's title
+   * cannot reach it at all, in either pass. Vacuous in both directions, and said
+   * plainly rather than dressed up: the same honesty `getTicketAttachments`'
+   * row uses.
+   */
+  getNoteComments: { verdict: 'excluded', carries: false },
+  getNoteHistory: { verdict: 'excluded', carries: false },
+  getNoteVersion: { verdict: 'excluded', carries: false },
 };
 
 /**
@@ -581,6 +717,21 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getWorkspaceSettings: () => ds.getWorkspaceSettings(workspaceId),
     getPreferences: () => ds.getPreferences(workspaceId),
     putPreferences: async () => ds.putPreferences(workspaceId, await ds.getPreferences(workspaceId)),
+    // The seven note reads. `noteId` is the LIVE note the fixture attached to
+    // the child; `getNoteVersion` is handed a fresh ULID DELIBERATELY — it is a
+    // `carries: false` row, so a version that does not exist exercises the same
+    // thing a real one would, and reaching for a real event id would make the
+    // call a second read of `getNoteHistory` rather than a visit to its own door.
+    getNotes: () => ds.getNotes(workspaceId),
+    getDeletedNotes: () => ds.getDeletedNotes(workspaceId),
+    getNote: () => ds.getNote(workspaceId, noteId),
+    getNotesForTicket: () => ds.getNotesForTicket(workspaceId, childId),
+    getNoteComments: () => ds.getNoteComments(workspaceId, noteId),
+    getNoteHistory: () => ds.getNoteHistory(workspaceId, noteId),
+    getNoteVersion: () => ds.getNoteVersion(workspaceId, noteId, newUlid()),
+    // The notes search reads, both modes. `MARKER` is this file's text term, so
+    // the call visits the same door every other `carries: true` row walks.
+    searchNotes: () => ds.searchNotes(workspaceId, MARKER, { mode: 'lexical' }),
   };
 }
 
@@ -647,7 +798,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // three `Record`s below would stop being total.
   expect(absenceTripwire('getBoard')).toBe('getBoard');
   expect(absenceTripwire('getTicketHistory')).toBe('getTicketHistory');
-  expect(MEMBERS).toHaveLength(16);
+  // 16 until the notes series (Plan 1 of 6) added its seven reads; 23 until
+  // Plan 3 of 6 added `searchNotes`.
+  expect(MEMBERS).toHaveLength(24);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

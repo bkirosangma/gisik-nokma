@@ -3,6 +3,7 @@ import type { PublishedWorkflowDef, StateCategory } from './workflow.js';
 import type { Grouping } from './filter-spec.js';
 import type { Priority, TicketTypeDef } from './ticket-types.js';
 import type { WorkspaceSettings } from './events/workspace-settings.js';
+import type { NoteScope, NoteScopeMode } from './note-state.js';
 
 /**
  * The read models every `/v1` read route serves and every client renders
@@ -258,6 +259,36 @@ export type TicketCard = {
  * alternative, carrying the workflow's LATEST version on a column no definition
  * names, would file that column under a definition it was never folded into.
  */
+/**
+ * A `TicketCard` plus the two hierarchy facts the BOARD — and only the board —
+ * also serves (owner request, 2026-09-23: parent-key badge, epic chip). The
+ * SAME reasoning `ListCard`'s own docblock states for why it is a separate
+ * type and not two fields on `TicketCard` applies here word for word:
+ * `TicketCard` is shared by search, My Work and the attention strip, and a
+ * field addition that closes a gap on the board would half-close a
+ * differently-shaped one on three surfaces that never asked for it.
+ *
+ * - `parent` — this ticket's IMMEDIATE parent, or `null` when it has none OR
+ *   this viewer may not see it. Unlike `TicketCard.parentId` (an existence
+ *   leak the single-ticket read deliberately makes, spec §6), the board makes
+ *   NO existence leak at all: an unreadable parent is indistinguishable from
+ *   no parent, exactly the choice `ListCard.epicId` already makes for the
+ *   epic walk one ancestor further up. A parent badge naming a ticket this
+ *   viewer cannot open would BE a leak, so this field follows the epic rule
+ *   rather than the single-ticket route's.
+ * - `epic` — the nearest ancestor-or-self whose type carries the EPIC rank AND
+ *   which this viewer may see; `null` when there is none or the walk is
+ *   stopped by a link the viewer may not follow. Exactly `epicId`'s own rule
+ *   (`ancestry.ts`'s `epicAncestors`), widened to also carry the `key` and
+ *   `title` the board's chip needs to draw ITSELF — `ListCard.epicId` never
+ *   needed a title on the card because the list only draws it once, on the
+ *   GROUP heading, not per card.
+ */
+export type BoardTicketCard = TicketCard & {
+  parent: { ticketId: string; key: string | null } | null;
+  epic: { ticketId: string; key: string | null; title: string } | null;
+};
+
 export type BoardColumn = {
   workflowId: string;
   workflowName: string;
@@ -266,7 +297,16 @@ export type BoardColumn = {
   name: string;
   category: StateCategory;
   blocked: boolean;
-  cards: TicketCard[];
+  /**
+   * Whether a NEW ticket may be born in this state (starting-status design,
+   * 2026-09-23) — `isCreatableState(def, stateId)`, read straight off the
+   * published definition the same way `blocked` is, immediately above. The
+   * board's empty-column "Add a ticket" button reads this rather than
+   * re-deriving it, so the client and the server can never disagree about
+   * which columns may receive a new ticket.
+   */
+  creatable: boolean;
+  cards: BoardTicketCard[];
 };
 
 export type BoardResponse = { projectId: string; workspaceId: string; columns: BoardColumn[] };
@@ -405,7 +445,58 @@ export type SearchHit = {
   matchedIn: 'title' | 'description' | 'comment';
 };
 
-export type SearchResponse = { workspaceId: string; query: string; hits: SearchHit[] };
+/**
+ * One note in a search answer (notes series, Plan 3 of 6, spec §2).
+ *
+ * ## Why there is no `source` field here, although the spec's type has one
+ *
+ * The spec's `NoteSearchHit` carries `source: 'lexical' | 'meaning'`, and it is
+ * set on the CLIENT from the `mode` the client itself asked for — the server
+ * knows the mode of the REQUEST, so a per-row copy would be the request's own
+ * parameter echoed back on every row, with the two free to disagree the moment
+ * anything filtered or reordered. This is the WIRE shape and it stops at what
+ * the server knows per row; `packages/app-core`'s view model is where `source`
+ * appears. (`SearchHit` is split the same way, and for the same reason.)
+ *
+ * `title` is the RAW title, not the folded one the index matched: folding is an
+ * indexing detail and a reader shown `compressor log` for `Compressor Log` would
+ * be reading the search engine rather than their own note.
+ */
+export type NoteSearchHit = {
+  noteId: string;
+  title: string;
+  /** `ts_headline` output with `**` around matches (lexical), or the chunk text (meaning). */
+  snippet: string;
+  homeProjectId: string;
+  scopeMode: NoteScopeMode;
+  attachedTicketKeys: string[];
+  authorId: string;
+  updatedAt: string;
+};
+
+export type SearchResponse = {
+  workspaceId: string;
+  query: string;
+  hits: SearchHit[];
+  /**
+   * The note half of the answer. ALWAYS present — `[]` when no note matched,
+   * when `kinds` left notes out, or when `mode=meaning` found nothing.
+   *
+   * Required rather than optional, although the plan's route description writes
+   * it as a sibling of an unchanged `hits`: a client that had to handle
+   * `undefined` and `[]` as different states would be inventing a distinction
+   * the server does not draw. `hits` stays exactly what it was, which is what
+   * keeps an older client working.
+   */
+  notes: NoteSearchHit[];
+  /**
+   * The words a misspelt query was corrected TO, present exactly when a
+   * correction happened (spec §7.5). Absent rather than `[]` when nothing was
+   * corrected, so a UI can render "showing results for …" on the presence of
+   * this field alone.
+   */
+  corrected?: string[];
+};
 
 export type MyWorkResponse = {
   workspaceId: string;
@@ -731,3 +822,51 @@ export type TicketCountsResponse = {
 export type MigrationOutcome =
   | { status: 'migrated'; count: number }
   | { status: 'refused'; rule: string; reason: string };
+
+/**
+ * The note read models (notes series, Plan 1 of 6, spec §2).
+ *
+ * `NoteSummary` is what a LIST serves and `NoteDetail` adds the two fields only
+ * a single-note read can afford: the `body` itself and the `schemaVersion` that
+ * says which document schema wrote it (the version rides INSIDE the doc —
+ * `DocJson`'s `attrs.schemaVersion` — but a reader that had to open the document
+ * to learn it would be parsing JSON to decide whether it can parse JSON).
+ *
+ * `attachedTickets` carries the ticket's `key` and `title`, not just its id,
+ * because the notes page shows "CCSO-1183 Renew the trade licence" on the row
+ * and a caller that had only ids would need N more reads to paint the list. The
+ * server builds it with the viewer's own ticket visibility applied — a reader of
+ * a note who cannot see one of its tickets does not learn that ticket's key —
+ * which is why the field is on the READ model and not derived client-side from
+ * an id list.
+ *
+ * `projectId` was added additively (notes series, Plan 6 of 7) so a note's
+ * byline can link to the ticket's own project page (`ticketSheetPath`) instead
+ * of the id-only My Work door — the same reason `key` and `title` are carried
+ * rather than looked up.
+ *
+ * `NoteVersion` is a POINTER, not a snapshot: a version is an event, and the
+ * history screen lists pointers until one is opened, at which point
+ * `getNoteVersion` fetches that event's body. Storing every version's body in
+ * this shape would ship the whole document history on every history read.
+ *
+ * `NoteComment` is deliberately narrower than the ticket comment read: no
+ * files, no mentions. Notes get images in Plan 4 of the series, and a field
+ * that is always empty today would read as "this note has no files" rather than
+ * "this read does not carry files yet".
+ */
+export type NoteSummary = {
+  noteId: string;
+  workspaceId: string;
+  homeProjectId: string;
+  authorId: string;
+  title: string;
+  scope: NoteScope;
+  attachedTickets: { ticketId: string; projectId: string; key: string; title: string }[];
+  deleted: boolean;
+  createdAt: string;
+  updatedAt: string;
+};
+export type NoteDetail = NoteSummary & { body: unknown; schemaVersion: number };
+export type NoteVersion = { eventId: string; authorId: string; recordedAt: string; seq: number };
+export type NoteComment = { commentId: string; authorId: string; body: unknown; recordedAt: string };

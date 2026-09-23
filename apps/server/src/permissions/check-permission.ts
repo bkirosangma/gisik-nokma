@@ -2,6 +2,9 @@ import {
   inviteSentPayload,
   membershipGrantedPayload,
   membershipRevokedPayload,
+  noteAttachedPayload,
+  noteCreatedPayload,
+  noteDetachedPayload,
   projectCreatedPayload,
   ticketAssignedPayload,
   ticketCollaboratorPayload,
@@ -15,6 +18,7 @@ import { projectExists } from '../projections/proj-projects.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
+import { canReadNote, loadNoteForVisibility } from '../visibility/can-read-note.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
 /**
@@ -126,8 +130,21 @@ export const WORKSPACE_OWNER_GRANT_REASON = 'Only a workspace owner can grant th
 export const WORKSPACE_OWNER_REMOVE_REASON =
   'Only a workspace owner can remove the owner role from a member.';
 export const PROJECT_ROSTER_REASON = 'Only a project admin can manage who is on this project.';
-/** Task 9 check 2, the guest half — answered in `checkRolePermission`, which owes it. */
-export const GUESTS_CANNOT_CREATE_TICKETS_REASON = 'Guests cannot create tickets.';
+/**
+ * Task 9 check 2, the guest half — answered in `checkRolePermission`, which owes
+ * it.
+ *
+ * ⚠ **Renamed and re-worded by the notes series (Plan 1 of 6).** The rule now
+ * covers `note.created` as well as `ticket.created` — one predicate, because it
+ * is one rule: putting a note in a workspace is the same act of authorship. The
+ * old name (`…TICKETS_REASON`) and the old sentence (*"Guests cannot create
+ * tickets."*) would both have been false about the note case, so a guest trying
+ * to write a note would have been told about a thing they did not attempt. The
+ * one test that pinned the old sentence is updated in the same commit, and it
+ * reddens on the REASON deliberately (`check-visibility-permission.test.ts`) —
+ * which is what makes this rename a checked change rather than a silent one.
+ */
+export const GUESTS_CANNOT_CREATE_REASON = 'Guests cannot create tickets or notes.';
 /** Task 9 check 2, the project half. No admin shortcut: an admin joins the project first, attributed. */
 export const NOT_ON_PROJECT_REASON =
   'You are not a member of this project, so you cannot create tickets in it.';
@@ -738,8 +755,14 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   // reason wins where both would fire, and existence is a database question
   // this pure function cannot ask. It runs in `checkVisibilityPermission`,
   // after `checkProjectExists`, and still reports `permission.role`.
-  if (env.type === 'ticket.created' && role === 'guest') {
-    return refuse(GUESTS_CANNOT_CREATE_TICKETS_REASON);
+  // The guest half, extended to NOTES by the notes series (Plan 1 of 6, spec
+  // §4.2: putting a note in a workspace is the same act of authorship creating a
+  // ticket is, and a guest reaches work through explicit lists rather than by
+  // making new things). The condition is one predicate with two types because it
+  // is one RULE; the sentence below names both, since a refusal that mentions
+  // only tickets would tell a guest the wrong thing about what they just tried.
+  if ((env.type === 'ticket.created' || env.type === 'note.created') && role === 'guest') {
+    return refuse(GUESTS_CANNOT_CREATE_REASON);
   }
   // Plan 5 Task 3. The attention strip's thresholds are workspace-scoped
   // configuration, so the gate is the same owner/admin question `ADMIN_ONLY_TYPES`
@@ -837,6 +860,27 @@ function projectsNamedBy(env: EventEnvelope): readonly string[] {
       return [env.entity.id];
     case 'invite.sent':
       return inviteSentPayload.parse(env.payload).projectIds ?? [];
+    // The note's HOME project (notes series, Plan 1 of 6, spec §3.3: "the
+    // project in `homeProjectId` exists in `env.workspaceId`"). It belongs in
+    // this function rather than in `checkNotePermission`'s membership arm for
+    // the reason this function's own docblock gives: existence must be asked
+    // BEFORE membership, so a person filing a note under a project nobody
+    // founded is told the project does not exist rather than that they are not
+    // a member of it — and the honest reason is the one that names the actual
+    // fault.
+    //
+    // `''` is filtered out and is NOT a missing value to guard elsewhere:
+    // `homeProjectId: ''` is the claim "this note lives at workspace level", a
+    // real and common answer, and asking whether the empty string is a founded
+    // project would refuse every workspace-level note.
+    //
+    // MEASURED before this line existed, by case 18.042: an OWNER could file a
+    // note under any ULID at all, because the membership arm exempts owners; and
+    // any member could, by first granting themselves `project.member_added` on a
+    // project nobody founded — which accepts any ULID without validating it,
+    // exactly as this docblock records one entity kind over.
+    case 'note.created':
+      return [noteCreatedPayload.parse(env.payload).homeProjectId].filter((id) => id !== '');
     default:
       return [];
   }
@@ -1096,6 +1140,133 @@ async function getTicketCreator(db: Queryable, ticketId: string): Promise<string
  * exported constants with one origin, so neither half can drift into inventing
  * its own string.
  */
+/** The one rule id every note-write refusal reports (notes series, spec §4.2). */
+export const NOTE_PERMISSION_RULE = 'permission.note';
+const NOTE_NOT_READABLE_REASON = 'You cannot see this note.';
+const NOTE_NOT_YOURS_REASON =
+  'Only the note’s author, an admin who can read it, or the workspace owner can change it.';
+const NOTE_HOME_REASON = 'You are not a member of the project this note is filed under.';
+const NOTE_TICKET_REASON = 'You cannot see the ticket this note would be attached to.';
+
+/**
+ * The events only the author (or an admin who can read it, or the owner) may
+ * send — spec §4.2's D6 row.
+ *
+ * They are the events that CHANGE THE NOTE, as distinct from the two that
+ * change its audience on a ticket and the one that adds a comment. `note.moved`
+ * is in the set although it only re-files the note: it moves the note under a
+ * different project's visibility, which is a reader-visible change and not a
+ * reader's act.
+ */
+const NOTE_AUTHOR_EVENTS = new Set([
+  'note.renamed',
+  'note.body_set',
+  'note.scope_set',
+  'note.moved',
+  'note.deleted',
+  'note.restored',
+]);
+
+/**
+ * Who may write which note event (notes series, Plan 1 of 6, spec §4.2).
+ *
+ * Runs only for `env.entity.kind === 'note'` and answers `null` for every other
+ * kind, so it is safe to place unconditionally in the chain. It reports
+ * `permission.note` and never `permission.visibility`: the two are different
+ * questions and a reader refused here should not be told a rule about ticket
+ * audiences.
+ *
+ * ## The admin cell, and the deviation it carries
+ *
+ * `isAdminReader` is `role === 'admin'` — but only AFTER `canReadNote` has
+ * already said yes, which is what makes it narrower than the word "admin"
+ * suggests. The brainstorm said admins may edit or delete any note; the ticket
+ * code gives admins no read bypass at all (`canSeeResolved` treats `admin`
+ * exactly like `member`), and this spec follows the CODE. So an admin edits a
+ * note they can read and is refused one they cannot — spec §4.2 flags this for
+ * the owner, and the PR body repeats it. If the owner wants the broader rule it
+ * is one term: `isAdminReader` becomes `role === 'admin'` unconditionally.
+ *
+ * ## ORDER inside the function is the order of the questions a person asks
+ *
+ * "Can you see it" comes before "is it yours", because a note you cannot see
+ * should be answered as unreadable rather than as not-yours — the second
+ * sentence would confirm the note exists. And the `note.created` branch comes
+ * first because it is the only event with no note to load.
+ *
+ * ## Where the two SERVER-ONLY preconditions are met, one of them elsewhere
+ *
+ * Spec §3.3's preconditions for a note's events are that the ticket named exists,
+ * is in this workspace and is not deleted, and that the project in
+ * `homeProjectId` exists and is not archived.
+ *
+ * - The TICKET half is discharged by `canSee`, which answers false for a ticket
+ *   that does not exist or is not in the workspace, plus
+ *   `loadNoteForVisibility`'s `ticketIsLive` filter — the `attachTicketId` arm
+ *   below and the attach/detach arm.
+ * - The PROJECT half is discharged in TWO places, and the split is the ordering
+ *   rule `checkProjectExists`'s docblock states: EXISTENCE is asked there, which
+ *   is why `projectsNamedBy` gained a `note.created` case, and MEMBERSHIP is
+ *   asked here (`eff.projects.has`). Existence first is what makes the refusal
+ *   honest — someone filing under a project nobody founded is told that, not
+ *   that they are not a member of it.
+ * - **The archived half is NOT implemented, for notes or for tickets.** Nothing
+ *   in this chain refuses a write under an archived project — `projectExists`
+ *   does not read the column and no call site does — so closing it for notes
+ *   alone would make notes stricter than tickets on a rule the product does not
+ *   enforce anywhere. Recorded rather than quietly half-done.
+ */
+export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityContext): Promise<Refusal | null> {
+  if (env.entity.kind !== 'note') return null;
+  const role = ctx.eff.workspaceRole;
+  if (env.type === 'note.created') {
+    // PARSED, not cast: a refusal built from a malformed payload would report
+    // the wrong fault. The door validates this shape before any check runs, so a
+    // throw here is a sequencing break rather than a user error — the same
+    // argument `projectsNamedBy` makes for parsing.
+    const p = noteCreatedPayload.parse(env.payload);
+    if (p.homeProjectId !== '' && role !== 'owner' && !ctx.eff.projects.has(p.homeProjectId)) {
+      return refuseWith(NOTE_PERMISSION_RULE, NOTE_HOME_REASON);
+    }
+    if (p.attachTicketId !== undefined && !(await canSee(ctx.db, ctx.sessionUserId, p.attachTicketId))) {
+      return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
+    }
+    return null;
+  }
+  const loaded = await loadNoteForVisibility(ctx.db, env.entity.id);
+  // A note that does not exist and a note this person cannot read are ONE
+  // answer, deliberately, and it is the same rule the read routes apply: a
+  // distinct refusal for "exists but hidden" is an existence oracle.
+  if (loaded === null) return refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_READABLE_REASON);
+  const readable = canReadNote(ctx.eff, ctx.sessionUserId, loaded.note, loaded.attachedVisibilities);
+  if (!readable) return refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_READABLE_REASON);
+  if (NOTE_AUTHOR_EVENTS.has(env.type)) {
+    const isAuthor = loaded.note.authorId === ctx.sessionUserId;
+    const isOwner = role === 'owner';
+    const isAdminReader = role === 'admin'; // readable is already established above
+    return isAuthor || isOwner || isAdminReader
+      ? null
+      : refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_YOURS_REASON);
+  }
+  if (env.type === 'note.attached' || env.type === 'note.detached') {
+    // BOTH halves, and the readability half is already spent above: a reader of
+    // the note who cannot see the ticket is refused, and a person who can see
+    // the ticket but not the note never reaches this line. Attaching is how a
+    // note's audience is widened, so it is not a reader's act alone.
+    const { ticketId } = (env.type === 'note.attached' ? noteAttachedPayload : noteDetachedPayload).parse(
+      env.payload,
+    );
+    if (!(await canSee(ctx.db, ctx.sessionUserId, ticketId))) {
+      return refuseWith(NOTE_PERMISSION_RULE, NOTE_TICKET_REASON);
+    }
+    return null;
+  }
+  // `comment.added`: readable is enough (spec §4.2 — any reader may comment, as
+  // on a ticket). Nothing else reaches here: the kind guard above admits only
+  // note events, and every note type is answered by one of the branches.
+  return null;
+}
+
 export async function checkVisibilityPermission(
   env: EventEnvelope,
   ctx: VisibilityContext,
@@ -1414,6 +1585,20 @@ export async function checkPermission(
   const roleRefusal = checkRolePermission(env, permissionContext);
   if (roleRefusal !== null) {
     return roleRefusal;
+  }
+  // The note vocabulary's own write-authority pass (notes series, Plan 1 of 6,
+  // spec §4.2). Placed directly after the role gate and BEFORE the visibility
+  // pass, for the reason `checkVisibilityPermission` returns early on a non-
+  // ticket kind: a note event would otherwise be admitted here by falling
+  // through a function that is about tickets, which is exactly the shape of
+  // "nothing checks this" that reads as coverage.
+  //
+  // After the role gate on purpose: a guest creating a note is told
+  // `permission.role` before any note is loaded, which is the owner's rule and
+  // what case 18.027 pins.
+  const noteRefusal = await checkNotePermission(env, permissionContext);
+  if (noteRefusal !== null) {
+    return noteRefusal;
   }
   // SECOND, and after the role gate on purpose: it is the question the role
   // gate cannot finish. `checkRolePermission` settles "are you at least an

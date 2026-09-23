@@ -5,6 +5,8 @@ import { usePathname } from "next/navigation";
 import { useState } from "react";
 import { AccountMenu } from "./account-menu.js";
 import { InboxNavLink } from "./inbox-nav-link.js";
+import { NavBrand } from "./nav-brand.js";
+import { NotesNavLink } from "./notes-nav-link.js";
 import { useCurrentUser } from "./providers.js";
 import { LastProjectNav } from "./last-project-nav.js";
 import { useLastWorkspace } from "./use-last-workspace.js";
@@ -262,6 +264,12 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           what mirrors `.gn-shell`'s max-width/centring, so the bar's content
           still lines up with the page content beneath it. */}
       <div className="gn-nav__inner">
+      {/* The brand group (owner request 2026-09-23, widened 2026-09-24 to a
+          tile + wordmark — `NavBrand`, shared with `LegalNav`): decorative
+          furniture, NOT a control — no link, no button, no tabindex —
+          rendered whether or not a session exists, which is why it sits
+          here rather than inside `.gn-nav__links` (gated content below). */}
+      <NavBrand />
       {/* Everything that may need a second (or third) line at a narrow
           viewport — the destination links and the scope note. Sign-out is
           deliberately OUTSIDE this div: see `.gn-nav__signout`'s own
@@ -464,6 +472,14 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           third of the dead controls this ruling names. */}
       {user !== null ? (
         <div className="gn-nav__corner">
+          {/* THE FIRST PREFIX MATCH IN THIS BAR (notes series Plan 5, spec §9.1).
+              Every other item is measured by `current()` above, which is exact
+              equality — and that is right for them: `/w/<id>` is not "inside"
+              `/w/<id>/members`. A note is different in kind. `/notes/<id>` is
+              the SAME view as `/notes`, with a note open, so exact equality
+              would leave the link dark on the page the reader is actually on.
+              Case 18.182 walks both spellings and the control. */}
+          <NotesNavLink active={pathname === "/notes" || pathname.startsWith("/notes/")} />
           <InboxNavLink active={pathname === "/inbox"} />
           <AccountMenu />
         </div>

@@ -17,6 +17,7 @@ import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useSessionStatus } from '../../../../src/providers.js';
 import { useProjectName } from '../../../../src/use-project-name.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
+import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../src/ticket-ref-callbacks.js';
 import {
   ExpiredSessionNotice,
   useSignInOnExpiredSession,
@@ -378,6 +379,17 @@ function MyWorkBoard() {
             and a caller that mounts none gets the read-only fallback.
           */
           editorSlot={TicketEditorSlot}
+          /*
+            18.287 (final review, 2026-09-23): the project page's mount
+            supplies these (Task 4, case 18.274); this one never did, so a
+            `:ticket` picker here falsely reported "No tickets match" and a
+            `ticketRef` chip rendered as a plain span. My Work spans
+            projects — there is no single "current project" the way the
+            project page has one — so the OPEN TICKET's own project keys
+            the ordering partition instead.
+          */
+          queryTickets={buildProjectPageQueryTickets(dataSource, workspaceId, openTicketProjectId)}
+          resolveTicketHref={ticketRefHrefIn(workspaceId)}
           workspaceName={workspaceName}
           projectName={projectName}
           workspaceHref={`/w/${workspaceId}`}

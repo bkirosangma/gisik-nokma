@@ -7,8 +7,37 @@
 FROM node:22-alpine AS build
 RUN corepack enable
 WORKDIR /repo
+# The MANIFEST COPY is deliberate and is not interchangeable with `COPY . .`:
+# `pnpm fetch` reads the lockfile alone, so this layer's cache key is the
+# lockfile plus the manifests. Copying the whole tree first would invalidate
+# it on every source edit, which is exactly the shape measured on App
+# Platform before this change — kaniko's registry cache HIT the apk layer
+# and `corepack enable`, then found "No cached layer found" for `pnpm
+# install` on every deploy (57s), because that layer's key was the whole
+# tree via `COPY . .`, unique on every commit. CONSEQUENCE: a NEW workspace
+# package needs a line here — `pnpm fetch` below is the step whose cache key
+# this list sets, and a package absent from it surfaces as an offline-store
+# miss at the install.
+COPY pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
+COPY package.json ./
+COPY apps/desktop/package.json apps/desktop/
+COPY apps/mobile/package.json apps/mobile/
+COPY apps/server/package.json apps/server/
+COPY apps/web/package.json apps/web/
+COPY packages/app-core/package.json packages/app-core/
+COPY packages/domain/package.json packages/domain/
+COPY packages/editor/package.json packages/editor/
+COPY packages/mcp-server/package.json packages/mcp-server/
+COPY packages/rule-engine/package.json packages/rule-engine/
+COPY packages/sync-client/package.json packages/sync-client/
+COPY packages/ui/package.json packages/ui/
+RUN pnpm fetch
+# Source last, so the edits above stay cache-warm for the fetch layer.
 COPY . .
-RUN pnpm install --frozen-lockfile
+# `--offline` is load-bearing rather than an optimisation: it makes the build
+# fail loudly if the fetch layer did not populate the store, instead of
+# silently reaching the network and hiding a broken cache key.
+RUN pnpm install --offline --frozen-lockfile
 # The two variables the web shell ACTUALLY reads, and both bind at BUILD time.
 #
 # SERVER_ORIGIN is the proxy target in next.config.ts. It is not a runtime
@@ -58,81 +87,6 @@ RUN pnpm turbo run build --filter=@gisik-nokma/web...
 # asset. Verified rather than assumed: the rebuilt container answers
 # `GET /google-mark.svg` with 200 image/svg+xml, 2070 bytes.
 RUN mkdir -p apps/web/public
-
-# ---------------------------------------------------------------------------
-# ⛔ RETIRED 2026-09-19 — HOT-RELOAD DEV STAGE. `docker-compose.hot.yml` targetED
-# this; NO SHIPPED COMMAND NAMES IT ANY MORE (the owner removed hot reload, and
-# `pnpm dev:stack` composes `docker-compose.dev.yml` alone, whose build names no
-# `target:`).
-#
-# **THE INVARIANT BELOW IS STILL LIVE AND IS NOW THE ONLY THING STANDING BETWEEN
-# `dev:stack:rebuild` AND A PRODUCTION IMAGE THAT IS NOT PRODUCTION** — with
-# `target: dev` gone from the compose path, the LAST stage wins for every build
-# this repo ships. Same shape as the `server` Dockerfile's stage.
-#
-# **THIS STAGE MUST SIT BEFORE `runtime`.** Docker builds the LAST stage when no
-# target is named, and neither `docker-compose.dev.yml` nor `docker-compose.yml`
-# names one — so a `dev` stage appended at the end would silently BECOME the
-# production image and `CMD ["node", "apps/web/server.js"]` would stop being what
-# `docker compose up` produces. Kept above `runtime` so the un-targeted default
-# stays the production build. Verify after any edit here:
-#   docker build -f apps/web/Dockerfile -q .
-#   docker image inspect --format '{{.Config.Cmd}}' <that image>   # node apps/web/server.js
-#
-# What this stage WAS for (FALSE SINCE 2026-09-19 — hot mode is retired, so no
-# container runs a branch's source): the container ran the branch's SOURCE —
-# bind-mounted from the checkout at compose time, not baked — so an edit on the
-# host was live on :3001 without a rebuild or a restart.
-#
-# NO `next build` HERE, deliberately. The production path above bakes a
-# standalone server at build time and that is exactly what hot mode replaced:
-# `next dev` compiles on demand, per route, and watches the source itself. A
-# `next build` in this stage would be paid for on every image rebuild and then
-# never read.
-#
-# The MANIFEST COPY is deliberate and is not interchangeable with `COPY . .`:
-# `pnpm fetch` reads the lockfile alone, so this layer's cache key is the
-# lockfile plus the manifests. Copying the whole tree first would invalidate it
-# on every source edit and rebuilds would stop being rare — which is the entire
-# point of the stage. CONSEQUENCE: a NEW workspace package needs a line here,
-# for the same reason `apps/server/Dockerfile`'s `dev` stage does.
-FROM node:22-alpine AS dev
-RUN corepack enable
-WORKDIR /repo
-COPY pnpm-lock.yaml pnpm-workspace.yaml turbo.json ./
-COPY package.json ./
-COPY apps/desktop/package.json apps/desktop/
-COPY apps/mobile/package.json apps/mobile/
-COPY apps/server/package.json apps/server/
-COPY apps/web/package.json apps/web/
-COPY packages/app-core/package.json packages/app-core/
-COPY packages/domain/package.json packages/domain/
-COPY packages/editor/package.json packages/editor/
-COPY packages/mcp-server/package.json packages/mcp-server/
-COPY packages/rule-engine/package.json packages/rule-engine/
-COPY packages/sync-client/package.json packages/sync-client/
-COPY packages/ui/package.json packages/ui/
-RUN pnpm fetch
-# Source last, so the edits above stay cache-warm for the fetch layer.
-COPY . .
-# `--offline` is load-bearing rather than an optimisation: it makes the build
-# fail loudly if the fetch layer did not populate the store, instead of silently
-# reaching the network and hiding a broken cache key.
-RUN pnpm install --offline --frozen-lockfile
-# Dependencies' `dist` only (`web^...` excludes the web itself). This app imports
-# `@gisik-nokma/app-core`, `@gisik-nokma/domain` and `@gisik-nokma/ui` BY PACKAGE
-# NAME, so they resolve through `./dist` — the same resolution the server's `dev`
-# stage documents, and the reason it runs the same line. `next dev` gains nothing
-# from the web's own build, which is why it is filtered out.
-RUN pnpm turbo run build --filter=@gisik-nokma/web^...
-ENV NODE_ENV=development NEXT_TELEMETRY_DISABLED=1
-# 3000 INSIDE, mapped to the host's 3001 by `docker-compose.dev.yml`'s
-# `ports: "3001:3000"` — which the hot override inherits rather than restates.
-EXPOSE 3000
-# Overridden by `docker-compose.hot.yml`, which starts the package watchers in
-# parallel with this. The default here is the plain `next dev` so the stage is
-# usable on its own.
-CMD ["pnpm", "--filter", "@gisik-nokma/web", "exec", "next", "dev", "-p", "3000", "-H", "0.0.0.0"]
 
 FROM node:22-alpine AS runtime
 WORKDIR /app

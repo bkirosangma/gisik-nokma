@@ -4,7 +4,7 @@ import { tmpdir } from 'node:os';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
-import { checkFreshness, generatedContent } from './generate-editor-html.mjs';
+import { BUNDLE_PATH, OUT_PATH, checkFreshness, generatedContent } from './generate-editor-html.mjs';
 
 /**
  * 12.413 — P30: `generate-editor-html.mjs --check` regenerates the content
@@ -84,6 +84,31 @@ describe('the --check CLI', () => {
       writeFileSync(outPath, generatedContent('<html>new</html>'));
       expect(run().code).toBe(0);
     });
+  });
+});
+
+describe('18.227 the checked-in bundle at THIS head is not stale', () => {
+  /**
+   * The other tests above prove `checkFreshness` against PLANTED bundles —
+   * this is the one that reads the real, checked-in
+   * `apps/mobile/src/editor/editor-html.generated.ts` against the real
+   * `packages/editor/dist-webview/index.html` this repo actually ships.
+   * `no-bundle` is an accepted outcome (the webview bundle is gitignored
+   * build output — absent on a fresh checkout that has not run
+   * `build:webview` yet, which `--check`'s own CLI already treats as "not
+   * an error"), but `stale` never is: that is exactly the drift Task 4's
+   * `packages/editor` changes could have left behind uncaught.
+   *
+   * Case 18.281 (Notes Plan 7, Task 6) is this same assertion re-run after
+   * Tasks 1-3 touched `packages/editor/src` (the `ticketRef` node, the
+   * `:note` trigger, the bridge) — the close regenerated the bundle
+   * (`build:webview` + `generate:editor-html`) precisely so this check
+   * reports `ok` rather than `stale` at that head.
+   */
+  it('checkFreshness against the real paths is ok or no-bundle, never stale', () => {
+    const result = checkFreshness(BUNDLE_PATH, OUT_PATH);
+    expect(result.status).not.toBe('stale');
+    expect(['ok', 'no-bundle']).toContain(result.status);
   });
 });
 

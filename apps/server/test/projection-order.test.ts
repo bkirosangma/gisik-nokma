@@ -72,7 +72,7 @@ describe('projection registration order (coordination §8)', () => {
   /**
    * 12.67 — proj_contested is registered directly after proj_visibility, last in the pinned order, in both the DB-free names pin (projection-order.test.ts) and its [name, tables] mirror (also this file, line 149) and the second, DB-required pin in entity-heads.test.ts (line 95-122).
    */
-  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, contested, workspace settings, search', () => {
+  it('buildProjectionRegistry registers the pinned order: heads, workflows, ticket types, projects, tickets, rollups, memberships, invites, visibility, notes, contested, workspace settings, search', () => {
     const registry = buildProjectionRegistry();
     expect(registry.all().map((projection) => projection.name)).toEqual([
       'proj_entity_heads',
@@ -104,6 +104,27 @@ describe('projection registration order (coordination §8)', () => {
       // so this INSERTS above proj_visibility rather than appending.
       'proj_invites',
       'proj_visibility',
+      // The notes series, Plan 1 of 6. INSERTED rather than appended, because
+      // here the spec HAS a position and names it: notes design doc §6.2 says
+      // "after `proj_visibility` and `proj_tickets`". No adjacency is
+      // load-bearing in either direction at this commit — `notesProjection.apply`
+      // reads only its own two tables, and no registered projection reads them
+      // inside an ingest transaction — so this row is the spec's order being
+      // followed, not a dependency being discharged. It is placed before
+      // `proj_contested` because `proj_contested` was the last entry and
+      // "after proj_visibility" admits either side of it; Plan 3's search
+      // projection is the first candidate to make this position load-bearing,
+      // since `proj_note_search` will read notes.
+      'proj_notes',
+      // Plan 3 of 6 (the notes series' search plan). INSERTED directly below
+      // `proj_notes`, and this is the entry that turns the note above it from a
+      // forecast into a fact: `proj_note_search`'s `apply` reads `proj_notes`,
+      // `proj_note_attachments`, `proj_tickets` and `proj_projects`, so its
+      // position is load-bearing in the ingest transaction, in
+      // `rebuildProjection`, and in the verifier's shadow rebuild — where
+      // `search_path = verify_shadow, public` resolves each of those names to a
+      // shadow copy that exists only because those projections replayed first.
+      'proj_note_search',
       // Plan 10 Task 4. §8's order gains one TAIL entry, so appending is its §8
       // position here — a coincidence of where it falls, not an exception to
       // the insert-at-your-position rule above.
@@ -156,15 +177,34 @@ describe('projection registration order (coordination §8)', () => {
       // deliberately not it. See the second assertion in this file.
       ['proj_invites', ['proj_invites']],
       ['proj_visibility', ['proj_visibility']],
+      // TWO tables, and both are this projection's. `proj_note_attachments` is
+      // not a second projection's: the note→ticket links are part of the note's
+      // own head-state fold (the reducer owns `attachedTicketIds`), so declaring
+      // them here is what keeps `verify-projections` from replaying a note's
+      // links into whichever live table the search_path happens to resolve.
+      ['proj_notes', ['proj_notes', 'proj_note_attachments']],
+      // TWO tables, and BOTH must be declared or the verifier truncates the
+      // LIVE one. `proj_note_lexemes` is not a projection of its own: it is
+      // derived from the same notes in the same `apply`, and a projection whose
+      // unqualified `TRUNCATE` reached it with no shadow copy would empty the
+      // workspace vocabulary on every verify run.
+      ['proj_note_search', ['proj_note_search', 'proj_note_lexemes']],
       ['proj_contested', ['proj_contested']],
       ['proj_workspace_settings', ['proj_workspace_settings']],
       // ONE table. `tsv` is a GENERATED column of proj_search, not a table of
       // its own, so there is nothing else here to declare.
       ['proj_search', ['proj_search']],
-      // ONE table. The comment's embedded attachment ids are NOT a table: they
-      // are derived from `body` by `collectImageAttachmentIds`, so there is no
-      // second spelling of them to declare — or to keep in step.
-      ['proj_ticket_comments', ['proj_ticket_comments']],
+      // ONE table for the ticket half. The comment's embedded attachment ids
+      // are NOT a table: they are derived from `body` by
+      // `collectImageAttachmentIds`, so there is no second spelling of them to
+      // declare — or to keep in step.
+      //
+      // TWO as of the notes series (Plan 1 of 6): one projection owns both the
+      // ticket and the note comment tables because `comment.added` is ONE event
+      // type with two kinds (`entityKind: ['ticket', 'note']`). Splitting it
+      // would put the same event in front of two `apply` functions, each
+      // re-stating which kind it takes.
+      ['proj_ticket_comments', ['proj_ticket_comments', 'proj_note_comments']],
     ]);
   });
 

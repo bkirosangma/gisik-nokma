@@ -115,4 +115,55 @@ describe('docToPlainText', () => {
     const shared = text('reused');
     expect(docToPlainText(doc(p(shared), p(shared)))).toBe('reused\nreused');
   });
+
+  /**
+   * 9.265 — spec §3.5 names four v2 shapes that must reach the search index and
+   * every notification. Each contributes its TEXT and nothing else: the task
+   * item's paragraph, the collapsible's summary then its content, the code
+   * block's text; a wiki-link contributes its stored `title`, never its
+   * `noteId`. The control (the trailing paragraph and the `see ` text before
+   * the link) is in the same document as the new shapes, so a walker that
+   * started emitting separators or dropping prose would fail here too.
+   */
+  it('9.265 v2 blocks get their own lines; wiki-link contributes its title', () => {
+    const v2doc = { type: 'doc', content: [
+      { type: 'taskList', content: [
+        { type: 'taskItem', attrs: { checked: false }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'buy milk' }] }] },
+        { type: 'taskItem', attrs: { checked: true }, content: [{ type: 'paragraph', content: [{ type: 'text', text: 'call CA' }] }] },
+      ] },
+      { type: 'details', attrs: { open: false }, content: [
+        { type: 'detailsSummary', content: [{ type: 'text', text: 'Why' }] },
+        { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'because' }] }] },
+      ] },
+      { type: 'paragraph', content: [{ type: 'text', text: 'see ' }, { type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] },
+    ] };
+    expect(docToPlainText(v2doc)).toBe('buy milk\ncall CA\nWhy\nbecause\nsee Cold room');
+  });
+
+  /**
+   * 9.311 — spec §14.2, Plan 7 Task 1's `ticketRef` node: contributes `KEY
+   * title`, never `ticketId` — the id is what the editor navigates by, the
+   * key and title are what a person read, the same rule the wiki-link node
+   * follows for its own id. Control in the same `it`: a node with no `key`
+   * (a malformed document — every real insertion supplies one) falls back to
+   * the stored title alone, so a missing key never glues an empty string to
+   * the front.
+   */
+  it('9.311 ticketRef contributes "KEY title"; a missing key falls back to the title', () => {
+    expect(
+      docToPlainText(
+        doc(
+          p(
+            text('see '),
+            { type: 'ticketRef', attrs: { ticketId: 't2', projectId: 'p1', key: 'SHOP-8', title: 'Compressor log' } },
+          ),
+        ),
+      ),
+    ).toBe('see SHOP-8 Compressor log');
+    expect(
+      docToPlainText(
+        doc(p({ type: 'ticketRef', attrs: { ticketId: 't2', projectId: 'p1', title: 'Compressor log' } })),
+      ),
+    ).toBe('Compressor log');
+  });
 });

@@ -30,16 +30,16 @@ function errandGroup(cards = [boardCardSeed()]): BoardGroup {
     workflowVersion: 1,
     workflowName: 'Errand',
     columns: [
-      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards },
-      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [] },
-      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, cards: [] },
-      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards },
+      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
+      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, creatable: true, cards: [] },
+      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
     ],
   };
 }
 
-function errandBoard(): BoardView {
-  return { projectId: 'prj_1', groups: [errandGroup()] };
+function errandBoard(cards?: Parameters<typeof errandGroup>[0]): BoardView {
+  return { projectId: 'prj_1', groups: [errandGroup(cards)] };
 }
 
 /**
@@ -146,6 +146,96 @@ describe('Board card — clicking anywhere on the card opens the ticket', () => 
     await waitFor(() => expect(moves.onMoved).toHaveBeenCalledTimes(1));
 
     expect(onOpenTicket).not.toHaveBeenCalled();
+  });
+});
+
+/**
+ * 13.1454-13.1457 — the parent-key badge and the epic chip (owner request,
+ * 2026-09-23) are REAL `<button>`s sitting INSIDE the card, exactly like the
+ * provenance toggle and the move arrows above — so they need the SAME
+ * click-bail proof: opening the badge's OWN ticket must not ALSO open the
+ * card's, in one gesture. `CARD_CLICK_BAIL_SELECTOR` already matches
+ * `button` unconditionally (`board.tsx`), so no selector change was needed
+ * for this — these cases are what proves it holds for the two new buttons
+ * too, rather than assuming it from the selector's own text.
+ */
+describe('Board card — the parent-key badge and the epic chip', () => {
+  it('13.1454-13.1455 clicking the parent badge opens the PARENT once, and does not also open the card', async () => {
+    const user = userEvent.setup();
+    const onOpenTicket = vi.fn();
+    const card = boardCardSeed({ parent: { ticketId: 'parent_1', key: 'OPS-12' } });
+    render(<Board board={errandBoard([card])} onOpenTicket={onOpenTicket} />);
+
+    const badge = screen.getByRole('button', { name: 'Open parent OPS-12' });
+    expect(badge).toHaveTextContent('OPS-12');
+    // LEFT of the card's own key — the badge is the meta-line's FIRST child.
+    const line = badge.closest<HTMLElement>('.gn-board-card__meta-line')!;
+    expect(line.firstElementChild).toBe(badge);
+
+    await user.click(badge);
+
+    expect(onOpenTicket).toHaveBeenCalledTimes(1);
+    expect(onOpenTicket).toHaveBeenCalledWith('parent_1');
+  });
+
+  it('13.1456 clicking the epic chip opens the EPIC once, and does not also open the card', async () => {
+    const user = userEvent.setup();
+    const onOpenTicket = vi.fn();
+    const card = boardCardSeed({
+      epic: { ticketId: 'epic_1', key: 'OPS-1', title: 'Cold-chain rollout' },
+    });
+    render(<Board board={errandBoard([card])} onOpenTicket={onOpenTicket} />);
+
+    const chip = screen.getByRole('button', { name: 'Open epic Cold-chain rollout' });
+    // On the card's TOP LINE — the very first element `.gn-board-card` renders.
+    const cardEl = chip.closest('.gn-board-card') as HTMLElement;
+    expect(cardEl.firstElementChild).toBe(chip);
+
+    await user.click(chip);
+
+    expect(onOpenTicket).toHaveBeenCalledTimes(1);
+    expect(onOpenTicket).toHaveBeenCalledWith('epic_1');
+  });
+
+  /** 13.1457 CONTROL — a card with no epic draws no chip at all; the top line is the title button. */
+  it('13.1457 CONTROL — a card with epic: null draws no epic chip', async () => {
+    render(<Board board={errandBoard([boardCardSeed({ epic: null })])} onOpenTicket={() => {}} />);
+    expect(screen.queryByRole('button', { name: /^Open epic/ })).toBeNull();
+    const cardEl = cardBody();
+    expect(cardEl.firstElementChild?.className).toContain('gn-board-card__title');
+  });
+
+  it('13.1458 the immediate parent IS the epic: the parent badge is suppressed, the epic chip alone names it', async () => {
+    const onOpenTicket = vi.fn();
+    const card = boardCardSeed({
+      parent: { ticketId: 'epic_1', key: 'OPS-1' },
+      epic: { ticketId: 'epic_1', key: 'OPS-1', title: 'Cold-chain rollout' },
+    });
+    render(<Board board={errandBoard([card])} onOpenTicket={onOpenTicket} />);
+
+    expect(screen.queryByRole('button', { name: /^Open parent/ })).toBeNull();
+    expect(screen.getByRole('button', { name: 'Open epic Cold-chain rollout' })).toBeInTheDocument();
+  });
+
+  it('13.1459 CONTROL — a grandchild of the epic shows BOTH badges, since its parent and its epic differ', async () => {
+    const card = boardCardSeed({
+      parent: { ticketId: 'middle_1', key: 'OPS-3' },
+      epic: { ticketId: 'epic_1', key: 'OPS-1', title: 'Cold-chain rollout' },
+    });
+    render(<Board board={errandBoard([card])} onOpenTicket={() => {}} />);
+
+    expect(screen.getByRole('button', { name: 'Open parent OPS-3' })).toBeInTheDocument();
+    expect(screen.getByRole('button', { name: 'Open epic Cold-chain rollout' })).toBeInTheDocument();
+  });
+
+  it("a null parent key draws no badge — the same 'null key draws nothing' rule the card's own key follows", async () => {
+    render(
+      <Board
+        board={errandBoard([boardCardSeed({ parent: { ticketId: 'parent_1', key: null } })])}
+        onOpenTicket={() => {}}
+      />,
+    );
+    expect(screen.queryByRole('button', { name: /^Open parent/ })).toBeNull();
   });
 });
 

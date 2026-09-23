@@ -36,10 +36,10 @@ function errandGroup(doingCards: BoardCard[] = [boardCardSeed()]): BoardGroup {
     workflowVersion: 1,
     workflowName: 'Errand',
     columns: [
-      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [] },
-      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: doingCards },
-      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, cards: [] },
-      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
+      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: doingCards },
+      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, creatable: true, cards: [] },
+      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
     ],
   };
 }
@@ -104,8 +104,8 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
           workflowVersion: 1,
           workflowName: 'Errand',
           columns: [
-            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [GST, LICENCE, INVOICE] },
-            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [GST, LICENCE, INVOICE] },
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
           ],
         },
       ],
@@ -122,8 +122,8 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
           workflowVersion: 1,
           workflowName: 'Errand',
           columns: [
-            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [GST] },
-            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [GST] },
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
           ],
         },
         {
@@ -131,8 +131,8 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
           workflowVersion: 1,
           workflowName: 'Approval',
           columns: [
-            { stateId: 'review', name: 'In review', category: 'active', blocked: false, cards: [LICENCE] },
-            { stateId: 'approved', name: 'Approved', category: 'terminal', blocked: false, cards: [INVOICE] },
+            { stateId: 'review', name: 'In review', category: 'active', blocked: false, creatable: true, cards: [LICENCE] },
+            { stateId: 'approved', name: 'Approved', category: 'terminal', blocked: false, creatable: false, cards: [INVOICE] },
           ],
         },
       ],
@@ -880,7 +880,7 @@ describe('3.112 an empty board says words, not nothing', () => {
           workflowId: 'wf-errand',
           workflowVersion: 1,
           workflowName: 'Errand',
-          columns: [{ stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [] }],
+          columns: [{ stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] }],
         },
       ],
     };
@@ -955,8 +955,8 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
           workflowVersion: 1,
           workflowName: 'Default',
           columns: [
-            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
-            { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
+            { stateId: 's2', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
           ],
         },
       ],
@@ -970,6 +970,82 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
     expect(screen.getByText('To do')).toBeInTheDocument();
     expect(screen.getByText('Doing')).toBeInTheDocument();
     expect(screen.getAllByRole('region')).toHaveLength(2);
+  });
+});
+
+/**
+ * Starting-status design (2026-09-23) — the board's empty-column "Add a
+ * ticket" is gated on `column.creatable`, not merely on `onCreateTicket`
+ * being passed, and the handler is now called WITH that column's own
+ * `{workflowId, stateId}` rather than unscoped. `errandGroup`'s own fixture
+ * (above) already carries `creatable: true` on 'todo'/'doing'/'waiting' and
+ * `creatable: false` on the terminal 'done' column — the same values a real
+ * `isCreatableState` derivation would produce — so these cases exercise the
+ * gate directly rather than inventing a parallel fixture.
+ */
+describe('Board — "Add a ticket" is gated on column.creatable (starting-status design, 2026-09-23)', () => {
+  it('13.1431 a creatable empty column shows "Add a ticket", and the click passes the column\'s own selection', async () => {
+    const user = userEvent.setup();
+    const selections: Array<{ workflowId: string; stateId: string } | undefined> = [];
+    render(
+      <Board
+        board={errandBoard()}
+        onOpenTicket={() => {}}
+        onCreateTicket={(selection) => selections.push(selection)}
+      />,
+    );
+    const todo = screen.getByRole('region', { name: 'To do' });
+    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    expect(selections).toEqual([{ workflowId: 'wf-errand', stateId: 'todo' }]);
+  });
+
+  it('13.1432 a creatable:false empty column shows the copy only — no icon, no button — while its creatable sibling still shows the button (control)', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
+    const done = screen.getByRole('region', { name: 'Done' });
+    expect(within(done).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+    expect(within(done).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    // The control, same render: 'To do' is empty too, `creatable: true`, and
+    // still shows the button — so the absence above is `creatable`'s doing,
+    // not a blanket regression of the empty-column action.
+    const todo = screen.getByRole('region', { name: 'To do' });
+    expect(within(todo).getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+  });
+
+  it('13.1433 the empty-board "Create a ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
+    const user = userEvent.setup();
+    const calls: Array<Array<{ workflowId: string; stateId: string } | undefined>> = [];
+    // `errandBoard()` (this file's own fixture, above): one group, `totalCards
+    // > 0` from `boardCardSeed()`'s default card in `doing` — NOT the fixture
+    // for this case. Zero cards everywhere, so BOTH the whole-board banner
+    // AND the 'To do' column's own empty state render on the SAME screen —
+    // the case R6 names, and the one render that can hold both calls apart.
+    const board = errandBoard([]);
+    render(
+      <Board
+        board={board}
+        onOpenTicket={() => {}}
+        onCreateTicket={(...args) => calls.push(args)}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Create a ticket' }));
+    // NOT `[undefined]` — the handler is called with ZERO arguments, so a
+    // regression that hands the click event through as `selection` (`onClick=
+    // {onCreateTicket}`) shows as `calls[0]` holding React's synthetic click
+    // event — MEASURED, not assumed: reverting to that exact line and running
+    // this case prints `calls[0][0]` as a `SyntheticBaseEvent` wrapping a
+    // `PointerEvent` (`_reactName: 'onClick'`, `type: 'click'`), not a bare
+    // `MouseEvent` instance — and a regression that passes `undefined`
+    // explicitly shows as length 1.
+    expect(calls).toEqual([[]]);
+
+    // CONTROL, same render, same `it`: the empty 'To do' column's OWN "Add a
+    // ticket" — a DIFFERENT button, on the SAME screen — calls the SAME
+    // handler WITH its column's own identity, so the assertion above is not
+    // vacuously true of a handler that never receives an argument at all.
+    calls.length = 0;
+    const todo = screen.getByRole('region', { name: 'To do' });
+    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    expect(calls).toEqual([[{ workflowId: 'wf-errand', stateId: 'todo' }]]);
   });
 });
 
@@ -1002,8 +1078,8 @@ describe('Board — Ruling 19: isNarrowed suppresses the pinned sentence when ca
         workflowVersion: 1,
         workflowName: 'Default',
         columns: [
-          { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
-          { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+          { stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
+          { stateId: 's2', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
         ],
       },
     ],
@@ -1183,7 +1259,7 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
           workflowVersion: 1,
           workflowName: 'Errand',
           columns: [
-            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
           ],
         },
       ],
@@ -1205,41 +1281,103 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
 });
 
 /**
- * 13.1237-13.1238 — the priority badge (spec 2026-09-22).
- *
- * A small `P1`/`P2`/`P3` on the card's meta line, `title` attributed like the
- * due label's, with `--p1` taking the danger tone. **P2 is the DEFAULT and is
- * still DRAWN** — the value is a fact on every card, and a card without one is
- * not a state this product has — so there is no absence arm to test and the
- * `13.1238` case is the control that says so.
+ * 13.1237-13.1238 — the priority badge — SUPERSEDED IN PLACE (owner request,
+ * 2026-09-23, board-card badges). The spec 2026-09-22 prose these two cases
+ * originally pinned — "P2 is the default … but not emphasised … only P1
+ * takes the tone" — is no longer true: the owner's follow-up request draws a
+ * red-fire/green-leaf/frozen-blue-snowflake icon and its own ink for EVERY
+ * level, and tints the whole card by it (`13.1452` below). Same ids, prose
+ * and assertions updated in place rather than left standing beside code that
+ * disagrees with them — what stays true across both requests is what 13.1238
+ * still asserts: P2 is the birth default and is still DRAWN, so there is no
+ * absence arm to test.
  */
-describe('13.1237 the board card draws the priority badge; P1 carries the danger tone', () => {
+describe('13.1237 the board card draws the priority badge; every level carries its own icon and ink', () => {
   const cardAt = (value: 'P1' | 'P2' | 'P3', ticketId: string) =>
     boardCardSeed({ ticketId, priority: { value, claim: claim({ actorName: 'Kiro' }) } });
 
-  it('13.1237 P1 is drawn in the danger tone, with the claimant as its title', () => {
+  it('13.1237 P1 draws the danger tone and a fire icon, with the claimant as its title', () => {
     render(<Board board={errandBoard([cardAt('P1', 'p-one')])} onOpenTicket={() => {}} />);
-    const badge = screen.getByText('P1');
-    expect(badge.className).toContain('gn-board-card__priority');
+    const badge = screen.getByText('P1').closest('.gn-board-card__priority') as HTMLElement;
     expect(badge.className).toContain('gn-board-card__priority--p1');
+    // The icon is LEFT of the text (owner request: "an ICON on its left"),
+    // and it is the FIRST element child — a DOM-order assertion, not merely
+    // "present somewhere in the badge".
+    expect(badge.firstElementChild?.tagName).toBe('svg');
+    expect(badge.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
+    // WHICH icon, not merely "an icon": `FireIcon` draws exactly ONE `<path>`
+    // (`packages/ui/src/icons/priority-icons.tsx`) — `LeafIcon` draws two,
+    // `SnowflakeIcon` five — so the count alone tells the three apart. Without
+    // this, swapping P1's icon for P2's (measured: a planted swap left this
+    // whole file green) would pass every assertion here.
+    expect(badge.querySelectorAll('path')).toHaveLength(1);
     // The attribution travels with the level, the same `'s claim` sentence the
     // due label and every sheet claim line uses — a badge with no claimant
     // would read as a fact the system established.
     expect(badge).toHaveAttribute('title', "Kiro's claim");
   });
 
-  it('13.1238 CONTROL — P2 and P3 are drawn WITHOUT the tone, and the badge is on EVERY card', () => {
+  it('13.1238 CONTROL — P2 and P3 carry their OWN distinct classes and icons, never P1’s, and the badge is on EVERY card', () => {
     render(
       <Board
         board={errandBoard([cardAt('P2', 'p-two'), cardAt('P3', 'p-three')])}
         onOpenTicket={() => {}}
       />,
     );
-    expect(screen.getByText('P2').className).not.toContain('--p1');
-    expect(screen.getByText('P3').className).not.toContain('--p1');
+    const p2 = screen.getByText('P2').closest('.gn-board-card__priority') as HTMLElement;
+    const p3 = screen.getByText('P3').closest('.gn-board-card__priority') as HTMLElement;
+    expect(p2.className).toContain('--p2');
+    expect(p2.className).not.toContain('--p1');
+    expect(p2.className).not.toContain('--p3');
+    expect(p3.className).toContain('--p3');
+    expect(p3.className).not.toContain('--p1');
+    expect(p3.className).not.toContain('--p2');
+    // WHICH icon each level draws — the same `<path>`-count discriminator
+    // 13.1237 uses: `LeafIcon` (P2) draws two, `SnowflakeIcon` (P3) draws
+    // five, so a P1↔P2 or P2↔P3 icon swap reddens here rather than passing
+    // on "an svg exists somewhere in the badge".
+    expect(p2.querySelectorAll('path')).toHaveLength(2);
+    expect(p3.querySelectorAll('path')).toHaveLength(5);
     // TWO badges for TWO cards — the positive half of "no absence arm", and the
     // assertion that stops the case passing on a board that drew one card.
     expect(screen.getAllByText(/^P[123]$/)).toHaveLength(2);
+  });
+});
+
+/**
+ * 13.1452 — the card's OWN surface is tinted by its priority (owner request,
+ * 2026-09-23). A card-level modifier class, not the badge's own — `board.tsx`
+ * derives it from `card.priority.value`, lower-cased, the same string the
+ * badge's own `--p1`/`--p2`/`--p3` modifier already uses.
+ */
+describe('13.1452 the card carries a priority tint modifier class of its own, distinct from the badge', () => {
+  it('draws gn-board-card--p1 on the CARD, not only gn-board-card__priority--p1 on the badge', () => {
+    render(
+      <Board
+        board={errandBoard([boardCardSeed({ ticketId: 't-tint', priority: { value: 'P1', claim: claim() } })])}
+        onOpenTicket={() => {}}
+      />,
+    );
+    const card = document.querySelector('[data-testid="ticket-card-t-tint"] .gn-board-card') as HTMLElement;
+    expect(card.className).toContain('gn-board-card--p1');
+  });
+
+  it('CONTROL — P2 and P3 each carry their own tint modifier, never p1’s', () => {
+    render(
+      <Board
+        board={errandBoard([
+          boardCardSeed({ ticketId: 't-p2', priority: { value: 'P2', claim: claim() } }),
+          boardCardSeed({ ticketId: 't-p3', priority: { value: 'P3', claim: claim() } }),
+        ])}
+        onOpenTicket={() => {}}
+      />,
+    );
+    const p2Card = document.querySelector('[data-testid="ticket-card-t-p2"] .gn-board-card') as HTMLElement;
+    const p3Card = document.querySelector('[data-testid="ticket-card-t-p3"] .gn-board-card') as HTMLElement;
+    expect(p2Card.className).toContain('gn-board-card--p2');
+    expect(p2Card.className).not.toContain('gn-board-card--p1');
+    expect(p3Card.className).toContain('gn-board-card--p3');
+    expect(p3Card.className).not.toContain('gn-board-card--p1');
   });
 });
 
@@ -1251,25 +1389,34 @@ describe('13.1237 the board card draws the priority badge; P1 carries the danger
  * card is the drift ruling E5-2 closed. A `null` key (a workspace whose ledger holds
  * no prefix, or the offline replica) draws the due label alone: no dash, no
  * placeholder key.
+ *
+ * UPDATED (owner request, 2026-09-23, board-card badges): this row is now "the
+ * keys row" — `[parent key badge] key [priority badge]`, then the due label —
+ * and the priority badge is ALWAYS present (spec 2026-09-22, never an absence
+ * arm), so every assertion below now expects it too. What stays true from the
+ * original request is unchanged: the key still leads, the due label still
+ * follows with its own `·` separator, and a `null` key still draws no
+ * separator and no placeholder for ITSELF.
  */
 describe('13.1281 the board card meta line leads with the ticket key', () => {
   const DUE = '2026-10-19';
-  it('13.1281 draws `KEY · <due>` in one meta line, key first', () => {
+  it('13.1281 draws `KEY P<n> · <due>` in one meta line, key first, priority always present', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1101', dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const key = screen.getByText('GN-1101');
     expect(key.className).toContain('gn-board-card__key');
     const line = key.closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(`GN-1101 · ${formatDate(DUE)}`);
+    // `boardCardSeed`'s own default priority is P2 (the birth default).
+    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
     expect(within(line).getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
   });
-  it('13.1281 CONTROL — a null key draws the due label alone, with no separator', () => {
+  it('13.1281 CONTROL — a null key draws the priority badge and the due label, with no key and no placeholder', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: null, dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const line = screen.getByText(formatDate(DUE)).closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(formatDate(DUE));
+    expect(line.textContent).toBe(`P2 · ${formatDate(DUE)}`);
     expect(line.querySelector('.gn-board-card__key')).toBeNull();
   });
-  it('13.1281 CONTROL — a key with no due date draws the key alone', () => {
+  it('13.1281 CONTROL — a key with no due date draws the key and the priority badge, with no due separator', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1102', dueDate: null })])} onOpenTicket={() => {}} />);
-    expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102');
+    expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102P2');
   });
 });

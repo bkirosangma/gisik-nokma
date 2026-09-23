@@ -42,6 +42,23 @@ const BLOCK_NODE_TYPES = new Set([
   'ordered_list',
   'listItem',
   'list_item',
+  // Schema v2's blocks (spec §8.3, added by the notes editor port). One is
+  // load-bearing and the rest are not, and the difference is worth naming
+  // because the list reads as uniform: `detailsSummary` holds TEXT directly,
+  // so without its entry the summary fuses onto the first line of the content
+  // ('Whybecause'). The other four are inert for this schema — a task item,
+  // a details content and a details each contain only other blocks, and a
+  // task list contains only task items — so their newlines come from the
+  // child regardless. They are listed anyway for the same reason
+  // `bullet_list` is: the walker carries spellings for documents from other
+  // producers, and a node that later gains direct text must not silently
+  // fuse. `packages/editor/test/doc-text-conformance.test.ts` measures the
+  // load-bearing one by deleting it.
+  'taskList',
+  'taskItem',
+  'details',
+  'detailsSummary',
+  'detailsContent',
 ]);
 
 export function docToPlainText(doc: unknown): string {
@@ -68,6 +85,29 @@ function render(node: unknown, depth: number): string {
     return `@${label}`;
   }
   if (candidate.type === 'hardBreak' || candidate.type === 'hard_break') return '\n';
+  // A wiki-link (spec §3.5) contributes its stored TITLE, never its noteId.
+  // The id is what the editor navigates by; the title is what a person read,
+  // and a search index that carried `01J9GNOTE…` would match nothing anyone
+  // typed. An absent or non-string title renders '', the same safe branch the
+  // mention node takes for a missing label.
+  if (candidate.type === 'wikiLink') {
+    const attrs = (
+      typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
+    ) as { title?: unknown };
+    return typeof attrs.title === 'string' ? attrs.title : '';
+  }
+  // A ticket reference (spec §14.2, Plan 7 Task 1) contributes `KEY title`,
+  // never its ticketId — the same rule the wiki-link branch above follows for
+  // its own id. A missing key falls back to the title alone rather than
+  // gluing an empty string onto the front of it.
+  if (candidate.type === 'ticketRef') {
+    const attrs = (
+      typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
+    ) as { key?: unknown; title?: unknown };
+    const key = typeof attrs.key === 'string' ? attrs.key : '';
+    const title = typeof attrs.title === 'string' ? attrs.title : '';
+    return key.length > 0 ? `${key} ${title}` : title;
+  }
   const children = Array.isArray(candidate.content)
     ? candidate.content.map((child) => render(child, depth + 1)).join('')
     : '';

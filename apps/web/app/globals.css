@@ -142,6 +142,12 @@ input, textarea, select { font-family: inherit; }
 @media (max-width: 60rem) {
   .gn-shell { padding: 0 0.75rem 2rem; }
 }
+/* The notes page only (owner request 2026-09-23: "the width is too narrow
+   ... basically the entire page minus the left pane"). `.gn-shell` is shared
+   by every route, so the cap lifts through a MODIFIER on the notes page's own
+   `<main>` rather than in place — declared AFTER `.gn-shell` above, since the
+   two selectors carry equal specificity and only source order decides. */
+.gn-shell--wide { max-width: none; }
 /* The font-size change below is GLOBAL and meant to be: this rule declared no
    font-size at all and fell through to the UA's `2em` on every page that uses
    it (`/account`, `/inbox`, `/settings`, `/invite/[token]`, `/mcp/authorize`,
@@ -1816,11 +1822,17 @@ input, textarea, select { font-family: inherit; }
    underneath, transparent means the text shows through the bar. `--gn-surface`
    keeps the bar's resting appearance byte-identical to what it was.
 
-   `z-index: 20` sits deliberately BELOW the two values already in the tree:
-   `.gn-select__panel` and `.mention-popup` at 30, and `.gn-dialog__scrim` /
-   `.gn-sheet__scrim` at 40. A dropdown opening near the top of the page must
-   render OVER the bar, and a modal scrim must cover it entirely; a bar that
-   outranked either would clip the menu it belongs to. */
+   `z-index: 20` sits deliberately BELOW the values already in the tree:
+   `.gn-select__panel` at 30, `.gn-dialog__scrim` / `.gn-sheet__scrim` at 40,
+   and the suggestion popups (`.mention-popup`/`.wikilink-popup`/
+   `.ticketref-popup`, `packages/editor/src/styles/editor.css`) at 50 —
+   raised from 30 in the same commit that fixed `:ticket`'s picker
+   (2026-09-24): all three are `position: fixed` siblings of `.gn-sheet__
+   scrim` appended straight to `document.body`, so one opened from a ticket
+   sheet's comment box (the reported bug's own reproduction) is a stacking
+   comparison against the scrim, and 30 lost. A dropdown opening near the top
+   of the page must render OVER the bar, and a modal scrim must cover it
+   entirely; a bar that outranked either would clip the menu it belongs to. */
 
 /* The bar's own height, published for the things that must sit clear of it
    once it stops scrolling away. Measured on the live page, identical at 768px
@@ -1859,6 +1871,53 @@ input, textarea, select { font-family: inherit; }
    unprefixed name keeps it out of that contract, and consumers read it with a
    `0px` fallback so the no-nav shell is unaffected without knowing anything
    about this file. */
+/* The suggestion popups' own colour, radius and shadow (bug fix, owner
+   report 2026-09-23: "the inline :note menu is also unstyled") —
+   `packages/editor` draws `.mention-popup`/`.wikilink-popup`/`.ticketref-
+   popup` with structure only (a `currentColor` border, no background: that
+   package's own stylesheet may hold no colour token at all), so this is the
+   host's half. The SAME raised surface and shadow `.gn-select__panel` uses
+   (`packages/ui/src/ui.css`) — a picker reads as the same kind of floating
+   control wherever the product draws one, rather than the browser's bare
+   `Canvas` colour the wiki-link and ticket-ref popups drew before this. */
+.mention-popup,
+.wikilink-popup,
+.ticketref-popup {
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  padding: 0.25rem;
+}
+.mention-popup__item,
+.wikilink-popup__item,
+.ticketref-popup__item {
+  border-radius: var(--gn-radius-control);
+}
+/* Selected state by BACKGROUND, not outline (owner request, 2026-09-23) —
+   the same fill `.gn-select__option[data-focused]` uses for its own
+   hover/selected tier, reused rather than a bespoke value. */
+.mention-popup__item--selected,
+.wikilink-popup__item--selected,
+.ticketref-popup__item--selected {
+  background: var(--gn-fill-tertiary);
+}
+/* `.ticketref-popup__status` alone is drawn VISIBLE (`editor.css` gives it
+   layout padding but no visually-hidden clip, unlike the other two popups'
+   status lines) — Unit 3 ruling, 2026-09-24: it can read "Search needs a
+   connection", a real state a sighted caller needs to see, not only a
+   result count. Muted, the same tier `.gn-select__option-description` uses. */
+.ticketref-popup__status {
+  color: var(--gn-text-muted);
+  font-size: 0.85em;
+}
+/* The ticket's key, a muted chip before the title (`ticket-ref-popup.ts`'s
+   `paint()` gives it its own `<span>` for exactly this). */
+.ticketref-popup__key {
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+  font-size: 0.85em;
+}
+
 :root { --app-nav-offset: 4.35rem; }
 .gn-nav__inner {
   display: flex;
@@ -1874,6 +1933,65 @@ input, textarea, select { font-family: inherit; }
 }
 .gn-nav__links { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; flex: 1 1 auto; min-width: 0; }
 .gn-nav__spacer { flex: 1; }
+
+/* The brand GROUP (owner ruling 2026-09-24: "placement is not balanced ...
+   make it the icon, then 'Gisik Nokma' in bold heavy text on its right ...
+   leave appropriate space before the 'workspace' item") — `NavBrand`
+   (`apps/web/src/nav-brand.tsx`), the tile plus the wordmark, shared by
+   `AppNav` and `LegalNav`. Widened from a tile-ONLY rule (owner request
+   2026-09-23); this class also used to be defined a SECOND time, further
+   down this file, for the legal bar's own hand-rolled markup — see that
+   old location's tombstone comment. One definition now, for both bars.
+
+   `min-height: 2.75rem` is `.gn-nav a, .gn-nav button`'s own control-row
+   height (below), not a new number — `.gn-nav__inner` stays
+   `align-items: flex-start` (sign-out/corner depend on it, see that rule's
+   own docblock), so this is what lands the tile+wordmark's OWN vertical
+   centre on the link row's centre without touching the parent's alignment:
+   the group's box starts at the same top edge as `.gn-nav__links`' first
+   line (both top-aligned by the parent), and `align-items: center` here
+   centres the tile+wordmark within that matched height.
+
+   `margin-inline-end` is a deliberate SECOND gap, added on top of
+   `.gn-nav__inner`'s own `1rem` flex `gap` (which still applies to
+   `.gn-nav__corner` on the far side) — 1rem + 0.5rem = 1.5rem before
+   `Workspaces`, visibly wider than the 1rem between the links themselves. */
+.gn-nav__brand {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  margin-inline-end: 0.5rem;
+}
+/* The tile itself — the sign-in page's own tile (`.gn-page-header__icon`,
+   packages/ui/src/ui.css:5810) scaled down, same tokens: `--gn-brand` fill,
+   `--gn-text-inverted` glyph, `--gn-radius-card` scaled to the tile's own
+   size rather than reused literally (a 20px/14px card radius on a 1.75rem
+   tile reads as a circle, not a tile). Not a link, not a button —
+   decorative furniture this rule's own `aria-hidden` (on the JSX) covers.
+   `LegalNav`'s tile used to be `--gn-accent`-tinted at 30px, its own rule
+   further down this file — moved to this ONE tile, `--gn-brand`, a
+   deliberate change (owner ruling 2026-09-24, "one component ... used by
+   app-nav AND legal-nav"). */
+.gn-nav__brand-tile {
+  flex: 0 0 auto;
+  width: 1.75rem;
+  height: 1.75rem;
+  border-radius: 0.5rem;
+  background: var(--gn-brand);
+  color: var(--gn-text-inverted);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+/* The wordmark — plain, VISIBLE text (not `aria-hidden`, unlike the tile
+   beside it): "Gisik Nokma" in bold heavy text, per the ruling above.
+   `font-weight: 800` is the "bold heavy" the owner asked for; `font-size`/
+   `line-height` are unchanged from the legal bar's own pre-unification
+   values (17px/22px, already measured legible there) rather than an
+   invented new number now that this rule reaches both bars. */
+.gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 800; }
 
 /* PHONE: THE WORKSPACE LINKS COLLAPSE INTO ONE DISCLOSURE (E4-11).
 
@@ -1934,6 +2052,13 @@ input, textarea, select { font-family: inherit; }
     flex-basis: 100%;
     min-width: 0;
   }
+  /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
+     promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
+     line") is a WIDTH budget, and the wordmark ("Gisik Nokma", 17px/800)
+     spends real space that budget never had. Hiding it here, rather than the
+     tile, is what the ruling asks for — the tile alone is what the phone bar
+     already carried before this round. */
+  .gn-nav__wordmark { display: none; }
 }
 /* Never shrinks and never wraps — the other half of the split above. Its
    rendered width is fixed (the inbox icon + the avatar), so unlike
@@ -2481,24 +2606,17 @@ input, textarea, select { font-family: inherit; }
 
 /* ── The bar's own three pieces (`isLegal` `:1722-1729`) ───────────────────
    The BAR is `.gn-nav`, the product's chrome — see `apps/web/src/legal-nav.tsx`
-   for why. Only the parts the export adds are styled here. */
-.gn-nav__brand { display: inline-flex; align-items: center; gap: 0.6rem; flex: none; }
-.gn-nav__brand-tile {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  /* `--gn-accent` on `--gn-accent-text` is the pair `.gn-button--primary` and
-     `.gn-avatar--tint-0` already ship (`ui.css:72`), so this introduces no
-     unmeasured colour pair — the export's `--brand`/`--onColor` map onto it
-     one-for-one. */
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
-}
-.gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 600; }
+   for why. The brand tile + wordmark pair used to be styled HERE, a second
+   time — `.gn-nav__brand`/`.gn-nav__brand-tile`/`.gn-nav__wordmark` were
+   each already declared above (`AppNav`'s own tile-only rule, in this same
+   file), so this SECOND definition of `.gn-nav__brand` silently overrode
+   the earlier one's layout at equal specificity, and `.gn-nav__brand-tile`
+   painted its own `--gn-accent` tint the app bar's tile never saw. Owner
+   ruling 2026-09-24 ("one component ... used by app-nav AND legal-nav")
+   resolved the collision by DELETING this copy — `NavBrand`
+   (`apps/web/src/nav-brand.tsx`) now renders the same shared markup here
+   too, styled by the one definition near `.gn-nav__inner` above. Only the
+   `Sign in` link (below) is still this bar's own. */
 
 /* ── The 404's own two additions ────────────────────────────────────────────
    `isNotFound` draws a centred 520px column (`:1846`) where this page used the
@@ -3090,4 +3208,648 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   justify-content: space-between;
   gap: 0.75rem;
+}
+
+/* ── THE NOTES PAGE (Plan 5 of 6, spec §9.1–9.2) ────────────────────────────
+   HERE and not in `ui.css`, for the reason the `.gn-inbox__header` rule above
+   records in its own words: `ui.css` is the stylesheet for what
+   `packages/app-core` renders, and `app-core`'s case 11.95 asserts SET EQUALITY
+   between the classes its components render and the rules that style them. The
+   notes page is `apps/web`'s own page — no component in `app-core` renders a
+   `.gn-notes*` class — so a rule for one in `ui.css` would be "a rule written
+   for a class no component renders" and 11.95 reddens on it.
+
+   The ONE remaining BREAKPOINT is reused, not invented: `60rem` is the point
+   `.gn-shell` itself steps down at (`:142`, and the paragraph below). Below
+   that the tree becomes a drawer; at and above it, two columns — always two,
+   not three: the THIRD column (a `64rem`-gated table of contents) is REMOVED
+   by owner request 2026-09-23, replaced by the floating `TocLauncher`
+   (`.gn-notes__toc`, below), available at every width instead of one gated
+   on a breakpoint.
+
+   WIDE AND TALL (owner, 2026-09-23: "the width is too narrow ... basically
+   the entire page minus the left pane. also the height should also be
+   enough to feel like its a note" — Confluence as the reference). `max-width:
+   none` here and on `.gn-shell--wide` (the notes page's own `<main>`
+   modifier, since `.gn-shell` is shared by every route) drop both caps; the
+   tree column stays a fixed `18rem` (`.gn-notes__body` below), so what widens
+   is the document. `.gn-notes__document`'s own `padding` and
+   `.gn-notes__editor`'s own `min-height` (both below) are the other two
+   thirds of the same request. */
+.gn-notes {
+  max-width: none;
+  margin: 0 auto;
+  padding-top: 1.625rem;
+}
+
+/* The header ROW — the title now, and Task 8's search box beside it. `wrap`
+   because 390px cannot hold "Notes" and a search input on one line, and
+   `space-between` so the box takes the room the title does not. */
+.gn-notes__header {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  justify-content: space-between;
+  gap: 0.75rem;
+}
+
+/* The margin reset is SCOPED, exactly as `.gn-workspaces__head .gn-page-title`
+   above is: `.gn-page-title` is shared by every page that carries the class, and
+   zeroing it globally would collapse the heading spacing on all of them. Only
+   this page hands its spacing to a flex row. */
+.gn-notes__header .gn-page-title {
+  margin: 0;
+}
+
+/* ALWAYS two columns at and above 60rem (never three — the former third
+   track, a 64rem-gated table of contents, is removed; see `.gn-notes`'s own
+   docblock above): the tree at a FIXED 18rem so it does not breathe with the
+   viewport, and the document on `minmax(0, 1fr)` — a ZERO floor, which is what
+   lets a wide code block scroll inside the document instead of pushing the grid
+   past the viewport. A bare `1fr` track's automatic minimum is `auto`
+   (content-based), the trap `.gn-workspaces`' own comment names. */
+.gn-notes__body {
+  display: grid;
+  grid-template-columns: 18rem minmax(0, 1fr);
+  gap: 1.5rem;
+  margin-top: 1rem;
+}
+
+.gn-notes__tree {
+  min-width: 0;
+}
+
+/* Confluence-style inner padding (owner, 2026-09-23), generous and
+   viewport-proportional so it neither pins to the edge at 1600px nor crowds
+   the text at 768px. */
+.gn-notes__document {
+  min-width: 0;
+  padding: 0 clamp(1rem, 3vw, 3rem);
+}
+
+/* The floating table-of-contents launcher's fixed container (owner,
+   2026-09-23: "a small floating icon at the left bottom of the screen which
+   can open the table of contents any time") — the SAME `<aside
+   aria-label="On this page">` case 18.181 requires present with no note open,
+   repurposed rather than replaced: it used to be `display: none` below
+   `64rem` and `display: block` above it (Task 9); it is now ALWAYS
+   positioned, at every width, and its own content (`TocLauncher`) decides
+   whether anything is visible inside it (fewer than three headings paints
+   nothing — MIN_HEADINGS, `packages/editor`). `env(safe-area-inset-*)` with a
+   `0px` fallback for devices with a rounded or gestural edge; `z-index: 30`
+   matches `.gn-select__panel`/`.gn-popover`'s own tier (`packages/ui/src/ui.css`)
+   — below `.gn-dialog__scrim`/`.gn-sheet__scrim` (40) and `.gn-toast-layer`
+   (60), never above either. */
+.gn-notes__toc {
+  position: fixed;
+  left: max(1rem, env(safe-area-inset-left, 0px));
+  bottom: max(1rem, env(safe-area-inset-bottom, 0px));
+  z-index: 30;
+}
+
+/* The button: a 2.75rem (44px, the WCAG 2.5.5 tap-target floor
+   `.gn-skip`'s own docblock already names) round control — neutral chrome,
+   not the brand hue: `--gn-brand` is reserved for the identity mark
+   (sign-in tile, nav tile, favicon), and this is a functional control. Same
+   surface/shadow pair `.gn-nav__menu` uses for its own floating panel. */
+.gn-toc-launcher__button {
+  position: relative;
+  width: 2.75rem;
+  height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: var(--gn-surface-raised);
+  color: var(--gn-text);
+  box-shadow: var(--gn-shadow-raised);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+}
+.gn-toc-launcher__button:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* Opens UPWARD from the button, since the button itself sits at the
+   viewport's bottom edge — `.gn-nav__menu`'s own floating-panel geometry
+   (surface/radius/shadow), turned to open the other way. */
+.gn-toc-launcher__panel {
+  position: absolute;
+  left: 0;
+  bottom: calc(100% + 0.5rem);
+  min-width: 14rem;
+  max-width: 20rem;
+  max-height: 60vh;
+  overflow-y: auto;
+  padding: 0.75rem;
+  background: var(--gn-surface-raised);
+  border-radius: var(--gn-radius-card);
+  box-shadow: var(--gn-shadow-raised);
+}
+
+/* One workspace's own branch of the tree — a plain spacing rule; the visible
+   structure is its heading and its rows'. Rendered since Task 2 with no rule
+   of its own until Task 9's scanner (18.226) found the gap. */
+.gn-notes__section + .gn-notes__section {
+  margin-top: 1rem;
+}
+
+.gn-notes__section-title,
+.gn-notes__group-title {
+  margin: 0;
+}
+
+.gn-notes__section-title {
+  font-size: 0.9375rem;
+  line-height: 1.25rem;
+}
+
+.gn-notes__group-title {
+  font-size: 0.8125rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-notes__group {
+  margin-top: 0.5rem;
+}
+
+/* The tree head — the title filter now, and Task 3's Create button beside it. */
+.gn-notes__tree-head {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  margin-bottom: 0.75rem;
+}
+
+/* The filter takes the room the button does not. `min-width: 0` on a flex child
+   is what lets an input shrink below its default intrinsic width instead of
+   overflowing the 18rem tree column. */
+.gn-notes__filter {
+  flex: 1 1 auto;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  font-size: 0.8125rem;
+  color: var(--gn-text);
+  background: var(--gn-surface-raised);
+  border: 1px solid var(--gn-border);
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__filter:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+/* One group's rows. A plain list: the tree is a navigation, so what carries the
+   meaning is the `<a>` inside each `<li>`, not the list itself. */
+.gn-notes__rows {
+  list-style: none;
+  margin: 0.25rem 0 0;
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 0.125rem;
+}
+
+.gn-notes__row-item {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-width: 0;
+}
+
+.gn-notes__row {
+  flex: 1 1 auto;
+  min-width: 0;
+  display: flex;
+  align-items: baseline;
+  gap: 0.375rem;
+  padding: 0.25rem 0.375rem;
+  color: var(--gn-text);
+  text-decoration: none;
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__row:hover {
+  background: var(--gn-fill-secondary);
+}
+
+/* The open note. Declaration AND attribute: `aria-current` is what a screen
+   reader hears, this is what a reader sees, and both come from one boolean. */
+.gn-notes__row--open {
+  background: var(--gn-fill-tertiary);
+  font-weight: 600;
+}
+
+/* The title takes the room; the keys do not wrap, so a long title truncates
+   rather than pushing a key off the row. */
+.gn-notes__row-title {
+  flex: 1 1 auto;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.gn-notes__keys {
+  flex: none;
+  display: inline-flex;
+  gap: 0.25rem;
+}
+
+.gn-notes__key {
+  font-family: var(--gn-font-mono);
+  font-size: 0.6875rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0 0.25rem;
+  white-space: nowrap;
+}
+
+/* The Deleted group. Separated from the project groups above it by a rule,
+   because it is not a home: it is every home's notes that were removed. */
+.gn-notes__deleted {
+  margin-top: 0.75rem;
+  padding-top: 0.5rem;
+  border-top: 1px solid var(--gn-border);
+}
+
+.gn-notes__restore-failure {
+  margin: 0.25rem 0 0;
+  font-size: 0.75rem;
+  color: var(--gn-danger);
+}
+
+/* ── Task 3: the Create dialog and the byline's scope editor ─────────────── */
+
+/* One column, because every field is a label over its control and the panel is
+   narrow. `gap` rather than margins so a field added later cannot sit flush. */
+.gn-notes__dialog,
+.gn-notes__scope-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 14rem;
+}
+
+.gn-notes__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.gn-notes__field-label {
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+}
+
+/* The visible label and the accessible name are the SAME string here, which is
+   why this input carries no `aria-label` of its own on the page — the `<label>`
+   wrapping it supplies both. `width: 100%` on a flex item inside a column is
+   what keeps it from shrinking to its content. */
+.gn-notes__input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  color: var(--gn-text);
+  background: var(--gn-surface-raised);
+  border: 1px solid var(--gn-border);
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__input:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+.gn-notes__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.gn-notes__dialog-empty {
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+
+/* The refusal, in the dialog and in the scope popover alike: the authority's
+   own words, so a person can read what was wrong rather than guessing. */
+.gn-notes__dialog-failure,
+.gn-notes__scope-failure {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--gn-danger);
+}
+
+/* The chip's wrapper carries the popover's anchor ref, so it must be positioned
+   and must not paint anything of its own. */
+.gn-notes__scope-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The chip: a control for an editor, a bare span for a reader. ONE class for
+   both, so the two arms cannot drift into different type. */
+.gn-notes__scope {
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.125rem 0.375rem;
+}
+
+/* The four sentences the tree can say about a READ rather than about notes:
+   loading, refused, empty, and your-session-is-not-here. Muted because every
+   one of them is the page telling the reader something in passing, and none is
+   the page's subject. */
+.gn-notes__loading,
+.gn-notes__empty,
+.gn-notes__session,
+.gn-notes__hint {
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+
+/* ONE COLUMN below 60rem, and the tree becomes a `<details>`-style drawer: a
+   `Notes list` toggle (`aria-expanded`, always in the DOM — jsdom cannot
+   evaluate `@media`, so the observable has to be the attribute, not a
+   conditional render) and the tree itself hidden unless `[data-open="true"]`.
+   Same shape `.gn-nav__more-toggle`'s own fix (E4-11) settled on: the content
+   stays in the document and in the accessibility tree, always one Tab away,
+   rather than being unmounted. */
+.gn-notes__tree-toggle {
+  display: none;
+}
+
+@media (max-width: 60rem) {
+  .gn-notes__body {
+    grid-template-columns: minmax(0, 1fr);
+  }
+  .gn-notes__tree-toggle {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .gn-notes__tree--drawer {
+    display: none;
+  }
+  .gn-notes__tree--drawer[data-open='true'] {
+    display: block;
+  }
+}
+
+/* ── Task 4: the note document, its title, its byline ─────────────────────── */
+
+.gn-note-document {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 0;
+}
+
+/* The crumb row. A list because the trail is ordered, with the separators drawn
+   by the stylesheet so they are not read out as text. */
+.gn-breadcrumb__list {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+  list-style: none;
+  margin: 0;
+  padding: 0;
+  font-size: 0.8125rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-breadcrumb__item + .gn-breadcrumb__item::before {
+  content: '/';
+  margin-right: 0.375rem;
+  color: var(--gn-text-subtle);
+}
+
+.gn-breadcrumb__item--current {
+  color: var(--gn-text);
+}
+
+/* The title: a heading that is also a field, so it keeps the page title's scale
+   and gains only what typing in it needs — a visible focus ring, and no
+   outline flash while the caret is in it. */
+.gn-notes__title {
+  margin: 0;
+  outline: none;
+}
+
+.gn-notes__title:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__byline {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.625rem;
+  font-size: 0.8125rem;
+  color: var(--gn-text-muted);
+}
+
+.gn-notes__author {
+  color: var(--gn-text);
+  font-weight: 600;
+}
+
+.gn-notes__edited,
+.gn-notes__reading-time {
+  white-space: nowrap;
+}
+
+.gn-notes__badges {
+  display: inline-flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.375rem;
+}
+
+/* Pushed to the end of the byline row, so the actions sit together rather than
+   drifting with the badges. */
+.gn-notes__byline-actions {
+  margin-left: auto;
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+
+/* A real floor (owner, 2026-09-23: "the height should also be enough to
+   feel like its a note"), so a nearly-empty note still reads as a page
+   rather than collapsing to a few lines. Reuses `--app-nav-offset`
+   (`:root`, `:1862`) with its own `0px` fallback rather than a second magic
+   number for the nav bar's height; `12rem` approximates the page's own
+   chrome above the editor (title, byline, breadcrumb, paddings) — a
+   minimum, not a pixel-exact fit, so it is deliberately not exact.
+   `cursor: text` signals the padded empty area below short text is part of
+   the same click-to-focus surface (`note-document.tsx`), not dead space. */
+.gn-notes__editor {
+  min-width: 0;
+  min-height: calc(100dvh - var(--app-nav-offset, 0px) - 12rem);
+  cursor: text;
+}
+
+/* ── Task 6: the History panel ──────────────────────────────────────────── */
+
+/* The version view's own wrapper — the banner, the read-only editor and the
+   actions row inside it, stacked. Rendered from Task 6 with no rule of its
+   own until Task 9's scanner (18.226) found the gap. */
+.gn-notes__history-version {
+  display: flex;
+  flex-direction: column;
+}
+
+.gn-notes__history-list {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gn-notes__history-row {
+  display: block;
+  width: 100%;
+  padding: 0.5rem 0.625rem;
+  border: 0;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  text-align: left;
+  font-size: 0.875rem;
+  cursor: pointer;
+}
+
+.gn-notes__history-row:hover {
+  background: var(--gn-fill-secondary);
+}
+
+.gn-notes__history-banner {
+  margin: 0 0 0.75rem;
+  padding: 0.5rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  color: var(--gn-text-muted);
+  font-size: 0.8125rem;
+}
+
+.gn-notes__history-actions {
+  display: flex;
+  gap: 0.5rem;
+  margin-top: 0.75rem;
+}
+
+/* ── Task 8: search on the Notes page ───────────────────────────────────── */
+
+.gn-notes__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.gn-notes__search-input {
+  min-width: 14rem;
+}
+
+.gn-notes__filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+/* The results wrapper — replaces the tree's groups while a query is active
+   (18.216). A plain block; the visible shape is `.gn-notes__results` and the
+   two copy lines inside it. */
+.gn-notes__search-results {
+  margin-top: 0.5rem;
+}
+
+.gn-notes__corrected {
+  margin: 0 0 0.5rem;
+  color: var(--gn-text-muted);
+  font-size: 0.8125rem;
+}
+
+.gn-notes__no-results {
+  color: var(--gn-text-muted);
+}
+
+.gn-notes__results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gn-notes__result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__result:hover {
+  background: var(--gn-fill-secondary);
+}
+
+.gn-notes__result-title {
+  color: var(--gn-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gn-notes__result-title:hover {
+  text-decoration: underline;
+}
+
+.gn-notes__snippet {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.8125rem;
+}
+
+.gn-notes__snippet mark {
+  background: var(--gn-tint-warning);
+  color: inherit;
+}
+
+/* ── Task 9: the deleted banner ─────────────────────────────────────────── */
+
+/* Same fill-plus-edge shape `.gn-shell__refusal` uses (`--gn-danger` as an
+   ACCENT, never as the fill — this codebase reserves the tint tokens it does
+   have, like `--gn-tint-warning`, for smaller surfaces such as a badge). */
+.gn-notes__deleted-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-secondary);
+  box-shadow: inset 4px 0 0 var(--gn-danger);
+  color: var(--gn-text);
+}
+
+.gn-notes__deleted-banner p {
+  margin: 0;
+  flex: 1 1 auto;
 }

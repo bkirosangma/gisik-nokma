@@ -1,4 +1,4 @@
-import { useRef, useState, type ReactElement, type ReactNode } from 'react';
+import { useEffect, useRef, useState, type ReactElement, type ReactNode } from 'react';
 import {
   PRIORITIES,
   newUlid,
@@ -8,7 +8,7 @@ import {
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Chip, Dialog, SegmentedControl, Select, Sheet } from '@gisik-nokma/ui';
+import { Button, Chip, Dialog, SegmentedControl, Select, Sheet, Toast } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -18,6 +18,7 @@ import { memberLabel } from '../member-label.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
+import { attachmentsImpliedBy, noteReferencesIn } from '../flows/attachments-implied-by.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import { CommentsThread, type TicketComment } from './comments-thread.js';
 import {
@@ -28,6 +29,7 @@ import {
 } from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
+import { TicketNotesSection } from './ticket-notes-section.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
@@ -87,7 +89,7 @@ export const HISTORY_PAGE_LIMIT = 200;
  * ⚠ **`DEEPEST_RANK` is NOT a bound on this, and reading it as one is the
  * natural mistake.** The constant (= 4, `packages/domain/src/ticket-types.ts:136`)
  * governs ROOT creation alone — a type at that rank or below may not sit at
- * project root (`hierarchy.ts:108`) — while a child's rank is unbounded above,
+ * project root (`hierarchy.ts:133`) — while a child's rank is unbounded above,
  * which is that file's own reason for writing `>=` there: *"a type DEEPER than
  * sub-task is smaller still and cannot coherently be exempt — `===` would leave
  * an escape hatch where defining rank 5 floats your tickets free."* A workspace
@@ -204,6 +206,17 @@ export type TicketSheetProps = {
    * refuse.
    */
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
+  /**
+   * Ticket-reference capabilities (Plan 7 Task 4, spec §14). Both optional and
+   * additive, the same shape `EditorSlotProps.queryTickets`/`resolveTicketHref`
+   * carry — this sheet cannot build them itself the way `queryUsers` is built
+   * from the roster it already reads: `resolveTicketHref` needs the app's own
+   * URL scheme (`ticketSheetPath`, in `apps/web`, which this package must never
+   * import), so the whole pair travels in from the page as a prop, wired to
+   * BOTH `<EditorSlot>` mounts below and to `<CommentsThread>`'s `ticketHref`.
+   */
+  queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   /**
    * The ticket's standing audience, for the "Who can see this" section — **an
    * OVERRIDE, not the source.**
@@ -554,6 +567,8 @@ export function TicketSheet({
   attachments,
   attachmentsUnavailable,
   uploadAttachment,
+  queryTickets,
+  resolveTicketHref,
   visibility,
   canSetVisibility = true,
   onOpenTicket,
@@ -635,6 +650,17 @@ export function TicketSheet({
    * is not a refusal of anything the person did.
    */
   const [editorError, setEditorError] = useState<string | null>(null);
+  /**
+   * Refusals from the attachments a posted comment IMPLIED (Plan 7 Task 5,
+   * spec §14.3, D28) — one line per note `attachmentsImpliedBy` tried and
+   * failed to attach, shown together in this sheet's own `Toast`. A comment's
+   * own posting refusal stays on `serverRefusal`, the same slot every other
+   * ticket-write refusal uses; this is a SEPARATE slot because the comment
+   * that implies these attachments has already committed by the time any of
+   * them can fail — D28's own rule, "the comment stays posted" — so the two
+   * facts must be drawable at once rather than one overwriting the other.
+   */
+  const [attachRefusals, setAttachRefusals] = useState<string[]>([]);
   /**
    * The title control's draft — `null` MEANS "not editing", and that is the
    * whole mechanism rather than a flag beside one.
@@ -807,6 +833,65 @@ export function TicketSheet({
   const comments = useLiveQuery(dataSource, workspaceId, `${ticketId}:comments`, () =>
     dataSource.query.getTicketComments(workspaceId, ticketId),
   );
+  /**
+   * The ticket's attached notes (Plan 7 Task 5, spec §14.3) — LIFTED here from
+   * `TicketNotesSection`, which used to own this query itself (Plan 6). The
+   * sheet's own `submitComment` needs the SAME `data` to compute
+   * `alreadyAttached` and to `reload()` after an implied attachment commits,
+   * so both it and the section now read the one instance rather than each
+   * keeping a query that could answer differently for a moment.
+   */
+  const notes = useLiveQuery(dataSource, workspaceId, `${ticketId}:notes`, () =>
+    dataSource.query.getNotesForTicket(workspaceId, ticketId),
+  );
+  /**
+   * `queryNotes` for the shared editor's `:note`/`[[` picker (spec §14, D26),
+   * on BOTH `<EditorSlot>` mounts below — caught by a final review (case
+   * 18.285): `queryTickets`/`resolveTicketHref` reached both mounts, but
+   * nothing built or forwarded a `queryNotes`, so a REAL ticket description
+   * or comment could not insert a note reference at all, leaving D27's own
+   * headline ("tag a note in a ticket comment") reachable only through a
+   * stub editor in tests. Unlike `queryTickets`, this needs no page-supplied
+   * prop: `dataSource` and `workspaceId` are already in scope, so it is built
+   * the same way `note-document.tsx`'s own `queryNotes` is — a client-side
+   * substring filter over a list fetched ONCE.
+   *
+   * A second final-review pass (case 18.288) caught that the first version
+   * fetched this list through `useLiveQuery`, which refetches on EVERY
+   * workspace stream frame for as long as the sheet stays open — a real
+   * cost paid on every unrelated ticket edit in a busy workspace, for a
+   * picker that may never open. `note-document.tsx`'s own `queryNotes` was
+   * already a one-time `useEffect` fetch, not a live query — this now
+   * matches it, and is therefore NOT one of `ticket-sheet.test.tsx`'s "live
+   * reads" (that ratchet counts `useLiveQuery`/stream subscriptions only).
+   */
+  const [workspaceNotesForPicker, setWorkspaceNotesForPicker] = useState<Array<{ noteId: string; title: string }>>(
+    [],
+  );
+  useEffect(() => {
+    let cancelled = false;
+    dataSource.query.getNotes(workspaceId).then(
+      (rows) => {
+        if (!cancelled) setWorkspaceNotesForPicker(rows);
+      },
+      () => {
+        if (!cancelled) setWorkspaceNotesForPicker([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, workspaceId]);
+  const queryNotes = async (query: string): Promise<Array<{ noteId: string; title: string }>> => {
+    const needle = query.trim().toLowerCase();
+    const hits: Array<{ noteId: string; title: string }> = [];
+    for (const candidate of workspaceNotesForPicker) {
+      if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+      hits.push({ noteId: candidate.noteId, title: candidate.title });
+      if (hits.length === 8) break;
+    }
+    return hits;
+  };
   /**
    * The ticket's CHILDREN (door F, 2026-09-19) — derived from the list read the
    * client already makes, NOT from a new route.
@@ -1257,6 +1342,52 @@ export function TicketSheet({
       setEditorError(null);
       comments.reload();
       history.reload();
+      // TAGGING A NOTE ATTACHES IT (spec §14.3, D27–D28) — AFTER the comment's
+      // own commit, never before: 18.276 pins the order, because an implied
+      // attachment is a CONSEQUENCE of the comment landing, not a
+      // precondition of it. `attachedNoteIds` reads the lifted `<ticketId>:notes`
+      // query's CURRENT answer, so a note already attached (by this comment's
+      // own author moments ago, or by anyone else) is never re-claimed.
+      //
+      // Only a `comment.added` submission carries a `body` to walk — the other
+      // two `EditorSlotSubmission` arms (`note.body_set`, `ticket.field_set`)
+      // do not, and `submitComment` is this sheet's TICKET-comment door only
+      // (D28: note comments never call this at all — `note-comments.tsx`
+      // does not import `attachmentsImpliedBy`).
+      if (submission.type === 'comment.added') {
+        const alreadyAttached = (notes.data ?? []).map((n) => n.noteId);
+        const implied = attachmentsImpliedBy(submission.payload.body, workspaceId, ticketId, alreadyAttached, make);
+        if (implied.length > 0) {
+          // THE COMMENT MUST STAND EVEN IF THIS FAILS TO ANSWER AT ALL —
+          // D28's "the comment stays posted" covers a silent transport
+          // failure here exactly as it covers a real refusal below. Without
+          // this catch, a rejected `ingest` would throw OUT of an already-
+          // `true`-bound function, which `TicketEditorSlot.handleSubmit`
+          // reads as the SUBMIT itself failing — its own `catch` fires
+          // `onError` and leaves the words in the composer, so the author
+          // would re-post a comment the ledger already has.
+          try {
+            const titleOf = new Map(noteReferencesIn(submission.payload.body).map((ref) => [ref.noteId, ref.title]));
+            const impliedResults = await dataSource.ingest(implied);
+            const refusals: string[] = [];
+            implied.forEach((impliedEvent, index) => {
+              const impliedResult = impliedResults[index];
+              const title = titleOf.get(impliedEvent.entity.id) ?? impliedEvent.entity.id;
+              if (impliedResult === undefined) {
+                refusals.push(`Couldn't attach "${title}": The server did not answer this change.`);
+              } else if (impliedResult.status === 'refused') {
+                refusals.push(`Couldn't attach "${title}": ${impliedResult.reason}`);
+              } else if (impliedResult.status !== 'committed') {
+                refusals.push(`Couldn't attach "${title}": ${impliedResult.message}`);
+              }
+            });
+            if (refusals.length > 0) setAttachRefusals(refusals);
+            notes.reload();
+          } catch {
+            setAttachRefusals(['Couldn\'t attach the tagged notes: the server did not answer.']);
+          }
+        }
+      }
       return true;
     }
     if (result.status === 'refused') setServerRefusal({ rule: result.rule, reason: result.reason });
@@ -3104,6 +3235,9 @@ export function TicketSheet({
                 placeholder="No description yet"
                 submit={submitDescription}
                 queryUsers={queryUsers}
+                queryNotes={queryNotes}
+                {...(queryTickets === undefined ? {} : { queryTickets })}
+                {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
                 onError={reportEditorError}
               />
               <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
@@ -3692,6 +3826,26 @@ export function TicketSheet({
           </section>
 
           {/*
+            THE NOTES SECTION — Subtasks → Notes → Comments, the prototype's
+            own order (spec §10.1). `canEdit` is `editorSlot !== undefined`,
+            the same expression `canEditDescription` below uses for the same
+            reason: no client-side edit flag exists, and the ingest door is
+            the one place that actually knows.
+          */}
+          <TicketNotesSection
+            dataSource={dataSource}
+            workspaceId={workspaceId}
+            ticketId={ticketId}
+            projectId={ticketRead.ticket.projectId}
+            currentUserId={currentUserId}
+            canEdit={editorSlot !== undefined}
+            make={make}
+            onNavigate={onNavigate}
+            onRefusal={(r) => setServerRefusal(r)}
+            notes={notes}
+          />
+
+          {/*
             THE COMMENT THREAD AND ITS BOX — the block at
             `design-system/interactive/desktop.dc.html:1268-1330`, mounted LAST
             in the details tab, which is where the prototype draws it (its
@@ -3736,6 +3890,7 @@ export function TicketSheet({
             comments={comments.data}
             commentsUnavailable={comments.error ?? undefined}
             nameOf={nameOf}
+            {...(resolveTicketHref === undefined ? {} : { ticketHref: resolveTicketHref })}
             composer={
               editorSlot === undefined ? undefined : (
                 <EditorSlot
@@ -3750,6 +3905,9 @@ export function TicketSheet({
                   placeholder="Add a comment — @ to mention someone"
                   submit={submitComment}
                   queryUsers={queryUsers}
+                  queryNotes={queryNotes}
+                  {...(queryTickets === undefined ? {} : { queryTickets })}
+                  {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}
@@ -3776,6 +3934,20 @@ export function TicketSheet({
                 />
               )
             }
+          />
+          {/*
+            Refusals from notes a posted comment TRIED to attach (spec §14.3,
+            D27–D28) — the comment itself always stands; this only reports what
+            could not follow it. `tone="danger"` rather than the plan's own
+            "error", because `ToastTone` (`packages/ui`) names no such tone —
+            the nearest real one, and `undo` stays absent: an attach retry is
+            not an undo of anything.
+          */}
+          <Toast
+            open={attachRefusals.length > 0}
+            message={attachRefusals.join(' ')}
+            tone="danger"
+            onDismiss={() => setAttachRefusals([])}
           />
         </div>
       ) : tab === 'attachments' ? (

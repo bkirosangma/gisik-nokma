@@ -1,0 +1,90 @@
+# Held work — paused by the owner, to resume on the owner's word
+
+**Written 2026-09-24 ~01:05 IST** by the planner session, on the owner's instruction: *"persist the held items somewhere so they are not lost."*
+Every item below was **paused by the owner** so that the notes release could ship. Nothing here is abandoned. Each has its branch pushed, its commit recorded, and its full brief copied into `docs/lanes/held/`, because the originals live in `gisik-nokma-lanes/`, which is not under git.
+
+**To resume any item:**
+1. The owner says so.
+2. Merge the current release branch into the item's branch first. Never rebase.
+3. Give the lane its brief from `docs/lanes/held/`. The lane restarts at the first task or unit with no commit.
+
+**Update this file in the same change set** whenever an item resumes, lands, or is dropped. Delete the item when it lands; no tombstones.
+
+Readings (commits) were taken at 2026-09-24 ~01:05 IST. Re-check each with `git rev-parse origin/<branch>` before relying on it.
+
+---
+
+## 1. Trash & purge — archive, soft delete, 15-day permanent purge
+
+- **Owner ruling (2026-09-23 ~22:5x):** *"pause it after task 6 is done. i wanna leave the remaining for the notes release."*
+- **Release branch:** `release/trash` at `cd84f0027f9cd4fe6f7a9d4c5b0b326f9507ac96`. It is stacked on `release/notes`, because trash depends on notes code (the note entity, notes projections, note authority). It ships to `main` only after notes. Merge `main` into it through a PR first.
+- **Spec:** `docs/superpowers/specs/2026-09-23-trash-and-purge-design.md` (owner-approved; decisions T1–T10).
+- **Plan 1:** `docs/superpowers/plans/2026-09-23-trash-1-lifecycle-core.md`.
+- **Branch:** `task/trash-1-lifecycle-core` at `0236d334f362754593ed31f24447d1718ff30bf1`. Tasks 1–6 are done: vocabulary, projection, authority, state refusals, deleted-workspace containment, deleted-project containment.
+- **Left in Plan 1:**
+  - Task 7: `GET /v1/me/deleted-items`.
+  - Task 8: the client `getDeletedItems()` contract.
+  - Then the PR `--base release/trash`.
+- **Left in the series (not yet written):**
+  - Plan 2: the purge engine and backup retention.
+  - Plan 3: replica and sync.
+  - Plan 4: UI (the delete dialog with its "Delete permanently" switch, archive/delete on cards, Account → Deleted items).
+  - Plans are written only after Plan 1 lands, against the landed tree.
+- **Case block:** `test-cases/19-trash.md`. P1 `19.001`–`19.080`, P2 `19.081`–`19.160`, P3 `19.161`–`19.200`, P4 `19.201`–`19.260`.
+- **Before Plan 2:** two read-only production measurements need the owner's OK.
+  - Can the migration role create a `SECURITY DEFINER` function on DO managed Postgres?
+  - Does the backup bucket already have a lifecycle rule?
+- **Briefs:** `docs/lanes/held/LANE-trash-plan-2026-09-23.md` and `docs/lanes/held/CTL-HANDOFF-trash-series-2026-09-23.md`. PRs go `--base release/trash`, not `release/notes`.
+
+## 2. Editor polish — the units not in the notes release
+
+- **Owner ruling (2026-09-24 ~00:47):** *"and pause Editor-polish".* Units 1 and 3 landed in the notes release as #727: the `:ticket` fix, and the inline pickers placed, styled and kept above the sheet.
+- **Branch:** `task/editor-polish` at `a7462363a87d824a898a1126cd36a30bdf19f2ff`. That is the controller's forward-merge of `release/notes` onto the held unit tip `2a30141ad8c63d97acdb30ea90acb0d130d637a2`.
+- **Left:**
+  - **Unit 2:** style the "Attach note" button and its menu.
+  - **Unit 4:** the editor toolbar.
+    - Restyle it to the prototype.
+    - A hover tooltip on every tool, with its keyboard shortcut (platform-aware ⌘/Ctrl) and its markdown shortcut, plus `aria-keyshortcuts`.
+    - Replace `[[` with **Insert note** and **Insert ticket**.
+    - No `@` button.
+  - **Unit 5:** an **Attach** button in the comment composer (paperclip, as in the prototype `desktop.dc.html:1314-1330`) through the existing upload path, and "Add file" on the Attachments tab.
+  - **Unit 6a:** the notes search gets `placeholder="Search"`.
+  - **Unit 6b:** "Any author" / "Any scope" never wrap.
+  - **Unit 6c:** placeholders disappear on focus, everywhere, with a label sweep of the 23 `placeholder=` sites.
+  - **Unit 6d:** placeholders use `--gn-text-subtle`, with a 4.5:1 contrast pair against the field background. If that pair fails, stop and report instead of lowering the bar.
+- **Owed from Unit 3:** the live browser check 9.317 (the popup above `.gn-sheet__scrim`).
+- **Case blocks:** Units 1–5 `9.313`–`9.337`; Unit 6 is a new §18 row, `18.301`–`18.320`.
+- **Brief:** `docs/lanes/held/BRIEF-editor-polish-2026-09-23.md`, including ADDENDUM 2 and ADDENDUM 3 at its end.
+
+## 3. Editor skin — everything the editor draws, and tables
+
+- **Owner ruling (2026-09-24 ~00:45):** *"pause Editor-skin".* Unit R (the "Keep … as text" chip removed, Backspace-undo kept) is going into the notes release on the owner's word, ~01:02.
+- **Branch:** `task/editor-skin` at `d7eb16ec6a491076b8a451978480cb164201be65`. That is Unit R on top of the lane's plan doc `docs/superpowers/plans/2026-09-24-editor-skin.md` (`dec19452`).
+- **Root cause:** `packages/editor/src/styles/editor.css` is colour-free by rule, and the web skin in `apps/web/app/globals.css` was never written. It has rules for one editor class only (`.mention-popup`).
+- **Left:**
+  - The content skin: code blocks, inline code, headings, lists, task lists, quotes, rules, images, collapsibles, links.
+  - The chips: mention, `:ticket`, note link, and the missing-target pill. No underline on hover.
+  - In-document chrome: the code block's Copy button, the note-link preview.
+  - **T1:** table skin.
+  - **T2:** port the owner's knowledge-base `TableFloatingToolbar.tsx` (9 actions).
+  - A coverage check driven from the classes the editor emits.
+  - A light and dark gallery pass with screenshots.
+  - Regenerate the mobile bundle.
+- **Case block:** `9.338`–`9.367`.
+- **Brief:** `docs/lanes/held/BRIEF-editor-skin-2026-09-24.md`.
+
+## 4. Knowledge-base editor parity — never started
+
+- **Owner ruling (2026-09-24 ~00:2x):** *"lets pause it for now."* The owner's instruction that created it: *"i took a lot of time to refine the editor in knowledgebase. make sure to study them and implement them here. without the live reveal of the markdown syntax."*
+- **Branch:** none. It was never cut.
+- **The reference:** `/Users/kiro/my_projects/knowledge-base/src/app/knowledge_base/features/document/` (43 files, 8,623 lines, at the knowledge-base commit `10d3350`).
+- **Excluded:** the `markdownReveal*` / `rawSyntaxEngine` / `RawBlock` family.
+- **Sequence:** it runs **after** items 2 and 3, because they touch the same files.
+- **Brief:** `docs/lanes/held/BRIEF-kb-editor-parity-2026-09-24.md`. It holds the per-file inventory and needs a written port/adapt/already-here/n-a verdict per file.
+
+## 5. Smaller follow-ups the owner has not scheduled
+
+- **Backlinks and unlinked mentions:** notes spec §13 lists them as a follow-up, and the knowledge-base has `BacklinksRail.tsx` / `UnlinkedMentions.tsx`.
+- **An "Insert table" button:** the knowledge-base has `TablePicker.tsx`. This is covered by item 4 when it runs.
+- **Reference-chip titles for readers who cannot see the target:** the owner ruled (2026-09-24) to **ship as is** (option A). Option B, where the server redacts the stored key/title, is not scheduled. It is recorded only so it isn't re-raised as new.
+- **The remaining notes-spec follow-ups (§13):** inline anchored comments, nested notes, notes on the mobile/desktop apps, a Garo-language search model.

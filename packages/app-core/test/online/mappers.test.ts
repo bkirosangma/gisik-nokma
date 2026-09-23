@@ -6,6 +6,7 @@ import type { BoardView } from '../../src/view-types.js';
 import type {
   AttentionResponse,
   BoardResponse,
+  BoardTicketCard,
   MemberListResponse,
   ListCard,
   ListResponse,
@@ -93,6 +94,23 @@ function serverCard(overrides: Partial<TicketCard> = {}): TicketCard {
     // the default for every `3.4x` case in this file that is not about rank.
     rank: null,
     ...overrides,
+  };
+}
+
+/**
+ * `serverCard()`, widened onto `BoardTicketCard` — the wire shape ONLY the
+ * board serves (owner request, 2026-09-23: parent-key badge, epic chip).
+ * `parent`/`epic` default to `null` (a root ticket under no epic), the same
+ * "nothing to narrow by" default `boardCardSeed` (`test/helpers/seed.ts`)
+ * takes for the CLIENT-side fixture one layer over — a case that wants
+ * either badge passes one.
+ */
+function serverBoardCard(overrides: Partial<BoardTicketCard> = {}): BoardTicketCard {
+  const { parent, epic, ...cardOverrides } = overrides;
+  return {
+    ...serverCard(cardOverrides),
+    parent: parent ?? null,
+    epic: epic ?? null,
   };
 }
 
@@ -289,7 +307,8 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'Doing',
         category: 'active',
         blocked: false,
-        cards: [serverCard()],
+        creatable: true,
+        cards: [serverBoardCard()],
       },
       {
         workflowId: 'wf-errand',
@@ -299,6 +318,11 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'Waiting on counterparty',
         category: 'active',
         blocked: true,
+        // Independent of `blocked` — a workflow setting can forbid creation
+        // in a non-terminal state too (starting-status design). `false` here,
+        // against `columns[0]`'s `true`, is what lets 13.1434 assert BOTH
+        // real booleans travel rather than one masking a default.
+        creatable: false,
         cards: [],
       },
       {
@@ -309,6 +333,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         name: 'New',
         category: 'open',
         blocked: false,
+        creatable: true,
         cards: [],
       },
     ],
@@ -347,7 +372,10 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
           name: 'ancient',
           category: 'open',
           blocked: false,
-          cards: [serverCard({ ticketId: '01J9GTKB000000000000000000', stateId: 'ancient' })],
+          // A real straggler is always `false` — `routes/board.ts`'s own
+          // convention, no published definition to read the flag off.
+          creatable: false,
+          cards: [serverBoardCard({ ticketId: '01J9GTKB000000000000000000', stateId: 'ancient' })],
         },
       ],
     };
@@ -409,6 +437,29 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
     expect(mapBoardView(body).groups[0]?.columns[1]?.blocked).toBe(true);
   });
 
+  /**
+   * 13.1434 — starting-status design, 2026-09-23. `creatable` is REQUIRED on
+   * the wire `BoardColumn` for the identical reason `blocked` is, two cases
+   * up: a garbled or absent read must fail loudly rather than default to a
+   * value that reads on screen as a claim about the work ("Add a ticket" for
+   * a state the workflow forbids, or its silent absence from a state that
+   * allows it).
+   */
+  it('13.1434 REFUSES an unreadable creatable flag rather than defaulting it, and both real booleans travel', () => {
+    for (const bad of [undefined, 'true', 1, null]) {
+      const column = { ...body.columns[1], creatable: bad };
+      const mangled = { ...body, columns: [column] } as unknown as BoardResponse;
+      expect(() => mapBoardView(mangled), String(bad)).toThrow(
+        /board\.columns\[0\]\.creatable: expected a boolean/,
+      );
+    }
+    // Controls, same run: `body.columns[0]` is creatable, `body.columns[1]`
+    // is not — both real booleans travel, and `false` is not swallowed by
+    // the check that refuses a missing one.
+    expect(mapBoardView(body).groups[0]?.columns[0]?.creatable).toBe(true);
+    expect(mapBoardView(body).groups[0]?.columns[1]?.creatable).toBe(false);
+  });
+
   it('3.43 REFUSES a cause kind it does not know rather than rendering an anonymous flip', () => {
     const withUnknownCause = {
       ...body,
@@ -464,7 +515,7 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
         {
           ...body.columns[0]!,
           cards: [
-            serverCard({
+            serverBoardCard({
               stateProvenance: {
                 actorId: ANSELMA,
                 clientTime: 'c',
@@ -479,6 +530,68 @@ describe('3.37 mapBoardView — a pure regrouping of the flat columns, plus the 
     const card = mapBoardView(reopened).groups[0]?.columns[0]?.cards[0];
     expect(card?.cause).toEqual({ kind: 'reopened-for-child', childTicketId: 'child_1' });
     expect(card?.stateProvenance).not.toHaveProperty('cause');
+  });
+
+  /**
+   * 13.1464 — `parent`/`epic` cross the wire (owner request, 2026-09-23,
+   * board-card badges). A MISSING key is a refusal, the same rule every other
+   * required field on this card already keeps — `null` is a real answer
+   * (no parent/no epic, or an unreadable one, `BoardCard.parent`'s own
+   * docblock) and an absent key is a body this client cannot read.
+   */
+  describe('13.1464 mapBoardCard carries parent/epic; an absent key is a refusal, not undefined', () => {
+    /** The `body` fixture above, its one card replaced by a fresh `serverBoardCard()`. */
+    const withCard = (overrides: Parameters<typeof serverBoardCard>[0]): BoardResponse => ({
+      ...body,
+      columns: [{ ...body.columns[0]!, cards: [serverBoardCard(overrides)] }],
+    });
+
+    it('null on the wire stays null — no parent, no epic', () => {
+      const view = mapBoardView(withCard({ parent: null, epic: null }));
+      const card = view.groups[0]?.columns[0]?.cards[0];
+      expect(card?.parent).toBeNull();
+      expect(card?.epic).toBeNull();
+    });
+
+    it('a real parent/epic object crosses whole, key included', () => {
+      const view = mapBoardView(
+        withCard({
+          parent: { ticketId: 'parent_1', key: 'CCSO-1' },
+          epic: { ticketId: 'epic_1', key: 'CCSO-2', title: 'Cold-chain rollout' },
+        }),
+      );
+      const card = view.groups[0]?.columns[0]?.cards[0];
+      expect(card?.parent).toEqual({ ticketId: 'parent_1', key: 'CCSO-1' });
+      expect(card?.epic).toEqual({ ticketId: 'epic_1', key: 'CCSO-2', title: 'Cold-chain rollout' });
+    });
+
+    it('a `key: null` on a real parent/epic survives — the ledger holds no prefix, which is a fact and not an absence', () => {
+      const view = mapBoardView(
+        withCard({
+          parent: { ticketId: 'parent_1', key: null },
+          epic: { ticketId: 'epic_1', key: null, title: 'Cold-chain rollout' },
+        }),
+      );
+      const card = view.groups[0]?.columns[0]?.cards[0];
+      expect(card?.parent).toEqual({ ticketId: 'parent_1', key: null });
+      expect(card?.epic).toEqual({ ticketId: 'epic_1', key: null, title: 'Cold-chain rollout' });
+    });
+
+    it("a MISSING `parent`/`epic` key refuses — an absent field is not this shape's spelling of null", () => {
+      const raw = withCard({}) as unknown as { columns: [{ cards: [Record<string, unknown>] }] };
+      const card = { ...raw.columns[0].cards[0] };
+      delete card['parent'];
+      raw.columns[0].cards = [card as never];
+      expect(() => mapBoardView(raw)).toThrow(/\.parent: expected an object/);
+    });
+
+    it("a `parent`/`epic` object missing ITS OWN `ticketId` refuses, naming the nested path", () => {
+      const raw = withCard({ parent: { ticketId: 'p1', key: null } }) as unknown as {
+        columns: [{ cards: [Record<string, unknown>] }];
+      };
+      raw.columns[0].cards[0]['parent'] = { key: null };
+      expect(() => mapBoardView(raw)).toThrow(/\.parent\.ticketId: expected a string/);
+    });
   });
 
   it('3.37 throws MappingError naming the path on a malformed response', () => {
@@ -1019,7 +1132,13 @@ describe('3.969 the priority claim crosses the wire as a claim; absence and an o
         name: 'Doing',
         category: 'active',
         blocked: false,
-        cards: [card],
+        creatable: true,
+        // Widened to `BoardTicketCard` here rather than at every `serverCard()`
+        // call this helper wraps: `card` is a plain `TicketCard` because this
+        // describe is about the PRIORITY claim, not the board's two hierarchy
+        // facts — `null`/`null` is the same "nothing to narrow by" default
+        // `serverBoardCard` above takes.
+        cards: [{ ...card, parent: null, epic: null }],
       },
     ],
   });
@@ -1156,6 +1275,10 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
     const body: SearchResponse = {
       workspaceId: 'w',
       query: 'q',
+      // Required on the response since the notes series' search plan; the
+      // ticket half of this case is what it is about, and `mapSearchHits`
+      // reads `hits` alone.
+      notes: [],
       hits: [
         {
           card: serverCard({ ticketId: 'tkt-h1', projectId: '01J9GPRJ000000000000000000' }),
@@ -1190,6 +1313,33 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
     expect(() =>
       mapSearchHits({ ...body, hits: [{ card: body.hits[0]!.card, snippet: 'x' }] }),
     ).toThrow(MappingError);
+  });
+
+  /**
+   * 18.271 — Plan 7 Task 4 (spec §14.2): `key` rides on every search hit, the
+   * same field `mapTicketRead` and the board's card mappers already read off
+   * `TicketCard` — this mapper simply started dropping it, since search hits
+   * predate `:ticket`'s picker. Control in the same `it`: every other field
+   * stays exactly as 3.39 already proved.
+   */
+  it('18.271 mapSearchHits exposes key from the card; null stays null; other fields unchanged (control)', () => {
+    const body: SearchResponse = {
+      workspaceId: 'w',
+      query: 'q',
+      notes: [],
+      hits: [
+        { card: serverCard({ ticketId: 'tkt-h1', key: 'CCSO-9' }), snippet: 's1', matchedIn: 'title' },
+        { card: serverCard({ ticketId: 'tkt-h2', key: null }), snippet: 's2', matchedIn: 'comment' },
+      ],
+    };
+    const hits = mapSearchHits(body);
+    expect(hits[0]?.key).toBe('CCSO-9');
+    expect(hits[1]?.key).toBeNull();
+    // CONTROL: the other fields still read exactly as 3.39 pins them.
+    expect(hits[0]?.ticketId).toBe('tkt-h1');
+    expect(hits[0]?.snippet).toBe('s1');
+    expect(hits[0]?.matchedIn).toBe('title');
+    expect(hits[1]?.matchedIn).toBe('comment');
   });
 
   /**
@@ -2381,8 +2531,9 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             name: 'Doing',
             category: 'active',
             blocked: false,
+            creatable: true,
             cards: [
-              serverCard({
+              serverBoardCard({
                 assigneeId: 'u2',
                 stateProvenance: { actorId: 'u2', clientTime: 'c', serverTime: 's', cause: null },
               }),
@@ -2455,7 +2606,8 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
             name: 'Doing',
             category: 'active',
             blocked: false,
-            cards: [serverCard({ assigneeId: 'u1' })],
+            creatable: true,
+            cards: [serverBoardCard({ assigneeId: 'u1' })],
           },
         ],
       },
@@ -2999,18 +3151,18 @@ describe('13.967 mapTicketRead carries assignedProvenance, and refuses a body wi
  * forgot the field cannot look like a workspace without a prefix.
  */
 describe('13.1280 the board card key', () => {
-  const body = (card: Partial<TicketCard>) => ({
+  const body = (card: Partial<BoardTicketCard>) => ({
     workspaceId: '01J9GWS0000000000000000000',
     projectId: '01J9GPRJ000000000000000000',
-    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [serverCard(card)] }],
+    columns: [{ workflowId: 'wf-errand', workflowName: 'Errand', workflowVersion: 2, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [serverBoardCard(card)] }],
   });
   it('carries the key, keeps null, refuses absence', () => {
     const firstCard = (view: BoardView) => view.groups[0]!.columns[0]!.cards[0]!;
     expect(firstCard(mapBoardView(body({ key: 'CCSO-7' }))).key).toBe('CCSO-7');
     expect(firstCard(mapBoardView(body({ key: null }))).key).toBeNull();
-    const { key: _dropped, ...without } = serverCard();
+    const { key: _dropped, ...without } = serverBoardCard();
     const absent = body({});
-    absent.columns[0]!.cards = [without as TicketCard];
+    absent.columns[0]!.cards = [without as BoardTicketCard];
     expect(() => mapBoardView(absent)).toThrow(/key/);
   });
 });

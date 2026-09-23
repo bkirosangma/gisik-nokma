@@ -1,7 +1,13 @@
-import { isRankKey, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
+import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
 import type {
   FieldClaim,
   IngestResult,
+  NoteComment,
+  NoteDetail,
+  NoteScope,
+  NoteScopeMode,
+  NoteSummary,
+  NoteVersion,
   Priority,
   StateCategory,
   TicketState,
@@ -24,6 +30,9 @@ import type {
   ListColumnId,
   ListRow,
   MyWorkView,
+  // The VIEW model, from `../view-types.js` and not from the domain: it is the
+  // one with `source` on it, and `mapNoteSearchHits` is where `source` is made.
+  NoteSearchHit,
   ParentRef,
   PriorityView,
   ProjectViewPrefs,
@@ -598,6 +607,37 @@ function mapAssignee(raw: unknown, path: string, roster: ReadonlyMap<string, str
   return { id, name: roster.get(id) ?? id };
 }
 
+/**
+ * `BoardCard.parent`/`BoardCard.epic`'s own wire shape, both `{ ticketId, key
+ * }`-or-`null` (epic adds `title`) — see those fields' own docblocks
+ * (`view-types.ts`) for why NEITHER carries an existence leak the way
+ * `ParentRef.restricted` does: an ABSENT key here is a body this client
+ * cannot read (`asRecord`/`asString` refuse it), never a silent `undefined`,
+ * which is the same "a missing field is a refusal" rule every other required
+ * field on this card already keeps.
+ */
+function mapBoardParent(raw: unknown, path: string): { ticketId: string; key: string | null } | null {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  return {
+    ticketId: asString(record['ticketId'], `${path}.ticketId`),
+    key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
+  };
+}
+
+function mapBoardEpic(
+  raw: unknown,
+  path: string,
+): { ticketId: string; key: string | null; title: string } | null {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  return {
+    ticketId: asString(record['ticketId'], `${path}.ticketId`),
+    key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
+    title: asString(record['title'], `${path}.title`),
+  };
+}
+
 function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, string>): BoardCard {
   const record = asRecord(raw, path);
   const provenancePath = `${path}.stateProvenance`;
@@ -624,6 +664,8 @@ function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, st
     // refuses it, so a forgotten field cannot pass as a prefix-less workspace.
     key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
     pending: false,
+    parent: mapBoardParent(record['parent'], `${path}.parent`),
+    epic: mapBoardEpic(record['epic'], `${path}.epic`),
   };
 }
 
@@ -647,6 +689,11 @@ function mapBoardColumn(
     // state". This module's promise is that a garbled read fails loudly here;
     // these two were the places it did not.
     blocked: asBoolean(record['blocked'], `${path}.blocked`),
+    // `creatable` is REQUIRED on `BoardColumn` for the identical reason
+    // `blocked` is, in the comment above: a garbled or absent read must fail
+    // loudly here rather than default to a value that reads on screen as a
+    // claim about the work (starting-status design, 2026-09-23).
+    creatable: asBoolean(record['creatable'], `${path}.creatable`),
     cards: asArray(record['cards'], `${path}.cards`).map((card, index) =>
       mapBoardCard(card, `${path}.cards[${index}]`, roster),
     ),
@@ -2195,8 +2242,68 @@ export function mapSearchHits(raw: unknown): SearchHit[] {
       title: asString(card['title'], `${path}.card.title`),
       snippet: asString(entry['snippet'], `${path}.snippet`),
       matchedIn: matchedInOf(entry['matchedIn'], `${path}.matchedIn`),
+      key: card['key'] === null ? null : asString(card['key'], `${path}.card.key`),
     };
   });
+}
+
+/**
+ * The note half of a search answer (notes series, Plan 3 of 6, spec §7.7).
+ *
+ * ## `mode` is a PARAMETER, and it is what adds `source`
+ *
+ * The server sends no `source` on a note hit: the mode is the request's own
+ * parameter, so a per-row copy would be the caller's word echoed back. This
+ * mapper is given the mode it asked for and stamps it on every row, which is
+ * what lets the merged list (spec §7.8) label a result "spelling" or "meaning"
+ * without asking which call it came out of.
+ *
+ * ## `corrected` is MODE-DEPENDENT, and that is the server's rule
+ *
+ * Correction is a lexical idea: `mode=meaning` never sends the field, and this
+ * mapper returns `undefined` for it rather than `[]` — because the two are
+ * different facts ("nothing was corrected" against "correction does not apply
+ * here"), and the hook that drives the screen is a lexical call by then anyway.
+ *
+ * ## A row missing `noteId` REFUSES
+ *
+ * The same standard `mapNoteSummaries` holds: `noteId` is the hit's identity and
+ * the key the merge rule de-duplicates on, so defaulting it to `''` would merge
+ * every malformed row into one.
+ */
+export function mapNoteSearchHits(
+  raw: unknown,
+  mode: 'lexical' | 'meaning',
+): { notes: NoteSearchHit[]; corrected?: string[] } {
+  const record = asRecord(raw, 'search');
+  const notes = asArray(record['notes'], 'search.notes').map((hit, index) => {
+    const path = `search.notes[${index}]`;
+    const entry = asRecord(hit, path);
+    const scopeMode = asString(entry['scopeMode'], `${path}.scopeMode`);
+    if (!(NOTE_SCOPE_MODES as readonly string[]).includes(scopeMode)) {
+      throw new MappingError(`${path}.scopeMode`, `one of ${NOTE_SCOPE_MODES.join(', ')}`);
+    }
+    return {
+      noteId: asString(entry['noteId'], `${path}.noteId`),
+      title: asString(entry['title'], `${path}.title`),
+      snippet: asString(entry['snippet'], `${path}.snippet`),
+      homeProjectId: asString(entry['homeProjectId'], `${path}.homeProjectId`),
+      scopeMode: scopeMode as NoteScopeMode,
+      attachedTicketKeys: asArray(entry['attachedTicketKeys'], `${path}.attachedTicketKeys`).map((key, keyIndex) =>
+        asString(key, `${path}.attachedTicketKeys[${keyIndex}]`),
+      ),
+      authorId: asString(entry['authorId'], `${path}.authorId`),
+      updatedAt: asString(entry['updatedAt'], `${path}.updatedAt`),
+      source: mode,
+    };
+  });
+
+  const correctedRaw = record['corrected'];
+  if (correctedRaw === undefined) return { notes };
+  const corrected = asArray(correctedRaw, 'search.corrected').map((word, index) =>
+    asString(word, `search.corrected[${index}]`),
+  );
+  return { notes, corrected };
 }
 
 /** The three columns `matchedIn` may name, in the PRECEDENCE the route applies. */
@@ -2597,3 +2704,156 @@ export const SERVING_GAPS: Readonly<Record<string, readonly Absence[]>> = {
   // (`replica-data-source.ts`), and a view with nothing to render says so where
   // it renders rather than here.
 };
+
+/**
+ * The note mappers (notes series, Plan 1 of 6, spec §6.4).
+ *
+ * ## Why `scope` is validated against the domain's constant rather than trusted
+ *
+ * `NOTE_SCOPE_MODES` is the ONE list of the five modes (`packages/domain/src/note-state.ts`)
+ * and it is imported rather than re-spelled. A mapper that accepted any string
+ * would put an unknown mode into `NoteScope`, whose union makes the switch arms
+ * in every later view total — so the sixth mode a future plan adds would fall
+ * out of a view's switch as "not readable" instead of failing to compile. The
+ * refusal is `MappingError` at the path, which names the row.
+ *
+ * ## `body` is passed through as `unknown`, NEVER stringified
+ *
+ * It is a ProseMirror document the editor owns. `JSON.stringify` here would hand
+ * the editor a STRING where it expects a doc, and the failure would show up as
+ * an editor rendering nothing rather than as a mapping error — so the shape is
+ * left alone and the mutation that stringifies it is killed by case 18.037.
+ *
+ * ## `attachedTickets` is mapped field by field
+ *
+ * `ticketId`, `projectId`, `key` and `title` are each read as required strings.
+ * A row missing one is a server change this mapper has not caught up with, and
+ * defaulting `key` to `''` would render a chip with no key rather than report
+ * it. `projectId` was added additively (notes series, Plan 6 of 7) so the
+ * byline can build the canonical `ticketSheetPath`.
+ */
+function noteScopeOf(raw: unknown, path: string): NoteScope {
+  const record = asRecord(raw, path);
+  const mode = record['mode'];
+  if (typeof mode !== 'string' || !(NOTE_SCOPE_MODES as readonly string[]).includes(mode)) {
+    throw new MappingError(`${path}.mode`, `one of ${NOTE_SCOPE_MODES.join(', ')}`);
+  }
+  // `userIds` is read ONLY for `explicit`, and that is the server's own rule
+  // (`proj_notes.scope_user_ids` is `'{}'` for every other mode). Reading it
+  // unconditionally would produce `{ mode: 'workspace', userIds: [] }`, which is
+  // not a member of the `NoteScope` union at all.
+  if (mode === 'explicit') {
+    const userIds = asArray(record['userIds'], `${path}.userIds`).map((entry, index) =>
+      asString(entry, `${path}.userIds[${index}]`),
+    );
+    return { mode, userIds };
+  }
+  // `Exclude<…, 'explicit'>` and not a bare `NoteScopeMode`: at this line the
+  // mode is known NOT to be `explicit` (that arm returned above), and
+  // `{ mode: 'explicit' }` with no `userIds` is not a member of `NoteScope`. The
+  // narrower cast is what makes the union's own shape carry the guarantee
+  // instead of a comment.
+  return { mode: mode as Exclude<NoteScopeMode, 'explicit'> };
+}
+
+function noteSummaryOf(row: Record<string, unknown>, path: string): NoteSummary {
+  return {
+    noteId: asString(row['noteId'], `${path}.noteId`),
+    workspaceId: asString(row['workspaceId'], `${path}.workspaceId`),
+    homeProjectId: asString(row['homeProjectId'], `${path}.homeProjectId`),
+    authorId: asString(row['authorId'], `${path}.authorId`),
+    title: asString(row['title'], `${path}.title`),
+    scope: noteScopeOf(row['scope'], `${path}.scope`),
+    attachedTickets: asArray(row['attachedTickets'], `${path}.attachedTickets`).map((entry, index) => {
+      const ticketPath = `${path}.attachedTickets[${index}]`;
+      const ticket = asRecord(entry, ticketPath);
+      return {
+        ticketId: asString(ticket['ticketId'], `${ticketPath}.ticketId`),
+        projectId: asString(ticket['projectId'], `${ticketPath}.projectId`),
+        key: asString(ticket['key'], `${ticketPath}.key`),
+        title: asString(ticket['title'], `${ticketPath}.title`),
+      };
+    }),
+    deleted: row['deleted'] === true,
+    createdAt: asString(row['createdAt'], `${path}.createdAt`),
+    updatedAt: asString(row['updatedAt'], `${path}.updatedAt`),
+  };
+}
+
+/** `{ notes: [...] }` — the list reads and the per-ticket read. */
+export function mapNoteSummaries(raw: unknown): NoteSummary[] {
+  const record = asRecord(raw, 'notes');
+  return asArray(record['notes'], 'notes.notes').map((entry, index) => {
+    const path = `notes[${index}]`;
+    return noteSummaryOf(asRecord(entry, path), path);
+  });
+}
+
+/**
+ * `{ note: {...} }` — one note with its body.
+ *
+ * `schemaVersion` is read as a NUMBER through `asNumber` rather than coerced,
+ * because the editor's migration path keys off it and `Number('2')` would accept
+ * a string the server never sends — hiding a wire change behind a coercion.
+ */
+export function mapNoteDetail(raw: unknown): NoteDetail {
+  const record = asRecord(raw, 'note');
+  const row = asRecord(record['note'], 'note.note');
+  return {
+    ...noteSummaryOf(row, 'note.note'),
+    // NOT stringified, not parsed, not inspected: see this section's docblock.
+    body: row['body'],
+    schemaVersion: asNumber(row['schemaVersion'], 'note.note.schemaVersion'),
+  };
+}
+
+/** `{ comments: [...] }` — a note's thread. No files: Plan 4 of the series adds them. */
+export function mapNoteComments(raw: unknown): NoteComment[] {
+  const record = asRecord(raw, 'comments');
+  return asArray(record['comments'], 'comments.comments').map((entry, index) => {
+    const path = `comments.comments[${index}]`;
+    const row = asRecord(entry, path);
+    return {
+      commentId: asString(row['commentId'], `${path}.commentId`),
+      authorId: asString(row['authorId'], `${path}.authorId`),
+      body: row['body'],
+      recordedAt: asString(row['recordedAt'], `${path}.recordedAt`),
+    };
+  });
+}
+
+/** `{ versions: [...] }` — pointers, not snapshots. The body is fetched per version. */
+export function mapNoteVersions(raw: unknown): NoteVersion[] {
+  const record = asRecord(raw, 'versions');
+  return asArray(record['versions'], 'versions.versions').map((entry, index) => {
+    const path = `versions.versions[${index}]`;
+    const row = asRecord(entry, path);
+    return {
+      eventId: asString(row['eventId'], `${path}.eventId`),
+      authorId: asString(row['authorId'], `${path}.authorId`),
+      recordedAt: asString(row['recordedAt'], `${path}.recordedAt`),
+      seq: asNumber(row['seq'], `${path}.seq`),
+    };
+  });
+}
+
+/**
+ * `{ body }` — one version's document, or `null` when the body IS null.
+ *
+ * The one mapper here that returns a bare document rather than a view model,
+ * because that is what the method's contract says: a version is fetched to be
+ * shown read-only, and Plan 1 has no component for it (`data-source.ts`'s note
+ * group says the same about `NoteComment`). `asRecord` is applied to the
+ * ENVELOPE and never to the body — the body is a ProseMirror document whose
+ * shape this file has no business asserting.
+ *
+ * `?? null` rather than returning the raw value: the server sends `null` for a
+ * `note.created` written without a body (the EMPTY document is the reducer's
+ * fallback, not something any event recorded), and a mapper that returned
+ * `undefined` for it would give the caller two absence values where the
+ * signature declares one.
+ */
+export function mapNoteVersionBody(raw: unknown): unknown {
+  const record = asRecord(raw, 'version');
+  return record['body'] ?? null;
+}

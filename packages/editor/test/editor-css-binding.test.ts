@@ -219,3 +219,190 @@ describe('13.1312 the editable node fills the field', () => {
     expect(declared(body, 'min-height')).not.toBe(declared(comment, 'min-height'));
   });
 });
+
+/**
+ * 9.272 — THE COLLAPSIBLE BLOCK'S CHROME (spec §8.4, Plan 4 Task 3).
+ *
+ * Same reason as every other case in this file: jsdom applies no stylesheet, so
+ * a rendered assertion would pass against any CSS at all — including none. What
+ * makes a collapsible LOOK like one is the border that encloses it, the pointer
+ * on the summary that says the summary is the fold control, and the padding
+ * that keeps the summary off its own edge.
+ *
+ * The edge is drawn with `currentColor` and not a token, which is this file's
+ * own standing rule (`editor.css`'s header): packages/editor must not depend on
+ * packages/ui, and a colour named here would also be caught by the repo's
+ * colour scanner. The assertion is written against the DECLARATION rather than
+ * its colour, so a later hand choosing a different inheriting ink still passes
+ * — that is not the property this case is for.
+ */
+describe('9.272 the collapsible block is styled', () => {
+  it('9.272 the block carries a border, a radius and padding; its title is weighted; its TOGGLE is the control', () => {
+    const box = ruleBody(EDITOR_CSS, '.editor-details');
+    expect(declared(box, 'border')).not.toBeNull();
+    expect(declared(box, 'border-radius')).not.toBeNull();
+    expect(declared(box, 'padding')).not.toBeNull();
+
+    // ⚠ THE SELECTORS HERE ARE THE ONES THAT MATCH THE RENDERED DOM, and the
+    // first version of this case named `.editor-details > summary` — which
+    // matched NOTHING, because the Details node view puts the summary one level
+    // deeper inside a wrapper div. This assertion could not see that: it reads
+    // the STYLESHEET, so a declaration is visible to it and a selector that
+    // matches no element is not. `collapsible.test.ts` now asserts
+    // `element.matches(<selector>)` against a live editor, which is the half
+    // this file cannot do.
+    const summary = ruleBody(EDITOR_CSS, '.editor-details summary');
+    expect(declared(summary, 'font-weight')).toBe('600');
+    // …and the FOLD CONTROL is the button the extension renders, with no class
+    // of its own, so it painted the UA's chrome until this reset.
+    const toggle = ruleBody(EDITOR_CSS, '.editor-details > button');
+    expect(declared(toggle, 'cursor')).toBe('pointer');
+    expect(declared(toggle, 'border')).toBe('none');
+    expect(declared(toggle, 'background')).toBe('none');
+
+    // CONTROL, same `it`: the two selectors must reach DIFFERENT rules.
+    // `ruleBody` is a first-match substring search, so a docblock that merely
+    // named the summary selector above the box rule — or a box rule written
+    // `.editor-details > summary` by mistake — would let the summary arm read
+    // the box's declarations and pass with no summary rule in the file at all.
+    expect(summary).not.toBe(box);
+    expect(declared(box, 'cursor')).toBeNull();
+  });
+});
+
+/**
+ * 9.275 — THE CODE BLOCK'S COPY BUTTON (Plan 4 Task 4). Same split as
+ * everything above: jsdom applies no stylesheet, so the only place the button's
+ * placement can be checked is the file. `position: relative` on the block is
+ * what makes the button's `position: absolute` mean "in this block's corner"
+ * rather than "in the page's", and the pair is asserted together because either
+ * one alone is a placement that does not work.
+ */
+describe('9.275 the code block copy button is placed', () => {
+  it('9.275 .editor-codeblock is a containing block and the copy button is positioned in it', () => {
+    const box = ruleBody(EDITOR_CSS, '.editor-codeblock');
+    expect(declared(box, 'position')).toBe('relative');
+
+    const copy = ruleBody(EDITOR_CSS, '.editor-codeblock__copy');
+    expect(declared(copy, 'position')).toBe('absolute');
+
+    // CONTROL, same `it`: the two selectors must reach DIFFERENT rules.
+    // `ruleBody` is a first-match substring search, so a block rule written
+    // `.editor-codeblock__copy` by mistake would let the box arm read the
+    // button's declarations and pass with no block rule in the file.
+    expect(copy).not.toBe(box);
+  });
+});
+
+/**
+ * 9.282 — THE WIKI-LINK'S TWO RENDERINGS (spec §8.5, Plan 4 Task 5).
+ *
+ * `renderNode`/the node view produce either an `<a>` or a `--missing` pill,
+ * and the whole point of the pill is that a reader can TELL. jsdom applies no
+ * stylesheet, so the only place that difference can be checked is this file.
+ *
+ * The distinction is drawn with `text-decoration`, not with an ink, and that is
+ * this stylesheet's own rule rather than a preference: `editor.css`'s header
+ * forbids every colour form — hex, function and bare keyword — and
+ * packages/editor must not reach packages/ui's tokens. The assertion is on the
+ * declaration and on the two rules really differing, never on a colour.
+ */
+describe('9.282 the wiki-link and its missing pill are styled apart', () => {
+  it('9.282 .editor-wikilink has a rule and .editor-wikilink--missing reads differently', () => {
+    const link = ruleBody(EDITOR_CSS, '.editor-wikilink');
+    const missing = ruleBody(EDITOR_CSS, '.editor-wikilink--missing');
+    // CONTROL, first: the two selectors must reach DIFFERENT rules. `ruleBody`
+    // is a first-match substring search, so a missing-pill rule absent from the
+    // file would let this arm read the base rule and pass with no pill styling
+    // at all — which is the mutation this case names.
+    expect(missing).not.toBe(link);
+    expect(declared(missing, 'text-decoration')).not.toBeNull();
+    // …and the base rule does NOT carry it, so the two renderings differ by a
+    // declaration rather than by the pill merely repeating the link's rule.
+    expect(declared(link, 'text-decoration')).toBeNull();
+  });
+});
+
+/**
+ * 9.306 — THE TICKET-REF CHIP AND ITS `:ticket` PICKER (spec §14, Plan 7 Task
+ * 1). Same split as the wiki-link case above: jsdom applies no stylesheet, so
+ * this file is the only place a missing rule can be seen at all.
+ */
+describe('9.306 the ticket-ref chip and its picker are styled', () => {
+  it('9.306 .editor-ticketref and .ticketref-popup both carry rules in editor.css', () => {
+    const chip = ruleBody(EDITOR_CSS, '.editor-ticketref');
+    const popup = ruleBody(EDITOR_CSS, '.ticketref-popup');
+    // CONTROL: the two selectors must reach DIFFERENT rules — `ruleBody` is a
+    // first-match substring search, so a popup rule absent from the file
+    // would let this arm read the chip's own rule and pass with no popup
+    // styling at all, which is the mutation this case names.
+    expect(popup).not.toBe(chip);
+  });
+});
+
+/**
+ * 9.322 — the popups' `z-index` outranks a ticket sheet's own scrim (bug
+ * fix, 2026-09-24, measured live on :3047 in a ticket sheet's comment box).
+ * `.gn-sheet__scrim` is `position: fixed; z-index: 40` (`packages/ui/src/
+ * ui.css`); every popup here is ALSO `position: fixed`, appended straight to
+ * `document.body` as a sibling of the scrim — so a popup opened from inside
+ * a sheet (the reported bug's own reproduction: "in a ticket-sheet comment")
+ * is a real stacking-context comparison against it, not a DOM-order one.
+ * `.wikilink-popup`/`.ticketref-popup` carried 50 before the three popup
+ * families were consolidated into one shared block, and the consolidation
+ * accidentally dropped all three to `.mention-popup`'s old 30 — invisible
+ * behind the scrim, measured live before this case existed.
+ */
+describe('9.322 the suggestion popups outrank a sheet scrim', () => {
+  it('9.322 .mention-popup, .wikilink-popup and .ticketref-popup each declare z-index: 50, above .gn-sheet__scrim\'s 40', () => {
+    for (const selector of ['.mention-popup', '.wikilink-popup', '.ticketref-popup']) {
+      const body = ruleBody(EDITOR_CSS, selector);
+      expect(declared(body, 'z-index'), `${selector}'s z-index`).toBe('50');
+    }
+  });
+});
+
+/**
+ * 9.288–9.290 — THE READING RAIL'S STYLES (Plan 4 Task 7). Same split as
+ * everything above: the markup is asserted in `reading-toc.test.tsx`, and what
+ * makes the rail READ as an outline is the per-level indent and the weight on
+ * the active entry — neither of which jsdom can report.
+ */
+describe('9.290 the reading rail is styled', () => {
+  it('9.290 each heading level is indented, and the active entry is marked by weight', () => {
+    const h1 = ruleBody(EDITOR_CSS, '.reading-toc__item--h1 .reading-toc__link');
+    const h2 = ruleBody(EDITOR_CSS, '.reading-toc__item--h2 .reading-toc__link');
+    const h3 = ruleBody(EDITOR_CSS, '.reading-toc__item--h3 .reading-toc__link');
+    expect(declared(h1, 'padding-left')).toBe('0');
+    expect(declared(h2, 'padding-left')).toBe('1rem');
+    expect(declared(h3, 'padding-left')).toBe('2rem');
+
+    // The active entry is NOT colour: this stylesheet may not name one, and
+    // colour alone is never the only indicator.
+    const active = ruleBody(EDITOR_CSS, ".reading-toc__link[aria-current='true']");
+    expect(declared(active, 'font-weight')).toBe('600');
+  });
+});
+
+/**
+ * 9.292 — THE NOTE MODE'S SAVE STATE HAS A RULE (Plan 4 Task 8), which it did
+ * not until the plan-close audit listed the `editor-slot__*` classes DECLARED
+ * against those EMITTED: three declared, four emitted, and mine was the fourth.
+ *
+ * The assertion is the SIZE, because that is the declaration that changes what a
+ * reader sees: `.editor-slot__hint` in the same row is 0.75rem, so a span with
+ * no rule draws at the page's size and the row shows two.
+ */
+describe('9.292 the save state is styled with its row', () => {
+  it('9.292 .editor-slot__save-state takes the hint’s size and not its flex or opacity', () => {
+    const state = ruleBody(EDITOR_CSS, '.editor-slot__save-state');
+    expect(declared(state, 'font-size')).toBe('0.75rem');
+    expect(declared(state, 'line-height')).toBe('1rem');
+    // CONTROL, same `it`: it must NOT have taken the hint's two other
+    // declarations. `flex: 1` would make the state grow and push the row's
+    // right-hand control out of place, and `opacity: 0.7` would mark a
+    // save-state warning as a whisper.
+    expect(declared(state, 'flex')).toBeNull();
+    expect(declared(state, 'opacity')).toBeNull();
+  });
+});

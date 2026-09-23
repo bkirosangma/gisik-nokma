@@ -1,7 +1,7 @@
 import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
-import type { TicketTypeDef } from '@gisik-nokma/domain';
+import type { SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
 import { EMPTY_BOARD_COPY, type BoardView, type TicketListView } from '@gisik-nokma/app-core';
 import { HttpError } from '@gisik-nokma/app-core/online';
 import { Providers } from '../src/providers.js';
@@ -103,6 +103,7 @@ const BOARD: BoardView = {
           name: 'Doing',
           category: 'active',
           blocked: false,
+          creatable: true,
           cards: [
             {
               ticketId: '01J9TICKET00000000000000TS',
@@ -120,6 +121,11 @@ const BOARD: BoardView = {
               key: null,
               rollup: null,
               pending: false,
+              // Owner request, 2026-09-23: REQUIRED on `BoardCard`;
+              // `null`/`null` is a root ticket under no epic, the same
+              // default `boardCardSeed` uses.
+              parent: null,
+              epic: null,
             },
           ],
         },
@@ -678,5 +684,167 @@ describe('V1 an empty project’s board offers the control its sentence names', 
     // The SAME dialog the header's own trigger opens: its Parent picker is the
     // control that exists only inside it.
     expect(await screen.findByRole('combobox', { name: 'Parent' })).toBeInTheDocument();
+  });
+});
+
+/**
+ * Case 13.1442 — starting-status design, 2026-09-23. The end-to-end claim:
+ * clicking an empty COLUMN's "Add a ticket" opens the New-ticket dialog
+ * pre-filled with THAT column's type and status, and a submit from there
+ * carries `stateId` on the wire — while the header's own unscoped "New
+ * ticket" still opens with the workflow's initial state and NO `stateId` at
+ * all (the wire's own absence-means-initial rule). This is the one site that
+ * can see the WHOLE chain: `Board`'s `onCreateTicket` selection through
+ * `page.tsx`'s `createSelection` state to `CreateTicketFlow.initialSelection`
+ * to the actual `ticket.created` payload — no lower-level test mounts all
+ * four at once.
+ */
+describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', () => {
+  /**
+   * `wf-errands`' OWN states — `todo` (its `initialStateId`) and `doing` — so
+   * the empty column this case clicks can be the NON-initial one: a click on
+   * `todo` would produce a `stateId` the omission rule (13.1439) drops from
+   * the wire again, which would make this case indistinguishable from the
+   * header's own unscoped default. `doing` has no such ambiguity.
+   */
+  const WF_ERRANDS_DEF: WorkflowDef = {
+    id: 'wf-errands',
+    version: 1,
+    name: 'Errand',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'doing', name: 'Doing', category: 'active' },
+    ],
+    transitions: [],
+  };
+  /** `todo` holds the counterpart row `LIST`/`WORKSPACE_TYPES` already name, so the board is not GLOBALLY empty (R6); `doing` is the empty, creatable column this case clicks. */
+  const BOARD_WITH_EMPTY_DOING: BoardView = {
+    projectId: PROJECT,
+    groups: [
+      {
+        workflowId: 'wf-errands',
+        workflowVersion: 1,
+        workflowName: 'Errand',
+        columns: [
+          {
+            stateId: 'todo',
+            name: 'To do',
+            category: 'open',
+            blocked: false,
+            creatable: true,
+            cards: [
+              {
+                ticketId: '01J9TICKET00000000000000TS',
+                title: 'Rewire the shop sign',
+                typeId: 'task',
+                assignee: null,
+                stateProvenance: PROVENANCE,
+                dueDate: null,
+                priority: { value: 'P2', claim: PROVENANCE },
+                cause: null,
+                key: null,
+                rollup: null,
+                pending: false,
+                // Owner request, 2026-09-23: REQUIRED on `BoardCard`; `null`/`null`
+                // is a root ticket under no epic, the same default `boardCardSeed` uses.
+                parent: null,
+                epic: null,
+              },
+            ],
+          },
+          {
+            stateId: 'doing',
+            name: 'Doing',
+            category: 'active',
+            blocked: false,
+            creatable: true,
+            cards: [],
+          },
+        ],
+      },
+    ],
+  };
+
+  function world() {
+    return stubServices({
+      getBoard: async () => BOARD_WITH_EMPTY_DOING,
+      getTickets: async () => LIST,
+      getTicketTypes: async () => WORKSPACE_TYPES,
+      getWorkflowDef: async (_workspaceId: string, workflowId: string) =>
+        workflowId === 'wf-errands' ? WF_ERRANDS_DEF : null,
+      getPreferences: async () => EMPTY_PREFERENCES,
+    });
+  }
+
+  it('a column click pre-fills type + status and the create carries stateId; the header opens with the initial state and no stateId (control)', async () => {
+    const user = userEvent.setup();
+    const ingested: SubmittedEvent[] = [];
+    const services = world();
+    services.dataSource.ingest = async (events) => {
+      ingested.push(...events);
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: ingested.length,
+        serverTime: '2026-08-20T09:00:00.000Z',
+      }));
+    };
+    render(
+      <Providers services={services}>
+        <ProjectPage />
+      </Providers>,
+    );
+
+    // The empty `Doing` column's own "Add a ticket" — not the header's.
+    const doingColumn = await screen.findByRole('region', { name: 'Doing' });
+    await user.click(within(doingColumn).getByRole('button', { name: 'Add a ticket' }));
+
+    // Pre-filled: `epic` is `WORKSPACE_TYPES`' FIRST entry sharing
+    // `wf-errands`, and it is NOT what renders — `task` is, because this
+    // dialog asks `defaultRootTypeFor` over the types sharing the workflow
+    // rather than a bare first-match (measured deviation from the design's
+    // literal "the first is pre-selected": an epic created into a column
+    // vanishes from every column the board draws, `isEpic`'s filter, owner
+    // ruling 2026-09-20 — the exact defect E5-16 already named once for the
+    // header's own default). The status is the column's own `doing`, not the
+    // workflow's `todo`.
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
+    expect(screen.getByRole('button', { name: /Starting status/ })).toHaveTextContent('Doing');
+    expect(screen.getByRole('checkbox', { name: 'Starts in the backlog?' })).not.toBeChecked();
+
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Fix the loose hinge' } });
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(ingested).toHaveLength(1));
+    const columnEvent = ingested[0];
+    if (columnEvent === undefined || columnEvent.type !== 'ticket.created') {
+      throw new Error(`expected one ticket.created event, got ${JSON.stringify(ingested)}`);
+    }
+    expect((columnEvent.payload as Record<string, unknown>)['stateId']).toBe('doing');
+    expect((columnEvent.payload as Record<string, unknown>)['typeId']).toBe('task');
+
+    // CONTROL, same render: a successful Create already closed the dialog
+    // (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on `committed`),
+    // so reopening from the HEADER's own unscoped trigger carries no
+    // selection at all — the workflow's initial state (`todo`), and NO
+    // `stateId` key on the wire (13.1439's own omission rule, exercised here
+    // through the real page rather than a fixture).
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Patch the fence' } });
+    // `chore` is the ordinary default here (rank 3, tied with `task` and won
+    // on id) — picked past explicitly, since this control is about the
+    // ABSENT `stateId`, not about which type the ladder happens to default
+    // to.
+    await user.click(screen.getByLabelText('Type'));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Epic' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    await waitFor(() => expect(ingested).toHaveLength(2));
+    const headerEvent = ingested[1];
+    if (headerEvent === undefined || headerEvent.type !== 'ticket.created') {
+      throw new Error(`expected a second ticket.created event, got ${JSON.stringify(ingested)}`);
+    }
+    expect(headerEvent.payload).not.toHaveProperty('stateId');
   });
 });

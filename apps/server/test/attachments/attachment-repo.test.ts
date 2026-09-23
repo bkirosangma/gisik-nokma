@@ -18,11 +18,39 @@ afterAll(async () => {
   await db.drop();
 });
 
-function row(id: string, overrides: Partial<Parameters<typeof insertAttachment>[1]> = {}) {
+/**
+ * A ticket-owned row, with the two fields the planted-defect cases vary.
+ *
+ * The override type is spelled out rather than derived as
+ * `Partial<Parameters<typeof insertAttachment>[1]>`, which is what it used to be
+ * and which STOPS WORKING the moment the parameter becomes a union: `Partial`
+ * over a union distributes into a union of partials, so every `row(...)` call
+ * returned a union and nine call sites became type errors at once (measured, in
+ * this file, when the notes series widened the owner). Naming the two fields the
+ * cases actually vary is narrower AND more stable.
+ */
+function row(
+  id: string,
+  overrides: Partial<{
+    size: number;
+    sha256: string;
+    filename: string;
+    mime: string;
+    ticketId: string;
+    objectKey: string;
+  }> = {},
+) {
   return {
     id,
     workspaceId: WS,
+    // `noteId: null` AND NOT an omission, since the notes series (Plan 1 of 6):
+    // `insertAttachment`'s row is now a union over the owner, and a ticket-owned
+    // row must say which arm it is. The `row()` helper above built its overrides
+    // from `Partial<Parameters<...>[1]>` — which over a UNION is a union of
+    // partials — so omitting the field made every `row(...)` call site a type
+    // error rather than a silent ticket default.
     ticketId: TICKET,
+    noteId: null,
     uploaderId: USER,
     filename: 'gst-receipt.pdf',
     mime: 'application/pdf',

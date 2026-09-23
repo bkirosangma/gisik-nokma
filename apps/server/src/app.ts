@@ -13,6 +13,7 @@ import { registerAuthMethodRoutes } from './routes/auth-methods.js';
 import { makeRequireSession } from './auth/require-session.js';
 import type { ClientIngest } from './ingest/ingest-service.js';
 import { createNotificationFanout } from './notifications/fanout.js';
+import { nudgesEmbedding } from './search/nudge.js';
 import { createInAppTransport } from './notifications/transport.js';
 import type { ObjectStore } from './attachments/object-store.js';
 import { registerAttachmentRoutes } from './routes/attachments.js';
@@ -32,6 +33,7 @@ import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './ro
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
+import { registerNoteRoutes } from './routes/notes.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import { registerSyncRoutes } from './sync/sync-routes.js';
@@ -156,6 +158,25 @@ export type AppDeps = {
    * times at once — and giving the stream its own would make that expressible.
    */
   stream?: Omit<StreamRouteDeps, 'pool' | 'hub' | 'now'>;
+  /**
+   * Called once per committed note event whose TEXT changed — `note.created`
+   * and `note.body_set`, filtered by `nudgesEmbedding`.
+   *
+   * A CALLBACK rather than the worker itself, and that is the whole design: the
+   * embedding loop is a timer, and `buildApp` is called by around sixty test
+   * files, so starting one here would fire it in every one of them (the
+   * snapshot writer's registration makes the same argument at length). What
+   * `buildApp` owns is the one thing only it can reach — the commit feed — and
+   * it hands the decision to whoever assembled the app. `index.ts` hands it
+   * `(noteId) => worker.nudge(noteId)`; the sixty test files hand it nothing,
+   * and a listener is registered only when this is defined, so they subscribe
+   * to nothing at all.
+   *
+   * The argument is accepted for the caller's benefit — a log line, or a
+   * future per-note wake-up — and the shipped worker does not need it:
+   * staleness is decided by the tables.
+   */
+  onNoteBodyCommitted?: (noteId: string) => void;
 };
 
 /**
@@ -826,6 +847,12 @@ export function buildApp(
   // each enforcing visibility server-side. Same preHandler by parameter, same
   // reason: all three handlers read `request.currentUserId`.
   registerTicketRoutes(app, { pool: deps.pool }, requireSession);
+  // The note read surface (notes series, Plan 1 of 6) — list, one note, a
+  // ticket's notes, comments, history and one version. Same preHandler by
+  // parameter, same reason: every handler reads `request.currentUserId`, and the
+  // three note-addressed paths learn their workspace from the note's own row
+  // rather than from the URL (see `routes/notes.ts`).
+  registerNoteRoutes(app, { pool: deps.pool }, requireSession);
   // One ticket's history at a workspace-free path (Plan 3 Task 13) — the ledger
   // filtered to that ticket, paged by `afterSeq`/`limit`, as
   // `TicketHistoryEvent`s. It is NOT a duplicate of the `/events` door
@@ -994,6 +1021,29 @@ export function buildApp(
   app.addHook('onClose', () => {
     unsubscribeNotifications();
   });
+  // The embedding worker's NUDGE (Plan 3 of 6, spec §7.6) — the third listener on
+  // the commit feed, and the only one that tells a background loop rather than a
+  // person or a socket. The loop itself is started in `index.ts` beside the
+  // snapshot writer; see `AppDeps.onNoteBodyCommitted` for why the split is
+  // where it is.
+  //
+  // FIRE-AND-FORGET, like the fan-out above and for a stronger reason: the
+  // callback's whole job is to schedule work for later, so there is nothing for
+  // a request to wait on and nothing a slow embedding could slow down.
+  //
+  // Registered ONLY when the caller supplied the callback. Without this guard
+  // every `buildApp` in the suite would take a subscription it has no use for
+  // and could never observe — and the suite's own app fixtures would each hold
+  // a live listener on the ingest service they were built over.
+  if (deps.onNoteBodyCommitted !== undefined) {
+    const onNoteBodyCommitted = deps.onNoteBodyCommitted;
+    const unsubscribeEmbedNudge = deps.ingest.onEventCommitted((event) => {
+      if (nudgesEmbedding(event)) onNoteBodyCommitted(event.entity.id);
+    });
+    app.addHook('onClose', () => {
+      unsubscribeEmbedNudge();
+    });
+  }
   // The attachment doors (Plan 7 Tasks 9 and 10) — upload and download. This
   // line is the whole of what was missing: the module was complete and tested
   // and reachable from nothing, so on the server this repo booted the

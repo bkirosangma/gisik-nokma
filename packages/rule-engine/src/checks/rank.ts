@@ -16,7 +16,7 @@ import { ACCEPT, refuse } from './refusals.js';
  *
  * THE TEST IS `stateId`, NOT `stateCategory`, and the difference is not
  * pedantic: the universal `BACKLOG_STATE` is `category: 'open'`
- * (`packages/domain/src/workflow.ts:56`), so a category test would admit every
+ * (`packages/domain/src/workflow.ts:73`), so a category test would admit every
  * open ticket in the workspace — `"To do"` among them — and the backlog is not
  * a category, it is one reserved id no workflow can declare.
  *

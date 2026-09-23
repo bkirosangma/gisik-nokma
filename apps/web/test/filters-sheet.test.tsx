@@ -90,6 +90,11 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     cause: null,
     rollup: null,
     pending: false,
+    // Owner request, 2026-09-23: REQUIRED on `BoardCard`; `null`/`null` is a
+    // root ticket under no epic, the same default `boardCardSeed` uses. No
+    // case in this file is about either badge.
+    parent: null,
+    epic: null,
     ...overrides,
   };
 }
@@ -109,7 +114,7 @@ function boardOf(cards: BoardCard[]): BoardView {
         workflowVersion: 1,
         workflowName: 'Basic',
         columns: [
-          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards },
+          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards },
         ],
       },
     ],

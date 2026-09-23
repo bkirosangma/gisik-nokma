@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 import { newUlid, parseEvent, type TicketTypeDef } from '@gisik-nokma/domain';
-import { draftFromPublished, newDraft } from '../../src/workflow-builder/draft-store.js';
+import { createDraftStore, draftFromPublished, newDraft } from '../../src/workflow-builder/draft-store.js';
 import {
   buildPublishPayload,
   buildTicketTypeDefinedEvent,
@@ -55,6 +55,20 @@ describe('droppedStates and buildPublishPayload', () => {
     expect('stateMapping' in buildPublishPayload(draft)).toBe(false);
     expect('stateMapping' in buildPublishPayload(draft, {})).toBe(false);
     expect(buildPublishPayload(draft, { review: 'todo' }).stateMapping).toEqual({ review: 'todo' });
+  });
+
+  /**
+   * 10.139 — starting-status design (2026-09-23): a state's `creatable: false`, set through the draft store, survives into the publish payload — buildPublishPayload spreads draft.def whole, and workflowStateSchema (packages/domain/src/workflow.ts) is what keeps a non-strict parse from stripping the key at publish.
+   */
+  it('a state with creatable: false, set through the store, carries the flag into the publish payload', () => {
+    const store = createDraftStore(draftFromPublished(publishedKanban()));
+    store.actions.setStateCreatable('review', false);
+    const payload = buildPublishPayload(store.getState());
+    expect(payload.states.find((state) => state.id === 'review')?.creatable).toBe(false);
+    // Every other state is untouched — the key is written for ONE state, not
+    // smeared across the payload.
+    expect(payload.states.find((state) => state.id === 'todo')?.creatable).toBeUndefined();
+    expect(payload.states.find((state) => state.id === 'done')?.creatable).toBeUndefined();
   });
 });
 

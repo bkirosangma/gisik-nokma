@@ -1,6 +1,8 @@
 import type { Editor } from '@tiptap/core';
 import { emptyDoc, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
+import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
+import type { TicketRefCandidate } from '../extensions/ticket-ref.js';
 import { parseHostMessage, type EditorToHostMessage } from './bridge.js';
 
 export type EditorBridgeDeps = {
@@ -12,6 +14,10 @@ export type EditorBridge = {
   handleHostMessage(raw: unknown): void;
   /** Mention data source for the webview editor: query rides the bridge. */
   resolveMentions(query: string): Promise<MentionCandidate[]>;
+  /** Note data source for the webview editor's `[[` picker — the same round trip. */
+  resolveNotes(query: string): Promise<NoteLinkCandidate[]>;
+  /** Ticket data source for the webview editor's `:ticket` picker — the same round trip. */
+  resolveTickets(query: string): Promise<TicketRefCandidate[]>;
   /** The attach affordance / captured paste: ask the host to run its native upload. */
   requestUpload(): void;
   dispose(): void;
@@ -30,6 +36,8 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
   let requestCounter = 0;
   let disposed = false;
   const pendingMentions = new Map<string, (users: MentionCandidate[]) => void>();
+  const pendingNotes = new Map<string, (candidates: NoteLinkCandidate[]) => void>();
+  const pendingTickets = new Map<string, (candidates: TicketRefCandidate[]) => void>();
 
   const onUpdate = (): void => {
     if (disposed) return;
@@ -73,9 +81,41 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
           }
           break;
         }
+        case 'noteResults': {
+          const resolve = pendingNotes.get(message.requestId);
+          if (resolve) {
+            pendingNotes.delete(message.requestId);
+            resolve(message.candidates);
+          }
+          break;
+        }
+        case 'ticketResults': {
+          const resolve = pendingTickets.get(message.requestId);
+          if (resolve) {
+            pendingTickets.delete(message.requestId);
+            resolve(message.candidates);
+          }
+          break;
+        }
         case 'uploadFailed':
           // Nothing to roll back: the webview never inserted anything for
           // an in-flight host upload. The host surfaces its own error UI.
+          break;
+        default:
+          // ⚠ EXHAUSTIVENESS MADE A COMPILE ERROR, and this is not decoration.
+          // The switch had NO default, so a kind added to
+          // `HostToEditorMessage` without a branch here was parsed, matched
+          // nothing, and was DROPPED IN SILENCE — no error, no log, nothing to
+          // notice. That is exactly the defect this branch found on the other
+          // side of the bridge, where the RN host ignored `noteQuery` and left
+          // the editor's picker pending forever.
+          //
+          // `satisfies never` type-checks against the union: while every kind
+          // is handled, `message` is `never` and this compiles; add a kind and
+          // it is a non-never, so the build fails at the line that must decide
+          // what the new kind does. MEASURED by adding a seventh kind to the
+          // union: `pnpm typecheck` reddens, naming this file.
+          message satisfies never;
           break;
       }
     },
@@ -86,6 +126,20 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
         post({ bridge: 1, kind: 'mentionQuery', requestId, query });
       });
     },
+    resolveNotes(query) {
+      const requestId = String(++requestCounter);
+      return new Promise((resolve) => {
+        pendingNotes.set(requestId, resolve);
+        post({ bridge: 1, kind: 'noteQuery', requestId, query });
+      });
+    },
+    resolveTickets(query) {
+      const requestId = String(++requestCounter);
+      return new Promise((resolve) => {
+        pendingTickets.set(requestId, resolve);
+        post({ bridge: 1, kind: 'ticketQuery', requestId, query });
+      });
+    },
     requestUpload() {
       post({ bridge: 1, kind: 'requestUpload', requestId: String(++requestCounter) });
     },
@@ -93,6 +147,8 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
       disposed = true;
       editor.off('update', onUpdate);
       pendingMentions.clear();
+      pendingNotes.clear();
+      pendingTickets.clear();
     },
   };
 }

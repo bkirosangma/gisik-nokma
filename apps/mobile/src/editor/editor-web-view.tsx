@@ -117,6 +117,30 @@ export function EditorWebView(props: EditorWebViewProps) {
             .then((users) => send({ bridge: 1, kind: 'mentionResults', requestId, users }));
           break;
         }
+        case 'noteQuery': {
+          // ALWAYS REPLY, for the reason the arm above states in its own
+          // comment — a dropped request leaves the editor's picker pending
+          // forever. The answer is EMPTY because this app has no notes surface
+          // yet: no screen reads notes, so there is nothing to search, and the
+          // picker's honest outcome is "No notes match". Inventing a source
+          // here would put a stub behind a promise the reader would take for a
+          // real search.
+          //
+          // ⚠ WHEN MOBILE GAINS NOTES, THIS IS THE SEAM TO WIDEN — and it
+          // should take an `onNoteQuery` prop then, exactly as
+          // `onMentionQuery` does, rather than growing a store in this file.
+          send({ bridge: 1, kind: 'noteResults', requestId: message.requestId, candidates: [] });
+          break;
+        }
+        case 'ticketQuery': {
+          // THE SAME RULE `noteQuery` FOLLOWS, ABOVE, for the same reason: this
+          // app has no ticket search surface yet, so the honest answer is
+          // empty rather than a stub behind a promise nobody built. When
+          // mobile gains one, this is the seam to widen — an `onTicketQuery`
+          // prop, exactly as `onMentionQuery` does.
+          send({ bridge: 1, kind: 'ticketResults', requestId: message.requestId, candidates: [] });
+          break;
+        }
       }
     },
     [editable, initialDoc, onChange, onEditorError, onMentionQuery, onRequestUpload, onSubmit, send],

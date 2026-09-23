@@ -1,4 +1,4 @@
-import type { LedgerEvent, ReachGrantedTicket } from '@gisik-nokma/domain';
+import type { LedgerEvent, ReachGrantedNote, ReachGrantedTicket } from '@gisik-nokma/domain';
 
 /**
  * What sync-down hands a replica — the CLIENT-SIDE MIRROR of
@@ -91,7 +91,23 @@ export type ScopeRevokedInstruction = { kind: 'scope-revoked'; workspaceId: stri
  * COMPLETELY from a stale partial one. An id-only notice could not: holding a
  * ticket says nothing about holding all of it.
  */
-export type ReachGrantedInstruction = { kind: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[] };
+export type ReachGrantedInstruction = {
+  kind: 'reach-granted';
+  workspaceId: string;
+  tickets: ReachGrantedTicket[];
+  /**
+   * The notes the same notice admits (notes series, Plan 2 of 6, spec §5.1).
+   * `tickets` is carried and EMPTY when a notice is entirely about notes, so
+   * the frame's shape does not change with its content.
+   *
+   * Present only when non-empty, exactly as the server builds it. The two arms
+   * are independent because the pull each drives is a different door
+   * (`GET /v1/sync/bootstrap/ticket` against `GET /v1/notes/:id/events`) and
+   * the two pending sets are separate — see `Replica.listPendingPulls`'s
+   * `kind` parameter for why they are not one discriminated list.
+   */
+  notes?: ReachGrantedNote[];
+};
 
 export type SyncItem = LedgerEvent | PurgeInstruction | ScopeRevokedInstruction | ReachGrantedInstruction;
 

@@ -33,13 +33,47 @@
   max-width: 50%;
 }
 
-/* Mention picker popup and the mention node itself (spec §2's one non-input-rule
-   trigger). Structure only, under the same rule as everything above: the edges
-   are drawn with `currentColor`, and the surface the popup sits on is the
-   host's to supply from the one origin named at the top of this file. */
+/* The three suggestion popups — mention (`@`, spec §2's one non-input-rule
+   trigger), wiki-link (`[[`/`:note`, spec §8.5) and ticket-ref (`:ticket`,
+   spec §14) — share ONE structural shape, under the same rule as everything
+   above: the edges are drawn with `currentColor`, and the surface, radius
+   and shadow the popup sits on are the host's to supply (bug fix, owner
+   report 2026-09-23: "the inline :note menu is also unstyled").
+   `packages/editor/src/extensions/suggestion-popup-position.ts` sets
+   `position: fixed` on the element directly; nothing here repeats it.
+
+   THREE SEPARATE RULES, not one comma-joined list, on purpose: `mention.
+   test.ts` and `wiki-link.test.ts` each scan this file with
+   `/\.(family-prefix)[a-z_-]*\s*\{/`, which matches a class only when it is
+   the LAST selector directly before `{` — a class earlier in a shared,
+   cross-family comma list (before a `,`) is invisible to its own family's
+   scan. Identical bodies, repeated, is what keeps every family's contract
+   test seeing its own classes declared.
+
+   `z-index: 50`, not 30 (measured live on :3047, 2026-09-24, in a ticket
+   sheet's comment box): `.gn-sheet__scrim` is `position: fixed; z-index: 40`
+   (`packages/ui/src/ui.css`), and EVERY popup here is a `position: fixed`
+   sibling of it, appended straight to `document.body` — so a popup opened
+   from inside a sheet, which is the reported bug's own reproduction, is a
+   stacking-context comparison against the scrim, not a DOM-order one.
+   `.wikilink-popup`/`.ticketref-popup` already carried 50 before this file's
+   three families were consolidated into one shared block; that value is
+   restored here rather than left at `.mention-popup`'s old 30, and
+   `.mention-popup` is raised to match — `@mention` inside a ticket comment
+   has the identical scrim beneath it. `apps/web/app/globals.css`'s z-index
+   scale comment is corrected in the same commit. */
 .mention-popup {
-  position: absolute;
-  z-index: 30;
+  z-index: 50;
+  min-width: 10rem;
+  border: 1px solid currentColor;
+}
+.wikilink-popup {
+  z-index: 50;
+  min-width: 10rem;
+  border: 1px solid currentColor;
+}
+.ticketref-popup {
+  z-index: 50;
   min-width: 10rem;
   border: 1px solid currentColor;
 }
@@ -47,9 +81,22 @@
   display: flex;
   flex-direction: column;
 }
-/* The result count, for screen readers only. Removed from the visual flow
-   without `display: none`, which would take it out of the accessibility tree
-   too and announce nothing. */
+.wikilink-popup__list {
+  display: flex;
+  flex-direction: column;
+}
+.ticketref-popup__list {
+  display: flex;
+  flex-direction: column;
+}
+/* The result count. For mention and wiki-link this is screen-reader only,
+   removed from the visual flow without `display: none` (which would take it
+   out of the accessibility tree too and announce nothing) — a plain "N
+   match" count carries nothing a sighted caller needs that the row list does
+   not already show. `.ticketref-popup__status` is the one exception
+   (Unit 3 ruling, 2026-09-24): it can ALSO read "Search needs a connection",
+   a real state, and the host draws it visible and muted for that reason —
+   see `apps/web/app/globals.css`. */
 .mention-popup__status {
   position: absolute;
   width: 1px;
@@ -61,6 +108,20 @@
   white-space: nowrap;
   border: 0;
 }
+.wikilink-popup__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.ticketref-popup__status {
+  padding: 0.25rem 0.5rem 0;
+}
 .mention-popup__item {
   text-align: left;
   padding: 0.25rem 0.5rem;
@@ -70,35 +131,51 @@
   font: inherit;
   color: inherit;
 }
+.wikilink-popup__item {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+.ticketref-popup__item {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+/* Selected state is a BACKGROUND, drawn by the host (owner request,
+   2026-09-23) — `apps/web/app/globals.css`. The selector stays here, with no
+   declaration, so the BEM contract tests above still see the class as real;
+   it is not an outline any more because these rows are never DOM-focused
+   (the contenteditable keeps focus throughout; `aria-activedescendant`
+   carries the selection to assistive tech instead), so an outline here was a
+   focus-ring convention borrowed for a control that is never focused. */
 .mention-popup__item--selected {
-  outline: 1px solid currentColor;
-  outline-offset: -1px;
+}
+.wikilink-popup__item--selected {
+}
+.ticketref-popup__item--selected {
+}
+.ticketref-popup__key {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
 }
 .editor-mention {
   white-space: nowrap;
 }
 
-/* Escape-suggestion chip: inline widget after the caret. */
-.escape-chip {
-  display: inline-flex;
-  gap: 0.375rem;
-  align-items: baseline;
-  margin-left: 0.375rem;
-  padding: 0.0625rem 0.375rem;
-  font-size: 0.75rem;
-  vertical-align: baseline;
-  cursor: pointer;
-  user-select: none;
-}
-.escape-chip__hint {
-  /* 0.75rem, not 0.625rem. At 10px this was the smallest text the product
-     rendered anywhere, and it carried `opacity: 0.7` on top — small AND faint,
-     which compound. The hierarchy against `.escape-chip` (also 0.75rem) is
-     already carried by the opacity, so raising the size loses nothing it was
-     doing. Floor and derivation: `apps/web/e2e-viewport/type-scale.ts`. */
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
+/* The escape-suggestion chip that used to render here is REMOVED (owner
+   ruling 2026-09-24, withdrawing spec §2's chip mechanic) — see
+   packages/editor/src/extensions/escape-suggestion.ts. Its Backspace-undo
+   repair is unaffected and needed no CSS. */
 
 /* Editor shell + chrome: the upload chips (UI-only optimistic placeholder,
    never a doc node) and the wrap menu shown on image selection. Structural
@@ -184,8 +261,8 @@
   font: inherit;
 }
 .ticket-editor__hint {
-  /* 0.75rem — the prototype's own 12px (`:1173`), and the floor this file
-     already holds itself to (`see .escape-chip__hint`). */
+  /* 0.75rem — the prototype's own 12px (`:1173`), and this file's established
+     floor for secondary text (`apps/web/e2e-viewport/type-scale.ts`). */
   font-size: 0.75rem;
   opacity: 0.7;
   margin: 0.375rem 0 0;
@@ -484,6 +561,21 @@
   opacity: 0.7;
 }
 
+/* The note mode's save state (Plan 4 Task 8). It had NO RULE while all three of
+   its siblings did — the family was `footer`/`hint`/`submit` declared and
+   `footer`/`hint`/`submit`/`save-state` emitted, which the plan-close audit
+   measured by listing both sides. The one declaration that matters is the SIZE:
+   `.editor-slot__hint` beside it is 0.75rem, so a span with no rule inherited
+   the page's size and the footer row drew two different text sizes.
+   IT DELIBERATELY DOES NOT TAKE THE HINT'S OTHER TWO DECLARATIONS. Not
+   `flex: 1` — the hint holds the row's left half so the right-hand control
+   stays pinned, and a state that grew would move it. Not `opacity: 0.7` —
+   that marks the hint as secondary, and "Not saved (kept on this device)" is
+   information the reader needs rather than a whisper. */
+.editor-slot__save-state {
+  font-size: 0.75rem;
+  line-height: 1rem;
+}
 .editor-slot__submit {
   /* 44px floor. The prototype draws 40 (`:1330`) and this product's own
      tap-target rule is the floor that wins; `packages/ui/test/
@@ -507,3 +599,124 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
+
+/* The collapsible block (spec §8.4, Plan 4 Task 3). `renderHTML` in
+   `../schema/extensions.ts` puts the `editor-details` class on the node via
+   the Details extension's `HTMLAttributes`, so this is the box the whole
+   block wears and `.editor-details > summary` is the fold control.
+   The edge is `currentColor` like every other visible edge in this file: the
+   colour is whatever the surrounding text already proves, and naming a token
+   here would make packages/editor depend on packages/ui. */
+.editor-details {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 8px 0;
+}
+/* ⚠ THE SELECTOR HERE WAS `.editor-details > summary` AND IT MATCHED NOTHING.
+   The Details extension renders a NODE VIEW, and its DOM is
+
+     <div class="editor-details"> <button …></button> <div><summary>…</summary>…
+
+   — the summary is a GRANDCHILD, so the child combinator never matched it, and
+   neither `cursor` nor `font-weight` ever applied. MEASURED from the rendered
+   DOM, and the case did not catch it because a css-binding assertion reads the
+   STYLESHEET: it can see a declaration and cannot see whether the selector
+   matches anything the editor draws.
+   `collapsible.test.ts` now asserts `element.matches(<selector>)` for each
+   selector below, against a real mounted editor, so a selector that matches
+   nothing is red rather than merely present. */
+.editor-details summary {
+  font-weight: 600;
+}
+/* THE FOLD CONTROL IS THE BUTTON, NOT THE SUMMARY — measured: clicking the
+   button dispatches the document change, and the summary is not clickable at
+   all. It arrives with NO class of its own, so nothing styled it and it painted
+   the user agent's own chrome — the defect class `bare-control-coverage` exists
+   for, on a control its fixed list does not name. The reset is that file's own
+   shape (`border: none; background: none; padding: 0`). */
+.editor-details > button {
+  border: none;
+  background: none;
+  padding: 0;
+  cursor: pointer;
+}
+/* ⚠ A PLACEHOLDER RULE STOOD HERE AND WAS REMOVED AS DEAD CSS, and the way it
+   failed is the reason this note is this long.
+   It read `.editor-details > summary:empty::before { content: 'Title' }`, from
+   the plan's CSS snippet, justified as "same affordance as the editor's
+   `Placeholder`". MEASURED, and it renders NOTHING: an empty textblock carries
+   prosemirror-view's `<br class="ProseMirror-trailingBreak">` — that element is
+   how the caret gets a home — so an empty `<summary>` has an ELEMENT child and
+   `:empty` does not match. The rule could never apply, in this test or in a
+   browser.
+   The sentence about the editor's `Placeholder` was false too, and it is the
+   reason a pseudo-class was the wrong instrument: the product's placeholder is
+   a CLASS the extension adds (`is-editor-empty`, plus `data-placeholder`, and
+   `showOnlyWhenEditable`) — JS, not CSS. Matching that affordance means adding
+   a decoration, which is a different job from a stylesheet rule.
+   **SO THE COLLAPSIBLE HAS NO EMPTY-SUMMARY HINT, and that is a recorded gap
+   rather than a hidden one**: §8.4 does not require one, and a reader or an
+   author sees an empty summary. Recorded here so the next hand either builds
+   it the product's way or leaves it deliberately. */
+
+/* The code block's Copy button (spec §8.2, Plan 4 Task 4). `position:
+   relative` here is what makes the button's `absolute` mean "in this block's
+   corner" rather than "in the page's" — the pair is one placement, and the
+   binding case asserts them together for that reason. No colour: this file's
+   standing rule, and the button inherits the block's ink. */
+.editor-codeblock { position: relative; }
+.editor-codeblock__copy {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  font: inherit;
+  cursor: pointer;
+}
+
+/* The wiki-link node and its picker (spec §8.5, Plan 4 Task 5). Structure
+   only, like everything above: this file names no colour. */
+.editor-wikilink { overflow-wrap: anywhere; }
+/* THE MISSING PILL, drawn apart from a live link without an ink — this file's
+   header forbids every colour form and packages/editor must not reach
+   packages/ui's tokens. A wavy underline is the affordance a reader already
+   reads as "this reference does not resolve", and `cursor: help` says the
+   element is still worth hovering (it carries the stored title). */
+.editor-wikilink--missing {
+  text-decoration: underline wavy;
+  cursor: help;
+}
+/* `.wikilink-popup` and its parts are the shared suggestion-popup rules
+   above (`.mention-popup, .wikilink-popup, .ticketref-popup { … }`, near the
+   top of this file) — not repeated here. */
+.wikilink-preview {
+  position: absolute;
+  max-width: 24rem;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 6px 8px;
+  background: Canvas;
+  z-index: 50;
+}
+
+/* The ticket-ref chip (spec §14, Plan 7 Task 1). Structure only, like every
+   block above: this file names no colour. `.ticketref-popup` and its parts
+   are the shared suggestion-popup rules near the top of this file. */
+.editor-ticketref { overflow-wrap: anywhere; }
+
+/* The reading rail (spec §8.2, Plan 4 Task 7). Structure only, like everything
+   above — and NO width rule: the source gated on a 1100px viewport inside the
+   component, and the port moved that decision out to the page, because a
+   breakpoint hidden in a component cannot be overridden by a stylesheet. */
+.reading-toc { padding: 0.5rem 0; }
+.reading-toc__list { list-style: none; margin: 0; padding: 0; }
+.reading-toc__item { margin: 0; }
+/* Indent by level so the outline reads as one — `padding-left` rather than a
+   margin, so the click target spans the full row. */
+.reading-toc__item--h1 .reading-toc__link { padding-left: 0; }
+.reading-toc__item--h2 .reading-toc__link { padding-left: 1rem; }
+.reading-toc__item--h3 .reading-toc__link { padding-left: 2rem; }
+.reading-toc__link { display: block; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+/* The active entry is marked by WEIGHT, not by colour: this file may not name
+   a colour, and colour alone is never the only indicator anyway. */
+.reading-toc__link[aria-current='true'] { font-weight: 600; }

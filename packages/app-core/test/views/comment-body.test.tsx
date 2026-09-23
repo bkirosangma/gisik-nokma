@@ -156,6 +156,96 @@ describe('renderCommentBody — the composer’s marks, rendered', () => {
     );
     expect(unknown.container.textContent).toContain('still here');
   });
+
+  /**
+   * 9.267 — SCHEMA V2'S NODES ON THE READ-ONLY SURFACE (spec §8.3 consequence 1,
+   * Plan 4 Task 2). The notes editor widened the document; a comment thread is
+   * where a widened document from ANOTHER client arrives first, because the
+   * server stores whatever an event carries.
+   *
+   * ONE document for all three families, deliberately. Each could pass in
+   * isolation while an implementation that short-circuited on the first node it
+   * did not recognise failed the next — which is the failure mode this file's
+   * neighbouring unknown-node case pins from the other direction.
+   *
+   * The checkbox is DISABLED and reads the stored `checked`: a comment is
+   * read-only, so this renders the STATE of the task, not a control the reader
+   * owns. The wiki-link's chrome is the second thing here with teeth — the
+   * stored title must be the visible words and the note id only the
+   * destination, the same preference `docToPlainText` takes.
+   */
+  it('9.267 renders v2 nodes with their chrome: task checkboxes, a collapsible, a wiki-link', () => {
+    const { container } = render(
+      <>
+        {renderCommentBody({
+          type: 'doc',
+          content: [
+            {
+              type: 'taskList',
+              content: [
+                {
+                  type: 'taskItem',
+                  attrs: { checked: false },
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'buy milk' }] }],
+                },
+                {
+                  type: 'taskItem',
+                  attrs: { checked: true },
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'call CA' }] }],
+                },
+              ],
+            },
+            {
+              type: 'details',
+              attrs: { open: false },
+              content: [
+                { type: 'detailsSummary', content: [{ type: 'text', text: 'Why' }] },
+                {
+                  type: 'detailsContent',
+                  content: [{ type: 'paragraph', content: [{ type: 'text', text: 'because' }] }],
+                },
+              ],
+            },
+            {
+              type: 'paragraph',
+              content: [
+                { type: 'text', text: 'see ' },
+                { type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } },
+              ],
+            },
+            // THE CONTROL, inside the same document: a node the renderer has
+            // never heard of still contributes its text. Without it, a
+            // `renderNode` that returned `null` for every unrecognised type —
+            // including the v2 ones it does not yet know — would satisfy every
+            // assertion above while silently eating prose.
+            {
+              type: 'someFutureBlock',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'still here' }] }],
+            },
+          ],
+        })}
+      </>,
+    );
+
+    const boxes = within(container).getAllByRole('checkbox') as HTMLInputElement[];
+    expect(boxes).toHaveLength(2);
+    expect(boxes[0]?.checked).toBe(false);
+    expect(boxes[1]?.checked).toBe(true);
+    for (const box of boxes) expect(box).toBeDisabled();
+    expect(container.textContent).toContain('buy milk');
+    expect(container.textContent).toContain('call CA');
+
+    const details = container.querySelector('details');
+    expect(details).not.toBeNull();
+    expect(details?.hasAttribute('open')).toBe(false);
+    expect(container.querySelector('summary')?.textContent).toBe('Why');
+    expect(container.textContent).toContain('because');
+
+    const link = within(container).getByRole('link', { name: 'Cold room' });
+    expect(link.getAttribute('href')).toBe('/notes/n1');
+
+    expect(container.textContent).toContain('still here');
+  });
 });
 
 /**
@@ -228,5 +318,37 @@ describe('renderCommentBody — total, never a throw', () => {
     let node: unknown = { type: 'text', text: 'deep' };
     for (let i = 0; i < 500; i += 1) node = { type: 'paragraph', content: [node] };
     expect(() => renderCommentBody({ type: 'doc', content: [node] })).not.toThrow();
+  });
+});
+
+/**
+ * 9.312 — Plan 7 Task 3 (spec §14.2, D26): `renderCommentBody`'s optional
+ * second parameter. The renderer has no href resolver of its own, unlike the
+ * wiki-link branch which always knows `/notes/<id>` — so a `ticketRef` links
+ * only when the caller supplies one, and renders as a plain span otherwise.
+ */
+describe('9.312 ticketRef in a comment', () => {
+  const TICKET_REF = { type: 'ticketRef', attrs: { ticketId: 't2', projectId: 'p1', key: 'SHOP-8', title: 'Compressor log' } };
+
+  it('9.312 links when ticketHref resolves and renders a span otherwise; wikiLink is unaffected (control)', () => {
+    const body = doc(text('see '), TICKET_REF);
+
+    const { container: linked } = render(<>{renderCommentBody(body, () => '/w/x/p/p1?ticket=t2')}</>);
+    const link = within(linked).getByRole('link', { name: 'SHOP-8 Compressor log' });
+    expect(link.getAttribute('href')).toBe('/w/x/p/p1?ticket=t2');
+    expect(link.className).toBe('gn-comment__ticketref');
+
+    // No `ticketHref` supplied at all: the default answers null, same as an
+    // explicit one that refuses.
+    const { container: plain } = render(<>{renderCommentBody(body)}</>);
+    expect(within(plain).queryByRole('link', { name: 'SHOP-8 Compressor log' })).toBeNull();
+    expect(plain.textContent).toContain('SHOP-8 Compressor log');
+
+    // CONTROL: a wikiLink in the SAME document is unaffected by the new
+    // parameter — it still resolves its own `/notes/<id>` regardless.
+    const noteBody = doc({ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } });
+    const { container: note } = render(<>{renderCommentBody(noteBody, () => '/w/x/p/p1?ticket=t2')}</>);
+    const noteLink = within(note).getByRole('link', { name: 'Cold room' });
+    expect(noteLink.getAttribute('href')).toBe('/notes/n1');
   });
 });

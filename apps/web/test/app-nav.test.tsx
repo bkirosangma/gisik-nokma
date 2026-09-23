@@ -261,7 +261,7 @@ describe('AppNav — the mounts, not the components', () => {
       // oversight: an `<a role="menuitem">` has the menuitem role, not `link`,
       // so `getAllByRole('link')` cannot see them by design. Their reachability
       // is asserted where it now lives — the account-menu block below.
-      expect(hrefs).toEqual(['/workspaces', '/inbox']);
+      expect(hrefs).toEqual(['/workspaces', '/notes', '/inbox']);
     });
 
     it('WITH a workspace, no project: the served name, My Work and Members join, Board does not', async () => {
@@ -281,6 +281,10 @@ describe('AppNav — the mounts, not the components', () => {
         '/settings?workspaceId=ws_1',
         // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
         // menuitems, not links — see the first arm's comment.
+        // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
+        // `/inbox` in the nav's corner (spec §9.1) — this case reddened by name
+        // when it landed, which is the tripwire working.
+        '/notes',
         '/inbox',
       ]);
     });
@@ -334,6 +338,9 @@ describe('AppNav — the mounts, not the components', () => {
         '/w/ws_1/my-work',
         '/w/ws_1/members',
         '/settings?workspaceId=ws_1',
+        // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
+        // `/inbox` (spec §9.1).
+        '/notes',
         '/inbox',
       ]);
     });
@@ -355,6 +362,10 @@ describe('AppNav — the mounts, not the components', () => {
         '/settings?workspaceId=ws_1',
         // `/help` and `/account` moved into `AccountMenu` (Round 24) and are
         // menuitems, not links — see the first arm's comment.
+        // `/notes` joined in Plan 5 of the notes series, immediately LEFT of
+        // `/inbox` in the nav's corner (spec §9.1) — this case reddened by name
+        // when it landed, which is the tripwire working.
+        '/notes',
         '/inbox',
       ]);
       // Named, so the failure says what came back rather than only that an
@@ -362,6 +373,64 @@ describe('AppNav — the mounts, not the components', () => {
       expect(hrefs).not.toContain('/w/ws_1/p/p_1');
       expect(screen.queryByRole('link', { name: 'Board' })).toBeNull();
     });
+  });
+});
+
+/**
+ * 18.182 — the Notes link, and the FIRST prefix match in this bar.
+ *
+ * **Every other item in this nav is measured by EXACT equality** (`current()` at
+ * `app-nav.tsx:230`), and that is correct for them: `/w/<id>` is not "inside"
+ * `/w/<id>/members`. A note is different in kind — `/notes/<id>` draws the SAME
+ * view, with a note open, that `/notes` draws with the tree alone — so the link
+ * must light on both or it is dark on the page the reader is actually on. It is
+ * stated here as an assertion rather than left to the code because the first
+ * prefix match in a bar of exact matches is exactly the line a later tidy-up
+ * "simplifies" back.
+ *
+ * The placement (`compareDocumentPosition`, then `nextElementSibling`) is the
+ * owner's: immediately LEFT of the inbox icon.
+ */
+describe('18.182 the Notes link sits before Inbox and lights for a note', () => {
+  function renderNav() {
+    return render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+  }
+
+  it('marks Notes current on /notes AND on /notes/<id>, but not on /inbox', () => {
+    currentPath = '/notes';
+    renderNav();
+    const onNotes = screen.getByRole('link', { name: 'Notes' });
+    expect(onNotes).toHaveAttribute('href', '/notes');
+    expect(onNotes).toHaveAttribute('aria-current', 'page');
+
+    // The note's own URL. MUTATION TARGET: `pathname === '/notes'` alone — the
+    // exact-equality form every sibling item uses — leaves this arm without a
+    // current item, and this is the only case in this file that walks it.
+    cleanup();
+    currentPath = '/notes/01J9NOTE00000000000000000';
+    renderNav();
+    expect(screen.getByRole('link', { name: 'Notes' })).toHaveAttribute('aria-current', 'page');
+
+    cleanup();
+    currentPath = '/inbox';
+    renderNav();
+    const onInbox = screen.getByRole('link', { name: 'Notes' });
+    expect(onInbox).toHaveAttribute('href', '/notes');
+    // CONTROL: the prefix is `/notes`, not `''`. Without this arm a link that
+    // lit on every route would pass everything above.
+    expect(onInbox).not.toHaveAttribute('aria-current', 'page');
+
+    // IMMEDIATELY LEFT of the inbox. `DOCUMENT_POSITION_FOLLOWING` (4) is the
+    // DOM's own order; `nextElementSibling` is the "immediately" half.
+    const inbox = screen.getByRole('link', { name: /Inbox/ });
+    expect(
+      onInbox.compareDocumentPosition(inbox) & Node.DOCUMENT_POSITION_FOLLOWING,
+    ).toBeTruthy();
+    expect(onInbox.nextElementSibling).toBe(inbox);
   });
 });
 
@@ -1102,6 +1171,7 @@ describe('13.392 every nav target resolves to a real page.tsx', () => {
     // this table, so a stale row here would fail as "nav does not render it"
     // rather than sitting unnoticed.
     ['/w/ws_1/my-work', 'app/w/[workspaceId]/my-work/page.tsx'],
+    ['/notes', 'app/notes/page.tsx'],
     ['/inbox', 'app/inbox/page.tsx'],
     ['/w/ws_1/members', 'app/w/[workspaceId]/members/page.tsx'],
     ['/settings?workspaceId=ws_1', 'app/settings/page.tsx'],
@@ -1420,5 +1490,88 @@ describe('E4-11 — the workspace links sit behind one disclosure', () => {
     // answering "no" rather than the component failing to mount. Signed out,
     // the always-item is the bar's own `Sign in` (E5-31, B11), not `Workspaces`.
     expect(document.querySelector('nav.gn-nav a.gn-nav__signin')).toHaveTextContent('Sign in');
+  });
+});
+
+/**
+ * 13.1474–13.1476 — the nav's own brand group (owner request 2026-09-23: "put
+ * it on the nav bar of the far left as well. not clickable."; widened
+ * 2026-09-24 to a tile + wordmark, `NavBrand`, shared with `LegalNav` — see
+ * 13.1491–13.1494 in `nav-brand.test.tsx`). `BrandMark` (13.1471), not a
+ * second copy of the glyph — a non-interactive `<span aria-hidden="true">`
+ * TILE inside `.gn-nav__brand`, the FIRST child of `.gn-nav__inner`, before
+ * the links, rendered whether or not a session exists. `.gn-nav__brand`
+ * itself is no longer `aria-hidden` — only the tile is — since the wordmark
+ * beside it is plain visible text now, not a second copy of a hidden glyph.
+ */
+describe('the nav brand group', () => {
+  function renderNav() {
+    return render(
+      <Providers services={NO_NAV_SERVICES}>
+        <AppNav />
+      </Providers>,
+    );
+  }
+
+  it('13.1474 renders first inside .gn-nav__inner, in both session states', () => {
+    currentPath = '/workspaces';
+    const { container } = renderNav();
+    const inner = container.querySelector('.gn-nav__inner');
+    const brand = inner?.firstElementChild ?? null;
+    expect(brand?.className).toBe('gn-nav__brand');
+    expect(brand?.querySelector('.gn-nav__brand-tile svg')).not.toBeNull();
+    expect(brand?.querySelector('.gn-nav__wordmark')?.textContent).toBe('Gisik Nokma');
+    // BEFORE `.gn-nav__links` — immediately, not merely somewhere in the bar.
+    expect(brand?.nextElementSibling?.className).toContain('gn-nav__links');
+
+    cleanup();
+    currentPath = '/help';
+    mockSessionUser = null;
+    const { container: signedOutContainer } = renderNav();
+    const signedOutBrand = signedOutContainer.querySelector('.gn-nav__brand');
+    expect(signedOutBrand).not.toBeNull();
+    expect(signedOutBrand?.querySelector('.gn-nav__brand-tile svg')).not.toBeNull();
+    expect(signedOutBrand?.querySelector('.gn-nav__wordmark')?.textContent).toBe('Gisik Nokma');
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro' };
+  });
+
+  /**
+   * NOT a link, NOT a button, no tabindex — DOM checks rather than role
+   * queries. The TILE alone carries `aria-hidden="true"` (the wordmark beside
+   * it is plain visible text, widened 2026-09-24 — see `nav-brand.test.tsx`),
+   * so `within(brand).queryByRole('link')` is no longer blind here the way it
+   * was when the whole group was hidden; the DOM checks below are kept
+   * anyway, since they prove the same thing without depending on which piece
+   * is or is not in the accessibility tree. MUTATION TARGET: wrap the tile in
+   * `<Link href="/workspaces">`.
+   */
+  it('13.1475 is not focusable and is not a link or a button', () => {
+    currentPath = '/workspaces';
+    const { container } = renderNav();
+    const brand = container.querySelector('.gn-nav__brand');
+    expect(brand).not.toBeNull();
+    expect(brand?.closest('a, button, [tabindex]')).toBeNull();
+    expect(brand?.querySelector('a, button, [tabindex]')).toBeNull();
+    expect(brand?.hasAttribute('tabindex')).toBe(false);
+  });
+
+  /**
+   * The accessible-name ratchet (Features.md:33) counts exactly four
+   * attributes product-wide — `aria-label`, `role`, `aria-selected`,
+   * `aria-describedby` — one way per route, so a rise nothing else catches
+   * ships silently. This group — tile AND wordmark, swept over the whole
+   * subtree — must introduce NONE of them. MUTATION TARGET: add `aria-label`
+   * to the tile.
+   */
+  it("13.1476 introduces none of the accessible-name ratchet's four counted attributes", () => {
+    currentPath = '/workspaces';
+    const { container } = renderNav();
+    const brand = container.querySelector('.gn-nav__brand');
+    expect(brand).not.toBeNull();
+    for (const el of [brand!, ...Array.from(brand!.querySelectorAll('*'))]) {
+      for (const attr of ['aria-label', 'role', 'aria-selected', 'aria-describedby']) {
+        expect(el.hasAttribute(attr), `${el.tagName} carries ${attr}`).toBe(false);
+      }
+    }
   });
 });

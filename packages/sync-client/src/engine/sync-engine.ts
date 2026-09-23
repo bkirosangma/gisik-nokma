@@ -1,4 +1,4 @@
-import type { SubmittedEvent } from '@gisik-nokma/domain';
+import type { LedgerEvent, SubmittedEvent } from '@gisik-nokma/domain';
 import type { BootstrapResponse, Replica, TicketBootstrap } from '../replica/replica.js';
 import { isSyncInstruction, type SyncItem } from '../replica/sync-item.js';
 import type { Outbox, SyncEventResult } from '../outbox/outbox.js';
@@ -33,7 +33,18 @@ export type StreamHandle = { close(): void };
  */
 export type ReconcileRestriction = { kind: 'restricted'; id: string };
 
-export type ReconcileAnswer = { workspaceId: string; restricted: ReconcileRestriction[] };
+export type ReconcileAnswer = {
+  workspaceId: string;
+  restricted: ReconcileRestriction[];
+  /**
+   * The same answer for the NOTE ids presented (notes series, Plan 2 of 6).
+   * REQUIRED, not optional: the server always sends it (`reconcile-route.ts`),
+   * and this series' signature failure is a mocked contract that excuses the
+   * server from existing — a fake that omits the field should stop compiling
+   * rather than quietly narrow what the engine tests.
+   */
+  restrictedNotes: ReconcileRestriction[];
+};
 
 export type SyncTransport = {
   bootstrap(workspaceId: string): Promise<BootstrapResponse>;
@@ -52,8 +63,15 @@ export type SyncTransport = {
    *
    * `heldIds` is bounded by the server at 1..100 (`MAX_BATCH_SIZE`,
    * `apps/server/src/routes/events.ts`); `SyncEngine.reconcile` chunks to it.
+   *
+   * `heldNoteIds` is the NOTE arm of the same door (Plan 2 of 6) — the ids this
+   * device holds, answered by `canReadNoteById` rather than `canSee`, because a
+   * note has no `proj_visibility` row and a shared predicate would restrict
+   * every note for every caller. It is OPTIONAL on the wire (the server declares
+   * it outside `required`, so an old client's body still validates, case 18.072)
+   * and REQUIRED here, because this engine always sends it.
    */
-  reconcile(workspaceId: string, heldIds: string[]): Promise<ReconcileAnswer>;
+  reconcile(workspaceId: string, heldIds: string[], heldNoteIds?: string[]): Promise<ReconcileAnswer>;
   /**
    * `GET /v1/sync/bootstrap/ticket` — closure 5b(d)'s pull door, ruling P37.1.
    *
@@ -69,6 +87,30 @@ export type SyncTransport = {
    * find — the compiler is the enumerator, and it located five last time.
    */
   bootstrapTicket(workspaceId: string, ticketId: string): Promise<TicketBootstrap>;
+  /**
+   * `GET /v1/notes/:noteId/events` — the note pull (notes series, Plan 2 of 6,
+   * spec §5.1).
+   *
+   * ## Why the payback is a bare event list and not a `BootstrapTicket` twin
+   *
+   * A ticket's pull carries a snapshot because tickets ARE snapshotted. Notes
+   * are not (spec §5.3), so the note's whole history is its events and there is
+   * nothing else to carry. The route is the READ door's
+   * (`routes/notes.ts`), whose dialect is the row-shaped `LedgerEventView`; an
+   * implementor is responsible for handing the engine ENVELOPES, and
+   * `http-transport.ts` owns that conversion at its own edge.
+   *
+   * 404 means the same thing it means for tickets, and MUST surface as
+   * `NotePullNotFound` rather than as `null` — the route answers 404
+   * identically for a note the caller may not see and one that never existed,
+   * so a caller able to tell them apart would have the existence oracle this
+   * shape exists to deny.
+   *
+   * It is the sixth method on this type, and the fourth to need the
+   * enumeration ruling: the interface has implementors a grep cannot find, so
+   * the compiler is the enumerator.
+   */
+  bootstrapNote(workspaceId: string, noteId: string): Promise<{ events: LedgerEvent[] }>;
 };
 
 export type SyncStatus = 'offline' | 'connecting' | 'catching-up' | 'live';
@@ -94,6 +136,27 @@ export class TicketPullNotFound extends Error {
     super(`bootstrapTicket: nothing travels for ${ticketId}`);
     this.name = 'TicketPullNotFound';
     this.ticketId = ticketId;
+  }
+}
+
+/**
+ * The same answer for a note pull (notes series, Plan 2 of 6). Every word of
+ * `TicketPullNotFound`'s docblock applies — a TYPE rather than a status code,
+ * no information about which of the two 404 cases this is, and a drop keyed to
+ * the NOTICE rather than to the error.
+ *
+ * A SEPARATE CLASS rather than a shared one with a `kind` field, because the
+ * two are caught in the same loop and a shared type would have to be narrowed
+ * before it could clear the right pending set — and the set is what the
+ * discriminator would be used for, which is exactly what the catch clause below
+ * already knows from the loop it is in.
+ */
+export class NotePullNotFound extends Error {
+  readonly noteId: string;
+  constructor(noteId: string) {
+    super(`bootstrapNote: nothing travels for ${noteId}`);
+    this.name = 'NotePullNotFound';
+    this.noteId = noteId;
   }
 }
 
@@ -201,6 +264,15 @@ export type SyncEngine = {
    * failure. Errors are swallowed here for that reason.
    */
   onItem(cb: (item: SyncItem) => void): () => void;
+  /**
+   * A PULL landed — its events are folded and the entity's row is current.
+   * Returns the unsubscribe. See `notifyPullApplied` for the whole argument.
+   *
+   * Separate from `onItem` because it answers a different question: `onItem`
+   * reports what the STREAM delivered, and a pull happens after the stream has
+   * gone quiet, so nothing on that channel announces it.
+   */
+  onPullApplied(cb: (info: { kind: 'ticket' | 'note'; id: string }) => void): () => void;
   /**
    * Ask the server which of the tickets this replica holds are no longer this
    * user's, and delete those — closure 5's NARROW half, case 6.104's residual.
@@ -407,6 +479,7 @@ export function createSyncEngine(deps: {
   let lastReconcileAt = 0;
   const statusListeners = new Set<(s: SyncStatus) => void>();
   const itemListeners = new Set<(item: SyncItem) => void>();
+  const pullAppliedListeners = new Set<(info: { kind: 'ticket' | 'note'; id: string }) => void>();
 
   function setStatus(next: SyncStatus): void {
     if (next === currentStatus) return;
@@ -515,6 +588,7 @@ export function createSyncEngine(deps: {
         const payload = await withTimeout(transport.bootstrapTicket(ws, ticketId), ticketId);
         await replica.loadTicketBootstrap(payload);
         await replica.clearPendingPull(ws, ticketId);
+        notifyPullApplied({ kind: 'ticket', id: ticketId });
       } catch (err) {
         // RULING P37.3. "Nothing travels" drops the entry — but only if no
         // newer notice has re-named it since this pull was issued, which is
@@ -529,6 +603,60 @@ export function createSyncEngine(deps: {
         // Every OTHER failure is deliberately silent and deliberately does NOT
         // clear the id: a network wobble is not an answer, and the next
         // catch-up retries.
+      }
+    }
+    // The note half of the same loop, over its own durable set and its own
+    // door. Written as a SECOND loop rather than one loop with a branch,
+    // because the two differ in more than the call: a note pull loads events
+    // rather than a `TicketBootstrap`, and the two pending sets are separate
+    // keys (`Replica.listPendingPulls`'s `kind`).
+    for (const { id: noteId, headSeq } of await replica.listPendingPulls(ws, 'note')) {
+      if (stopped || stalled || streamEnded) return;
+      try {
+        const payload = await withTimeout(transport.bootstrapNote(ws, noteId), noteId);
+        await replica.loadNoteEvents(payload.events);
+        await replica.clearPendingPull(ws, noteId, 'note');
+        notifyPullApplied({ kind: 'note', id: noteId });
+      } catch (err) {
+        if (err instanceof NotePullNotFound) {
+          await replica.dropPendingPullIfUnchanged(ws, noteId, headSeq, 'note');
+        }
+      }
+    }
+  }
+
+  /**
+   * A pull landed: its events are folded and the entity's row is current.
+   *
+   * ## Why this exists, and what it is NOT
+   *
+   * A localStorage view that is open when a notice-driven pull lands has no way
+   * to know its data changed — the pull happens on `onCaughtUp`, after the
+   * stream has gone quiet, so no `event` frame announces it and no `caught-up`
+   * follows. Plan 2's exploration found that hole at
+   * `replica-data-source.ts`'s `subscribe`: it forwards stream frames and
+   * nothing else, so a note that arrived by PULL never refreshed the screen
+   * showing it.
+   *
+   * This is the engine's half of the repair: a listener the data source turns
+   * into a `refresh` frame (Plan 2 Task 7). It fires AFTER `loadNoteEvents`
+   * resolves, so a listener that re-reads the replica synchronously sees the
+   * new row — firing it before the load would announce a change that had not
+   * happened yet, which is worse than not announcing it.
+   *
+   * Tickets fire it too. They had the same hole and nobody had looked; a
+   * listener that only heard about notes would be a second, narrower rule
+   * waiting to be discovered.
+   */
+  function notifyPullApplied(info: { kind: 'ticket' | 'note'; id: string }): void {
+    for (const cb of pullAppliedListeners) {
+      // A listener is a shell's callback and its throw is its own business:
+      // one bad subscriber must not abort a pull that has already landed, nor
+      // stop the other listeners being told.
+      try {
+        cb(info);
+      } catch {
+        // swallowed deliberately — see above.
       }
     }
   }
@@ -585,6 +713,27 @@ export function createSyncEngine(deps: {
    */
   async function recoverByPull(item: SyncItem): Promise<boolean> {
     if (isSyncInstruction(item)) return false;
+    // NOTES TOO, and the omission cost the device outright (Plan 2 of 6). The
+    // rule this function implements — "bootstrap-before-apply on any event for
+    // an entity not held" — was written for tickets and never extended, so an
+    // unfoldable note event reached `stall`, whose latch only `start()` clears
+    // and which resumes at the same cursor: the same pair arrives again and the
+    // device stalls again, permanently.
+    //
+    // Reachable with no defect in the widening. A reader added to a PROJECT is
+    // the ordinary case: that project's notes become readable, their
+    // `note.created` sits below the cursor and was never delivered, and the
+    // next event for one of them arrives to a replica that cannot fold it.
+    if (item.entity.kind === 'note') {
+      if ((await replica.getNote(item.entity.id)) !== null) return false;
+      await replica.addPendingPulls(
+        item.workspaceId,
+        [{ id: item.entity.id, headSeq: item.workspaceSeq }],
+        'note',
+      );
+      await drainPendingPulls(item.workspaceId);
+      return true;
+    }
     if (item.entity.kind !== 'ticket') return false;
     if ((await replica.getTicket(item.entity.id)) !== null) return false;
     // Keyed by the failing event's own `workspaceSeq` — the server's position
@@ -994,6 +1143,13 @@ export function createSyncEngine(deps: {
       };
     },
 
+    onPullApplied(cb) {
+      pullAppliedListeners.add(cb);
+      return () => {
+        pullAppliedListeners.delete(cb);
+      };
+    },
+
     async reconcile(ws) {
       // SINGLE-FLIGHT, modelled verbatim on `flush`'s `flushing` latch and for
       // the same reason: this method is public, so a shell's pull-to-refresh can
@@ -1015,7 +1171,20 @@ export function createSyncEngine(deps: {
   async function runReconcile(ws: string): Promise<{ presented: number; purged: string[] }> {
     {
       const held = (await replica.listTickets(ws)).map((t) => t.ticketId);
+      // The note ids, from `listNoteIds` and NOT `listNotes`: a device must
+      // offer up every id it holds, and it still holds the DELETED ones. Asking
+      // about only the live ones would leave a deleted note this user can no
+      // longer read on the device for ever — which is precisely the residual
+      // this door exists to close, wearing the undo list's clothes.
+      const heldNotes = await replica.listNoteIds(ws);
       const purged: string[] = [];
+      // ONE LOOP PER ARM, chunked independently. A single request carrying both
+      // arms is legal on the wire and was the first shape here, but the two sets
+      // have different sizes and one `RECONCILE_CHUNK_SIZE` budget cannot be
+      // shared between them without a rule for which arm spends it — and that
+      // rule is exactly the kind of quiet budget bug that leaves a note
+      // un-reconciled when a device holds many tickets. Two loops cost at most
+      // one extra round trip per catch-up.
       for (let i = 0; i < held.length; i += RECONCILE_CHUNK_SIZE) {
         const chunk = held.slice(i, i + RECONCILE_CHUNK_SIZE);
         const answer = await transport.reconcile(ws, chunk);
@@ -1032,7 +1201,19 @@ export function createSyncEngine(deps: {
           purged.push(item.id);
         }
       }
-      return { presented: held.length, purged };
+      for (let i = 0; i < heldNotes.length; i += RECONCILE_CHUNK_SIZE) {
+        const chunk = heldNotes.slice(i, i + RECONCILE_CHUNK_SIZE);
+        const answer = await transport.reconcile(ws, [], chunk);
+        // The same guard on the note arm, for the same reason and against the
+        // same case: `purgeEntity` is destructive and local, and it takes the
+        // note's events and comments with it.
+        for (const item of answer.restrictedNotes) {
+          if (!chunk.includes(item.id)) continue;
+          await replica.purgeEntity(item.id);
+          purged.push(item.id);
+        }
+      }
+      return { presented: held.length + heldNotes.length, purged };
     }
   }
 

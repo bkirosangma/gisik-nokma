@@ -158,14 +158,17 @@ function applyMarks(text: string, marks: unknown, key: string): ReactNode {
   return node;
 }
 
-function childrenOf(node: Node, depth: number, keyPrefix: string): ReactNode[] {
+/** The `href` resolver `ticketRef` renders through — see `renderCommentBody`'s parameter. */
+type TicketHrefResolver = (ref: { ticketId: string; projectId: string }) => string | null;
+
+function childrenOf(node: Node, depth: number, keyPrefix: string, ticketHref: TicketHrefResolver): ReactNode[] {
   if (!Array.isArray(node.content)) return [];
   return node.content
-    .map((child, index) => renderNode(child, depth + 1, `${keyPrefix}.${index}`))
+    .map((child, index) => renderNode(child, depth + 1, `${keyPrefix}.${index}`, ticketHref))
     .filter((child): child is ReactNode => child !== null);
 }
 
-function renderNode(value: unknown, depth: number, key: string): ReactNode | null {
+function renderNode(value: unknown, depth: number, key: string, ticketHref: TicketHrefResolver): ReactNode | null {
   if (depth > MAX_DEPTH) return null;
   const node = asNode(value);
   if (node === null) return null;
@@ -195,7 +198,7 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
   // place they are drawn — the declared decision, unchanged.
   if (node.type === 'image') return null;
 
-  const children = childrenOf(node, depth, key);
+  const children = childrenOf(node, depth, key, ticketHref);
 
   if (node.type === 'bulletList' || node.type === 'bullet_list') {
     return createElement('ul', { className: 'gn-comment__list', key }, children);
@@ -215,6 +218,77 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
   if (node.type === 'codeBlock' || node.type === 'code_block') {
     return createElement('pre', { className: 'gn-comment__code', key }, createElement('code', null, children));
   }
+  // Schema v2's nodes (spec §8.3 consequence 1, added by the notes editor
+  // port). Each carries its FULL chrome rather than degrading to text: a
+  // checkbox that says whether the thing was done, a `<details>` that can be
+  // folded open, a link that goes to the note. The one deliberate degradation
+  // is the checkbox's: it is DISABLED and reads the stored `checked`, because
+  // a comment is read-only and a control that looked live but refused the
+  // click would be a lie about what this surface can do.
+  if (node.type === 'taskList') {
+    return createElement('ul', { className: 'gn-comment__list gn-comment__list--tasks', key }, children);
+  }
+  if (node.type === 'taskItem') {
+    const attrs = asNode(node.attrs);
+    return createElement(
+      'li',
+      { className: 'gn-comment__task', key },
+      createElement('input', {
+        type: 'checkbox',
+        disabled: true,
+        readOnly: true,
+        checked: attrs !== null && attrs['checked'] === true,
+      }),
+      createElement('span', null, children),
+    );
+  }
+  if (node.type === 'details') {
+    const attrs = asNode(node.attrs);
+    return createElement(
+      'details',
+      { className: 'gn-comment__details', open: attrs !== null && attrs['open'] === true, key },
+      children,
+    );
+  }
+  if (node.type === 'detailsSummary') {
+    return createElement('summary', { key }, children);
+  }
+  if (node.type === 'detailsContent') {
+    return createElement('div', { key }, children);
+  }
+  if (node.type === 'wikiLink') {
+    const attrs = asNode(node.attrs);
+    const noteId = attrs !== null && typeof attrs['noteId'] === 'string' ? attrs['noteId'] : '';
+    // The stored title is the fallback when there is no id to link to, which
+    // is the same preference the walker takes (doc-text.ts): the words a
+    // person read, never the ULID. A link with no id would point at
+    // `/notes/`, so it degrades to a span rather than to a broken href.
+    const title = attrs !== null && typeof attrs['title'] === 'string' ? attrs['title'] : noteId;
+    return noteId === ''
+      ? createElement('span', { key }, title)
+      : createElement('a', { className: 'gn-comment__wikilink', href: `/notes/${noteId}`, key }, title);
+  }
+  if (node.type === 'ticketRef') {
+    const attrs = asNode(node.attrs);
+    const ticketId = attrs !== null && typeof attrs['ticketId'] === 'string' ? attrs['ticketId'] : '';
+    const projectId = attrs !== null && typeof attrs['projectId'] === 'string' ? attrs['projectId'] : '';
+    const ticketKey = attrs !== null && typeof attrs['key'] === 'string' ? attrs['key'] : '';
+    const title = attrs !== null && typeof attrs['title'] === 'string' ? attrs['title'] : '';
+    const text = `${ticketKey} ${title}`;
+    // Unlike `wikiLink` above, this renderer has NO href of its own to fall
+    // back on — the caller must supply `ticketHref`, and a refused href (the
+    // resolver answers `null`, or `safeHref` refuses what it answers) renders
+    // the label as plain text, the same rule `applyMarks`'s link mark follows.
+    // Unlike `wikiLink` above, this renderer has NO href of its own to fall
+    // back on — the caller must supply `ticketHref`, and a refused href (the
+    // resolver answers `null`, or `safeHref` refuses what it answers) renders
+    // the label as plain text, the same rule `applyMarks`'s link mark follows.
+    const resolved = ticketId === '' ? null : ticketHref({ ticketId, projectId });
+    const href = resolved === null ? null : safeHref(resolved);
+    return href === null
+      ? createElement('span', { className: 'gn-comment__ticketref', key }, text)
+      : createElement('a', { className: 'gn-comment__ticketref', href, key }, text);
+  }
   if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'doc') {
     const element = node.type === 'doc' ? Fragment : 'p';
     return createElement(element, node.type === 'doc' ? { key } : { key }, children);
@@ -227,7 +301,12 @@ function renderNode(value: unknown, depth: number, key: string): ReactNode | nul
  * The comment body, as elements. Total: unrenderable input yields `null`, and
  * a malformed node yields nothing rather than throwing, so one bad comment
  * cannot take down the thread it sits in.
+ *
+ * `ticketHref` is optional and defaults to answering `null` for everything —
+ * this renderer has no href resolver of its own the way `wikiLink`'s
+ * `/notes/<id>` is built in, so a caller that supplies none gets a `ticketRef`
+ * chip rendered as a plain span (spec §14.2).
  */
-export function renderCommentBody(doc: unknown): ReactNode {
-  return renderNode(doc, 0, 'b');
+export function renderCommentBody(doc: unknown, ticketHref: TicketHrefResolver = () => null): ReactNode {
+  return renderNode(doc, 0, 'b', ticketHref);
 }

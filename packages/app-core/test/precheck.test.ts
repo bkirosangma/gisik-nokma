@@ -1,6 +1,13 @@
 import { describe, expect, it } from 'vitest';
-import { eventEnvelopeSchema, isUlid, type SubmittedEvent, type TicketState, type WorkflowDef } from '@gisik-nokma/domain';
-import { REFUSAL_RULES, evaluateEvent } from '@gisik-nokma/rule-engine';
+import {
+  eventEnvelopeSchema,
+  isUlid,
+  type SubmittedEvent,
+  type TicketState,
+  type TicketTypeDef,
+  type WorkflowDef,
+} from '@gisik-nokma/domain';
+import { REFUSAL_RULES, evaluateEvent, type EngineContext } from '@gisik-nokma/rule-engine';
 import { createClientStateCache, type ClientStateCache } from '../src/cache.js';
 import {
   PARENT_TERMINAL_RULE,
@@ -210,7 +217,7 @@ describe('precheckEvent — instant named-reason previews from the same engine t
    * cache can offer: a parent cached, alive, and contradicting nothing. It
    * still defers, because a `passed` would have to be an accept, and every
    * engine accept for `ticket.created` is decided behind the ticket's own type
-   * definition (`checks/hierarchy.ts:84`) — which this cache has no store for.
+   * definition (`checks/hierarchy.ts:97`) — which this cache has no store for.
    */
   it('defers a create under a cached non-terminal parent — the accept reads a type rank this cache cannot serve', async () => {
     const cache = createClientStateCache();
@@ -222,8 +229,8 @@ describe('precheckEvent — instant named-reason previews from the same engine t
   });
 
   /**
-   * The no-parent path is not the exception it looks like. `hierarchy.ts:84`
-   * resolves the type BEFORE the no-parent branch at `:90`, and `:108` refuses
+   * The no-parent path is not the exception it looks like. `hierarchy.ts:97`
+   * resolves the type BEFORE the no-parent branch at `:114`, and `:133` refuses
    * `hierarchy.deepest-rank-parent-required` off `type.rank` — so the old
    * unconditional `passed` was false for every type at or below the deepest
    * rank, not merely unproven.
@@ -252,7 +259,7 @@ describe('precheckEvent — instant named-reason previews from the same engine t
    * The narrow-refusal claim above is unchanged and still true. What changed
    * (Plan 3 Chain A, 2026-08-31) is the other half: NOT REFUSING is not the
    * same as passing, once the engine's accept for `ticket.reparented` reads a
-   * definition (`checks/hierarchy.ts:215`) this cache cannot serve.
+   * definition (`checks/hierarchy.ts:251`) this cache cannot serve.
    */
   it('does not refuse a FINISHED ticket reparented under a terminal parent — but defers rather than passing', async () => {
     const cache = createClientStateCache();
@@ -935,8 +942,8 @@ describe('precheckEvent — coverage it does not have downgrades, and never fake
  *
  * THE HONEST MECHANISM, stated because the designed one is not quite what
  * happened: it did not trip on a hierarchy RULE refusing a planted claim. It
- * trips at the ticket's own type lookup (`checks/hierarchy.ts:84` for creation,
- * `:215` for a reparent), which sits ahead of every hierarchy rule. So this
+ * trips at the ticket's own type lookup (`checks/hierarchy.ts:97` for creation,
+ * `:251` for a reparent), which sits ahead of every hierarchy rule. So this
  * successor must not claim to witness the rules — it witnesses the DOOR, and
  * says so.
  *
@@ -1014,5 +1021,120 @@ describe('completeForPrecheck — a stand-in that could never pass for a fact', 
   it('is refused by the envelope door, on seq and on nothing else', () => {
     const parsed = eventEnvelopeSchema.safeParse(completeForPrecheck(transitionTo('done')));
     expect(parsed.success ? [] : parsed.error.issues.map((issue) => issue.path.join('.'))).toEqual(['seq']);
+  });
+});
+
+/**
+ * 4.63 — starting-status design (2026-09-23): the client precheck's
+ * `ticket.created` branch previews the SAME refusal `checkTicketCreated`
+ * gives for a non-creatable `stateId`, and does not refuse what the engine
+ * accepts. Unlike every other `ticket.created` case in this file, this one
+ * drives BOTH the real engine (`evaluateEvent`, hand-rolled `EngineContext` —
+ * never `contextFromCache`, which the CANARY above pins as throwing the
+ * moment `ticket.created` reaches `getTicketTypeDef`) and `precheckEvent`
+ * against the identical submitted event, asserting each side's own literal
+ * reason rather than one against the other (13.604's rule) — so a reworded
+ * sentence on either side reddens this case rather than certifying itself.
+ *
+ * `parentId: null` and a rank BELOW `DEEPEST_RANK` on the fixture type keep
+ * the engine's ACCEPT reachable without staging a parent: a root ticket at a
+ * shallow rank passes `checkTicketCreated`'s own no-parent branch outright.
+ */
+describe('4.63 ticket.created starting status: the precheck agrees with the engine', () => {
+  const WF_WITH_ARCHIVED: WorkflowDef = {
+    ...WF_ERRAND,
+    states: [...WF_ERRAND.states, { id: 'archived', name: 'Archived', category: 'active', creatable: false }],
+  };
+  const TASK_TYPE: TicketTypeDef = {
+    id: 'task',
+    name: 'Task',
+    icon: 'check',
+    rank: 3,
+    workflowId: 'wf-errand',
+    fields: [],
+  };
+
+  function engineCtx(): EngineContext {
+    return {
+      getEntityState: async () => null,
+      getChildrenStates: async () => [],
+      getWorkflowDef: async () => WF_WITH_ARCHIVED,
+      getTicketTypeDef: async () => TASK_TYPE,
+    };
+  }
+
+  function clientCache(): ClientStateCache {
+    const cache = createClientStateCache();
+    cache.upsertWorkflowDef(WF_WITH_ARCHIVED);
+    return cache;
+  }
+
+  function createWithState(stateId?: string): SubmittedEvent {
+    return make({
+      workspaceId: WS,
+      entity: { kind: 'ticket', id: TICKET },
+      type: 'ticket.created',
+      payload: {
+        typeId: 'task',
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Follow-up',
+        ...(stateId === undefined ? {} : { stateId }),
+      },
+    });
+  }
+
+  it('both refuse a terminal starting status, with the identical literal reason', async () => {
+    const submitted = createWithState('done');
+    expect(await evaluateEvent(completeForPrecheck(submitted), engineCtx())).toEqual({
+      refused: true,
+      rule: 'workflow.state-not-creatable',
+      reason: 'Tickets cannot start in "Done". Pick another status, or allow it in the workflow\'s settings.',
+    });
+    expect(await precheckEvent(submitted, clientCache(), { workflowId: 'wf-errand' })).toEqual({
+      kind: 'refused',
+      rule: 'workflow.state-not-creatable',
+      reason: 'Tickets cannot start in "Done". Pick another status, or allow it in the workflow\'s settings.',
+    });
+  });
+
+  it('both refuse a creatable:false starting status, with the identical literal reason', async () => {
+    const submitted = createWithState('archived');
+    expect(await evaluateEvent(completeForPrecheck(submitted), engineCtx())).toEqual({
+      refused: true,
+      rule: 'workflow.state-not-creatable',
+      reason: 'Tickets cannot start in "Archived". Pick another status, or allow it in the workflow\'s settings.',
+    });
+    expect(await precheckEvent(submitted, clientCache(), { workflowId: 'wf-errand' })).toEqual({
+      kind: 'refused',
+      rule: 'workflow.state-not-creatable',
+      reason: 'Tickets cannot start in "Archived". Pick another status, or allow it in the workflow\'s settings.',
+    });
+  });
+
+  it('the engine accepts a creatable starting status, and the precheck does not refuse it', async () => {
+    const submitted = createWithState('doing');
+    expect(await evaluateEvent(completeForPrecheck(submitted), engineCtx())).toEqual({ refused: false });
+    expect(await precheckEvent(submitted, clientCache(), { workflowId: 'wf-errand' })).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
+  });
+
+  it('control: an absent stateId is likewise accepted by the engine and not refused by the precheck', async () => {
+    const submitted = createWithState();
+    expect(await evaluateEvent(completeForPrecheck(submitted), engineCtx())).toEqual({ refused: false });
+    expect(await precheckEvent(submitted, clientCache(), { workflowId: 'wf-errand' })).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
+  });
+
+  it('an absent workflowId dep defers rather than refusing — the caller did not resolve one', async () => {
+    const submitted = createWithState('archived');
+    expect(await precheckEvent(submitted, clientCache())).toEqual({
+      kind: 'not-evaluated',
+      why: 'missing-local-state',
+    });
   });
 });

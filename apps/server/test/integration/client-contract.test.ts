@@ -1179,7 +1179,19 @@ describe('GET /v1/search vs SearchHit', () => {
     expect(hit['snippet']).toContain('**aisle**');
 
     // And the response WRAPS the hits, where `search()` returns `SearchHit[]`.
-    expect(Object.keys(body).sort()).toEqual(['hits', 'query', 'workspaceId']);
+    //
+    // `notes` joined this list with the notes series' search plan (Plan 3 of 6,
+    // spec §7.7): ALWAYS present, `[]` when nothing matched or when `kinds` left
+    // notes out, so a client never has to tell `undefined` from "no notes". This
+    // assertion is kept as a WHOLE-KEY equality rather than widened to a
+    // `toContain`, which is what makes the day a fourth key appears a decision
+    // rather than a surprise.
+    expect(Object.keys(body).sort()).toEqual(['hits', 'notes', 'query', 'workspaceId']);
+    // `corrected` is NOT in that list, and that is the point of its being
+    // optional: it is present exactly when a correction happened, and this
+    // query matched, so it is absent — the sort above is the assertion that it
+    // is not merely `undefined` under a key.
+    expect(body).not.toHaveProperty('corrected');
     // `matchedIn` is on the HIT and not on the response — the field answers a
     // question about one row, and hoisting it would be a claim about the query.
     expect(allKeys(body)).not.toContain('matchedIn');

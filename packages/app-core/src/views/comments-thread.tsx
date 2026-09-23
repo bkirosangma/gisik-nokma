@@ -100,6 +100,13 @@ export type CommentsThreadProps = {
    * there is nothing to say "Posting records an event" about.
    */
   composer?: ReactNode;
+  /**
+   * A `ticketRef` chip's link (Plan 7 Task 3, spec §14.2) — `renderCommentBody`'s
+   * own optional parameter, threaded through this component because the
+   * renderer has no href resolver of its own. Absent → every `ticketRef` in
+   * this thread's comments renders as a plain span.
+   */
+  ticketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
 };
 
 /**
@@ -125,15 +132,17 @@ function extensionOf(filename: string): string {
 function CommentItem({
   comment,
   nameOf,
+  ticketHref,
 }: {
   comment: TicketComment;
   nameOf: (actorId: string) => string;
+  ticketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
 }): ReactElement {
   const name = nameOf(comment.authorId);
   // F3 — the body is rendered as the DOCUMENT the composer wrote, not as its
   // plain text. `docToPlainText` still serves the search projection and the
   // notifications; it is a display of last resort and never was this one.
-  const text = renderCommentBody(comment.body);
+  const text = ticketHref === undefined ? renderCommentBody(comment.body) : renderCommentBody(comment.body, ticketHref);
   return (
     <li className="gn-comment" data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
@@ -173,6 +182,7 @@ export function CommentsThread({
   commentsUnavailable,
   nameOf,
   composer,
+  ticketHref,
 }: CommentsThreadProps): ReactElement {
   // THREE FACTS, THREE ARMS — and the ORDER of these two lines is the whole
   // fix. A failure outranks a wait: `useLiveQuery` leaves `data` at `null` after
@@ -234,7 +244,7 @@ export function CommentsThread({
       ) : (
         <ul className="gn-comments__list">
           {comments.map((comment) => (
-            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} />
+            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} ticketHref={ticketHref} />
           ))}
         </ul>
       )}

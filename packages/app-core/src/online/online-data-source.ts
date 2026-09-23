@@ -17,7 +17,13 @@ import {
   mapListPage,
   listWorkspaceId,
   mapMyWork,
+  mapNoteComments,
+  mapNoteDetail,
+  mapNoteSummaries,
+  mapNoteVersionBody,
+  mapNoteVersions,
   mapPreferences,
+  mapNoteSearchHits,
   mapSearchHits,
   mapTicketAttachments,
   mapTicketComments,
@@ -353,6 +359,62 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       return mapTicketComments(raw);
     },
 
+    /**
+     * The note reads (notes series, Plan 1 of 6). Seven methods, and every one
+     * of them takes the `[]`/`null`-on-404 branch `getMembers` and
+     * `getTicketHistory` take rather than the `HttpError` branch
+     * `getTicketComments` takes — see `data-source.ts`'s docblock on the group
+     * for the argument, whose short form is that the note routes answer 404 for
+     * "invisible" and "absent" deliberately, so re-raising it as a status would
+     * hand a caller a distinction the server refuses to draw.
+     */
+    getNotes: async (workspaceId, filter = {}) => {
+      const q = new URLSearchParams();
+      if (filter.homeProjectId !== undefined) q.set('home', filter.homeProjectId);
+      if (filter.authorId !== undefined) q.set('author', filter.authorId);
+      if (filter.scopeMode !== undefined) q.set('scope', filter.scopeMode);
+      // `q.size === 0` rather than a length check on the built string: an EMPTY
+      // suffix and a `?`-only suffix are different URLs, and `?home=` is a real
+      // filter value (notes filed at workspace level) that must survive.
+      const suffix = q.size === 0 ? '' : `?${q.toString()}`;
+      const raw = await http.get(`/v1/workspaces/${workspaceId}/notes${suffix}`);
+      return raw === null ? [] : mapNoteSummaries(raw);
+    },
+    getDeletedNotes: async (workspaceId) => {
+      const raw = await http.get(`/v1/workspaces/${workspaceId}/notes?deleted=1`);
+      return raw === null ? [] : mapNoteSummaries(raw);
+    },
+    getNote: async (_workspaceId, noteId) => {
+      // `_workspaceId` UNUSED, and it is in the signature because every other
+      // read takes one and the route does not need it: the note-addressed paths
+      // learn their workspace from the note's own row, which is what keeps a
+      // caller from answering a question about workspace B with a role held in
+      // workspace A. Kept rather than dropped so a caller cannot forget it when
+      // it becomes load-bearing (the replica's local read needs the scope).
+      const raw = await http.get(`/v1/notes/${noteId}`);
+      return raw === null ? null : mapNoteDetail(raw);
+    },
+    getNotesForTicket: async (workspaceId, ticketId) => {
+      const raw = await http.get(`/v1/workspaces/${workspaceId}/tickets/${ticketId}/notes`);
+      return raw === null ? [] : mapNoteSummaries(raw);
+    },
+    getNoteComments: async (_workspaceId, noteId) => {
+      const raw = await http.get(`/v1/notes/${noteId}/comments`);
+      return raw === null ? [] : mapNoteComments(raw);
+    },
+    getNoteHistory: async (_workspaceId, noteId) => {
+      const raw = await http.get(`/v1/notes/${noteId}/history`);
+      return raw === null ? [] : mapNoteVersions(raw);
+    },
+    getNoteVersion: async (_workspaceId, noteId, eventId) => {
+      const raw = await http.get(`/v1/notes/${noteId}/history/${eventId}`);
+      // `null` for a version that is not one: the history route's 404 covers
+      // both "no such version" and "not a version of this note". The mapping
+      // lives in `mappers.ts` with every other one — `mapNoteVersionBody`
+      // applies `asRecord` to the ENVELOPE and leaves the document alone.
+      return raw === null ? null : mapNoteVersionBody(raw);
+    },
+
     getWorkflowDef: async (workspaceId, workflowId, version) => {
       const suffix = version === undefined ? '' : `?version=${version}`;
       const raw = await http.get(`/v1/workspaces/${workspaceId}/workflows/${workflowId}${suffix}`);
@@ -389,6 +451,17 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         if (Object.keys(spec).length > 0) params.set('filter', JSON.stringify(spec));
       }
       return mapSearchHits(await http.get(`/v1/search?${params.toString()}`));
+    },
+
+    searchNotes: async (workspaceId, text, options) => {
+      // `kinds=note` because the caller wants notes: leaving it out would ask
+      // the server to search tickets too, and `mode=meaning` would then return
+      // `hits: []` anyway — one wasted query on a path that runs after every
+      // typing pause.
+      const params = new URLSearchParams({ workspaceId, q: text, kinds: 'note', mode: options.mode });
+      if (options.authorId !== undefined) params.set('author', options.authorId);
+      if (options.scopeMode !== undefined) params.set('scope', options.scopeMode);
+      return mapNoteSearchHits(await http.get(`/v1/search?${params.toString()}`), options.mode);
     },
 
     /**

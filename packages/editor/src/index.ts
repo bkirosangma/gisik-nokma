@@ -25,7 +25,33 @@ export {
   escapeSuggestionKey,
   getEscapeSuggestion,
 } from './extensions/escape-suggestion.js';
-export { UploadRefusedError, uploadAttachmentHttp, type UploadResult } from './upload.js';
+export {
+  exportMarkdown,
+  htmlToMarkdown,
+  looksLikeMarkdown,
+  markdownToHtml,
+} from './markdown/serializer.js';
+export { MarkdownClipboard } from './extensions/markdown-clipboard.js';
+export {
+  WikiLink,
+  wikiLinkSuggestionKey,
+  type NoteLinkCandidate,
+  type WikiLinkOptions,
+} from './extensions/wiki-link.js';
+export {
+  createWikiLinkPopup,
+  wikiLinkResultAnnouncement,
+  type WikiLinkPopupProps,
+  type WikiLinkPopupRenderer,
+} from './extensions/wiki-link-popup.js';
+export {
+  extractReadingMeta,
+  headerSlug,
+  readingTimeMinutes,
+  type ReadingMeta,
+} from './reading/reading-meta.js';
+export { MIN_HEADINGS, ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
+export { UploadRefusedError, uploadAttachmentHttp, uploadNoteAttachmentHttp, type UploadResult } from './upload.js';
 export {
   attachmentPasteKey,
   createAttachmentPasteExtension,

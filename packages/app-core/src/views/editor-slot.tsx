@@ -78,6 +78,7 @@ import { docToPlainText } from '@gisik-nokma/domain';
  */
 export type EditorSlotSubmission =
   | { type: 'comment.added'; payload: { body: unknown } }
+  | { type: 'note.body_set'; payload: { body: unknown } }
   | { type: 'ticket.field_set'; payload: { fieldId: 'description'; value: unknown } };
 
 /** What an upload answers with — the SERVER-sniffed truth, echoed into `attachment.added`. */
@@ -92,7 +93,7 @@ export type EditorSlotUpload = {
 
 export type EditorSlotProps = {
   /** Which ledger event a submit becomes. */
-  mode: 'comment' | 'description';
+  mode: 'comment' | 'description' | 'note';
   /** ProseMirror JSON — opaque outside `packages/editor`; null → empty. */
   doc: unknown;
   readOnly: boolean;
@@ -100,6 +101,21 @@ export type EditorSlotProps = {
   workspaceId: string;
   /** Uploads and `attachment.added` are ticket-scoped. */
   ticketId: string;
+  /**
+   * The note an upload belongs to, in `note` mode (notes series Plan 5, spec
+   * §4.4). The twin of the block in
+   * `packages/editor/src/components/TicketEditorSlot.tsx`, declared with the
+   * same name and the same optionality ON PURPOSE: the transcription case in
+   * `packages/editor/test/ticket-editor-slot.test.tsx` compares this
+   * declaration's field names against its own copy, so adding the field on one
+   * side alone fails a test before it fails a build.
+   *
+   * `ticketId` stays REQUIRED and this one is optional, which is a statement
+   * about the two modes rather than an oversight: every ticket-shaped mount has
+   * a ticket, and a note mount has no ticket at all. It is also the shape that
+   * costs the existing `ticketId` call sites nothing.
+   */
+  noteId?: string;
   placeholder?: string;
   autoFocus?: boolean;
   /**
@@ -141,6 +157,27 @@ export type EditorSlotProps = {
   // for composing, and states the gap honestly when one is missing rather than
   // pretending (e.g. no uploadAttachment → image paste is refused, not dropped).
   queryUsers?: (query: string) => Promise<Array<{ userId: string; name: string }>>;
+  // Wiki-link capabilities (Plan 4 Task 5), the twin of the block in
+  // `packages/editor/src/components/TicketEditorSlot.tsx`. Declared with the
+  // same four names and the same inline shapes ON PURPOSE: the transcription
+  // case in `packages/editor/test/ticket-editor-slot.test.tsx` compares this
+  // declaration's field names against its own copy, so adding a prop here
+  // without adding it there fails a test before it fails a build.
+  // The AUTOSAVE hooks of `note` mode (Plan 4 Task 8), the twin of the block
+  // in `packages/editor/src/components/TicketEditorSlot.tsx`.
+  onDraft?: (doc: unknown) => void;
+  onSave?: (doc: unknown) => void;
+  saveState?: 'saved' | 'saving' | 'unsaved';
+  queryNotes?: (query: string) => Promise<Array<{ noteId: string; title: string }>>;
+  resolveNoteTitle?: (noteId: string) => string | null;
+  previewNote?: (noteId: string) => Promise<string | null>;
+  onNavigateNote?: (noteId: string) => void;
+  // Ticket-reference capabilities (Plan 7 Task 1), the twin of the block in
+  // `packages/editor/src/components/TicketEditorSlot.tsx`. Same reasoning as
+  // the wiki-link four above: field names, not deep types, are what the
+  // transcription case compares.
+  queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
   /**

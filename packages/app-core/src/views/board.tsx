@@ -13,7 +13,7 @@ import {
   statesWithBacklog,
   type WorkflowDef,
 } from '@gisik-nokma/domain';
-import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
+import { Avatar, Button, Card, Chip, FireIcon, FlagIcon, LeafIcon, SnowflakeIcon } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -54,8 +54,19 @@ export type BoardProps = {
    * tested (`board.test.tsx`): with a handler the button is there and clicking
    * it calls the handler; without one there is no button and the sentence is
    * still on screen.
+   *
+   * `selection` is OPTIONAL on every call (starting-status design, 2026-09-23):
+   * the whole-board button (`emptyBanner`) and the empty-board banner call it
+   * with none, exactly as before this parameter existed. A creatable
+   * empty-COLUMN's own "Add a ticket" calls it WITH one — `{workflowId,
+   * stateId}`, that column's own identity — so the shell can pre-fill the
+   * New-ticket dialog's type and status. Widening an existing required-arity
+   * callback rather than adding a second prop: every call site already reads
+   * `onCreateTicket === undefined` to decide whether the affordance renders at
+   * all, and a second prop would have to agree with the first about that
+   * every time either one changed.
    */
-  onCreateTicket?: () => void;
+  onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   /**
    * Whether `board` is a NARROWED view — the shell's client-side board filter
    * (`boardNarrowing` in `page.tsx`) has dropped some of this project's real
@@ -789,7 +800,17 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
               : EMPTY_BOARD_COPY}
         </p>
         {onCreateTicket !== undefined ? (
-          <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
+          // NOT `onClick={onCreateTicket}` (starting-status design, 2026-09-23):
+          // `onCreateTicket` now takes an optional `selection`, and a bare
+          // handler reference would hand React's click event to that
+          // parameter instead. This button has no column to name, so it calls
+          // with no argument at all, exactly as it did before the parameter
+          // existed.
+          <button
+            type="button"
+            className="gn-board__empty-create"
+            onClick={() => onCreateTicket()}
+          >
             Create a ticket
           </button>
         ) : null}
@@ -930,7 +951,7 @@ function BoardGroupSection({
   /** The person's opposite choice. `Board`'s `toggleGroup` owns what that means. */
   onToggleWorkflow: () => void;
   onOpenTicket: (ticketId: string) => void;
-  onCreateTicket?: () => void;
+  onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
   /**
    * Board-prototype-port Task 14. `null` on the plain, `moves`-less path —
@@ -1101,6 +1122,7 @@ function BoardGroupSection({
                   card={card}
                   stateName={column.name}
                   onOpen={() => onOpenTicket(card.ticketId)}
+                  onOpenTicket={onOpenTicket}
                   arrows={arrows === null ? null : arrows(card, column.stateId)}
                   today={today}
                 />
@@ -1121,19 +1143,26 @@ function BoardGroupSection({
              * `inbox/icons.tsx`'s `NotificationIcon`) and carries no
              * information text does not already say.
              *
-             * The action reuses `onCreateTicket` UNSCOPED — the same
-             * handler `emptyBanner`'s button already calls, with no
-             * column argument, because `BoardProps` carries none to
-             * pass and adding one is outside this task. Labelled "Add a
-             * ticket" rather than repeating `emptyBanner`'s "Create a
-             * ticket" for two reasons: it matches the prototype's own
-             * per-column copy, and a board can render both an
-             * `emptyBanner` button and one of these per empty column at
-             * once (R6) — an identical accessible name on every one of
-             * them would be indistinguishable by role and name alike.
-             * Different wording does NOT claim the created ticket lands
-             * in THIS column; the handler has no way to place it there,
-             * and that is unchanged by this task.
+             * The action reuses `onCreateTicket`, now SCOPED to this column
+             * (starting-status design, 2026-09-23 — the docblock's old claim
+             * that scoping it was "outside this task" is what this task closes):
+             * `{workflowId: group.workflowId, stateId: column.stateId}`, this
+             * column's own identity, so the shell can pre-fill the New-ticket
+             * dialog's type and status. Labelled "Add a ticket" rather than
+             * repeating `emptyBanner`'s "Create a ticket" for two reasons: it
+             * matches the prototype's own per-column copy, and a board can
+             * render both an `emptyBanner` button and one of these per empty
+             * column at once (R6) — an identical accessible name on every one
+             * of them would be indistinguishable by role and name alike.
+             *
+             * GATED ON `column.creatable`, not merely on `onCreateTicket` being
+             * passed (starting-status design): a state a workflow forbids
+             * creating tickets in shows no Add button even when empty and even
+             * when the shell has wired the handler — `EMPTY_COLUMN_COPY` alone
+             * says the column is empty, without inviting an action the engine
+             * would refuse. `isCreatableState` is the one place that decides
+             * this, read off the column by the server/mapper/replica sites that
+             * build it, never re-derived here.
              */}
             {column.cards.length === 0 ? (
               <div className="gn-board__column-empty">
@@ -1141,8 +1170,8 @@ function BoardGroupSection({
                     a CONTROL, and it must never render unaccompanied — a glyph
                     that looks pressable with nothing behind it is the dead
                     affordance this board refuses elsewhere. Gated on the same
-                    prop the button below is. */}
-                {onCreateTicket !== undefined ? (
+                    condition the button below is. */}
+                {onCreateTicket !== undefined && column.creatable ? (
                   <span className="gn-board__column-empty-icon" aria-hidden="true">
                   <svg
                     width="18"
@@ -1160,8 +1189,14 @@ function BoardGroupSection({
                 <p className="gn-board__column-empty-copy">
                   {column.epicsHidden === true ? EMPTY_COLUMN_EPICS_COPY : EMPTY_COLUMN_COPY}
                 </p>
-                {onCreateTicket !== undefined ? (
-                  <Button onClick={onCreateTicket}>Add a ticket</Button>
+                {onCreateTicket !== undefined && column.creatable ? (
+                  <Button
+                    onClick={() =>
+                      onCreateTicket({ workflowId: group.workflowId, stateId: column.stateId })
+                    }
+                  >
+                    Add a ticket
+                  </Button>
                 ) : null}
               </div>
             ) : null}
@@ -1215,7 +1250,7 @@ function BoardGroupWithMoves({
   /** See the prop of the same name on `BoardGroupSection`. */
   onToggleWorkflow: () => void;
   onOpenTicket: (ticketId: string) => void;
-  onCreateTicket?: () => void;
+  onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   moves: BoardMoveCapability;
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock. Owned by `Board`, threaded through unchanged. */
   moveRegistry: MutableRefObject<MoveRegistry>;
@@ -1381,12 +1416,22 @@ function BoardCardSlot({
   card,
   stateName,
   onOpen,
+  onOpenTicket,
   arrows,
   today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
+  /**
+   * `Board`'s own `onOpenTicket`, threaded through UNCHANGED from `onOpen`
+   * above (owner request, 2026-09-23: parent-key badge, epic chip). `onOpen`
+   * opens THIS card's own ticket and is what the `<li>`'s bail-guarded click
+   * handler calls; the parent badge and the epic chip open a DIFFERENT
+   * ticket, which needs the raw function rather than a closure already bound
+   * to `card.ticketId`.
+   */
+  onOpenTicket: (ticketId: string) => void;
   arrows: ReactNode;
   /** Ruling E5-2 — `Board`'s own `today`, threaded through unchanged; see its prop docblock. */
   today?: string;
@@ -1416,7 +1461,14 @@ function BoardCardSlot({
         onOpen();
       }}
     >
-      <BoardCardView card={card} stateName={stateName} onOpen={onOpen} arrows={arrows} today={today} />
+      <BoardCardView
+        card={card}
+        stateName={stateName}
+        onOpen={onOpen}
+        onOpenTicket={onOpenTicket}
+        arrows={arrows}
+        today={today}
+      />
     </li>
   );
 }
@@ -1445,12 +1497,15 @@ function BoardCardView({
   card,
   stateName,
   onOpen,
+  onOpenTicket,
   arrows,
   today,
 }: {
   card: BoardCardData;
   stateName: string;
   onOpen: () => void;
+  /** `BoardCardSlot`'s own prop, threaded through unchanged; see its docblock. */
+  onOpenTicket: (ticketId: string) => void;
   arrows: ReactNode;
   today?: string;
 }) {
@@ -1480,8 +1535,71 @@ function BoardCardView({
    * The visible text is the date alone, exactly as the export draws it.
    */
   const late = card.dueDate !== null && today !== undefined && card.dueDate.date < today;
+  /**
+   * The priority badge's icon and tone (owner request, 2026-09-23: red fire
+   * P1, green leaf P2, frozen-blue snowflake P3). Every level is DRAWN — the
+   * level is a fact on every card, so there is no absence arm, exactly as
+   * spec 2026-09-22 already established — and now every level ALSO takes its
+   * own tone and icon, superseding that spec's "only P1 takes the tone"
+   * (a dense grid where every card is tinted by its own priority no longer
+   * has a reason to single P1 out; the tint IS the interruption).
+   */
+  const priorityIcon =
+    card.priority.value === 'P1' ? (
+      <FireIcon size={14} />
+    ) : card.priority.value === 'P2' ? (
+      <LeafIcon size={14} />
+    ) : (
+      <SnowflakeIcon size={14} />
+    );
+  const priorityLevel = card.priority.value.toLowerCase();
+  /**
+   * The immediate parent's badge, SUPPRESSED when it names the same ticket
+   * the epic chip already does (owner request, 2026-09-23: "when the
+   * immediate parent IS the epic, do not repeat it as a parent-key badge —
+   * the epic chip already says it"). The data stays honest either way —
+   * `card.parent` always names the true immediate parent (`BoardCard.parent`'s
+   * own docblock) — this is a VIEW-layer dedup, not a data-layer one, so every
+   * door that builds a `BoardCard` gets the rule for free without having to
+   * know about it.
+   *
+   * `parent.key === null` also does not draw: the same "a null key draws no
+   * separator and no placeholder" rule `card.key` itself already follows
+   * (the ledger holds no prefix, or — offline — the replica cannot compose
+   * one at all; `replica-data-source.ts`'s own `boardHierarchyOf` records
+   * that as narrower-than-the-truth on purpose).
+   */
+  const showParentBadge =
+    card.parent !== null &&
+    card.parent.key !== null &&
+    (card.epic === null || card.parent.ticketId !== card.epic.ticketId);
   return (
-    <Card className={card.pending ? 'gn-board-card gn-board-card--pending' : 'gn-board-card'}>
+    <Card
+      className={[
+        'gn-board-card',
+        `gn-board-card--${priorityLevel}`,
+        card.pending ? 'gn-board-card--pending' : null,
+      ]
+        .filter((name): name is string => name !== null)
+        .join(' ')}
+    >
+      {/* The epic chip (owner ruling, 2026-09-23): the card's TOP LINE, above
+          the title — epics are never drawn on the board as cards of their own
+          (owner ruling 2026-09-20), so this is the board's only way to say
+          which one a card belongs to. Absent when the card has none. */}
+      {card.epic !== null ? (
+        <button
+          type="button"
+          className="gn-board-card__epic"
+          aria-label={`Open epic ${card.epic.title}`}
+          onClick={() => onOpenTicket((card.epic as NonNullable<BoardCardData['epic']>).ticketId)}
+        >
+          <FlagIcon size={12} />
+          <span className="gn-board-card__epic-title" aria-hidden="true">
+            {card.epic.title}
+          </span>
+        </button>
+      ) : null}
       <button type="button" className="gn-board-card__title" onClick={onOpen}>
         {card.title}
       </button>
@@ -1498,42 +1616,45 @@ function BoardCardView({
         {card.rollup !== null ? (
           <span className="gn-board-card__progress">{formatRollup(card.rollup)}</span>
         ) : null}
-        {/* The priority badge (spec 2026-09-22), before the due label and
-            attributed like it. P2 is the birth default and is DRAWN — the level
-            is a fact on every card, so there is no absence arm — but only P1
-            takes the tone: on a dense grid the badge is the only priority
-            signal there is, and P1 is the one worth interrupting a scan for. */}
-        <span
-          className={
-            card.priority.value === 'P1'
-              ? 'gn-board-card__priority gn-board-card__priority--p1'
-              : 'gn-board-card__priority'
-          }
-          title={`${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
-        >
-          {card.priority.value}
-        </span>
       </div>
       {/* The prototype's META LINE (`desktop.dc.html:2496-2504`: `bits = [t.id, …,
-          dueLabel].join(" · ")`), key first (owner, 2026-09-22). The due span is
-          the SAME element it was in the chips row, with its late tone (13.1177);
-          only its seat moved. A `null` key draws no separator and no placeholder
-          — a missing prefix is a fact about the ledger, not a blank to fill. The
-          line is omitted entirely when it would hold nothing. */}
-      {card.key !== null || card.dueDate !== null ? (
-        <p className="gn-board-card__meta-line">
-          {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
-          {card.key !== null && card.dueDate !== null ? <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span> : null}
-          {card.dueDate !== null ? (
+          dueLabel].join(" · ")`), key first (owner, 2026-09-22) — now "the KEYS
+          ROW" (owner request, 2026-09-23): `[parent key badge] key [priority
+          badge]`, then the due label. The priority badge MOVED here from the
+          chips row above — it is always present (spec 2026-09-22), so this row
+          is no longer conditional on `key`/`dueDate` the way it used to be. A
+          `null` card key still draws no separator and no placeholder.  */}
+      <p className="gn-board-card__meta-line">
+        {showParentBadge ? (
+          <button
+            type="button"
+            className="gn-board-card__parent-key"
+            aria-label={`Open parent ${card.parent?.key}`}
+            onClick={() => onOpenTicket((card.parent as NonNullable<BoardCardData['parent']>).ticketId)}
+          >
+            {card.parent?.key}
+          </button>
+        ) : null}
+        {card.key !== null ? <span className="gn-board-card__key">{card.key}</span> : null}
+        <span
+          className={`gn-board-card__priority gn-board-card__priority--${priorityLevel}`}
+          title={`${actorLabel(card.priority.claim.actorId, card.priority.claim.actorName)}'s claim`}
+        >
+          {priorityIcon}
+          {card.priority.value}
+        </span>
+        {card.dueDate !== null ? (
+          <>
+            <span className="gn-board-card__meta-sep" aria-hidden="true">{' · '}</span>
             <span
               className={late ? 'gn-board-card__due gn-board-card__due--late' : 'gn-board-card__due'}
               title={`${actorLabel(card.dueDate.claim.actorId, card.dueDate.claim.actorName)}'s claim`}
             >
               {formatDate(card.dueDate.date)}
             </span>
-          ) : null}
-        </p>
-      ) : null}
+          </>
+        ) : null}
+      </p>
       <button
         type="button"
         className="gn-board-card__provenance"
