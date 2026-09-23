@@ -1,5 +1,43 @@
 # ▣ RESTART CARD — the ONLY mandatory read at wake. Rewritten at every anchor, in the anchor's own commit. Last rewritten **2026-09-22 06:02 IST** at `origin/main` **`0d83bfff`** (#678) by the cycle-50 controller, on branch `ctl/cycle50-anchor`. (Cycle 45 ran on Fable — its last cycle; the loop moved to Sonnet.)
 
+## ▶ UPDATE 2026-09-23 ~13:30 IST — NEWEST; read this block, then the 05:15 block below it
+
+**Topology changed.** `release/2026-09-23` is RETIRED (owner, ~12:2x): remote branch deleted, its last commit
+preserved as tag `archive/release-2026-09-23` (= `c6614e0b`, which this anchor cherry-picks). The next non-notes
+task gets a fresh `release/<date>`; hotfixes go straight to `main` on the owner's word (#705 did). `main` =
+`c96153e5` (#700 + #705, deployed). The owner's PRIMARY checkout still stands on the LOCAL `release/2026-09-23`:
+do not switch it, and do not `ctl rebuild` until the owner has.
+
+**`release/notes` = `8c47586e` and CONTAINS ALL OF `main`** (#706 merged main in; its one semantic conflict,
+`TicketEditorSlot.tsx`: `onDocChange` → `onDraft` in note mode, → `onChange` otherwise; footer: note mode =
+save state and never a button, else `submitSlot 'none'` = no button). Landed on it: #698 spec+Plan 1 doc,
+#701 Plan 4 doc, #703 **Plan 1**, #702 Plans 2-3 docs, #704 **Plan 4**, #706 main.
+
+| lane | worktree | work | state at this write |
+|---|---|---|---|
+| `gisik:1` | `gisik-nokma-task1` | `task/notes-merge-main` | DONE, merged (#706); idle |
+| `gisik:2` | `gisik-nokma-ds3` | **Plan 2** `task/notes-2-sync` | running, tasks 1-5 in |
+| `gisik:3` | `gisik-nokma-ds5` | **Plan 3** `task/notes-3-search` | running, tasks 1-2 in; own container `notes3-lane-pg` on 54331 |
+
+Nudger → `gisik:2,gisik:3`. Hand-backs to the plan author ALSO go to `gisik-nokma-lanes/CTL-TO-PLANNER-notes.md`
+(cross-session messages wait for owner approval there). The battery is `battery.sh <label> <head> [base]` in
+the controller's scratchpad — rewrite it if the session is new: the would-be merge, build, typecheck, the mobile
+bundle `--check`, all eleven package suites one at a time, the five catalogue checks, DIRTY_AFTER.
+
+**Owed / open, owner-facing:**
+- **Swap the shared test Postgres (54329) to `pgvector/pgvector:pg16`** BEFORE Plan 3 lands — every server
+  suite on `release/notes` needs `vector` after it. `docker compose` up/down is owner-only (ctl hook, lanes too);
+  compose from a worktree addresses the wrong project (no `name:` in the file). Use `-p gisik-nokma` and
+  `--renew-anon-volumes` (alpine → debian data dir).
+- **Plan 3's `search:preflight` against the managed DO DB, before its merge.** `vector` is `trusted=false` on
+  PG16 → `CREATE EXTENSION vector` needs superuser-equivalent; if the app user cannot, the migration fails AT
+  DEPLOY.
+- Plan 3 commits **125 MB** of model files (vocab-split safetensors, Backend B `potion-base-32M`; Backend A's
+  ONNX cannot load on the musl runtime) and the server's warm RSS goes **268.7 → 543.5 MB** on a `basic-xs`
+  (1 GB) server.
+- `main`'s mobile editor bundle was already stale at `59029e1c` (fixed on `release/notes`, ships with it).
+- `ctl gate` can print FAIL with EXIT=0 · 33/33 when turbo emits ANSI — run it with `NO_COLOR=1 FORCE_COLOR=0`.
+
 ## ▶ UPDATE 2026-09-23 ~05:15 IST — READ THIS BLOCK FIRST; it overrides anything below it
 
 **Released.** `release/2026-09-23` → `main` as **#700**, merge `3cf4e551` (owner's word). DO deployment
