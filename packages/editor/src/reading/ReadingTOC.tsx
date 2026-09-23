@@ -25,8 +25,13 @@ import type { ReadingMeta } from './reading-meta.js';
  * `prefers-reduced-motion`, so nothing the source did is lost.
  */
 
-/** Fewer than this many headings and there is nothing worth a rail. */
-const MIN_HEADINGS = 3;
+/**
+ * Fewer than this many headings and there is nothing worth a rail. EXPORTED
+ * (owner request 2026-09-23's floating table-of-contents button) so the
+ * button that opens this rail's panel gates on the SAME threshold rather
+ * than a copied literal that could drift from it.
+ */
+export const MIN_HEADINGS = 3;
 
 export type ReadingTOCProps = {
   headings: ReadingMeta['headings'];
