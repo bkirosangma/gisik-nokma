@@ -36,10 +36,21 @@ import { TextSelection } from '@tiptap/pm/state';
  * (it omits `keymap` from the result, so that call is not the list that
  * matters). What IS measured is the effect: without this branch, 9.269 fails.
  *
- * `priority: 1000` is what makes this file's keymap run first. It is the
- * smallest lever that makes the behaviour deterministic instead of dependent
- * on list order, and it is safe because these handlers return `false` for
- * every key they do not own.
+ * **NO `priority` IS SET, AND SETTING ONE WAS A MISTAKE.** This file carried
+ * `priority: 1000`, justified in this very paragraph and written before it was
+ * tested: *"the smallest lever that makes the behaviour deterministic instead
+ * of dependent on list order"*. **Measured, and the lever does nothing** — the
+ * constant was deleted and `test/collapsible.test.ts` re-run: **5/5 green**.
+ * This file's handlers already win both keys on the natural order.
+ *
+ * It is gone rather than kept as insurance. A priority that is not needed is a
+ * real cost: it moves this extension ahead of EVERY other one in the keymap
+ * order, which is how an extension silently takes another's key — the hazard
+ * the plan-close review checked this file for. That price was being paid for a
+ * benefit that does not exist. If a future change to the extension list does
+ * disturb the order, 9.269 and 9.270 are what catch it, and a test catching a
+ * real break is worth more than a constant holding a position nobody
+ * contested.
  *
  * ## WHICH OF THE THREE BEHAVIOURS ARE ACTUALLY THIS FILE'S — measured
  *
@@ -101,9 +112,6 @@ const DETAILS: JSONContent = {
 
 export const Collapsible = Extension.create({
   name: 'collapsible',
-  // Runs before the base keymap — see the docblock. Not a tuning knob.
-  priority: 1000,
-
   addInputRules() {
     return [
       new InputRule({
