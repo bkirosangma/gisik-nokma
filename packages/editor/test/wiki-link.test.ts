@@ -152,3 +152,85 @@ describe('9.297 no note picker inside a code block', () => {
     editor.destroy();
   });
 });
+
+/**
+ * 9.300 — THE HOVER CARD. Spec §8.5 names it, the plan's Interfaces name
+ * `previewNote`, and the plan allocated no case to it: `attachHoverPreview`
+ * shipped with no witness. Minted from the block's last spare id.
+ *
+ * The delay is the case's spine. A card that opened on `mouseenter` would
+ * satisfy every assertion about its CONTENT while firing a fetch at every
+ * pointer that crossed a link — so the assertions below are ordered around the
+ * 400 ms boundary: nothing at 399, the card after it, and a fetch count of
+ * zero for a pointer that leaves early.
+ */
+describe('9.300 the note-link hover card', () => {
+  it('9.300 shows the first 200 characters after 400 ms, nothing on null, and no fetch on an early leave', async () => {
+    vi.useFakeTimers();
+    try {
+      const long = 'x'.repeat(300);
+      const previewNote = vi.fn(async () => long);
+      const editor = createTestEditor(
+        { previewNote, resolveNoteTitle: () => 'Cold room' },
+        {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }],
+            },
+          ],
+        },
+      );
+      const link = editor.view.dom.querySelector('a.editor-wikilink');
+      expect(link).not.toBeNull();
+
+      // LEAVING BEFORE THE DELAY: no fetch, no card.
+      link!.dispatchEvent(new MouseEvent('mouseenter'));
+      await vi.advanceTimersByTimeAsync(399);
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      link!.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(5000);
+      expect(previewNote).not.toHaveBeenCalled();
+
+      // RESTING PAST IT: the card, carrying exactly the first 200 characters.
+      link!.dispatchEvent(new MouseEvent('mouseenter'));
+      await vi.advanceTimersByTimeAsync(401);
+      await vi.waitFor(() => {
+        expect(document.querySelector('.wikilink-preview')).not.toBeNull();
+      });
+      const card = document.querySelector('.wikilink-preview');
+      expect(card?.textContent).toHaveLength(200);
+      expect(card?.textContent).toBe(long.slice(0, 200));
+
+      // …and leaving removes it.
+      link!.dispatchEvent(new MouseEvent('mouseleave'));
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      editor.destroy();
+
+      // A NULL ANSWER SHOWS NOTHING — the target is gone or unreadable, and a
+      // card that opened to say so would be a second, quieter missing pill.
+      const missing = createTestEditor(
+        { previewNote: async () => null, resolveNoteTitle: () => 'Cold room' },
+        {
+          type: 'doc',
+          content: [
+            {
+              type: 'paragraph',
+              content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }],
+            },
+          ],
+        },
+      );
+      missing.view.dom
+        .querySelector('a.editor-wikilink')!
+        .dispatchEvent(new MouseEvent('mouseenter'));
+      await vi.advanceTimersByTimeAsync(1000);
+      await Promise.resolve();
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      missing.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
