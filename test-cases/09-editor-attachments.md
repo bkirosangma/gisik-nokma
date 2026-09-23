@@ -416,3 +416,5 @@ assumed it would find.
 - ✅ **9.304 — the chip renders as `a.editor-ticketref[href]` when `resolveTicketHref` returns a string and as `span.editor-ticketref` without href when it returns null; text is `KEY title`** (the STORED title always — this node carries no live-title resolver). Mutation: always render `<a>`. `test/ticket-ref.test.ts`.
 - ✅ **9.305 — Escape closes the picker leaving `:ticket comp` as text.** Mutation: delete the range on Escape. `test/ticket-ref.test.ts`.
 - ✅ **9.306 — `editor.css` styles `.editor-ticketref` and `.ticketref-popup`** (binding test). Mutation: delete the popup rule. `test/editor-css-binding.test.ts`.
+- ✅ **9.307 — `:note co` opens the wiki-link picker and Enter inserts the same `wikiLink { noteId, title }` node `[[co` would; control: `[[` still works.** Mutation: give the second plugin the first plugin's key (ProseMirror throws — the test asserts the editor constructs). `test/wiki-link.test.ts`.
+- ✅ **9.308 — `:notebook` in prose opens nothing.** Mutation: drop the whitespace requirement. `test/wiki-link.test.ts`.
