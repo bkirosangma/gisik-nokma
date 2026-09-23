@@ -3578,10 +3578,15 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   gate that suppressed the button everywhere could not pass). This is the case the mutation above reddens. —
   (`packages/app-core/test/views/board.test.tsx`)
 - **13.1433** ✅ The empty-BOARD "Create a ticket" button calls `onCreateTicket` with **zero** arguments,
-  not `[undefined]` and not the click event. `onClick={onCreateTicket}` would hand React's `MouseEvent`
-  through as `selection` the moment the prop widened — caught here by asserting `calls` (built from the
-  handler's own rest-args) equals `[[]]`, which a `MouseEvent` payload or an explicit `undefined` argument
-  both fail differently than an assertion on `selection` alone would. —
+  not `[undefined]` and not the click event. `onClick={onCreateTicket}` would hand React's click event
+  through as `selection` the moment the prop widened — MEASURED, not assumed: reverting to that exact line
+  and running this case shows `calls[0][0]` as a `SyntheticBaseEvent` wrapping a `PointerEvent` (`_reactName:
+  'onClick'`, `type: 'click'`), which the assertion catches by comparing `calls` (built from the handler's
+  own rest-args) to `[[]]` — that event payload and an explicit `undefined` argument both fail this assertion
+  differently than an assertion on `selection` alone would. **Control, same render, same `it`:** a DIFFERENT
+  button on the SAME screen — the empty, creatable 'To do' column's own "Add a ticket" — calls the SAME
+  handler WITH its column's own `{workflowId, stateId}`, so the zero-argument assertion above is not
+  vacuously true of a handler nothing ever calls with an argument. —
   (`packages/app-core/test/views/board.test.tsx`)
 - **13.1434** ✅ `creatable` is REQUIRED on the wire `BoardColumn` (`packages/domain/src/read-models.ts`)
   for the identical reason `blocked` already is: `mapBoardColumn` REFUSES an unreadable or absent flag
@@ -3604,7 +3609,8 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   `wfV1` (this file's own fixture): three non-terminal states (`todo`, `doing`, `waiting` — the last
   `blocked` too, independent axis) read `creatable: true`; the terminal `done` reads `false`.
   Mutation-witnessed: hardcoding the derivation to `creatable: true` reddens the `done` expectation,
-  restored from the committed tree (`git checkout --`, since the tree was clean before this run). —
+  restored from the committed tree (`git checkout -- packages/app-core/src/replica/replica-data-source.ts`,
+  since only that one file was touched by this mutation). —
   (`packages/app-core/test/replica/replica-data-source.test.ts`)
 
 - **13.1435** ✅ The Starting-status select lists only `creatable` states and defaults to the workflow's
@@ -3618,9 +3624,11 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
 - **13.1436** ✅ The select is DISABLED while "Starts in the backlog?" is ON, with a helper sentence naming
   the state a backlog ticket actually starts in ("A backlog ticket starts in To do when it enters focus") —
-  the owner's own ruling, *"the state selection is disabled if starting from backlog."* Mutation-witnessed:
-  dropping `startInBacklog` from the `disabled` expression leaves the select enabled under the switch's
-  default ON, reddening `toBeDisabled()`, restored from the committed tree. —
+  the owner's own ruling, *"the state selection is disabled if starting from backlog."* **Control, same
+  dialog, same `it`:** switched OFF, the select re-enables and the helper sentence disappears — the disabled
+  state above is the switch's doing, not a permanently disabled control. Mutation-witnessed: dropping
+  `startInBacklog` from the `disabled` expression leaves the select enabled under the switch's default ON,
+  reddening `toBeDisabled()`, restored from the committed tree. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
 - **13.1437** ✅ Switching "Starts in the backlog?" back OFF re-enables the select with the PREVIOUS value —
   `stateId` is its own `useState`, never cleared by the switch, so disabling only hides the control rather
@@ -3641,12 +3649,19 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   carries it otherwise (`stateId: 'doing'`, backlog OFF, a value that is NOT the initial state). Three
   submits, one dialog instance, `onCreate` cleared between them. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
-- **13.1440** ✅ `initialSelection` pre-fills the type (the FIRST `typeOption` whose `workflowId` matches —
-  the planner default, "when several types share the column's workflow the first is pre-selected"; `task`
-  and `errand` both share `wf-errand` and `task` is listed first) and the status (`doing`), and switches
-  "Starts in the backlog?" OFF. **Control, same block:** an `initialSelection` naming a workflow NO type on
-  this project shares is ignored ENTIRELY — the type, status and switch all read their ordinary,
-  no-selection defaults, not merely a type-less half-fill. —
+- **13.1440** ✅ `initialSelection` pre-fills the type — `defaultRootTypeFor` over the `typeOption`s sharing
+  the column's workflow, NOT the design's literal "the first is pre-selected" (planner default, unobjected:
+  "when several types share the column's workflow the first is pre-selected"). **MEASURED DEVIATION,** and
+  this is the case that proves it: `epic` is listed FIRST on `wf-errand` (this block's own `TYPES` fixture,
+  built that way on purpose), `task` is listed second but has the higher rank — `task` is what renders,
+  because an epic created into a column vanishes from every column the board draws (`isEpic`'s filter, owner
+  ruling 2026-09-20), which "the first is pre-selected" read literally would have shipped. Also pre-fills the
+  status (`doing`), and switches "Starts in the backlog?" OFF. **Control, same block:** an `initialSelection`
+  naming a workflow NO type on this project shares is ignored ENTIRELY — the type, status and switch all read
+  their ordinary, no-selection defaults, not merely a type-less half-fill. Mutation-witnessed (the deviation
+  itself, not merely the ordinary reseed logic): restoring the design's literal `typeOptions.find((o) =>
+  o.workflowId === initialSelection.workflowId)` in the open effect reddens with `expected Task, received
+  Epic`, restored from the committed tree. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
 - **13.1441** ✅ The remembered backlog preference is NOT overwritten by a board-initiated open. Storage
   seeded to `'backlog'`; opened from a board column (`initialSelection`) — the switch answers OFF, per the
@@ -3695,19 +3710,24 @@ now genuinely needed only for a LATE `workflowStates` load or a truly stale valu
   through `page.tsx`'s `createSelection` state, to `CreateTicketFlow.initialSelection`, to the actual
   `ticket.created` payload. `apps/web/test/project-create-gate.test.tsx`, the file that already exists to
   stop the New-ticket control from making claims nothing backs. Clicking the (real, non-`todo`) `Doing`
-  column's own "Add a ticket" pre-fills Type (`Epic`, `WORKSPACE_TYPES`' first entry sharing `wf-errands`)
-  and Starting status (`Doing`), switches the backlog switch OFF, and a submit from there carries
-  `stateId: 'doing'` on the wire. **CONTROL, same render:** the create closes the dialog on its own
-  (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on a committed outcome — no explicit Cancel needed,
-  and the first draft of this case tried to click one that was no longer there), and reopening from the
-  HEADER's own unscoped "New ticket" carries no selection at all — no `stateId` key on the wire, the same
-  omission rule 13.1439 pins at the dialog level, now exercised through the real page. The EMPTY, creatable
-  column deliberately used is `doing`, NOT the workflow's own `todo`: a click on `todo` would produce a
-  `stateId` the omission rule (13.1439) drops again, making the case indistinguishable from the control.
-  Mutation-witnessed: `page.tsx`'s `onCreateTicket` handler with `setCreateSelection(selection ?? null)`
-  hardcoded to `setCreateSelection(null)` reddens the pre-fill assertion, `expected element to have value
-  Epic, received Chore` (the ordinary rank-tie-broken default, proving the selection never reached the
-  dialog at all), restored from the committed tree. —
+  column's own "Add a ticket" pre-fills Type — `Task`, NOT `epic` (`WORKSPACE_TYPES`' first entry sharing
+  `wf-errands`): this dialog asks `defaultRootTypeFor` over the types sharing the workflow, the SAME
+  measured deviation 13.1440 pins, closing here at the one site that proves the real workspace fixture
+  (`epic` genuinely listed first) hits it too — and Starting status (`Doing`), switches the backlog switch
+  OFF, and a submit from there carries `stateId: 'doing'` on the wire. **CONTROL, same render:** the create
+  closes the dialog on its own (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on a committed outcome
+  — no explicit Cancel needed, and the first draft of this case tried to click one that was no longer there),
+  and reopening from the HEADER's own unscoped "New ticket" carries no selection at all — no `stateId` key on
+  the wire, the same omission rule 13.1439 pins at the dialog level, now exercised through the real page. The
+  EMPTY, creatable column deliberately used is `doing`, NOT the workflow's own `todo`: a click on `todo` would
+  produce a `stateId` the omission rule (13.1439) drops again, making the case indistinguishable from the
+  control. Mutation-witnessed: `page.tsx`'s `onCreateTicket` handler with `setCreateSelection(selection ??
+  null)` hardcoded to `setCreateSelection(null)` reddens the pre-fill assertion, `expected element to have
+  value Task, received Chore` (the ordinary rank-tie-broken default among ALL of `WORKSPACE_TYPES`, proving
+  the selection never reached the dialog at all), restored from the committed tree — rebuilding
+  `packages/app-core` first, since `apps/web` reads its `dist`, not its source (measured the hard way earlier
+  in this same session: the FIRST run of this exact case after the `defaultRootTypeFor` fix still showed
+  `Epic` until the rebuild). —
   (`apps/web/test/project-create-gate.test.tsx`)
 
 ## The birth Start and Due date inputs (addendum, 2026-09-23) — UI half

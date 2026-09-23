@@ -122,9 +122,14 @@ omitted when backlog is ON or when the value equals the workflow's own initial s
 absence-means-initial rule, kept minimal). **The board's own pre-fill:** `Board`'s `onCreateTicket` widens to
 carry an optional `{workflowId, stateId}` — the empty-column "Add a ticket" now calls it WITH that column's
 own identity (see the board bullet above) — threaded through `CreateTicketFlow` to `NewTicketDialogProps.
-initialSelection`, which pre-fills the type (the FIRST `typeOption` sharing that workflow — the planner
-default, unobjected, "when several types share the column's workflow the first is pre-selected and the form
-lets you change it") and the status, and turns the backlog switch OFF (a board-column click asks for a
+initialSelection`, which pre-fills the type — `defaultRootTypeFor` over the `typeOption`s sharing that
+workflow, a MEASURED DEVIATION from the design's literal "the first is pre-selected" (planner default,
+unobjected: "when several types share the column's workflow the first is pre-selected and the form lets you
+change it"): the ladder arrives rank-ascending, so a bare first-match is always that workflow's epic, and an
+epic created into a column vanishes from every column the board draws (`isEpic`'s filter, owner ruling
+2026-09-20) — the exact defect E5-16 already named once for the header's own default, now closed here with
+the SAME answer rather than a second opinion — and the status, and turns the backlog switch OFF (a
+board-column click asks for a
 ticket IN that column, not the backlog) WITHOUT writing through `rememberNewTicketStart` — the remembered
 preference belongs to the person, and a board-initiated open answering a different question must not
 overwrite it. An unmatched `workflowId` (no type on the project shares it) is ignored entirely, falling back

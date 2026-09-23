@@ -342,11 +342,21 @@ export type NewTicketDialogProps = {
    * A board column's own identity, when the dialog was opened FROM one
    * (starting-status design, 2026-09-23) — `Board`'s `onCreateTicket`
    * selection, threaded down through `CreateTicketFlow`. Pre-fills the type
-   * (the first `typeOption` whose `workflowId` matches — planner default,
-   * unobjected: "when several types share the column's workflow the first is
-   * pre-selected and the form lets you change it") and the starting status
-   * (that column's `stateId`), and turns "Starts in the backlog?" OFF — a
-   * board-column click asks for a ticket IN that column, not in the backlog.
+   * — `defaultRootTypeFor` over the `typeOption`s sharing the column's
+   * `workflowId`, NOT the design's literal "the first is pre-selected"
+   * (planner default, unobjected: "when several types share the column's
+   * workflow the first is pre-selected and the form lets you change it").
+   * **Measured deviation:** the ladder arrives rank-ascending, so a bare
+   * first-match is always that workflow's epic — a root ticket, since a
+   * board-column create carries no parent — and an epic created into a
+   * column vanishes from every column the board draws (`isEpic`'s filter,
+   * owner ruling 2026-09-20), leaving the very column the person clicked
+   * "Add a ticket" in empty. `defaultRootTypeFor` is E5-16's own answer to
+   * "which type by default", asked again here rather than re-decided; see
+   * the open effect below for the full argument. Pre-fills the starting
+   * status too (that column's `stateId`), and turns "Starts in the
+   * backlog?" OFF — a board-column click asks for a ticket IN that column,
+   * not in the backlog.
    *
    * An unmatched `workflowId` (no `typeOption` on this project uses it) is
    * IGNORED — the dialog opens exactly as it would with no selection at all,

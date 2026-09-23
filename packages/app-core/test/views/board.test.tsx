@@ -1030,8 +1030,12 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     await user.click(screen.getByRole('button', { name: 'Create a ticket' }));
     // NOT `[undefined]` — the handler is called with ZERO arguments, so a
     // regression that hands the click event through as `selection` (`onClick=
-    // {onCreateTicket}`) shows as `calls[0]` holding a `MouseEvent`, and a
-    // regression that passes `undefined` explicitly shows as length 1.
+    // {onCreateTicket}`) shows as `calls[0]` holding React's synthetic click
+    // event — MEASURED, not assumed: reverting to that exact line and running
+    // this case prints `calls[0][0]` as a `SyntheticBaseEvent` wrapping a
+    // `PointerEvent` (`_reactName: 'onClick'`, `type: 'click'`), not a bare
+    // `MouseEvent` instance — and a regression that passes `undefined`
+    // explicitly shows as length 1.
     expect(calls).toEqual([[]]);
 
     // CONTROL, same render, same `it`: the empty 'To do' column's OWN "Add a

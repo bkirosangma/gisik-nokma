@@ -161,16 +161,19 @@ describe('13.1441a the inline stateRefusal precheck — a cache that disagrees w
     await user.click(await screen.findByRole('option', { name: 'Locked' }));
     fireEvent.click(screen.getByRole('button', { name: 'Create' }));
 
-    // NOTHING submitted — the refusal is caught before `submitChildEvent` is
-    // ever reached.
-    await new Promise((resolve) => setTimeout(resolve, 0));
-    expect(source.ingested).toHaveLength(0);
-
     // The SAME sentence `checks/hierarchy.ts` would refuse with, rendered
     // INSIDE the dialog, under the select — not the flow's own below-dialog
-    // `failure` paragraph.
+    // `failure` paragraph. Awaited FIRST, not a bare synchronous read: the
+    // precheck is async, so this is what waits for it to have actually
+    // decided before either assertion below is checked.
     const reason = workflowStateNotCreatableRefusal(label(def, 'locked'));
     expect(await screen.findByText(reason)).toBeInTheDocument();
     expect(screen.getByRole('dialog', { name: 'New ticket' })).toBeInTheDocument();
+
+    // NOTHING submitted — the refusal was caught before `submitChildEvent`
+    // was ever reached. Checked AFTER the reason renders, not before: by this
+    // point the precheck has definitely settled, so a `0` here means the
+    // branch actually refused rather than merely not having run yet.
+    expect(source.ingested).toHaveLength(0);
   });
 });
