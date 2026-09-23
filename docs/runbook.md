@@ -28,6 +28,15 @@ extension on PostgreSQL 16**, so on a managed database that role usually is not 
 is `NO`; the exit status is non-zero in that case, which is the answer to act on — not a warning to read
 past. Nothing else in this runbook changes.
 
+**TLS: this tool reads `DATABASE_URL` and NOTHING else.** It is not the server, so it does not read
+`DATABASE_CA_CERT` — that is a server-config variable (`apps/server/src/config.ts`) which the boot path
+and the migrator apply, and neither of them is running here. A managed Postgres presents a CA the system
+trust store does not carry, so every way of supplying that anchor has to be inside the connection string
+itself; `deploy/do/README.md` owns the detailed rule (an `ssl*` parameter in the URL replaces whatever CA
+a caller passed, which is why the server rebuilds the string before connecting). A URL that asks for
+verification without its anchor fails the CONNECTION, before any extension is looked at — and that failure
+looks nothing like the `NO` this section is about, so it is worth recognising.
+
 ## Deploy (first time)
 
 See `deploy/do/README.md`. DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving
