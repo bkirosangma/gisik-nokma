@@ -176,6 +176,7 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
     name: 'Garo Hills Logistics',
     prefix: 'CC',
     role: 'owner',
+    archived: false,
     memberCount: 2,
     nameRestrictedProjectCount: 0,
     projects: [],

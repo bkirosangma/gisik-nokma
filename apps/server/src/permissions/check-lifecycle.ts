@@ -87,6 +87,29 @@ async function noteHomeProjectId(db: Queryable, noteId: string): Promise<string 
 }
 
 export async function checkLifecycle(db: Queryable, env: EventEnvelope, now: Date): Promise<Refusal | null> {
+  // Trash series, Plan 1 Task 5 (spec §4 T10). In a DELETED workspace, refuse
+  // every event except the ones that manage the WORKSPACE's own lifecycle —
+  // its undelete, its own mark/unmark, and (Ruling, ledgered) its own delete,
+  // exempted here for the same reason `LIVE_GATE_EXEMPT` exempts
+  // `ticket.deleted`: the per-type arm below gives the more specific sentence
+  // (`ALREADY_DELETED_REASON`), and without the exemption 19.030's second
+  // `workspace.deleted` would answer `WORKSPACE_DELETED_REASON` instead.
+  // Checked FIRST, before the per-type switch, so it also refuses types this
+  // switch has no case for at all (`ticket.field_set`, `note.body_set`,
+  // `workspace.renamed`, …) — the choke point the brief names.
+  const isWorkspaceOwnAct =
+    env.entity.kind === 'workspace' &&
+    (env.type === 'workspace.deleted' ||
+      env.type === 'workspace.undeleted' ||
+      env.type === 'purge.marked' ||
+      env.type === 'purge.unmarked');
+  if (!isWorkspaceOwnAct) {
+    const workspace = await readLifecycle(db, 'workspace', env.workspaceId);
+    if (workspace.deletedAt !== null) {
+      return refuse(WORKSPACE_DELETED_REASON);
+    }
+  }
+
   switch (env.type) {
     case 'workspace.deleted':
     case 'project.deleted': {

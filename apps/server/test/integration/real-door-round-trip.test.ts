@@ -474,6 +474,7 @@ describe('GET /v1/me/workspaces — the directory', () => {
           // real `POST /v1/workspaces`.
           prefix: 'RT',
           role: 'owner',
+          archived: false,
           // Task 16's counts, and this file is the one place they are asserted
           // against a world built ENTIRELY through the real doors — the
           // founder alone in the workspace, and the two tickets this file

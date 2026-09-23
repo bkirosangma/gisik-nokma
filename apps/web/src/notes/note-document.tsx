@@ -303,7 +303,7 @@ export function NoteDocument({
 
       <NoteByline
         note={note}
-        workspace={workspace ?? { id: note.workspaceId, name: '', prefix: '', role: 'member', memberCount: null, nameRestrictedProjectCount: 0, projects: [] }}
+        workspace={workspace ?? { id: note.workspaceId, name: '', prefix: '', role: 'member', archived: false, memberCount: null, nameRestrictedProjectCount: 0, projects: [] }}
         members={members}
         authorName={authorName}
         editedLabel={editedLabel(note.updatedAt)}

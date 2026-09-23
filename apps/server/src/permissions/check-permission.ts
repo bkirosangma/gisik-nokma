@@ -1675,7 +1675,13 @@ export async function checkPermission(
   env: EventEnvelope,
   ctx: SubmissionContext,
 ): Promise<Refusal | null> {
-  const eff = await resolveEffectiveRole(ctx.db, ctx.sessionUserId, env.workspaceId);
+  // Trash series, Plan 1 Task 5 (Review Focus 1): the write door must see
+  // through a deleted workspace, or its owner could never submit the
+  // `workspace.undeleted`/`purge.marked`/`purge.unmarked` that recover it —
+  // `checkLifecycle` below is what actually confines which events pass.
+  const eff = await resolveEffectiveRole(ctx.db, ctx.sessionUserId, env.workspaceId, {
+    includeDeleted: true,
+  });
   const permissionContext: VisibilityContext = {
     db: ctx.db,
     sessionUserId: ctx.sessionUserId,

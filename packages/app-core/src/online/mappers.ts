@@ -1455,6 +1455,13 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
       // half of every key in the workspace.
       prefix: asString(workspace['prefix'], `${path}.prefix`),
       role: asString(workspace['role'], `${path}.role`),
+      // Trash series, Plan 1 Task 5 (spec T8). REQUIRED, not `withheldOrNumber`-
+      // style optional — same reasoning `nameRestrictedProjectCount` gives
+      // below and the sibling `project.archived` mapping gives two screens
+      // down: served to every caller told about this workspace at all, guest
+      // included, so an absent key is a construction site that forgot the
+      // field, not a withholding.
+      archived: asBoolean(workspace['archived'], `${path}.archived`),
       memberCount: withheldOrNumber(workspace, 'memberCount', `${path}.memberCount`),
       // REQUIRED, and deliberately not `withheldOrNumber`: this count has no
       // withheld state on the wire — the server serves it to every caller
