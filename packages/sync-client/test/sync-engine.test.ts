@@ -247,6 +247,23 @@ function fakeTransport(script: Script): SyncTransport {
       script.pullCalls.push({ workspaceId, ticketId });
       return script.pullImpl(workspaceId, ticketId);
     },
+    /**
+     * REFUSES, like `pullImpl`'s default and for the same reason: this file is
+     * the TICKET half, so a note pull reaching it is a surprise rather than a
+     * thing to answer. The note cases have their own fake
+     * (`test/sync-engine-notes.test.ts`); a shared one would have to satisfy
+     * both and would end up proving a payload neither sends.
+     *
+     * It exists because `SyncTransport` grew a sixth method and the COMPILER
+     * found this file — which is what that interface's "the interface has
+     * implementors a grep cannot find, so the compiler is the enumerator"
+     * docblock claims, demonstrated rather than asserted. `pnpm typecheck` was
+     * the first thing to see it: every per-package `vitest run` was green,
+     * because the test runner does not typecheck.
+     */
+    async bootstrapNote(_workspaceId, noteId) {
+      throw new Error(`fakeTransport: unexpected note pull for ${noteId}`);
+    },
     async reconcile(workspaceId, heldIds) {
       // Recorded, not merely answered: the reconcile cases assert WHAT was
       // presented, and a fake that only returned a verdict could not tell a

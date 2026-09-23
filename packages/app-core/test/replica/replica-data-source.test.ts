@@ -19,7 +19,7 @@ import {
   type SyncTransport,
 } from '@gisik-nokma/sync-client';
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
-import type { DataSource, ServerStreamFrame } from '../../src/data-source.js';
+import type { ClientStreamFrame, DataSource } from '../../src/data-source.js';
 import {
   OFFLINE_BORN_ABSENCE,
   OfflineAcceptError,
@@ -147,7 +147,8 @@ const idleTransport: SyncTransport = {
   sync: () => Promise.reject(new Error('offline')),
   openStream: () => ({ close: () => undefined }),
   bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
-      reconcile: () => Promise.reject(new Error('offline')),
+  bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
+  reconcile: () => Promise.reject(new Error('offline')),
 };
 
 type Fixture = {
@@ -570,7 +571,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       // over an empty replica, and the honest answer to all seven is an empty
       // one; a read that threw a `ReplicaGapError` would be the screen saying a
       // feature is missing when it is not.
-      await expect(ds.query[m](...args)).resolves.toBeDefined();
+      await expect((ds.query[m] as (...a: readonly string[]) => Promise<unknown>)(...args)).resolves.toBeDefined();
       expect(REPLICA_GAPS[m], `${m} is still listed as a gap`).toBeUndefined();
     }
     // CONTROL, and it is the same one the case carried before inversion: an
@@ -583,7 +584,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     await expect(ds.query.search(WS, 'x')).rejects.toBeInstanceOf(ReplicaGapError);
   });
 
-  it('12.186 subscribe hands its callback a real ServerStreamFrame — the kind useLiveQuery acts on', async () => {
+  it('12.186 subscribe hands its callback a real ClientStreamFrame — the kind useLiveQuery acts on', async () => {
     // A transport that hands the engine one stream, so a frame can be delivered
     // through the door a production stream uses.
     let handlers: StreamHandlers | null = null;
@@ -602,12 +603,13 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
           return { close: () => undefined };
         },
         bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
-      reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [] }),
+        bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
+        reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [], restrictedNotes: [] }),
       },
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
 
-    const seen: ServerStreamFrame[] = [];
+    const seen: ClientStreamFrame[] = [];
     const off = ds.subscribe(WS, 0, (item) => seen.push(item));
     await engine.start(WS);
     const streamed = envelope({ kind: 'ticket', id: newUlid() }, 'ticket.created', {

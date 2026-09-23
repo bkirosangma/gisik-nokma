@@ -50,7 +50,10 @@ import { listVisibleTickets } from '../../src/visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
 import { listNotes } from '../../src/read/notes.js';
-import { toEventView, type LedgerRow } from '../../src/routes/tickets.js';
+// ALIASED: this file declares its OWN `LedgerRow` (a narrower, harness-facing
+// row shape at `:141`), and the two collided when the bootstrap's `notes` section
+// needed the route's column list. The alias keeps both names honest.
+import { toEventView, type LedgerRow as EventViewRow } from '../../src/routes/tickets.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedMember, seedProject } from '../helpers/seed.js';
@@ -318,7 +321,7 @@ async function bootstrapFor(pool: Pool, userId: string, workspaceId: string): Pr
         ? { events: [] }
         : {
             events: (
-              await client.query<LedgerRow>(
+              await client.query<EventViewRow>(
                 `SELECT id, workspace_id, entity_kind, entity_id, type, version, payload,
                         actor_id, origin, client_time, server_time, seq, workspace_seq
                    FROM events

@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { DataSource, ServerStreamFrame } from '../../src/data-source.js';
+import type { ClientStreamFrame, DataSource } from '../../src/data-source.js';
 import { useLiveQuery } from '../../src/views/use-live-query.js';
 
 /**
@@ -29,10 +29,10 @@ const SOURCE = { subscribe: () => () => undefined } as unknown as DataSource;
  * to be inert, and a source that also fires frames would make the two cases
  * above depend on a callback they never use.
  */
-function drivableSource(): { source: DataSource; fire: (item: ServerStreamFrame) => void } {
-  let cb: ((item: ServerStreamFrame) => void) | null = null;
+function drivableSource(): { source: DataSource; fire: (item: ClientStreamFrame) => void } {
+  let cb: ((item: ClientStreamFrame) => void) | null = null;
   const source = {
-    subscribe: (_ws: string, _afterSeq: number, next: (item: ServerStreamFrame) => void) => {
+    subscribe: (_ws: string, _afterSeq: number, next: (item: ClientStreamFrame) => void) => {
       cb = next;
       return () => {
         cb = null;

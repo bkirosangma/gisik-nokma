@@ -179,16 +179,16 @@ describe('visibleEventsFor — the note audience class', () => {
     const items = await drain(world.ids.memberIn, before);
     const found = notices(items);
     expect(found).toHaveLength(1);
-    expect(found[0].notes).toEqual([{ id: world.NOTES.nPrivate, headSeq: headBelow }]);
+    expect(found[0]!.notes).toEqual([{ id: world.NOTES.nPrivate, headSeq: headBelow }]);
     // `tickets` is carried and empty: a notice about notes names no ticket, and
     // the frame's shape is the same one the ticket notices use.
-    expect(found[0].tickets).toEqual([]);
+    expect(found[0]!.tickets).toEqual([]);
 
     // Before, not after. A notice that arrives with (or behind) its trigger is
     // one a client cannot act on ahead of the event that made it necessary.
     const envIndex = items.findIndex((i) => !('kind' in i) && i.id === widened.id);
     expect(envIndex).toBeGreaterThan(0);
-    expect(items.indexOf(found[0])).toBe(envIndex - 1);
+    expect(items.indexOf(found[0]!)).toBe(envIndex - 1);
 
     // Control: a note event that is NOT in `NOTE_GRANT_TRIGGERS` yields no
     // notice — and the event itself still arrives, which is what separates "no
@@ -213,7 +213,7 @@ describe('visibleEventsFor — the note audience class', () => {
 
     const items = await drain(world.ids.memberIn, before);
     expect(notices(items)).toHaveLength(1);
-    expect(notices(items)[0].notes?.map((n) => n.id)).toEqual([world.NOTES.nWorkspace]);
+    expect(notices(items)[0]!.notes?.map((n) => n.id)).toEqual([world.NOTES.nWorkspace]);
     // Control: both events are in the range being drained, so one notice is a
     // statement about the ledger rather than about an empty window.
     expect(eventsOf(items, world.NOTES.nWorkspace)).toHaveLength(2);
@@ -300,14 +300,14 @@ describe('visibleEventsFor — the ticket cascade into inherit notes', () => {
     const items = await drain(world.ids.memberIn, before);
     const found = notices(items);
     expect(found).toHaveLength(1);
-    expect(found[0].notes?.map((n) => n.id)).toEqual([world.NOTES.nInherit]);
-    expect(found[0].notes?.[0].headSeq).toBe(headBelow);
+    expect(found[0]!.notes?.map((n) => n.id)).toEqual([world.NOTES.nInherit]);
+    expect(found[0]!.notes?.[0]!.headSeq).toBe(headBelow);
     // The notice precedes its trigger, as the note branch's and the ticket
     // branch's already do — a client cannot apply an event whose entity it has
     // not pulled.
     const envIndex = items.findIndex((i) => !('kind' in i) && i.id === widened.id);
     expect(envIndex).toBeGreaterThan(0);
-    expect(items.indexOf(found[0])).toBe(envIndex - 1);
+    expect(items.indexOf(found[0]!)).toBe(envIndex - 1);
   });
 
   it('18.068 a ticket the reader still cannot see grants nothing for its notes (control)', async () => {
@@ -339,7 +339,7 @@ describe('visibleEventsFor — the ticket cascade into inherit notes', () => {
     // about a range with nothing in it.
     const guestItems = await drain(world.ids.guestListed, narrowed.workspaceSeq - 1);
     expect(notices(guestItems)).toHaveLength(1);
-    expect(notices(guestItems)[0].notes?.map((n) => n.id)).toEqual([world.NOTES.nInherit]);
+    expect(notices(guestItems)[0]!.notes?.map((n) => n.id)).toEqual([world.NOTES.nInherit]);
 
     // And `memberIn` gets nothing at all: not the envelope, not a notice.
     const memberItems = await drain(world.ids.memberIn, narrowed.workspaceSeq - 1);
