@@ -3482,8 +3482,7 @@ group heading, naming that workflow — rather than deleted; the fact the line e
 
 *Block `13.1446`–`13.1450`, the DOMAIN half of `task/starting-status`'s `13.1431`–`13.1450` (the controller's
 split of a shared id space — see `13-hig-per-screen.md`'s block table; the UI half, `13.1431`–`13.1445`, is a
-later lane's work and is not this section). Only `13.1446`–`13.1448` are spent here; `13.1449`–`13.1450` are
-UNSPENT, not held — see the BLOCKED note below.*
+later lane's work and is not this section). `13.1446`–`13.1449` are spent; `13.1450` is UNSPENT, not held.*
 
 - **13.1446** ✅ `ticketCreatedPayload` gains optional `startDate`/`dueDate`, sharing `dueDateValueSchema`
   with `ticket.field_set` (one origin, not a copy — `packages/domain/src/ticket-types.ts`). Round-trips
@@ -3491,8 +3490,8 @@ UNSPENT, not held — see the BLOCKED note below.*
   (`packages/domain/test/ticket-events.test.ts`)
 - **13.1447** ✅ A real day in `YYYY-MM-DD` form (`'2026-09-30'`) is accepted for either field (control);
   a non-day string, and a shape-right day the calendar has none of (`'2026-02-30'`), are refused
-  `invalid-payload` for either field — the same `dueDateValueSchema` refusal `ticket.field_set` gives,
-  from the one schema both doors share. —
+  `invalid-payload` for either field — by the same `dueDateValueSchema` that `ticket.field_set` checks,
+  not the same REFUSAL SHAPE (case 13.1449 holds that difference constant on purpose). —
   (`packages/domain/test/ticket-events.test.ts`)
 - **13.1448** ✅ The reducer writes a `startDate`/`dueDate` claim ONLY when the payload carries one — the
   identical treatment, and the identical reason, `description` already has: an absent claim writing
@@ -3502,13 +3501,13 @@ UNSPENT, not held — see the BLOCKED note below.*
   tree. —
   (`packages/domain/test/ticket-state.test.ts`)
 
-**⚠ BLOCKED, not built: the rule-engine extraction (addendum item 3) and its precheck counterpart (item
-4's domain-lane note).** The addendum asks `checkTicketCreated` to apply `fields.ts:140`'s day-format
-validation to the birth values too, "BY THE SAME CODE, not a copy," extracted into a helper both doors
-call — and asks the app-core precheck's `ticket.created` branch to run that same helper. **THREE runs were
-actually made, not argued, and reverted afterward (nothing from this spike is in the committed tree):**
+**⚠ ADDENDUM ITEM 3 WITHDRAWN (owner ruling via the plan author, 2026-09-23, relayed by the controller) —
+a defect in the addendum, not a gap in the build.** The addendum asked `checkTicketCreated` to apply
+`fields.ts:140-146`'s day-format validation to the birth values too, "BY THE SAME CODE, not a copy,"
+extracted into a helper both doors call. **THREE runs were made to test that, not merely argued, and all
+three were reverted afterward (nothing from any of them is in the committed tree):**
 
-1. **Wired.** `checkDueDateLikeValue` was extracted from `fields.ts:140` (exported), imported into
+1. **Wired.** `checkDueDateLikeValue` was extracted from `fields.ts:140-146` (exported), imported into
    `checkTicketCreated`, and called on `p.startDate`/`p.dueDate` right after the state-creatable check.
    A throwaway case sent `ticket.created` with `dueDate: { date: '2026-02-30' }` (`WF`/`TASK`, no parent,
    root-legal rank). Actual verdict, printed and pinned in the run log:
@@ -3525,23 +3524,34 @@ actually made, not argued, and reverted afterward (nothing from this spike is in
    (`expected true to be false` on `result.ok`), proving `dueDateValueSchema` at the payload door is the
    live check a malformed birth date is actually caught by, not an inert type annotation.
 
-Runs 1 and 2 together are the proof: a malformed birth date is refused by the SCHEMA before `checkTicketCreated`
-reaches any later line, so a business-rule call placed after that guard — extracted or not — cannot ever see
-an invalid value to refuse. The identical argument applies to `precheckCreatableState`
-(`packages/app-core/src/precheck.ts`), which parses the same schema at its own top for the same reason.
-**What IS true, and is NOT the same claim item 5 asks for:** both doors refuse a malformed birth date
-(`malformed-payload` on `ticket.created`, `field.type-mismatch` on `ticket.field_set`) — agreement on the
-VERDICT, never on the rule id or the reason text, which item 5's "exactly what it refuses on field_set"
-wording asks for and which items 1 and 3 together make structurally impossible. Building item 3 as written
-would require EITHER loosening `ticketCreatedPayload`'s schema to a shape-only check (contradicting item 1's
-literal type, and run 3 above shows exactly what that loosening would cost) or accepting that the extracted
-call never fires (contradicting item 5's mutation, "skip the birth validation," which needs something
-skippable to redden — run 2 shows it does not). Owner ruling needed on which of items 1/3/5 gives way;
-`13.1449`–`13.1450` are reserved for whatever that resolves to. **The consequence for the UI lane, item 4's
-other half:** `precheckCreatableState` cannot preview a nice per-field reason for a malformed birth date
-either, for the identical structural reason — a bad date makes `ticketCreatedPayload.safeParse` fail inside
-that function too, so it returns `null` (no verdict from that check) and `precheckEvent` falls through to
-`precheckParentTerminal`, which answers `not-evaluated` for a root ticket. There is no `field.type-mismatch`-
-shaped reason for the form to render from this path; date-input validation belongs to the UI lane's own
-client-side check (e.g. validating the raw string before it is even built into a payload), not to a date
-helper reused from the engine.
+**The ruling, verified independently on this branch at `83725cd3`:** `fields.ts:140-146`'s day check IS
+`dueDateValueSchema.safeParse` and nothing else — no start-≤-due ordering, no second rule to extract — and
+`ticketCreatedPayload` already types `startDate`/`dueDate` with that SAME `dueDateValueSchema`. The
+addendum's own intent, "same code, not a copy," was ALREADY satisfied by the one shared schema at both
+doors; item 3 asked to extract a helper that would have duplicated what the schema already does, and the
+three runs above show precisely why that duplicate can never run. **Item 3 is withdrawn, not blocked** —
+there was never a gap for it to close. The identical argument applies to `precheckCreatableState`'s date
+counterpart (item 4's domain-lane note): a bad birth date already fails `ticketCreatedPayload.safeParse`
+inside that function too, so a per-field reason for the UI lane to render from THIS path was never
+buildable either way; per the ruling, the UI lane's form validates each non-empty date input client-side
+with the same `dueDateValueSchema` import and omits empty inputs, with no precheck branch for dates.
+
+- **13.1449** ✅ The PARITY case the addendum actually wanted, proven the honest way: one shared schema,
+  asserted independently at both doors. Four bad days (`'2026-13-01'`, `'2026-02-30'`, `'30-09-2026'`,
+  `''`) are refused by `ticketCreatedPayload.safeParse` at birth for both fields (asserted as ONE array
+  per field against `[false, false, false, false]`, so a mutation admitting even one bad day shows as a
+  changed array rather than a loop stopping at its first failure) AND by `checkTicketFieldSet` on
+  `ticket.field_set`, for either field; the real `checkTicketCreated` door is asserted too, for one of the
+  four, so the case witnesses the actual door's verdict and not only its schema precondition;
+  `'2026-09-30'` — a real day — is accepted by all three (control). **The two refusal SHAPES are
+  deliberately different and that is not what this case holds constant:** a bad birth date refuses
+  `malformed-payload` at the PAYLOAD door, before any business rule runs; a bad `field_set` value refuses
+  `field.type-mismatch` from `checkTicketFieldSet`'s own business logic, reached only after its payload has
+  already parsed. What the two doors agree on is the VERDICT — refused for the same four days, accepted
+  for the same one — because both ask the one schema the identical question. Mutation-witnessed: loosening
+  the birth fields to `z.object({ date: z.string() }).optional()` turns the birth array from
+  `[false, false, false, false]` to `[true, true, true, true]` (measured after rebuilding
+  `@gisik-nokma/domain`, since `rule-engine` reads its `dist`, not its source — the first run against
+  source-only left the cache stale and stayed green for the wrong reason), restored from the committed
+  tree. `13.1450` stays unspent. —
+  (`packages/rule-engine/test/fields.test.ts`)
