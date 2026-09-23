@@ -297,6 +297,27 @@ describe('applyTicketEvent', () => {
     );
   });
 
+  /**
+   * 13.1448 — starting-status design addendum (2026-09-23): the reducer
+   * writes a `startDate`/`dueDate` claim ONLY when the payload carries one —
+   * the identical treatment `description` already has above, and the
+   * identical reason: an absent claim writing `null` would answer "has this
+   * ticket got a due date?" YES for every ticket nobody gave one, under the
+   * creator's own name.
+   */
+  it('13.1448 writes a startDate/dueDate claim only when present; control: neither key exists when absent', () => {
+    const both = fold([
+      createdWith({ startDate: { date: '2026-09-30' }, dueDate: { date: '2026-10-01', note: 'per the calendar' } }),
+    ]);
+    expect(both.fields.startDate?.value).toEqual({ date: '2026-09-30' });
+    expect(both.fields.dueDate?.value).toEqual({ date: '2026-10-01', note: 'per the calendar' });
+
+    expect(createdState().fields.startDate).toBeUndefined();
+    expect(createdState().fields.dueDate).toBeUndefined();
+    expect('startDate' in createdState().fields).toBe(false);
+    expect('dueDate' in createdState().fields).toBe(false);
+  });
+
   it('transition moves state, re-derives the category, and logs the mover under the vocabulary the move is written in', () => {
     const state = applyTicketEvent(
       createdState(),

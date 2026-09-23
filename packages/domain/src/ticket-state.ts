@@ -195,6 +195,12 @@ export function applyTicketEvent(
         // every ticket nobody described, and name the person who filed it as the
         // one who set an empty description.
         ...(p.description === undefined ? {} : { description: claim(p.description, env) }),
+        // The birth start/due date (starting-status design addendum,
+        // 2026-09-23), same treatment as `description` directly above and for
+        // the identical reason: no pre-existing `ticket.created` carried
+        // either, so absent writes NO KEY rather than a null clearing claim.
+        ...(p.startDate === undefined ? {} : { startDate: claim(p.startDate, env) }),
+        ...(p.dueDate === undefined ? {} : { dueDate: claim(p.dueDate, env) }),
       },
       transitions: [],
       closed: null,

@@ -3477,3 +3477,54 @@ true either way" is exactly the shape a reviewer should expect to find a witness
 heading, using that absence as a cross-confirmation that its fixture carries one workflow. The heading
 now renders for a lone workflow by design, so the witness was replaced with a stronger one — exactly ONE
 group heading, naming that workflow — rather than deleted; the fact the line exists for is unchanged.
+
+## Start and due date at birth (starting-status design addendum, 2026-09-23: "put due date as well on the ticket creation form" … "both start and due date") — domain half
+
+*Block `13.1446`–`13.1450`, the DOMAIN half of `task/starting-status`'s `13.1431`–`13.1450` (the controller's
+split of a shared id space — see `13-hig-per-screen.md`'s block table; the UI half, `13.1431`–`13.1445`, is a
+later lane's work and is not this section). Only `13.1446`–`13.1448` are spent here; `13.1449`–`13.1450` are
+UNSPENT, not held — see the BLOCKED note below.*
+
+- **13.1446** ✅ `ticketCreatedPayload` gains optional `startDate`/`dueDate`, sharing `dueDateValueSchema`
+  with `ticket.field_set` (one origin, not a copy — `packages/domain/src/ticket-types.ts`). Round-trips
+  both together, either alone, and neither — the shape every pre-existing `ticket.created` has. —
+  (`packages/domain/test/ticket-events.test.ts`)
+- **13.1447** ✅ A real day in `YYYY-MM-DD` form (`'2026-09-30'`) is accepted for either field (control);
+  a non-day string, and a shape-right day the calendar has none of (`'2026-02-30'`), are refused
+  `invalid-payload` for either field — the same `dueDateValueSchema` refusal `ticket.field_set` gives,
+  from the one schema both doors share. —
+  (`packages/domain/test/ticket-events.test.ts`)
+- **13.1448** ✅ The reducer writes a `startDate`/`dueDate` claim ONLY when the payload carries one — the
+  identical treatment, and the identical reason, `description` already has: an absent claim writing
+  `null` would answer *"has this ticket got a due date?"* YES for every ticket nobody gave one, under the
+  creator's own name. Mutation-witnessed: writing `claim(p.startDate ?? null, env)` unconditionally
+  reddens the control half (`expected { value: null, … } to be undefined`), restored from the committed
+  tree. —
+  (`packages/domain/test/ticket-state.test.ts`)
+
+**⚠ BLOCKED, not built: the rule-engine extraction (addendum item 3) and its precheck counterpart (item
+4's domain-lane note).** The addendum asks `checkTicketCreated` to apply `fields.ts:140`'s day-format
+validation to the birth values too, "BY THE SAME CODE, not a copy," extracted into a helper both doors
+call — and asks the app-core precheck's `ticket.created` branch to run that same helper. **Measured, not
+merely argued:** `ticketCreatedPayload` (per this same addendum's item 1) types `startDate`/`dueDate` as
+`dueDateValueSchema.optional()`, so a malformed birth date already fails `ticketCreatedPayload.safeParse`
+— confirmed directly: `ticketCreatedPayload.safeParse({ ...base, dueDate: { date: '2026-02-30' } }).success
+=== false`. `checkTicketCreated`'s own `parsed = ticketCreatedPayload.safeParse(env.payload)` guard (right
+at its own door, before the state-creatable check and before any parent branch) returns the
+`malformed-payload` refusal on that same failure — a `return` statement, not a warning — so no line later
+in the function, including a call to an extracted date-validation helper, can ever run for a value that
+reaches it: the schema already excluded the only input the helper could refuse. The identical argument
+applies to `precheckCreatableState` (`packages/app-core/src/precheck.ts`), which parses the same schema at
+its own top. **Verified empirically**, not left as a plausible-sounding argument: `checkDueDateLikeValue`
+was extracted from `fields.ts:140` and wired into `checkTicketCreated` as a spike, and every case
+submitting a malformed birth date still resolved to `malformed-payload` from the schema-level parse — the
+extracted call was never reached in any run, which is what "unreachable" is being used to mean here. The
+spike was reverted rather than left in place, because a call site that cannot execute is dead code, not a
+tested behaviour. **What IS true, and is NOT the same claim item 5 asks for:** both doors refuse a
+malformed birth date (`malformed-payload` on `ticket.created`, `field.type-mismatch` on `ticket.field_set`)
+— agreement on the VERDICT, never on the rule id or the reason text, which item 5's "exactly what it
+refuses on field_set" wording asks for and which items 1 and 3 together make structurally impossible.
+Building item 3 as written would require EITHER loosening `ticketCreatedPayload`'s schema to a shape-only
+check (contradicting item 1's literal type) or accepting that the extracted call never fires (contradicting
+item 5's mutation, "skip the birth validation," which needs something skippable to redden). Owner ruling
+needed on which of items 1/3/5 gives way; `13.1449`–`13.1450` are reserved for whatever that resolves to.

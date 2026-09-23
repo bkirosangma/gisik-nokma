@@ -1,7 +1,7 @@
 import { z } from 'zod';
 import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
 import { RANK_KEY_REGEX, isRankKey } from '../rank.js';
-import { prioritySchema } from '../ticket-types.js';
+import { dueDateValueSchema, prioritySchema } from '../ticket-types.js';
 
 /**
  * The payload shapes of the ticket vocabulary (spec §3). Schemas only — the
@@ -132,6 +132,23 @@ export const ticketCreatedPayload = z
      * door.
      */
     stateId: z.string().min(1).optional(),
+    /**
+     * The ticket's birth START DATE and DUE DATE (starting-status design
+     * addendum, 2026-09-23: "put due date as well on the ticket creation
+     * form" … "both start and due date"). Both built-ins share ONE value
+     * shape — `dueDateValueSchema` (`ticket-types.ts`), the same schema
+     * `ticket.field_set` holds `startDate`/`dueDate` to — so this door and the
+     * edit door agree on what a day claim looks like from one origin, never a
+     * second copy that could drift.
+     *
+     * OPTIONAL, AND ABSENT MEANS NO CLAIM — following the birth-field
+     * precedent `description` set above: no pre-existing `ticket.created`
+     * carried either, and the reducer writes NO KEY for an absent member
+     * rather than a null one, for the identical reason `description` gives
+     * (a null claim would be a clearing nobody made, invariant 4).
+     */
+    startDate: dueDateValueSchema.optional(),
+    dueDate: dueDateValueSchema.optional(),
   })
   .refine((p) => !(p.start === 'backlog' && p.stateId !== undefined), {
     // The owner's ruling (starting-status design): a backlog ticket has no

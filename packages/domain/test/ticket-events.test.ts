@@ -232,6 +232,39 @@ describe('ticket event vocabulary', () => {
     });
   });
 
+  /**
+   * 13.1446–13.1447 — starting-status design addendum (2026-09-23, "put due
+   * date as well on the ticket creation form" … "both start and due date"):
+   * `ticketCreatedPayload` gains optional `startDate`/`dueDate`, sharing
+   * `dueDateValueSchema` with `ticket.field_set` (one origin, not a copy).
+   */
+  describe('13.1446 ticketCreatedPayload gains startDate/dueDate, sharing dueDateValueSchema', () => {
+    const BASE = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' };
+    const NOTE_2026_09_30 = { date: '2026-09-30' };
+    const NOTE_2026_10_01 = { date: '2026-10-01', note: 'per the filing calendar' };
+
+    it('13.1446 round-trips both, either alone, and neither — the shape every pre-existing event has', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, startDate: NOTE_2026_09_30, dueDate: NOTE_2026_10_01 });
+      roundTrips('ticket.created', 'ticket', { ...BASE, startDate: NOTE_2026_09_30 });
+      roundTrips('ticket.created', 'ticket', { ...BASE, dueDate: NOTE_2026_10_01 });
+      roundTrips('ticket.created', 'ticket', { ...BASE });
+    });
+
+    it("13.1447 control: '2026-09-30' — a real day in YYYY-MM-DD form — is accepted for either field", () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE, startDate: { date: '2026-09-30' } });
+      roundTrips('ticket.created', 'ticket', { ...BASE, dueDate: { date: '2026-09-30' } });
+    });
+
+    it('13.1447 refuses a non-day string for either field — wrong shape, and a shape-right day the calendar has none of', () => {
+      expect(refuses('ticket.created', 'ticket', { ...BASE, startDate: { date: '30/09/2026' } })).toBe(
+        'invalid-payload',
+      );
+      expect(refuses('ticket.created', 'ticket', { ...BASE, dueDate: { date: '2026-02-30' } })).toBe(
+        'invalid-payload',
+      );
+    });
+  });
+
   it('refuses an upload with a negative size', () => {
     expect(
       refuses('attachment.added', 'ticket', {
