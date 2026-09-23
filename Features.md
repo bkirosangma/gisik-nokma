@@ -3046,6 +3046,8 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   the check rather than passing quietly. `scripts/check-migration-order.mjs`, `package.json`,
   `.github/workflows/ci.yml`, cases 13.902–13.906
 
+- ⚙️ **The backup worker's pool trusts the managed cluster's CA** (hotfix 2026-09-23) — `apps/server/src/ops/backup-env.ts` reads `DATABASE_CA_CERT` with `loadConfig`'s rules (blank = none, non-PEM refused by name) and the daemon announces `{"msg":"database pool","tls":"ca"|"none"}` from the pool it built; before this every pool-backed job (`sweep-notifications`, `auto-close`, the ledger export) failed against DigitalOcean with "self-signed certificate in certificate chain". Cases 13.1421–13.1423.
+
 ## 14. MCP server
 
 *The assistant-facing door. An MCP server a person runs on their own machine, signed in as
