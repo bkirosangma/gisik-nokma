@@ -212,7 +212,14 @@ describe('18.11 The Notes page — the shell', () => {
       </Providers>,
     );
     expect(await screen.findByText('No notes yet')).toBeInTheDocument();
-    expect(screen.queryByText(/cannot be shown yet/)).toBeNull();
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
+    // The Create button is part of THIS state (spec §9.7: "No notes yet" AND
+    // the button) and not of the two beside it — asserted here rather than only
+    // in the populated case, because "there is nowhere to file a note" and
+    // "there is nowhere to file a note YET" are the two facts a person in this
+    // state needs told apart.
+    expect(screen.getByRole('button', { name: 'New note' })).toBeInTheDocument();
+    // ...and NOT while loading, where the read has not answered at all.
     empty.unmount();
 
     // The read never answers: `workspaces` stays null and NEITHER of the two
@@ -230,7 +237,8 @@ describe('18.11 The Notes page — the shell', () => {
     );
     expect(await screen.findByText('Loading…')).toBeInTheDocument();
     expect(screen.queryByText('No notes yet')).toBeNull();
-    expect(screen.queryByText(/cannot be shown yet/)).toBeNull();
+    expect(screen.queryByText(/could not be loaded/)).toBeNull();
+    expect(screen.queryByRole('button', { name: 'New note' })).toBeNull();
   });
 
   /**

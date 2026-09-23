@@ -140,6 +140,10 @@ export {
   type VisibilityClaim,
   type VisibilityEditorProps,
 } from './views/visibility-editor.js';
+// The explicit-audience checkbox roster (notes series Plan 5, Task 3),
+// extracted from `visibility-editor.tsx` so the two callers share ONE label
+// rule rather than two copies of it. See the component's own docblock.
+export { PeoplePicker } from './views/people-picker.js';
 // Plan 9 Task 8 — the calendar view-model and the claim readers under it.
 // `FilterSpec` is deliberately absent from this block: it is declared in
 // `view-types.ts` and already leaves through the `export *` above. The

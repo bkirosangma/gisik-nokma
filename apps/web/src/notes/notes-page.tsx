@@ -2,11 +2,13 @@
 
 import Link from 'next/link';
 import { useEffect, useState } from 'react';
-import { usePathname } from 'next/navigation';
+import { usePathname, useRouter } from 'next/navigation';
+import { Button } from '@gisik-nokma/ui';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../app-nav.js';
 import { ShellRefusal } from '../shell-refusal.js';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
+import { CreateNoteDialog } from './create-note-dialog.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
 
 /**
@@ -52,7 +54,9 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   const user = useCurrentUser();
   const session = useSessionStatus();
   const pathname = usePathname();
+  const router = useRouter();
   const signedIn = session.kind === 'signed-in' && user !== null;
+  const [createOpen, setCreateOpen] = useState(false);
 
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [refusal, setRefusal] = useState<string | null>(null);
@@ -97,20 +101,30 @@ export function NotesPage({ noteId }: { noteId?: string }) {
         </div>
         <div className="gn-notes__body">
           <nav aria-label="Notes" className="gn-notes__tree">
-            {/* The tree head. The filter is drawn only once the tree has
-                something to filter — a box over a refusal or a spinner is a
-                control whose effect nobody can see. Task 3 puts the Create
-                button beside it. */}
-            {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
+            {/* The tree head — the Create button, and the title filter beside
+                it.
+                The head is drawn once the workspaces READ has ANSWERED, which
+                is what makes the empty-list arm below carry the Create button
+                too (spec §9.7's "No notes yet" AND the button; 18.184). It is
+                absent while loading and after a refusal: a Create over a
+                spinner or a refusal panel is a control whose effect nobody can
+                see.
+                The FILTER is narrower still — only once there are rows for it to
+                narrow — because filtering an empty tree can only ever produce
+                the same empty tree. */}
+            {signedIn && refusal === null && workspaces !== null ? (
               <div className="gn-notes__tree-head">
-                <input
-                  type="text"
-                  className="gn-notes__filter"
-                  aria-label="Filter by title"
-                  placeholder="Filter by title"
-                  value={titleFilter}
-                  onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
-                />
+                <Button onClick={() => setCreateOpen(true)}>New note</Button>
+                {workspaces.length > 0 ? (
+                  <input
+                    type="text"
+                    className="gn-notes__filter"
+                    aria-label="Filter by title"
+                    placeholder="Filter by title"
+                    value={titleFilter}
+                    onChange={(changeEvent) => setTitleFilter(changeEvent.target.value)}
+                  />
+                ) : null}
               </div>
             ) : null}
             {!signedIn ? (
@@ -161,6 +175,19 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           <aside className="gn-notes__toc" aria-label="On this page" />
         </div>
       </div>
+      {/* The dialog is mounted OUTSIDE `.gn-notes` — `Dialog` portals to the
+          body anyway, and keeping it out of the grid means the tree's layout
+          cannot be affected by a panel that is not in it. */}
+      <CreateNoteDialog
+        open={createOpen}
+        onClose={() => setCreateOpen(false)}
+        workspaces={workspaces ?? []}
+        defaultHome={{ workspaceId: workspaces?.[0]?.id ?? '', projectId: '' }}
+        onCreated={(noteId) => {
+          setCreateOpen(false);
+          router.push(`/notes/${noteId}`);
+        }}
+      />
     </main>
   );
 }

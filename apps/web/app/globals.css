@@ -3288,6 +3288,86 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-danger);
 }
 
+/* ── Task 3: the Create dialog and the byline's scope editor ─────────────── */
+
+/* One column, because every field is a label over its control and the panel is
+   narrow. `gap` rather than margins so a field added later cannot sit flush. */
+.gn-notes__dialog,
+.gn-notes__scope-editor {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  min-width: 14rem;
+}
+
+.gn-notes__field {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+}
+
+.gn-notes__field-label {
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+}
+
+/* The visible label and the accessible name are the SAME string here, which is
+   why this input carries no `aria-label` of its own on the page — the `<label>`
+   wrapping it supplies both. `width: 100%` on a flex item inside a column is
+   what keeps it from shrinking to its content. */
+.gn-notes__input {
+  width: 100%;
+  min-width: 0;
+  padding: 0.375rem 0.5rem;
+  font: inherit;
+  color: var(--gn-text);
+  background: var(--gn-surface-raised);
+  border: 1px solid var(--gn-border);
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__input:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+
+.gn-notes__dialog-actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.5rem;
+}
+
+.gn-notes__dialog-empty {
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+
+/* The refusal, in the dialog and in the scope popover alike: the authority's
+   own words, so a person can read what was wrong rather than guessing. */
+.gn-notes__dialog-failure,
+.gn-notes__scope-failure {
+  margin: 0;
+  font-size: 0.8125rem;
+  color: var(--gn-danger);
+}
+
+/* The chip's wrapper carries the popover's anchor ref, so it must be positioned
+   and must not paint anything of its own. */
+.gn-notes__scope-wrap {
+  position: relative;
+  display: inline-flex;
+}
+
+/* The chip: a control for an editor, a bare span for a reader. ONE class for
+   both, so the two arms cannot drift into different type. */
+.gn-notes__scope {
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.125rem 0.375rem;
+}
+
 /* The four sentences the tree can say about a READ rather than about notes:
    loading, refused, empty, and your-session-is-not-here. Muted because every
    one of them is the page telling the reader something in passing, and none is
