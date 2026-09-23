@@ -407,7 +407,7 @@ describe('behavioural options that spec §2 constrains', () => {
    * The same path, and part of why Task 5's decision is bigger than links:
    * five configured extensions register seven paste rules between them
    * (`bold` 2, `italic` 2, `code` 1, `strike` 1, `link` 1). Its TYPED
-   * sibling — twenty input rules across twelve extensions, behind
+   * sibling — twenty-one input rules across thirteen extensions, behind
    * `enableInputRules` rather than `enablePasteRules` — is a disjoint rule
    * set: disabling either lever was verified to leave the other set firing,
    * so no single lever settles Task 5's decision. Census and dist citations

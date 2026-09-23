@@ -219,3 +219,39 @@ describe('13.1312 the editable node fills the field', () => {
     expect(declared(body, 'min-height')).not.toBe(declared(comment, 'min-height'));
   });
 });
+
+/**
+ * 9.272 — THE COLLAPSIBLE BLOCK'S CHROME (spec §8.4, Plan 4 Task 3).
+ *
+ * Same reason as every other case in this file: jsdom applies no stylesheet, so
+ * a rendered assertion would pass against any CSS at all — including none. What
+ * makes a collapsible LOOK like one is the border that encloses it, the pointer
+ * on the summary that says the summary is the fold control, and the padding
+ * that keeps the summary off its own edge.
+ *
+ * The edge is drawn with `currentColor` and not a token, which is this file's
+ * own standing rule (`editor.css`'s header): packages/editor must not depend on
+ * packages/ui, and a colour named here would also be caught by the repo's
+ * colour scanner. The assertion is written against the DECLARATION rather than
+ * its colour, so a later hand choosing a different inheriting ink still passes
+ * — that is not the property this case is for.
+ */
+describe('9.272 the collapsible block is styled', () => {
+  it('9.272 .editor-details carries a border, a radius and padding; its summary is the fold control', () => {
+    const box = ruleBody(EDITOR_CSS, '.editor-details');
+    expect(declared(box, 'border')).not.toBeNull();
+    expect(declared(box, 'border-radius')).not.toBeNull();
+    expect(declared(box, 'padding')).not.toBeNull();
+
+    const summary = ruleBody(EDITOR_CSS, '.editor-details > summary');
+    expect(declared(summary, 'cursor')).toBe('pointer');
+
+    // CONTROL, same `it`: the two selectors must reach DIFFERENT rules.
+    // `ruleBody` is a first-match substring search, so a docblock that merely
+    // named the summary selector above the box rule — or a box rule written
+    // `.editor-details > summary` by mistake — would let the summary arm read
+    // the box's declarations and pass with no summary rule in the file at all.
+    expect(summary).not.toBe(box);
+    expect(declared(box, 'cursor')).toBeNull();
+  });
+});

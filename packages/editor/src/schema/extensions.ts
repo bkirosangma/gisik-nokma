@@ -14,6 +14,7 @@ import {
   DetailsSummary,
 } from '@tiptap/extension-details';
 import { VersionedDocument } from './versioned-document.js';
+import { Collapsible } from '../extensions/collapsible.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
 import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
@@ -125,11 +126,11 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
     // `italic` 2, `code` 1, `strike` 1, `link` 1), firing on external paste,
     // external drop, or an `applyPasteRules` meta (the guard at core
-    // dist:5121-5125); and TWENTY INPUT RULES across twelve extensions
+    // dist:5121-5125); and TWENTY-ONE INPUT RULES across thirteen extensions
     // (`heading` 6, `bold` 2, `italic` 2, `codeBlock` 2, `blockquote` 1,
     // `bulletList` 1, `code` 1, `orderedList` 1, `strike` 1,
-    // `horizontalRule` 1, `link` 1, `taskItem` 1), firing from
-    // `handleTextInput` as text is typed (core dist:4834). **The counts were 18
+    // `horizontalRule` 1, `link` 1, `taskItem` 1, `collapsible` 1), firing
+    // from `handleTextInput` as text is typed (core dist:4834). **The counts were 18
     // and ten until 2026-09-21, and `link` is the one that moved** — with the
     // option reversed it contributes to BOTH censuses, so
     // `test/rule-census.test.ts`'s `pasted \ typed` set is now empty where it
@@ -139,6 +140,12 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // not on `taskList` — so the input total went 19 → 20 and the paste total
     // did not move at all.** That asymmetry is the reason this paragraph names
     // the extension each rule belongs to rather than only the totals.
+    // **`collapsible` is the third move, 2026-09-23 (Plan 4 Task 3), and it is
+    // additive in the same way: 20 → 21 input rules, paste unchanged. It is the
+    // only rule the collapsible block contributes — the Enter and Backspace
+    // shortcuts that ship beside it live in `addKeyboardShortcuts`, which
+    // neither census reads, so a reader expecting the block to cost two lines
+    // here finds one.**
     // Every number and every membership here is asserted per-extension by that
     // file, so a future upgrade that moves one fails there naming the extension
     // rather than reconciling two totals. So `**due soon**` arrives bold whether pasted,
@@ -191,6 +198,11 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     }),
     DetailsSummary,
     DetailsContent,
+    // The `< ` rule and the Enter/Backspace keymap the Details extension does
+    // not ship. It registers NO node of its own — it is an `Extension`, not a
+    // `Node` — so it adds one line to the input-rule census and nothing to the
+    // schema vocabulary.
+    Collapsible,
     // The image node of schema v1 (spec §2: only images embed inline). The
     // default attachment route is stated ONCE, in TicketImage's `addOptions`,
     // and is not restated here: `configure` merges with `mergeDeep` (core

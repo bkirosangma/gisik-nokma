@@ -68,6 +68,14 @@ const EXPECTED_INPUT_RULES: Record<string, number> = {
   // between the two siblings would be caught here rather than reconciling
   // 20 === 20.
   taskItem: 1,
+  // ADDED 2026-09-23 with the notes editor port (Plan 4 Task 3): `collapsible`
+  // registers the `< ` rule, joining as a THIRTEENTH extension and moving the
+  // total 20 -> 21. This is the entry the plan's Task 3 names, and it is the
+  // only one the collapsible block contributes — the Enter/Backspace keymap
+  // that ships with it is a KEYBOARD SHORTCUT, not a rule, and does not appear
+  // in either census. A later reader who expects the block to cost two lines
+  // here should read `collapsible.ts`'s `addKeyboardShortcuts` instead.
+  collapsible: 1,
 };
 
 function census(field: 'addInputRules' | 'addPasteRules'): Record<string, number> {
@@ -114,8 +122,8 @@ describe('the rule census the schema origin states in prose', () => {
   it('9.263 registers exactly the input rules the comment block enumerates', () => {
     const counts = census('addInputRules');
     expect(counts).toEqual(EXPECTED_INPUT_RULES);
-    expect(total(counts)).toBe(20);
-    expect(Object.keys(counts)).toHaveLength(12);
+    expect(total(counts)).toBe(21);
+    expect(Object.keys(counts)).toHaveLength(13);
   });
 
   /**

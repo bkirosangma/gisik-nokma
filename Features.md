@@ -1455,11 +1455,16 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   renderer gives each node its chrome — a disabled checkbox reading the stored `checked`, a
   `<details>` that can be folded, a link to `/notes/<id>`. `packages/domain/src/doc-text.ts`,
   `packages/app-core/src/views/comment-body.tsx`
+- ✅ **A collapsible block** — start a line with `< `, the rest of the line is the title, Enter moves
+  into the body, Enter on an empty last line leaves the block, Backspace in an empty summary removes
+  it; the folded state is saved with the document for an editor and is view-only for a reader
+  (spec §8.4). `packages/editor/src/extensions/collapsible.ts`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
-  fires), and they are not sufficient: **seven paste rules across five extensions** and **twenty input
-  rules across twelve** remain live, counted against the built extension list at tiptap 3.30.5, and the
+  fires), and they are not sufficient: **seven paste rules across five extensions** and
+  **twenty-one input rules across thirteen** remain live, counted against the built extension list at
+  tiptap 3.30.5, and the
   two sets sit behind `enablePasteRules` / `enableInputRules` — `Editor` options this function returns
   `Extensions` for and therefore cannot reach. In tension with spec §2's "nothing silently becomes
   markup"; **left as it is, deliberately and unruled**, with the census pinned by a test so the number

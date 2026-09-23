@@ -507,3 +507,28 @@
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
+
+/* The collapsible block (spec §8.4, Plan 4 Task 3). `renderHTML` in
+   `../schema/extensions.ts` puts the `editor-details` class on the node via
+   the Details extension's `HTMLAttributes`, so this is the box the whole
+   block wears and `.editor-details > summary` is the fold control.
+   The edge is `currentColor` like every other visible edge in this file: the
+   colour is whatever the surrounding text already proves, and naming a token
+   here would make packages/editor depend on packages/ui. */
+.editor-details {
+  border: 1px solid currentColor;
+  border-radius: 8px;
+  padding: 6px 10px;
+  margin: 8px 0;
+}
+.editor-details > summary {
+  cursor: pointer;
+  font-weight: 600;
+}
+/* An empty summary is a fold control with no label, which reads as a bug
+   rather than as a thing to fill in. Same affordance as the editor's
+   `Placeholder`, without a second implementation of it. */
+.editor-details > summary:empty::before {
+  content: 'Title';
+  opacity: 0.5;
+}
