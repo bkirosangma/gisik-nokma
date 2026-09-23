@@ -421,3 +421,27 @@ and each case records what its own run printed.
   main` then `OK rebuild dry-run on main`, exit 0. Without this arm a guard that had been narrowed to
   `release/*` alone would look identical to the intended one across every other case in this section.
   `scripts/ctl/verbs/rebuild.sh`
+
+## Backup worker TLS to the managed cluster (`hotfix/backup-worker-ca`, 2026-09-23)
+
+The production `backup` worker logged `backup job failed … self-signed certificate in certificate chain`
+for `sweep-notifications` and `auto-close` (2026-09-23 00:13 IST). Cause: `backup-daemon-main.ts` built
+its pool with `createPool(databaseUrl)` and never read `DATABASE_CA_CERT`, although `deploy/do/app.yaml`
+binds it to the worker exactly as to the server, and the server hands it to `createPool` (`src/index.ts`).
+The ledger export shares that pool and failed the same way; `pg_dump` goes through libpq under
+`sslmode=require` and was unaffected.
+
+- 13.1421 ✅ `optionalDatabaseCaCert(env)`: unset and blank are `null` (App Platform resolves an unbound
+  variable to `''`); a PEM comes back verbatim; a non-PEM throws `ConfigError` naming `DATABASE_CA_CERT`.
+  `apps/server/test/ops/backup-env.test.ts`. Mutation: return the string unconditionally → the refusal
+  assertions red.
+- 13.1422 ✅ The spawned daemon announces `{"msg":"database pool","tls":"ca"}` when `DATABASE_CA_CERT`
+  is bound and still arms the scheduler; CONTROL in the same `it`: bound to `''` → `"tls":"none"` and the
+  scheduler arms. The announce is read back from `pool.options.ssl`, NOT from the variable — the first
+  version read the variable and a mutation dropping `{ caCert }` from `createPool` SURVIVED (recorded here
+  because it is the shape of the original defect: the environment said "ca", the pool said nothing).
+  Mutation: `createPool(databaseUrl)` without the CA → `"tls":"none"` under a bound CA → red (measured
+  2026-09-23, Node v22.22.2). `apps/server/test/ops/backup-daemon-main.test.ts`.
+- 13.1423 ✅ A non-PEM `DATABASE_CA_CERT` aborts the whole scheduler (no `backup daemon scheduled` line)
+  and stderr names the variable, the same shape as a refused sweep interval.
+  `apps/server/test/ops/backup-daemon-main.test.ts`.

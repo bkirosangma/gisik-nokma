@@ -89,6 +89,39 @@ describe('backup-daemon-main — one scheduler for all five jobs', () => {
    * WHOLE scheduler down — nothing is armed and the announcement never prints — which
    * could not happen if the errand sweeps sat on a scheduler of their own.
    */
+  it('13.1422 announces the pool’s TLS mode: "ca" when DATABASE_CA_CERT is bound, "none" when it is not', async () => {
+    // The production defect (2026-09-23): every job that used the pool failed
+    // with "self-signed certificate in certificate chain" because the worker
+    // built its pool without the CA the deploy spec binds to it. The announce
+    // line is the observable: it is printed before the scheduler arms, from
+    // the same value that reaches `createPool`.
+    const withCa = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      DATABASE_CA_CERT: '-----BEGIN CERTIFICATE-----\nMIIBfake\n-----END CERTIFICATE-----\n',
+    });
+    expect(withCa.stdout).toContain('"msg":"database pool","tls":"ca"');
+    expect(withCa.stdout).toContain(SCHEDULED);
+    // CONTROL, same case: unbound → "none", and the scheduler still arms.
+    const withoutCa = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      DATABASE_CA_CERT: '',
+    });
+    expect(withoutCa.stdout).toContain('"msg":"database pool","tls":"none"');
+    expect(withoutCa.stdout).toContain(SCHEDULED);
+  }, 90_000);
+
+  it('13.1423 a DATABASE_CA_CERT that is not a PEM aborts the scheduler, naming the variable', async () => {
+    const run = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      DATABASE_CA_CERT: 'not a certificate',
+    });
+    expect(run.stdout).not.toContain(SCHEDULED);
+    expect(run.stderr).toContain('DATABASE_CA_CERT');
+  }, 60_000);
+
   it('lets one job’s refused interval abort the whole scheduler, naming the variable', async () => {
     const run = await runDaemon({
       DATABASE_URL: db.url,
