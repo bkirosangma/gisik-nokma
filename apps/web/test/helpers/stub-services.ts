@@ -134,6 +134,21 @@ export function stubServices(
     // case meaning to prove the thread is drawn could pass against a read
     // nobody stubbed.
     getTicketComments: unstubbed('getTicketComments'),
+    // UNSTUBBED, the same rule and the same second reason, for the notes series'
+    // seven reads (Plan 1 of 6). The server DOES serve all seven, so the
+    // "served read takes the same treatment" argument above applies verbatim:
+    // `[]` from `getNotes` would be this helper asserting the workspace has no
+    // notes — a claim about the world — and a notes page under test would render
+    // an invented blank and pass. No screen calls these yet (Plan 5 builds the
+    // page), so nothing is overridden today; they are here because
+    // `DataSourceQuery` grew them and this helper is typed by it.
+    getNotes: unstubbed('getNotes'),
+    getDeletedNotes: unstubbed('getDeletedNotes'),
+    getNote: unstubbed('getNote'),
+    getNotesForTicket: unstubbed('getNotesForTicket'),
+    getNoteComments: unstubbed('getNoteComments'),
+    getNoteHistory: unstubbed('getNoteHistory'),
+    getNoteVersion: unstubbed('getNoteVersion'),
     getWorkflowDef: unstubbed('getWorkflowDef'),
     // UNSTUBBED, not `[]`, even though the shipped server serves this one. The
     // rule above holds for a SERVED read exactly as for a refusing one: `[]`

@@ -67,3 +67,9 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.033 — `attachedTickets` in a summary omits tickets the viewer cannot see.** Mutation: drop `visibleTicketsWhere` from the join.
 - ✅ **18.034 — history lists `note.created` and every `note.body_set` in order; the version body is that event's payload body.** Mutation: include `note.renamed`.
 - ✅ **18.035 — comments are returned in `workspace_seq` order only to readers.** Mutation: skip the readability check.
+
+## 18.6 Client data layer
+
+- ✅ **18.036 — `mapNoteSummaries` maps the server's `{ notes: [...] }` shape and refuses a row missing `noteId` with a `MappingError` naming the path.** Mutation: default `noteId` to `''`.
+- ✅ **18.037 — `mapNoteDetail` carries `body` through untouched (as `unknown`) and `schemaVersion` as a number.** Mutation: `JSON.stringify` the body.
+- ✅ **18.038 — every note method on the replica data source rejects with `ReplicaGapError`** naming the method; control: `getTicketSummary` (or another implemented read) resolves. Mutation: return `[]` from `getNotes`.

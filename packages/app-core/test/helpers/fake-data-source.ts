@@ -51,6 +51,19 @@ export function createFakeDataSource(
     // because the refusal it would imitate is a 404 from a real route and this
     // file is not that source (see this file's header).
     getTicketComments: async () => [],
+    // The seven note reads (notes series, Plan 1 of 6) default to the same
+    // absent-everything the two reads above do, on the same argument: a view
+    // test that has not stubbed them is rendering a workspace with no notes,
+    // which is a state the product produces constantly. `getNote` and
+    // `getNoteVersion` are `null` for the same reason `getTicket` is — `null` is
+    // this group's absence value, not `[]`.
+    getNotes: async () => [],
+    getDeletedNotes: async () => [],
+    getNote: async () => null,
+    getNotesForTicket: async () => [],
+    getNoteComments: async () => [],
+    getNoteHistory: async () => [],
+    getNoteVersion: async () => null,
     getWorkflowDef: async () => null,
     // NOT `[]`, and this default is the one that is deliberately non-empty. Plan
     // 4's bootstrap materialises the four built-ins as real

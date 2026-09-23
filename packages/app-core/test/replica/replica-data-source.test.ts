@@ -460,7 +460,7 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 TEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 SEVENTEEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
@@ -476,6 +476,17 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       // `toEqual(Object.keys(REPLICA_GAPS))`, which is order-sensitive, and
       // `REPLICA_GAPS` gained this key directly under `getTicketAttachments`.
       ['getTicketComments', () => ds.query.getTicketComments(WS, newUlid())],
+      // Added by the notes series, Plan 1 of 6. SEVEN entries for ONE absence —
+      // `NOTES_ABSENCES` is shared by reference — placed together directly under
+      // `getTicketComments` because that is where `REPLICA_GAPS` gained them and
+      // the assertion below is order-sensitive.
+      ['getNotes', () => ds.query.getNotes(WS)],
+      ['getDeletedNotes', () => ds.query.getDeletedNotes(WS)],
+      ['getNote', () => ds.query.getNote(WS, newUlid())],
+      ['getNotesForTicket', () => ds.query.getNotesForTicket(WS, newUlid())],
+      ['getNoteComments', () => ds.query.getNoteComments(WS, newUlid())],
+      ['getNoteHistory', () => ds.query.getNoteHistory(WS, newUlid())],
+      ['getNoteVersion', () => ds.query.getNoteVersion(WS, newUlid(), newUlid())],
       ['search', () => ds.query.search(WS, 'x')],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
@@ -507,8 +518,14 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
           'field',
           'owner',
         ]);
-        // And every owner is something the CLIENT would have to change.
-        expect(absence.owner, `${name}: ${absence.field}`).toMatch(/^Plan 10 — /);
+        // And every owner is something the CLIENT would have to change. The
+        // notes series (Plan 1 of 6) added a SECOND such owner and named it
+        // honestly rather than writing "Plan 10" over Plan 2's work: the
+        // property this line holds is that the owner is a NAMED plan the client
+        // must change, which was a one-plan set until the notes replica landed.
+        // Widening it to the two plans that will actually do the work keeps the
+        // property; hard-coding `Plan 10` would have made the sentence false.
+        expect(absence.owner, `${name}: ${absence.field}`).toMatch(/^(Plan 10|Plan 2 of the notes series) — /);
       }
       names.push(name);
     }
@@ -518,6 +535,38 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     // evidence beside the list of what answers.
     await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
     await expect(ds.query.getTicketHistory(newUlid())).resolves.toEqual([]);
+  });
+
+  /**
+   * 18.038 — the same seven doors as 12.185's list, asserted as ONE case with
+   * its own id.
+   *
+   * It is deliberately a second pass over ground 12.185 already walks: 12.185 is
+   * the ENUMERATION case (it compares the whole refusal list against
+   * `REPLICA_GAPS`), and this is the notes series' own witness that the seven
+   * note reads are among them. A case id belongs to the plan that mints it, and
+   * 12.185 cannot cite 18.038 for the same reason it cannot cite any other
+   * later plan's id.
+   *
+   * The CONTROL is in the same `it` because a rejection list on its own is
+   * satisfied by a source that rejects everything: `getTicketTypes` resolves.
+   */
+  it('18.038 note reads are replica gaps until Plan 2', async () => {
+    const { ds } = await fixture();
+    for (const m of [
+      'getNotes',
+      'getDeletedNotes',
+      'getNote',
+      'getNotesForTicket',
+      'getNoteComments',
+      'getNoteHistory',
+      'getNoteVersion',
+    ] as const) {
+      await expect(ds.query[m](WS, newUlid(), newUlid())).rejects.toBeInstanceOf(ReplicaGapError);
+    }
+    // CONTROL: an implemented read still answers, so the seven rejections above
+    // are about the note group and not about the source refusing everything.
+    await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
   });
 
   it('12.186 subscribe hands its callback a real ServerStreamFrame — the kind useLiveQuery acts on', async () => {
