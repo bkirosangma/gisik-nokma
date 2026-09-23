@@ -23,6 +23,7 @@ import {
   mapNoteVersionBody,
   mapNoteVersions,
   mapPreferences,
+  mapNoteSearchHits,
   mapSearchHits,
   mapTicketAttachments,
   mapTicketComments,
@@ -450,6 +451,17 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
         if (Object.keys(spec).length > 0) params.set('filter', JSON.stringify(spec));
       }
       return mapSearchHits(await http.get(`/v1/search?${params.toString()}`));
+    },
+
+    searchNotes: async (workspaceId, text, options) => {
+      // `kinds=note` because the caller wants notes: leaving it out would ask
+      // the server to search tickets too, and `mode=meaning` would then return
+      // `hits: []` anyway — one wasted query on a path that runs after every
+      // typing pause.
+      const params = new URLSearchParams({ workspaceId, q: text, kinds: 'note', mode: options.mode });
+      if (options.authorId !== undefined) params.set('author', options.authorId);
+      if (options.scopeMode !== undefined) params.set('scope', options.scopeMode);
+      return mapNoteSearchHits(await http.get(`/v1/search?${params.toString()}`), options.mode);
     },
 
     /**

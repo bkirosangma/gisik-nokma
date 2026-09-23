@@ -1103,6 +1103,16 @@ reason on record, not an oversight:*
   make a result set the caller can only half explain. Every query value is type-checked before it is
   used, because `?q=a&q=b` arrives as an array and would otherwise be a 500 for a request the door
   owes a 400. `apps/server/src/routes/search.ts`, `apps/server/src/app.ts`
+- ✅ **`GET /v1/search` also searches NOTES — `kinds`, `mode`, `author`, `scope`** (notes series, Plan 3
+  of 6, spec §7.7). `kinds` is a comma list of `ticket`/`note` defaulting to both, so every existing
+  caller gets what it always got and the response's `hits` is unchanged; `mode` is `lexical`
+  (default) or `meaning`; `author` and `scope` narrow the note half. The response gains a REQUIRED
+  `notes` array — `[]` when nothing matched or when `kinds` left notes out — and `corrected`, present
+  exactly when a misspelt query was corrected. **`mode=meaning` returns `hits: []`**: tickets have no
+  chunks in v1, and answering spelling matches labelled as meaning would be worse than empty. An
+  invalid `kinds`, `mode` or `scope` is `invalid_query` rather than a silent default. Every new
+  value is parsed before anything is read, and the same `requireMember` gate covers both modes.
+  `apps/server/src/routes/search.ts`, `apps/server/src/read/note-search.ts`
 - ⚙️ **`FTS_CONFIG` and `searchTermSchema` — one name each for a matching rule and a search term** —
   the text-search configuration is a matching rule, so it has to be the same on both sides or it is
   not a rule: `to_tsvector` decides what lexemes are stored and `websearch_to_tsquery` decides what
@@ -3137,3 +3147,4 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ⚙️ **Notes are indexed for full-text search** — `proj_note_search` (folded title, body and attached-ticket text, with a generated `tsv` weighted A/B/C) and `proj_note_lexemes` (a trigram-indexed vocabulary per workspace), kept current by `noteSearchProjection` and replays clean under `verifyProjections`. Folding is `foldSearchText` (`packages/domain/src/search-fold.ts`): the four spellings of the raka mark are unified, and the mark is removed only between two letters. **Visibility is applied at read time only** — the index is complete and the reader predicate is in every query.
 - ⚙️ **An in-process worker keeps note embeddings current** — `startEmbedWorker` (`apps/server/src/search/embed-worker.ts`) runs every `EMBED_WORKER_INTERVAL_MS` (10 s), is nudged after a commit by a listener `buildApp` registers (`onNoteBodyCommitted`, forwarded from `index.ts`), and is also the backfill and the re-index after a model change. One pass at a time; a deleted note's chunks are dropped in the same pass. `EMBED_WORKER_ENABLED=false` stops it without stopping the server.
 - ⚙️ **Three note search queries** — prefix lexical (last word `:*`, `ts_rank_cd` order), trigram correction on zero hits (one rerun, never two), and nearest-chunk meaning (`DISTINCT ON`, 200 candidates, first 20) — all in `apps/server/src/read/note-search.ts`, each with `visibleNotesWhere` INSIDE the statement. `HEADLINE_OPTIONS` moved to `read/headline.ts` so the ticket search and the note search cut snippets the same way.
+- ✅ **Notes are searchable through the same search API as tickets**, labelled by kind, with meaning search behind `mode=meaning`. `NoteSearchHit` on the client (`packages/app-core/src/view-types.ts`) carries `source`, which the SERVER does not send — the mode is the request's own parameter — and `mapNoteSearchHits` stamps it from the `mode` the caller asked for. The replica refuses `searchNotes` with a `ReplicaGapError`: the device has neither index, and serving the lexical half alone would make the screen work while typing and fail after the pause.

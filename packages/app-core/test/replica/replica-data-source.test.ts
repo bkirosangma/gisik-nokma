@@ -488,6 +488,11 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
       ['getNoteHistory', () => ds.query.getNoteHistory(WS, newUlid())],
       ['getNoteVersion', () => ds.query.getNoteVersion(WS, newUlid(), newUlid())],
       ['search', () => ds.query.search(WS, 'x')],
+      // Added by the notes series' search plan (Plan 3 of 6). This entry is the
+      // list announcing itself, exactly as the comment below describes: the
+      // replica gained the method and this case, which compares the list against
+      // `Object.keys(REPLICA_GAPS)`, reddened until it was named here.
+      ['searchNotes', () => ds.query.searchNotes(WS, 'x', { mode: 'lexical' })],
       ['getMyWork', () => ds.query.getMyWork(WS)],
       ['getAttention', () => ds.query.getAttention(WS)],
       // Added by second wave Task 6. This list is enumerated rather than

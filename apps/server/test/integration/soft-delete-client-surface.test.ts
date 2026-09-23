@@ -488,7 +488,12 @@ type AbsenceDecision =
   | 'getNotesForTicket'
   | 'getNoteComments'
   | 'getNoteHistory'
-  | 'getNoteVersion';
+  | 'getNoteVersion'
+  // The notes series, Plan 3 of 6 (search). A carrier: a deleted note must not
+  // come back through search, in EITHER mode, and 18.148 is the case that
+  // holds the queries to it — so this row is `carries: true` and the verdict
+  // is the one that matters here.
+  | 'searchNotes';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -576,6 +581,30 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
   getWorkflowDef: { verdict: 'excluded', carries: false },
   getTicketTypes: { verdict: 'excluded', carries: false },
   search: { verdict: 'excluded', carries: true },
+  searchNotes: {
+    verdict: 'excluded',
+    // `false`, and the reason is a property of the ANSWER rather than a gap in
+    // the read. A note's search hit shows the NOTE's own fields — its raw title,
+    // a snippet cut from its body, and the KEYS (not the titles) of its attached
+    // tickets — so the deleted ticket's title reaches this surface only as a
+    // MATCH, through `proj_note_search.ticket_text`, and never as text a caller
+    // reads. `carries: true` would be the claim that the marker appears in the
+    // answer, which it does not: `attachedTicketKeys` holds `CCSO-7`, a key
+    // composed from a project's prefix, and the fixture's ticket title is
+    // nowhere in the row.
+    //
+    // The delete still reaches it, which is what `excluded` says and what the
+    // after-pass measures: `ticket.deleted` re-derives the note's row, the line
+    // for that ticket leaves `ticket_text`, and a query on the deleted ticket's
+    // OWN WORD stops finding the note. That is the exclusion — a filter on the
+    // match rather than a removal from the text.
+    //
+    // (`n.deleted = FALSE` is the other half and it is 18.148's: a note that is
+    // itself deleted is in neither mode, in the meaning one especially, where
+    // the chunk rows outlive the note until the worker catches up.)
+    carries: false,
+    why: 'a note hit shows the note’s own text and its tickets’ KEYS; the deleted ticket’s title reaches it as a match, not as content',
+  },
   getMyWork: { verdict: 'excluded', carries: true },
   getAttention: { verdict: 'excluded', carries: true },
   getWorkspaceSettings: { verdict: 'excluded', carries: false },
@@ -700,6 +729,9 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     getNoteComments: () => ds.getNoteComments(workspaceId, noteId),
     getNoteHistory: () => ds.getNoteHistory(workspaceId, noteId),
     getNoteVersion: () => ds.getNoteVersion(workspaceId, noteId, newUlid()),
+    // The notes search reads, both modes. `MARKER` is this file's text term, so
+    // the call visits the same door every other `carries: true` row walks.
+    searchNotes: () => ds.searchNotes(workspaceId, MARKER, { mode: 'lexical' }),
   };
 }
 
@@ -766,8 +798,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   // three `Record`s below would stop being total.
   expect(absenceTripwire('getBoard')).toBe('getBoard');
   expect(absenceTripwire('getTicketHistory')).toBe('getTicketHistory');
-  // 16 until the notes series (Plan 1 of 6) added its seven reads.
-  expect(MEMBERS).toHaveLength(23);
+  // 16 until the notes series (Plan 1 of 6) added its seven reads; 23 until
+  // Plan 3 of 6 added `searchNotes`.
+  expect(MEMBERS).toHaveLength(24);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

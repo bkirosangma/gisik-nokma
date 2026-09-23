@@ -122,7 +122,7 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   registry.register(notesProjection);
   // The notes SEARCH projection (Plan 3 of 6, spec §7.3), and the first
   // registrant for which the note above this one became load-bearing rather
-  // than forecast: `notesProjection`'s own comment said "Plan 3's search
+  // than merely named by the spec: `notesProjection`'s own comment said "Plan 3's search
   // projection is the first candidate, since `proj_note_search` will read
   // notes", and this is that. `apply` reads `proj_notes`,
   // `proj_note_attachments`, `proj_tickets` and `proj_projects`, so it must sit

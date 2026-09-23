@@ -74,6 +74,13 @@ export function createFakeDataSource(
     // a change to the ladder cannot leave this fixture behind.
     getTicketTypes: async () => builtinTicketTypeDefs('wf_default'),
     search: async () => [],
+    // Notes search, added with the method (notes series Plan 3 of 6). `[]` here
+    // is a DEFAULT rather than a claim about the world — this helper is for
+    // cases that do not care about search, and a case that does overrides it.
+    // (The `stub-services.ts` helper in `apps/web` takes the opposite line for
+    // the same method, because ITS pages render the empty state: there `[]`
+    // would be a page asserting the workspace contains no matching note.)
+    searchNotes: async () => ({ notes: [] }),
     // Three of these take a `workspaceId` (ruling P25 clause 2) and none of the
     // defaults reads it: the fake answers the same empty view for every
     // workspace, which is what a default is for. Overrides that care take it.

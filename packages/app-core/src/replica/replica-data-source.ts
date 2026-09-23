@@ -357,6 +357,32 @@ const SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
+/**
+ * Notes series, Plan 3 of 6. Unlike `SEARCH_ABSENCES` — which is about two
+ * FIELDS of a hit the replica can otherwise produce — this is the whole method.
+ *
+ * The reason is that note search is two different indexes and the device has
+ * neither. `Replica.searchLocal` scans ticket titles and comment bodies for a
+ * LIKE match, and a note's body is a ProseMirror document that has to be
+ * flattened and FOLDED before it can be matched at all (spec §7.2), with a
+ * vocabulary for the correction pass that nothing local builds. And the meaning
+ * mode has no offline story whatsoever: its whole index is the output of a
+ * 130 MB model.
+ *
+ * Answering the lexical half alone would be worse than refusing. `mode` is
+ * required on the call (see `data-source.ts`), so a replica that served lexical
+ * and threw on meaning would make the search screen work while typing and fail
+ * after the pause — a screen that breaks depending on how long the user waited.
+ */
+const NOTE_SEARCH_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'NoteSearchHit (every field)',
+    because:
+      'the device has neither index. The lexical one needs a note body flattened to text and FOLDED (spec §7.2) plus a workspace vocabulary for the correction pass, none of which the local schema or `Replica.searchLocal` builds; the meaning one needs the 130 MB model\'s output, which cannot exist offline at all. Serving the lexical half alone would make the screen work while typing and fail after the pause',
+    owner: 'Plan 10 — a folded local note index and a chosen offline answer for `mode=meaning`',
+  },
+];
+
 const MY_WORK_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'WorkItem.projectName',
@@ -613,6 +639,7 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getNoteHistory: NOTES_ABSENCES,
   getNoteVersion: NOTES_ABSENCES,
   search: SEARCH_ABSENCES,
+  searchNotes: NOTE_SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
   getAttention: ATTENTION_ABSENCES,
   getWorkspaceSettings: WORKSPACE_SETTINGS_ABSENCES,
@@ -1031,6 +1058,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     getPreferences: () => Promise.reject(new ReplicaGapError('getPreferences', PREFERENCES_ABSENCES)),
     putPreferences: () => Promise.reject(new ReplicaGapError('putPreferences', PREFERENCES_ABSENCES)),
     search: () => Promise.reject(new ReplicaGapError('search', SEARCH_ABSENCES)),
+    searchNotes: () => Promise.reject(new ReplicaGapError('searchNotes', NOTE_SEARCH_ABSENCES)),
 
     /**
      * `grouping` is READ AND NOT USED, and that is the shipped view type rather

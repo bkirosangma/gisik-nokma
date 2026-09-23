@@ -1156,6 +1156,10 @@ describe('3.39 the register is EMPTY — the blocked methods ANSWER, and the fac
     const body: SearchResponse = {
       workspaceId: 'w',
       query: 'q',
+      // Required on the response since the notes series' search plan; the
+      // ticket half of this case is what it is about, and `mapSearchHits`
+      // reads `hits` alone.
+      notes: [],
       hits: [
         {
           card: serverCard({ ticketId: 'tkt-h1', projectId: '01J9GPRJ000000000000000000' }),
