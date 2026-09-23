@@ -112,6 +112,29 @@ describe('9.276-9.279 wiki-links', () => {
     expect(Object.keys(link?.attrs ?? {}).sort()).toEqual(['noteId', 'title']);
     editor.destroy();
   });
+
+  /**
+   * THE HTML → DOCUMENT DIRECTION, which had no witness: 9.277/9.278 build a
+   * document from JSON and read the DOM, and nothing went the other way. The
+   * mention node has exactly this case ("survives a full HTML round trip with
+   * both attrs intact"), so the omission is a gap rather than a decision.
+   *
+   * It is the direction a PASTE takes — `data-note-id` is the parse
+   * discriminator — and the anchor the node renders is the HTML a host would
+   * hand back.
+   */
+  it('9.279 a rendered link round-trips back through HTML with both attrs intact', () => {
+    const editor = createTestEditor(
+      { resolveNoteTitle: () => 'Cold room' },
+      { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] }] },
+    );
+    const html = editor.getHTML();
+    expect(html).toContain('data-note-id="n1"');
+    editor.commands.setContent(html);
+    const link = asJson(editor).content?.[0]?.content?.find((n) => n.type === 'wikiLink');
+    expect(link?.attrs).toEqual({ noteId: 'n1', title: 'Cold room' });
+    editor.destroy();
+  });
 });
 
 /**

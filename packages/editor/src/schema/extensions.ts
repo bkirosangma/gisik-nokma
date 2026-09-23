@@ -191,7 +191,29 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // why it failed them and why they were FLIPPED rather than deleted.
     //
     // `openOnClick: false` keeps a click editing the link, not following it.
-    Link.configure({
+    // ⚠ THE PARSE RULE IS NARROWED, and it is load-bearing rather than tidy.
+    //
+    // A note link renders as an `<a data-note-id href="/notes/…">`, which the
+    // stock `a[href]` rule ALSO matches. prosemirror-model builds its rule list
+    // MARK RULES FIRST and node rules after (`dist:2654` for marks, `:2663` for
+    // nodes) and `matchTag` returns the FIRST match (`:2600-2616`) — so the
+    // LINK MARK always won, and an `<a data-note-id>` parsed back as a plain
+    // link on text: the note id survived only inside the href, where nothing
+    // reads it. MEASURED, and the effect is ordinary: copy a wiki-link, paste
+    // it, and it is no longer a note link — no rename-following, no missing
+    // pill, no `onNavigateNote` — and the HTML a host feeds to `setContent`
+    // does the same. Extension `priority` does NOT fix it (tried: `priority:
+    // 1000` on `WikiLink` left the round trip broken, because the ordering is
+    // by rule KIND, not by extension).
+    //
+    // `:not([data-note-id])` is the smallest change that hands the anchor to
+    // the node that renders it, and it changes nothing else: every other
+    // `<a href>` is still a link.
+    Link.extend({
+      parseHTML() {
+        return [{ tag: 'a[href]:not([data-note-id])' }];
+      },
+    }).configure({
       openOnClick: false,
       autolink: false,
       linkOnPaste: false,

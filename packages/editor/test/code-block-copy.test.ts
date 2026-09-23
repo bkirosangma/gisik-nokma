@@ -39,4 +39,53 @@ describe('9.273 code block copy button', () => {
     expect(codeBlock).toBeDefined();
     editor.destroy();
   });
+
+  /**
+   * THE OTHER BRANCH OF THE SAME BUTTON, and it had NO witness — found by the
+   * closing audit asking what in the new code nothing could fail on.
+   *
+   * `navigator.clipboard` is undefined outside a secure context, and the mobile
+   * WebView is one of those (a `source={{ html }}` document has no secure
+   * origin), so the fallback is the ONLY path a phone ever takes. A branch that
+   * never runs in a test is indistinguishable from one that cannot run.
+   */
+  it('9.273 falls back to execCommand when there is no clipboard API', async () => {
+    const original = Object.getOwnPropertyDescriptor(globalThis.navigator, 'clipboard');
+    // Removed, not stubbed to undefined: `navigator.clipboard?.writeText` must
+    // take the same path a phone does.
+    delete (globalThis.navigator as { clipboard?: unknown }).clipboard;
+    // The value is captured INSIDE the call, not read afterwards: the
+    // implementation appends the textarea, copies and removes it in the same
+    // synchronous tick, so by the next line it is gone. (The first cut of this
+    // arm read it after the click and failed on an empty list — the test being
+    // wrong, not the code.)
+    let copiedAtCallTime: string | null = null;
+    const execCommand = vi.fn(() => {
+      copiedAtCallTime = document.querySelector('textarea')?.value ?? null;
+      return true;
+    });
+    const originalExec = document.execCommand;
+    document.execCommand = execCommand as unknown as typeof document.execCommand;
+    try {
+      const editor = createTestEditor(undefined, {
+        type: 'doc',
+        content: [{ type: 'codeBlock', content: [{ type: 'text', text: 'npm run gst' }] }],
+      });
+      const button = editor.view.dom.querySelector<HTMLButtonElement>('button.editor-codeblock__copy');
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      // The text really reached the hidden textarea the browser copies from —
+      // asserting the CALL alone would pass on a fallback that copied ''.
+      expect(execCommand).toHaveBeenCalledWith('copy');
+      expect(copiedAtCallTime).toBe('npm run gst');
+      // …and the textarea is removed again rather than left in the document.
+      await vi.waitFor(() => {
+        expect(button?.textContent).toBe('Copied');
+      });
+      expect(document.querySelectorAll('textarea')).toHaveLength(0);
+      editor.destroy();
+    } finally {
+      document.execCommand = originalExec;
+      if (original !== undefined) Object.defineProperty(globalThis.navigator, 'clipboard', original);
+    }
+  });
 });
