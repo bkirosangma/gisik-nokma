@@ -172,27 +172,10 @@
   white-space: nowrap;
 }
 
-/* Escape-suggestion chip: inline widget after the caret. */
-.escape-chip {
-  display: inline-flex;
-  gap: 0.375rem;
-  align-items: baseline;
-  margin-left: 0.375rem;
-  padding: 0.0625rem 0.375rem;
-  font-size: 0.75rem;
-  vertical-align: baseline;
-  cursor: pointer;
-  user-select: none;
-}
-.escape-chip__hint {
-  /* 0.75rem, not 0.625rem. At 10px this was the smallest text the product
-     rendered anywhere, and it carried `opacity: 0.7` on top — small AND faint,
-     which compound. The hierarchy against `.escape-chip` (also 0.75rem) is
-     already carried by the opacity, so raising the size loses nothing it was
-     doing. Floor and derivation: `apps/web/e2e-viewport/type-scale.ts`. */
-  font-size: 0.75rem;
-  opacity: 0.7;
-}
+/* The escape-suggestion chip that used to render here is REMOVED (owner
+   ruling 2026-09-24, withdrawing spec §2's chip mechanic) — see
+   packages/editor/src/extensions/escape-suggestion.ts. Its Backspace-undo
+   repair is unaffected and needed no CSS. */
 
 /* Editor shell + chrome: the upload chips (UI-only optimistic placeholder,
    never a doc node) and the wrap menu shown on image selection. Structural
@@ -278,8 +261,8 @@
   font: inherit;
 }
 .ticket-editor__hint {
-  /* 0.75rem — the prototype's own 12px (`:1173`), and the floor this file
-     already holds itself to (`see .escape-chip__hint`). */
+  /* 0.75rem — the prototype's own 12px (`:1173`), and this file's established
+     floor for secondary text (`apps/web/e2e-viewport/type-scale.ts`). */
   font-size: 0.75rem;
   opacity: 0.7;
   margin: 0.375rem 0 0;
