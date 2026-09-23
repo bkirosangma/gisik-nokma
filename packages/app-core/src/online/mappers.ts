@@ -689,6 +689,11 @@ function mapBoardColumn(
     // state". This module's promise is that a garbled read fails loudly here;
     // these two were the places it did not.
     blocked: asBoolean(record['blocked'], `${path}.blocked`),
+    // `creatable` is REQUIRED on `BoardColumn` for the identical reason
+    // `blocked` is, in the comment above: a garbled or absent read must fail
+    // loudly here rather than default to a value that reads on screen as a
+    // claim about the work (starting-status design, 2026-09-23).
+    creatable: asBoolean(record['creatable'], `${path}.creatable`),
     cards: asArray(record['cards'], `${path}.cards`).map((card, index) =>
       mapBoardCard(card, `${path}.cards[${index}]`, roster),
     ),

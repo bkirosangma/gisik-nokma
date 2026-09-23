@@ -36,10 +36,10 @@ function errandGroup(doingCards: BoardCard[] = [boardCardSeed()]): BoardGroup {
     workflowVersion: 1,
     workflowName: 'Errand',
     columns: [
-      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [] },
-      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: doingCards },
-      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, cards: [] },
-      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
+      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: doingCards },
+      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, creatable: true, cards: [] },
+      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
     ],
   };
 }
@@ -104,8 +104,8 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
           workflowVersion: 1,
           workflowName: 'Errand',
           columns: [
-            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [GST, LICENCE, INVOICE] },
-            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [GST, LICENCE, INVOICE] },
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
           ],
         },
       ],
@@ -122,8 +122,8 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
           workflowVersion: 1,
           workflowName: 'Errand',
           columns: [
-            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [GST] },
-            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+            { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [GST] },
+            { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
           ],
         },
         {
@@ -131,8 +131,8 @@ describe('Board — grouping is a rearrangement, never a filter (invariant 5)', 
           workflowVersion: 1,
           workflowName: 'Approval',
           columns: [
-            { stateId: 'review', name: 'In review', category: 'active', blocked: false, cards: [LICENCE] },
-            { stateId: 'approved', name: 'Approved', category: 'terminal', blocked: false, cards: [INVOICE] },
+            { stateId: 'review', name: 'In review', category: 'active', blocked: false, creatable: true, cards: [LICENCE] },
+            { stateId: 'approved', name: 'Approved', category: 'terminal', blocked: false, creatable: false, cards: [INVOICE] },
           ],
         },
       ],
@@ -880,7 +880,7 @@ describe('3.112 an empty board says words, not nothing', () => {
           workflowId: 'wf-errand',
           workflowVersion: 1,
           workflowName: 'Errand',
-          columns: [{ stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards: [] }],
+          columns: [{ stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] }],
         },
       ],
     };
@@ -955,8 +955,8 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
           workflowVersion: 1,
           workflowName: 'Default',
           columns: [
-            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
-            { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
+            { stateId: 's2', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
           ],
         },
       ],
@@ -970,6 +970,82 @@ describe('Board — the per-column empty state and Ruling R6 (Task 7)', () => {
     expect(screen.getByText('To do')).toBeInTheDocument();
     expect(screen.getByText('Doing')).toBeInTheDocument();
     expect(screen.getAllByRole('region')).toHaveLength(2);
+  });
+});
+
+/**
+ * Starting-status design (2026-09-23) — the board's empty-column "Add a
+ * ticket" is gated on `column.creatable`, not merely on `onCreateTicket`
+ * being passed, and the handler is now called WITH that column's own
+ * `{workflowId, stateId}` rather than unscoped. `errandGroup`'s own fixture
+ * (above) already carries `creatable: true` on 'todo'/'doing'/'waiting' and
+ * `creatable: false` on the terminal 'done' column — the same values a real
+ * `isCreatableState` derivation would produce — so these cases exercise the
+ * gate directly rather than inventing a parallel fixture.
+ */
+describe('Board — "Add a ticket" is gated on column.creatable (starting-status design, 2026-09-23)', () => {
+  it('13.1431 a creatable empty column shows "Add a ticket", and the click passes the column\'s own selection', async () => {
+    const user = userEvent.setup();
+    const selections: Array<{ workflowId: string; stateId: string } | undefined> = [];
+    render(
+      <Board
+        board={errandBoard()}
+        onOpenTicket={() => {}}
+        onCreateTicket={(selection) => selections.push(selection)}
+      />,
+    );
+    const todo = screen.getByRole('region', { name: 'To do' });
+    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    expect(selections).toEqual([{ workflowId: 'wf-errand', stateId: 'todo' }]);
+  });
+
+  it('13.1432 a creatable:false empty column shows the copy only — no icon, no button — while its creatable sibling still shows the button (control)', () => {
+    render(<Board board={errandBoard()} onOpenTicket={() => {}} onCreateTicket={() => {}} />);
+    const done = screen.getByRole('region', { name: 'Done' });
+    expect(within(done).getByText(EMPTY_COLUMN_COPY)).toBeInTheDocument();
+    expect(within(done).queryByRole('button', { name: 'Add a ticket' })).toBeNull();
+    // The control, same render: 'To do' is empty too, `creatable: true`, and
+    // still shows the button — so the absence above is `creatable`'s doing,
+    // not a blanket regression of the empty-column action.
+    const todo = screen.getByRole('region', { name: 'To do' });
+    expect(within(todo).getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
+  });
+
+  it('13.1433 the empty-board "Create a ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
+    const user = userEvent.setup();
+    const calls: Array<Array<{ workflowId: string; stateId: string } | undefined>> = [];
+    // `errandBoard()` (this file's own fixture, above): one group, `totalCards
+    // > 0` from `boardCardSeed()`'s default card in `doing` — NOT the fixture
+    // for this case. Zero cards everywhere, so BOTH the whole-board banner
+    // AND the 'To do' column's own empty state render on the SAME screen —
+    // the case R6 names, and the one render that can hold both calls apart.
+    const board = errandBoard([]);
+    render(
+      <Board
+        board={board}
+        onOpenTicket={() => {}}
+        onCreateTicket={(...args) => calls.push(args)}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'Create a ticket' }));
+    // NOT `[undefined]` — the handler is called with ZERO arguments, so a
+    // regression that hands the click event through as `selection` (`onClick=
+    // {onCreateTicket}`) shows as `calls[0]` holding React's synthetic click
+    // event — MEASURED, not assumed: reverting to that exact line and running
+    // this case prints `calls[0][0]` as a `SyntheticBaseEvent` wrapping a
+    // `PointerEvent` (`_reactName: 'onClick'`, `type: 'click'`), not a bare
+    // `MouseEvent` instance — and a regression that passes `undefined`
+    // explicitly shows as length 1.
+    expect(calls).toEqual([[]]);
+
+    // CONTROL, same render, same `it`: the empty 'To do' column's OWN "Add a
+    // ticket" — a DIFFERENT button, on the SAME screen — calls the SAME
+    // handler WITH its column's own identity, so the assertion above is not
+    // vacuously true of a handler that never receives an argument at all.
+    calls.length = 0;
+    const todo = screen.getByRole('region', { name: 'To do' });
+    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    expect(calls).toEqual([[{ workflowId: 'wf-errand', stateId: 'todo' }]]);
   });
 });
 
@@ -1002,8 +1078,8 @@ describe('Board — Ruling 19: isNarrowed suppresses the pinned sentence when ca
         workflowVersion: 1,
         workflowName: 'Default',
         columns: [
-          { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
-          { stateId: 's2', name: 'Doing', category: 'active', blocked: false, cards: [] },
+          { stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
+          { stateId: 's2', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
         ],
       },
     ],
@@ -1183,7 +1259,7 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
           workflowVersion: 1,
           workflowName: 'Errand',
           columns: [
-            { stateId: 's1', name: 'To do', category: 'open', blocked: false, cards: [] },
+            { stateId: 's1', name: 'To do', category: 'open', blocked: false, creatable: true, cards: [] },
           ],
         },
       ],
