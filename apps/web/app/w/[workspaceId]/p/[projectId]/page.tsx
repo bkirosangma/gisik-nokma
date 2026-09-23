@@ -72,6 +72,7 @@ import {
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
 import { ticketSheetPath } from '../../../../../src/ticket-location.js';
+import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../../src/ticket-ref-callbacks.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
 import {
   DEFAULT_PROJECT_TAB,
@@ -219,6 +220,17 @@ function ProjectBoard() {
   const searchParams = useSearchParams();
   const { workspaceId, projectId } = params;
   const { dataSource, cache, ticketLocation } = useAppServices();
+  /**
+   * The `:ticket` picker's data source and the chip's link (Plan 7 Task 4,
+   * spec §14, D26–D28) — passed into `TicketSheet`, which forwards both to
+   * its `<EditorSlot>` mounts and `resolveTicketHref` to `CommentsThread`'s
+   * `ticketHref`. Not memoized, matching `TicketSheet`'s own `queryUsers`: a
+   * fresh closure on every render costs nothing here, because
+   * `TicketEditor`'s `propsRef` pattern reads the LATEST one rather than the
+   * one captured at mount.
+   */
+  const queryTickets = buildProjectPageQueryTickets(dataSource, workspaceId, projectId);
+  const resolveTicketHref = ticketRefHrefIn(workspaceId);
   /**
    * `useSessionStatus`, not `useCurrentUser`, and the difference is a write.
    *
@@ -3488,6 +3500,8 @@ function ProjectBoard() {
             is the argument `canSetVisibility` states at length.
           */
           editorSlot={TicketEditorSlot}
+          queryTickets={queryTickets}
+          resolveTicketHref={resolveTicketHref}
           /*
             THE SHEET'S BREADCRUMB NAMES. Both are already computed above for
             this page's own header (`:174-175`) and already rendered there

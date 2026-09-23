@@ -20,6 +20,7 @@ import {
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser } from '../providers.js';
+import { ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
@@ -378,7 +379,13 @@ export function NoteDocument({
         />
       </div>
 
-      <NoteComments workspaceId={note.workspaceId} noteId={note.noteId} nameOf={nameOf} canComment />
+      <NoteComments
+        workspaceId={note.workspaceId}
+        noteId={note.noteId}
+        nameOf={nameOf}
+        canComment
+        notes={treeNotes}
+      />
 
       <HistoryPanel
         open={historyOpen}
@@ -486,6 +493,10 @@ function NoteEditorPane({
         return docToPlainText(target.body).slice(0, 200);
       }}
       onNavigateNote={onNavigateNote}
+      queryTickets={async (query: string) =>
+        ticketRefCandidatesOf(await dataSource.query.search(note.workspaceId, query))
+      }
+      resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
     />
   );
 }

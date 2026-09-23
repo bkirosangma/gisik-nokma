@@ -242,6 +242,60 @@ describe('9.276-9.279 wiki-links', () => {
 });
 
 /**
+ * 9.307–9.308 — Plan 7 Task 2 (spec §14, D26): a SECOND trigger, `:note`, on
+ * the same `wikiLink` node — inserted through the same command, rendered by
+ * the same node view, offered by the same popup.
+ */
+describe('9.307-9.308 the :note trigger on wiki-links', () => {
+  it('9.307 :note co opens the same picker and inserts the same node [[co would; [[ still works', async () => {
+    const queryNotes = vi.fn(async (q: string) =>
+      NOTES.filter((n) => n.title.toLowerCase().includes(q.toLowerCase())),
+    );
+    let editor!: ReturnType<typeof createTestEditor>;
+    // THE MUTATION THIS CASE NAMES throws here: two `Suggestion` plugins
+    // sharing one `PluginKey` fail at ProseMirror construction time.
+    expect(() => {
+      editor = createTestEditor({ queryNotes });
+    }).not.toThrow();
+
+    // CONTROL: `[[` is untouched by the second plugin's addition.
+    typeText(editor, 'a [[co');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.wikilink-popup__item')).not.toBeNull();
+    });
+    editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const bracketLink = asJson(editor).content?.[0]?.content?.find((n) => n.type === 'wikiLink');
+    expect(bracketLink?.attrs).toEqual({ noteId: 'n1', title: 'Cold room' });
+    editor.commands.clearContent();
+
+    typeText(editor, ':note co');
+    await vi.waitFor(() => {
+      expect(queryNotes).toHaveBeenCalledWith('co');
+    });
+    await vi.waitFor(() => {
+      expect(document.querySelector('.wikilink-popup__item')).not.toBeNull();
+    });
+    editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    const noteTriggerLink = asJson(editor).content?.[0]?.content?.find((n) => n.type === 'wikiLink');
+    expect(noteTriggerLink?.attrs).toEqual({ noteId: 'n1', title: 'Cold room' });
+    editor.destroy();
+  });
+
+  it('9.308 :notebook in prose opens nothing', async () => {
+    const queryNotes = vi.fn(async () => NOTES);
+    const editor = createTestEditor({ queryNotes });
+    typeText(editor, 'read the :notebook please');
+    await Promise.resolve();
+    await Promise.resolve();
+    expect(queryNotes).not.toHaveBeenCalledWith('book');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.wikilink-popup')).toBeNull();
+    });
+    editor.destroy();
+  });
+});
+
+/**
  * 9.297 — `[[` INSIDE A CODE BLOCK.
  *
  * The same review that found 9.296 measured this one rather than assuming it:

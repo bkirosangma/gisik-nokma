@@ -3,6 +3,7 @@
 import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
 import { CommentsThread, makeSubmittedFactory, useLiveQuery, type TicketComment } from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
+import { ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 
 /**
  * The comment thread under a note's editor — the same kit component the
@@ -35,11 +36,23 @@ export function NoteComments({
   noteId,
   nameOf,
   canComment,
+  notes = [],
 }: {
   workspaceId: string;
   noteId: string;
   nameOf: (authorId: string) => string;
   canComment: boolean;
+  /**
+   * The workspace's notes, for the composer's `:note`/`[[` picker (spec
+   * §14, D26) — a final-review finding (2026-09-23): `queryTickets` reached
+   * this composer, but nothing ever supplied `queryNotes`, so a real note's
+   * OWN comment box could not insert a note reference at all. The caller
+   * (`note-document.tsx`) already loads this list for its own editor's
+   * `queryNotes` (`treeNotes`) — passed straight through here rather than a
+   * second fetch. Optional, defaulting to `[]`, so a caller with no list yet
+   * (or a test) still renders a composer whose picker simply finds nothing.
+   */
+  notes?: ReadonlyArray<{ noteId: string; title: string }>;
 }) {
   const { dataSource } = useAppServices();
   const user = useCurrentUser();
@@ -71,6 +84,7 @@ export function NoteComments({
       comments={comments.data}
       commentsUnavailable={comments.error ?? undefined}
       nameOf={nameOf}
+      ticketHref={ticketRefHrefIn(workspaceId)}
       composer={
         canComment ? (
           <TicketEditorSlot
@@ -83,6 +97,20 @@ export function NoteComments({
             placeholder="Add a comment"
             submit={submitComment}
             footerNote="Posting records an event citing you."
+            queryTickets={async (query: string) =>
+              ticketRefCandidatesOf(await dataSource.query.search(workspaceId, query))
+            }
+            resolveTicketHref={ticketRefHrefIn(workspaceId)}
+            queryNotes={async (query: string) => {
+              const needle = query.trim().toLowerCase();
+              const hits: Array<{ noteId: string; title: string }> = [];
+              for (const candidate of notes) {
+                if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+                hits.push({ noteId: candidate.noteId, title: candidate.title });
+                if (hits.length === 8) break;
+              }
+              return hits;
+            }}
           />
         ) : undefined
       }

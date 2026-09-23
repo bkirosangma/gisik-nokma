@@ -49,6 +49,11 @@ export const SCHEMA_V2_NODES = [
   'detailsContent',
   // …and the one INLINE node the port adds, at Plan 4 Task 5.
   'wikiLink',
+  // 9.301 — the `:ticket` picker's chip (Plan 7 Task 1, spec §14, D26). The
+  // closed-vocabulary case below (9.261) is the general witness that this
+  // list and the built schema still agree; `ticket-ref.test.ts` asserts the
+  // node itself is the one actually registered.
+  'ticketRef',
 ];
 
 export const SCHEMA_V2_MARKS = ['bold', 'italic', 'strike', 'code', 'link'];

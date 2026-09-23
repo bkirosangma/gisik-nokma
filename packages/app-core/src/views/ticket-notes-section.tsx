@@ -1,9 +1,10 @@
 import { useRef, useState } from 'react';
+import type { NoteSummary } from '@gisik-nokma/domain';
 import { NoteBadge, Popover, Toast } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import type { MakeSubmitted } from '../submit.js';
 import { AttachNotePicker } from './attach-note-picker.js';
-import { useLiveQuery } from './use-live-query.js';
+import type { LiveQueryResult } from './use-live-query.js';
 
 export type TicketNotesSectionProps = {
   dataSource: DataSource;
@@ -16,6 +17,15 @@ export type TicketNotesSectionProps = {
   make: MakeSubmitted;
   onNavigate?: (href: string) => void;
   onRefusal: (refusal: { rule: string; reason: string }) => void;
+  /**
+   * The `<ticketId>:notes` live query, LIFTED to `TicketSheet` (Plan 7 Task 5,
+   * spec §14.3) — this component no longer calls `useLiveQuery` itself. The
+   * sheet's own `submitComment` reads the SAME instance for `alreadyAttached`
+   * and calls `reload()` after an implied attachment commits, so a comment
+   * that tags a note and this section's badge list never answer from two
+   * queries that could disagree for a moment.
+   */
+  notes: LiveQueryResult<NoteSummary[]>;
 };
 
 /**
@@ -33,10 +43,8 @@ export function TicketNotesSection({
   make,
   onNavigate,
   onRefusal,
+  notes,
 }: TicketNotesSectionProps) {
-  const notes = useLiveQuery(dataSource, workspaceId, `${ticketId}:notes`, () =>
-    dataSource.query.getNotesForTicket(workspaceId, ticketId),
-  );
   const [toast, setToast] = useState<{ noteId: string; title: string } | null>(null);
   const attachTriggerRef = useRef<HTMLButtonElement>(null);
   const [pickerOpen, setPickerOpen] = useState(false);

@@ -320,3 +320,35 @@ describe('renderCommentBody — total, never a throw', () => {
     expect(() => renderCommentBody({ type: 'doc', content: [node] })).not.toThrow();
   });
 });
+
+/**
+ * 9.312 — Plan 7 Task 3 (spec §14.2, D26): `renderCommentBody`'s optional
+ * second parameter. The renderer has no href resolver of its own, unlike the
+ * wiki-link branch which always knows `/notes/<id>` — so a `ticketRef` links
+ * only when the caller supplies one, and renders as a plain span otherwise.
+ */
+describe('9.312 ticketRef in a comment', () => {
+  const TICKET_REF = { type: 'ticketRef', attrs: { ticketId: 't2', projectId: 'p1', key: 'SHOP-8', title: 'Compressor log' } };
+
+  it('9.312 links when ticketHref resolves and renders a span otherwise; wikiLink is unaffected (control)', () => {
+    const body = doc(text('see '), TICKET_REF);
+
+    const { container: linked } = render(<>{renderCommentBody(body, () => '/w/x/p/p1?ticket=t2')}</>);
+    const link = within(linked).getByRole('link', { name: 'SHOP-8 Compressor log' });
+    expect(link.getAttribute('href')).toBe('/w/x/p/p1?ticket=t2');
+    expect(link.className).toBe('gn-comment__ticketref');
+
+    // No `ticketHref` supplied at all: the default answers null, same as an
+    // explicit one that refuses.
+    const { container: plain } = render(<>{renderCommentBody(body)}</>);
+    expect(within(plain).queryByRole('link', { name: 'SHOP-8 Compressor log' })).toBeNull();
+    expect(plain.textContent).toContain('SHOP-8 Compressor log');
+
+    // CONTROL: a wikiLink in the SAME document is unaffected by the new
+    // parameter — it still resolves its own `/notes/<id>` regardless.
+    const noteBody = doc({ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } });
+    const { container: note } = render(<>{renderCommentBody(noteBody, () => '/w/x/p/p1?ticket=t2')}</>);
+    const noteLink = within(note).getByRole('link', { name: 'Cold room' });
+    expect(noteLink.getAttribute('href')).toBe('/notes/n1');
+  });
+});

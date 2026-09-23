@@ -6,6 +6,7 @@ import { buildEditorExtensions } from '../schema/extensions.js';
 import { createAttachmentPasteExtension } from '../extensions/attachment-paste.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
+import type { TicketRefCandidate } from '../extensions/ticket-ref.js';
 import { emptyDoc, type DocJson } from '../doc.js';
 import type { UploadResult } from '../upload.js';
 import { ImageWrapMenu } from './ImageWrapMenu.js';
@@ -28,6 +29,14 @@ export type TicketEditorProps = {
   resolveNoteTitle?(noteId: string): string | null;
   previewNote?(noteId: string): Promise<string | null>;
   onNavigateNote?(noteId: string): void;
+  /**
+   * Ticket-reference capabilities (Plan 7 Task 1), the same two schema options
+   * reach `buildEditorExtensions` with. Both optional, the same additive
+   * default as the wiki-link four above: a mount with neither still renders
+   * and round-trips `ticketRef` nodes, it just offers no picker and no link.
+   */
+  queryTickets?(query: string): Promise<TicketRefCandidate[]>;
+  resolveTicketHref?(ref: { ticketId: string; projectId: string }): string | null;
   uploadAttachment(file: File): Promise<UploadResult>;
   /** Emit attachment.added — runs after upload, before any node insertion. */
   onAttachmentAdded(result: UploadResult): Promise<void> | void;
@@ -129,6 +138,13 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         ...(props.onNavigateNote === undefined
           ? {}
           : { onNavigateNote: (noteId: string) => propsRef.current.onNavigateNote?.(noteId) }),
+        // The ticket-ref two, threaded through `propsRef` for the same reason
+        // as `queryNotes` above: Tiptap snapshots extension options at
+        // construction. `resolveTicketHref` has no "no resolver supplied"
+        // three-way distinction to protect (unlike `resolveNoteTitle`), so it
+        // travels unconditionally like `queryNotes` does.
+        queryTickets: (query) => propsRef.current.queryTickets?.(query) ?? Promise.resolve([]),
+        resolveTicketHref: (ref) => propsRef.current.resolveTicketHref?.(ref) ?? null,
       }),
       createAttachmentPasteExtension({
         uploadAttachment: (file) => propsRef.current.uploadAttachment(file),

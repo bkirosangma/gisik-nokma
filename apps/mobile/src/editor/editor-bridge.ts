@@ -87,6 +87,13 @@ export function parseEditorMessage(raw: unknown): EditorToHostMessage | null {
     case 'noteQuery':
       if (typeof record.requestId !== 'string' || typeof record.query !== 'string') return null;
       return { bridge: 1, kind: 'noteQuery', requestId: record.requestId, query: record.query };
+    // The THIRD request/response pair (Plan 7 Task 3), the same shape and the
+    // same reason `noteQuery` needed one: an unrecognised kind is refused by
+    // `default` below, which would drop this one silently and leave the
+    // editor's `:ticket` picker pending forever.
+    case 'ticketQuery':
+      if (typeof record.requestId !== 'string' || typeof record.query !== 'string') return null;
+      return { bridge: 1, kind: 'ticketQuery', requestId: record.requestId, query: record.query };
     default:
       // ⚠ EXHAUSTIVENESS MADE A COMPILE ERROR. This switch had NO such check,
       // and a kind added to `EditorToHostMessage` without a branch above was
