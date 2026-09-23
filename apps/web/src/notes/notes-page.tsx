@@ -9,6 +9,7 @@ import { AppNav } from '../app-nav.js';
 import { ShellRefusal } from '../shell-refusal.js';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
 import { CreateNoteDialog } from './create-note-dialog.js';
+import { NoteDocument } from './note-document.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
 
 /**
@@ -163,13 +164,11 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             {noteId === undefined ? (
               <p className="gn-notes__hint">{NO_NOTE_COPY}</p>
             ) : (
-              /* Task 4 replaces this with `NoteDocument`, which finds the
-                 note's workspace and draws its title, byline, editor, history
-                 and comments. Until then the id IS the honest answer: a note
-                 was asked for, and nothing here knows what one is yet. */
-              <p className="gn-notes__hint" data-testid="note-document-placeholder">
-                {noteId}
-              </p>
+              /* Task 6 adds History and Task 7 the comments thread inside the
+                 document; both are absent rather than stubbed, because a
+                 control that opens nothing is the dead-control shape this repo
+                 refuses to draw. */
+              <NoteDocument noteId={noteId} workspaces={workspaces ?? []} />
             )}
           </section>
           <aside className="gn-notes__toc" aria-label="On this page" />

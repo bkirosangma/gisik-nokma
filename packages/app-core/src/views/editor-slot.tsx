@@ -101,6 +101,21 @@ export type EditorSlotProps = {
   workspaceId: string;
   /** Uploads and `attachment.added` are ticket-scoped. */
   ticketId: string;
+  /**
+   * The note an upload belongs to, in `note` mode (notes series Plan 5, spec
+   * §4.4). The twin of the block in
+   * `packages/editor/src/components/TicketEditorSlot.tsx`, declared with the
+   * same name and the same optionality ON PURPOSE: the transcription case in
+   * `packages/editor/test/ticket-editor-slot.test.tsx` compares this
+   * declaration's field names against its own copy, so adding the field on one
+   * side alone fails a test before it fails a build.
+   *
+   * `ticketId` stays REQUIRED and this one is optional, which is a statement
+   * about the two modes rather than an oversight: every ticket-shaped mount has
+   * a ticket, and a note mount has no ticket at all. It is also the shape that
+   * costs the existing `ticketId` call sites nothing.
+   */
+  noteId?: string;
   placeholder?: string;
   autoFocus?: boolean;
   /**

@@ -1,5 +1,5 @@
 import { render, screen } from '@testing-library/react';
-import userEvent from '@testing-library/user-event';
+import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import { PeoplePicker } from '../../src/views/people-picker.js';
 import type { RosterMember } from '../../src/view-types.js';
@@ -39,6 +39,11 @@ const labelOf = (member: RosterMember): string =>
 
 describe('18.191 the people picker', () => {
   it('renders one checkbox per member, labelled by memberLabel, checked for selected, and toggles by id', async () => {
+    // `userEvent.setup()` is REQUIRED in v14: the bare `userEvent.click` of v13
+    // is not on the module, and calling it typechecks nowhere — it resolved at
+    // runtime only because this suite does not typecheck the test file with the
+    // package's own config.
+    const user = userEvent.setup();
     const onToggle = vi.fn();
     render(
       <PeoplePicker members={MEMBERS} selected={[ANSELMA]} onToggle={onToggle} />,
@@ -63,7 +68,7 @@ describe('18.191 the people picker', () => {
 
     // The callback carries the ID and not the label — a picker that handed back
     // a display name would build an audience of strings nothing can resolve.
-    await userEvent.click(screen.getByRole('checkbox', { name: 'Dipu' }));
+    await user.click(screen.getByRole('checkbox', { name: 'Dipu' }));
     expect(onToggle).toHaveBeenCalledTimes(1);
     expect(onToggle).toHaveBeenCalledWith(DIPU);
   });

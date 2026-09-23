@@ -22,6 +22,16 @@ export { AVATAR_TINTS, Avatar, initialsOf, tintIndexOf, type AvatarProps } from 
 export { Button, type ButtonProps, type ButtonVariant } from './components/button.js';
 export { Card, type CardProps } from './components/card.js';
 export { Chip, type ChipProps, type ChipTone } from './components/chip.js';
+// `NoteBadge` (notes series Plan 5, spec §10.2) — a note named on another
+// surface: the ticket's Notes section (Plan 6) and the note's own byline. The
+// truncation constant and `truncateNoteTitle` leave with it so a caller that
+// needs the rule does not re-spell it.
+export {
+  NoteBadge,
+  NOTE_BADGE_TITLE_MAX,
+  truncateNoteTitle,
+  type NoteBadgeProps,
+} from './components/note-badge.js';
 export { Dialog, type DialogProps } from './components/dialog.js';
 export { InfoTip, type InfoTipProps } from './components/info-tip.js';
 export { Popover, type PopoverProps } from './components/popover.js';

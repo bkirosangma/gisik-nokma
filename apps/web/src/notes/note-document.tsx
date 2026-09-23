@@ -1,0 +1,297 @@
+'use client';
+
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { useRouter } from 'next/navigation';
+import {
+  TicketEditorSlot,
+  exportMarkdown,
+  extractReadingMeta,
+  readingTimeMinutes,
+} from '@gisik-nokma/editor';
+import {
+  makeSubmittedFactory,
+  useLiveQuery,
+  type RosterMember,
+  type WorkspaceRef,
+} from '@gisik-nokma/app-core';
+import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
+import { useAppServices, useCurrentUser } from '../providers.js';
+import { NoteByline } from './note-byline.js';
+import { NoteTitle } from './note-title.js';
+
+/**
+ * The note itself (notes series Plan 5, spec §9.2, §9.6).
+ *
+ * ## Finding the workspace, and why this iterates
+ *
+ * The route is `/notes/<id>` and the URL does not carry a workspace, but every
+ * note read takes one. Read rather than assumed: `online-data-source.ts:387`'s
+ * `getNote` names its first parameter `_workspaceId` and ignores it — the route
+ * it calls is `GET /v1/notes/<noteId>`, which learns the workspace from the
+ * note's own row — while the REPLICA implementation filters by workspace, so
+ * the parameter is load-bearing offline. **So: try each workspace until one
+ * answers non-null.** Online that is one read; offline it is at most one per
+ * workspace, and the alternative (guessing `workspaces[0]`) would answer `null`
+ * for a note in the second workspace and draw "no longer shared" for a note that
+ * is right there.
+ *
+ * ## `canEdit` is the client's copy of §4.2, and the server is the door
+ *
+ * `isAuthor || isAdminReader || isOwner` (spec §9.6). It decides paint, not
+ * permission: every write below goes through `dataSource.ingest` and
+ * `checkNotePermission` refuses at the door regardless. A client that computed
+ * this wrongly loses a control, not a boundary.
+ */
+export function NoteDocument({
+  noteId,
+  workspaces,
+}: {
+  noteId: string;
+  workspaces: WorkspaceRef[];
+}) {
+  const { dataSource } = useAppServices();
+  const user = useCurrentUser();
+  const router = useRouter();
+
+  const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
+  const [searched, setSearched] = useState(false);
+
+  const workspaceKey = workspaces.map((workspace) => workspace.id).join(',');
+  // The IDS, held in a ref, are what the effect walks — NOT the `workspaces`
+  // prop itself. A caller that passes a fresh array of the same workspaces on
+  // every render (the page does, and so does every test) would otherwise restart
+  // this read on every paint, resetting `searched` to false each time and
+  // leaving the document stuck on "Loading…" forever. `workspaceKey` is the
+  // dependency because it is the VALUE the read depends on, and a ref is how the
+  // effect reads that value without listing the array.
+  const workspacesRef = useRef(workspaces);
+  workspacesRef.current = workspaces;
+  useEffect(() => {
+    let cancelled = false;
+    setSearched(false);
+    void (async () => {
+      for (const workspace of workspacesRef.current) {
+        const found = await dataSource.query.getNote(workspace.id, noteId);
+        if (cancelled) return;
+        if (found !== null) {
+          setResolvedWorkspaceId(workspace.id);
+          setSearched(true);
+          return;
+        }
+      }
+      if (cancelled) return;
+      setResolvedWorkspaceId(null);
+      setSearched(true);
+    })();
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, noteId, workspaceKey]);
+
+  const live = useLiveQuery(
+    dataSource,
+    resolvedWorkspaceId ?? workspaces[0]?.id ?? '',
+    // THE KEY CARRIES THE RESOLVED WORKSPACE, and it is not decoration.
+    // `useLiveQuery` reloads on a KEY change and on stream frames, not on a
+    // changed closure — so a key of `note:<id>` alone would run `load` once,
+    // while the workspace was still unresolved, get `null`, and never ask
+    // again: the document would sit on "no longer shared" for a note it had
+    // just found. Measured, not reasoned about.
+    `note:${resolvedWorkspaceId ?? ''}:${noteId}`,
+    () =>
+      resolvedWorkspaceId === null
+        ? Promise.resolve<NoteDetail | null>(null)
+        : dataSource.query.getNote(resolvedWorkspaceId, noteId),
+  );
+
+  const note = live.data;
+  const workspace = workspaces.find((candidate) => candidate.id === note?.workspaceId) ?? null;
+
+  const [members, setMembers] = useState<RosterMember[]>([]);
+  useEffect(() => {
+    if (note === null) return;
+    let cancelled = false;
+    dataSource.query.getMembers(note.workspaceId).then(
+      (rows) => {
+        if (!cancelled) setMembers(rows);
+      },
+      () => {
+        if (!cancelled) setMembers([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, note?.workspaceId]);
+
+  /**
+   * The document as the editor last reported it. `onDraft` fires on every
+   * change in note mode, and this is what "Copy as Markdown" and the reading
+   * time read — WITHOUT it they would serialise the body the note was LOADED
+   * with, which is the note as it was, not as it is.
+   */
+  const [draft, setDraft] = useState<unknown>(null);
+  const editorRoot = useRef<HTMLDivElement | null>(null);
+  const [wordCount, setWordCount] = useState(0);
+
+  // The reading time comes off the RENDERED node (`extractReadingMeta` reads a
+  // DOM element), so it is recomputed after each paint that a draft changed.
+  useEffect(() => {
+    const root = editorRoot.current;
+    if (root === null) return;
+    setWordCount(extractReadingMeta(root).wordCount);
+  }, [draft, note?.noteId]);
+
+  /** The loaded list for `queryNotes` and `resolveNoteTitle`. */
+  const [treeNotes, setTreeNotes] = useState<NoteSummary[]>([]);
+  useEffect(() => {
+    if (note === null) return;
+    let cancelled = false;
+    dataSource.query.getNotes(note.workspaceId).then(
+      (rows) => {
+        if (!cancelled) setTreeNotes(rows);
+      },
+      () => {
+        if (!cancelled) setTreeNotes([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, note?.workspaceId]);
+
+  const canEdit =
+    note !== null &&
+    user !== null &&
+    (note.authorId === user.id || workspace?.role === 'owner' || workspace?.role === 'admin');
+
+  async function write(eventType: string, payload: Record<string, unknown>): Promise<boolean> {
+    if (user === null || note === null) return false;
+    const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+    const event = make({
+      workspaceId: note.workspaceId,
+      entity: { kind: 'note', id: note.noteId },
+      type: eventType,
+      payload,
+    });
+    const results = await dataSource.ingest([event]);
+    if (results[0]?.status === 'committed') {
+      live.reload();
+      return true;
+    }
+    return false;
+  }
+
+  const authorName = useMemo(() => {
+    if (note === null) return '';
+    const author = members.find((member) => member.id === note.authorId);
+    return author?.name?.trim() || author?.email?.trim() || note.authorId;
+  }, [note, members]);
+
+  if (note === null) {
+    return (
+      <p className="gn-notes__hint" data-testid="note-document-missing">
+        {searched ? 'That note is no longer shared with you.' : 'Loading…'}
+      </p>
+    );
+  }
+
+  return (
+    <div className="gn-note-document" data-testid="note-document">
+      <nav aria-label="Breadcrumb" className="gn-breadcrumb">
+        <ol className="gn-breadcrumb__list">
+          <li className="gn-breadcrumb__item">{workspace?.name ?? ''}</li>
+          <li className="gn-breadcrumb__item">
+            {workspace?.projects.find((project) => project.id === note.homeProjectId)?.name ?? ''}
+          </li>
+          <li className="gn-breadcrumb__item gn-breadcrumb__item--current">{note.title}</li>
+        </ol>
+      </nav>
+
+      <NoteTitle
+        title={note.title}
+        canEdit={canEdit}
+        onRename={(next) => void write('note.renamed', { title: next })}
+      />
+
+      <NoteByline
+        note={note}
+        workspace={workspace ?? { id: note.workspaceId, name: '', prefix: '', role: 'member', memberCount: null, nameRestrictedProjectCount: 0, projects: [] }}
+        members={members}
+        authorName={authorName}
+        editedLabel={editedLabel(note.updatedAt)}
+        canEdit={canEdit}
+        onScopeChanged={() => live.reload()}
+        onDetach={(ticketId) => void write('note.detached', { ticketId })}
+        readingLabel={readingLabel(wordCount)}
+        onCopyMarkdown={() => {
+          void navigator.clipboard.writeText(
+            exportMarkdown(draft ?? note.body),
+          );
+        }}
+      />
+
+      <div className="gn-notes__editor" ref={editorRoot} data-testid="note-editor">
+        <TicketEditorSlot
+          mode="note"
+          doc={note.body}
+          readOnly={!canEdit}
+          workspaceId={note.workspaceId}
+          ticketId=""
+          noteId={note.noteId}
+          submitSlot="none"
+          onDraft={(doc) => setDraft(doc)}
+          placeholder="Write the note…"
+          queryNotes={async (query: string) => {
+            const needle = query.trim().toLowerCase();
+            const hits: Array<{ noteId: string; title: string }> = [];
+            for (const candidate of [note, ...treeNotes]) {
+              if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+              if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
+              hits.push({ noteId: candidate.noteId, title: candidate.title });
+              if (hits.length === 8) break;
+            }
+            return hits;
+          }}
+          resolveNoteTitle={(id: string) => {
+            if (id === note.noteId) return note.title;
+            return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
+          }}
+          previewNote={async (id: string) => {
+            const target =
+              id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
+            if (target === null) return null;
+            return docToPlainText(target.body).slice(0, 200);
+          }}
+          onNavigateNote={(id: string) => router.push(`/notes/${id}`)}
+        />
+      </div>
+    </div>
+  );
+}
+
+/**
+ * "edited N min ago", and it is deliberately COARSE.
+ *
+ * A note's byline is not a log line: the precision a person needs from it is
+ * "just now / this hour / today / older", and a timestamp to the second would be
+ * a claim of precision nobody asked for. The boundary cases are chosen so the
+ * label never reads "0 min ago" — under a minute is "just now".
+ */
+export function editedLabel(iso: string, now: number = Date.now()): string {
+  const at = Date.parse(iso);
+  if (Number.isNaN(at)) return 'edited';
+  const minutes = Math.floor((now - at) / 60_000);
+  if (minutes < 1) return 'edited just now';
+  if (minutes < 60) return `edited ${minutes} min ago`;
+  const hours = Math.floor(minutes / 60);
+  if (hours < 24) return `edited ${hours} h ago`;
+  const days = Math.floor(hours / 24);
+  return `edited ${days} d ago`;
+}
+
+/** "N min read", or nothing at all for an empty document. */
+export function readingLabel(wordCount: number): string {
+  const minutes = readingTimeMinutes(wordCount);
+  return minutes === 0 ? '' : `${minutes} min read`;
+}
