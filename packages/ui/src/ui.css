@@ -2906,6 +2906,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-state-node__initial-badge { color: var(--gn-text-accent); font-size: 0.75rem; font-weight: 600; }
 .gn-state-node__category { display: flex; flex-direction: column; gap: 0.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-state-node__blocked { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
+.gn-state-node__creatable { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
 
 .gn-any-state-node {
   background: var(--gn-surface-raised);
