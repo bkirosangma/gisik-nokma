@@ -87,6 +87,17 @@ export function validateWorkflowDef(def: WorkflowDef): Issue[] {
       message: `This workflow's initial state is "${def.initialStateId}", but no state with that id exists.`,
     });
   } else {
+    // Starting-status design (2026-09-23): a workflow whose start state
+    // forbids creation would leave the workflow with no way to ever get a
+    // ticket onto it — `isCreatableState` is not asked here because it also
+    // tests category/backlog, both already-covered questions this branch
+    // does not repeat; the flag alone is this issue's whole subject.
+    if (start.creatable === false) {
+      issues.push({
+        code: 'start-state-not-creatable',
+        message: 'The start state must allow new tickets.',
+      });
+    }
     const reachable = new Set<string>([start.id]);
     for (const transition of def.transitions) {
       if (transition.from === '*' && stateIds.has(transition.to)) reachable.add(transition.to);

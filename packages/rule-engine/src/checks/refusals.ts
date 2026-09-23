@@ -100,6 +100,19 @@ export function fieldKindRefusal(fieldName: string, needsPhrase: string): string
 }
 
 /**
+ * `ticket.created`'s `stateId`, when named, fails `isCreatableState`
+ * (starting-status design, 2026-09-23) — not a fixed-string `REFUSALS` entry
+ * for the same reason `deepestRankParentRefusal`/`parentTerminalRefusal`
+ * above are not: the sentence names the state, so it is built rather than
+ * looked up. `stateLabel` is `label(def, stateId)`'s own return — already
+ * quoted, a state's name for a known id and the raw id for an unknown one —
+ * so this function does not add a second pair of quotes around it.
+ */
+export function workflowStateNotCreatableRefusal(stateLabel: string): string {
+  return `Tickets cannot start in ${stateLabel}. Pick another status, or allow it in the workflow's settings.`;
+}
+
+/**
  * `ticket.workflow_rebound` to the workflow the ticket is already on.
  *
  * NOT a tidiness rule, which is why the reason names the mechanism rather than

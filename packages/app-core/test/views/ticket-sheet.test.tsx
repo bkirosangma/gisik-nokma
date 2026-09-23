@@ -293,24 +293,25 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(screen.getByText('19 Aug 2026, 15:30 IST')).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: seven live reads means seven stream subscriptions, all on this workspace', async () => {
+  it('PLANTED DEFECT: eight live reads means eight stream subscriptions, all on this workspace', async () => {
     // Ruling P17: `useLiveQuery` keys the SUBSCRIPTION on the workspace and the
-    // REFETCH on the query key. SEVEN reads ride this sheet — ticket, workflow,
+    // REFETCH on the query key. EIGHT reads ride this sheet — ticket, workflow,
     // members, history, the project's rows from which the SUBTASKS are derived
-    // (door F, 2026-09-19), the ticket's TYPE LADDER (door G), and the comment
-    // THREAD — and each opens its own subscription.
+    // (door F, 2026-09-19), the ticket's TYPE LADDER (door G), the comment
+    // THREAD, and the ticket's NOTES section (notes series, Plan 6 of 7,
+    // `18.241`) — and each opens its own subscription.
     //
-    // **The count was four until door F, five until door G, and six until the
-    // comment thread, and each change is deliberate.** This assertion is a
-    // planted defect: it exists so that adding a read is a decision somebody
-    // makes rather than a side effect. The seventh read is a real cost — a
-    // subscription per open sheet — and it is paid because the thread is what
-    // the sheet's own composer writes to, so a sheet that did not read it could
-    // not show the author their own comment.
+    // **The count was four until door F, five until door G, six until the
+    // comment thread, seven until the notes section, and each change is
+    // deliberate.** This assertion is a planted defect: it exists so that
+    // adding a read is a decision somebody makes rather than a side effect.
+    // The eighth read is a real cost — a subscription per open sheet — and it
+    // is paid because a note attached elsewhere must appear on this sheet
+    // without a reload (spec §10.4).
     const source = sheetSource(ticketRead());
     renderSheet(ticketRead(), source);
     await settled();
-    expect(source.subscriptions).toHaveLength(7);
+    expect(source.subscriptions).toHaveLength(8);
     expect(source.subscriptions.every((s) => s.workspaceId === WS)).toBe(true);
   });
 
@@ -2437,7 +2438,7 @@ describe('F — the subtasks section', () => {
  * **`DEEPEST_RANK` does NOT bound a child's rank** and these cases say so by
  * construction: the rule is `childRank > parentRank`, unbounded above.
  * `DEEPEST_RANK` (= 4) governs the ROOT-creation rule alone — a type at that
- * rank or below may not sit at project root (`hierarchy.ts:108`) — and the
+ * rank or below may not sit at project root (`hierarchy.ts:133`) — and the
  * domain docblock contemplates "a type defined at rank 7, smaller work still"
  * (`packages/domain/src/ticket-types.ts:126`).
  */

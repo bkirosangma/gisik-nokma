@@ -106,6 +106,7 @@ export {
   type TransitionSubmission,
 } from './views/transition-dialog.js';
 export { TicketSheet, HISTORY_PAGE_LIMIT, type TicketSheetProps } from './views/ticket-sheet.js';
+export { TicketNotesSection, type TicketNotesSectionProps } from './views/ticket-notes-section.js';
 export {
   UnansweredClaimError,
   reopenAndProceed,

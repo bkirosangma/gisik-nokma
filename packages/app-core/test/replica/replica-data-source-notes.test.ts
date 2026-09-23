@@ -261,7 +261,7 @@ describe('the replica data source answers the note reads (Plan 2 of 6)', () => {
     expect(summary.scope).toEqual({ mode: 'project' });
     expect(summary.authorId).toBe(USER_A);
     expect(summary.deleted).toBe(false);
-    expect(summary.attachedTickets).toEqual([{ ticketId: TICKET, key: '', title: 'Share the July invoices' }]);
+    expect(summary.attachedTickets).toEqual([{ ticketId: TICKET, projectId: P, key: '', title: 'Share the July invoices' }]);
 
     const detail = await ds.query.getNote(WS, NOTE);
     expect(detail?.body).toEqual(plainTextToDoc('second body'));

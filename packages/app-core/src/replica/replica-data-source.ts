@@ -859,18 +859,27 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
    * (`read/notes.ts`'s `attachedTicketsByNote`). One spelling for "no key
    * available", on both sides. *Owner: whoever gives the replica project
    * numbers — Plan 3's surface, if anything.*
+   *
+   * `projectId` (notes series, Plan 6 of 7) has no such gap: it is a plain
+   * column of `TicketState` the confirmed ticket already carries, so — unlike
+   * `key` — the replica always answers it, not a fallback.
    */
   async function attachedTicketsOf(
     notes: readonly NoteState[],
-  ): Promise<Map<string, { ticketId: string; key: string; title: string }[]>> {
-    const grouped = new Map<string, { ticketId: string; key: string; title: string }[]>();
+  ): Promise<Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>> {
+    const grouped = new Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>();
     for (const note of notes) {
-      const list: { ticketId: string; key: string; title: string }[] = [];
+      const list: { ticketId: string; projectId: string; key: string; title: string }[] = [];
       for (const ticketId of note.attachedTicketIds) {
         const ticket = await replica.getTicket(ticketId);
         if (ticket === null || ticket.confirmed === null) continue;
         const title = ticket.confirmed.fields['title']?.value;
-        list.push({ ticketId, key: '', title: typeof title === 'string' ? title : '' });
+        list.push({
+          ticketId,
+          projectId: ticket.confirmed.projectId,
+          key: '',
+          title: typeof title === 'string' ? title : '',
+        });
       }
       grouped.set(note.noteId, list);
     }
@@ -880,7 +889,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   /** The domain shape `getNotes` and its siblings answer in. */
   function summariesOf(
     notes: readonly NoteState[],
-    attached: Map<string, { ticketId: string; key: string; title: string }[]>,
+    attached: Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>,
   ): NoteSummary[] {
     return notes.map((note) => ({
       noteId: note.noteId,

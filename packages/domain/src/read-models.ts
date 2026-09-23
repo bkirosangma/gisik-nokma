@@ -831,6 +831,11 @@ export type MigrationOutcome =
  * which is why the field is on the READ model and not derived client-side from
  * an id list.
  *
+ * `projectId` was added additively (notes series, Plan 6 of 7) so a note's
+ * byline can link to the ticket's own project page (`ticketSheetPath`) instead
+ * of the id-only My Work door — the same reason `key` and `title` are carried
+ * rather than looked up.
+ *
  * `NoteVersion` is a POINTER, not a snapshot: a version is an event, and the
  * history screen lists pointers until one is opened, at which point
  * `getNoteVersion` fetches that event's body. Storing every version's body in
@@ -848,7 +853,7 @@ export type NoteSummary = {
   authorId: string;
   title: string;
   scope: NoteScope;
-  attachedTickets: { ticketId: string; key: string; title: string }[];
+  attachedTickets: { ticketId: string; projectId: string; key: string; title: string }[];
   deleted: boolean;
   createdAt: string;
   updatedAt: string;

@@ -62,7 +62,7 @@ type NoteRow = {
 };
 
 /** One attached ticket, as the summary carries it. */
-type AttachedTicket = { ticketId: string; key: string; title: string };
+type AttachedTicket = { ticketId: string; projectId: string; key: string; title: string };
 
 function summaryOf(row: NoteRow, attachedTickets: AttachedTicket[]): NoteSummary {
   return {
@@ -139,7 +139,7 @@ export async function attachedTicketsByNote(
         ? ''
         : ticketKey(identity.prefix, projectPrefix, number);
     const list = grouped.get(row.note_id) ?? [];
-    list.push({ ticketId: row.ticket_id, key, title: row.title ?? '' });
+    list.push({ ticketId: row.ticket_id, projectId: row.project_id, key, title: row.title ?? '' });
     grouped.set(row.note_id, list);
   }
   return grouped;

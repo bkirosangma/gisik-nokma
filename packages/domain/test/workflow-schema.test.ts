@@ -9,7 +9,9 @@ import {
   workflowDefSchema,
   workflowDefinedPayloadSchema,
   workflowStateSchema,
+  type WorkflowDef,
 } from '../src/workflow.js';
+import { isCreatableState } from '../src/workflow-helpers.js';
 
 const validDef = {
   id: 'wf_basic',
@@ -83,6 +85,73 @@ describe('workflowStateSchema — amendment 9', () => {
       workflowStateSchema.safeParse({ id: 'b', name: 'B', category: 'active', blocked: 'yes' })
         .success,
     ).toBe(false);
+  });
+
+  /**
+   * 4.57 — starting-status design: `creatable` carries through the parse
+   * instead of being stripped, exactly the `blocked` case above proves for
+   * its own flag — and this is what makes the flag survive
+   * `workflowDefinedPayloadSchema`'s non-strict parse at publish, since that
+   * schema strips any key `workflowStateSchema` does not declare.
+   */
+  it('4.57 carries the creatable flag through the parse instead of stripping it', () => {
+    const parsed = workflowStateSchema.parse({
+      id: 'done',
+      name: 'Done',
+      category: 'terminal',
+      creatable: false,
+    });
+    expect(parsed).toEqual({ id: 'done', name: 'Done', category: 'terminal', creatable: false });
+  });
+
+  it('refuses a non-boolean creatable flag', () => {
+    expect(
+      workflowStateSchema.safeParse({ id: 'b', name: 'B', category: 'active', creatable: 'no' })
+        .success,
+    ).toBe(false);
+  });
+});
+
+/**
+ * 4.57 — `isCreatableState` tested ALONE (the ONE HELPER, USED EVERYWHERE
+ * design note): the reducer, the rule engine, the client precheck, board
+ * columns and the New-ticket form all assert THROUGH this function rather
+ * than re-deriving its four conditions, so a defect in any of them would show
+ * up here first.
+ */
+describe('4.57 isCreatableState', () => {
+  const wf: WorkflowDef = {
+    id: 'wf_creatable',
+    version: 1,
+    name: 'Creatable',
+    initialStateId: 'todo',
+    states: [
+      { id: 'todo', name: 'To do', category: 'open' },
+      { id: 'doing', name: 'Doing', category: 'active' },
+      { id: 'done', name: 'Done', category: 'terminal' },
+      { id: 'archived', name: 'Archived', category: 'active', creatable: false },
+    ],
+    transitions: [],
+  };
+
+  it('accepts an ordinary open state whose creatable flag is absent', () => {
+    expect(isCreatableState(wf, 'todo')).toBe(true);
+  });
+
+  it('refuses the universal Backlog state — a backlog ticket has no starting status', () => {
+    expect(isCreatableState(wf, 'backlog')).toBe(false);
+  });
+
+  it('refuses a terminal state — a ticket cannot be born finished', () => {
+    expect(isCreatableState(wf, 'done')).toBe(false);
+  });
+
+  it('refuses a state whose creatable flag is explicitly false', () => {
+    expect(isCreatableState(wf, 'archived')).toBe(false);
+  });
+
+  it('refuses a state id the workflow does not declare', () => {
+    expect(isCreatableState(wf, 'nonexistent')).toBe(false);
   });
 });
 

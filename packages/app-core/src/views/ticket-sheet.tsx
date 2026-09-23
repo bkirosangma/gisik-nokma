@@ -28,6 +28,7 @@ import {
 } from './editor-slot.js';
 import { HistoryList } from './history-list.js';
 import { formatRollup } from './rollup-text.js';
+import { TicketNotesSection } from './ticket-notes-section.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
@@ -87,7 +88,7 @@ export const HISTORY_PAGE_LIMIT = 200;
  * ⚠ **`DEEPEST_RANK` is NOT a bound on this, and reading it as one is the
  * natural mistake.** The constant (= 4, `packages/domain/src/ticket-types.ts:136`)
  * governs ROOT creation alone — a type at that rank or below may not sit at
- * project root (`hierarchy.ts:108`) — while a child's rank is unbounded above,
+ * project root (`hierarchy.ts:133`) — while a child's rank is unbounded above,
  * which is that file's own reason for writing `>=` there: *"a type DEEPER than
  * sub-task is smaller still and cannot coherently be exempt — `===` would leave
  * an escape hatch where defining rank 5 floats your tickets free."* A workspace
@@ -3690,6 +3691,25 @@ export function TicketSheet({
               </p>
             )}
           </section>
+
+          {/*
+            THE NOTES SECTION — Subtasks → Notes → Comments, the prototype's
+            own order (spec §10.1). `canEdit` is `editorSlot !== undefined`,
+            the same expression `canEditDescription` below uses for the same
+            reason: no client-side edit flag exists, and the ingest door is
+            the one place that actually knows.
+          */}
+          <TicketNotesSection
+            dataSource={dataSource}
+            workspaceId={workspaceId}
+            ticketId={ticketId}
+            projectId={ticketRead.ticket.projectId}
+            currentUserId={currentUserId}
+            canEdit={editorSlot !== undefined}
+            make={make}
+            onNavigate={onNavigate}
+            onRefusal={(r) => setServerRefusal(r)}
+          />
 
           {/*
             THE COMMENT THREAD AND ITS BOX — the block at
