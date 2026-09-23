@@ -3717,3 +3717,15 @@ now genuinely needed only for a LATE `workflowStates` load or a truly stale valu
   dropping `startDateInvalid || dueDateInvalid` from the Create button's `disabled` expression reddens
   (`toBeDisabled()` fails), restored from the committed tree. —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+
+**Addendum item 6 — "the created ticket appears on the calendar for its due day" — is 🧪, deliberately, and
+spends no id.** The UI block (`13.1431`–`13.1445`) is fully spent by the cases above; the addendum's own
+text allows this ("if a calendar assertion is cheap [...] else 🧪 with the recipe"). Considered rather than
+dropped silently: the design's own FACTS section records that the calendar/timeline/filters already read
+`fields -> 'dueDate' -> 'value' ->> 'date'` (`compile-filter.ts:133-137`) with NO projection change needed —
+the birth claim lands in `fields` through machinery `13.1444` already proves reaches the wire, and the
+calendar's OWN read of that path is existing, already-tested code this feature introduces no new version of.
+Recipe, if picked up later: seed a board/page world whose ticket carries a `dueDate` claim from
+`ticket.created` (not a later `field_set`), switch to the Calendar tab, and assert the ticket renders under
+its due day — mirroring whatever fixture `project-calendar-timeline.test.tsx` already uses for a `field_set`
+due date, with the ONE difference that the claim originates at birth.
