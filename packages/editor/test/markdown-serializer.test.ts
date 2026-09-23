@@ -250,6 +250,19 @@ describe('9.283 round-trip', () => {
     const back = markdownToHtml(nested);
     expect(back).toMatch(/<ul>[\s\S]*<ul>[\s\S]*<li>b<\/li>/);
 
+    // A PARAGRAPH AFTER THE NESTED LIST, which is two keystrokes away: Enter
+    // at the end of a nested item makes a paragraph inside it, and Enter again
+    // on that empty paragraph lifts it to the PARENT item. The first cut of
+    // the indent fix glued its text onto the nested item's line (`- a\n  - bc`).
+    const after = htmlToMarkdown(
+      '<ul><li><p>a</p><ul><li><p>b</p></li></ul><p>c</p></li></ul>',
+    );
+    expect(after).toBe('- a\n  - b\n\n  c');
+    // …and 'c' is a paragraph of the OUTER item, not a second word in 'b'.
+    const afterBack = markdownToHtml(after);
+    expect(afterBack).not.toContain('bc');
+    expect(afterBack.match(/<li>/g)?.length).toBe(2);
+
     const quote = htmlToMarkdown('<blockquote><p>first</p><p>second</p></blockquote>');
     expect(quote).toBe('> first\n>\n> second');
     // Two paragraphs out, two paragraphs back — the blank line is the

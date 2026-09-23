@@ -923,10 +923,19 @@ describe('9.291-9.292 the note slot mode', () => {
   it('9.299 a note mount with no saveState renders no state rather than claiming Saved', async () => {
     const slot = await mountSlot(makeProps({ mode: 'note' }));
     expect(slot.view.container.querySelector('[data-testid="editor-save-state"]')).toBeNull();
-    // THE CONTROL, in the same `it`: the element is not missing because the
+    // ⚠ AND NO SUBMIT CONTROL. This assertion is why the FIRST cut of the fix
+    // was wrong and the suite was green: the condition was written
+    // `isNote && saveState !== undefined ? <state/> : <submit/>`, so a note
+    // mount WITHOUT a saveState fell into the ELSE arm and got the very button
+    // note mode exists to remove. 9.291 passes `saveState: 'saved'` and so
+    // never reached that arm. Silence about the save state must not become a
+    // submit button.
+    expect(slot.view.container.querySelector('.editor-slot__submit')).toBeNull();
+    // THE CONTROL, in the same `it`: neither element is missing because the
     // footer stopped rendering — the toolbar and the field are both there.
     expect(slot.view.container.querySelector('.ticket-editor__toolbar')).not.toBeNull();
     expect(slot.view.container.querySelector('.ProseMirror')).not.toBeNull();
+    expect(slot.view.container.querySelector('.editor-slot__footer')).not.toBeNull();
     slot.view.unmount();
   });
 });

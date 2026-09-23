@@ -129,14 +129,25 @@ function nodeToMarkdown(node: Node): string {
       // lines. The task item's own `div` wrapper is unwrapped for the same
       // reason. A nested LIST inside an item is not handled -- the source did
       // not handle it either, and it is not reachable from this plan's cases.
+      let sawNestedList = false;
       const inner = Array.from(el.childNodes)
         .map((child) => {
           if (child.nodeType !== Node.ELEMENT_NODE) return nodeToMarkdown(child);
           const childTag = (child as HTMLElement).tagName.toLowerCase();
           if (childTag === 'p' || childTag === 'div') {
-            return Array.from(child.childNodes).map(nodeToMarkdown).join('').replace(/\n+$/, '');
+            const text = Array.from(child.childNodes)
+              .map(nodeToMarkdown)
+              .join('')
+              .replace(/\n+$/, '');
+            // A BLOCK AFTER A NESTED LIST IS ITS OWN, INDENTED PARAGRAPH.
+            // Without this its text ran on from the nested item's line —
+            // `- a\n  - bc` — gluing it into the child. Reachable in two
+            // keystrokes: Enter at the end of a nested item, then Enter again
+            // on the empty paragraph, which lifts it to the parent item.
+            return sawNestedList ? `\n\n  ${text}` : text;
           }
           if (childTag === 'ul' || childTag === 'ol') {
+            sawNestedList = true;
             // A NESTED LIST IS INDENTED UNDER ITS PARENT ITEM. Without this the
             // child's markdown ran straight on from the parent's text — `- a- b`
             // — gluing the child's words into the parent's and turning its
