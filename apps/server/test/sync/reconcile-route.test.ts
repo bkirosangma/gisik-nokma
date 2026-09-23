@@ -175,7 +175,11 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     // Exact: `KEPT` must not appear, and `LOST` must, and there must be nothing
     // else. A `toContainEqual` alone would pass on an answer that restricted
     // both — which is the answer that wipes a replica.
-    expect(body).toEqual({ workspaceId: WS, restricted: [{ kind: 'restricted', id: LOST }] });
+    expect(body).toEqual({
+      workspaceId: WS,
+      restricted: [{ kind: 'restricted', id: LOST }],
+      restrictedNotes: [],
+    });
 
     // A caller with no role in the workspace never reaches `canSee`, so this
     // door cannot be used as an id probe by someone outside. Same refusal
@@ -195,7 +199,11 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     // every project this member is not on.
     const { statusCode, body } = await reconcile(memberHeaders, [LOST]);
     expect(statusCode).toBe(200);
-    expect(body).toEqual({ workspaceId: WS, restricted: [{ kind: 'restricted', id: LOST }] });
+    expect(body).toEqual({
+      workspaceId: WS,
+      restricted: [{ kind: 'restricted', id: LOST }],
+      restrictedNotes: [],
+    });
     // Not "the array is short" — the id must appear in NO field of the response.
     expect(JSON.stringify(body)).not.toContain(KEPT);
 
@@ -203,7 +211,7 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     // opportunistic list. This is the positive control's mirror: an empty
     // `restricted` is a real answer, not a failure mode.
     const kept = await reconcile(memberHeaders, [KEPT]);
-    expect(kept.body).toEqual({ workspaceId: WS, restricted: [] });
+    expect(kept.body).toEqual({ workspaceId: WS, restricted: [], restrictedNotes: [] });
   });
 
   it('12.286 an id that never existed answers EXACTLY as a genuine loss — no existence oracle', async () => {
@@ -227,12 +235,17 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
         { kind: 'restricted', id: neverMinted },
         { kind: 'restricted', id: LOST },
       ],
+      restrictedNotes: [],
     });
 
     // A repeated id is answered once — repeating must not multiply the work,
     // and must not make the answer's LENGTH a second channel.
     const repeated = await reconcile(memberHeaders, [LOST, LOST, LOST]);
-    expect(repeated.body).toEqual({ workspaceId: WS, restricted: [{ kind: 'restricted', id: LOST }] });
+    expect(repeated.body).toEqual({
+      workspaceId: WS,
+      restricted: [{ kind: 'restricted', id: LOST }],
+      restrictedNotes: [],
+    });
   });
 
   it('12.304 CLOSURE 5b(c): the same door answers a GUEST, which is 6.102 and was never measured', async () => {
@@ -251,7 +264,11 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     // that can tell the two apart.
     const { statusCode, body } = await reconcile(guestHeaders, [SHARED_TO_GUEST, UNSHARED]);
     expect(statusCode).toBe(200);
-    expect(body).toEqual({ workspaceId: WS, restricted: [{ kind: 'restricted', id: UNSHARED }] });
+    expect(body).toEqual({
+      workspaceId: WS,
+      restricted: [{ kind: 'restricted', id: UNSHARED }],
+      restrictedNotes: [],
+    });
 
     // The MEMBER's answer for the same two ids, in the same run. Neither is
     // shared with them and neither is in a mode they reach, so both come back
@@ -261,6 +278,7 @@ describe('POST /v1/sync/reconcile — the copy nobody takes away (closure 5, rul
     expect(asMember.body).toEqual({
       workspaceId: WS,
       restricted: [{ kind: 'restricted', id: SHARED_TO_GUEST }, { kind: 'restricted', id: UNSHARED }],
+      restrictedNotes: [],
     });
 
     // And a guest is still refused nothing structurally: they are a member of
