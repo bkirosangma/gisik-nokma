@@ -55,11 +55,33 @@ export const searchProjection: Projection = {
     }
 
     if (event.type === 'ticket.created') {
-      const payload = event.payload as { projectId: string; title: string };
+      // `description` is optional on the payload (owner request 2026-09-23): the
+      // New ticket dialog can compose one at creation. It is rendered by the
+      // SAME `docToPlainText` the `ticket.field_set` branch below uses, so the
+      // two doors cannot disagree about what a description is as search text —
+      // and `docToPlainText` is TOTAL, so an ABSENT description (or a payload
+      // older than the member, or a `null`) renders `''` rather than throwing
+      // inside the ingest transaction. `''` is also the column's own default,
+      // which is what this row used to get for want of the write at all.
+      //
+      // ⚠ MEASURED before this line existed: `proj_search.description` was
+      // written by `ticket.field_set` ALONE, so a ticket created with a
+      // description carried the document in head state while this column stayed
+      // empty — the person found the ticket by its title and not by the words
+      // they had just typed. `search-birth-description.test.ts` pins both halves,
+      // including that a ticket born with NO description does not get the string
+      // `'undefined'` indexed instead.
+      const payload = event.payload as { projectId: string; title: string; description?: unknown };
       await tx.query(
-        `INSERT INTO proj_search (ticket_id, workspace_id, project_id, title)
-         VALUES ($1, $2, $3, $4)`,
-        [event.entity.id, event.workspaceId, payload.projectId, payload.title],
+        `INSERT INTO proj_search (ticket_id, workspace_id, project_id, title, description)
+         VALUES ($1, $2, $3, $4, $5)`,
+        [
+          event.entity.id,
+          event.workspaceId,
+          payload.projectId,
+          payload.title,
+          docToPlainText(payload.description),
+        ],
       );
       return;
     }

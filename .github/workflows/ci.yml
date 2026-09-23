@@ -65,10 +65,40 @@ name: ci
 # `describe.skipIf(!pgDumpAvailable())` around the restore-drill suite, and
 # this is what turns a missing pg_dump binary into a loud CI failure instead
 # of a quietly-empty green suite.
+# WHERE THIS RUNS, and why it is not "only on merges to main" (owner, 2026-09-23:
+# *"can we not run CI for the dev PR merges, and only have CI run on merges to main?"*).
+#
+# This repo is PRIVATE, so every minute here is billed, and on 2026-09-22 the account
+# stopped being able to start jobs at all ("recent account payments have failed or your
+# spending limit needs to be increased"). Cutting the volume is the right instinct: the
+# dev PRs are nearly all of it, since the release plan's task branches each ran the full
+# fourteen checks including `e2e` and `viewport`.
+#
+# But "run it on merges to main" would put CI AFTER the thing it is supposed to guard.
+# A merge to `main` fires App Platform's `deploy_on_push` (`deploy/do/app.yaml`, three
+# components), so by the time a `push: main` job starts, production is already
+# deploying. That is a post-mortem, not a gate.
+#
+# So the filter is on the PULL REQUEST's BASE, which is the distinction that makes this
+# work: `pull_request.branches` matches the branch a PR is merging INTO, never the one
+# it comes from. A PR from a task branch into `release/<date>` therefore runs nothing,
+# and the release -> `main` PR — the only one that decides a production deploy — runs
+# everything, BEFORE the merge.
+#
+# `push: [main]` stays. It is the second run of the same tree and it is deliberate:
+# `main` is unprotected, this is a free private repo, and nothing on the server stops a
+# direct push. The PR run gates the intended path; this one is the only thing that would
+# ever see an unintended one.
+#
+# `workflow_dispatch` is here so a release branch can still be run on demand — before a
+# release cut, or when a dev PR is big enough to be worth the minutes — without editing
+# this file to get it.
 on:
   pull_request:
+    branches: [main]
   push:
     branches: [main]
+  workflow_dispatch:
 
 concurrency:
   group: ci-${{ github.ref }}

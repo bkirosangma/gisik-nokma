@@ -65,6 +65,51 @@ export const ticketCreatedPayload = z.object({
    * product's own client always sends it.
    */
   priority: prioritySchema.optional(),
+  /**
+   * The ticket's birth DESCRIPTION (owner request 2026-09-23) — the same
+   * DOCUMENT `ticket.field_set` writes under `fieldId: 'description'`, which is
+   * why the shape is `z.record` rather than a string: `checkTicketFieldSet`
+   * holds that built-in to *"a document"*, and a birth value that reached head
+   * state in a shape the edit door would refuse is the "two doors that disagree"
+   * defect this repository keeps re-finding.
+   *
+   * OPTIONAL, AND ABSENT MEANS NO DESCRIPTION — the same additive-field rule
+   * `start` and `priority` follow. No pre-existing `ticket.created` carried one,
+   * and the reducer writes NO claim at all for an absent member rather than a
+   * null one: a null claim is the explicit CLEARING claim `ticket.field_set`
+   * sanctions, which at birth would record a clearing nobody made (invariant 4).
+   *
+   * `null` is deliberately NOT accepted. `ticket.field_set` admits it because a
+   * field that has a value needs a way to lose it; at birth there is nothing to
+   * clear, so "absent" is the one spelling of none and a second one would invite
+   * a reader to think the two meant different things.
+   *
+   * Shape-only, like `ticketFieldSetPayload`'s `value`: whether this document is
+   * well-formed for ProseMirror is `packages/editor`'s question, and the domain
+   * has no vocabulary for it (amendment 12). What the door can honestly say is
+   * that it is `{}`-like and not a string.
+   */
+  description: z.record(z.string(), z.unknown()).optional(),
+  /**
+   * The ticket's birth ASSIGNEE (owner request 2026-09-23) — the same member
+   * `ticket.assigned` carries, with the same `nullable()` for "nobody".
+   *
+   * OPTIONAL, AND ABSENT MEANS NOBODY, which is what every pre-existing
+   * `ticket.created` meant: the reducer hard-coded `assigneeId: null` here
+   * before this member existed. The two spellings are equivalent on purpose —
+   * the product's own client OMITS the member rather than sending `null`.
+   *
+   * ⚠ **A birth assignee must not become a way around the assign permission**,
+   * and that is not a comment about this schema: `checkVisibilityPermission`
+   * refuses a `ticket.assigned` naming a person with no role in the workspace
+   * (E6-17), and the SAME lookup runs for this member in the `ticket.created`
+   * branch — which is a different branch of that module, because
+   * `ticket.created` returns before the `canSee` check (there is no ticket to
+   * see yet). Adding this member here without that check would have made the
+   * dialog's Assignee picker the one door in the product through which a typo
+   * could name nobody.
+   */
+  assigneeId: z.string().min(1).nullable().optional(),
 });
 
 export const ticketAssignedPayload = z.object({ assigneeId: z.string().min(1).nullable() });

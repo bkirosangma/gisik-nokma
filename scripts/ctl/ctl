@@ -20,7 +20,8 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   lanes [--watch]                 one line per gisik: window
   restart <window> <worktree> <brief> [--override FILE]
   dispatch <window> <file>        two pastes + proof of delivery
-  rebuild                         pull --ff-only in the primary checkout, rebuild the stack, verify
+  rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
+                                  rebuild the stack from it, verify
   selftest                        hook table, lib tests, every verb --dry-run
 HELP
     exit 0;;

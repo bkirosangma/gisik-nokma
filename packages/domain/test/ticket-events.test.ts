@@ -131,6 +131,72 @@ describe('ticket event vocabulary', () => {
     expect(refuses('comment.added', 'ticket', { body: 'plain string' })).toBe('invalid-payload');
   });
 
+  /**
+   * 13.1358–13.1359 — the two birth members the New ticket dialog writes (owner
+   * request 2026-09-23) are OPTIONAL on `ticket.created`, and each is held to the
+   * shape its LATER door demands.
+   *
+   * The compatibility half is the important one and it is asserted rather than
+   * assumed: every ledger row and all 441 fixtures written before today carry
+   * neither member, so the door must keep admitting the old shape. The refusals
+   * are the other half — each names the SECOND spelling of "none" that a
+   * permissive schema would quietly admit, and which would then reach head state
+   * as a claim nobody made.
+   */
+  describe('13.1358–13.1359 the birth description and assignee are optional members of ticket.created', () => {
+    const DOC = { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }] };
+    const BASE = { typeId: 'task', projectId: PROJECT, parentId: null, title: 'File the GST return' };
+
+    it('round-trips both members together, and the document survives the door UNCHANGED', () => {
+      // `roundTrips` asserts `result.event.payload).toEqual(payload)`, so a
+      // member the schema silently STRIPPED would redden here — which is the
+      // failure mode 13.786's own note records for `ticket-type.defined`. That
+      // matters more for `description` than for a scalar: a stripped document is
+      // a description that never reached the ledger, and no later reader can
+      // recover a key that was never recorded.
+      roundTrips('ticket.created', 'ticket', {
+        ...BASE,
+        description: DOC,
+        assigneeId: 'user-anselma',
+      });
+    });
+
+    it('round-trips with NEITHER member — the shape every pre-existing event has', () => {
+      roundTrips('ticket.created', 'ticket', { ...BASE });
+      roundTrips('ticket.created', 'ticket', { ...BASE, description: DOC });
+      // An explicit `null` assignee is admitted, and means what absence means:
+      // the client omits the member, so this arm exists for the shape the schema
+      // declares rather than for a producer.
+      roundTrips('ticket.created', 'ticket', { ...BASE, assigneeId: null });
+    });
+
+    it('refuses a description that is not a document — the SAME "a document" rule its field_set door enforces', () => {
+      // The two doors must agree. `checkTicketFieldSet` refuses a string
+      // description with `field.type-mismatch` …'a document'; a birth value
+      // admitted here as a string would put a description in head state that the
+      // edit door would then refuse to replace, and `docToPlainText` would
+      // render '' for it everywhere the person looked.
+      expect(refuses('ticket.created', 'ticket', { ...BASE, description: 'plain string' })).toBe(
+        'invalid-payload',
+      );
+      expect(refuses('ticket.created', 'ticket', { ...BASE, description: 42 })).toBe('invalid-payload');
+    });
+
+    it('refuses an explicit NULL description — absent is the one spelling of "no description"', () => {
+      // `ticket.field_set` admits `null` because a field that HAS a value needs a
+      // way to lose it. At birth there is nothing to clear, so admitting `null`
+      // here would be a clearing claim about a description that never existed.
+      expect(refuses('ticket.created', 'ticket', { ...BASE, description: null })).toBe('invalid-payload');
+    });
+
+    it('refuses an EMPTY-STRING assignee — a named person who is nobody', () => {
+      // `ticketAssignedPayload` uses `z.string().min(1).nullable()` for the same
+      // reason: `''` is not an id, and the sheet's roster lookup would render it
+      // as an assignee whose name is the empty string.
+      expect(refuses('ticket.created', 'ticket', { ...BASE, assigneeId: '' })).toBe('invalid-payload');
+    });
+  });
+
   it('refuses an upload with a negative size', () => {
     expect(
       refuses('attachment.added', 'ticket', {

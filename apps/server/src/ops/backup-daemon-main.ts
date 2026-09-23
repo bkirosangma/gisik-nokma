@@ -13,6 +13,7 @@ import { runNotificationSweep } from '../notifications/sweep.js';
 import { buildProjectionRegistry } from '../projections/index.js';
 import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
+import { optionalDatabaseCaCert } from './backup-env.js';
 import { exportLedger } from './export-ledger.js';
 import { s3SinkFromEnv } from './object-sink.js';
 import { dumpDatabaseToSink } from './pg-dump.js';
@@ -39,12 +40,16 @@ import {
  * have "fixed" it by handing a backup process a session-signing secret it has
  * no use for, which is the wrong direction.
  *
- * So the one setting this daemon actually needs is read and refused here, in
+ * So the two settings this daemon actually needs are read and refused here, in
  * `loadConfig`'s own style (`ConfigError`, the same message shape) so an
- * operator meets one vocabulary across both entry points. There is no
- * `DATABASE_CA_CERT` read to convert alongside it: `AppConfig` has no such
- * field on this branch, and this file never read one — the worker's env block
- * declares the variable ahead of its reader, exactly as `.env.example` does.
+ * operator meets one vocabulary across both entry points: `DATABASE_URL`
+ * below, and `DATABASE_CA_CERT` in `./backup-env.ts`. An earlier revision of
+ * this docblock said there was no `DATABASE_CA_CERT` to read because
+ * `AppConfig` had no such field; that stopped being true when go-live added
+ * the field to `config.ts` and handed it to `createPool` in `src/index.ts`,
+ * and this worker was not brought along — production's pool then spoke to the
+ * managed cluster without the CA and every pool-backed job failed with
+ * "self-signed certificate in certificate chain" (2026-09-23; case 13.1422).
  */
 function requireDatabaseUrl(env: NodeJS.ProcessEnv): string {
   const databaseUrl = env.DATABASE_URL;
@@ -78,7 +83,20 @@ async function main(): Promise<void> {
   // of "unset" to the one the alerter's contract recognises.
   const alerter = alerterFromConfig(process.env.ALERT_WEBHOOK_URL || null);
   const sink = s3SinkFromEnv(process.env, 'BACKUP_S3_BUCKET');
-  const pool = createPool(databaseUrl);
+  // The CA the managed cluster presents, when the deploy binds one — the same
+  // value, through the same `createPool`, as the API server's pool in
+  // `src/index.ts`. Announced before the scheduler arms so a log reader can
+  // see which mode the pool was built in (13.1422): the production defect was
+  // a pool built with NO CA while the variable sat unread in the environment.
+  const caCert = optionalDatabaseCaCert(process.env);
+  const pool = createPool(databaseUrl, { caCert });
+  // Read back from the POOL, not from `caCert`: the first version of this line
+  // reported the variable, and a mutation that dropped `{ caCert }` from the
+  // `createPool` call above still printed "ca" — the announce was describing
+  // the environment, not the connection. `pg.Pool` keeps its config on
+  // `options`; `ssl` is set only when `createPool` was given a CA (`src/db.ts`).
+  const tls = pool.options.ssl ? 'ca' : 'none';
+  console.log(JSON.stringify({ msg: 'database pool', tls }));
   const jobs = {
     runPgDump: async (): Promise<void> => {
       const key = await dumpDatabaseToSink(databaseUrl, sink, () => new Date());

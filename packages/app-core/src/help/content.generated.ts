@@ -2521,6 +2521,23 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "One exception, added 2026-09-23: a job deleted from My Work has no Undo."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The message and the fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place without them, so the deletion there is silent and final. The job still stops appearing in every view and its history is still kept. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "If you want the way back, delete the job from its project page."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
                   }
@@ -4405,7 +4422,32 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "italic",
-                    "text": "\"the list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
+                    "text": "\"The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.\""
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "That line is always there, sitting between the project's title and the tab strip; with the switch off it is simply empty. So turning the switch on changes what the line "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "says"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and never what the page "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "looks like"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — nothing above or below it moves."
                   }
                 ]
               },

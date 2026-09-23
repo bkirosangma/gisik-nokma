@@ -155,7 +155,11 @@ export function applyTicketEvent(
       workflowVersion: wf.version,
       stateId: bornIn,
       stateCategory: category,
-      assigneeId: null,
+      // The birth assignee (owner request 2026-09-23), or NOBODY — `?? null` for
+      // an event older than the member, which is what those events meant because
+      // this line read a hard-coded `null` before it existed. An explicit `null`
+      // and an absent member land here identically, by design.
+      assigneeId: p.assigneeId ?? null,
       collaboratorIds: [],
       fields: {
         title: claim(p.title, env),
@@ -165,6 +169,18 @@ export function applyTicketEvent(
         // without the member replays to P2 under its creator's name, which is what
         // every reader downstream relies on (they throw on an absent claim).
         priority: claim(p.priority ?? DEFAULT_PRIORITY, env),
+        // The birth description (owner request 2026-09-23), and the ONLY member
+        // here with no default: an absent description writes NO KEY rather than a
+        // null claim. That asymmetry with `priority` directly above is the point
+        // rather than an inconsistency — every ticket HAS a priority, so the
+        // absent case needs an answer, while a ticket may simply have no
+        // description, and `state.fields['description'] === undefined` is exactly
+        // how every reader downstream asks *"has anybody described this?"*
+        // (`ticket-sheet.tsx`'s `descriptionClaim === undefined` arm is the live
+        // one). A `claim(null, env)` here would answer that question YES for
+        // every ticket nobody described, and name the person who filed it as the
+        // one who set an empty description.
+        ...(p.description === undefined ? {} : { description: claim(p.description, env) }),
       },
       transitions: [],
       closed: null,

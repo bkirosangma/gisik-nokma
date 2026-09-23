@@ -51,6 +51,7 @@ import {
 import { AppNav } from '../../../../../src/app-nav.js';
 import { startTargetFor } from '../../../../../src/backlog-start.js';
 import { BacklogStartButton } from '../../../../../src/backlog-start-button.js';
+import { NewTicketDescriptionSlot } from '../../../../../src/new-ticket-description-slot.js';
 import { BacklogRankControls, submitRank } from '../../../../../src/backlog-rank-controls.js';
 import {
   buildFilterChips,
@@ -1447,6 +1448,52 @@ function ProjectBoard() {
   }, [members.data]);
 
   /**
+   * The Assignee picker's options for the New-ticket dialog (owner request
+   * 2026-09-23) — resolved off the roster this page ALREADY reads for `nameOf`,
+   * so nothing new is fetched and there is no second notion of who is in the
+   * workspace to keep in step.
+   *
+   * `memberLabel` and not `member.name`, for the reason `nameOf` records two
+   * lines up: `member.name` is the empty string for the magic-link population,
+   * and `''` is not nullish, so a blank name survives a `??` fallback and paints
+   * an EMPTY option — a hole on screen rather than a degradation. `memberLabel`
+   * answers name → email → id, so a nameless member with a real address is
+   * offered by their address and only a member with neither by their id.
+   *
+   * A picker option is a person, so `actorLabel` is deliberately NOT used: the
+   * system-actor override belongs to CLAIMS, not to a roster row — the same
+   * reason `ticket-sheet.tsx`'s own picker has its own label.
+   */
+  const assigneeCandidates = (members.data ?? []).map((member) => ({
+    id: member.id,
+    name: memberLabel(member),
+  }));
+
+  /**
+   * Why the dialog must NOT offer the roster — or `null` when it must.
+   *
+   * ⚠ **`members.data === null` is one of the two reasons, and that is the whole
+   * point of this variable.** A pending read and a refused one are different
+   * facts (the page's own filter panel says so: `membersError` / `members ===
+   * null` / an empty roster are three arms), but they agree on the thing that
+   * matters here: neither is evidence that this workspace has nobody in it.
+   * Handing the dialog `assigneeCandidates={[]}` in either case would render a
+   * picker whose only option is "Unassigned" — a control that ASSERTS nobody can
+   * be assigned, from a read that has not answered. That is the same lie
+   * `ticket-sheet.tsx` fixed for its own picker (`members={members.data ?? []}`,
+   * #530), one screen over.
+   *
+   * The empty-roster case is NOT here on purpose: `data` being an EMPTY ARRAY is
+   * a real answer, and the picker legitimately offers only "Unassigned" then.
+   */
+  const membersRefusal =
+    members.error !== null
+      ? members.error
+      : members.data === null
+        ? 'The workspace roster has not loaded yet.'
+        : null;
+
+  /**
    * THE ONE PLACE THIS SHELL DECIDES WHICH DAY IS TODAY.
    *
    * Computed once per render and handed to both views as a prop, because neither
@@ -1718,13 +1765,20 @@ function ProjectBoard() {
    * `parentCandidates` is only ever built from rows that ARRIVED. Everything
    * else is a state the create control names out loud below.
    *
-   * `inFocus` (backlog/closed spec §5.4, 2026-09-17) drives the New-ticket
-   * dialog's "Start in focus" checkbox: a candidate is in focus when it sits
-   * outside the universal Backlog state AND has never been closed (or was
-   * reopened) — `row.closed === null` reads exactly that, the same
-   * `state.closed ?? null` idiom every other reader of the flag spells,
-   * since `ListRow.closed` is REQUIRED (never the optional domain form this
-   * row was assembled from — `view-types.ts`).
+   * ⚠ AN `inFocus` KEY USED TO BE COMPUTED HERE AND IS GONE (owner ruling
+   * 2026-09-23). It was `row.stateId !== BACKLOG_STATE_ID && row.closed ===
+   * null` — a candidate is in focus when it sits outside the universal Backlog
+   * state AND has never been closed (or was reopened) — and its ONE reader was
+   * the New-ticket dialog's "Start in focus" checkbox, which appeared only
+   * under an in-focus parent. The owner lifted that condition: the dialog's
+   * birth-state control is now a `Switch` that is always present, always
+   * answerable, and remembers the person's answer, so the parent's own state
+   * has no bearing on where a ticket is born and this map has nothing to claim
+   * about it. The formula is recorded here rather than silently dropped because
+   * `test-cases/13-owner-requests-and-backlog.md`'s 13.591f pinned it at this
+   * exact site for a whole release, and the next reader deserves to know what
+   * happened to it rather than to re-derive it from the spec §5.4 text it
+   * contradicts.
    */
   const parentCandidates =
     list.rows === null
@@ -1732,7 +1786,6 @@ function ProjectBoard() {
       : list.rows.map((row) => ({
           id: row.ticketId,
           title: row.title,
-          inFocus: row.stateId !== BACKLOG_STATE_ID && row.closed === null,
         }));
 
   const typeOptions =
@@ -1992,7 +2045,22 @@ function ProjectBoard() {
     }
     // The list refusing no longer withholds the form — it withholds only the
     // parent picker, which project-root creation never needed.
-    if (session.kind === 'loading' || (list.rows === null && list.error === null)) {
+    // ⚠ `rowsHaveAnswered`, NOT `rows === null` — owner report 2026-09-23, "the
+    // project header still has a flicker during transition", and the flicker was
+    // this line. `rows` is nulled on every KEY change, and the list's key carries
+    // the filter, so toggling *Only tickets in progress* retracted the New ticket
+    // BUTTON and put this gate in its place until the refetch landed. The gate is
+    // a differently-sized element (229×23 against the button's 116×44), so the
+    // header's flex row resized and snapped back — measured at ~40 ms across
+    // three animation frames, with the rail and the note row not moving at all.
+    //
+    // The question this gate asks is "has the list ever been answerable", not
+    // "does it have rows for the current filter". The second is what `rows` says
+    // and it is the wrong question for deciding whether a CONTROL exists: a
+    // re-read is not a reason to take the button away. The comment two lines
+    // below was already half of this argument — a list REFUSAL stopped
+    // withholding the form — and a list RELOAD is the other half.
+    if (session.kind === 'loading' || (!list.rowsHaveAnswered && list.error === null)) {
       return (
         <p role="status" className="gn-new-ticket__gate">
           Preparing the New ticket form…
@@ -2045,6 +2113,13 @@ function ProjectBoard() {
           parentCandidates={parentCandidates}
           {...(activeOnly ? { parentCandidatesNarrowing: 'tickets in progress' } : {})}
           {...parentsUnavailable}
+          // The description composer (owner request 2026-09-23). `TicketEditorSlot`
+          // wrapped to suppress its own submit control — see
+          // `src/new-ticket-description-slot.tsx` for why that is this app's job
+          // rather than app-core's.
+          editorSlot={NewTicketDescriptionSlot}
+          assigneeCandidates={assigneeCandidates}
+          {...(membersRefusal === null ? {} : { assigneeCandidatesUnavailable: membersRefusal })}
           onCreated={openTicket}
         />
         {ticketTypes.data === null ? (
@@ -2211,11 +2286,16 @@ function ProjectBoard() {
                   `board.data !== null`: a project with zero or exactly one
                   workflow offers no real choice — "All workflows" and that one
                   workflow's name would render the identical board — so the
-                  control would be a picker between one thing and itself. This
-                  mirrors `Board`'s OWN gate for the identical judgment one
-                  level down (`board.tsx`: `board.groups.length > 1 ? <h3
-                  className="gn-board__workflow">` — the workflow name itself
-                  only renders once there is more than one to distinguish).
+                  control would be a picker between one thing and itself.
+                  ⚠ **AMENDED 2026-09-23: this no longer "mirrors a gate in
+                  `Board` one level down", because that gate is gone.** The
+                  board's group heading used to render only where a board had
+                  more than one workflow group, and the owner's collapse ruling
+                  removed that condition — a workflow group is collapsible even
+                  when it is the only one, so it always has a heading to click.
+                  The reason THIS control is still gated is its own and does not
+                  depend on the other: a picker whose only option is the thing
+                  already on screen is a control with nothing to do.
                   Deliberately reading `board.data.groups` here rather than
                   `boardNarrowing.view.groups`: the latter is ALREADY narrowed
                   by `workflowFilter`, so once a person picks a specific
@@ -2318,32 +2398,104 @@ function ProjectBoard() {
                   Filters
                 </button>
                 {createRegion}
-                {/*
-                  Said here as well as in the list's own summary, because past the cap
-                  there IS no list to carry a summary — the arms are refusing — and
-                  this is the only place the state of the question is visible. LAST in
-                  the row on purpose: it is a sentence, not a control, and in a
-                  `flex-wrap: wrap` header it takes its own line rather than pushing the
-                  switch away from the button the owner asked it to sit beside.
-
-                  `gn-project__scope-note`, NOT the old `gn-list-filter__note`: that
-                  block no longer renders, so the class was an orphan element with no
-                  block, and `.gn-list-filter` never had a CSS rule anywhere in this
-                  repo (measured — `git log -S -- '*.css'` across all refs is empty).
-                  This re-scopes onto the rule its sibling `board-scope-note` already
-                  uses (`ui.css`: muted small print), so the note gains the treatment
-                  it should always have had and no new rule is added.
-                  The `data-testid` is the contract and is unchanged.
-                */}
-                {activeOnly ? (
-                  <span className="gn-project__scope-note" data-testid="list-filter-note">
-                    the list, calendar, timeline and backlog are asking only for tickets in
-                    progress — not started and done are both excluded, and the backlog is
-                    emptied. The board is not narrowed.
-                  </span>
-                ) : null}
               </div>
             </div>
+
+            {/*
+              THE SCOPE NOTE'S OWN STANDING ROW (owner request, 2026-09-23).
+
+              IT USED TO BE THE LAST CHILD OF `.gn-project__header` ABOVE, and every
+              time it appeared it moved a control — which is what the owner's two
+              screenshots of the live project page show, and what the docblock that
+              stood here got wrong. With the switch OFF the controls row (search,
+              workflow picker, switch, Filters, New ticket) sits beside the title;
+              switching it ON dropped that ENTIRE row under the title, and only then
+              wrapped the note inside it.
+
+              THE CAUSE IS INTRINSIC WIDTH, NOT WRAPPING. `.gn-project__header`
+              (`ui.css:5831`) is a wrapping flex row, itself the second flex item of
+              `.gn-project__head` (`ui.css:5864` — `flex-wrap: wrap;
+              justify-content: space-between`) whose first item is
+              `.gn-project__identity` (crumb over `<h1>`). **A wrapping flex
+              container's max-content contribution to ITS parent is all its children
+              on ONE line**: the sentence is ~770 CSS px and the controls ~625 px, so
+              with the note present the row's intrinsic width is ~1400 px, it no
+              longer fits beside the identity column, and `.gn-project__head` wraps
+              the whole row down. The note wraps INSIDE the row only after that has
+              already happened. The docblock that stood here described that inner
+              wrap — "it takes its own line rather than pushing the switch away from
+              the button" — and missed the outer one, which is the one the owner saw.
+              It was false, so it is replaced rather than patched.
+
+              WHY NO FREE SPOT EXISTED FOR IT, before settling on a reserved row.
+              `.gn-project` (`ui.css:5804`) stacks the head row, the rail and the
+              content with `gap: 0.875rem` (14px), and the note is an 18px line — an
+              overlay in that gap overlaps the rail. The rail row's free width at the
+              owner's viewport (~700 px) is narrower than the sentence, so the note
+              cannot sit beside the tabs either. Both were rejected on measurement.
+
+              THE RULING (owner, 2026-09-23): **the note must not move any other
+              element when it appears.** Two costs are ACCEPTED and recorded here
+              rather than discovered later:
+                · a permanent 32px band between the head row and the rail — the
+                  14px gap, the reserved 18px line, and the 14px gap again —
+                  present whether or not the note says anything;
+                · at viewports narrow enough to wrap the sentence onto two lines,
+                  the rail shifts down by one line when the switch comes on. Only a
+                  two-line reservation would remove that, and the owner scoped it
+                  out.
+
+              ⚠ WHERE THAT SECOND COST ACTUALLY BITES — MEASURED 2026-09-23, and
+              this docblock said otherwise until it was. The line above used to end
+              "the measured cases are 1000 px and 1280 px, where the single line
+              holds". **It does not hold at 1000 px.** The note is NOT inside the
+              fixed-width content column — that column is 684 px wide and merely
+              CENTRES as the viewport grows (`header.left` 295.65 → 575.65 between
+              1000 px and 1280 px while `header.width` stays 684.35) — so the note's
+              own width tracks the viewport: 960 px at a 1000 px viewport, 1240 px at
+              1280 px. The sentence needs somewhere between the two. Measured on the
+              stack built from `91a82eefaff4`:
+                · 1280 px — note 18 px in both states, rail `top` 248.59 → 248.59.
+                  Nothing moves.
+                · 1000 px — note 18 → 36 px, rail `top` 248.59 → **266.59**. The rail
+                  moves by exactly one line.
+              The HEADER rect is identical at both widths in both states, so the
+              owner's actual complaint — the note dropping the whole controls row out
+              from beside the title — is fixed either way.
+
+              RULED 2026-09-23 (owner): **the 18 px rail shift at ~1000 px is
+              ACCEPTED.** Reserving two lines and shortening the sentence were both
+              offered and not taken, so the row reserves ONE line and the rail drops
+              by one line wherever the sentence wraps. That is the shipped behaviour.
+              Do not "fix" it by growing `min-height` on `.gn-project__scope-row`:
+              that would reserve the second line at EVERY width, which is the cost
+              the owner declined. Case `13.1383` carries the numbers.
+
+              ALWAYS RENDERED, EMPTY WHEN OFF. The `<p>` is in the tree in both
+              states and only its TEXT is conditional, so the band is reserved either
+              way and the element is the SAME node across the toggle — asserted, not
+              assumed, in `13.1381`. `visibility: hidden` is deliberately NOT used:
+              there is nothing to hide when the switch is off. The row is EMPTY, not
+              invisible, and an empty row cannot be read aloud, clicked or focused.
+
+              THE SENTENCE BEGINS WITH A CAPITAL NOW. It is a standing row rather
+              than a fragment hanging off the controls, so it reads as the sentence
+              it is. Two places quote it and moved in the same change:
+              `page-refusals.test.tsx`'s `12.387` arm and `docs/manual.md`, whose
+              quote is compiled into the in-app help corpus.
+
+              `gn-project__scope-note` is KEPT for the type treatment (`ui.css:5948`,
+              the muted small print it shares with the board tab's own
+              `board-scope-note`); `gn-project__scope-row` is the new reservation,
+              declared AFTER it so the shared rule is not edited to make one page
+              reserve a line. The `data-testid` is the contract and is unchanged.
+            */}
+            <p
+              className="gn-project__scope-note gn-project__scope-row"
+              data-testid="list-filter-note"
+            >
+              {activeOnly ? 'The list, calendar, timeline and backlog are asking only for tickets in progress — not started and done are both excluded, and the backlog is emptied. The board is not narrowed.' : null}
+            </p>
 
             {/*
               THE SHARED CONTROL ITSELF, not the shared control's CLASSES — and
@@ -2856,6 +3008,17 @@ function ProjectBoard() {
                 <Board
                   board={boardNarrowing.view}
                   onOpenTicket={openTicket}
+                  /*
+                    WHO the board remembers its collapse choices for. The
+                    record is `localStorage`, keyed by this id and the
+                    project — see `preferences/workflow-collapse.ts`. `''`
+                    when signed out (`currentUserId`'s own declaration above
+                    names the sentinel), and the storage module reads and
+                    writes nothing for it, so a signed-out board shows
+                    defaults and remembers nothing rather than remembering it
+                    for whoever signs in next on this machine.
+                  */
+                  currentUserId={currentUserId}
                   /*
                     V1 (round-2 ruling, 2026-09-21) — the empty state's create
                     affordance, wired to the SAME `CreateTicketFlow` the header
