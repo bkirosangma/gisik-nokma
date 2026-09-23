@@ -1237,6 +1237,40 @@ describe('13.1451-13.1452 the priority tint and the epic chip truncation are rea
 });
 
 /**
+ * 13.1467 — owner bug report, 2026-09-23: a board card read "⚑ Open
+ * questionsHSN digit count", the epic chip and the title run together on one
+ * line. CAUSE: `.gn-board-card__epic` was `display: inline-flex`, and
+ * `.gn-board-card` (`ui.css`, the rule immediately above 13.1451/13.1452's
+ * own block) sets only `padding` — no `display: flex` of its own — so the
+ * chip shared a line with its next sibling, `.gn-board-card__title`, an
+ * inline-level `<button>` by default (`board.tsx`), whenever both fit. Owner
+ * ruling #720 restated the requirement: the epic chip is the card's TOP
+ * LINE, ABOVE the title — jsdom does no layout, which is why 13.1456's own
+ * DOM-order assertion passed throughout.
+ *
+ * A CSS-binding gate, the same shape as 13.1451/13.1452 immediately above:
+ * this proves the RULE now forces its own line and stays sized to its
+ * content, never that a real browser lays two elements out this way for a
+ * `display: flex` element in general — 13.1468's hand reading against a real
+ * browser is what proves THAT. `margin: 0 0 0.3rem` is asserted because it
+ * is the one declaration this rule and no other in `ui.css` carries, so a
+ * `rule()` mismatch (the wrong selector, or a comment stealing the lookup —
+ * see this file's own docblock on `rule()`) would fail this line rather than
+ * silently reading someone else's rule.
+ */
+describe('13.1467 the epic chip is block-level, sized to its own content, not inline with the title', () => {
+  it('.gn-board-card__epic is display: flex (not inline-*) and width: fit-content', () => {
+    const body = rule('.gn-board-card__epic');
+    expect(body, body).toMatch(/display:\s*flex\s*;/);
+    expect(body).not.toMatch(/display:\s*inline/);
+    expect(body).toMatch(/width:\s*fit-content\s*;/);
+    // The one declaration unique to this rule in the whole file — proof
+    // `rule()`'s first-match regex landed on THIS rule, not a namesake.
+    expect(body).toMatch(/margin:\s*0 0 0\.3rem\s*;/);
+  });
+});
+
+/**
  * Case 13.513 — board-prototype-port Task 14, 2026-09-16. The spec's Board
  * metrics table "Card" row names `cursor:grab`; this task adds it beside the
  * drag-and-drop behaviour that makes it true (Ruling 15, cited at length in
