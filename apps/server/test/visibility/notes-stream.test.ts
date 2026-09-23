@@ -101,6 +101,16 @@ function noteEvent(noteId: string, type: string, payload: unknown): LedgerEvent 
   });
 }
 
+function ticketEvent(ticketId: string, type: string, payload: unknown): LedgerEvent {
+  return makeCommitted({
+    workspaceId: world.WS,
+    actorId: world.ids.owner,
+    entity: { kind: 'ticket', id: ticketId },
+    type,
+    payload,
+  });
+}
+
 describe('visibleEventsFor — the note audience class', () => {
   it('18.061 a note event is yielded, and the invite class is still admin-only (control)', async () => {
     // The CLASS is not exported, so the first witness is the build: adding
@@ -267,5 +277,89 @@ describe('visibleEventsFor — the note audience class', () => {
     // author's own copy disappears with the reader's.
     expect(eventsOf(await drain(world.ids.memberIn, before), noteId)).toHaveLength(0);
     expect(eventsOf(await drain(world.ids.author, before), noteId)).toHaveLength(2);
+  });
+});
+
+describe('visibleEventsFor — the ticket cascade into inherit notes', () => {
+  it('18.067 a ticket grant trigger announces the inherit notes attached to it', async () => {
+    // `TE` is `explicit [guestListed]` in the fixture, so `memberIn` cannot see
+    // it — nor `nInherit`, which inherits from it and from nothing else. The
+    // widening is the ONE event that can tell them: the note's own stream says
+    // nothing, because its `note.created` sits below their cursor and the
+    // event that changed its readership is filed against the TICKET.
+    const headBelow = Math.max(
+      ...eventsOf(await drain(world.ids.author), world.NOTES.nInherit).map((e) => e.workspaceSeq),
+    );
+    const before = await workspaceHead();
+    const widened = ticketEvent(world.TE, 'visibility.set', {
+      ticketId: world.TE,
+      mode: 'workspace',
+    });
+    await applyCommitted(db.pool, [widened]);
+
+    const items = await drain(world.ids.memberIn, before);
+    const found = notices(items);
+    expect(found).toHaveLength(1);
+    expect(found[0].notes?.map((n) => n.id)).toEqual([world.NOTES.nInherit]);
+    expect(found[0].notes?.[0].headSeq).toBe(headBelow);
+    // The notice precedes its trigger, as the note branch's and the ticket
+    // branch's already do — a client cannot apply an event whose entity it has
+    // not pulled.
+    const envIndex = items.findIndex((i) => !('kind' in i) && i.id === widened.id);
+    expect(envIndex).toBeGreaterThan(0);
+    expect(items.indexOf(found[0])).toBe(envIndex - 1);
+  });
+
+  it('18.068 a ticket the reader still cannot see grants nothing for its notes (control)', async () => {
+    // The control arm of 18.067, in the same `it`: narrow `TE` back and the
+    // cascade must go quiet. Read the case text's mutation as a statement about
+    // which guard holds this — the answer is that TWO do, and neither is
+    // singly mutable: with `canSee` in place the narrowing's row never enters
+    // the branch, and with it removed `noteGrantNoticeFor`'s `canReadNote`
+    // refuses the note. Both single mutations were run and both left this case
+    // GREEN (see the ledger); that is a property of the case, not a gap in it.
+    const narrowed = ticketEvent(world.TE, 'visibility.set', {
+      ticketId: world.TE,
+      mode: 'explicit',
+      userIds: [world.ids.guestListed],
+    });
+    await applyCommitted(db.pool, [narrowed]);
+
+    // The liveness control, and it is what makes the absence above mean
+    // something: `guestListed` is named by the new explicit list, so the SAME
+    // narrowing IS a grant for them and their drain carries the notice. An
+    // empty drain for `memberIn` is therefore a statement about reach, not
+    // about a range with nothing in it.
+    const guestItems = await drain(world.ids.guestListed, narrowed.workspaceSeq - 1);
+    expect(notices(guestItems)).toHaveLength(1);
+    expect(notices(guestItems)[0].notes?.map((n) => n.id)).toEqual([world.NOTES.nInherit]);
+
+    // And `memberIn` gets nothing at all: not the envelope, not a notice.
+    const memberItems = await drain(world.ids.memberIn, narrowed.workspaceSeq - 1);
+    expect(notices(memberItems)).toHaveLength(0);
+  });
+
+  it('18.069 a note that does not depend on the ticket is not announced by a ticket trigger', async () => {
+    // `nProject` is `project`-scoped and memberIn is on P, so they can already
+    // read it — and its readership has nothing to do with `TE`. Attaching it to
+    // a ticket does not change that: the attachment is a door for an
+    // `inherit`-scoped note and is inert for every other scope.
+    await applyCommitted(db.pool, [
+      noteEvent(world.NOTES.nProject, 'note.attached', { ticketId: world.TE }),
+    ]);
+
+    const before = await workspaceHead();
+    await applyCommitted(db.pool, [
+      ticketEvent(world.TE, 'visibility.set', { ticketId: world.TE, mode: 'workspace' }),
+    ]);
+
+    const named = notices(await drain(world.ids.memberIn, before)).flatMap(
+      (n) => n.notes?.map((x) => x.id) ?? [],
+    );
+    // Control: the notice is live and names the note that DOES depend on `TE`,
+    // so the exclusion below is about the scope clause rather than about a
+    // notice that never happened.
+    expect(named).toContain(world.NOTES.nInherit);
+    expect(named).not.toContain(world.NOTES.nProject);
   });
 });

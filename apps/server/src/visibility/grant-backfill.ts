@@ -365,6 +365,59 @@ export async function grantNoticeFor(
 }
 
 /**
+ * The `inherit`-scoped notes attached to any of these tickets — the candidates
+ * a ticket-audience change can widen, before any per-reader question is asked
+ * (spec §5.2).
+ *
+ * ## Why the filter is `scope_mode = 'inherit'` and nothing else
+ *
+ * Only an `inherit` note's readership depends on a ticket. A `workspace`,
+ * `project` or `explicit` note attached to the same ticket is readable or not
+ * for reasons the ticket has no part in, so a ticket-wide event is not news
+ * about it and announcing it would be a notice the client could not act on.
+ * `private` is excluded by the same clause for the stronger reason: nothing
+ * about a private note's audience involves a ticket at all.
+ *
+ * ## `deleted = FALSE`, and it is a DELIVERY decision rather than a read rule
+ *
+ * `canReadNote` deliberately ignores `deleted` — a deleted note is in the undo
+ * window and still readable — so this clause is NOT a restatement of that
+ * function and does not belong beside it. It is here because the cascade
+ * announces *"this is now readable, pull it"*, and a device that pulls a
+ * deleted note's history learns nothing it can show anybody. The deleted note
+ * is not stranded: its own `note.deleted` arrives on the ordinary stream to
+ * every reader who already held it, and `note.restored` is in
+ * `NOTE_GRANT_TRIGGERS`, so a restore re-announces it from the note's side.
+ * *Case 18.097 is the two-device witness.*
+ *
+ * ## No workspace predicate, inherited rather than chosen
+ *
+ * The same inheritance `audienceDependents`' docblock records: the caller's
+ * ticket ids come from a walk that has none, so adding one here would make this
+ * query and that walk disagree about the candidate set. It is not a disclosure
+ * on its own — what these ids become is a `noteGrantNoticeFor` call filtered by
+ * `canReadNote`, and a note in another workspace is admitted only to somebody
+ * who may read it there.
+ */
+export async function notesAttachedTo(
+  db: Queryable,
+  ticketIds: readonly string[],
+): Promise<string[]> {
+  if (ticketIds.length === 0) return [];
+  const { rows } = await db.query<{ note_id: string }>(
+    `SELECT DISTINCT na.note_id
+       FROM proj_note_attachments na
+       JOIN proj_notes n ON n.note_id = na.note_id
+      WHERE na.ticket_id = ANY($1::text[])
+        AND n.scope_mode = 'inherit'
+        AND n.deleted = FALSE
+      ORDER BY 1`,
+    [[...ticketIds]],
+  );
+  return rows.map((r) => r.note_id);
+}
+
+/**
  * The note ids this reader may now read because their own reach, or the reach
  * of a ticket they inherit from, just changed — the notes arm of one
  * `reach-granted` notice (Plan 2 of 6, spec §5.1–§5.2).

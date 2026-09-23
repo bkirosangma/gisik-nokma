@@ -14,6 +14,7 @@ import {
   isGrantBackfillTrigger,
   isNoteGrantTrigger,
   noteGrantNoticeFor,
+  notesAttachedTo,
   readerReachNoticeFor,
 } from './grant-backfill.js';
 
@@ -510,7 +511,51 @@ export async function* visibleEventsFor(
           // dies before the client finishes pulling.
           if (isGrantBackfillTrigger(env.type)) {
             const tickets = await grantNoticeFor(db, userId, env.entity.id, afterSeq, backfilled);
-            if (tickets.length > 0) yield { kind: 'reach-granted', workspaceId, tickets };
+            // THE CASCADE (spec §5.2). A ticket's audience just widened, and an
+            // `inherit`-scoped note's readership IS its attached tickets' — so
+            // the same event can widen a note the reader could not read a
+            // moment ago, and the note's own stream will never say so (its
+            // `note.created` sits below the reader's cursor and the widening
+            // event is filed against the TICKET, not the note).
+            //
+            // The candidate set is every ticket this notice would name —
+            // including the trigger ticket itself, which is why `dependents`
+            // starts with it rather than using `tickets` alone. `notesAttachedTo`
+            // then keeps only `inherit`-scoped, non-deleted notes, and
+            // `noteGrantNoticeFor` decides which of those this reader may
+            // actually read.
+            //
+            // **That second question is redundant on THIS path and is kept
+            // anyway, which is worth stating rather than leaving to be
+            // re-derived.** Every id in `dependents` came either from the
+            // trigger ticket — already `canSee`-admitted by the `if` above — or
+            // from `grantNoticeFor`, which `canSee`s each candidate itself. And
+            // an `inherit` note attached to a ticket the reader may see is
+            // readable BY DEFINITION of `canReadNote`'s `inherit` arm, which
+            // asks the same `canSeeResolved` of the same ticket. So on this path
+            // the filter cannot change an answer. It is kept because
+            // `noteGrantNoticeFor` is also the note branch's filter (Task 1),
+            // where it is load-bearing — a note event reaches that call for a
+            // note whose readability nothing else has asked about — and because
+            // a function whose safety argument holds only at one of its two call
+            // sites is the shape this repository has already paid for. The one
+            // path where it is NOT redundant here is a ticket in another
+            // workspace: `audienceDependents` carries no workspace predicate
+            // (its own docblock records this, owner unassigned).
+            const dependents = [env.entity.id, ...tickets.map((t) => t.id)];
+            const noteIds = await notesAttachedTo(db, dependents);
+            const notes =
+              noteIds.length === 0
+                ? []
+                : await noteGrantNoticeFor(db, userId, noteIds, afterSeq, backfilled);
+            if (tickets.length > 0 || notes.length > 0) {
+              yield {
+                kind: 'reach-granted',
+                workspaceId,
+                tickets,
+                ...(notes.length > 0 ? { notes } : {}),
+              };
+            }
           }
           yield env;
         }

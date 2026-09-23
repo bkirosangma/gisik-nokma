@@ -90,3 +90,6 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.064 — the notice is emitted once per drain** (`backfilled`): two triggers on the same note in one drain produce one notice. Mutation: skip the `backfilled` check.
 - ✅ **18.065 — the hub forwards `notes` on the `reach-granted` frame unchanged.** Mutation: drop the field in `drain`.
 - ✅ **18.066 — a `comment.added` filed against a note follows the note's audience, not the ticket rule.** Mutation: route note comments through the ticket branch.
+- ✅ **18.067 — a ticket grant trigger also announces inherit notes attached to that ticket (and to its `audienceDependents`) that the user can now read:** `visibility.set` on `TE` to `workspace` makes `memberIn` read `nInherit`; the drain yields a `reach-granted` whose `notes` contains `nInherit` before the `visibility.set` envelope. Mutation: skip `notesAttachedTo`.
+- ✅ **18.068 — a ticket the user still cannot see grants nothing for its notes** (control in the same `it`): `visibility.set` on `TE` to `explicit [guestListed]` again yields no note notice for `memberIn`. Mutation: drop the `canReadNote` filter inside `noteGrantNoticeFor`.
+- ✅ **18.069 — a project-scope or explicit note attached to the ticket is NOT announced by a ticket trigger** (it does not depend on the ticket). Mutation: drop the `scope_mode = 'inherit'` clause.

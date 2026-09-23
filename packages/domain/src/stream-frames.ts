@@ -256,18 +256,15 @@ export type ServerStreamFrame =
    * trigger that also widens notes carries both, and the client's two pull
    * queues differ.
    */
-  | {
-      type: 'reach-granted';
-      workspaceId: string;
-      tickets: ReachGrantedTicket[];
-      /**
-       * The notes this reader's reach now admits, absent when there are none
-       * (Plan 2 of 6, spec §5.1 and §5.2). `tickets` is carried and empty when
-       * a notice is entirely about notes, so the frame's shape does not change
-       * with its content.
-       */
-      notes?: ReachGrantedNote[];
-    }
+  // `notes` is the Plan 2 arm — see the docblock above for why it exists and
+  // why `tickets` stays required and empty beside it. ONE LINE, like every
+  // other member of this union and NOT by taste: `client-contract.test.ts`
+  // derives this union's tags by scanning the source text up to the FIRST
+  // line-ending semicolon, so a member spread over several lines — or any
+  // line-final semicolon inside one — silently truncates the list that case
+  // asserts, and a comment quoting the scanner's own pattern adds a phantom tag
+  // to it. Both were measured on the first draft of this change.
+  | { type: 'reach-granted'; workspaceId: string; tickets: ReachGrantedTicket[]; notes?: ReachGrantedNote[] }
   | { type: 'caught-up'; workspaceId: string; seq: number }
   | { type: 'error'; workspaceId: string | null; code: StreamErrorCode; message: string };
 
