@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import Link from 'next/link';
 import { Button, Card, SegmentedControl } from '@gisik-nokma/ui';
 import { authClient } from '../../src/auth-client.js';
+import { BrandMark } from '../../src/brand-mark.js';
 
 type Method = 'phone' | 'email';
 
@@ -290,10 +291,7 @@ function SignInForm() {
     <main id="gn-main" className="gn-shell gn-shell--centred">
       <header className="gn-page-header">
         <div className="gn-page-header__icon" aria-hidden="true">
-          <svg width="30" height="30" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth="1.8" strokeLinecap="round" strokeLinejoin="round">
-            <path d="M4 5.5A1.5 1.5 0 0 1 5.5 4H10l2 2.5h6.5A1.5 1.5 0 0 1 20 8v10.5a1.5 1.5 0 0 1-1.5 1.5h-13A1.5 1.5 0 0 1 4 18.5Z" />
-            <path d="M8 13h8" /><path d="M8 16.5h5" />
-          </svg>
+          <BrandMark size={30} />
         </div>
         <h1 className="gn-page-header__title">Gisik Nokma</h1>
         <p className="gn-page-header__tagline">The keeper of memory</p>

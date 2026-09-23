@@ -3555,3 +3555,9 @@ with the same `dueDateValueSchema` import and omits empty inputs, with no preche
   source-only left the cache stale and stayed green for the wrong reason), restored from the committed
   tree. `13.1450` stays unspent. —
   (`packages/rule-engine/test/fields.test.ts`)
+
+## The brand glyph, the favicon, the nav tile, and a wide/tall Notes page (owner request 2026-09-23 ~20:20 IST, relayed by the planner)
+
+*Block `13.1471`–`13.1490`, allocated by the controller before this lane started (`13-hig-per-screen.md`'s block table). Five units: `BrandMark` (one origin for the glyph), the favicon, a non-interactive nav brand tile, a wide/tall `/notes` page (Confluence-style, one document column), and a floating table-of-contents button replacing the right-hand TOC column.*
+
+- **13.1471** ✅ `BrandMark({ size })` renders the sign-in page's glyph unchanged — THREE `<path>` elements (the folder outline plus its two crossbars, not one — a miscount the brief itself made), `stroke="currentColor"`, `aria-hidden="true"`, `focusable="false"`, sized from the prop rather than a fixed literal. Asserted as the ordered `d` array with its length pinned first, so a regex that matches nothing cannot pass two empty arrays against each other. Mutation-witnessed: changing one path's `d` string reddens (`h8` → `h9`), restored from the committed tree. — (`apps/web/test/brand-mark.test.tsx`)
