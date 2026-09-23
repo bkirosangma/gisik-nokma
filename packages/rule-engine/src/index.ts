@@ -64,6 +64,7 @@ export {
   reboundSameWorkflowRefusal,
   reboundUnknownStateRefusal,
   reboundUnknownWorkflowRefusal,
+  workflowStateNotCreatableRefusal,
 } from './checks/refusals.js';
 export { evaluateWorkflowDefined } from './workflow-defined.js';
 export { evaluateTicketTransitioned } from './transition.js';

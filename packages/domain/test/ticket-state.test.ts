@@ -32,11 +32,15 @@ const WF: WorkflowDef = {
     { id: 'todo', name: 'To do', category: 'open' },
     { id: 'doing', name: 'Doing', category: 'active' },
     { id: 'done', name: 'Done', category: 'terminal' },
+    // Starting-status design (2026-09-23): a non-terminal state a workflow has
+    // switched OFF for new tickets, distinct from `done`'s terminal exclusion.
+    { id: 'archived', name: 'Archived', category: 'active', creatable: false },
   ],
   transitions: [
     { from: '*', to: 'todo', rules: [] },
     { from: '*', to: 'doing', rules: [] },
     { from: '*', to: 'done', rules: [] },
+    { from: '*', to: 'archived', rules: [] },
   ],
 };
 
@@ -250,6 +254,68 @@ describe('applyTicketEvent', () => {
     ).toBe(
       'applyTicketEvent: workflow "wf-ghost" is not defined — the engine must refuse ticket.created before it reaches a projection',
     );
+  });
+
+  /**
+   * 4.60 — starting-status design (2026-09-23): `bornIn` reads the payload's
+   * `stateId` when present, falling back to the workflow's initial state when
+   * it is absent (control) — the shape every pre-existing `ticket.created`
+   * has.
+   */
+  it('4.60 control: creation with no stateId is born in the workflow initial state, as before', () => {
+    expect(createdState().stateId).toBe('todo');
+    expect(createdState().stateCategory).toBe('open');
+  });
+
+  it('4.60 a creatable stateId is born there, with ITS OWN category — not the initial state\'s', () => {
+    const state = fold([createdWith({ stateId: 'doing' })]);
+    expect(state.stateId).toBe('doing');
+    expect(state.stateCategory).toBe('active');
+  });
+
+  /**
+   * 4.61 — the three ways a `stateId` fails `isCreatableState` all throw in
+   * the reducer's existing style, exactly as an unknown type or workflow does
+   * above: the engine refuses each of these before the event is ever
+   * accepted, so reaching one here means ledger integrity is broken.
+   */
+  it('4.61 an unknown stateId throws', () => {
+    expect(messageOf(() => fold([createdWith({ stateId: 'nonexistent' })]))).toBe(
+      'applyTicketEvent: workflow "wf-basic" cannot create a ticket in state "nonexistent" — the engine must refuse ticket.created before it reaches a projection',
+    );
+  });
+
+  it('4.61 a terminal stateId throws', () => {
+    expect(messageOf(() => fold([createdWith({ stateId: 'done' })]))).toBe(
+      'applyTicketEvent: workflow "wf-basic" cannot create a ticket in state "done" — the engine must refuse ticket.created before it reaches a projection',
+    );
+  });
+
+  it('4.61 a creatable:false stateId throws', () => {
+    expect(messageOf(() => fold([createdWith({ stateId: 'archived' })]))).toBe(
+      'applyTicketEvent: workflow "wf-basic" cannot create a ticket in state "archived" — the engine must refuse ticket.created before it reaches a projection',
+    );
+  });
+
+  /**
+   * 13.1448 — starting-status design addendum (2026-09-23): the reducer
+   * writes a `startDate`/`dueDate` claim ONLY when the payload carries one —
+   * the identical treatment `description` already has above, and the
+   * identical reason: an absent claim writing `null` would answer "has this
+   * ticket got a due date?" YES for every ticket nobody gave one, under the
+   * creator's own name.
+   */
+  it('13.1448 writes a startDate/dueDate claim only when present; control: neither key exists when absent', () => {
+    const both = fold([
+      createdWith({ startDate: { date: '2026-09-30' }, dueDate: { date: '2026-10-01', note: 'per the calendar' } }),
+    ]);
+    expect(both.fields.startDate?.value).toEqual({ date: '2026-09-30' });
+    expect(both.fields.dueDate?.value).toEqual({ date: '2026-10-01', note: 'per the calendar' });
+
+    expect(createdState().fields.startDate).toBeUndefined();
+    expect(createdState().fields.dueDate).toBeUndefined();
+    expect('startDate' in createdState().fields).toBe(false);
+    expect('dueDate' in createdState().fields).toBe(false);
   });
 
   it('transition moves state, re-derives the category, and logs the mover under the vocabulary the move is written in', () => {

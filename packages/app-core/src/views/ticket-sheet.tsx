@@ -87,7 +87,7 @@ export const HISTORY_PAGE_LIMIT = 200;
  * ⚠ **`DEEPEST_RANK` is NOT a bound on this, and reading it as one is the
  * natural mistake.** The constant (= 4, `packages/domain/src/ticket-types.ts:136`)
  * governs ROOT creation alone — a type at that rank or below may not sit at
- * project root (`hierarchy.ts:108`) — while a child's rank is unbounded above,
+ * project root (`hierarchy.ts:133`) — while a child's rank is unbounded above,
  * which is that file's own reason for writing `>=` there: *"a type DEEPER than
  * sub-task is smaller still and cannot coherently be exempt — `===` would leave
  * an escape hatch where defining rank 5 floats your tickets free."* A workspace

@@ -83,7 +83,7 @@ export type NewTicketDraft = {
    * two presses that somehow escaped the dialog's `submittingRef` were two
    * distinct ids, i.e. two tickets in an append-only ledger. **With the id minted
    * per OPEN, the same escape is refused instead of filed.**
-   * `packages/rule-engine/src/checks/hierarchy.ts:80` is
+   * `packages/rule-engine/src/checks/hierarchy.ts:95` is
    * `if ((await getTicketState(ctx, env.entity.id)) !== null) return
    * refuse('ticket.already-exists')`, and its own docblock says why the door
    * exists at all: the reducer folds `ticket.created` unconditionally, so an
@@ -532,7 +532,7 @@ export function NewTicketDialog({
    * is no longer what happens, and leaving it would have been a docblock
    * describing a previous build. **What replaces it is a WEAKER cost, and the
    * guard is still the thing that prevents it:** a second escape now names an id
-   * that already resolves, so `checks/hierarchy.ts:80` refuses it
+   * that already resolves, so `checks/hierarchy.ts:95` refuses it
    * `ticket.already-exists` rather than filing a second ticket. The ref remains
    * the first line of defence — the door is the second, and it is an error
    * rather than silent duplication.

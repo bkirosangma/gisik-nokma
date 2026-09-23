@@ -1,11 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import type { EventEnvelope, TicketTypeDef } from '@gisik-nokma/domain';
-import { makeEnvelope } from '@gisik-nokma/domain';
+import { makeEnvelope, ticketCreatedPayload } from '@gisik-nokma/domain';
 import type { MemoryContext } from '../src/memory-context.js';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketFieldSet } from '../src/checks/fields.js';
+import { checkTicketCreated } from '../src/checks/hierarchy.js';
 import { evaluateEvent } from '../src/evaluate.js';
-import { WF, WS, created, typeDefined } from '../src/checks/test-support.js';
+import { PROJECT, WF, WS, created, typeDefined } from '../src/checks/test-support.js';
 
 const TICKET = '01J9GTKA000000000000000000';
 const GHOST = '01J9GGHT000000000000000000';
@@ -297,7 +298,7 @@ describe('checkTicketFieldSet', () => {
    * `packages/domain/test/ticket-events.test.ts`); this is the same refusal
    * seen from where the fixture suite and Plan 10's offline replica stand,
    * which is the only door those two ever pass. The coalesce is gone as well —
-   * `ticket-state.ts:211` reads `claim(p.value, env)`, because once the key is
+   * `ticket-state.ts:343` reads `claim(p.value, env)`, because once the key is
    * required the fold could only restate the closed hole as the design.
    */
   /**
@@ -323,6 +324,93 @@ describe('checkTicketFieldSet', () => {
       refused: true,
       rule: 'malformed-payload',
       reason: 'This ticket.field_set event does not point at a ticket; it points at a ticket-type.',
+    });
+  });
+});
+
+/**
+ * 13.1449 — starting-status design addendum, the PARITY case (owner ruling,
+ * relayed 2026-09-23): addendum item 3 asked for a rule-engine helper
+ * extracted from this file's own `dueDate`/`startDate` block (`checks/fields.ts:140-146`)
+ * and shared with `checkTicketCreated`, on the theory that the birth check
+ * would otherwise be a COPY of this one. **Ruled WITHDRAWN as a defect in the
+ * addendum itself, not built**: that block IS `dueDateValueSchema.safeParse`
+ * and nothing else — no start-≤-due ordering, no second rule — and
+ * `ticketCreatedPayload`'s `startDate`/`dueDate` are typed with that SAME
+ * `dueDateValueSchema` (`packages/domain/src/events/ticket-events.ts`). One
+ * schema, two doors, already — there was no copy for item 3 to replace.
+ *
+ * This case is the parity the addendum actually wanted, proven the honest
+ * way: one shared schema, asserted independently at both doors — the payload
+ * schema directly for the SHAPE agreement across all four bad days, and
+ * `checkTicketCreated` itself (not merely the schema) for ONE of them, so the
+ * case witnesses the actual door's verdict and not only its precondition.
+ * **The two refusal SHAPES are deliberately different, and that is not the
+ * thing this case holds constant** — `ticket.created`'s day check is
+ * enforced by the PAYLOAD SCHEMA itself, so a bad day refuses
+ * `malformed-payload` at the door before any business rule runs;
+ * `ticket.field_set`'s is enforced by this check's own business logic,
+ * reached only after ITS payload has already parsed, so a bad day there
+ * refuses `field.type-mismatch`. What the two doors agree on is the
+ * VERDICT — refused for the same four bad days, accepted for the same real
+ * one — because both ask the one schema the identical question.
+ */
+describe('13.1449 birth dueDate/startDate and field_set dueDate/startDate agree on the verdict, from the one shared schema', () => {
+  const NEW_TICKET = '01J9GNEW000000000000000000';
+  const BIRTH_BASE = { typeId: 'invoice', projectId: PROJECT, parentId: null, title: 'File the GST return' };
+  const BAD_DAYS = ['2026-13-01', '2026-02-30', '30-09-2026', ''];
+
+  function createdWithDueDate(date: string): EventEnvelope {
+    return makeEnvelope({
+      type: 'ticket.created',
+      entity: { kind: 'ticket', id: NEW_TICKET },
+      workspaceId: WS,
+      payload: { ...BIRTH_BASE, dueDate: { date } },
+    });
+  }
+
+  it('refuses every bad day at the payload door (both fields), and the same one bad day through the real checkTicketCreated door', async () => {
+    // One assertion per axis, so a mutation admitting even one bad day shows
+    // up as a changed ARRAY rather than a loop stopping at its first failure.
+    expect(BAD_DAYS.map((date) => ticketCreatedPayload.safeParse({ ...BIRTH_BASE, dueDate: { date } }).success)).toEqual(
+      [false, false, false, false],
+    );
+    expect(
+      BAD_DAYS.map((date) => ticketCreatedPayload.safeParse({ ...BIRTH_BASE, startDate: { date } }).success),
+    ).toEqual([false, false, false, false]);
+
+    // The real door, not only the schema it carries: checkTicketCreated's own
+    // `ticketCreatedPayload.safeParse` guard is what actually answers for a
+    // ticket.created event, and this is its literal verdict for one bad day.
+    expect(await checkTicketCreated(createdWithDueDate('2026-02-30'), ctx())).toEqual({
+      refused: true,
+      rule: 'malformed-payload',
+      reason: "This ticket.created event's payload is malformed: at dueDate.date: a due date is a day the calendar has",
+    });
+  });
+
+  it('field_set refuses the same four bad days for either field', async () => {
+    for (const date of BAD_DAYS) {
+      expect(await checkTicketFieldSet(fieldSet('dueDate', { date }), ctx())).toEqual({
+        refused: true,
+        rule: 'field.type-mismatch',
+        reason: '"Due date" needs a day in YYYY-MM-DD form (a note is optional).',
+      });
+      expect(await checkTicketFieldSet(fieldSet('startDate', { date }), ctx())).toEqual({
+        refused: true,
+        rule: 'field.type-mismatch',
+        reason: '"Start date" needs a day in YYYY-MM-DD form (a note is optional).',
+      });
+    }
+  });
+
+  it('control: a real day the calendar has is accepted by both doors, for either field', async () => {
+    expect(ticketCreatedPayload.safeParse({ ...BIRTH_BASE, dueDate: { date: '2026-09-30' } }).success).toBe(true);
+    expect(ticketCreatedPayload.safeParse({ ...BIRTH_BASE, startDate: { date: '2026-09-30' } }).success).toBe(true);
+    expect(await checkTicketCreated(createdWithDueDate('2026-09-30'), ctx())).toEqual({ refused: false });
+    expect(await checkTicketFieldSet(fieldSet('dueDate', { date: '2026-09-30' }), ctx())).toEqual({ refused: false });
+    expect(await checkTicketFieldSet(fieldSet('startDate', { date: '2026-09-30' }), ctx())).toEqual({
+      refused: false,
     });
   });
 });

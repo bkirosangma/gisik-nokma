@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { TicketState, TicketTypeDef } from '@gisik-nokma/domain';
+import type { EventEnvelope, PublishedWorkflowDef, TicketState, TicketTypeDef } from '@gisik-nokma/domain';
 import { makeEnvelope } from '@gisik-nokma/domain';
 import { buildMemoryContext } from '../src/memory-context.js';
 import { checkTicketCreated } from '../src/checks/hierarchy.js';
@@ -14,6 +14,7 @@ import {
   SUBTASK,
   TASK,
   WF,
+  WS,
   created,
   createdIn,
   typeDefined,
@@ -482,6 +483,78 @@ describe('checkTicketCreated — which refusal names the event when two are avai
       refused: true,
       rule: 'hierarchy.cross-project',
       reason: 'The parent is in a different project. Pick a parent from the same project.',
+    });
+  });
+
+  /**
+   * 4.62 — starting-status design (2026-09-23): `stateId`, when the payload
+   * names one, must be a state `isCreatableState` allows. Refused for
+   * terminal, `creatable: false`, and unknown; accepted for a creatable state
+   * and for absent (control). The workflow variant is built LOCALLY — the
+   * shared `WF` other suites in this file import keeps its own three-state
+   * shape.
+   */
+  describe('4.62 stateId must be a creatable state', () => {
+    const WF_WITH_ARCHIVED: PublishedWorkflowDef = {
+      ...WF,
+      states: [...WF.states, { id: 'archived', name: 'Archived', category: 'active', creatable: false }],
+    };
+    const ctxWith = () => buildMemoryContext([WF_WITH_ARCHIVED], [typeDefined(TASK)]);
+
+    function createdWithState(stateId: string): EventEnvelope {
+      return makeEnvelope({
+        type: 'ticket.created',
+        entity: { kind: 'ticket', id: NEW },
+        workspaceId: WS,
+        payload: { typeId: 'task', projectId: PROJECT, parentId: null, title: 'ticket new', stateId },
+      });
+    }
+
+    it('control: a creatable state is accepted', async () => {
+      expect(await checkTicketCreated(createdWithState('doing'), ctxWith())).toEqual({ refused: false });
+    });
+
+    it('control: an absent stateId is accepted, born in the workflow initial state', async () => {
+      expect(await checkTicketCreated(created(NEW, 'task', null, PROJECT), ctxWith())).toEqual({ refused: false });
+    });
+
+    it('refuses a terminal state, naming it', async () => {
+      expect(await checkTicketCreated(createdWithState('done'), ctxWith())).toEqual({
+        refused: true,
+        rule: 'workflow.state-not-creatable',
+        reason: 'Tickets cannot start in "Done". Pick another status, or allow it in the workflow\'s settings.',
+      });
+    });
+
+    it('refuses a creatable:false state, naming it', async () => {
+      expect(await checkTicketCreated(createdWithState('archived'), ctxWith())).toEqual({
+        refused: true,
+        rule: 'workflow.state-not-creatable',
+        reason: 'Tickets cannot start in "Archived". Pick another status, or allow it in the workflow\'s settings.',
+      });
+    });
+
+    it('refuses an unknown state, quoting the raw id', async () => {
+      expect(await checkTicketCreated(createdWithState('nonexistent'), ctxWith())).toEqual({
+        refused: true,
+        rule: 'workflow.state-not-creatable',
+        reason: 'Tickets cannot start in "nonexistent". Pick another status, or allow it in the workflow\'s settings.',
+      });
+    });
+
+    it('this refusal precedes deepest-rank-parent — a fact about the workflow, decided before any parent question', async () => {
+      const ctx = buildMemoryContext([WF_WITH_ARCHIVED], [typeDefined(SUBTASK)]);
+      const envelope = makeEnvelope({
+        type: 'ticket.created',
+        entity: { kind: 'ticket', id: NEW },
+        workspaceId: WS,
+        payload: { typeId: 'sub-task', projectId: PROJECT, parentId: null, title: 'x', stateId: 'done' },
+      });
+      expect(await checkTicketCreated(envelope, ctx)).toEqual({
+        refused: true,
+        rule: 'workflow.state-not-creatable',
+        reason: 'Tickets cannot start in "Done". Pick another status, or allow it in the workflow\'s settings.',
+      });
     });
   });
 });

@@ -80,10 +80,10 @@ function customFieldVerdict(field: CustomFieldDef, value: unknown): Accept | Ref
  * this plan.
  *
  * NOTHING HERE HAS TO INVENT AN ABSENT VALUE. `ticketFieldSetPayload` now
- * requires `value` to be present (`events/ticket-events.ts:91-93`, this task):
+ * requires `value` to be present (`events/ticket-events.ts:205`, this task):
  * before that, a payload omitting it parsed clean and the reducer's
  * then-`p.value ?? null` folded the absence into a null clearing claim nobody
- * made. That coalesce has since been dropped as well (`ticket-state.ts:211`).
+ * made. That coalesce has since been dropped as well (`ticket-state.ts:343`).
  * The refusal for an absent value is therefore `malformed-payload` from the
  * parse below, which is the honest answer — the claim never arrived.
  */
