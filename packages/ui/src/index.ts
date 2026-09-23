@@ -58,3 +58,10 @@ export { RemoveIcon } from './select/select-icons.js';
 // visible symptom. A barrel that exports a family "for symmetry" is a surface
 // nobody chose — so this is one glyph, and the other new consumers ask.
 export { PageIcon } from './select/select-icons.js';
+// The board card's priority badge and epic chip (owner request, 2026-09-23).
+// Same precedent as `RemoveIcon`/`PageIcon` immediately above: the real
+// consumer, `packages/app-core`'s `board.tsx`, cannot reach into `icons/`
+// directly, and a second inline copy of any one of these paths is the
+// two-spellings defect this barrel exists to avoid. All four ship together
+// because the one consumer needs all four, not "for symmetry".
+export { FireIcon, LeafIcon, SnowflakeIcon, FlagIcon } from './icons/priority-icons.js';

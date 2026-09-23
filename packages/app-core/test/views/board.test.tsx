@@ -1205,41 +1205,93 @@ describe('V1 the empty board never instructs an action it cannot offer', () => {
 });
 
 /**
- * 13.1237-13.1238 — the priority badge (spec 2026-09-22).
- *
- * A small `P1`/`P2`/`P3` on the card's meta line, `title` attributed like the
- * due label's, with `--p1` taking the danger tone. **P2 is the DEFAULT and is
- * still DRAWN** — the value is a fact on every card, and a card without one is
- * not a state this product has — so there is no absence arm to test and the
- * `13.1238` case is the control that says so.
+ * 13.1237-13.1238 — the priority badge — SUPERSEDED IN PLACE (owner request,
+ * 2026-09-23, board-card badges). The spec 2026-09-22 prose these two cases
+ * originally pinned — "P2 is the default … but not emphasised … only P1
+ * takes the tone" — is no longer true: the owner's follow-up request draws a
+ * red-fire/green-leaf/frozen-blue-snowflake icon and its own ink for EVERY
+ * level, and tints the whole card by it (`13.1452` below). Same ids, prose
+ * and assertions updated in place rather than left standing beside code that
+ * disagrees with them — what stays true across both requests is what 13.1238
+ * still asserts: P2 is the birth default and is still DRAWN, so there is no
+ * absence arm to test.
  */
-describe('13.1237 the board card draws the priority badge; P1 carries the danger tone', () => {
+describe('13.1237 the board card draws the priority badge; every level carries its own icon and ink', () => {
   const cardAt = (value: 'P1' | 'P2' | 'P3', ticketId: string) =>
     boardCardSeed({ ticketId, priority: { value, claim: claim({ actorName: 'Kiro' }) } });
 
-  it('13.1237 P1 is drawn in the danger tone, with the claimant as its title', () => {
+  it('13.1237 P1 draws the danger tone and a fire icon, with the claimant as its title', () => {
     render(<Board board={errandBoard([cardAt('P1', 'p-one')])} onOpenTicket={() => {}} />);
-    const badge = screen.getByText('P1');
-    expect(badge.className).toContain('gn-board-card__priority');
+    const badge = screen.getByText('P1').closest('.gn-board-card__priority') as HTMLElement;
     expect(badge.className).toContain('gn-board-card__priority--p1');
+    // The icon is LEFT of the text (owner request: "an ICON on its left"),
+    // and it is the FIRST element child — a DOM-order assertion, not merely
+    // "present somewhere in the badge".
+    expect(badge.firstElementChild?.tagName).toBe('svg');
+    expect(badge.querySelector('svg')).toHaveAttribute('aria-hidden', 'true');
     // The attribution travels with the level, the same `'s claim` sentence the
     // due label and every sheet claim line uses — a badge with no claimant
     // would read as a fact the system established.
     expect(badge).toHaveAttribute('title', "Kiro's claim");
   });
 
-  it('13.1238 CONTROL — P2 and P3 are drawn WITHOUT the tone, and the badge is on EVERY card', () => {
+  it('13.1238 CONTROL — P2 and P3 carry their OWN distinct classes and icons, never P1’s, and the badge is on EVERY card', () => {
     render(
       <Board
         board={errandBoard([cardAt('P2', 'p-two'), cardAt('P3', 'p-three')])}
         onOpenTicket={() => {}}
       />,
     );
-    expect(screen.getByText('P2').className).not.toContain('--p1');
-    expect(screen.getByText('P3').className).not.toContain('--p1');
+    const p2 = screen.getByText('P2').closest('.gn-board-card__priority') as HTMLElement;
+    const p3 = screen.getByText('P3').closest('.gn-board-card__priority') as HTMLElement;
+    expect(p2.className).toContain('--p2');
+    expect(p2.className).not.toContain('--p1');
+    expect(p2.className).not.toContain('--p3');
+    expect(p3.className).toContain('--p3');
+    expect(p3.className).not.toContain('--p1');
+    expect(p3.className).not.toContain('--p2');
+    expect(p2.querySelector('svg')).not.toBeNull();
+    expect(p3.querySelector('svg')).not.toBeNull();
     // TWO badges for TWO cards — the positive half of "no absence arm", and the
     // assertion that stops the case passing on a board that drew one card.
     expect(screen.getAllByText(/^P[123]$/)).toHaveLength(2);
+  });
+});
+
+/**
+ * 13.1452 — the card's OWN surface is tinted by its priority (owner request,
+ * 2026-09-23). A card-level modifier class, not the badge's own — `board.tsx`
+ * derives it from `card.priority.value`, lower-cased, the same string the
+ * badge's own `--p1`/`--p2`/`--p3` modifier already uses.
+ */
+describe('13.1452 the card carries a priority tint modifier class of its own, distinct from the badge', () => {
+  it('draws gn-board-card--p1 on the CARD, not only gn-board-card__priority--p1 on the badge', () => {
+    render(
+      <Board
+        board={errandBoard([boardCardSeed({ ticketId: 't-tint', priority: { value: 'P1', claim: claim() } })])}
+        onOpenTicket={() => {}}
+      />,
+    );
+    const card = document.querySelector('[data-testid="ticket-card-t-tint"] .gn-board-card') as HTMLElement;
+    expect(card.className).toContain('gn-board-card--p1');
+  });
+
+  it('CONTROL — P2 and P3 each carry their own tint modifier, never p1’s', () => {
+    render(
+      <Board
+        board={errandBoard([
+          boardCardSeed({ ticketId: 't-p2', priority: { value: 'P2', claim: claim() } }),
+          boardCardSeed({ ticketId: 't-p3', priority: { value: 'P3', claim: claim() } }),
+        ])}
+        onOpenTicket={() => {}}
+      />,
+    );
+    const p2Card = document.querySelector('[data-testid="ticket-card-t-p2"] .gn-board-card') as HTMLElement;
+    const p3Card = document.querySelector('[data-testid="ticket-card-t-p3"] .gn-board-card') as HTMLElement;
+    expect(p2Card.className).toContain('gn-board-card--p2');
+    expect(p2Card.className).not.toContain('gn-board-card--p1');
+    expect(p3Card.className).toContain('gn-board-card--p3');
+    expect(p3Card.className).not.toContain('gn-board-card--p1');
   });
 });
 
@@ -1251,25 +1303,34 @@ describe('13.1237 the board card draws the priority badge; P1 carries the danger
  * card is the drift ruling E5-2 closed. A `null` key (a workspace whose ledger holds
  * no prefix, or the offline replica) draws the due label alone: no dash, no
  * placeholder key.
+ *
+ * UPDATED (owner request, 2026-09-23, board-card badges): this row is now "the
+ * keys row" — `[parent key badge] key [priority badge]`, then the due label —
+ * and the priority badge is ALWAYS present (spec 2026-09-22, never an absence
+ * arm), so every assertion below now expects it too. What stays true from the
+ * original request is unchanged: the key still leads, the due label still
+ * follows with its own `·` separator, and a `null` key still draws no
+ * separator and no placeholder for ITSELF.
  */
 describe('13.1281 the board card meta line leads with the ticket key', () => {
   const DUE = '2026-10-19';
-  it('13.1281 draws `KEY · <due>` in one meta line, key first', () => {
+  it('13.1281 draws `KEY P<n> · <due>` in one meta line, key first, priority always present', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1101', dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const key = screen.getByText('GN-1101');
     expect(key.className).toContain('gn-board-card__key');
     const line = key.closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(`GN-1101 · ${formatDate(DUE)}`);
+    // `boardCardSeed`'s own default priority is P2 (the birth default).
+    expect(line.textContent).toBe(`GN-1101P2 · ${formatDate(DUE)}`);
     expect(within(line).getByText(formatDate(DUE)).className).toContain('gn-board-card__due');
   });
-  it('13.1281 CONTROL — a null key draws the due label alone, with no separator', () => {
+  it('13.1281 CONTROL — a null key draws the priority badge and the due label, with no key and no placeholder', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: null, dueDate: { date: DUE, claim: claim() } })])} onOpenTicket={() => {}} />);
     const line = screen.getByText(formatDate(DUE)).closest<HTMLElement>('.gn-board-card__meta-line')!;
-    expect(line.textContent).toBe(formatDate(DUE));
+    expect(line.textContent).toBe(`P2 · ${formatDate(DUE)}`);
     expect(line.querySelector('.gn-board-card__key')).toBeNull();
   });
-  it('13.1281 CONTROL — a key with no due date draws the key alone', () => {
+  it('13.1281 CONTROL — a key with no due date draws the key and the priority badge, with no due separator', () => {
     render(<Board board={errandBoard([boardCardSeed({ key: 'GN-1102', dueDate: null })])} onOpenTicket={() => {}} />);
-    expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102');
+    expect(screen.getByText('GN-1102').closest('.gn-board-card__meta-line')!.textContent).toBe('GN-1102P2');
   });
 });
