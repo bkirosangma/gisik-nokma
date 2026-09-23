@@ -1,6 +1,8 @@
-import { REFUSAL_RULES, evaluateEvent, type EngineContext } from '@gisik-nokma/rule-engine';
+import { REFUSAL_RULES, evaluateEvent, workflowStateNotCreatableRefusal, type EngineContext } from '@gisik-nokma/rule-engine';
 import {
   BACKLOG_STATE_ID,
+  isCreatableState,
+  label,
   statesWithBacklog,
   ticketClosedPayload,
   ticketCreatedPayload,
@@ -66,6 +68,24 @@ export type PrecheckDeps = {
    * change the verdict differs between the two paths.
    */
   pendingFields?: Record<string, string>;
+  /**
+   * The workflow a `ticket.created` candidate would be born on (starting-
+   * status design, 2026-09-23) — the caller's channel for the one fact
+   * `precheckCreatableState` needs that this cache cannot derive on its own.
+   *
+   * `ticketCreatedPayload` names the ticket's TYPE, not its workflow, and
+   * `ClientStateCache` holds no ticket-type store to resolve one from the
+   * other (see `getTicketTypeDef` below, and gate 4's docblock on
+   * `precheckParentTerminal`) — the caller building the draft already
+   * resolved the type the New-ticket form picked, and with it the workflow,
+   * so it is handed here rather than re-derived. Absent (or a workflow this
+   * cache has not cached) defers rather than guessing: `precheckCreatableState`
+   * answers `null` — no verdict from THIS check — and `precheckEvent` falls
+   * through to `precheckParentTerminal` for the rest of `ticket.created`'s
+   * preview, exactly as an uncached fact defers everywhere else in this
+   * module.
+   */
+  workflowId?: string;
 };
 
 /** A fresh object each time: a shared literal would let one caller's mutation reach the next. */
@@ -114,14 +134,20 @@ function notEvaluated(): PrecheckResult {
  *     — the parent-terminal invariant reads an unseen child as no child, and
  *     that is the one way an accept can be conjured from nothing;
  *  4. a hierarchy claim — `ticket.created`, `ticket.reparented` — defers
- *     ENTIRELY. Plan 3 landed both as engine cases (`evaluate.js`), and every
- *     engine ACCEPT for either is decided behind the ticket's own type
- *     definition (`checks/hierarchy.ts:84` for creation, `:215` for a
- *     reparent), which is read BEFORE even the no-parent branch. This cache
- *     holds no ticket-type definitions at all, so there is no accept for those
- *     two types left to derive from what it holds. What survives is the
- *     `hierarchy.parent-terminal` REFUSAL below, which reads only the cached,
- *     server-served `stateCategory` and nothing else;
+ *     ENTIRELY through `precheckParentTerminal`. Plan 3 landed both as engine
+ *     cases (`evaluate.js`), and every engine ACCEPT for either is decided
+ *     behind the ticket's own type definition (`checks/hierarchy.ts:84` for
+ *     creation, `:215` for a reparent), which is read BEFORE even the
+ *     no-parent branch. This cache holds no ticket-type definitions at all,
+ *     so there is no accept for those two types left to derive from what it
+ *     holds. What survives FROM THAT FUNCTION is the `hierarchy.parent-terminal`
+ *     REFUSAL below, which reads only the cached, server-served `stateCategory`
+ *     and nothing else. **`ticket.created` alone has a SECOND, independent
+ *     refusal since the starting-status design (2026-09-23):**
+ *     `precheckCreatableState` answers `workflow.state-not-creatable` off the
+ *     cached `WorkflowDef` and the payload's own `stateId` — a question this
+ *     cache's ticket-type gap has nothing to do with, so it is not gated by
+ *     this numbered list;
  *  5. an ACCEPT that moves a ticket OUT of a terminal state must rest on its
  *     parent being cached — the child's side of the parent-terminal invariant
  *     (`transition.ts`, E3-19) reads the parent's category and refuses nothing
@@ -140,7 +166,17 @@ export async function precheckEvent(
 ): Promise<PrecheckResult> {
   if (submitted.entity.kind !== 'ticket') return notEvaluated();
 
-  if (submitted.type === 'ticket.created' || submitted.type === 'ticket.reparented') {
+  if (submitted.type === 'ticket.created') {
+    // Starting-status design (2026-09-23): the state check runs FIRST,
+    // mirroring the engine's own order (`checks/hierarchy.ts`, right after
+    // the workflow resolves and before every parent branch) — a fact about
+    // the workflow and the payload alone, decided before parent-terminal
+    // even asks whether there is a parent.
+    const stateRefusal = precheckCreatableState(submitted, cache, deps.workflowId);
+    if (stateRefusal !== null) return stateRefusal;
+    return precheckParentTerminal(submitted, cache);
+  }
+  if (submitted.type === 'ticket.reparented') {
     return precheckParentTerminal(submitted, cache);
   }
 
@@ -320,6 +356,47 @@ export function contextFromCache(cache: ClientStateCache, overlay?: PendingOverl
           'through the engine. Owners: Plan 6a (cache surface), Plan 6 Task 7 (producer).',
       );
     },
+  };
+}
+
+/**
+ * `ticket.created`'s STARTING STATUS, previewed client-side (starting-status
+ * design, 2026-09-23): the same `isCreatableState` test
+ * `checks/hierarchy.ts` runs, so the New-ticket form can show "Tickets cannot
+ * start in …" before submit rather than only after the server refuses it.
+ *
+ * Hand-rolled, like `precheckTicketClosed`/`precheckTicketRanked` below, and
+ * deliberately NOT routed through `evaluateEvent`/`contextFromCache`: the
+ * CANARY test in `precheck.test.ts` pins that `checkTicketCreated` rejects
+ * (throws) the moment it reaches `getTicketTypeDef`, which this cache cannot
+ * answer — so driving `ticket.created` through the shared engine here would
+ * throw on every call rather than preview anything.
+ *
+ * Returns `null` — no verdict from THIS check, not `not-evaluated` — when
+ * there is nothing to say: the payload names no `stateId` (absent means the
+ * workflow's initial state, always creatable), `workflowId` was not supplied,
+ * or this cache has not cached that definition. `null` lets `precheckEvent`
+ * fall through to `precheckParentTerminal` for the rest of `ticket.created`'s
+ * preview instead of manufacturing an answer this function does not have.
+ */
+function precheckCreatableState(
+  submitted: SubmittedEvent,
+  cache: ClientStateCache,
+  workflowId: string | undefined,
+): PrecheckResult | null {
+  const parsed = ticketCreatedPayload.safeParse(submitted.payload);
+  if (!parsed.success || parsed.data.stateId === undefined) return null;
+  if (workflowId === undefined) return null;
+  const def = cache.getWorkflowDef(workflowId);
+  if (def === undefined) return null;
+  if (isCreatableState(def, parsed.data.stateId)) return null;
+  return {
+    kind: 'refused',
+    rule: 'workflow.state-not-creatable',
+    // `label`, not a hand-rolled quote: the SAME function `checks/hierarchy.ts`
+    // feeds `workflowStateNotCreatableRefusal`, so a known state's name and an
+    // unknown id's own quoting cannot drift between the engine and this preview.
+    reason: workflowStateNotCreatableRefusal(label(def, parsed.data.stateId)),
   };
 }
 
