@@ -99,6 +99,17 @@ export const WORKSPACE_MEMBERSHIP_REASON =
  */
 export const WORKSPACE_RENAME_REASON = 'Only a workspace owner or admin can rename a workspace.';
 /**
+ * Trash series, Plan 1 Task 3 (spec §4 "Authority"). Archive, restore, delete,
+ * undelete, mark and unmark are all the SAME question for a workspace —
+ * "does this actor own the workspace" — unlike `workspace.renamed` and
+ * `workspace.settings_set` above, which `isWorkspaceAdmin` (owner OR admin)
+ * answers. Deliberately narrower: an admin who could delete or purge-mark a
+ * workspace could take away every member's access to it, which is a step
+ * beyond configuration or a name change.
+ */
+export const WORKSPACE_OWNER_ONLY_REASON =
+  'Only the workspace owner can archive, delete or restore a workspace.';
+/**
  * The narrower refusal that rides WITH the one above, never instead of it
  * (owner ruling 2026-09-18): the senders who may grant membership are an admin
  * question, and among them the senders who may grant the OWNER role are an
@@ -183,7 +194,7 @@ export const VISIBILITY_AUTHORITY_REASON =
  * `serverRefusal` surface renders `rule: reason` verbatim, and the UI does not
  * gate on role at all — this door is the only party that knows.
  */
-export function ticketDeleteAuthorityReason(act: 'delete' | 'restore'): string {
+export function ticketDeleteAuthorityReason(act: 'delete' | 'restore' | 'mark' | 'unmark'): string {
   return `Only a project admin can ${act} a ticket.`;
 }
 /**
@@ -368,7 +379,36 @@ const ADMIN_ONLY_TYPES: ReadonlySet<string> = new Set([
   // work vanished from their boards.
   'project.archived',
   'project.restored',
+  // Trash series, Plan 1 Task 3 (spec §4 "Authority"): soft delete/undelete is
+  // the same class of act as archive/restore two lines up — it takes the
+  // project out of (or back into) every list of live work for the whole
+  // workspace — so the same workspace admin/owner question answers it.
+  'project.deleted',
+  'project.undeleted',
 ]);
+
+/**
+ * Trash series, Plan 1 Task 3 (spec §4 "Authority"). Workspace acts an
+ * OWNER ONLY may submit — a narrower bar than `ADMIN_ONLY_TYPES`, checked
+ * separately below rather than folded into that set, because the refusal
+ * NAMES the act (`WORKSPACE_OWNER_ONLY_REASON`) the way `workspace.renamed`'s
+ * own check does, and because the bar itself (`role === 'owner'`) is
+ * different from `isWorkspaceAdmin`.
+ */
+const WORKSPACE_OWNER_TYPES: ReadonlySet<string> = new Set([
+  'workspace.archived',
+  'workspace.restored',
+  'workspace.deleted',
+  'workspace.undeleted',
+]);
+/**
+ * `purge.marked`/`purge.unmarked` inherit the authority of the item's own
+ * delete (spec §4) — filed against any of the four purgeable kinds, so this
+ * set is checked beside each kind's own delete authority rather than folded
+ * into `WORKSPACE_OWNER_TYPES` or `ADMIN_ONLY_TYPES`, neither of which is
+ * kind-aware.
+ */
+const PURGE_TYPES: ReadonlySet<string> = new Set(['purge.marked', 'purge.unmarked']);
 
 /**
  * **`origin` in this module is the event envelope's provenance enum — `'web' |
@@ -790,6 +830,29 @@ export function checkRolePermission(env: EventEnvelope, ctx: PermissionContext):
   if (env.type === 'workspace.renamed' && !isWorkspaceAdmin) {
     return refuse(WORKSPACE_RENAME_REASON);
   }
+  // Trash series, Plan 1 Task 3 (spec §4 "Authority"). Workspace archive,
+  // restore, delete, undelete, mark and unmark are all an OWNER-only question —
+  // compared `role === 'owner'` inline, as `WORKSPACE_OWNER_GRANT_REASON`'s
+  // check above does, and deliberately without an `isWorkspaceOwner` helper
+  // (see the docblock on `WORKSPACE_OWNER_GRANT_REASON` for why none exists).
+  if (
+    WORKSPACE_OWNER_TYPES.has(env.type) ||
+    (env.entity.kind === 'workspace' && PURGE_TYPES.has(env.type))
+  ) {
+    if (role !== 'owner') {
+      return refuse(WORKSPACE_OWNER_ONLY_REASON);
+    }
+  }
+  // A project mark/unmark inherits the project's own delete authority — the
+  // same workspace admin/owner question `ADMIN_ONLY_TYPES` answers for
+  // `project.deleted`/`project.undeleted` two cases up, asked here instead of
+  // folded into that set because `purge.marked`/`purge.unmarked` are filed
+  // against every purgeable kind and this module's other kinds (ticket, note)
+  // answer a DIFFERENT authority question, decided in `checkVisibilityPermission`
+  // and `checkNotePermission` respectively.
+  if (env.entity.kind === 'project' && PURGE_TYPES.has(env.type) && !isWorkspaceAdmin) {
+    return refuse(adminOnlyReason(role));
+  }
   return null;
 }
 
@@ -857,7 +920,21 @@ function projectsNamedBy(env: EventEnvelope): readonly string[] {
     // does not exist, rather than silently writing nothing and answering 201.
     case 'project.archived':
     case 'project.restored':
+    // Trash series, Plan 1 Task 3: same reasoning as the archive pair above —
+    // both are filed against the project entity with an empty payload, so
+    // `checkProjectExists` must be asked before `checkRolePermission`'s
+    // `ADMIN_ONLY_TYPES` answer would otherwise be the only gate reached.
+    case 'project.deleted':
+    case 'project.undeleted':
       return [env.entity.id];
+    // A project purge mark/unmark is filed against WHICHEVER kind spec §4
+    // purges — workspace, project, ticket or note — so this arm is kind-aware
+    // rather than a bare `[env.entity.id]`: naming a non-project entity id as
+    // a "project" would make `checkProjectExists` refuse `project-unknown` for
+    // a ticket or note id that was never a project id to begin with.
+    case 'purge.marked':
+    case 'purge.unmarked':
+      return env.entity.kind === 'project' ? [env.entity.id] : [];
     case 'invite.sent':
       return inviteSentPayload.parse(env.payload).projectIds ?? [];
     // The note's HOME project (notes series, Plan 1 of 6, spec §3.3: "the
@@ -1165,6 +1242,13 @@ const NOTE_AUTHOR_EVENTS = new Set([
   'note.moved',
   'note.deleted',
   'note.restored',
+  // Trash series, Plan 1 Task 3 (spec §4 "Authority"): purge.marked/unmarked
+  // inherit note.deleted's authority — the same author/admin-reader/owner
+  // question, asked of the same note. `checkNotePermission` runs this set only
+  // for `env.entity.kind === 'note'`, so a ticket or workspace purge mark never
+  // reaches it.
+  'purge.marked',
+  'purge.unmarked',
 ]);
 
 /**
@@ -1421,13 +1505,29 @@ export async function checkVisibilityPermission(
    * differently for a ticket that does not exist and one that exists but is
    * invisible, rebuilding one layer down the existence oracle Task 8 removed.
    */
-  if (env.type === 'ticket.deleted' || env.type === 'ticket.restored') {
+  if (
+    env.type === 'ticket.deleted' ||
+    env.type === 'ticket.restored' ||
+    // Trash series, Plan 1 Task 3 (spec §4 "Authority"): a ticket mark/unmark
+    // inherits the ticket.deleted rule — the same project-admin question,
+    // asked of the same row.
+    env.type === 'purge.marked' ||
+    env.type === 'purge.unmarked'
+  ) {
     const ticket = await getTicketStateFromDb(ctx.db, env.workspaceId, env.entity.id);
     if (ticket === null) {
       return refuse(TICKET_DELETE_UNRESOLVED_REASON);
     }
     if (!hasProjectAdminRights(ctx.eff, ticket.projectId)) {
-      return refuse(ticketDeleteAuthorityReason(env.type === 'ticket.deleted' ? 'delete' : 'restore'));
+      const act =
+        env.type === 'ticket.deleted'
+          ? 'delete'
+          : env.type === 'ticket.restored'
+            ? 'restore'
+            : env.type === 'purge.marked'
+              ? 'mark'
+              : 'unmark';
+      return refuse(ticketDeleteAuthorityReason(act));
     }
   }
 
