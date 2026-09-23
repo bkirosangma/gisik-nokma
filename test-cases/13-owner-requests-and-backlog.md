@@ -3659,6 +3659,27 @@ effect now computes the correct seed value DIRECTLY (`seedStateIdFor`, a small h
 `workflowStates`) rather than deferring to the reseed effect for the ordinary case; the reseed effect stays,
 now genuinely needed only for a LATE `workflowStates` load or a truly stale value reached some other way.
 
+## The board-to-form pre-fill, end to end (starting-status design, 2026-09-23) — UI half
+
+- **13.1442** ✅ The ONE site that mounts the whole chain at once — `Board`'s `onCreateTicket` selection,
+  through `page.tsx`'s `createSelection` state, to `CreateTicketFlow.initialSelection`, to the actual
+  `ticket.created` payload. `apps/web/test/project-create-gate.test.tsx`, the file that already exists to
+  stop the New-ticket control from making claims nothing backs. Clicking the (real, non-`todo`) `Doing`
+  column's own "Add a ticket" pre-fills Type (`Epic`, `WORKSPACE_TYPES`' first entry sharing `wf-errands`)
+  and Starting status (`Doing`), switches the backlog switch OFF, and a submit from there carries
+  `stateId: 'doing'` on the wire. **CONTROL, same render:** the create closes the dialog on its own
+  (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on a committed outcome — no explicit Cancel needed,
+  and the first draft of this case tried to click one that was no longer there), and reopening from the
+  HEADER's own unscoped "New ticket" carries no selection at all — no `stateId` key on the wire, the same
+  omission rule 13.1439 pins at the dialog level, now exercised through the real page. The EMPTY, creatable
+  column deliberately used is `doing`, NOT the workflow's own `todo`: a click on `todo` would produce a
+  `stateId` the omission rule (13.1439) drops again, making the case indistinguishable from the control.
+  Mutation-witnessed: `page.tsx`'s `onCreateTicket` handler with `setCreateSelection(selection ?? null)`
+  hardcoded to `setCreateSelection(null)` reddens the pre-fill assertion, `expected element to have value
+  Epic, received Chore` (the ordinary rank-tie-broken default, proving the selection never reached the
+  dialog at all), restored from the committed tree. —
+  (`apps/web/test/project-create-gate.test.tsx`)
+
 ## The birth Start and Due date inputs (addendum, 2026-09-23) — UI half
 
 *Cases `13.1443`–`13.1445`, the remainder of the UI block. `13.1442` is the page e2e case, below.*

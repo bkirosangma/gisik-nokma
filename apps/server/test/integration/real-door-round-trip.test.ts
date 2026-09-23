@@ -594,6 +594,7 @@ describe('GET /v1/projects/:projectId/board', () => {
           name: 'To do',
           category: 'open',
           blocked: false,
+          creatable: true,
           cards: [parentCard],
         },
         {
@@ -604,6 +605,7 @@ describe('GET /v1/projects/:projectId/board', () => {
           name: 'Doing',
           category: 'active',
           blocked: false,
+          creatable: true,
           cards: [childCard],
         },
         {
@@ -614,6 +616,7 @@ describe('GET /v1/projects/:projectId/board', () => {
           name: 'Done',
           category: 'terminal',
           blocked: false,
+          creatable: false,
           cards: [],
         },
       ],
