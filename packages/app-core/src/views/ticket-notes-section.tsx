@@ -1,14 +1,15 @@
-import { useState } from 'react';
-import { NoteBadge, Toast } from '@gisik-nokma/ui';
+import { useRef, useState } from 'react';
+import { NoteBadge, Popover, Toast } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import type { MakeSubmitted } from '../submit.js';
+import { AttachNotePicker } from './attach-note-picker.js';
 import { useLiveQuery } from './use-live-query.js';
 
 export type TicketNotesSectionProps = {
   dataSource: DataSource;
   workspaceId: string;
   ticketId: string;
-  /** Unused by this section directly; threaded through for `AttachNotePicker`. */
+  /** The ticket's own project — the New-note row's home (Task 2). */
   projectId: string;
   currentUserId: string;
   canEdit: boolean;
@@ -27,14 +28,18 @@ export function TicketNotesSection({
   dataSource,
   workspaceId,
   ticketId,
+  projectId,
   canEdit,
   make,
+  onNavigate,
   onRefusal,
 }: TicketNotesSectionProps) {
   const notes = useLiveQuery(dataSource, workspaceId, `${ticketId}:notes`, () =>
     dataSource.query.getNotesForTicket(workspaceId, ticketId),
   );
   const [toast, setToast] = useState<{ noteId: string; title: string } | null>(null);
+  const attachTriggerRef = useRef<HTMLButtonElement>(null);
+  const [pickerOpen, setPickerOpen] = useState(false);
 
   async function detach(noteId: string, title: string): Promise<void> {
     const event = make({
@@ -96,14 +101,42 @@ export function TicketNotesSection({
       )}
       {canEdit ? (
         <button
+          ref={attachTriggerRef}
           type="button"
           className="gn-ticket-sheet__attach"
           data-testid="attach-note"
           aria-haspopup="dialog"
+          aria-expanded={pickerOpen}
+          onClick={() => setPickerOpen((open) => !open)}
         >
           Attach note
         </button>
       ) : null}
+      <Popover
+        triggerRef={attachTriggerRef}
+        open={pickerOpen && canEdit}
+        onClose={() => setPickerOpen(false)}
+        aria-label="Attach a note"
+      >
+        <AttachNotePicker
+          dataSource={dataSource}
+          workspaceId={workspaceId}
+          ticketId={ticketId}
+          projectId={projectId}
+          attachedIds={rows.map((note) => note.noteId)}
+          make={make}
+          onAttached={() => {
+            setPickerOpen(false);
+            notes.reload();
+          }}
+          onCreated={(noteId) => {
+            setPickerOpen(false);
+            notes.reload();
+            onNavigate?.(`/notes/${noteId}`);
+          }}
+          onRefusal={onRefusal}
+        />
+      </Popover>
       <Toast
         open={toast !== null}
         message={toast === null ? '' : `Detached "${toast.title}"`}
