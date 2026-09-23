@@ -24,6 +24,10 @@ export type WikiLinkOptions = {
 };
 
 export const wikiLinkSuggestionKey = new PluginKey('wikiLinkSuggestion');
+export const noteRefSuggestionKey = new PluginKey('noteRefSuggestion');
+
+/** The `:note` trigger. No trailing space: see `ticket-ref.ts`'s identical note on `char`. */
+const NOTE_TRIGGER = ':note';
 
 declare module '@tiptap/core' {
   interface Commands<ReturnType> {
@@ -168,6 +172,46 @@ export const WikiLink = Node.create<WikiLinkOptions>({
         // is ever sent.
         allow: ({ state, range }) => state.doc.resolve(range.from).parent.type.spec.code !== true,
         items: async ({ query }) => (await this.options.queryNotes(query)).slice(0, 8),
+        command: ({ editor, range, props }) => {
+          editor
+            .chain()
+            .focus()
+            .deleteRange(range)
+            .insertWikiLink(props)
+            .run();
+        },
+        render: () => createWikiLinkPopup(),
+      }),
+      // Plan 7 Task 2 (spec §14, D26): a SECOND trigger on the same node —
+      // `:note` inserts the identical `wikiLink { noteId, title }` node `[[`
+      // does, through the same command and the same popup. A distinct
+      // `PluginKey` is required: ProseMirror refuses two plugins sharing one
+      // key at construction time, which is this task's own mutation (9.307).
+      Suggestion<NoteLinkCandidate, NoteLinkCandidate>({
+        editor: this.editor,
+        pluginKey: noteRefSuggestionKey,
+        char: NOTE_TRIGGER,
+        allowSpaces: true,
+        allow: ({ state, range }) => {
+          // The same code-block gate the `[[` plugin uses above.
+          if (state.doc.resolve(range.from).parent.type.spec.code === true) return false;
+          // NO wiki-link COUNTERPART FOR THE SECOND HALF, for the reason
+          // `ticket-ref.ts`'s identical gate explains: `char` carries no
+          // trailing space, so the library's own matcher accepts a run-on
+          // word right after the trigger — `:notebook` would otherwise match
+          // with query `book`. Case 9.308 pins one behaviour: legitimate only
+          // when the query is empty (nothing typed yet) or starts with
+          // whitespace (a real word boundary). `[[` needs no such gate — it is
+          // punctuation, not a prefix any English word starts with.
+          const matched = state.doc.textBetween(range.from, range.to);
+          const query = matched.slice(NOTE_TRIGGER.length);
+          return query.length === 0 || /^\s/.test(query);
+        },
+        // TRIMMED, UNLIKE THE `[[` PLUGIN ABOVE: `:note co` matches with query
+        // ` co` (a leading space, the same shape `:ticket comp` has in
+        // `ticket-ref.ts`) — `[[co` has no leading space to trim because `[[`
+        // itself carries none of the query's own characters.
+        items: async ({ query }) => (await this.options.queryNotes(query.trim())).slice(0, 8),
         command: ({ editor, range, props }) => {
           editor
             .chain()

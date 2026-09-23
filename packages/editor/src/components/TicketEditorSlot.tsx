@@ -90,6 +90,15 @@ export type EditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  // Ticket-reference capabilities (Plan 7 Task 1), the twin of the block in
+  // `packages/app-core/src/views/editor-slot.tsx`. Same two names and the
+  // same inline shapes ON PURPOSE — see that file's docblock on the
+  // wiki-link four for why: the transcription case in
+  // `test/ticket-editor-slot.test.tsx` compares field names across three
+  // declarations, so adding a prop on one side alone fails a test before it
+  // fails a build.
+  queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   /**
    * Contract-required, and THIS IMPLEMENTATION READS NEITHER — said plainly
    * rather than dressed up as a guarantee. Both scopes arrive already baked
@@ -413,6 +422,10 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         {...(props.onNavigateNote === undefined
           ? {}
           : { onNavigateNote: props.onNavigateNote })}
+        {...(props.queryTickets === undefined ? {} : { queryTickets: props.queryTickets })}
+        {...(props.resolveTicketHref === undefined
+          ? {}
+          : { resolveTicketHref: props.resolveTicketHref })}
         uploadAttachment={uploadOrRefuse}
         // The host owns event emission. Non-image uploads reach the ticket's
         // attachment list the same way — through this event and the ledger —

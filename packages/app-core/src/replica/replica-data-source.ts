@@ -38,10 +38,11 @@ import type {
   NoteListFilter,
   Unsubscribe,
 } from '../data-source.js';
-import { EPIC_RANK, epicAncestorOf } from '../hierarchy/epic-ancestor.js';
+import { EPIC_RANK, epicAncestorOf, type IsEpicType } from '../hierarchy/epic-ancestor.js';
 import { matchesFilter } from '../filter/matches-filter.js';
 import type {
   Actor,
+  BoardCard,
   BoardColumn,
   BoardGroup,
   BoardView,
@@ -859,18 +860,27 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
    * (`read/notes.ts`'s `attachedTicketsByNote`). One spelling for "no key
    * available", on both sides. *Owner: whoever gives the replica project
    * numbers — Plan 3's surface, if anything.*
+   *
+   * `projectId` (notes series, Plan 6 of 7) has no such gap: it is a plain
+   * column of `TicketState` the confirmed ticket already carries, so — unlike
+   * `key` — the replica always answers it, not a fallback.
    */
   async function attachedTicketsOf(
     notes: readonly NoteState[],
-  ): Promise<Map<string, { ticketId: string; key: string; title: string }[]>> {
-    const grouped = new Map<string, { ticketId: string; key: string; title: string }[]>();
+  ): Promise<Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>> {
+    const grouped = new Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>();
     for (const note of notes) {
-      const list: { ticketId: string; key: string; title: string }[] = [];
+      const list: { ticketId: string; projectId: string; key: string; title: string }[] = [];
       for (const ticketId of note.attachedTicketIds) {
         const ticket = await replica.getTicket(ticketId);
         if (ticket === null || ticket.confirmed === null) continue;
         const title = ticket.confirmed.fields['title']?.value;
-        list.push({ ticketId, key: '', title: typeof title === 'string' ? title : '' });
+        list.push({
+          ticketId,
+          projectId: ticket.confirmed.projectId,
+          key: '',
+          title: typeof title === 'string' ? title : '',
+        });
       }
       grouped.set(note.noteId, list);
     }
@@ -880,7 +890,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   /** The domain shape `getNotes` and its siblings answer in. */
   function summariesOf(
     notes: readonly NoteState[],
-    attached: Map<string, { ticketId: string; key: string; title: string }[]>,
+    attached: Map<string, { ticketId: string; projectId: string; key: string; title: string }[]>,
   ): NoteSummary[] {
     return notes.map((note) => ({
       noteId: note.noteId,
@@ -985,6 +995,59 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     if (state.parentId === null) return false;
     if (engine.status() !== 'live') return false;
     return !byId.has(state.parentId);
+  }
+
+  /**
+   * `BoardCard.parent`/`.epic`, offline (owner request, 2026-09-23) —
+   * DELETED-SAFE, unlike `epicAncestorOf` and `confirmedById`'s own `byId`
+   * above, which deliberately keep a deleted ticket reachable for the LIST's
+   * reasons (`confirmedById`'s own docblock a few lines up: pulling a deleted
+   * parent out of `byId` would turn every deleted epic into a
+   * `hasRestrictedParent` on its live children — a DIFFERENT statement than
+   * the true one). The server's board read stops its own walk at a
+   * soft-deleted hop (`ancestryCte`'s `LIVE_TICKET_WHERE` conjunct,
+   * `apps/server/src/read/ancestry.ts`), so a live device must not disagree —
+   * this wrapper re-applies that same check at every hop it takes, which is
+   * why it is a SEPARATE function from `epicAncestorOf` rather than a shared
+   * one: changing that function's own behaviour would move the List too.
+   *
+   * `key: null` on both — the replica holds no workspace or project prefix and
+   * no per-project number, so it cannot compose either badge's key, the same
+   * under-claim every other key on this card already makes (`cardOf`'s own
+   * `key: null`, above). The board's parent badge is therefore never drawn
+   * offline (`board.tsx`'s "a null key draws nothing" rule) — narrower than
+   * the truth, never wrong about it, `epicAncestorOf`'s own rule.
+   */
+  function boardHierarchyOf(
+    state: TicketState,
+    byId: ReadonlyMap<string, TicketState>,
+    isEpicType: IsEpicType,
+  ): { parent: BoardCard['parent']; epic: BoardCard['epic'] } {
+    const isLive = (candidate: TicketState): boolean => (candidate.deleted ?? null) === null;
+
+    let parent: BoardCard['parent'] = null;
+    if (state.parentId !== null) {
+      const parentState = byId.get(state.parentId);
+      if (parentState !== undefined && isLive(parentState)) {
+        parent = { ticketId: state.parentId, key: null };
+      }
+    }
+
+    let epic: BoardCard['epic'] = null;
+    let current: TicketState | undefined = state;
+    const seen = new Set<string>();
+    while (current !== undefined) {
+      if (isEpicType(current.typeId)) {
+        epic = { ticketId: current.id, key: null, title: titleOf(current) };
+        break;
+      }
+      if (current.parentId === null || seen.has(current.id)) break;
+      seen.add(current.id);
+      const next = byId.get(current.parentId);
+      current = next !== undefined && isLive(next) ? next : undefined;
+    }
+
+    return { parent, epic };
   }
 
   async function rowOf(
@@ -1292,6 +1355,15 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       for (const state of inProject) {
         if ((await outbox.pendingFor(state.id)) !== null) pendingIds.add(state.id);
       }
+      // The SAME rank-based `isEpicType` `getTickets` builds, above — the
+      // workspace's own roster, so this device agrees with the server about
+      // which type is an epic exactly, rather than falling back to
+      // `isBuiltinEpicType`'s narrower built-in-id test.
+      const types = await ticketTypesById();
+      const epicTypeIds = new Set(
+        [...types.values()].filter((type) => type.rank === EPIC_RANK).map((type) => type.id),
+      );
+      const isEpicType = (typeId: string): boolean => epicTypeIds.has(typeId);
 
       async function cardOf(state: TicketState) {
         const events = await replica.listEntityEvents(state.id);
@@ -1339,6 +1411,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // under-claim `rollup: null` above makes, for the same reason.
           key: null,
           pending: pendingIds.has(state.id),
+          ...boardHierarchyOf(state, byId, isEpicType),
         };
       }
 

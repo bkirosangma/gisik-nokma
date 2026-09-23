@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { noteDraftKey } from '../src/notes/use-note-autosave.js';
@@ -95,7 +95,7 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
     authorId: 'u_kiro',
     title: 'Compressor log',
     scope: { mode: 'private' },
-    attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+    attachedTickets: [{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }],
     deleted: false,
     createdAt: '2026-09-23T06:00:00.000Z',
     updatedAt: '2026-09-23T06:00:00.000Z',
@@ -105,9 +105,12 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
   };
 }
 
-function world(opts: { note?: NoteDetail; role?: string } = {}) {
+function world(
+  opts: { note?: NoteDetail; role?: string; search?: DataSourceQuery['search'] } = {},
+) {
   const services = stubServices({
     getMyWorkspaces: async () => [{ ...WS_A_REF, role: opts.role ?? 'owner' }],
+    ...(opts.search === undefined ? {} : { search: opts.search }),
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
@@ -199,8 +202,9 @@ describe('18.11 The Notes page — the document', () => {
     expect(await screen.findByText('Kiro')).toBeInTheDocument();
     expect(screen.getByText(/edited/i)).toBeInTheDocument();
     expect(screen.getByTestId('note-scope')).toHaveTextContent('Private');
+    // 18.253 — the canonical sheet path, not the id-only My Work door.
     const badge = screen.getByRole('link', { name: 'Renew the trade licence' });
-    expect(badge).toHaveAttribute('href', `${'/w/' + WS_A}/my-work?ticket=${TICKET}`);
+    expect(badge).toHaveAttribute('href', `/w/${WS_A}/p/${P_COLD}?ticket=${TICKET}`);
     expect(screen.getByTestId('note-reading-time')).toBeInTheDocument();
 
     // The editor, over the loaded body. MUTATION TARGET: an empty `doc` empties
@@ -366,6 +370,43 @@ describe('18.11 The Notes page — the document', () => {
 
     onNavigateNote('01J9NUNKNOWN000000000000000');
     expect(routerPush).toHaveBeenCalledWith('/notes/01J9NUNKNOWN000000000000000');
+  });
+
+  /**
+   * 18.273 — Plan 7 Task 4 (spec §14): the note page supplies the SAME two
+   * ticket-ref callbacks to its editor (this case) and its comment thread
+   * (`note-comments.test.tsx`). Same shape as 18.202's read: `stubSlot`
+   * renders `null` so the closures can be called directly.
+   */
+  it('18.273 supplies queryTickets and resolveTicketHref to the note editor', async () => {
+    stubSlot = true;
+    capturedSlotProps = [];
+    const search = vi.fn(async (_workspaceId: string, _text: string) => [
+      { ticketId: TICKET, projectId: P_COLD, title: 'Renew the trade licence', snippet: '', matchedIn: 'title' as const, key: 'CCSO-1183' },
+    ]);
+    render(
+      <Providers services={world({ search })}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+
+    await waitFor(() => {
+      expect(slotProps().queryTickets).toBeDefined();
+    });
+    const queryTickets = slotProps().queryTickets as (
+      q: string,
+    ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+    const resolveTicketHref = slotProps().resolveTicketHref as (ref: {
+      ticketId: string;
+      projectId: string;
+    }) => string | null;
+
+    const hits = await queryTickets('licence');
+    expect(search).toHaveBeenCalledWith(WS_A, 'licence');
+    expect(hits).toEqual([{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }]);
+    expect(resolveTicketHref({ ticketId: TICKET, projectId: P_COLD })).toBe(
+      `/w/${WS_A}/p/${P_COLD}?ticket=${TICKET}`,
+    );
   });
 
   /**

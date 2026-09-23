@@ -205,3 +205,37 @@ describe('9.281 note-lookup messages', () => {
     expect(parseHostMessage({ bridge: 1, kind: 'noteResults', requestId: 'r1' })).toBeNull();
   });
 });
+
+/**
+ * 9.310 — Plan 7 Task 3 (spec §14.4): the ticket-lookup pair, mirroring
+ * `noteQuery`/`noteResults` above exactly.
+ */
+describe('9.310 ticket-lookup messages', () => {
+  it('9.310 parses ticketResults, serialises ticketQuery, and still refuses an alien kind', () => {
+    const CANDIDATES = [{ ticketId: 't1', projectId: 'p1', key: 'SHOP-7', title: 'Fix the freezer' }];
+    const parsed = parseHostMessage({
+      bridge: 1,
+      kind: 'ticketResults',
+      requestId: 'r1',
+      candidates: CANDIDATES,
+    });
+    expect(parsed).toEqual({
+      bridge: 1,
+      kind: 'ticketResults',
+      requestId: 'r1',
+      candidates: CANDIDATES,
+    });
+
+    expect(
+      JSON.parse(serializeEditorMessage({ bridge: 1, kind: 'ticketQuery', requestId: 'r1', query: 'comp' })),
+    ).toEqual({ bridge: 1, kind: 'ticketQuery', requestId: 'r1', query: 'comp' });
+
+    // THE CONTROL, the same one 9.281 carries: an unknown kind is refused
+    // rather than coerced into a shape a newer or older peer invented.
+    expect(parseHostMessage({ bridge: 1, kind: 'bogus', requestId: 'r1' })).toBeNull();
+
+    // …and a `ticketResults` missing its candidates is refused like every
+    // other per-branch partial message.
+    expect(parseHostMessage({ bridge: 1, kind: 'ticketResults', requestId: 'r1' })).toBeNull();
+  });
+});

@@ -153,6 +153,51 @@ describe('18.213-18.215 NoteComments', () => {
   });
 
   /**
+   * 18.278 — Plan 7 Task 5 (spec §14.3, D28): "the auto-attach fires only when
+   * a TICKET comment is posted" — a note comment tagging a note never implies
+   * an attachment, regardless of what its body references. `submitComment` in
+   * `ticket-sheet.tsx` is the only caller of `attachmentsImpliedBy`
+   * (`packages/app-core/test/views/ticket-sheet-comments.test.tsx` proves ITS
+   * side, cases 18.276–18.277); this proves `NoteComments`' own `submitComment`
+   * never calls it at all — ONE ingest, ever, however many `wikiLink`s the
+   * body carries.
+   *
+   * Mutation: call the helper from `note-comments.tsx` — a second `ingested`
+   * batch (`note.attached`) would appear.
+   */
+  it('18.278 a note comment with a wikiLink never produces note.attached (D28)', async () => {
+    const ingested: SubmittedEvent[] = [];
+    const services = stubServices({ getNoteComments: async () => [] });
+    services.dataSource.ingest = committedIngest(ingested);
+
+    render(
+      <Providers services={services}>
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+      </Providers>,
+    );
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+
+    const submit = slotProps().submit as (submission: { type: string; payload: unknown }) => Promise<boolean>;
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'wikiLink', attrs: { noteId: 'n_other', title: 'Compressor log' } }],
+        },
+      ],
+    };
+    let accepted = false;
+    await act(async () => {
+      accepted = await submit({ type: 'comment.added', payload: { body } });
+    });
+    expect(accepted).toBe(true);
+    // ONE batch, ever — the comment itself, never a second (implied) one.
+    expect(ingested).toHaveLength(1);
+    expect(ingested[0]!.type).toBe('comment.added');
+  });
+
+  /**
    * 18.215 — a reader who is not the author still gets a working composer,
    * and `canComment=false` withholds it entirely.
    *
@@ -189,5 +234,99 @@ describe('18.213-18.215 NoteComments', () => {
     );
     await screen.findByText('No comments yet.');
     expect(capturedSlotProps).toHaveLength(0);
+  });
+
+  /**
+   * 18.273 / 18.274 — Plan 7 Task 4 (spec §14): the note page supplies the
+   * SAME two ticket-ref callbacks to its editor (`note-document.test.tsx`)
+   * and here, to its comment thread — `queryTickets`/`resolveTicketHref` to
+   * the composer, `ticketHref` to `CommentsThread`. 18.274 rides on the same
+   * mount: a real `ticketRef` in a seeded comment renders as a link to the
+   * ticket's page — `CommentsThread` is NOT stubbed in this file, unlike the
+   * composer, so this is the shipped renderer.
+   */
+  it('18.273/18.274 supplies queryTickets/resolveTicketHref to the composer and ticketHref to the thread; a ticketRef chip links to the ticket\'s page', async () => {
+    const search = vi.fn(async (_workspaceId: string, _text: string) => [
+      { ticketId: 't1', projectId: 'p1', title: 'Renew the trade licence', snippet: '', matchedIn: 'title' as const, key: 'CCSO-1183' },
+    ]);
+    const services = stubServices({
+      getNoteComments: async () => [
+        comment({
+          commentId: 'c1',
+          body: {
+            type: 'doc',
+            content: [
+              {
+                type: 'paragraph',
+                content: [
+                  { type: 'text', text: 'see ' },
+                  {
+                    type: 'ticketRef',
+                    attrs: { ticketId: 't1', projectId: 'p1', key: 'CCSO-1183', title: 'Renew the trade licence' },
+                  },
+                ],
+              },
+            ],
+          },
+        }),
+      ],
+      search,
+    });
+
+    render(
+      <Providers services={services}>
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+      </Providers>,
+    );
+
+    // 18.274 — the rendered chip.
+    const link = await screen.findByRole('link', { name: 'CCSO-1183 Renew the trade licence' });
+    expect(link).toHaveAttribute('href', `/w/${WS}/p/p1?ticket=t1`);
+
+    // 18.273 — the composer's own two callbacks.
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    const queryTickets = slotProps().queryTickets as (
+      q: string,
+    ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+    const resolveTicketHref = slotProps().resolveTicketHref as (ref: {
+      ticketId: string;
+      projectId: string;
+    }) => string | null;
+    const hits = await queryTickets('licence');
+    expect(search).toHaveBeenCalledWith(WS, 'licence');
+    expect(hits).toEqual([{ ticketId: 't1', projectId: 'p1', key: 'CCSO-1183', title: 'Renew the trade licence' }]);
+    expect(resolveTicketHref({ ticketId: 't1', projectId: 'p1' })).toBe(`/w/${WS}/p/p1?ticket=t1`);
+  });
+
+  /**
+   * 18.286 — a final-review finding (2026-09-23): `queryTickets`/
+   * `resolveTicketHref` reached this composer (18.273 above), but nothing
+   * ever supplied `queryNotes` — so a real note's OWN comment box could not
+   * type `:note`/`[[` and get a picker at all, the mirror image of the gap
+   * case 18.285 closed on the ticket side. `NoteComments` now takes the
+   * page's already-loaded note list (`note-document.tsx`'s own `treeNotes`,
+   * the SAME array its editor's `queryNotes` filters — no second fetch) and
+   * builds its composer's `queryNotes` from it the same way.
+   */
+  it('18.286 supplies queryNotes to the composer, built from the notes list the page passes, matching by title substring', async () => {
+    const services = stubServices({ getNoteComments: async () => [] });
+    render(
+      <Providers services={services}>
+        <NoteComments
+          workspaceId={WS}
+          noteId={NOTE}
+          nameOf={nameOf}
+          canComment
+          notes={[
+            { noteId: 'n1', title: 'Cold room' },
+            { noteId: 'n2', title: 'Compressor log' },
+          ]}
+        />
+      </Providers>,
+    );
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    const queryNotes = slotProps().queryNotes as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
+    expect(queryNotes).toBeDefined();
+    expect(await queryNotes('compr')).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);
   });
 });

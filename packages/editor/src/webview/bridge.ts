@@ -1,6 +1,7 @@
 import { isDocJson, type DocJson } from '../doc.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
+import type { TicketRefCandidate } from '../extensions/ticket-ref.js';
 
 /** Protocol version — bump only with a coordinated Plan 10 change. */
 export const EDITOR_BRIDGE_VERSION = 1 as const;
@@ -11,6 +12,7 @@ export type HostToEditorMessage =
   | { bridge: 1; kind: 'requestSubmit' }
   | { bridge: 1; kind: 'mentionResults'; requestId: string; users: MentionCandidate[] }
   | { bridge: 1; kind: 'noteResults'; requestId: string; candidates: NoteLinkCandidate[] }
+  | { bridge: 1; kind: 'ticketResults'; requestId: string; candidates: TicketRefCandidate[] }
   | { bridge: 1; kind: 'uploadFailed'; requestId: string; message: string };
 
 export type EditorToHostMessage =
@@ -19,7 +21,8 @@ export type EditorToHostMessage =
   | { bridge: 1; kind: 'submit'; doc: DocJson }
   | { bridge: 1; kind: 'requestUpload'; requestId: string }
   | { bridge: 1; kind: 'mentionQuery'; requestId: string; query: string }
-  | { bridge: 1; kind: 'noteQuery'; requestId: string; query: string };
+  | { bridge: 1; kind: 'noteQuery'; requestId: string; query: string }
+  | { bridge: 1; kind: 'ticketQuery'; requestId: string; query: string };
 
 /**
  * Host messages arrive from outside this process across a channel that can
@@ -143,6 +146,21 @@ export function parseHostMessage(raw: unknown): HostToEditorMessage | null {
           typeof (candidate as { title?: unknown }).title === 'string',
       );
       return { bridge: 1, kind: 'noteResults', requestId: record.requestId, candidates };
+    }
+    // The ticket-lookup batch (spec §14.4, Plan 7 Task 3), mirroring
+    // `noteResults` exactly, four fields instead of two.
+    case 'ticketResults': {
+      if (typeof record.requestId !== 'string' || !Array.isArray(record.candidates)) return null;
+      const candidates = record.candidates.filter(
+        (candidate): candidate is TicketRefCandidate =>
+          candidate !== null &&
+          typeof candidate === 'object' &&
+          typeof (candidate as { ticketId?: unknown }).ticketId === 'string' &&
+          typeof (candidate as { projectId?: unknown }).projectId === 'string' &&
+          typeof (candidate as { key?: unknown }).key === 'string' &&
+          typeof (candidate as { title?: unknown }).title === 'string',
+      );
+      return { bridge: 1, kind: 'ticketResults', requestId: record.requestId, candidates };
     }
     case 'uploadFailed':
       if (typeof record.requestId !== 'string' || typeof record.message !== 'string') return null;

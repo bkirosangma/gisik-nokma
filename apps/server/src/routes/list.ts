@@ -12,7 +12,7 @@ import {
 import type { Queryable } from '../db/queryable.js';
 import type { EffectiveRole } from '../permissions/effective-role.js';
 import { BLOCKED_STATES_CTE, compileFilterSpec } from '../read/compile-filter.js';
-import { EPIC_RANK, MAX_ANCESTRY_DEPTH } from '../read/ancestry.js';
+import { epicAncestors, type EpicOf } from '../read/ancestry.js';
 import { READ_NOT_FOUND_BODY, requireMember, workspaceOfProject } from '../read/membership.js';
 import { assembleListCards } from '../read/list-cards.js';
 import { SqlParams } from '../read/sql-params.js';
@@ -27,17 +27,19 @@ const MAX_LIMIT = 200;
 const NO_EPIC = 'no-epic';
 
 /**
- * `EPIC_RANK` and `MAX_ANCESTRY_DEPTH` were declared here until 2026-09-20 and
- * now live at `read/ancestry.ts`; their own docblocks went with them.
+ * `EPIC_RANK` and `MAX_ANCESTRY_DEPTH` were declared here until 2026-09-20, and
+ * `epicAncestors`/`EpicOf` joined them at `read/ancestry.ts` on 2026-09-23
+ * (owner request, board-card badges) — the board needed the SAME walk for its
+ * epic chip, and `EPIC_RANK`'s own docblock already argued the reason a level
+ * up: "two readers need the same number and they must not each spell it"
+ * applies just as much to the function that reads the number as to the
+ * number itself. Their own docblocks went with them; nothing this route
+ * computes changed, only where the code that computes it lives.
  *
- * ⚠ **THEY WERE CITED IN PROSE BY NAME HERE FOR ONE ROUND AFTER THE MOVE, AND
- * THAT WAS WORSE THAN A STALE LINE NUMBER.** What stood in this spot was two
- * "MOVED to …" notes with no code beneath them — one of them naming
- * `read/epic-rank.ts`, **a module that has never existed** (the file is
- * `read/ancestry.ts`) — so a reader following the signpost reached nothing, and
- * a reader grepping for the old constant found an explanation instead of a
- * definition. A pointer is not a substitute for the thing it points at; the
- * imports below are what actually resolve.
+ * ⚠ A stale "MOVED to …" note with no code beneath it stood in this spot once
+ * before and named a module that never existed — a pointer is not a
+ * substitute for the thing it points at. The import below is what actually
+ * resolves.
  */
 
 export type ListQuery = {
@@ -338,152 +340,6 @@ function bucket(
   return [...buckets.keys()]
     .sort()
     .map((key) => ({ key, label: labelOf(key), cards: buckets.get(key) ?? [] }));
-}
-
-type EpicOf = { epicId: string; title: string };
-
-/**
- * The nearest ancestor-or-self, of each card, whose ticket TYPE carries the epic
- * rank — and which the CALLER may see.
- *
- * ## Why the walk carries the visibility predicate
- *
- * A group's `key` is a ticket id and its `label` is that ticket's title. Both go
- * over the wire. So a walk that climbed the parent chain without asking Plan 4's
- * question would take a caller who may see a child, and hand them the id and the
- * TITLE of an ancestor they may not — a disclosure through the arrangement of
- * data rather than through the data itself.
- *
- * That shape is reachable and it is seeded: `proj_visibility` resolves a ticket's
- * audience from its OWN claim when it has one, so a child that authors
- * `explicit: [owner, member]` under a parent that authored `explicit: [owner]` is
- * an ordinary ledger, not a corruption. The planted-defect case pins it in both
- * directions — the member gets `no-epic`, the owner gets the epic as a key with
- * its title as the label.
- *
- * The predicate is `visibleTicketsWhere` again, the SAME expression the page
- * query uses, evaluated once and spliced into both the seed and the recursive
- * term of the CTE. Consumed, not re-expressed: one SQL statement of the decision
- * table remains on this branch.
- *
- * An invisible link therefore STOPS the walk rather than being climbed over.
- * That is deliberate: skipping past it to a visible grandparent would report a
- * grouping whose reason the caller cannot see, and it would leak the fact that
- * the chain continues. `no-epic` is what a caller who cannot see the answer gets.
- *
- * Recorded rather than decided here: the house style elsewhere for "there is
- * something you may not see" is `rollupFor`'s `restrictedCount`, which counts
- * without naming. A distinct `restricted-epic` bucket would carry that
- * information here too, and it is a product decision about a response shape
- * Plan 5's contract already pins — filed against the plan's Open questions,
- * owner to rule.
- *
- * ## Tenancy, and which of these clauses can be falsified
- *
- * `t.workspace_id` is bound in all three places for the reason `readList` gives
- * for its own copy, and with the same honesty: ruling P12's parent guard refuses
- * a `ticket.created` whose parent sits in another workspace, so no reachable
- * ledger produces a cross-tenancy parent link and NO TEST HERE CAN REDDEN by
- * deleting the clause from the recursive term. It stays because it costs one
- * already-bound parameter and because this walk is the one query that must not
- * follow such a link on the day one exists.
- *
- * The depth cap is termination, not policy: `reResolveSubtree` documents that
- * nothing on this branch refuses a cycle-creating reparent (case 6.58), and a
- * `WITH RECURSIVE` over a cyclic parent graph does not stop on its own.
- *
- * ## The title comes out of this query, not a second one
- *
- * The plan's `epicTitles` was a separate `WHERE ticket_id = ANY(...)` read with
- * no workspace clause and no visibility clause — a second door into the same
- * table, reached with ids the first door produced. Folding the title into the
- * walk means the only rows whose titles this route can print are rows this
- * predicate already admitted.
- *
- * A NULL title THROWS, for the reason `assembleTicketCards` throws: every
- * `ticket.created` writes `fields.title`, so its absence means `proj_tickets` and
- * the ledger disagree, and `''` would sit exactly where a real title goes. No
- * test constrains that throw — the door cannot produce the row — and it is
- * reported as unconstrained rather than left looking covered.
- */
-async function epicAncestors(
-  db: Queryable,
-  eff: EffectiveRole,
-  viewerId: string,
-  workspaceId: string,
-  ticketIds: string[],
-): Promise<Map<string, EpicOf>> {
-  if (ticketIds.length === 0) {
-    return new Map();
-  }
-
-  const params = new SqlParams();
-  const workspaceParam = params.add(workspaceId);
-  const idsParam = params.add(ticketIds);
-  // ONE evaluation, spliced twice. Calling it twice would bind the same values a
-  // second time for no reason; the `$n` placeholders it returns address the same
-  // parameters wherever they appear.
-  const visible = visibleTicketsWhere(eff, viewerId, params);
-  // THE SOFT-DELETE PREDICATE IS ON THE RECURSIVE MEMBER, and a deleted
-  // ancestor ends the walk exactly as an invisible one does: the children fall
-  // to `no-epic`, and the title never leaves the query (round-2 E6-11). This
-  // paragraph used to call that an open question — the cascade ruling, "named,
-  // not decided" — and it was decided in the same commit at the neighbouring
-  // door: `routes/tickets.ts` answers `restricted` for a deleted PARENT because
-  // *"the parent's TITLE is the deleted ticket's content, and the FAQ's 'stops
-  // appearing in views' is exactly a statement about content"*, and search
-  // withholds it too. The list was the one door of four still serving it — and
-  // in the group HEADER (`titleOfEpic`, the `case 'epic'` label), not on the
-  // card, which carries only `epicId` (`read/list-cards.ts`). The seed term
-  // needs no copy of it: its rows are the page's own cards, which `readList`
-  // already ANDs `LIVE_TICKET_WHERE` into.
-  //
-  // WHAT REMAINS OPEN, and it is the same question the docblock above already
-  // files: whether a deleted (or invisible) ancestor should be a DISTINCT
-  // `restricted-epic` bucket rather than `no-epic` is a response-shape decision
-  // Plan 5's contract pins — owner to rule. Nothing here pre-empts it.
-  const depthParam = params.add(MAX_ANCESTRY_DEPTH);
-  const rankParam = params.add(EPIC_RANK);
-
-  const { rows } = await db.query<{ start_id: string; epic_id: string; title: string | null }>(
-    `WITH RECURSIVE ancestry AS (
-       SELECT t.ticket_id AS start_id, t.ticket_id, t.parent_id, t.type_id, t.fields, 0 AS depth
-         FROM proj_tickets t
-         JOIN proj_visibility v ON v.ticket_id = t.ticket_id
-        WHERE t.workspace_id = ${workspaceParam}
-          AND t.ticket_id = ANY (${idsParam}::text[])
-          AND ${visible}
-       UNION ALL
-       SELECT a.start_id, t.ticket_id, t.parent_id, t.type_id, t.fields, a.depth + 1
-         FROM ancestry a
-         JOIN proj_tickets t ON t.ticket_id = a.parent_id
-         JOIN proj_visibility v ON v.ticket_id = t.ticket_id
-        WHERE t.workspace_id = ${workspaceParam}
-          AND a.depth < ${depthParam}
-          AND ${visible}
-          AND ${LIVE_TICKET_WHERE}
-     )
-     SELECT DISTINCT ON (start_id)
-            start_id, ticket_id AS epic_id, fields -> 'title' ->> 'value' AS title
-       FROM ancestry
-      WHERE type_id IN (
-            SELECT type_id FROM proj_ticket_types
-             WHERE workspace_id = ${workspaceParam} AND rank = ${rankParam}
-          )
-      ORDER BY start_id, depth`,
-    params.toArray(),
-  );
-
-  const epics = new Map<string, EpicOf>();
-  for (const row of rows) {
-    if (row.title === null) {
-      throw new Error(
-        `readList: no title claim on epic ${row.epic_id} — every ticket.created writes one, so proj_tickets and the ledger disagree`,
-      );
-    }
-    epics.set(row.start_id, { epicId: row.epic_id, title: row.title });
-  }
-  return epics;
 }
 
 /**

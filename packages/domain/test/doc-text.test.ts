@@ -139,4 +139,31 @@ describe('docToPlainText', () => {
     ] };
     expect(docToPlainText(v2doc)).toBe('buy milk\ncall CA\nWhy\nbecause\nsee Cold room');
   });
+
+  /**
+   * 9.311 — spec §14.2, Plan 7 Task 1's `ticketRef` node: contributes `KEY
+   * title`, never `ticketId` — the id is what the editor navigates by, the
+   * key and title are what a person read, the same rule the wiki-link node
+   * follows for its own id. Control in the same `it`: a node with no `key`
+   * (a malformed document — every real insertion supplies one) falls back to
+   * the stored title alone, so a missing key never glues an empty string to
+   * the front.
+   */
+  it('9.311 ticketRef contributes "KEY title"; a missing key falls back to the title', () => {
+    expect(
+      docToPlainText(
+        doc(
+          p(
+            text('see '),
+            { type: 'ticketRef', attrs: { ticketId: 't2', projectId: 'p1', key: 'SHOP-8', title: 'Compressor log' } },
+          ),
+        ),
+      ),
+    ).toBe('see SHOP-8 Compressor log');
+    expect(
+      docToPlainText(
+        doc(p({ type: 'ticketRef', attrs: { ticketId: 't2', projectId: 'p1', title: 'Compressor log' } })),
+      ),
+    ).toBe('Compressor log');
+  });
 });

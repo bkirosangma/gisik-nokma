@@ -96,6 +96,18 @@ function render(node: unknown, depth: number): string {
     ) as { title?: unknown };
     return typeof attrs.title === 'string' ? attrs.title : '';
   }
+  // A ticket reference (spec §14.2, Plan 7 Task 1) contributes `KEY title`,
+  // never its ticketId — the same rule the wiki-link branch above follows for
+  // its own id. A missing key falls back to the title alone rather than
+  // gluing an empty string onto the front of it.
+  if (candidate.type === 'ticketRef') {
+    const attrs = (
+      typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
+    ) as { key?: unknown; title?: unknown };
+    const key = typeof attrs.key === 'string' ? attrs.key : '';
+    const title = typeof attrs.title === 'string' ? attrs.title : '';
+    return key.length > 0 ? `${key} ${title}` : title;
+  }
   const children = Array.isArray(candidate.content)
     ? candidate.content.map((child) => render(child, depth + 1)).join('')
     : '';

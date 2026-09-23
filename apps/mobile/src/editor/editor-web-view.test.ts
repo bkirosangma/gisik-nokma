@@ -33,6 +33,12 @@ describe('editor bridge protocol — host side', () => {
         requestId: 'r2',
         candidates: [{ noteId: 'n1', title: 'Cold room' }],
       },
+      ticketResults: {
+        bridge: 1,
+        kind: 'ticketResults',
+        requestId: 'r3',
+        candidates: [{ ticketId: 't1', projectId: 'p1', key: 'SHOP-7', title: 'Fix the freezer' }],
+      },
       uploadFailed: { bridge: 1, kind: 'uploadFailed', requestId: 'r1', message: 'boom' },
     };
     const messages: HostToEditorMessage[] = [

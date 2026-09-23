@@ -2377,7 +2377,9 @@ card had nothing to compose one from. `TicketCard.key: string | null` now travel
 route, composed by `assembleTicketCards` from the three ledger facts the single-ticket read already uses for
 its crumb — workspace prefix, project prefix, per-project number — batched per workspace; `null` when any is
 missing, never a partial key. The offline replica answers `null` (it holds no prefixes). The card draws a
-meta line under the chips, key first, then the due label with its late tone; the due half keeps the product's
+keys row under the chips, key first, then the due label with its late tone — **superseded 2026-09-23 by
+`task/board-card-badges`: the row now reads `[parent key badge] key [priority badge] · <due>`, see
+`13.1237`–`13.1238`/`13.1281`'s own "Superseded in place" notes below** — the due half keeps the product's
 one date formatter rather than the prototype's `Due 19 Oct` (ruling E5-2). The list row gets no key here.
 `apps/server/src/read/ticket-cards.ts`, `packages/domain/src/read-models.ts`,
 `packages/app-core/src/{view-types.ts,online/mappers.ts,replica/replica-data-source.ts,views/board.tsx}`.
@@ -2390,10 +2392,13 @@ one date formatter rather than the prototype's `Due 19 Oct` (ruling E5-2). The l
   missing, and the full key only when all three are present. `apps/server/test/read/ticket-cards.test.ts`.
 - **13.1280** ✅ `mapBoardView` carries the key, keeps `null`, and REFUSES an absent key as a mapping error
   naming `.key`. `packages/app-core/test/online/mappers.test.ts`.
-- **13.1281** ✅ The card's meta line reads `KEY · <due>` with the key first and the due span keeping its class;
-  CONTROL — a `null` key draws the due label alone with no separator; CONTROL — a key with no due date draws
-  the key alone. `packages/app-core/test/views/board.test.tsx`. The real-door round trip asserts `RTSF-1` /
-  `RTSF-2` on the attention and board bodies (`apps/server/test/integration/real-door-round-trip.test.ts`).
+- **13.1281** ✅ The card's KEYS ROW reads `KEY P<n> · <due>` — key first, then the (always-present) priority
+  badge's text, then the due label with its separator; CONTROL — a `null` key draws the priority badge and the
+  due label with no key and no placeholder; CONTROL — a key with no due date draws the key and the priority
+  badge with no due separator. `packages/app-core/test/views/board.test.tsx`. The real-door round trip asserts
+  `RTSF-1` / `RTSF-2` on the attention and board bodies (`apps/server/test/integration/real-door-round-trip.test.ts`).
+  **Superseded in place 2026-09-23 by `task/board-card-badges` (`13.1451`–`13.1466`); previously: the meta line
+  read `KEY · <due>` alone, with no priority badge sharing the row.**
 
 ### Go-live day (2026-09-22): two defects the first production boot found — cases `13.1282`–`13.1283`
 
@@ -2440,13 +2445,19 @@ contract across a boundary was run at Node v22.22.2 and is green — `packages/e
 
 - **13.1237** ✅ The board card draws the priority badge with the claimant as its `title` — the same
   `'s claim` sentence the due label and every sheet claim line use — and `P1` carries
-  `gn-board-card__priority--p1`, the danger tone the late due label takes on the same measured pair. —
-  `packages/app-core/test/views/board.test.tsx`
-- **13.1238** ✅ CONTROL — `P2` and `P3` are drawn WITHOUT the tone, and the badge is on EVERY card: two
-  cards, two badges. **There is no absence arm to test** and that is the case's point — P2 is the birth
-  default, so a card without a level is not a state this product has; a one-armed assertion would be
-  satisfied by a tone that is always on and by one that is never on alike. —
-  `packages/app-core/test/views/board.test.tsx`
+  `gn-board-card__priority--p1`, the danger tone the late due label takes on the same measured pair, with a
+  fire-icon `<svg>` as the badge's own first element child (`aria-hidden="true"`), left of the `P1` text. —
+  `packages/app-core/test/views/board.test.tsx`. **Superseded in place 2026-09-23 by `task/board-card-badges`
+  (`13.1451`–`13.1466`); previously: no icon assertion — only the danger-tone class and the `title` were
+  pinned.**
+- **13.1238** ✅ CONTROL — `P2` and `P3` each carry their OWN distinct modifier class and their OWN icon,
+  never `P1`'s: `--p2`/`--p3` present, `--p1` absent from either, and both badges hold a drawn `<svg>`; the
+  badge is on EVERY card — two cards, two badges. **There is no absence arm to test** and that is still the
+  case's point — P2 is the birth default, so a card without a level is not a state this product has; a
+  one-armed assertion would be satisfied by a tone that is always on and by one that is never on alike. —
+  `packages/app-core/test/views/board.test.tsx`. **Superseded in place 2026-09-23 by `task/board-card-badges`
+  (`13.1451`–`13.1466`); previously: `P2` and `P3` were drawn WITHOUT any tone at all — plain muted text, no
+  icon, no modifier class distinguishing one level from the other.**
 
 ## The project head row arranged as the prototype's two rows (owner, 2026-09-22)
 

@@ -55,6 +55,25 @@ export function StateNode(props: NodeProps) {
         />
         <span>Blocked</span>
       </label>
+      <label className="gn-state-node__creatable">
+        <input
+          type="checkbox"
+          aria-label="Tickets can start here"
+          className="nodrag"
+          disabled={!canAuthor || data.category === 'terminal' || data.isInitial}
+          title={
+            data.category === 'terminal'
+              ? "A done state can't be a starting status"
+              : data.isInitial
+                ? 'The start state always allows new tickets'
+                : undefined
+          }
+          checked={data.creatable}
+          onClick={(mouseEvent) => mouseEvent.stopPropagation()}
+          onChange={(changeEvent) => store.actions.setStateCreatable(data.stateId, changeEvent.target.checked)}
+        />
+        <span>Tickets can start here</span>
+      </label>
       <Handle type="source" position={Position.Right} isConnectable={canAuthor} />
     </div>
   );

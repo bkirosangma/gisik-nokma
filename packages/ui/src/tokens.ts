@@ -663,6 +663,93 @@ export const primitives = {
   labelWarmDark: '#f2e9e1',
   onColorWarmLight: '#fbf7f3',
   onColorWarmDark: '#141a2e',
+
+  /**
+   * ## The priority card tint (owner request, 2026-09-23: "the entire card
+   * surface is tinted by priority")
+   *
+   * Eight primitives: an ALPHA wash per priority per theme, plus two new
+   * SOLID inks for P3 (P1/P2 reuse the existing `danger`/`success` roles for
+   * ink — see `TOKEN_ROLES`'s `priorityP1Tint`/`priorityP2Tint`/`priorityP3`
+   * docblock for the role-level picture).
+   *
+   * **This reopens a refusal on record, and the reopening is authorised,
+   * not accidental.** `ui.css` (the `.gn-visibility__standing-mode` block)
+   * says outright: "this product has no tint role for [a danger/success
+   * wash]... inventing one would be adding a token on a STYLING TASK's
+   * authority." That refusal was about a styling task reaching for a colour
+   * nobody asked for; this one is the owner's own explicit request, named
+   * and dated, so the reason the refusal gave does not apply. The tokens
+   * below are named `priorityTintP1`/`priorityTintP2` rather than a general
+   * `tintDanger`/`tintSuccess` for exactly that reason: scoped to what was
+   * asked, not a general-purpose wash a later styling task could reach for
+   * on ITS OWN authority.
+   *
+   * ## Alpha, hue and the method
+   *
+   * ALPHA 0.05 (byte `0x0d`) for all three, all four theme×priority
+   * combinations — one weight, so the three read as one system rather than
+   * three independent decisions. The HUE is the corresponding ink's own
+   * primitive: `red600`/`red300` for P1 (danger family), `green700`/`green300`
+   * for P2 (success family) — literally "reuses the … family", not merely a
+   * similar colour — and the two NEW `priorityInkP3*` hexes below for P3, a
+   * cyan-leaning blue chosen to read as "frozen" and to stay visually distinct
+   * from `accent`/`textAccent` (`blue600`/`blue300`), which already carries
+   * the product's link/button meaning.
+   *
+   * Measured exactly as `packages/ui/test/tokens.test.ts`'s own
+   * `relativeLuminance`/`contrastRatio`/`over` helpers compute it (a
+   * throwaway script mirroring them line for line, `over(tint, groundBySt‑
+   * yle)`), against BOTH grounds a tinted card can sit on — `warmRaised`
+   * (hig/minimal light) and `neoPaper` (neo light); `navyRaised`
+   * (hig/minimal dark) and `neoNavyRaised` (neo dark) — for every foreground
+   * a tinted card actually draws: the priority ink itself, `text`,
+   * `textMuted`, and the THIRD-LEVEL composite `textAccent` on `fillTertiary`
+   * (the move-arrows' ghost buttons, `.gn-board-card__move`) over the SAME
+   * wash. All twelve combinations (3 priorities × 2 themes × 2 style
+   * grounds) clear 4.5; the worst of each is cited below, at 0.05:
+   *
+   * - **P1** (hue `red600`/`red300`): light hig/minimal ink **4.605**
+   *   (text 11.950, muted 9.358, ghost 5.468), light neo ink 5.754; dark
+   *   hig/minimal ink **4.759** (text 11.197, muted 11.335, ghost 5.110),
+   *   dark neo ink 5.116.
+   * - **P2** (hue `green700`/`green300`): light hig/minimal ink **4.748**
+   *   (text 12.283, muted 9.619, ghost 5.607), light neo ink 5.399; dark
+   *   hig/minimal ink 7.032 (ghost **4.949**, the tightest P2 number), dark
+   *   neo ink 7.678.
+   * - **P3** (new hue, below): light hig/minimal ink 5.248, light neo ink
+   *   **4.719** (the tightest P3 number; text 10.988, muted 8.605, ghost
+   *   5.414); dark hig/minimal ink 7.813 (ghost **4.854**), dark neo ink
+   *   8.544.
+   *
+   * No `STYLE_COLOR_OVERRIDES` entry: the tint's HUE does not vary by style
+   * (unlike `danger`/`success` themselves, which already do) — only the
+   * ground it composites against does, which is exactly what the twelve
+   * combinations above measure. A future reader who wants `neo`'s own
+   * tinted-card hue to match `neoLightDanger`/`neoLightSuccess` exactly is
+   * free to add one; nothing here forecloses it, and today's margins (worst
+   * 4.605) are not so tight that hig/minimal's shared value is fragile.
+   */
+  priorityTintP1Light: '#d700150d',
+  priorityTintP1Dark: '#ff69610d',
+  priorityTintP2Light: '#1e7a340d',
+  priorityTintP2Dark: '#30db5b0d',
+  /**
+   * P3's ink — DERIVED, not exported from anywhere, the same standing
+   * `textAccentLight`/`textAccentDark` and `textSubtleLight`/`textSubtleDark`
+   * already have in this file: a colour this product needs that no prototype
+   * export supplies. Chosen for hue distance from `accent`
+   * (`blue600`/`blue300`, roughly 211° in HSL) — this sits nearer 190-195°,
+   * cyan-leaning rather than violet-leaning, which is what reads as "icy"
+   * beside the product's own blue rather than as a duller copy of it.
+   * Measured worst-case ratios are cited on `priorityTintP1Light`'s own
+   * docblock above (the P3 bullet); both clear 4.5 with the SAME margin
+   * discipline the other two priorities are held to.
+   */
+  priorityInkP3Light: '#146b8a',
+  priorityInkP3Dark: '#7ad8f5',
+  priorityTintP3Light: '#146b8a0d',
+  priorityTintP3Dark: '#7ad8f50d',
 } as const;
 
 export type PrimitiveName = keyof typeof primitives;
@@ -821,6 +908,36 @@ export const TOKEN_ROLES = [
    * that wants them apart moves this line, not every call site.
    */
   'customMarker',
+  /**
+   * ## The priority card tint + P3's ink (owner request, 2026-09-23)
+   *
+   * Four roles, not three: `priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint`
+   * are the alpha washes `ui.css`'s `.gn-board-card--p1`/`--p2`/`--p3`
+   * composite over `surfaceRaised`; `priorityP3` is a SOLID ink role, the P3
+   * badge/icon colour, sitting in the SAME family as `danger`/`success` —
+   * which is why P1 and P2 need no ink role of their own here: their badges
+   * already draw `danger`/`success` directly, "reuses the … family" in the
+   * literal sense.
+   *
+   * `priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint` are ALPHA, so — the
+   * same rule `tintWarning` above is held to — **no `CONTRAST_PAIRS` row may
+   * name one of them**: `relativeLuminance` ignores alpha, and a declared
+   * pair would measure the wash's own colour against a background it is
+   * actually blended INTO. The obligation is against the COMPOSITE, proven in
+   * `tokens.test.ts`'s own describe block for these three roles, mirroring
+   * the shape its `tintWarning composites legibly…` block already uses.
+   *
+   * `priorityP3` (solid) COULD be named in `CONTRAST_PAIRS` against a plain
+   * surface, but is deliberately NOT: a P3 badge only ever renders on a
+   * P3-tinted card (every card is tinted by ITS OWN priority), so the
+   * obligation that matters is the same composite check the tint roles
+   * already need — a plain-surface pairing would assert a guarantee nothing
+   * on screen relies on.
+   */
+  'priorityP1Tint',
+  'priorityP2Tint',
+  'priorityP3Tint',
+  'priorityP3',
 ] as const;
 
 export type TokenRole = (typeof TOKEN_ROLES)[number];
@@ -868,6 +985,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     restricted: 'violet600',
     contested: 'magenta600',
     customMarker: 'violet600',
+    priorityP1Tint: 'priorityTintP1Light',
+    priorityP2Tint: 'priorityTintP2Light',
+    priorityP3Tint: 'priorityTintP3Light',
+    priorityP3: 'priorityInkP3Light',
   },
   dark: {
     surface: 'navyBase',
@@ -905,6 +1026,10 @@ export const themes: Record<ThemeName, Record<TokenRole, PrimitiveName>> = {
     restricted: 'violet300',
     contested: 'magenta300',
     customMarker: 'violet300',
+    priorityP1Tint: 'priorityTintP1Dark',
+    priorityP2Tint: 'priorityTintP2Dark',
+    priorityP3Tint: 'priorityTintP3Dark',
+    priorityP3: 'priorityInkP3Dark',
   },
 };
 

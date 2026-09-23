@@ -638,6 +638,27 @@
   z-index: 50;
 }
 
+/* The ticket-ref chip and its `:ticket` picker (spec §14, Plan 7 Task 1).
+   Structure only, like every block above: this file names no colour. */
+.editor-ticketref { overflow-wrap: anywhere; }
+.ticketref-popup {
+  background: Canvas;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  padding: 4px;
+  z-index: 50;
+}
+.ticketref-popup__list { display: flex; flex-direction: column; }
+.ticketref-popup__item { padding: 4px 8px; cursor: pointer; }
+.ticketref-popup__item--selected { outline: 2px solid currentColor; }
+.ticketref-popup__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+}
+
 /* The reading rail (spec §8.2, Plan 4 Task 7). Structure only, like everything
    above — and NO width rule: the source gated on a 1100px viewport inside the
    component, and the port moved that decision out to the page, because a

@@ -30,6 +30,7 @@ describe('toFlowGraph', () => {
       category: 'active',
       blocked: true,
       isInitial: false,
+      creatable: true,
     });
     const start = nodes.find((node) => node.id === 's:later')!;
     expect(start.data).toMatchObject({ blocked: false, isInitial: true });
