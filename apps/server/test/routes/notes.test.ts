@@ -171,8 +171,11 @@ describe('18.031 one 404 for unreadable and absent', () => {
     });
     expect(readable.statusCode).toBe(200);
     expect(readable.json().note.noteId).toBe(N.nPrivate);
-    // The detail read carries the body and its schema version.
-    expect(readable.json().note.schemaVersion).toBe(1);
+    // The detail read carries the body and its schema version. This note's
+    // `note.created` names no body, so the body is the reducer's `EMPTY_NOTE_DOC`
+    // and the version is THAT document's `attrs.schemaVersion`, which follows
+    // `DOC_SCHEMA_VERSION` (2 since Plan 4 of the notes series).
+    expect(readable.json().note.schemaVersion).toBe(2);
   });
 });
 
