@@ -607,6 +607,37 @@ function mapAssignee(raw: unknown, path: string, roster: ReadonlyMap<string, str
   return { id, name: roster.get(id) ?? id };
 }
 
+/**
+ * `BoardCard.parent`/`BoardCard.epic`'s own wire shape, both `{ ticketId, key
+ * }`-or-`null` (epic adds `title`) — see those fields' own docblocks
+ * (`view-types.ts`) for why NEITHER carries an existence leak the way
+ * `ParentRef.restricted` does: an ABSENT key here is a body this client
+ * cannot read (`asRecord`/`asString` refuse it), never a silent `undefined`,
+ * which is the same "a missing field is a refusal" rule every other required
+ * field on this card already keeps.
+ */
+function mapBoardParent(raw: unknown, path: string): { ticketId: string; key: string | null } | null {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  return {
+    ticketId: asString(record['ticketId'], `${path}.ticketId`),
+    key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
+  };
+}
+
+function mapBoardEpic(
+  raw: unknown,
+  path: string,
+): { ticketId: string; key: string | null; title: string } | null {
+  if (raw === null) return null;
+  const record = asRecord(raw, path);
+  return {
+    ticketId: asString(record['ticketId'], `${path}.ticketId`),
+    key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
+    title: asString(record['title'], `${path}.title`),
+  };
+}
+
 function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, string>): BoardCard {
   const record = asRecord(raw, path);
   const provenancePath = `${path}.stateProvenance`;
@@ -633,6 +664,8 @@ function mapBoardCard(raw: unknown, path: string, roster: ReadonlyMap<string, st
     // refuses it, so a forgotten field cannot pass as a prefix-less workspace.
     key: record['key'] === null ? null : asString(record['key'], `${path}.key`),
     pending: false,
+    parent: mapBoardParent(record['parent'], `${path}.parent`),
+    epic: mapBoardEpic(record['epic'], `${path}.epic`),
   };
 }
 
