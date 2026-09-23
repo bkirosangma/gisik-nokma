@@ -1465,6 +1465,12 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   from the spec's wording rather than an omission: `editor.css`'s header forbids every colour form and
   packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
   a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
+- ✅ **Markdown in and out** — pasting plain text that looks like Markdown converts it (a clipboard carrying
+  `text/html` is left to the default handler); copying formatted content puts Markdown in the PLAIN-TEXT
+  clipboard flavour only; `exportMarkdown` renders a whole document through the editor's own schema.
+  Ported from the knowledge-base app, with `data-raw-block` dropped (§8.7) and the note-link form re-keyed
+  to `[[title]]`. `packages/editor/src/markdown/serializer.ts`,
+  `packages/editor/src/extensions/markdown-clipboard.ts`
 - ✅ **Code blocks carry a Copy button, and the toolbar gained three controls** — the strip keeps the
   prototype's six (`B i code link list quote`) and appends Task item, Code block and Collapsible. The
   code block's node view keeps its name (`codeBlock`) and its two input rules, so the document is

@@ -16,6 +16,7 @@ import {
 import { VersionedDocument } from './versioned-document.js';
 import { CodeBlockWithCopy } from '../extensions/code-block-copy.js';
 import { Collapsible } from '../extensions/collapsible.js';
+import { MarkdownClipboard } from '../extensions/markdown-clipboard.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
 import { WikiLink, type NoteLinkCandidate } from '../extensions/wiki-link.js';
@@ -294,5 +295,9 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // does not extend to the two paste-rule tests in test/schema.test.ts —
     // this extension owns the typed (input-rule) trigger table only.
     EscapeSuggestion,
+    // Markdown on the clipboard (Plan 4 Task 6). An `Extension` with no node
+    // and no rule of its own — two `editorProps` handlers — so it moves
+    // neither census and adds nothing to the schema vocabulary.
+    MarkdownClipboard,
   ];
 }
