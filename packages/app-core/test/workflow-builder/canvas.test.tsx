@@ -159,6 +159,69 @@ describe('WorkflowCanvas', () => {
   });
 
   /**
+   * 10.134 — starting-status design (2026-09-23): unchecking "Tickets can start here" writes `creatable: false` on the state.
+   */
+  it('unchecking "Tickets can start here" writes creatable: false on the state', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    renderCanvas(store);
+    await user.click(
+      within(screen.getByTestId('state-node-next')).getByRole('checkbox', { name: 'Tickets can start here' }),
+    );
+    expect(store.getState().def.states.find((state) => state.id === 'next')?.creatable).toBe(false);
+  });
+
+  /**
+   * 10.135 — re-checking "Tickets can start here" removes the key rather than storing creatable: true, mirroring the blocked checkbox's own asymmetry (10.3).
+   */
+  it('re-checking "Tickets can start here" removes the creatable key rather than storing true', async () => {
+    const user = userEvent.setup();
+    const store = createDraftStore(draftFromTemplate(errand));
+    store.actions.setStateCreatable('next', false);
+    renderCanvas(store);
+    await user.click(
+      within(screen.getByTestId('state-node-next')).getByRole('checkbox', { name: 'Tickets can start here' }),
+    );
+    expect('creatable' in (store.getState().def.states.find((state) => state.id === 'next') ?? {})).toBe(false);
+  });
+
+  /**
+   * 10.136 — "Tickets can start here" is disabled, with a title, on a terminal state — a done state can never be a starting status regardless of the flag.
+   */
+  it('disables "Tickets can start here" on a terminal state, with an explanatory title', () => {
+    renderCanvas(createDraftStore(draftFromTemplate(errand)));
+    const checkbox = within(screen.getByTestId('state-node-done')).getByRole('checkbox', {
+      name: 'Tickets can start here',
+    });
+    expect(checkbox).toBeDisabled();
+    expect(checkbox).toHaveAttribute('title', "A done state can't be a starting status");
+  });
+
+  /**
+   * 10.137 — "Tickets can start here" is disabled, with a title, on the workflow's start state — it always allows new tickets.
+   */
+  it('disables "Tickets can start here" on the start state, with an explanatory title', () => {
+    renderCanvas(createDraftStore(draftFromTemplate(errand)));
+    const checkbox = within(screen.getByTestId('state-node-later')).getByRole('checkbox', {
+      name: 'Tickets can start here',
+    });
+    expect(checkbox).toBeDisabled();
+    expect(checkbox).toHaveAttribute('title', 'The start state always allows new tickets');
+  });
+
+  /**
+   * 10.138 — control for 10.136/10.137: an open, non-start state's "Tickets can start here" checkbox is enabled and carries no title. Without this, a checkbox disabled for EVERY state would satisfy both cases above.
+   */
+  it('control: "Tickets can start here" is enabled and untitled on an open, non-start state', () => {
+    renderCanvas(createDraftStore(draftFromTemplate(errand)));
+    const checkbox = within(screen.getByTestId('state-node-next')).getByRole('checkbox', {
+      name: 'Tickets can start here',
+    });
+    expect(checkbox).toBeEnabled();
+    expect(checkbox).not.toHaveAttribute('title');
+  });
+
+  /**
    * 10.8 — click node/edge to select; inspectors follow the selection.
    */
   it('selects a state on click', async () => {
