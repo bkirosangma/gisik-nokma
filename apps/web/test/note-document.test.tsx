@@ -558,3 +558,30 @@ describe('History → Restore reaches the live editor, not just the server recor
     expect(editor.querySelector('.ProseMirror')?.textContent ?? '').not.toContain('the current words');
   });
 });
+
+/**
+ * 13.1488 — clicking the padded empty area below short text focuses the
+ * editor (owner, 2026-09-23: the notes page should "feel like its a note" —
+ * `.gn-notes__editor`'s own `min-height`, `globals.css`, is the OTHER half of
+ * this request). The wrapper `<div className="gn-notes__editor" ...>` is the
+ * click target this reuses — a click landing INSIDE the editor's own content
+ * never reaches this handler (`event.target !== event.currentTarget`), so
+ * ProseMirror's own click-to-position-caret behaviour is untouched; this is
+ * for the empty space the `min-height` adds, which has nothing else to catch
+ * the click.
+ */
+describe('13.1488 clicking below the text focuses the editor', () => {
+  /** MUTATION TARGET: drop the wrapper's onClick handler. */
+  it('a click on the wrapper itself (not the editor content) focuses the editor', async () => {
+    renderDocument();
+    const wrapper = await screen.findByTestId('note-editor');
+    // SCOPED to the wrapper: a second `TicketEditorSlot` (the comment
+    // composer, mode: 'comment') mounts elsewhere on this same page.
+    const textbox = await within(wrapper).findByRole('textbox');
+    expect(textbox).not.toHaveFocus(); // CONTROL: not focused before the click.
+
+    fireEvent.click(wrapper);
+
+    await waitFor(() => expect(textbox).toHaveFocus());
+  });
+});
