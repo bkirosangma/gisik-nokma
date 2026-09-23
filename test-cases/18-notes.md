@@ -11,6 +11,7 @@ in the table below. Take from your block, never from the tip.
 | Plan | Block |
 |---|---|
 | 1 Backend core | `18.001`–`18.060` — **minted: `18.001`–`18.042`**, so the next plan takes the table's next row or continues at `18.043` if it is drawn from this block |
+| 3 Search | `18.121`–`18.180` |
 
 **Write cases as `- ❌ **18.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -80,3 +81,11 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.040 — download of a note-owned attachment is 200 for a reader and 404 for a non-reader** (same body as an unknown id). Mutation: authorise by ticket only.
 - ✅ **18.041 — a request naming both `ticketId` and `noteId`, or neither, is 400.** Mutation: prefer `ticketId` silently.
 - ✅ **18.042 — `note.created` refuses a `homeProjectId` no project was founded under, even for the owner and even when the actor holds a forged membership on it** (spec §3.3's existence precondition); control: a real project is accepted. Mutation: drop the `note.created` case from `projectsNamedBy`.
+
+## 18.10 Search
+
+- ✅ **18.121 — every fresh test database has `pg_trgm` and `vector` installed** (`SELECT extname FROM pg_extension`); control: `postgis` is absent. Mutation: drop `CREATE EXTENSION vector` from the migration (red only on the pgvector image, which is the point of 18.122). `apps/server/test/search/preflight.test.ts`.
+- ✅ **18.122 — the four Postgres image sites name one image string**, `pgvector/pgvector:pg16`: the two compose files and `ci.yml`'s two postgres service blocks. The COUNT (`4`) is asserted as well as the distinct value — deleting a site or adding a fifth pgvector site both leave the distinct set correct and only the count catches them. Mutation: change one site. `apps/server/test/search/preflight.test.ts`.
+- ✅ **18.123 — `proj_note_search.tsv` is generated from the three columns with weights A/B/C** (title A, body B, ticket text C); control: a word in no column has no weight. The weight is read by suffix, not by position: `tsvector` concatenation offsets the right operand's positions, so `'room':1B` would pin an arithmetic detail of the generator rather than the claim that the body is weight B. Mutation: swap A and B in the migration. `apps/server/test/search/preflight.test.ts`.
+- ✅ **18.124 — the pre-flight tool reports both extensions available and the connected role able to create them**, and reads `vector`'s `default_version` as ≥ `0.8.0` (spec §7.1's floor for an HNSW index under a visibility filter). Two controls, both in the same case: `postgis` is absent from `pg_available_extensions` and reported unavailable, and **`hstore` is available and NOT installed** — reported `available: true` with a null `installedVersion`, which is what makes a tool reading `pg_extension` fail this case instead of passing it. Mutation: query `pg_extension` instead of `pg_available_extensions`. `apps/server/test/search/preflight.test.ts`.
+

@@ -36,7 +36,7 @@ Managed PostgreSQL + Spaces, all BLR1, serving `pm.artsourced.in` /
    choice and the client is whatever the operator's laptop carries, so this is
    an operational rule, not a theoretical one. **No automated test in this
    repo covers either direction** — CI pins a matched pair
-   (`postgres:16-alpine` beside `postgresql-client-16`) precisely so it never
+   (`pgvector/pgvector:pg16` beside `postgresql-client-16`) precisely so it never
    exercises the skew; `scripts/restore.sh`'s usage text repeats the rule.
 3. Nothing to substitute in `app.yaml` beyond the SECRET values below — the
    hosts and the two `BUILD_TIME` envs on `web` (`SERVER_ORIGIN`,

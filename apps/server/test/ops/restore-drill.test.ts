@@ -152,7 +152,7 @@ const PROBE_FAILURES: string[] = [CLIENT, SERVER].flatMap((probe) =>
  * table and row landed. That is a real property of the pair, not a flaw in this
  * suite, and `restore.sh` propagating that non-zero exit is correct behaviour.
  *
- * CI runs a MATCHED pair — `.github/workflows/ci.yml` pins `postgres:16-alpine`
+ * CI runs a MATCHED pair — `.github/workflows/ci.yml` pins `pgvector/pgvector:pg16`
  * beside `postgresql-client-16` ("pinned to the server's major version") — so
  * this block executes there. It skips on a skewed workstation, loudly.
  *

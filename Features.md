@@ -2757,7 +2757,7 @@ DigitalOcean spec is written and quarantined in `deploy/do/`, and provisioning i
   **Skew is the ONLY thing allowed to skip the round trip.** The suite gates on client-major ≤
   server-major, not merely on the binaries existing, and skips loudly (naming both majors) on a skewed
   workstation rather than reddening; CI runs it on the matched pair `ci.yml` already pins
-  (`postgres:16-alpine` + `postgresql-client-16`). Every OTHER reason a version probe might come back
+  (`pgvector/pgvector:pg16` + `postgresql-client-16`). Every OTHER reason a version probe might come back
   empty — no `psql`, no libpq on `PATH`, Postgres down or not yet ready, unparseable output — is a
   **failure**, asserted by an always-running precondition test that names the probe and quotes its error.
   It has to be: the probes used to fail open, `check-no-silent-skips.mjs` cannot see a partially skipped
@@ -3132,3 +3132,4 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ⚙️ **The client data source exposes seven note reads** (`getNotes`, `getDeletedNotes`, `getNote`, `getNotesForTicket`, `getNoteComments`, `getNoteHistory`, `getNoteVersion`); the replica rejects them as gaps until Plan 2.
 - ⚙️ **Files uploaded into a note are owned by the note** — upload needs author/admin-reader/owner, download needs a reader (spec §4.4).
 - ⚙️ **A note cannot be filed under a project nobody founded** — spec §3.3's existence precondition, asked in `checkProjectExists` (existence) before `checkNotePermission` (membership), so the refusal names the actual fault. The archived half is deliberately NOT enforced, for notes or for tickets.
+- ⚙️ **The database gains `pg_trgm` and `pgvector`** — migration `1790200000000_note-search.sql`; every Postgres image (two compose files, two CI service blocks) is `pgvector/pgvector:pg16`; a pre-flight tool (`pnpm --filter @gisik-nokma/server run search:preflight`) checks a target database before the migration runs, because `vector` is not a trusted extension and so needs a superuser to create.

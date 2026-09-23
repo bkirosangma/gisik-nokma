@@ -15,6 +15,19 @@ Merge to `main` with approval → App Platform builds and deploys (`deploy_on_pu
 container boot (entrypoint) before the server listens. Watch `doctl apps logs <app-id> server --follow`;
 confirm `GET /healthz` reports the new deploy sha.
 
+**Before the FIRST deploy that carries the notes search migration, run the pre-flight against the target
+database — from a repo checkout, never from a lane — with `DATABASE_URL` pointed at it:**
+
+```
+pnpm --filter @gisik-nokma/server run search:preflight
+```
+
+It prints whether `pg_trgm` and `vector` are installable there, what version of each `CREATE EXTENSION`
+would install, and whether the connected role may create them at all. **`vector` is not a trusted
+extension on PostgreSQL 16**, so on a managed database that role usually is not a superuser and the answer
+is `NO`; the exit status is non-zero in that case, which is the answer to act on — not a warning to read
+past. Nothing else in this runbook changes.
+
 ## Deploy (first time)
 
 See `deploy/do/README.md`. DigitalOcean App Platform + Managed PostgreSQL + Spaces, all BLR1, serving
