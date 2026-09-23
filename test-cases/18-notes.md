@@ -96,3 +96,6 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.070 — `heldNoteIds` are answered by `canReadNoteById`:** presenting `[nPrivate, nWorkspace]` as `memberIn` returns `restrictedNotes: [{ id: nPrivate }]`; control: `heldIds` still answers tickets. Mutation: answer notes with `canSee`.
 - ✅ **18.071 — an unknown note id is restricted.** Mutation: skip unknown ids.
 - ✅ **18.072 — a body without `heldNoteIds` is still valid and returns `restrictedNotes: []`** (old clients). Mutation: make the field required.
+- ✅ **18.073 — the note events route returns the note's full ledger in `seq` order to a reader and 404 to a non-reader** (same body as an unknown id). Mutation: skip the readability check.
+- ✅ **18.074 — the workspace bootstrap carries the events of every readable note and none of an unreadable one.** Mutation: include all notes.
+- ✅ **18.075 — the route's `LedgerEventView` shape equals the one `GET /v1/tickets/:id/events` (or the existing ticket bootstrap) returns** — same field names, so the client's one parser reads both. Mutation: rename `workspace_seq`.
