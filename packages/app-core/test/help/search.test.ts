@@ -30,23 +30,32 @@ describe('the generated content is the documents, not a summary of them', () => 
   });
 
   /**
-   * 15.3 — the passage the coverage map nearly got wrong.
+   * 15.3 — the passage the coverage map nearly got wrong, corrected again by
+   * help-notes Unit 4d once starting-status gave the New ticket window its
+   * own Start/Due date inputs.
    *
    * The map initially believed a "require a field" rule's typing box was a
    * due-date workaround, checked, found it is not, and corrected all three
-   * documents rather than shipping the wrong claim. This asserts the CORRECTED
-   * version survived the parse into the app — because a build-time transform is
-   * exactly where a carefully corrected sentence could quietly lose its
-   * correction and nobody would look again.
+   * documents rather than shipping the wrong claim. Then the starting-status
+   * release (2026-09-23) made the ORIGINAL correction itself read as a wider
+   * claim than true — "It will not get you a due date" was about this one
+   * typing box, but by then a job's date COULD be set at creation through a
+   * different control, and an unqualified sentence would have read as "you
+   * cannot set a due date when creating a job". This asserts the
+   * RE-corrected, scoped version survived the parse into the app — because a
+   * build-time transform is exactly where a carefully corrected sentence
+   * could quietly lose its correction and nobody would look again.
    */
-  it('15.3 preserves the corrected due-date passage rather than the near-miss', () => {
+  it('15.3 preserves the corrected due-date passage rather than either near-miss', () => {
     const all = HELP_CONTENT.flatMap((d) =>
       d.sections.flatMap((s) => s.entries.map((e) => entryText(e))),
     ).join('\n');
-    expect(all).toContain('It will not get you a due date');
+    expect(all).toContain('This particular box will not get you a due date');
     expect(all).toContain('A custom date only ever draws a marker');
-    // And the claim it replaced must NOT be there.
+    expect(all).toContain('You can still set both dates properly');
+    // Neither the original wrong claim nor the unqualified 2026-09-23 near-miss.
     expect(all).not.toContain('is a workaround for a due date');
+    expect(all).not.toContain('It will not get you a due date.');
   });
 
   it('15.4 keeps emphasis rather than flattening it — the documents mark their load-bearing claims with it', () => {
