@@ -1,6 +1,20 @@
 import type { SyncStorage } from './storage.js';
 
-export const LOCAL_SCHEMA_VERSION = 1;
+/**
+ * Raised to 2 by Plan 2 of the notes series, which added `notes` and
+ * `note_comments`.
+ *
+ * **The number is a version stamp; it is not an upgrade path.** `migrateLocal`
+ * runs `CREATE TABLE IF NOT EXISTS` and nothing else, and this constant is
+ * written into `meta` and never read back by anything — checked across
+ * `sync-client`, `app-core` and both shells. So the bump records that the shape
+ * changed and is not what makes a device converge: the two new TABLES are, and
+ * they are safe on an existing device precisely because they are new. The day
+ * this schema must ALTER rather than CREATE, the version needs a reader and a
+ * migration step, and `snapshot_provenance`'s docblock below already records
+ * that as unowned.
+ */
+export const LOCAL_SCHEMA_VERSION = 2;
 
 // ULID discipline: no column here carries a hand-written shape constraint.
 // `events.id`, `outbox.event_id` and the entity ids are ULIDs, but the ONE
@@ -72,6 +86,66 @@ const TABLES = [
      ticket_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, parent_id TEXT, state TEXT NOT NULL
    )`,
   `CREATE INDEX IF NOT EXISTS tickets_parent_idx ON tickets (parent_id)`,
+  /**
+   * The local notes, folded by the SHARED reducer (notes series, Plan 2 of 6,
+   * spec §5.3).
+   *
+   * ## Columns, and the three of them that are JSON
+   *
+   * `body`, `scope` and `scope_before_inherit` are the reducer's own objects
+   * (`NoteState`), so they are stored as JSON text rather than flattened — a
+   * flattening would be a second spelling of `NoteScope` that could disagree
+   * with the domain type, and `scopeBeforeInherit` is `null` or a whole scope.
+   * `attached_ticket_ids` is a JSON ARRAY, and it is a column rather than a
+   * join table because the replica never reads it by ticket: `listNotesForTicket`
+   * answers that question, and it must answer it the way the column is stored —
+   * SQLite's `json_each` over this column is the one query, and it is written
+   * where it is used.
+   *
+   * ## `seq` mirrors `proj_notes.seq`, deliberately
+   *
+   * The server's comments projection says it plainly: *"`seq` is the note
+   * entity's own per-entity seq of the latest event folded, mirroring
+   * proj_tickets. `workspace_seq` sits beside it and is the workspace's stream
+   * cursor."* The replica keeps the same split for the same reason — `seq`
+   * orders ONE note's history, and the workspace cursor is `meta`'s. A device
+   * that conflated them would have a note's history order change every time an
+   * unrelated commit landed.
+   *
+   * ## No `workspace_seq` column here, unlike `events`
+   *
+   * A note's head row has no resume position to keep: the cursor is the
+   * workspace's, and the note's own history order is `seq`. This is the same
+   * reason `tickets` carries only `state`.
+   */
+  `CREATE TABLE IF NOT EXISTS notes (
+     note_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, home_project_id TEXT NOT NULL,
+     author_id TEXT NOT NULL, title TEXT NOT NULL, body TEXT NOT NULL,
+     scope TEXT NOT NULL, scope_before_inherit TEXT, attached_ticket_ids TEXT NOT NULL,
+     deleted INTEGER NOT NULL, created_at TEXT NOT NULL, updated_at TEXT NOT NULL,
+     last_body_event_id TEXT NOT NULL, seq INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS notes_home_idx ON notes (workspace_id, home_project_id)`,
+  /**
+   * Comments filed against a NOTE — the same event type tickets use, split by
+   * entity kind exactly as the server's two comment projections are.
+   *
+   * `comment_id` IS the event id: the payload is `{ body }` and carries no
+   * identity of its own (`proj_note_comments`' own comment says so). Ordering
+   * is `workspace_seq`, matching `listNoteComments` on the server: a comment
+   * thread reads as a conversation, so it is ordered by when the claim entered
+   * the workspace rather than by per-entity numbering.
+   *
+   * `workspace_id` is carried although nothing reads it today, because the
+   * server's table carries it and a local row that could not say which
+   * workspace it belonged to would be the one row `revokeScope` cannot reach.
+   */
+  `CREATE TABLE IF NOT EXISTS note_comments (
+     comment_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, note_id TEXT NOT NULL,
+     author_id TEXT NOT NULL, body TEXT NOT NULL, recorded_at TEXT NOT NULL,
+     workspace_seq INTEGER NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS note_comments_note_idx ON note_comments (note_id, workspace_seq)`,
   `CREATE TABLE IF NOT EXISTS workflows (
      workflow_id TEXT NOT NULL, version INTEGER NOT NULL, def TEXT NOT NULL, PRIMARY KEY (workflow_id, version)
    )`,

@@ -21,16 +21,21 @@ describe('migrateLocal', () => {
       // back — so a new column would work on a fresh device and throw
       // `no such column` on every existing one. An exact `toEqual` here is what
       // made that decision visible instead of silent.
-      'contests', 'events', 'meta', 'outbox', 'snapshot_provenance', 'snapshots',
-      'ticket_types', 'tickets', 'workflows',
+      // `notes` and `note_comments` joined with Plan 2 of the notes series and
+      // the version moved with them. The two arrived as NEW TABLES for exactly
+      // the reason the paragraph above gives — `CREATE TABLE IF NOT EXISTS` is
+      // the only DDL `migrateLocal` runs, so a table is safe on an existing
+      // device and a changed column is not.
+      'contests', 'events', 'meta', 'note_comments', 'notes', 'outbox', 'snapshot_provenance',
+      'snapshots', 'ticket_types', 'tickets', 'workflows',
     ]);
     const version = await storage.all("SELECT value FROM meta WHERE key = 'schema_version'");
     // Pin the LITERAL, not String(LOCAL_SCHEMA_VERSION): comparing the constant
     // against itself is a round-trip check that survives any value change, so a
     // silent version bump would pass. A schema version is exactly the thing that
     // should require a conscious edit here when it moves.
-    expect(LOCAL_SCHEMA_VERSION).toBe(1);
-    expect(version[0]?.value).toBe('1');
+    expect(LOCAL_SCHEMA_VERSION).toBe(2);
+    expect(version[0]?.value).toBe('2');
     await storage.close();
   });
 });

@@ -10,6 +10,8 @@ import { readStreamSeq } from './stream-seq.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import type { ServerAppend } from '../routes/invites.js';
 import { MAX_BATCH_SIZE } from '../routes/events.js';
+import { toEventView, type LedgerEventView, type LedgerRow } from '../routes/tickets.js';
+import { listNotes } from '../read/notes.js';
 import { createSyncService } from './sync-service.js';
 import { registerReconcileRoute } from './reconcile-route.js';
 
@@ -133,6 +135,42 @@ export type BootstrapResponse = {
    */
   definitions: LedgerEvent[];
   tickets: BootstrapTicket[];
+  /**
+   * Every readable note's whole ledger, in `workspace_seq` order (Plan 2 of 6,
+   * spec §5.1).
+   *
+   * ## Why the bootstrap carries notes at all, when the stream also announces them
+   *
+   * The stream's `reach-granted` notice is a REPAIR for a device whose cursor
+   * already ran past a note it could not read. A device that has never synced
+   * has no such gap, and a device that joins the workspace has none either —
+   * `needsBootstrap` runs before any notice could matter. Without this section
+   * both would be handed a workspace whose notes are simply missing, and the
+   * only thing that would ever fill them in is a later widening. That is also
+   * why Plan 2's membership-widening case (a new member's notes) is closed here
+   * rather than by extending `readerReachNoticeFor`: the bootstrap route lists
+   * everything readable, which is the whole answer.
+   *
+   * ## OPTIONAL, and that is the ruling rather than an oversight
+   *
+   * A required field forces every constructor of this type to change — the
+   * argument is written out on `BootstrapTicket.provenance` in this same file,
+   * where a required field was tried for one commit and broke
+   * `test/dual-client/rig.ts`. `BootstrapResponse` has more constructors than
+   * that type did. So the field is optional and the server always sends it; the
+   * case that pins "the server sends it" is 18.074, not the type.
+   *
+   * ## `LedgerEventView`, not `LedgerEvent`, and the two live side by side here
+   *
+   * `definitions` and `tickets` above are ENVELOPES (`rowToEnvelope`); this is
+   * the row-shaped view `GET /v1/notes/:noteId/events` serves, because a note
+   * pulled from the bootstrap and a note pulled from that route must be
+   * identical payloads — a device pulls whichever the situation calls for and
+   * folds the result with the same code. Two dialects in one payload is the
+   * cost, and it is paid deliberately: the alternative is two parsers for one
+   * entity, which is the drift this series' signature failure.
+   */
+  notes?: { events: LedgerEventView[] };
 };
 
 /**
@@ -452,6 +490,36 @@ export function registerSyncRoutes(
         for (const row of visible) {
           tickets.push(await bootstrapTicket(client, row.ticket_id as string));
         }
+        // The notes this caller may read, in ONE query rather than a per-note
+        // pull: `listNotes` answers the readable (non-deleted) set through
+        // `visibleNotesWhere`, and the deleted set through the same function
+        // with `deleted: true` — which narrows by spec §4.1's deleted rule to
+        // the author, a workspace admin or the owner. Both are needed, because
+        // a device that never held a note it CAN read (its author's own deleted
+        // one, in the undo window) would otherwise have an undo with nothing to
+        // undo.
+        //
+        // Ordering is `workspace_seq`, like `definitions` above and unlike the
+        // single-note route's `seq`: across entities `seq` is not a total order
+        // (it restarts per entity), and a replica wants the order the commits
+        // actually happened in. Inside one note the two orders coincide.
+        const readableNotes = await listNotes(client, eff, userId, workspaceId);
+        const deletedNotes = await listNotes(client, eff, userId, workspaceId, { deleted: true });
+        const noteIds = [...readableNotes, ...deletedNotes].map((n) => n.noteId);
+        const noteRows =
+          noteIds.length === 0
+            ? []
+            : (
+                await client.query<LedgerRow>(
+                  `SELECT id, workspace_id, entity_kind, entity_id, type, version, payload,
+                          actor_id, origin, client_time, server_time, seq, workspace_seq
+                   FROM events
+                   WHERE entity_kind = 'note' AND entity_id = ANY($1::text[])
+                   ORDER BY workspace_seq`,
+                  [noteIds],
+                )
+              ).rows;
+        const notes = { events: noteRows.map(toEventView) };
         await client.query('COMMIT');
         const me: BootstrapMe = {
           userId,
@@ -461,7 +529,7 @@ export function registerSyncRoutes(
           // ids. `.keys()` is the fix (Plan 10 adaptation map, Task 6).
           projectIds: [...eff.projects.keys()],
         };
-        const body: BootstrapResponse = { workspaceId, me, streamSeq, definitions, tickets };
+        const body: BootstrapResponse = { workspaceId, me, streamSeq, definitions, tickets, notes };
         return body;
       } catch (err) {
         try {

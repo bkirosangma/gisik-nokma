@@ -1,6 +1,8 @@
 import type {
   IngestResult,
   LedgerEvent,
+  NoteState,
+  NoteSummary,
   PublishedWorkflowDef,
   StateCategory,
   SubmittedEvent,
@@ -28,7 +30,13 @@ import {
   type SyncStorage,
   type SnapshotProvenanceBlock,
 } from '@gisik-nokma/sync-client';
-import type { DataSource, DataSourceQuery, ServerStreamFrame, Unsubscribe } from '../data-source.js';
+import type {
+  ClientStreamFrame,
+  DataSource,
+  DataSourceQuery,
+  NoteListFilter,
+  Unsubscribe,
+} from '../data-source.js';
 import { EPIC_RANK, epicAncestorOf } from '../hierarchy/epic-ancestor.js';
 import { matchesFilter } from '../filter/matches-filter.js';
 import type {
@@ -512,16 +520,6 @@ const ATTACHMENTS_ABSENCES: readonly ReplicaAbsence[] = [
   },
 ];
 
-const NOTES_ABSENCES: readonly ReplicaAbsence[] = [
-  {
-    field: 'NoteSummary / NoteDetail / NoteComment / NoteVersion (all seven note reads)',
-    because:
-      'Notes are not held locally yet, and the reason is a TABLE rather than a fold: `184_spec.md` §5.3\'s `notes` and `note_comments` tables (with `LOCAL_SCHEMA_VERSION` raised to 2) are what a local note read would select from, and Plan 1 of the notes series deliberately ships no replica tables — it ships the entity, the projections and the reads, and leaves the replica to the plan whose whole subject is sync. Answering `[]` from `getNotes` today would be rule P24\'s failure with a different subject: a client with no local ledger for notes would report every workspace as having none, and the screen would draw "no notes here" over a set it never read',
-    owner:
-      'Plan 2 of the notes series — the replica tables in `packages/sync-client/src/storage/schema.ts` (spec §5.3) plus the `ReplicaDataSource` implementations',
-  },
-];
-
 const PREFERENCES_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'UserPreferences (the whole document)',
@@ -625,19 +623,14 @@ export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> =
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
   getTicketComments: COMMENTS_ABSENCES,
-  // The SEVEN note reads share ONE absence, and share it by REFERENCE rather
-  // than by seven copies of the same three strings: `NOTES_ABSENCES` names the
-  // replica tables as the single fix, and seven entries would let one of them
-  // drift into naming a different owner. They are seven KEYS because a caller
-  // enumerating `REPLICA_GAPS` must see every method that refuses; they are one
-  // VALUE because the reason is one.
-  getNotes: NOTES_ABSENCES,
-  getDeletedNotes: NOTES_ABSENCES,
-  getNote: NOTES_ABSENCES,
-  getNotesForTicket: NOTES_ABSENCES,
-  getNoteComments: NOTES_ABSENCES,
-  getNoteHistory: NOTES_ABSENCES,
-  getNoteVersion: NOTES_ABSENCES,
+  // THE SEVEN NOTE ENTRIES ARE GONE, and their absence is now the measured
+  // state rather than a promise. Plan 1 listed all seven here behind one shared
+  // `NOTES_ABSENCES` naming the replica tables as the single fix; Plan 2 landed
+  // those tables (`notes`, `note_comments`, local schema version 2) and the
+  // implementations below, so the entries are deleted rather than reworded —
+  // a gap entry that outlives its gap is a screen telling a user a feature is
+  // missing when it is not. `search` is STILL absent and unrelated: local note
+  // search is Plan 3's.
   search: SEARCH_ABSENCES,
   searchNotes: NOTE_SEARCH_ABSENCES,
   getMyWork: MY_WORK_ABSENCES,
@@ -843,6 +836,81 @@ function actorOf(assigneeId: string | null): Actor | null {
 export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDataSource {
   const { workspaceId: ownWorkspaceId, replica, outbox, engine, storage } = deps;
 
+  /**
+   * A note's attachments, as the BADGE sees them: `{ticketId, key, title}`.
+   *
+   * ## Tickets this device does not hold are OMITTED, and that is the reader predicate for free
+   *
+   * The replica holds only the tickets this user may see — a ticket the server
+   * never sent is not here — so resolving the badge from local rows is
+   * automatically "the tickets this reader can see". Emitting an id this device
+   * does not hold would put an untitled, unkeyable row on a screen and assert a
+   * relationship to something the device has no evidence exists.
+   *
+   * ## `key: ''`, and the server does the same thing
+   *
+   * `key` is composed from a workspace prefix, a project prefix and a
+   * per-project number. The replica holds NONE of the three — its other local
+   * reads answer `key: null` for that stated reason (`getTickets` and the
+   * board's rows) — and `NoteSummary.attachedTickets` types the field
+   * non-nullable, so the honest answer is the EMPTY STRING, which is exactly
+   * what the server falls back to when any of the three components is missing
+   * (`read/notes.ts`'s `attachedTicketsByNote`). One spelling for "no key
+   * available", on both sides. *Owner: whoever gives the replica project
+   * numbers — Plan 3's surface, if anything.*
+   */
+  async function attachedTicketsOf(
+    notes: readonly NoteState[],
+  ): Promise<Map<string, { ticketId: string; key: string; title: string }[]>> {
+    const grouped = new Map<string, { ticketId: string; key: string; title: string }[]>();
+    for (const note of notes) {
+      const list: { ticketId: string; key: string; title: string }[] = [];
+      for (const ticketId of note.attachedTicketIds) {
+        const ticket = await replica.getTicket(ticketId);
+        if (ticket === null || ticket.confirmed === null) continue;
+        const title = ticket.confirmed.fields['title']?.value;
+        list.push({ ticketId, key: '', title: typeof title === 'string' ? title : '' });
+      }
+      grouped.set(note.noteId, list);
+    }
+    return grouped;
+  }
+
+  /** The domain shape `getNotes` and its siblings answer in. */
+  function summariesOf(
+    notes: readonly NoteState[],
+    attached: Map<string, { ticketId: string; key: string; title: string }[]>,
+  ): NoteSummary[] {
+    return notes.map((note) => ({
+      noteId: note.noteId,
+      workspaceId: note.workspaceId,
+      homeProjectId: note.homeProjectId,
+      authorId: note.authorId,
+      title: note.title,
+      scope: note.scope,
+      attachedTickets: attached.get(note.noteId) ?? [],
+      deleted: note.deleted,
+      createdAt: note.createdAt,
+      updatedAt: note.updatedAt,
+    }));
+  }
+
+  /**
+   * The list filters, applied in memory.
+   *
+   * `?deleted=` is NOT here: a deleted note is a different READ
+   * (`getDeletedNotes`), because the two are gated by different rules on the
+   * server and a flag that could cross them would let one door answer for the
+   * other.
+   */
+  function noteMatchesFilter(note: NoteState, filter: NoteListFilter | undefined): boolean {
+    if (filter === undefined) return true;
+    if (filter.homeProjectId !== undefined && note.homeProjectId !== filter.homeProjectId) return false;
+    if (filter.authorId !== undefined && note.authorId !== filter.authorId) return false;
+    if (filter.scopeMode !== undefined && note.scope.mode !== filter.scopeMode) return false;
+    return true;
+  }
+
   async function ticketTypesById(): Promise<Map<string, TicketTypeDef>> {
     const rows = await storage.all('SELECT type_id, def FROM ticket_types');
     return new Map(
@@ -1044,13 +1112,95 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getTicketComments: () =>
       Promise.reject(new ReplicaGapError('getTicketComments', COMMENTS_ABSENCES)),
-    getNotes: () => Promise.reject(new ReplicaGapError('getNotes', NOTES_ABSENCES)),
-    getDeletedNotes: () => Promise.reject(new ReplicaGapError('getDeletedNotes', NOTES_ABSENCES)),
-    getNote: () => Promise.reject(new ReplicaGapError('getNote', NOTES_ABSENCES)),
-    getNotesForTicket: () => Promise.reject(new ReplicaGapError('getNotesForTicket', NOTES_ABSENCES)),
-    getNoteComments: () => Promise.reject(new ReplicaGapError('getNoteComments', NOTES_ABSENCES)),
-    getNoteHistory: () => Promise.reject(new ReplicaGapError('getNoteHistory', NOTES_ABSENCES)),
-    getNoteVersion: () => Promise.reject(new ReplicaGapError('getNoteVersion', NOTES_ABSENCES)),
+    getNotes: async (workspaceId, filter) => {
+      // Filters applied IN MEMORY over `listNotes`, and not pushed into SQL.
+      // That is a deliberate cost rather than an oversight: `listNotes` is the
+      // one local read that answers "which notes exist here", and a filtered
+      // second query would be a second place that decides what a workspace
+      // holds. The sets are small — a device holds what it was sent — and the
+      // alternative is the drift `can-read-note.ts` has a whole case against.
+      const notes = await replica.listNotes(workspaceId);
+      return summariesOf(notes.filter((n) => noteMatchesFilter(n, filter)), await attachedTicketsOf(notes));
+    },
+    getDeletedNotes: async (workspaceId) => {
+      const notes = await replica.listDeletedNotes(workspaceId);
+      // THE DELETED-NOTE GATE, which is NOT `canReadNote` and must not be
+      // folded into it. A deleted note is still READABLE — that is what the
+      // undo window means, and `canReadNote` deliberately ignores `deleted` —
+      // but going LOOKING for deleted notes is narrower: only the author, a
+      // workspace admin or the owner. The server states it in one line
+      // (`read/notes.ts`: the `?deleted=1` arm adds `author_id = me` for anyone
+      // else) and the replica applied NOTHING here, so a plain member's device
+      // listed, and offered to undo, notes the server would refuse to show.
+      //
+      // The role comes from `me`, the workspace role the bootstrap recorded.
+      // A device with no `me` has never bootstrapped and its `listDeletedNotes`
+      // is empty anyway; treating that as a plain member is the fail-closed
+      // direction.
+      const me = await replica.getMe();
+      const mayLook = me !== null && (me.workspaceRole === 'owner' || me.workspaceRole === 'admin');
+      const visible = mayLook ? notes : notes.filter((n) => n.authorId === me?.userId);
+      return summariesOf(visible, await attachedTicketsOf(visible));
+    },
+    getNote: async (workspaceId, noteId) => {
+      const note = await replica.getNote(noteId);
+      // A note from ANOTHER workspace answers `null`, exactly as an absent one
+      // does: the replica's reads are keyed by note id, and a caller that could
+      // tell "not yours" from "not here" would have the existence oracle the
+      // server's note routes are built to deny.
+      if (note === null || note.workspaceId !== workspaceId) return null;
+      const attached = await attachedTicketsOf([note]);
+      const summary = summariesOf([note], attached)[0]!;
+      // `schemaVersion` is READ from the stored body, never assumed — the
+      // docblock inside the body is the only authority, and Plan 4 of the
+      // series raises it to 2 when the new node types land.
+      const body = note.body as { attrs?: { schemaVersion?: unknown } } | null;
+      const raw = body?.attrs?.schemaVersion;
+      return { ...summary, body: note.body, schemaVersion: typeof raw === 'number' ? raw : 1 };
+    },
+    getNotesForTicket: async (workspaceId, ticketId) => {
+      const notes = await replica.listNotesForTicket(workspaceId, ticketId);
+      return summariesOf(notes, await attachedTicketsOf(notes));
+    },
+    getNoteComments: async (workspaceId, noteId) => {
+      const note = await replica.getNote(noteId);
+      if (note === null || note.workspaceId !== workspaceId) return [];
+      return (await replica.listNoteComments(noteId)).map((c) => ({
+        commentId: c.commentId,
+        authorId: c.authorId,
+        body: c.body,
+        recordedAt: c.recordedAt,
+      }));
+    },
+    getNoteHistory: async (workspaceId, noteId) => {
+      const note = await replica.getNote(noteId);
+      if (note === null || note.workspaceId !== workspaceId) return [];
+      // Read from the local `events` table, and filtered to the two types that
+      // ARE versions — exactly what the server's `listNoteHistory` does over
+      // the same rows. `note.renamed` is deliberately out: it moves the title,
+      // which the current row already carries, and a version that changed no
+      // body would appear as a duplicate.
+      const events = await replica.listEntityEvents(noteId, 'note');
+      return events
+        .filter((e) => e.type === 'note.created' || e.type === 'note.body_set')
+        .map((e) => ({ eventId: e.id, authorId: e.actorId, recordedAt: e.serverTime, seq: e.seq }));
+    },
+    getNoteVersion: async (workspaceId, noteId, eventId) => {
+      const note = await replica.getNote(noteId);
+      if (note === null || note.workspaceId !== workspaceId) return null;
+      const events = await replica.listEntityEvents(noteId, 'note');
+      const event = events.find((e) => e.id === eventId);
+      if (event === undefined) return null;
+      // `payload.body ?? null`, EXACTLY as the server's `getNoteVersionBody`
+      // does — no fallback to the current row. A `note.created` with no body
+      // (a note born empty carries the reducer's `EMPTY_NOTE_DOC` and no
+      // payload body) therefore answers `null` on both sides. **A fallback
+      // here would have been the more helpful answer and the WRONG one**: it
+      // would let the offline copy show a body the online read calls absent,
+      // which is this series' whole failure mode one package over.
+      if (event.type !== 'note.created' && event.type !== 'note.body_set') return null;
+      return (event.payload as { body?: unknown }).body ?? null;
+    },
     getMyWork: () => Promise.reject(new ReplicaGapError('getMyWork', MY_WORK_ABSENCES)),
     getAttention: () => Promise.reject(new ReplicaGapError('getAttention', ATTENTION_ABSENCES)),
     getWorkspaceSettings: () =>
@@ -1595,7 +1745,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
      * from `replica.getCursor`. A second cursor here would be a second opinion
      * about where this device is.
      */
-    subscribe(workspaceId: string, _afterSeq: number, cb: (item: ServerStreamFrame) => void): Unsubscribe {
+    subscribe(workspaceId: string, _afterSeq: number, cb: (item: ClientStreamFrame) => void): Unsubscribe {
       const offItem = engine.onItem((item) => {
         if (!isSyncInstruction(item)) {
           if (item.workspaceId === workspaceId) cb({ type: 'event', envelope: item });
@@ -1617,12 +1767,18 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
           // got both halves wrong and the branch review caught it.** Item
           // listeners run AFTER the engine's drain, so by the time a subscriber
           // sees this frame the successful pulls have already landed and those
-          // tickets ARE readable. And no `event` frame follows a pull:
-          // `loadTicketBootstrap` calls `notify()` only, and nothing routes a
-          // pulled ticket through `onItem`. What refreshes a view is the
-          // ordinary TRIGGER envelope arriving behind this frame — the right
-          // outcome by a different mechanism, and a consumer waiting for a
-          // per-pull frame would wait for one that never comes.
+          // tickets ARE readable.
+          //
+          // **And the sentence that used to end this paragraph — "a consumer
+          // waiting for a per-pull frame would wait for one that never comes" —
+          // WAS TRUE and is now FALSE.** Plan 2 of the notes series added
+          // exactly that frame: `refresh`, forwarded below from the engine's
+          // `onPullApplied`. It is the reason a note reached by pull refreshes
+          // the screen showing it, because nothing on the ordinary stream
+          // announces it. The ticket half keeps its older mechanism as well —
+          // the trigger envelope that follows this frame IS an `event` — but a
+          // note's pull has no such follower, so the frame is load-bearing
+          // there and merely useful here.
           if (item.workspaceId === workspaceId) {
             cb({ type: 'reach-granted', workspaceId, tickets: item.tickets });
           }
@@ -1631,6 +1787,24 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         if (item.workspaceId === workspaceId && item.projectId === undefined) {
           cb({ type: 'scope-revoked', workspaceId });
         }
+      });
+      // A LANDED PULL, as a frame. `refresh` is client-only (`data-source.ts`
+      // argues why it is not a member of the published protocol), and it exists
+      // for the case no other frame covers: a note pulled in response to a
+      // `reach-granted` notice arrives AFTER the stream has gone quiet, so
+      // there is no `event` and no `caught-up` behind it. Without this the note
+      // is in the replica and the screen showing it keeps the stale answer.
+      //
+      // No workspace check, unlike every arm above, and the reason is the
+      // SIGNAL rather than an omission: `onPullApplied` carries `{kind, id}`
+      // and no workspace, because the engine drains one workspace — the one it
+      // was subscribed to — and this data source was built for that same
+      // workspace (`ReplicaDataSourceDeps.workspaceId`). The ID is
+      // deliberately not echoed either: a `refresh` says "re-read", and WHICH
+      // entity moved would tempt a view into a partial update, which is the
+      // shape the debounced refetch exists to avoid.
+      const offPull = engine.onPullApplied(() => {
+        cb({ type: 'refresh', workspaceId });
       });
       const offStatus = engine.onStatus((status) => {
         // `live` is set immediately after the cursor is written, so the value
@@ -1646,6 +1820,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       });
       return () => {
         offItem();
+        offPull();
         offStatus();
       };
     },
