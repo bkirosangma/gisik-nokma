@@ -311,13 +311,20 @@ describe('visibleEventsFor — the ticket cascade into inherit notes', () => {
   });
 
   it('18.068 a ticket the reader still cannot see grants nothing for its notes (control)', async () => {
-    // The control arm of 18.067, in the same `it`: narrow `TE` back and the
-    // cascade must go quiet. Read the case text's mutation as a statement about
-    // which guard holds this — the answer is that TWO do, and neither is
-    // singly mutable: with `canSee` in place the narrowing's row never enters
-    // the branch, and with it removed `noteGrantNoticeFor`'s `canReadNote`
-    // refuses the note. Both single mutations were run and both left this case
-    // GREEN (see the ledger); that is a property of the case, not a gap in it.
+    // The control arm of 18.067, one `it` later rather than inside it (the plan
+    // said "in the same `it`"; its own scenario needs 18.067's widening to have
+    // happened first, so the two are ordered rather than merged, which also
+    // leaves each case cited by a test naming exactly its own id).
+    //
+    // Read the case text's mutation as a statement about WHICH guard holds
+    // this, and the answer is that two do and neither is singly mutable: with
+    // `canSee` in place the narrowing's row never enters the ticket branch at
+    // all, and with `canSee` removed `noteGrantNoticeFor`'s `canReadNote`
+    // refuses the note. BOTH single mutations were run and both left this case
+    // GREEN. It is not vacuous, though — 18.067's mutation (skip
+    // `notesAttachedTo`) reddens it through the `guestListed` control below —
+    // it is simply a case whose own named mutation is unreachable by
+    // construction, which is a property of the case rather than a gap in it.
     const narrowed = ticketEvent(world.TE, 'visibility.set', {
       ticketId: world.TE,
       mode: 'explicit',
