@@ -1618,6 +1618,11 @@ with **Same as the ticket** scope.
 Each attached note is a badge with an × on it (if you can edit the job) that detaches it — the note
 itself is not deleted, only unlinked from this job. Detaching shows a toast you can undo.
 
+It works the other way too: an attached job appears as a badge in the note's own byline. Click it and
+the job's own panel opens right there, over the note — you are not taken to the job's page. Deleting the
+job from that panel does not remove the badge; a deleted job stays attached (see the Notes FAQ entry on
+this).
+
 ### Linking to a job or another note
 
 Typing `:ticket ` followed by a few words, in a comment or in a note, opens a picker over the jobs you
