@@ -94,6 +94,33 @@ import type {
 // surface for a client that never depends on the domain package directly.
 export type { ServerStreamFrame };
 
+/**
+ * What a `DataSource.subscribe` callback actually receives: every frame the
+ * SERVER can send, plus one the server never will (notes series, Plan 2 of 6).
+ *
+ * ## `refresh` is CLIENT-ONLY, and that is why this is a union rather than a
+ * ## widened `ServerStreamFrame`
+ *
+ * `ServerStreamFrame` is the published wire protocol — `serverStreamFrameSchema`
+ * and the hub build it, and the compiler asserts this package handles every
+ * member. Adding a member to it for a frame no server sends would make that
+ * assertion say something false about the wire and would put a field in the
+ * protocol that a later server author could innocently try to emit.
+ *
+ * `refresh` means ONE thing: a PULL landed. A note reaches a device after its
+ * `reach-granted` notice and after the stream has gone quiet, so no `event`
+ * frame announces it and no `caught-up` follows — a view showing that note
+ * would keep a stale answer until something unrelated moved. The engine is the
+ * only component that knows a pull completed, so it is the only component that
+ * can say so.
+ *
+ * `ClientStreamFrame` EXTENDS the server union rather than being redeclared
+ * beside it: the file above states at length why a second spelling of the
+ * server's union was deleted once, and a union that is a superset of the real
+ * one cannot drift from it.
+ */
+export type ClientStreamFrame = ServerStreamFrame | { type: 'refresh'; workspaceId: string };
+
 export type Unsubscribe = () => void;
 
 /**
@@ -323,5 +350,5 @@ export type DataSourceQuery = {
 export type DataSource = {
   ingest(events: SubmittedEvent[]): Promise<IngestResult[]>;
   query: DataSourceQuery;
-  subscribe(workspaceId: string, afterSeq: number, cb: (item: ServerStreamFrame) => void): Unsubscribe;
+  subscribe(workspaceId: string, afterSeq: number, cb: (item: ClientStreamFrame) => void): Unsubscribe;
 };

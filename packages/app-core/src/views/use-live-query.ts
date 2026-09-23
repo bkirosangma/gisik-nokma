@@ -127,7 +127,13 @@ export function useLiveQuery<T>(
   useEffect(() => {
     let timer: ReturnType<typeof setTimeout> | null = null;
     const unsubscribe = source.subscribe(workspaceId, 0, (item) => {
-      if (item.type !== 'event' && item.type !== 'purge') return;
+      // `refresh` refetches for the same reason `event` does — this key's data
+      // may have changed — and it is the ONLY signal a pulled note gives:
+      // `ReplicaDataSource.subscribe` emits it when a `reach-granted` pull
+      // lands, after the stream has gone quiet, so nothing on the `event`
+      // channel ever announces it. `caught-up` is still NOT accepted: it means
+      // the cursor moved, not that this key's answer changed.
+      if (item.type !== 'event' && item.type !== 'purge' && item.type !== 'refresh') return;
       if (timer !== null) clearTimeout(timer);
       timer = setTimeout(reload, debounceMs);
     });

@@ -73,7 +73,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 
 - ✅ **18.036 — `mapNoteSummaries` maps the server's `{ notes: [...] }` shape and refuses a row missing `noteId` with a `MappingError` naming the path.** Mutation: default `noteId` to `''`.
 - ✅ **18.037 — `mapNoteDetail` carries `body` through untouched (as `unknown`) and `schemaVersion` as a number.** Mutation: `JSON.stringify` the body.
-- ✅ **18.038 — every note method on the replica data source rejects with `ReplicaGapError`** naming the method; control: `getTicketSummary` (or another implemented read) resolves. Mutation: return `[]` from `getNotes`.
+- ✅ **18.038 — every note method on the replica data source NOW ANSWERS** (Plan 2 landed the tables and the implementations), and `REPLICA_GAPS` no longer lists any of the seven; controls: `getTicketSummary` still resolves, and `search` still refuses — so "the note reads were implemented" is distinguishable from "the gap machinery was switched off". *(Was Plan 1's "rejects with `ReplicaGapError` until Plan 2"; inverted rather than deleted, per the same rule `client-contract.test.ts` used for `scope-revoked` — a divergence that closed can silently re-open.)* Mutation: list a note read in `REPLICA_GAPS` again.
 
 ## 18.7 Server — file attachments on notes
 
@@ -114,3 +114,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.085 — a 404 on a note pull drops the entry if unchanged, as for tickets.** Mutation: retry forever.
 - ✅ **18.086 — `runReconcile` presents every held note id and purges each `restrictedNotes` entry;** control: ticket purges unchanged. Mutation: present tickets only.
 - ✅ **18.087 — an in-process fake transport records exactly one `bootstrapNote` call for a note a single notice names twice, and none on a catch-up after it is satisfied.** Mutation: `addPendingPulls` appends instead of superseding. *(Re-scoped from "per catch-up": `applyOne` drains after EVERY `reach-granted` frame by design, so two notices naming two different heads legitimately cost two pulls. Recorded in the SDD ledger.)*
+- ✅ **18.088 — the seven note reads answer from the replica** on a seeded fixture (`createReplica` + `loadBootstrap` + `loadNoteEvents`), with `NoteSummary`/`NoteDetail` shapes equal to the online mapper's for the same events. Mutation: drop `attachedTickets`.
+- ✅ **18.089 — `attachedTickets` omits a ticket the replica does not hold.** Mutation: emit the id with an empty key.
+- ✅ **18.090 — `getNoteHistory` lists `note.created` and each `note.body_set`, in order; `getNoteVersion` returns that body.** Mutation: include `note.renamed`.
+- ✅ **18.091 — `subscribe` forwards `onPullApplied` as a `refresh` frame; control: `event` frames still pass.** Mutation: swallow it.
+- ✅ **18.092 — `useLiveQuery` refetches on a `refresh` frame** (mutation: ignore it) **and still ignores `caught-up`** (control).

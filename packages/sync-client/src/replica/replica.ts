@@ -242,8 +242,11 @@ export type Replica = {
     workspaceId: string,
     filter?: { ticketId?: string; claimantId?: string; open?: boolean },
   ): Promise<LocalContest[]>;
-  /** Local history view, per-entity `seq` order. */
-  listEntityEvents(ticketId: string): Promise<LedgerEvent[]>;
+  /**
+   * Local history view, per-entity `seq` order. `kind` defaults to `'ticket'`,
+   * which is what every caller before the notes series meant.
+   */
+  listEntityEvents(entityId: string, kind?: 'ticket' | 'note'): Promise<LedgerEvent[]>;
   /**
    * The provenance a BOOTSTRAP delivered for this ticket, or `null` when none
    * has — a device that has never bootstrapped it, or a server snapshot written
@@ -1539,9 +1542,14 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     return storage.transaction((tx) => readSnapshotProvenance(tx, ticketId));
   },
 
-  async listEntityEvents(ticketId) {
-      const rows = await storage.all("SELECT * FROM events WHERE entity_kind = 'ticket' AND entity_id = ? ORDER BY seq", [
-        ticketId,
+  async listEntityEvents(entityId, kind = 'ticket') {
+      // `kind` is a parameter for the same reason `listPendingPulls`'s is: a
+      // note's history is read from the SAME table by the same row mapper, and
+      // a second near-identical query is what comes to disagree with this one.
+      // The default keeps every existing caller's meaning exactly.
+      const rows = await storage.all('SELECT * FROM events WHERE entity_kind = ? AND entity_id = ? ORDER BY seq', [
+        kind,
+        entityId,
       ]);
       return rows.map(rowToEnvelope);
     },

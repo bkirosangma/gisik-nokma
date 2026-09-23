@@ -1,6 +1,6 @@
 import { act, renderHook, waitFor } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
-import type { DataSource } from '../../src/data-source.js';
+import type { DataSource, ServerStreamFrame } from '../../src/data-source.js';
 import { useLiveQuery } from '../../src/views/use-live-query.js';
 
 /**
@@ -20,6 +20,70 @@ import { useLiveQuery } from '../../src/views/use-live-query.js';
  * saying the harness is broken, not the subject.
  */
 const SOURCE = { subscribe: () => () => undefined } as unknown as DataSource;
+
+/**
+ * A source whose subscription the test DRIVES — one captured callback per
+ * `subscribe`, so a case can hand the hook a frame and watch what it does.
+ *
+ * A separate fixture from `SOURCE` rather than a widening of it: `SOURCE` exists
+ * to be inert, and a source that also fires frames would make the two cases
+ * above depend on a callback they never use.
+ */
+function drivableSource(): { source: DataSource; fire: (item: ServerStreamFrame) => void } {
+  let cb: ((item: ServerStreamFrame) => void) | null = null;
+  const source = {
+    subscribe: (_ws: string, _afterSeq: number, next: (item: ServerStreamFrame) => void) => {
+      cb = next;
+      return () => {
+        cb = null;
+      };
+    },
+  } as unknown as DataSource;
+  return {
+    source,
+    fire: (item) => {
+      if (cb === null) throw new Error('drivableSource: nothing subscribed yet');
+      cb(item);
+    },
+  };
+}
+
+describe('useLiveQuery — which frames refetch', () => {
+  /**
+   * 18.092 — a `refresh` frame refetches, and `caught-up` still does not.
+   *
+   * `refresh` is CLIENT-ONLY: it is what the data source emits when a PULL
+   * landed. A note reaches a device by pull, after the notice and after the
+   * stream has gone quiet, so no `event` frame announces it and no `caught-up`
+   * follows — a view showing that note would keep a stale answer until
+   * something unrelated moved. The control below is the one that makes this a
+   * statement about `refresh` rather than about "any frame refetches".
+   */
+  it('18.092 refetches on refresh, and still ignores caught-up (control)', async () => {
+    const { load, calls } = controllableLoad();
+    const { source, fire } = drivableSource();
+    renderHook(() => useLiveQuery(source, 'ws_1', 'project_1', load));
+
+    await waitFor(() => expect(calls()).toBe(1));
+
+    // Control FIRST, and it is ordering rather than style: an assertion above a
+    // control can mask it. `caught-up` means the cursor moved, not that this
+    // key's data changed, and a hook that refetched on it would reload every
+    // open view on every reconnect.
+    await act(async () => {
+      fire({ type: 'caught-up', workspaceId: 'ws_1', seq: 9 });
+    });
+    await new Promise((resolve) => setTimeout(resolve, 260));
+    expect(calls()).toBe(1);
+
+    await act(async () => {
+      fire({ type: 'refresh', workspaceId: 'ws_1' });
+    });
+    // The hook debounces (`debounceMs`, 200 by default), so this waits longer
+    // than that rather than for a render.
+    await waitFor(() => expect(calls()).toBe(2), { timeout: 1000 });
+  });
+});
 
 /** A load whose settlement each call is handed back to the test to control. */
 function controllableLoad(): {
