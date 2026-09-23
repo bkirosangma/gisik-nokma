@@ -1,4 +1,4 @@
-import { act, renderHook } from '@testing-library/react';
+import { act, fireEvent, render, renderHook } from '@testing-library/react';
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import type { DataSourceQuery, NoteSearchHit } from '@gisik-nokma/app-core';
 import { useNotesSearch } from '../src/use-notes-search.js';
@@ -67,7 +67,17 @@ async function settle(mode: 'lexical' | 'meaning', notes: NoteSearchHit[], corre
   });
 }
 
-function render(query: DataSourceQuery) {
+/**
+ * The hook under test, in a hook harness.
+ *
+ * NOT named `render`: that name belongs to `@testing-library/react`'s element
+ * renderer, which this file also needs for 18.159b's per-render probe, and a
+ * local declaration of it shadows the import — MEASURED, as every case in this
+ * file failing with "Objects are not valid as a React child (found: object with
+ * keys {searchNotes})", because the harness was handed a data source where React
+ * expected an element.
+ */
+function searchHook(query: DataSourceQuery) {
   return renderHook(() => useNotesSearch(query, 'ws'));
 }
 
@@ -86,7 +96,7 @@ describe('18.155–18.159 useNotesSearch', () => {
    * Mutation: no debounce.
    */
   it('18.155 — typing c, co, col within 100 ms makes one lexical call, with the last value', async () => {
-    const hook = render(fakeDataSource());
+    const hook = searchHook(fakeDataSource());
 
     act(() => {
       hook.result.current.setQuery('c');
@@ -115,7 +125,7 @@ describe('18.155–18.159 useNotesSearch', () => {
    * Mutation: rerank by meaning order.
    */
   it('18.156 — lexical [A,B] then meaning [B,C,A] displays [A,B,C], never reordered', async () => {
-    const hook = render(fakeDataSource());
+    const hook = searchHook(fakeDataSource());
     act(() => {
       hook.result.current.setQuery('cold room');
     });
@@ -151,7 +161,7 @@ describe('18.155–18.159 useNotesSearch', () => {
    * Mutation: apply it.
    */
   it('18.157 — a meaning response for an older query is discarded', async () => {
-    const hook = render(fakeDataSource());
+    const hook = searchHook(fakeDataSource());
     act(() => {
       hook.result.current.setQuery('first query');
     });
@@ -193,7 +203,7 @@ describe('18.155–18.159 useNotesSearch', () => {
    * Mutation: fire at 100 ms.
    */
   it('18.158 — the meaning call waits 400 ms after the last change, and a change at 300 ms resets it', async () => {
-    const hook = render(fakeDataSource());
+    const hook = searchHook(fakeDataSource());
     act(() => {
       hook.result.current.setQuery('q');
     });
@@ -229,7 +239,7 @@ describe('18.155–18.159 useNotesSearch', () => {
    * Mutation: keep the old value.
    */
   it('18.159 — corrected from the lexical response is exposed, and cleared on the next query', async () => {
-    const hook = render(fakeDataSource());
+    const hook = searchHook(fakeDataSource());
     act(() => {
       hook.result.current.setQuery('compresor');
     });
@@ -253,11 +263,71 @@ describe('18.155–18.159 useNotesSearch', () => {
   });
 
   /**
+   * 18.159, SECOND HALF — and it exists because the first half does not kill
+   * its named mutation.
+   *
+   * Measured: `corrected: round.corrected` (the comparison dropped) passed every
+   * other case in this file. The reason is that the ROUND RESET also clears the
+   * correction — in an effect, which runs after the render that carries the new
+   * text. So the comparison's only effect is on THAT paint: without it, there is
+   * one frame in which the new query sits on screen beside the previous query's
+   * "showing results for …". `act()` flushes that frame away before any settled
+   * assertion can see it, so the assertion has to be made on every RENDER.
+   *
+   * The probe records each render rather than the settled state, which is what
+   * makes a one-paint defect observable at all. It is the same instrument the
+   * `document-title` cases use for the same reason: a value that exists for one
+   * frame is invisible to a probe that only looks at the end.
+   */
+  it('18.159b — no render shows the new query beside the previous query’s correction', async () => {
+    const rendered: Array<{ text: string; corrected: string[] | null }> = [];
+    function Probe({ source }: { source: DataSourceQuery }) {
+      const state = useNotesSearch(source, 'ws');
+      // A side effect in render, which a PRODUCTION component must not do and a
+      // test instrument must: the whole point is to see a value that exists
+      // only during a render.
+      rendered.push({ text: state.query, corrected: state.corrected });
+      return (
+        <div>
+          <button type="button" onClick={() => state.setQuery('first query')}>
+            first
+          </button>
+          <button type="button" onClick={() => state.setQuery('second query')}>
+            second
+          </button>
+        </div>
+      );
+    }
+
+    const source = fakeDataSource();
+    const view = render(<Probe source={source} />);
+
+    fireEvent.click(view.getByText('first'));
+    await act(async () => {
+      await vi.advanceTimersByTimeAsync(100);
+    });
+    await settle('lexical', [hit('A')], ['compressor']);
+    expect(rendered.at(-1)?.corrected, 'control: the correction IS shown for its own query').toEqual(['compressor']);
+
+    rendered.length = 0;
+    fireEvent.click(view.getByText('second'));
+
+    const offending = rendered.filter((entry) => entry.text === 'second query' && entry.corrected !== null);
+    expect(
+      offending,
+      'the previous query’s correction must not appear on any paint of the new query',
+    ).toEqual([]);
+    // Control on the instrument: the render that carries the new text really
+    // was recorded, so an empty `offending` is absence and not an empty log.
+    expect(rendered.some((entry) => entry.text === 'second query')).toBe(true);
+  });
+
+  /**
    * The empty query, which the plan's Interface block names and no numbered case
    * owns: no calls at all, and an empty list.
    */
   it('an empty query makes no calls and displays nothing', async () => {
-    const hook = render(fakeDataSource());
+    const hook = searchHook(fakeDataSource());
     act(() => {
       hook.result.current.setQuery('cold');
     });
