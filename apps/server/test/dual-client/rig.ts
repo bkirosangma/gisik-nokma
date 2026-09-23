@@ -40,14 +40,17 @@ import {
   type BootstrapTicket,
 } from '../../src/sync/sync-routes.js';
 import { readStreamSeq } from '../../src/sync/stream-seq.js';
-import { reconcileHeldIds } from '../../src/sync/reconcile-route.js';
+import { reconcileHeldIds, reconcileHeldNoteIds } from '../../src/sync/reconcile-route.js';
 import { ticketBootstrapFor } from '../../src/sync/sync-routes.js';
 import { runSnapshotPass } from '../../src/sync/snapshot-writer.js';
 import { visibleEventsFor } from '../../src/visibility/visible-events-for.js';
 import { canSee } from '../../src/visibility/can-see.js';
+import { canReadNoteById } from '../../src/visibility/can-read-note.js';
 import { listVisibleTickets } from '../../src/visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
+import { listNotes } from '../../src/read/notes.js';
+import { toEventView, type LedgerRow } from '../../src/routes/tickets.js';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { seedMember, seedProject } from '../helpers/seed.js';
@@ -172,6 +175,8 @@ export type HarnessClient = {
    * successes only would have hidden exactly the shape it measures.
    */
   pulls: string[];
+  /** `pulls` for notes (Plan 2 of 6): every note id this client's transport was ASKED for, at entry. */
+  notePulls: string[];
   /** Flush the outbox through the REAL sync service (the engine's own loop), then catch up. */
   goOnline(): Promise<void>;
   /**
@@ -295,6 +300,34 @@ async function bootstrapFor(pool: Pool, userId: string, workspaceId: string): Pr
     for (const row of await listVisibleTickets(client, userId, workspaceId)) {
       tickets.push(await bootstrapTicket(client, row['ticket_id'] as string));
     }
+    // THE NOTES, and their absence here was MEASURED rather than assumed
+    // (Plan 2 Task 8): without this section a harness client bootstraps ABOVE
+    // every note's events — its cursor is the current cut — and the stream then
+    // delivers none of them, because `workspace_seq > cursor` excludes them. So
+    // the first two-device note scenario found a client holding NOTHING after a
+    // clean sync, which is what a real fresh device would have held too.
+    //
+    // The route's own rule, restated here only because this function IS the
+    // route's restatement (`sync-routes.ts`'s handler is the other builder):
+    // every readable note plus the deleted ones this caller may see.
+    const readableNotes = await listNotes(client, eff, userId, workspaceId);
+    const deletedNotes = await listNotes(client, eff, userId, workspaceId, { deleted: true });
+    const noteIds = [...readableNotes, ...deletedNotes].map((n) => n.noteId);
+    const notes =
+      noteIds.length === 0
+        ? { events: [] }
+        : {
+            events: (
+              await client.query<LedgerRow>(
+                `SELECT id, workspace_id, entity_kind, entity_id, type, version, payload,
+                        actor_id, origin, client_time, server_time, seq, workspace_seq
+                   FROM events
+                   WHERE entity_kind = 'note' AND entity_id = ANY($1::text[])
+                   ORDER BY workspace_seq`,
+                [noteIds],
+              )
+            ).rows.map(toEventView),
+          };
     await client.query('COMMIT');
     return {
       workspaceId,
@@ -302,6 +335,7 @@ async function bootstrapFor(pool: Pool, userId: string, workspaceId: string): Pr
       streamSeq,
       definitions,
       tickets,
+      notes,
     };
   } catch (err) {
     try {
@@ -356,6 +390,14 @@ export async function createHarness(): Promise<Harness> {
         : new Promise<void>((resolve) => {
             waiters.push(resolve);
           });
+
+    /**
+     * Every NOTE id this client's transport was asked for, in order, appended
+     * at ENTRY — `pulls`'s exact rule and for its exact reason. A scenario
+     * proving "this widening cost one pull and not two" has no other door:
+     * the pull leaves no envelope behind and moves no cursor.
+     */
+    const notePulls: string[] = [];
 
     const transport: SyncTransport = {
       bootstrap: (ws) => bootstrapFor(pool, userId, ws),
@@ -419,8 +461,40 @@ export async function createHarness(): Promise<Harness> {
           client.release();
         }
       },
-      async reconcile(ws, heldIds) {
-        return { workspaceId: ws, restricted: await reconcileHeldIds(pool, userId, heldIds) };
+      async reconcile(ws, heldIds, heldNoteIds) {
+        // Both arms call the ROUTE's own functions, the same discipline the
+        // ticket arm's docblock states above: a restated rule is what lets a
+        // harness prove replicas against a server that no longer exists.
+        return {
+          workspaceId: ws,
+          restricted: await reconcileHeldIds(pool, userId, heldIds),
+          restrictedNotes: await reconcileHeldNoteIds(pool, userId, heldNoteIds ?? []),
+        };
+      },
+      /**
+       * The note pull (notes series, Plan 2 of 6) — the READ route's rule,
+       * asked here for the reason `bootstrapTicket` asks its own.
+       *
+       * `canReadNoteById` lives in the ROUTE rather than in a shared assembly
+       * function, and this harness has no 404 to send, so it asks the predicate
+       * itself. Skipping it would give this door a weaker gate than the
+       * product's, and every scenario asserting who can pull what would be
+       * asserting it against a server that does not exist.
+       *
+       * ENVELOPES, not rows: the real HTTP transport converts the route's
+       * `LedgerEventView` at its own edge (`net/http-transport.ts`), and the
+       * engine folds envelopes. `readEntityEvents` is the same reader the
+       * per-ticket bootstrap uses, so both pulls hand the engine one shape.
+       */
+      async bootstrapNote(_ws, noteId) {
+        // BEFORE the gate, for `bootstrapTicket`'s reason: a refused pull is a
+        // pull made, and a ledger written after the return would hide the
+        // retry-forever shape.
+        notePulls.push(noteId);
+        if (!(await canReadNoteById(pool, userId, noteId))) {
+          throw new Error(`bootstrapNote failed: 404 (${noteId})`);
+        }
+        return { events: await readEntityEvents(pool, 'note', noteId) };
       },
       // Only `engine.start()` opens a stream, and the harness never calls it:
       // sync-down is `syncDown()` below, on the same primitive the socket
@@ -484,6 +558,18 @@ export async function createHarness(): Promise<Harness> {
         } catch {
           // Deliberately silent, and deliberately WITHOUT clearing the id —
           // see the docblock. The next `syncDown()` tries again.
+        }
+      }
+      // And the NOTE half, over its own durable set and its own door — the
+      // same two loops the engine's `drainPendingPulls` runs, for the same
+      // reason the ticket loop above is mirrored rather than called.
+      for (const { id: noteId } of await replica.listPendingPulls(workspaceId, 'note')) {
+        try {
+          const payload = await transport.bootstrapNote(workspaceId, noteId);
+          await replica.loadNoteEvents(payload.events);
+          await replica.clearPendingPull(workspaceId, noteId, 'note');
+        } catch {
+          // Silent, id left owed — the ticket arm's rule, unchanged.
         }
       }
     }
@@ -612,7 +698,7 @@ export async function createHarness(): Promise<Harness> {
       }
     }
 
-    return { userId, replica, outbox, engine, ds, pulls, goOnline, syncDown, submit };
+    return { userId, replica, outbox, engine, ds, pulls, notePulls, goOnline, syncDown, submit };
   }
 
   const harness: Harness = {

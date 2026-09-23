@@ -68,6 +68,17 @@ export type BootstrapResponse = {
   /** Every `workflow.defined` / `ticket-type.defined`, ascending `workspaceSeq`. */
   definitions: LedgerEvent[];
   tickets: BootstrapTicket[];
+  /**
+   * Every readable note's whole ledger (Plan 2 of 6, spec §5.1). OPTIONAL
+   * because the server's own type declares it optional — a required field
+   * forces every constructor to change — and the server always sends it.
+   *
+   * `LedgerEventView`, the ROW dialect, because that is what the note pull
+   * route serves too: a device folds a note the same way whether it arrived in
+   * the bootstrap or from a `reach-granted` pull, and one conversion
+   * (`viewToEnvelope`) covers both.
+   */
+  notes?: { events: LedgerEventView[] };
 };
 
 /**
@@ -144,6 +155,50 @@ export type ReplicaTicket = { ticketId: string; confirmed: TicketState | null; c
  * into one.
  */
 export type PendingPullKind = 'ticket' | 'note';
+
+/**
+ * One ledger row as the READ routes serve it — the shape
+ * `GET /v1/notes/:noteId/events` and the bootstrap's `notes` section both send
+ * (the server's `LedgerEventView`). Declared here rather than in
+ * `net/http-transport.ts` because it is not a transport detail: the bootstrap
+ * payload carries these too, so `loadBootstrap` converts them as well.
+ *
+ * `viewToEnvelope` is the conversion, and it is TOTAL: both clocks already
+ * arrive as the server's own ISO 'Z' strings, so they are carried through
+ * untouched. `rowToEnvelope` above is the same function over local columns.
+ */
+export type LedgerEventView = {
+  id: string;
+  workspace_id: string;
+  entity_kind: string;
+  entity_id: string;
+  type: string;
+  version: number;
+  payload: unknown;
+  actor_id: string;
+  origin: string;
+  client_time: string;
+  server_time: string;
+  seq: number;
+  workspace_seq: number;
+};
+
+export function viewToEnvelope(row: LedgerEventView): LedgerEvent {
+  return {
+    id: row.id,
+    workspaceId: row.workspace_id,
+    entity: { kind: row.entity_kind as EventEnvelope['entity']['kind'], id: row.entity_id },
+    type: row.type,
+    version: row.version,
+    payload: row.payload,
+    actorId: row.actor_id,
+    origin: row.origin as EventEnvelope['origin'],
+    clientTime: row.client_time,
+    serverTime: row.server_time,
+    seq: row.seq,
+    workspaceSeq: row.workspace_seq,
+  };
+}
 
 export type LocalNoteComment = {
   commentId: string;
@@ -966,6 +1021,31 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     );
   }
 
+  /**
+   * `loadNoteEvents`'s body, split out so `loadBootstrap` can run it INSIDE the
+   * transaction that also writes the cursor — a bootstrap whose cursor landed
+   * and whose notes did not would be a device that believes it holds a
+   * workspace it has no notes from.
+   *
+   * IDEMPOTENT by construction: `INSERT OR IGNORE` on the events (keyed by
+   * event id) and a full replay per touched note. Delivery is at-least-once,
+   * and a device cut off mid-pull re-fetches the whole history.
+   */
+  async function loadNoteEventsIn(tx: SyncStorage, events: readonly LedgerEvent[]): Promise<void> {
+    const touched = new Set<string>();
+    for (const env of events) {
+      await insertEnvelopeIfAbsent(tx, env);
+      if (env.entity.kind !== 'note') continue;
+      if (env.type === 'comment.added') await applyNoteComment(tx, env);
+      else touched.add(env.entity.id);
+    }
+    // One refold per note, AFTER the whole batch is stored — not one per event.
+    // A refold replays that note's entire history, so doing it inside the loop
+    // would replay it once per event, which for a three-save note is nine
+    // passes over the same rows for one answer.
+    for (const noteId of touched) await refoldNote(tx, noteId);
+  }
+
   function rowToNote(row: SqlRow): NoteState {
     const pre = row.scope_before_inherit;
     return {
@@ -1069,6 +1149,21 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           'INSERT INTO meta (key, value) VALUES (?, ?) ON CONFLICT(key) DO UPDATE SET value = excluded.value',
           [`cursor:${data.workspaceId}`, String(data.streamSeq)],
         );
+        // THE NOTES, inside the same transaction as the cursor that covers
+        // them (Plan 2 of 6). A device that has never synced has no cursor gap
+        // for a notice to repair, so without this a fresh device — and a new
+        // MEMBER, which is the case `readerReachNoticeFor` deliberately does
+        // not cover — would be handed a workspace whose notes are simply
+        // missing until something happened to widen one.
+        //
+        // Through `loadNoteEvents` rather than a second insert loop, so the
+        // id-idempotence and the fold are the same code the pull path uses.
+        // `viewToEnvelope` because the payload is the ROW dialect: this is the
+        // same conversion the note pull route needs, and having one of it is
+        // the whole reason it is exported.
+        if (data.notes !== undefined && data.notes.events.length > 0) {
+          await loadNoteEventsIn(tx, data.notes.events.map(viewToEnvelope));
+        }
       });
       notify();
     },
@@ -1487,20 +1582,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     },
 
     async loadNoteEvents(events) {
-      await storage.transaction(async (tx) => {
-        const touched = new Set<string>();
-        for (const env of events) {
-          await insertEnvelopeIfAbsent(tx, env);
-          if (env.entity.kind !== 'note') continue;
-          if (env.type === 'comment.added') await applyNoteComment(tx, env);
-          else touched.add(env.entity.id);
-        }
-        // One refold per note, AFTER the whole batch is stored — not one per
-        // event. A refold replays that note's entire history, so doing it inside
-        // the loop would replay it once per event, which for a three-save note
-        // is nine passes over the same rows for one answer.
-        for (const noteId of touched) await refoldNote(tx, noteId);
-      });
+      await storage.transaction((tx) => loadNoteEventsIn(tx, events));
       notify();
     },
 

@@ -1,5 +1,5 @@
 import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
-import type { BootstrapResponse, TicketBootstrap } from '../replica/replica.js';
+import { viewToEnvelope, type BootstrapResponse, type LedgerEventView, type TicketBootstrap } from '../replica/replica.js';
 import { NotePullNotFound, TicketPullNotFound } from '../engine/sync-engine.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
@@ -37,60 +37,15 @@ export type WebSocketLike = {
 };
 
 /**
- * One ledger row as `GET /v1/notes/:noteId/events` serves it — a MIRROR of the
- * server's `LedgerEventView` (`apps/server/src/routes/tickets.ts`), declared
- * here for the same reason `sync-item.ts` mirrors `SyncItem`: this package may
- * not depend on `apps/server`.
+ * The note pull's payload conversion — `viewToEnvelope`, imported from the
+ * replica module rather than declared here.
  *
- * ## Why the note pull needs a conversion and the ticket pull does not
- *
- * The ticket pull goes to `/v1/sync/bootstrap/ticket`, a SYNC door, which
- * serves `LedgerEvent` envelopes. The note pull goes to the note-events READ
- * route, which is in the row dialect (snake_case columns, ISO-string clocks) —
- * the one `GET /v1/tickets/:id/events` uses, because the web app's history view
- * reads both. The engine folds envelopes, so the conversion belongs HERE, at
- * the transport edge, rather than in the engine: an engine that accepted either
- * dialect would be an engine whose `loadNoteEvents` had two shapes to keep in
- * step, and the fold is the one place that must not guess.
- *
- * The move is total and lossless — `replica.ts`'s private `rowToEnvelope` is
- * the same function over the same columns, and its docblock states the one
- * property that matters: both clocks already arrive as the server's own ISO 'Z'
- * strings, so they are carried through untouched rather than re-parsed.
+ * It MOVED there in Plan 2 Task 8, when `Replica.loadBootstrap` turned out to
+ * need the same function for the bootstrap's `notes` section. Two copies of a
+ * field-by-field mapping is the shape this series' signature failure names, and
+ * the alternative — the bootstrap handing the replica ROWS and the pull handing
+ * it ENVELOPES — would give the fold two input shapes.
  */
-type LedgerEventView = {
-  id: string;
-  workspace_id: string;
-  entity_kind: string;
-  entity_id: string;
-  type: string;
-  version: number;
-  payload: unknown;
-  actor_id: string;
-  origin: string;
-  client_time: string;
-  server_time: string;
-  seq: number;
-  workspace_seq: number;
-};
-
-function viewToEnvelope(row: LedgerEventView): LedgerEvent {
-  return {
-    id: row.id,
-    workspaceId: row.workspace_id,
-    entity: { kind: row.entity_kind as LedgerEvent['entity']['kind'], id: row.entity_id },
-    type: row.type,
-    version: row.version,
-    payload: row.payload,
-    actorId: row.actor_id,
-    origin: row.origin as LedgerEvent['origin'],
-    clientTime: row.client_time,
-    serverTime: row.server_time,
-    seq: row.seq,
-    workspaceSeq: row.workspace_seq,
-  };
-}
-
 /** The same derivation `app-core/src/online/stream.ts` uses — one wire, one URL rule. */
 export function streamUrl(baseUrl: string): string {
   return `${baseUrl.replace(/^http/, 'ws')}/v1/stream`;
