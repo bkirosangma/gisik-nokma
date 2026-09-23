@@ -3158,6 +3158,13 @@ input, textarea, select { font-family: inherit; }
   display: none;
 }
 
+/* One workspace's own branch of the tree — a plain spacing rule; the visible
+   structure is its heading and its rows'. Rendered since Task 2 with no rule
+   of its own until Task 9's scanner (18.226) found the gap. */
+.gn-notes__section + .gn-notes__section {
+  margin-top: 1rem;
+}
+
 .gn-notes__section-title,
 .gn-notes__group-title {
   margin: 0;
@@ -3380,13 +3387,31 @@ input, textarea, select { font-family: inherit; }
   color: var(--gn-text-muted);
 }
 
-/* ONE COLUMN below 60rem, and the tree stays ABOVE the document in the flow:
-   the tree is how you reach a note, so it is the thing a reader with no open
-   note needs first. Task 9 turns this block into the drawer; at this task the
-   two stack. */
+/* ONE COLUMN below 60rem, and the tree becomes a `<details>`-style drawer: a
+   `Notes list` toggle (`aria-expanded`, always in the DOM — jsdom cannot
+   evaluate `@media`, so the observable has to be the attribute, not a
+   conditional render) and the tree itself hidden unless `[data-open="true"]`.
+   Same shape `.gn-nav__more-toggle`'s own fix (E4-11) settled on: the content
+   stays in the document and in the accessibility tree, always one Tab away,
+   rather than being unmounted. */
+.gn-notes__tree-toggle {
+  display: none;
+}
+
 @media (max-width: 60rem) {
   .gn-notes__body {
     grid-template-columns: minmax(0, 1fr);
+  }
+  .gn-notes__tree-toggle {
+    display: inline-flex;
+    align-items: center;
+    margin-bottom: 0.75rem;
+  }
+  .gn-notes__tree--drawer {
+    display: none;
+  }
+  .gn-notes__tree--drawer[data-open='true'] {
+    display: block;
   }
 }
 
@@ -3489,6 +3514,14 @@ input, textarea, select { font-family: inherit; }
 
 /* ── Task 6: the History panel ──────────────────────────────────────────── */
 
+/* The version view's own wrapper — the banner, the read-only editor and the
+   actions row inside it, stacked. Rendered from Task 6 with no rule of its
+   own until Task 9's scanner (18.226) found the gap. */
+.gn-notes__history-version {
+  display: flex;
+  flex-direction: column;
+}
+
 .gn-notes__history-list {
   display: flex;
   flex-direction: column;
@@ -3549,6 +3582,13 @@ input, textarea, select { font-family: inherit; }
   gap: 0.5rem;
 }
 
+/* The results wrapper — replaces the tree's groups while a query is active
+   (18.216). A plain block; the visible shape is `.gn-notes__results` and the
+   two copy lines inside it. */
+.gn-notes__search-results {
+  margin-top: 0.5rem;
+}
+
 .gn-notes__corrected {
   margin: 0 0 0.5rem;
   color: var(--gn-text-muted);
@@ -3599,4 +3639,27 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__snippet mark {
   background: var(--gn-tint-warning);
   color: inherit;
+}
+
+/* ── Task 9: the deleted banner ─────────────────────────────────────────── */
+
+/* Same fill-plus-edge shape `.gn-shell__refusal` uses (`--gn-danger` as an
+   ACCENT, never as the fill — this codebase reserves the tint tokens it does
+   have, like `--gn-tint-warning`, for smaller surfaces such as a badge). */
+.gn-notes__deleted-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-secondary);
+  box-shadow: inset 4px 0 0 var(--gn-danger);
+  color: var(--gn-text);
+}
+
+.gn-notes__deleted-banner p {
+  margin: 0;
+  flex: 1 1 auto;
 }

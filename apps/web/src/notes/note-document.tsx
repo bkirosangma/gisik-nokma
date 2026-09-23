@@ -1,13 +1,15 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   TicketEditorSlot,
   exportMarkdown,
   extractReadingMeta,
   readingTimeMinutes,
+  type ReadingMeta,
 } from '@gisik-nokma/editor';
+import { Button } from '@gisik-nokma/ui';
 import {
   makeSubmittedFactory,
   useLiveQuery,
@@ -49,9 +51,21 @@ import { useNoteAutosave } from './use-note-autosave.js';
 export function NoteDocument({
   noteId,
   workspaces,
+  editorRootRef,
+  onHeadingsChange,
+  onLostAccess,
 }: {
   noteId: string;
   workspaces: WorkspaceRef[];
+  /** Task 9: `NotesPage`'s TOC column needs the SAME scroll container `ReadingTOC` observes — supplied here rather than exposed via `forwardRef`, since nothing else needs imperative access to it. */
+  editorRootRef?: RefObject<HTMLDivElement | null>;
+  onHeadingsChange?: (headings: ReadingMeta['headings']) => void;
+  /**
+   * Spec §9.7: an open note whose live query answers `null` AFTER having
+   * already answered non-null — not a note that was never readable, which
+   * the existing inline "no longer shared" state below already covers.
+   */
+  onLostAccess?: () => void;
 }) {
   const { dataSource } = useAppServices();
   const user = useCurrentUser();
@@ -111,6 +125,28 @@ export function NoteDocument({
   const note = live.data;
   const workspace = workspaces.find((candidate) => candidate.id === note?.workspaceId) ?? null;
 
+  /**
+   * Whether THIS `noteId` has ever answered non-null, reset per note. Without
+   * it, a `null` on the very FIRST answer (a stale link, a note that was
+   * never shared) would ALSO fire `onLostAccess` — the wrong copy for that
+   * case, which the inline "no longer shared" state below already draws.
+   * `onLostAccess` is for a note that WAS open and then stopped being
+   * readable — a purge, a scope change — which only a note this ref has
+   * already seen non-null can mean.
+   */
+  const everLoadedRef = useRef(false);
+  useEffect(() => {
+    everLoadedRef.current = false;
+  }, [noteId]);
+  useEffect(() => {
+    if (note !== null) {
+      everLoadedRef.current = true;
+      return;
+    }
+    if (!live.settled || !everLoadedRef.current) return;
+    onLostAccess?.();
+  }, [note, live.settled, onLostAccess]);
+
   const [members, setMembers] = useState<RosterMember[]>([]);
   useEffect(() => {
     if (note === null) return;
@@ -135,16 +171,22 @@ export function NoteDocument({
    * with, which is the note as it was, not as it is.
    */
   const [draft, setDraft] = useState<unknown>(null);
-  const editorRoot = useRef<HTMLDivElement | null>(null);
+  const ownEditorRoot = useRef<HTMLDivElement | null>(null);
+  const editorRoot = editorRootRef ?? ownEditorRoot;
   const [wordCount, setWordCount] = useState(0);
 
-  // The reading time comes off the RENDERED node (`extractReadingMeta` reads a
-  // DOM element), so it is recomputed after each paint that a draft changed.
+  // The reading time AND the TOC's headings come off the RENDERED node
+  // (`extractReadingMeta` reads a DOM element), so both are recomputed after
+  // each paint that a draft changed. The headings are reported UP to
+  // `NotesPage` — its `<aside>` column is a sibling of this component, not a
+  // descendant, so it cannot read this ref itself.
   useEffect(() => {
     const root = editorRoot.current;
     if (root === null) return;
-    setWordCount(extractReadingMeta(root).wordCount);
-  }, [draft, note?.noteId]);
+    const meta = extractReadingMeta(root);
+    setWordCount(meta.wordCount);
+    onHeadingsChange?.(meta.headings);
+  }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
 
   /** The loaded list for `queryNotes` and `resolveNoteTitle`. */
   const [treeNotes, setTreeNotes] = useState<NoteSummary[]>([]);
@@ -168,6 +210,15 @@ export function NoteDocument({
     note !== null &&
     user !== null &&
     (note.authorId === user.id || workspace?.role === 'owner' || workspace?.role === 'admin');
+  /**
+   * A deleted note is read-only for EVERYONE, including its own author,
+   * until Restore brings it back — editing a note that is not there is not a
+   * state this page draws. `canEdit` itself stays the "may this person act
+   * on this note at all" fact (the banner's own Restore button reads it
+   * directly), and this is the narrower "may they type right now" fact the
+   * editor/title/byline read instead.
+   */
+  const canEditNow = canEdit && note?.deleted !== true;
 
   async function write(eventType: string, payload: Record<string, unknown>): Promise<boolean> {
     if (user === null || note === null) return false;
@@ -202,6 +253,27 @@ export function NoteDocument({
   );
 
   const [historyOpen, setHistoryOpen] = useState(false);
+  /**
+   * Bumped on any write whose effect a mounted `NoteEditorPane` cannot pick
+   * up from a changed PROP alone, and folded into the pane's `key` below —
+   * neither write changes `noteId`, so without this the pane would not
+   * remount:
+   *
+   * - a History **Restore** (`note.body_set`): `useNoteAutosave`'s
+   *   lazy-state `initialDoc` (see its own docblock) and `TicketEditor`'s
+   *   one-time `useEditor` mount would both keep showing the PRE-restore
+   *   body forever — `live.reload()` updates the `note` PROP, but nothing
+   *   downstream of the pane's own mount ever reads a prop change again.
+   *   Found by an advisor review, not by 18.212 (`HistoryPanel`'s own
+   *   case), which only proves `onRestore` is called with the right bytes —
+   *   never that they reach the screen.
+   * - the deleted banner's **Restore** (`note.restored`): `TicketEditor`'s
+   *   own docblock states `editable` is read ONCE, at mount, exactly like
+   *   `content` — *"a host that needs it to change must remount"* — so
+   *   flipping `note.deleted` back to `false` would leave the editor
+   *   read-only until the person reloaded the page, without this.
+   */
+  const [editorGeneration, setEditorGeneration] = useState(0);
 
   if (note === null) {
     return (
@@ -225,7 +297,7 @@ export function NoteDocument({
 
       <NoteTitle
         title={note.title}
-        canEdit={canEdit}
+        canEdit={canEditNow}
         onRename={(next) => void write('note.renamed', { title: next })}
       />
 
@@ -235,7 +307,7 @@ export function NoteDocument({
         members={members}
         authorName={authorName}
         editedLabel={editedLabel(note.updatedAt)}
-        canEdit={canEdit}
+        canEdit={canEditNow}
         onScopeChanged={() => live.reload()}
         onDetach={(ticketId) => void write('note.detached', { ticketId })}
         readingLabel={readingLabel(wordCount)}
@@ -247,12 +319,33 @@ export function NoteDocument({
         onOpenHistory={() => setHistoryOpen(true)}
       />
 
+      {note.deleted ? (
+        <div className="gn-notes__deleted-banner" role="status" data-testid="note-deleted-banner">
+          <p>This note was deleted</p>
+          {canEdit ? (
+            <Button
+              onClick={() => {
+                void write('note.restored', {}).then((wrote) => {
+                  if (wrote) setEditorGeneration((generation) => generation + 1);
+                });
+              }}
+            >
+              Restore
+            </Button>
+          ) : (
+            <Button variant="ghost" onClick={() => router.push('/notes')}>
+              Back
+            </Button>
+          )}
+        </div>
+      ) : null}
+
       <div className="gn-notes__editor" ref={editorRoot} data-testid="note-editor">
         <NoteEditorPane
-          key={note.noteId}
+          key={`${note.noteId}:${editorGeneration}`}
           note={note}
           treeNotes={treeNotes}
-          canEdit={canEdit}
+          canEdit={canEditNow}
           dataSource={dataSource}
           userId={user?.id ?? ''}
           onDraftChange={setDraft}
@@ -271,7 +364,10 @@ export function NoteDocument({
         nameOf={nameOf}
         onRestore={(body) => {
           void write('note.body_set', { body }).then((wrote) => {
-            if (wrote) setHistoryOpen(false);
+            if (wrote) {
+              setHistoryOpen(false);
+              setEditorGeneration((generation) => generation + 1);
+            }
           });
         }}
       />

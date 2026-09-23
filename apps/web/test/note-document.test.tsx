@@ -489,3 +489,72 @@ describe('18.205-18.209 autosave, mounted through NoteDocument', () => {
     }
   });
 });
+
+/**
+ * Additional coverage beyond the plan's named cases (advisor review, same
+ * session): a real defect in the History→Restore path, found before Task 9
+ * touched this file at all.
+ *
+ * `NoteEditorPane` (Task 5) is keyed by `note.noteId` so a DIFFERENT note
+ * remounts it — the mechanism the autosave hook's own docblock depends on for
+ * synchronous draft recovery. Restoring an OLD version does not change
+ * `noteId`, so before the fix below, `write('note.body_set', …)`'s
+ * `live.reload()` updated the `note` PROP the pane already had — but
+ * `TicketEditor`'s `useEditor` (`packages/editor` case 9.72, empty deps)
+ * never re-reads it: the live editor kept showing the PRE-restore body, and
+ * `HistoryPanel`'s own 18.212 could not see this — it only proves
+ * `onRestore` is called with the right bytes, not that they reach the page.
+ */
+describe('History → Restore reaches the live editor, not just the server record', () => {
+  it('Restore actually updates the editor on screen, not only the record the server holds', async () => {
+    const user = userEvent.setup();
+    const OLD_EVENT = '01J9EVENTOLD00000000000000000';
+    let currentNote = noteDetail({ body: body('the current words') });
+
+    const services = stubServices({
+      getNote: async (_workspaceId: string, id: string) => (id === NOTE ? currentNote : null),
+      getMembers: async () => MEMBERS,
+      getNotes: async () => [],
+      getDeletedNotes: async () => [],
+      getNoteHistory: async () => [
+        { eventId: OLD_EVENT, authorId: 'u_kiro', recordedAt: '2026-09-23T05:00:00.000Z', seq: 1 },
+      ],
+      getNoteVersion: async () => body('the old words'),
+    });
+    services.dataSource.ingest = async (events: SubmittedEvent[]) => {
+      // The fixture's OWN commit: a real server would fold `note.body_set`
+      // through the reducer; this stands in for that fold, the same way
+      // every other write test in this file does.
+      currentNote = { ...currentNote, body: body('the old words'), updatedAt: '2026-09-23T09:00:00.000Z' };
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 2,
+        serverTime: '2026-09-23T09:00:00.000Z',
+      }));
+    };
+
+    render(
+      <Providers services={services}>
+        <NoteDocument noteId={NOTE} workspaces={[WS_A_REF]} />
+      </Providers>,
+    );
+    const editor = await screen.findByTestId('note-editor');
+    await waitFor(() =>
+      expect(editor.querySelector('.ProseMirror')?.textContent ?? '').toContain('the current words'),
+    );
+
+    await user.click(screen.getByRole('button', { name: 'History' }));
+    const row = await screen.findByTestId(`history-row-${OLD_EVENT}`);
+    await user.click(row);
+    await screen.findByText(/Viewing version from/);
+    await user.click(screen.getByRole('button', { name: 'Restore' }));
+
+    // THE ASSERTION: the LIVE editor (not the History panel's own read-only
+    // one) shows the restored body.
+    await waitFor(() =>
+      expect(editor.querySelector('.ProseMirror')?.textContent ?? '').toContain('the old words'),
+    );
+    expect(editor.querySelector('.ProseMirror')?.textContent ?? '').not.toContain('the current words');
+  });
+});

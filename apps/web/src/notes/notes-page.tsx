@@ -1,9 +1,10 @@
 'use client';
 
 import Link from 'next/link';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
-import { Button } from '@gisik-nokma/ui';
+import { Button, Toast } from '@gisik-nokma/ui';
+import { ReadingTOC, type ReadingMeta } from '@gisik-nokma/editor';
 import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteScopeMode } from '@gisik-nokma/domain';
 import { AppNav } from '../app-nav.js';
@@ -13,6 +14,20 @@ import { CreateNoteDialog } from './create-note-dialog.js';
 import { NoteDocument } from './note-document.js';
 import { NotesSearchHeader } from './notes-search-header.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
+
+/**
+ * A ONE-SHOT flash, read by the NEXT mount of this page and cleared
+ * immediately — the module-level cache `use-last-project.ts` uses for the
+ * same reason, applied to a toast instead of a remembered id.
+ *
+ * `/notes` and `/notes/[noteId]` are TWO route files (`app/notes/page.tsx`,
+ * `app/notes/[noteId]/page.tsx`), each mounting `NotesPage` fresh — so
+ * `router.replace('/notes')` from a note whose access was just lost does not
+ * merely re-render this component, it REMOUNTS it, and any state set right
+ * before the navigation is gone before the toast could ever paint. A module
+ * variable survives the remount; component state does not.
+ */
+let pendingLostAccessToast = false;
 
 /**
  * The `/notes` page (notes series Plan 5, spec §9.1–9.2).
@@ -84,6 +99,37 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   const [authorId, setAuthorId] = useState('');
   const [scopeMode, setScopeMode] = useState('');
 
+  /**
+   * Read ONCE, in the lazy initializer, and cleared in the SAME call —
+   * `pendingLostAccessToast` is a one-shot flag, and reading it twice (once
+   * here, once in an effect) would risk a second mount seeing it still `true`
+   * from React's Strict Mode double-invoke of initializers in development.
+   */
+  const [lostAccessToast, setLostAccessToast] = useState(() => {
+    const flash = pendingLostAccessToast;
+    pendingLostAccessToast = false;
+    return flash;
+  });
+  const handleLostAccess = useCallback(() => {
+    pendingLostAccessToast = true;
+    router.replace('/notes');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  /**
+   * Task 9's TOC (spec §8.2): `NoteDocument` owns the editor's DOM (the
+   * headings live inside it) and this page owns the `<aside>` column — so the
+   * ref `ReadingTOC` needs to scroll/observe is CREATED here and handed down,
+   * and the headings it needs are reported back up through a callback. See
+   * `NoteDocument`'s own docblock for why the ref is not exposed some other
+   * way.
+   */
+  const editorRootRef = useRef<HTMLDivElement | null>(null);
+  const [headings, setHeadings] = useState<ReadingMeta['headings']>([]);
+
+  /** The drawer toggle (Task 9, `<details>`-style, below 60rem — CSS gates the actual visibility; see globals.css). */
+  const [treeOpen, setTreeOpen] = useState(false);
+
   useEffect(() => {
     if (!signedIn) return;
     let cancelled = false;
@@ -151,7 +197,25 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           ) : null}
         </div>
         <div className="gn-notes__body">
-          <nav aria-label="Notes" className="gn-notes__tree">
+          {/* Below 60rem (globals.css): a `<details>`-style drawer. Always in
+              the DOM — CSS alone decides whether it is painted, `aria-expanded`
+              is the observable a test (or a screen reader) can see regardless
+              of viewport, and `aria-controls` names the tree it opens. */}
+          <button
+            type="button"
+            className="gn-notes__tree-toggle"
+            aria-expanded={treeOpen}
+            aria-controls="gn-notes-tree"
+            onClick={() => setTreeOpen((open) => !open)}
+          >
+            Notes list
+          </button>
+          <nav
+            aria-label="Notes"
+            id="gn-notes-tree"
+            className="gn-notes__tree gn-notes__tree--drawer"
+            data-open={treeOpen ? 'true' : 'false'}
+          >
             {/* The tree head — the Create button, and the title filter beside
                 it.
                 The head is drawn once the workspaces READ has ANSWERED, which
@@ -217,16 +281,40 @@ export function NotesPage({ noteId }: { noteId?: string }) {
             {noteId === undefined ? (
               <p className="gn-notes__hint">{NO_NOTE_COPY}</p>
             ) : (
-              /* Task 6 adds History and Task 7 the comments thread inside the
-                 document; both are absent rather than stubbed, because a
-                 control that opens nothing is the dead-control shape this repo
-                 refuses to draw. */
-              <NoteDocument noteId={noteId} workspaces={workspaces ?? []} />
+              <NoteDocument
+                noteId={noteId}
+                workspaces={workspaces ?? []}
+                editorRootRef={editorRootRef}
+                onHeadingsChange={setHeadings}
+                onLostAccess={handleLostAccess}
+              />
             )}
           </section>
-          <aside className="gn-notes__toc" aria-label="On this page" />
+          {/* `aria-label` stays on THIS wrapper, not on `ReadingTOC`'s own
+              inner `<nav>` — case 18.181 (Task 1) already asserts this
+              `complementary` landmark exists with no note open, when
+              `ReadingTOC` renders nothing at all (fewer than 3 headings is
+              its own gate, and an unopened note has none). Yes, once the TOC
+              DOES render, its inner `<nav aria-label="On this page">` nests
+              inside a `complementary` region of the same name — redundant,
+              not broken; the alternative breaks the region that has to exist
+              before any heading does. */}
+          <aside className="gn-notes__toc" aria-label="On this page">
+            <ReadingTOC headings={headings} scrollContainerRef={editorRootRef} />
+          </aside>
         </div>
       </div>
+      {/* Spec §9.7: a note that stops being readable while open. Mounted at
+          the page's foot, like the inbox's own Undo toast, so it survives
+          whatever the document region is showing underneath it — though here
+          the flag that opens it is set BEFORE the navigation that remounts
+          this whole page (see `pendingLostAccessToast`'s own docblock), not
+          by a state change on an already-mounted instance. */}
+      <Toast
+        open={lostAccessToast}
+        message="That note is no longer shared with you"
+        onDismiss={() => setLostAccessToast(false)}
+      />
       {/* The dialog is mounted OUTSIDE `.gn-notes` — `Dialog` portals to the
           body anyway, and keeping it out of the grid means the tree's layout
           cannot be affected by a panel that is not in it. */}
