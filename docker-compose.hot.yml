@@ -93,9 +93,15 @@
 services:
   server:
     build:
-      # `context` and `dockerfile` are inherited from docker-compose.dev.yml;
-      # only the stage is added. The stage MUST be named here, because the
-      # Dockerfile's un-targeted default is the production `runtime` stage.
+      # `context` is inherited from docker-compose.dev.yml. `dockerfile` is
+      # OVERRIDDEN here — task/docker-build-cache (2026-09-23) moved the `dev`
+      # stage out of `apps/server/Dockerfile` into its own
+      # `apps/server/Dockerfile.dev`, so this override can no longer inherit
+      # the base file's `dockerfile:`. `target: dev` still names the stage
+      # inside it, which is no longer strictly required (it is the only stage
+      # in that file) but is kept for parity with the `web` service below and
+      # because it is what the comments elsewhere in this file still say.
+      dockerfile: apps/server/Dockerfile.dev
       target: dev
     # Migrations first (the same thing the prod entrypoint does), then the
     # package watchers in parallel with the server's own source watcher.
@@ -268,10 +274,11 @@ services:
   # answering before this starts serving.
   web:
     build:
-      # `context`, `dockerfile` and the base file's two build args are inherited;
-      # only the stage is added. The stage MUST be named, because the web
-      # Dockerfile's un-targeted default is the production `runtime` stage — the
-      # same trap the `server` service above documents, in the same shape.
+      # `context` and the base file's two build args are inherited; `dockerfile`
+      # is OVERRIDDEN, same reason and same shape as the `server` service above
+      # — the `dev` stage moved to `apps/web/Dockerfile.dev` on
+      # task/docker-build-cache (2026-09-23).
+      dockerfile: apps/web/Dockerfile.dev
       target: dev
     command:
       # `sh -c` explicitly, for the measured reason given at `server` above:

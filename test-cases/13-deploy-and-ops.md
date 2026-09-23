@@ -468,3 +468,48 @@ at the web host.
   is dialled at the host that holds the cookie; CONTROL: `SERVER_ORIGIN` is still `https://pm-api.artsourced.in`
   (the build-time rewrite target). `apps/server/test/deploy/app-spec-ingress.test.ts`. Mutation: restore
   `pm-api` in `NEXT_PUBLIC_SERVER_URL` → red.
+
+## Production Docker builds reuse their dependency layer (`task/docker-build-cache`, 2026-09-23)
+
+App Platform build logs of deployment `88477008…` (copies at
+`gisik-nokma-lanes/evidence-build-{server,web,backup}-2026-09-23.log`): kaniko's registry layer cache
+HIT the apk layer, `RUN corepack enable`, and the retired `dev` stage's `RUN pnpm fetch` — but the
+production `build` stage did `COPY . .` THEN `RUN pnpm install --frozen-lockfile`, so its install layer
+had no lockfile-keyed cache to hit at all: "No cached layer found" on every deploy (71s server, 57s
+web, 71s backup, which shares `apps/server/Dockerfile`). Separately, with no `--target` named anywhere
+on App Platform, kaniko built the `dev` stage too — an image nothing runs — adding ~2-3 min per
+component (wall: server 4:50, web 4:21, backup 4:26). Both Dockerfiles' `build` stage now uses the
+`dev` stage's own layering (manifests → `pnpm fetch` → source → `pnpm install --offline`), and the
+`dev` stage itself moved out to `apps/{server,web}/Dockerfile.dev`, which `docker-compose.hot.yml`'s
+retired override now points at directly (`dockerfile:`, alongside the `target: dev` it already named).
+
+- 13.1426 ✅ For BOTH Dockerfiles, in the `build` stage the manifest/lockfile `COPY` lines precede
+  `RUN pnpm fetch`, which precedes `COPY . .`, which precedes `RUN pnpm install --offline
+  --frozen-lockfile`. CONTROL: the `runtime` stage still `COPY --from=build`s the same paths as before
+  this change (server: `/out`, the entrypoint script; web: `.next/standalone`, `.next/static`,
+  `public`). `apps/server/test/deploy/dockerfile-cache-shape.test.ts`. Mutation: swap `RUN pnpm fetch`
+  and `COPY . .` in the server Dockerfile's `build` stage → red (measured 2026-09-23, Node v22.23.2).
+- 13.1427 ✅ No stage named `dev` remains in either production Dockerfile, the `runtime` stage is still
+  the last stage in each, the moved-out `apps/{server,web}/Dockerfile.dev` files exist and each still
+  carries the `dev` stage, and `docker-compose.hot.yml`'s retired override points its `build.dockerfile`
+  at them. `apps/server/test/deploy/dockerfile-cache-shape.test.ts`. Mutation: re-add `FROM node:22-alpine
+  AS dev` to the server Dockerfile → red (measured 2026-09-23, Node v22.23.2).
+- 13.1428 🧪 LOCAL MEASUREMENT (run 2026-09-23, Node v22.23.2, Docker Desktop) — `docker build
+  --no-cache -f apps/server/Dockerfile --target runtime .`, then the same command without `--no-cache`,
+  then once more after a one-line comment-only edit to `apps/server/src/index.ts` (not the lockfile),
+  each timed with `/usr/bin/time -p`: **266.73s cold → 24.33s fully cached (every step `CACHED`) →
+  86.14s after the source edit**, with `RUN pnpm fetch` reported `CACHED` and `RUN pnpm install
+  --offline --frozen-lockfile` finishing in **3.6s** (`Done in 2s`). Same recipe for
+  `apps/web/Dockerfile` (with `--build-arg SERVER_ORIGIN=http://server:3000 --build-arg
+  NEXT_PUBLIC_SERVER_URL=http://localhost:3000`, edit to `apps/web/next.config.ts`): **265.73s cold →
+  8.43s fully cached → 59.96s after the source edit**, fetch `CACHED`, install in **2.0s** (`Done in
+  1.6s`). Both edits reverted immediately after their timed build; probe images removed
+  (`docker rmi`). No `docker compose` used.
+- 13.1429 🧪 The existing `apps/server/test/deploy/compose-dev-contract.test.ts` cases and
+  `pnpm check:runbook` stay green after the `docker-compose.hot.yml` repoint (verified 2026-09-23,
+  Node v22.23.2 — see this branch's commit body for the exact run).
+- 13.1430 🧪 Post-deploy App Platform log reading, once this lands and deploys: confirm the fetch layer
+  and install step show cache hits, the `dev` stage no longer builds, wall times drop toward the
+  13.1428 measurement, and whether the `backup` worker's layers come back CACHED once `server`'s build
+  has already primed the registry cache (the two share `apps/server/Dockerfile`). Not yet run — left 🧪
+  with this recipe.
