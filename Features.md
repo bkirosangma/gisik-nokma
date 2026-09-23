@@ -1465,6 +1465,9 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   from the spec's wording rather than an omission: `editor.css`'s header forbids every colour form and
   packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
   a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
+- ✅ **Reading extras for long documents** — word count, reading time (200 wpm, floored at a
+  minute for any non-empty text) and a table of contents that renders at three headings or more.
+  `packages/editor/src/reading/reading-meta.ts`, `ReadingTOC.tsx`
 - ✅ **Markdown in and out** — pasting plain text that looks like Markdown converts it (a clipboard carrying
   `text/html` is left to the default handler); copying formatted content puts Markdown in the PLAIN-TEXT
   clipboard flavour only; `exportMarkdown` renders a whole document through the editor's own schema.

@@ -308,3 +308,25 @@ describe('9.282 the wiki-link and its missing pill are styled apart', () => {
     expect(declared(link, 'text-decoration')).toBeNull();
   });
 });
+
+/**
+ * 9.288–9.290 — THE READING RAIL'S STYLES (Plan 4 Task 7). Same split as
+ * everything above: the markup is asserted in `reading-toc.test.tsx`, and what
+ * makes the rail READ as an outline is the per-level indent and the weight on
+ * the active entry — neither of which jsdom can report.
+ */
+describe('9.290 the reading rail is styled', () => {
+  it('9.290 each heading level is indented, and the active entry is marked by weight', () => {
+    const h1 = ruleBody(EDITOR_CSS, '.reading-toc__item--h1 .reading-toc__link');
+    const h2 = ruleBody(EDITOR_CSS, '.reading-toc__item--h2 .reading-toc__link');
+    const h3 = ruleBody(EDITOR_CSS, '.reading-toc__item--h3 .reading-toc__link');
+    expect(declared(h1, 'padding-left')).toBe('0');
+    expect(declared(h2, 'padding-left')).toBe('1rem');
+    expect(declared(h3, 'padding-left')).toBe('2rem');
+
+    // The active entry is NOT colour: this stylesheet may not name one, and
+    // colour alone is never the only indicator.
+    const active = ruleBody(EDITOR_CSS, ".reading-toc__link[aria-current='true']");
+    expect(declared(active, 'font-weight')).toBe('600');
+  });
+});

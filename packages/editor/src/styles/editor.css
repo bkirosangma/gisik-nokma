@@ -587,3 +587,20 @@
   background: Canvas;
   z-index: 50;
 }
+
+/* The reading rail (spec §8.2, Plan 4 Task 7). Structure only, like everything
+   above — and NO width rule: the source gated on a 1100px viewport inside the
+   component, and the port moved that decision out to the page, because a
+   breakpoint hidden in a component cannot be overridden by a stylesheet. */
+.reading-toc { padding: 0.5rem 0; }
+.reading-toc__list { list-style: none; margin: 0; padding: 0; }
+.reading-toc__item { margin: 0; }
+/* Indent by level so the outline reads as one — `padding-left` rather than a
+   margin, so the click target spans the full row. */
+.reading-toc__item--h1 .reading-toc__link { padding-left: 0; }
+.reading-toc__item--h2 .reading-toc__link { padding-left: 1rem; }
+.reading-toc__item--h3 .reading-toc__link { padding-left: 2rem; }
+.reading-toc__link { display: block; padding-top: 0.25rem; padding-bottom: 0.25rem; }
+/* The active entry is marked by WEIGHT, not by colour: this file may not name
+   a colour, and colour alone is never the only indicator anyway. */
+.reading-toc__link[aria-current='true'] { font-weight: 600; }

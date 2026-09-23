@@ -44,6 +44,13 @@ export {
   type WikiLinkPopupProps,
   type WikiLinkPopupRenderer,
 } from './extensions/wiki-link-popup.js';
+export {
+  extractReadingMeta,
+  headerSlug,
+  readingTimeMinutes,
+  type ReadingMeta,
+} from './reading/reading-meta.js';
+export { ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
 export { UploadRefusedError, uploadAttachmentHttp, type UploadResult } from './upload.js';
 export {
   attachmentPasteKey,
