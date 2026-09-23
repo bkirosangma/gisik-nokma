@@ -14,6 +14,7 @@ in the table below. Take from your block, never from the tip.
 | 2 Sync | `18.061`–`18.120` — **minted: `18.061`–`18.101`**, so `18.102`–`18.120` are unused and a later plan drawing from this block continues at `18.102` rather than at the tip |
 | 3 Search | `18.121`–`18.180` |
 | 5 Notes page | `18.181`–`18.240` |
+| 6 Ticket section | `18.241`–`18.270` |
 
 **Write cases as `- ❌ **18.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -228,3 +229,12 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.227 — the mobile editor bundle is fresh at this head:** `pnpm --filter @gisik-nokma/editor build:webview && pnpm --filter mobile generate:editor-html` produces byte-identical output to what is checked in, and `generate-editor-html.mjs --check` exits 0; its own planted-staleness self-test proves `--check` catches drift. Mutation: revert the generated file. `apps/mobile/scripts/generate-editor-html.test.ts`.
 - 🧪 **18.228 — browser: sign in as the owner, open `/notes`, and the workspace heading is present (positive control) before Create; create a workspace-level private note titled "Cold room", type a paragraph, wait for the save state to read "Saved", reload the page, and the note is in the tree under the workspace with its body still rendered.** Recipe: `apps/web/e2e-stack/notes.spec.ts`. Run against the built stack once the controller has one on `release/notes`.
 - 🧪 **18.229 — browser: rename an open note and see the tree row and the document title update to the new title with no reload** (the tree's own live query, not the document's local state) — **control: the pre-rename title is visible in both places first, and is gone from the tree afterward.** Recipe: `apps/web/e2e-stack/notes.spec.ts`. Run against the built stack once the controller has one on `release/notes`.
+
+## 18.12 The ticket's Notes section
+
+- ✅ **18.241 — the section sits between Subtasks and Comments in the Details tab and reads `getNotesForTicket` under the key `<ticketId>:notes`;** the heading counts the returned notes; control: a ticket with none shows "Notes · 0" and no badges. Mutation: key without the ticket id. `packages/app-core/test/views/ticket-notes-section.test.tsx`.
+- ✅ **18.242 — one badge per note, linking to `/notes/<id>`, tinted by `scope.mode`, with the × only when `canEdit`;** control: the same fixture with `canEdit: false` renders the links and no buttons. Mutation: render × for everyone. `packages/app-core/test/views/ticket-notes-section.test.tsx`.
+- ✅ **18.243 — clicking × writes exactly one `note.detached { ticketId }` against the note, reloads, and shows a toast with Undo.** Mutation: file it against the ticket. `packages/app-core/test/views/ticket-notes-section.test.tsx`.
+- ✅ **18.244 — Undo writes `note.attached { ticketId }` and reloads; dismiss writes nothing (control).** Mutation: Undo writes `note.detached`. `packages/app-core/test/views/ticket-notes-section.test.tsx`.
+- ✅ **18.245 — a refused detach surfaces through the sheet's inline alert with the server's reason and shows no toast.** Mutation: show the toast anyway. `packages/app-core/test/views/ticket-notes-section.test.tsx`.
+- ✅ **18.246 — a live update (a `refresh`/`event` frame for the workspace) re-reads the section without a reload;** the test drives the subscription callback the way `use-live-query.test.tsx` does. Mutation: drop `useLiveQuery` for a one-shot read. `packages/app-core/test/views/ticket-notes-section.test.tsx`.
