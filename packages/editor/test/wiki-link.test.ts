@@ -123,6 +123,80 @@ describe('9.276-9.279 wiki-links', () => {
    * discriminator — and the anchor the node renders is the HTML a host would
    * hand back.
    */
+  /**
+   * ⚠ A CROSS-NODE TABLE LIVING IN A WIKI-LINK FILE, and the placement is a
+   * judgement rather than an accident: this port's case block (9.261–9.300) is
+   * fully allocated, and taking an id outside it risks colliding with Plan 5's
+   * allocation — which this lane cannot check. So the property is guarded HERE,
+   * in the case that found the defect class, and the case text says so.
+   *
+   * WHAT IT GUARDS. The note link's loss was an ATTRIBUTE loss (the id survived
+   * only inside the href), so the generalisation worth pinning is "every v2
+   * node's attributes survive HTML", not just "the node types do". Measured
+   * across the whole set before this arm existed: all five are byte-identical.
+   * The next change to any parse rule in this schema now has somewhere to fail.
+   */
+  it('9.279 every v2 node survives an HTML round trip with its attributes intact', () => {
+    const cases: Array<[string, unknown]> = [
+      [
+        'taskItem.checked=true',
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: true },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'done' }] }],
+            },
+          ],
+        },
+      ],
+      [
+        'taskItem.checked=false',
+        {
+          type: 'taskList',
+          content: [
+            {
+              type: 'taskItem',
+              attrs: { checked: false },
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'todo' }] }],
+            },
+          ],
+        },
+      ],
+      [
+        'details.open=true',
+        {
+          type: 'details',
+          attrs: { open: true },
+          content: [
+            { type: 'detailsSummary', content: [{ type: 'text', text: 'S' }] },
+            {
+              type: 'detailsContent',
+              content: [{ type: 'paragraph', content: [{ type: 'text', text: 'b' }] }],
+            },
+          ],
+        },
+      ],
+      ['codeBlock.language', { type: 'codeBlock', attrs: { language: 'ts' }, content: [{ type: 'text', text: 'x' }] }],
+      [
+        'image.attrs',
+        {
+          type: 'image',
+          attrs: { attachmentId: '01J9GIMA000000000000000000', wrap: 'inline-left', alt: 'a' },
+        },
+      ],
+    ];
+    for (const [name, node] of cases) {
+      const editor = createTestEditor(undefined, { type: 'doc', content: [node] });
+      const before = JSON.stringify((asJson(editor).content ?? [])[0]);
+      editor.commands.setContent(editor.getHTML());
+      const after = JSON.stringify((asJson(editor).content ?? [])[0]);
+      expect(after, `${name} changed across an HTML round trip`).toBe(before);
+      editor.destroy();
+    }
+  });
+
   it('9.279 a rendered link round-trips back through HTML with both attrs intact', () => {
     const editor = createTestEditor(
       { resolveNoteTitle: () => 'Cold room' },
