@@ -4,12 +4,14 @@ import Link from 'next/link';
 import { useEffect, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button } from '@gisik-nokma/ui';
-import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { NoteScopeMode } from '@gisik-nokma/domain';
 import { AppNav } from '../app-nav.js';
 import { ShellRefusal } from '../shell-refusal.js';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
 import { CreateNoteDialog } from './create-note-dialog.js';
 import { NoteDocument } from './note-document.js';
+import { NotesSearchHeader } from './notes-search-header.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
 
 /**
@@ -68,6 +70,20 @@ export function NotesPage({ noteId }: { noteId?: string }) {
    */
   const [titleFilter, setTitleFilter] = useState('');
 
+  /**
+   * Search (Task 8, spec §7.8): ONE query and ONE pair of filters, for the
+   * same reason `titleFilter` above is one value — held HERE and handed to
+   * every `WorkspaceNotesSection`, which runs its OWN `useNotesSearch`
+   * against it (one workspace, one subscription; see that hook's own
+   * docblock for why it cannot be shared across workspaces). `''` is "no
+   * filter" for `searchQuery`/`authorId`/`scopeMode` alike — see
+   * `notes-search-header.tsx`'s docblock for why the filters use `''` rather
+   * than `null`.
+   */
+  const [searchQuery, setSearchQuery] = useState('');
+  const [authorId, setAuthorId] = useState('');
+  const [scopeMode, setScopeMode] = useState('');
+
   useEffect(() => {
     if (!signedIn) return;
     let cancelled = false;
@@ -90,15 +106,49 @@ export function NotesPage({ noteId }: { noteId?: string }) {
     };
   }, [dataSource, signedIn]);
 
+  /**
+   * The Author filter's options: every member reachable from ANY workspace
+   * this person belongs to, deduplicated by id. A per-workspace roster would
+   * make the filter answer a different question in each `WorkspaceNotesSection`
+   * than the one box asking it looks like it is asking.
+   */
+  const [members, setMembers] = useState<RosterMember[]>([]);
+  useEffect(() => {
+    if (workspaces === null) return;
+    let cancelled = false;
+    Promise.all(
+      workspaces.map((workspace) => dataSource.query.getMembers(workspace.id).catch(() => [] as RosterMember[])),
+    ).then((lists) => {
+      if (cancelled) return;
+      const byId = new Map<string, RosterMember>();
+      for (const list of lists) for (const member of list) byId.set(member.id, member);
+      setMembers([...byId.values()]);
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, workspaces]);
+
   return (
     <main id="gn-main" className="gn-shell">
       <AppNav />
       <div className="gn-notes" data-testid="notes-page">
         <div className="gn-notes__header">
           <h1 className="gn-page-title">Notes</h1>
-          {/* Task 8 mounts `NotesSearchHeader` here. It is absent rather than
-              an empty box: a search input that cannot search is a control that
-              does nothing, which this repo refuses to draw. */}
+          {/* Same gate as the tree head below: a search box with nothing to
+              search — no workspace, no member roster to filter by — is a
+              control that does nothing, which this repo refuses to draw. */}
+          {signedIn && refusal === null && workspaces !== null && workspaces.length > 0 ? (
+            <NotesSearchHeader
+              value={searchQuery}
+              onChange={setSearchQuery}
+              authorId={authorId}
+              onAuthor={setAuthorId}
+              scopeMode={scopeMode}
+              onScope={setScopeMode}
+              members={members}
+            />
+          ) : null}
         </div>
         <div className="gn-notes__body">
           <nav aria-label="Notes" className="gn-notes__tree">
@@ -156,6 +206,9 @@ export function NotesPage({ noteId }: { noteId?: string }) {
                   workspace={workspace}
                   openNoteId={noteId}
                   titleFilter={titleFilter}
+                  searchQuery={searchQuery}
+                  authorId={authorId === '' ? undefined : authorId}
+                  scopeMode={scopeMode === '' ? undefined : (scopeMode as NoteScopeMode)}
                 />
               ))
             )}

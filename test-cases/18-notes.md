@@ -214,3 +214,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.213 — a note's comments render in the thread with author names; control: none → the thread's own empty copy.** Mutation: drop `nameOf`. `apps/web/test/note-comments.test.tsx`.
 - ✅ **18.214 — posting writes one `comment.added` against `{ kind: 'note', id }`, and the thread reloads on commit.** Mutation: file it against a ticket. `apps/web/test/note-comments.test.tsx`.
 - ✅ **18.215 — a reader (non-author) can post; the composer is present for every reader.** Mutation: hide it. `apps/web/test/note-comments.test.tsx`.
+- ✅ **18.216 — typing replaces each section's groups with that workspace's results; clearing restores the groups (control).** Mutation: keep the groups visible. `apps/web/test/notes-search.test.tsx`.
+- ✅ **18.217 — the Author and Scope selects are passed into the hook's options and change the request; control: no filter sends none.** Mutation: ignore the scope select. `apps/web/test/notes-search.test.tsx`.
+- ✅ **18.218 — a `**match**` snippet renders `<mark>` around the match.** Mutation: render the asterisks. `apps/web/test/notes-search.test.tsx`.
+- ✅ **18.219 — `corrected` shows "Showing results for …"; empty results show "No notes match".** Mutation: swap the two. `apps/web/test/notes-search.test.tsx`.
+- ✅ **18.220 — the merge rule survives the page: lexical `[A,B]` then meaning `[B,C]` renders A, B, C in that order** (the hook is Plan 3's; this asserts the page does not re-sort). Mutation: sort results by title. `apps/web/test/notes-search.test.tsx`.

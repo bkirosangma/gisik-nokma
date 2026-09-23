@@ -3529,3 +3529,74 @@ input, textarea, select { font-family: inherit; }
   gap: 0.5rem;
   margin-top: 0.75rem;
 }
+
+/* ── Task 8: search on the Notes page ───────────────────────────────────── */
+
+.gn-notes__search {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.5rem;
+  margin-left: auto;
+}
+
+.gn-notes__search-input {
+  min-width: 14rem;
+}
+
+.gn-notes__filters {
+  display: flex;
+  gap: 0.5rem;
+}
+
+.gn-notes__corrected {
+  margin: 0 0 0.5rem;
+  color: var(--gn-text-muted);
+  font-size: 0.8125rem;
+}
+
+.gn-notes__no-results {
+  color: var(--gn-text-muted);
+}
+
+.gn-notes__results {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.gn-notes__result {
+  display: flex;
+  flex-direction: column;
+  gap: 0.25rem;
+  padding: 0.5rem 0.625rem;
+  border-radius: var(--gn-radius-control);
+}
+
+.gn-notes__result:hover {
+  background: var(--gn-fill-secondary);
+}
+
+.gn-notes__result-title {
+  color: var(--gn-text);
+  font-weight: 600;
+  text-decoration: none;
+}
+
+.gn-notes__result-title:hover {
+  text-decoration: underline;
+}
+
+.gn-notes__snippet {
+  margin: 0;
+  color: var(--gn-text-muted);
+  font-size: 0.8125rem;
+}
+
+.gn-notes__snippet mark {
+  background: var(--gn-tint-warning);
+  color: inherit;
+}

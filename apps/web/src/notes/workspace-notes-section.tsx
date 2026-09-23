@@ -1,13 +1,16 @@
 'use client';
 
-import { useState } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
+import Link from 'next/link';
 import { Button } from '@gisik-nokma/ui';
-import type { NoteSummary } from '@gisik-nokma/domain';
+import type { NoteScopeMode, NoteSummary } from '@gisik-nokma/domain';
 import { makeSubmittedFactory } from '@gisik-nokma/app-core';
 import { useLiveQuery } from '@gisik-nokma/app-core';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
+import { useNotesSearch } from '../use-notes-search.js';
 import { NoteRow } from './note-row.js';
+import { SCOPE_LABELS } from './note-scope-options.js';
 
 /**
  * ONE workspace's branch of the notes tree (spec §9.2).
@@ -52,14 +55,37 @@ function byUpdatedDesc(a: NoteSummary, b: NoteSummary): number {
   return b.updatedAt.localeCompare(a.updatedAt);
 }
 
+/**
+ * `NoteSearchHit.snippet` carries the server's `**match**` markers
+ * (`apps/server/src/read/headline.ts`'s `HEADLINE_OPTIONS`, the same
+ * convention the ticket search snippet uses) — this turns each one into a
+ * `<mark>`, leaving everything else as plain text.
+ */
+function renderSnippet(snippet: string): ReactNode {
+  return snippet.split(/(\*\*[^*]+\*\*)/g).map((part, index) =>
+    part.startsWith('**') && part.endsWith('**') ? (
+      <mark key={index}>{part.slice(2, -2)}</mark>
+    ) : (
+      <span key={index}>{part}</span>
+    ),
+  );
+}
+
 export function WorkspaceNotesSection({
   workspace,
   openNoteId,
   titleFilter = '',
+  searchQuery = '',
+  authorId,
+  scopeMode,
 }: {
   workspace: WorkspaceRef;
   openNoteId?: string;
   titleFilter?: string;
+  /** Task 8, spec §7.8. `''` (the default) means the tree's groups render — search is per-workspace, one `useNotesSearch` each, all driven from `NotesPage`'s single box. */
+  searchQuery?: string;
+  authorId?: string;
+  scopeMode?: NoteScopeMode;
 }) {
   const { dataSource } = useAppServices();
   const user = useCurrentUser();
@@ -70,6 +96,21 @@ export function WorkspaceNotesSection({
   const deleted = useLiveQuery(dataSource, workspace.id, 'deleted-notes', () =>
     dataSource.query.getDeletedNotes(workspace.id),
   );
+
+  /**
+   * `useNotesSearch` owns its OWN `query`/`setQuery`, uncontrolled — it is
+   * Plan 3's hook, built for a single search box, and this page hands it the
+   * SAME text on every keystroke rather than widening its contract. The
+   * effect is the sync: `NotesPage`'s `searchQuery` is the source of truth,
+   * and this is the one place per workspace that copies it in.
+   */
+  const search = useNotesSearch(dataSource.query, workspace.id, { authorId, scopeMode });
+  useEffect(() => {
+    search.setQuery(searchQuery);
+    // `search.setQuery` is stable (a `useState` setter); listing it would
+    // re-run this on every render of the search hook itself.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchQuery]);
 
   const [restoreFailure, setRestoreFailure] = useState<string | null>(null);
 
@@ -139,49 +180,88 @@ export function WorkspaceNotesSection({
     <section className="gn-notes__section" data-testid={`notes-container-${workspace.id}`}>
       <h2 className="gn-notes__section-title">{workspace.name}</h2>
 
-      {homeRows.length > 0 ? (
-        <ul className="gn-notes__rows" data-testid={`notes-home-${workspace.id}`}>
-          {homeRows.map((note) => (
-            <NoteRow key={note.noteId} note={note} open={note.noteId === openNoteId} />
-          ))}
-        </ul>
-      ) : null}
-
-      {groups.filter((group) => showGroup(group.id)).map((group) => (
-        <section
-          key={group.id}
-          className="gn-notes__group"
-          data-testid={`notes-container-${group.id}`}
-        >
-          <h3 className="gn-notes__group-title">{group.name}</h3>
-          <ul className="gn-notes__rows">
-            {rowsFor(group.id).map((note) => (
-              <NoteRow key={note.noteId} note={note} open={note.noteId === openNoteId} />
-            ))}
-          </ul>
-        </section>
-      ))}
-
-      {deletedRows.length > 0 ? (
-        <section className="gn-notes__group gn-notes__deleted" data-testid="notes-deleted">
-          <h3 className="gn-notes__group-title">Deleted</h3>
-          <ul className="gn-notes__rows">
-            {deletedRows.map((note) => (
-              <li key={note.noteId} className="gn-notes__row-item">
-                <span className="gn-notes__row-title">{note.title}</span>
-                <Button aria-label={`Restore ${note.title}`} onClick={() => void restore(note.noteId)}>
-                  Restore
-                </Button>
-              </li>
-            ))}
-          </ul>
-          {restoreFailure !== null ? (
-            <p className="gn-notes__restore-failure" role="status">
-              {restoreFailure}
-            </p>
+      {searchQuery !== '' ? (
+        <div className="gn-notes__search-results" data-testid={`notes-results-${workspace.id}`}>
+          {search.corrected !== null ? (
+            <p className="gn-notes__corrected">{`Showing results for ${search.corrected.join(' ')}`}</p>
           ) : null}
-        </section>
-      ) : null}
+          {search.results.length === 0 ? (
+            <p className="gn-notes__no-results">No notes match</p>
+          ) : (
+            <ol className="gn-notes__results">
+              {search.results.map((hit) => (
+                <li
+                  key={hit.noteId}
+                  className="gn-notes__result"
+                  data-testid={`notes-result-${hit.noteId}`}
+                  data-source={hit.source}
+                >
+                  <Link href={`/notes/${hit.noteId}`} className="gn-notes__result-title">
+                    {hit.title}
+                  </Link>
+                  <p className="gn-notes__snippet">{renderSnippet(hit.snippet)}</p>
+                  <span className="gn-notes__scope">{SCOPE_LABELS[hit.scopeMode]}</span>
+                  {hit.attachedTicketKeys.length > 0 ? (
+                    <span className="gn-notes__keys">
+                      {hit.attachedTicketKeys.map((key) => (
+                        <span key={key} className="gn-notes__key">
+                          {key}
+                        </span>
+                      ))}
+                    </span>
+                  ) : null}
+                </li>
+              ))}
+            </ol>
+          )}
+        </div>
+      ) : (
+        <>
+          {homeRows.length > 0 ? (
+            <ul className="gn-notes__rows" data-testid={`notes-home-${workspace.id}`}>
+              {homeRows.map((note) => (
+                <NoteRow key={note.noteId} note={note} open={note.noteId === openNoteId} />
+              ))}
+            </ul>
+          ) : null}
+
+          {groups.filter((group) => showGroup(group.id)).map((group) => (
+            <section
+              key={group.id}
+              className="gn-notes__group"
+              data-testid={`notes-container-${group.id}`}
+            >
+              <h3 className="gn-notes__group-title">{group.name}</h3>
+              <ul className="gn-notes__rows">
+                {rowsFor(group.id).map((note) => (
+                  <NoteRow key={note.noteId} note={note} open={note.noteId === openNoteId} />
+                ))}
+              </ul>
+            </section>
+          ))}
+
+          {deletedRows.length > 0 ? (
+            <section className="gn-notes__group gn-notes__deleted" data-testid="notes-deleted">
+              <h3 className="gn-notes__group-title">Deleted</h3>
+              <ul className="gn-notes__rows">
+                {deletedRows.map((note) => (
+                  <li key={note.noteId} className="gn-notes__row-item">
+                    <span className="gn-notes__row-title">{note.title}</span>
+                    <Button aria-label={`Restore ${note.title}`} onClick={() => void restore(note.noteId)}>
+                      Restore
+                    </Button>
+                  </li>
+                ))}
+              </ul>
+              {restoreFailure !== null ? (
+                <p className="gn-notes__restore-failure" role="status">
+                  {restoreFailure}
+                </p>
+              ) : null}
+            </section>
+          ) : null}
+        </>
+      )}
     </section>
   );
 }
