@@ -7,7 +7,7 @@ import { Providers } from '../src/providers.js';
 import { SkipLink } from '../src/skip-link.js';
 import { RouteAnnouncer } from '../src/route-announcer.js';
 
-export const metadata = { title: 'Gisik Nokma' };
+export const metadata = { title: 'Gisik Nokma', icons: { icon: '/favicon.svg' } };
 
 /**
  * `@gisik-nokma/ui/tokens`, not `@gisik-nokma/ui`.
