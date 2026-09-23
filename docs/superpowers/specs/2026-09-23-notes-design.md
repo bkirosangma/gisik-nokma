@@ -90,6 +90,9 @@ inferred from "how tickets do it": where tickets are the model, the ticket rule 
 | D23 | Indexed text: title, body, and the keys and titles of attached tickets. Author is a filter, not indexed text. |
 | D24 | Filters beside the notes search box: author, scope. |
 | D25 | Mentions in a note comment notify like mentions in a ticket comment. Mentions in a note body notify each mentioned person once, on the first save whose body contains them. |
+| D26 | **Inline references** (owner, 2026-09-23 afternoon): in any comment — on a ticket or on a note — typing `:ticket` opens an in-place picker that searches tickets and inserts the chosen one; `:note` does the same for notes. |
+| D27 | **Tagging a note in a ticket comment attaches the note to that ticket** — it appears in the ticket's Notes section as if attached by hand. |
+| D28 | Defaults set by the planner, unobjected: the two triggers exist in every editor (descriptions and note bodies too, since the editor is shared), but the auto-attach fires only when a *ticket comment* is posted; a reference that cannot be attached (permission refused) still posts the comment and shows a toast naming the note and the reason; removing a reference never detaches; the ticket picker searches the whole workspace the person can see, current project's tickets first. |
 
 ### 0.4 Out of scope (do not build)
 
@@ -1233,3 +1236,38 @@ edit rights, picker attach, picker create-from-ticket writes one `note.created` 
 Inline anchored comments · nested notes (`parent_note_id` reserved) · desktop and mobile screens ·
 Garo-tuned model (swap = change `CURRENT_MODEL`, the worker re-embeds) · backlinks · counts on cards
 and rows · syntax highlighting · a local (replica) note search for offline.
+
+---
+
+## 14. Inline references in comments (`:ticket`, `:note`) — added 2026-09-23
+
+### 14.1 What it is
+
+Two suggestion triggers in the shared editor, modelled on the existing mention (`@`, `packages/editor/src/extensions/mention.ts`) and wiki-link (`[[`, `src/extensions/wiki-link.ts`) extensions:
+
+| Typed | Picker searches | Inserts | Rendered as |
+|---|---|---|---|
+| `:ticket ` + query | tickets the person can see in the workspace (`DataSourceQuery.search`, current project's hits first) | inline atom node `ticketRef { ticketId, key, title }` | a chip `SHOP-7 Fix the freezer` linking to the ticket's page |
+| `:note ` + query | notes the person can read (`getNotes`, title filter; `searchNotes` lexical behind it) | the existing `wikiLink { noteId, title }` node (no second note node) | as today: `<a href="/notes/<id>">title</a>`, red pill when unreadable |
+
+The trigger is the literal string followed by a space; `startOfLine: false`; the default allowed prefix (a space or line start) means `re: ticket 5` in prose never opens the picker. Escape leaves the typed text. The picker is the same vanilla-DOM popup shape as the mention popup, listing up to 8 results with key + title (tickets) or title + home (notes).
+
+### 14.2 The ticket reference node
+
+`ticketRef` (inline, atom, selectable) with attrs `ticketId`, `key`, `title` (both strings are the values at insertion; the renderer shows the live title when it can resolve the ticket, else the stored one). HTML: `<a data-ticket-id data-ticket-key class="editor-ticketref" href="<ticket url>">KEY title</a>`. Plain text (`docToPlainText`): `KEY title`. Comment renderer (`renderCommentBody`): the same chip. Schema version stays 2 (an additive node; the v2 list grows by one and the pins move with it). The ticket URL is the one the board uses to open a ticket in its sheet (`/w/<workspaceId>/p/<projectId>?ticket=<ticketId>`); `projectId` comes from the search hit, so the node carries `projectId` too.
+
+`DataSourceQuery.search`'s hits carry no key today (`SearchHit { ticketId, projectId, title, snippet, matchedIn }`); the server route gains `key` on each hit (it already assembles ticket cards) and the client mapper reads it.
+
+### 14.3 The auto-attach rule (D27)
+
+When a **ticket comment** is submitted (`comment.added` against a ticket) and its body contains `wikiLink` nodes, the submitting client also submits one `note.attached { ticketId }` against each distinct referenced note, **after** the comment's own event, in the same `ingest` batch where the outbox supports batches, else one after the other. `note.attached` is idempotent, so a note already attached costs nothing. Permission: the commenter can see the ticket (they are commenting on it) and read the note (they picked it from their own list), which is exactly what `checkNotePermission` requires for `note.attached`; a refusal (the note became unreadable between pick and post, or the ticket is no longer editable) leaves the comment posted and shows a toast "Couldn't attach <title>: <reason>". The rule lives in ONE function, `attachmentsImpliedBy(commentBody, ticketId): SubmittedEvent[]` in `packages/app-core`, called by the ticket sheet's comment submit; note comments and descriptions do not call it (D28). Removing the reference later never detaches.
+
+The ticket's Notes section (spec §10) is a live query, so the badge appears without reload.
+
+### 14.4 Mobile bridge
+
+`ticketQuery` / `ticketResults` message pair beside `noteQuery` / `noteResults` (`src/webview/bridge.ts`), additive; the WebView bundle is regenerated in the plan's close.
+
+### 14.5 Tests (block allocated by the plan)
+
+Editor: each trigger opens its picker and inserts its node; `:ticket` mid-word and `re: ticket` do not; Escape leaves text; the ticket chip renders live/stored title; `docToPlainText` and `renderCommentBody` show `KEY title`; schema pins updated; bridge parses/serialises the new pair. App-core: `attachmentsImpliedBy` returns one `note.attached` per distinct note and none for a note comment or for a body without references; the ticket sheet submits comment then attachments; a refused attachment posts the comment and surfaces the toast. Server: `key` on search hits. Browser: post a ticket comment tagging a note → the note's badge appears in the ticket's Notes section without reload.
