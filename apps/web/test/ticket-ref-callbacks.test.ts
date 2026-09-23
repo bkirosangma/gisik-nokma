@@ -1,3 +1,4 @@
+import { searchTermSchema } from '@gisik-nokma/domain';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildProjectPageQueryTickets,
@@ -5,6 +6,21 @@ import {
   ticketRefCandidatesOf,
   ticketRefHrefIn,
 } from '../src/ticket-ref-callbacks.js';
+
+/**
+ * A `search` fake that enforces `searchTermSchema` exactly as the server's
+ * `/v1/search` route does (`apps/server/src/routes/search.ts`) — case 9.313:
+ * the ORIGINAL fake accepted an empty string, which is why the empty-query
+ * 400 shipped without a red test. Importing the schema rather than
+ * re-stating `min(1)` here is what keeps the fake and the server from
+ * drifting apart the same way they already did once.
+ */
+function strictSearch(hits: Parameters<typeof ticketRefCandidatesOf>[0]) {
+  return vi.fn(async (_workspaceId: string, text: string) => {
+    searchTermSchema.parse(text);
+    return hits;
+  });
+}
 
 /**
  * 18.272 / 18.284 — Plan 7 Task 4 (spec §14, D26–D28): the project page's own
@@ -76,10 +92,12 @@ describe('18.272 buildProjectPageQueryTickets', () => {
       { ticketId: 't8', projectId: 'here', title: 'Here 8', snippet: '', matchedIn: 'title' as const, key: 'H-8' },
       { ticketId: 't9', projectId: 'here', title: 'Here 9', snippet: '', matchedIn: 'title' as const, key: 'H-9' },
     ];
-    const search = vi.fn(async () => hits);
-    const queryTickets = buildProjectPageQueryTickets({ query: { search } }, 'ws_1', 'here');
+    const search = strictSearch(hits);
+    const getTickets = vi.fn(async () => ({ rows: [] }));
+    const queryTickets = buildProjectPageQueryTickets({ query: { search, getTickets } }, 'ws_1', 'here');
     const result = await queryTickets('x');
     expect(search).toHaveBeenCalledWith('ws_1', 'x');
+    expect(getTickets).not.toHaveBeenCalled();
     // UNSLICED: all 10 candidates present, not just the first 8 the library's
     // own `.slice(0, 8)` (packages/editor/src/extensions/ticket-ref.ts)
     // would keep — that slice runs AFTER this function returns.
@@ -87,7 +105,12 @@ describe('18.272 buildProjectPageQueryTickets', () => {
     expect(result.map((c) => c.ticketId)).toEqual(['t8', 't9', 't0', 't1', 't2', 't3', 't4', 't5', 't6', 't7']);
 
     const failing = buildProjectPageQueryTickets(
-      { query: { search: vi.fn(async () => { throw new Error('offline'); }) } },
+      {
+        query: {
+          search: vi.fn(async () => { throw new Error('offline'); }),
+          getTickets: vi.fn(async () => ({ rows: [] })),
+        },
+      },
       'ws_1',
       'here',
     );
@@ -95,5 +118,49 @@ describe('18.272 buildProjectPageQueryTickets', () => {
     // packages/editor/src/extensions/ticket-ref.ts's `items` wrapper, not
     // here — this function must never swallow it.
     await expect(failing('x')).rejects.toThrow('offline');
+  });
+
+  /**
+   * 9.313 — bug fix (2026-09-24, owner report 2026-09-23: "`:ticket` does not
+   * open it"). Root cause: `:ticket` alone sends `search(workspaceId, '')`,
+   * and the server's `searchTermSchema.min(1)` (shared with note search and
+   * filter text) refuses an empty term with 400 every time — the popup's
+   * `items` wrapper (`packages/editor/src/extensions/ticket-ref.ts`) then
+   * shows "Search needs a connection" for a state that is not a connection
+   * failure at all. `:note`'s own empty query never reaches a server route
+   * (`ticket-sheet.tsx`'s `queryNotes` filters a client-side list), which is
+   * why only `:ticket` broke. THE FAKE ENFORCES THE SAME SCHEMA THE SERVER
+   * DOES (`strictSearch`, above) — the original fake accepted `''`, which is
+   * exactly how this shipped without a failing test.
+   */
+  it('9.313 an empty (or whitespace) query never calls search; it answers from getTickets(projectId) instead; a non-empty query still calls search (control, same it)', async () => {
+    const rows = [
+      { ticketId: 't1', title: 'Fix the freezer', key: 'SHOP-7' },
+      { ticketId: 't2', title: 'Compressor log', key: null },
+    ];
+    const getTickets = vi.fn(async () => ({ rows }));
+    const search = strictSearch([]);
+    const queryTickets = buildProjectPageQueryTickets({ query: { search, getTickets } }, 'ws_1', 'here');
+
+    const empty = await queryTickets('');
+    expect(getTickets).toHaveBeenCalledWith('here', {}, 'flat');
+    expect(search).not.toHaveBeenCalled();
+    expect(empty).toEqual([
+      { ticketId: 't1', projectId: 'here', key: 'SHOP-7', title: 'Fix the freezer' },
+      // `key: null` falls back to the id's last six characters, the same rule
+      // `ticketRefCandidatesOf` already applies to a `search` hit.
+      { ticketId: 't2', projectId: 'here', key: 't2', title: 'Compressor log' },
+    ]);
+
+    // A query typed after the empty state — not just any non-empty string —
+    // reaches `search` and NOT `getTickets` again: the picker still narrows
+    // once the caller types something, exactly as before this fix.
+    getTickets.mockClear();
+    await queryTickets('  ');
+    expect(getTickets).toHaveBeenCalledTimes(1); // whitespace-only trims to empty too
+    expect(search).not.toHaveBeenCalled();
+
+    await queryTickets('freezer');
+    expect(search).toHaveBeenCalledWith('ws_1', 'freezer');
   });
 });

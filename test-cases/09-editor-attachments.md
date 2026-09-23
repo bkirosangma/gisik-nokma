@@ -425,8 +425,23 @@ assumed it would find.
 - ✅ **9.311 — `docToPlainText` renders `ticketRef` as `KEY title`; a missing key falls back to the title (control in the same `it`).** Mutation: render the ticket id. `packages/domain/test/doc-text.test.ts`, `packages/editor/test/doc-text-conformance.test.ts`.
 - ✅ **9.312 — `renderCommentBody` renders `ticketRef` as a link when `ticketHref` resolves and as a span otherwise; control: `wikiLink` unchanged.** Mutation: link with `href="#"`. `packages/app-core/test/views/comment-body.test.tsx`.
 
-*(Block `9.313`–`9.337` allocated to `task/editor-polish` — see that branch's own reservation commit. Not
-duplicated here; the row below starts past it.)*
+## Editor polish: `:ticket` open bug, picker/toolbar styling, Attach button (owner request+bug, 2026-09-23) — block `9.313`–`9.337`
+
+*Allocated 2026-09-23 by the controller against `origin/release/notes` `fc713961` (table tip `9.312`), for
+`task/editor-polish`: Unit 1 (`:ticket` does not open the picker — bug), Unit 2 (Attach-note button/menu
+styling), Unit 3 (inline `:note`/`:ticket` picker positioning + styling), Unit 4 (editor toolbar restyle,
+tooltips, Insert note/Insert ticket buttons, no @), Unit 5 (an Attach button reaching the existing upload
+path). Cases file: this one.*
+
+- ✅ **9.313 — Unit 1 bug fix: a bare `:ticket` (empty query) never calls `search` — the server's `searchTermSchema.min(1)` always refuses an empty term (400), which is why the picker read as "does not open"; it answers instead from `getTickets(projectId, {}, 'flat')`, the current project's tickets; control in the same `it`: a typed query still calls `search`.** Mutation: drop the empty-query guard (routes back to `search('')`, which the fake — enforcing `searchTermSchema` itself — throws on). `apps/web/test/ticket-ref-callbacks.test.ts`.
+- ✅ **9.314 — Unit 3(a) bug fix: `computeSuggestionPopupPlacement` sits the popup below the caret when there is room; control in the same `it`: the left edge is untouched when it already fits.** Mutation: n/a here, see 9.315. `packages/editor/test/suggestion-popup-position.test.ts`.
+- ✅ **9.315 — the placement flips above the caret when there is not enough room below.** Mutation: a placement fixed at "below" regardless of room answers a distinguishably wrong `top` and `placement` for the same fixture. `packages/editor/test/suggestion-popup-position.test.ts`.
+- ✅ **9.316 — the placement clamps the left edge inside the viewport when the caret sits near the right edge; control: top is unaffected.** Mutation: drop the clamp (left runs past the viewport). `packages/editor/test/suggestion-popup-position.test.ts`.
+- 🧪 **9.317 — browser, PARTIAL: measured live on a lane dev server (:3047), signed in, 2026-09-24 — `.ticketref-popup` is `position: fixed` at the caret's own rect (`top`/`left` matching `getBoundingClientRect()`, not `scrollY` above it), real size (608×332px, not the old 10×10 empty box), real background (`rgb(241,234,227)`) and box-shadow.** This is what surfaced the z-index defect 9.322 fixes (the popup was correctly positioned and painted but invisible, hidden behind `.gn-sheet__scrim`) — the owner's PAUSE landed before a re-screenshot AFTER the z-index fix; 9.322's jsdom assertion is the evidence for the fix itself, this row is NOT yet re-confirmed visually post-fix. Flagged in PROGRESS, not claimed complete.
+- ✅ **9.318 — Unit 3 ruling bug fix: the `searchUnavailable` sequence guard — an older `:ticket` call that rejects and resolves AFTER a newer call already succeeded must not clobber the flag; forced into view with an ArrowDown repaint that issues no new `items()` call (the DOM alone cannot show it, since `@tiptap/suggestion` discards the stale call's own `onUpdate`).** Mutation: drop the `requestId === latestRequestId` guard (both calls then write unconditionally, and the stale rejection wins). `packages/editor/test/ticket-ref.test.ts`.
+- ✅ **9.319 — Unit 3(b) styling: the shared popup rule in `apps/web/app/globals.css` gives `.mention-popup`/`.wikilink-popup`/`.ticketref-popup` `--gn-surface-raised`/`--gn-shadow-raised`/`--gn-radius-control` (the same pair `.gn-select__panel` uses) and selected items `--gn-fill-tertiary`, not an outline; control in the same `it`: the base item rule carries no background of its own.** Mutation: drop a var() reference (a typo here resolves to nothing at runtime and no other suite reads this file — see the case's own docblock). `apps/web/test/suggestion-popup-styling.test.ts`.
+- ✅ **9.320 — `.ticketref-popup__status` and `.ticketref-popup__key` both read `--gn-text-muted`, the same tier `.gn-select__option-description` uses.** Mutation: drop the var() reference. `apps/web/test/suggestion-popup-styling.test.ts`.
+- ✅ **9.322 — Unit 3 bug fix: `.mention-popup`/`.wikilink-popup`/`.ticketref-popup` each declare `z-index: 50`, above `.gn-sheet__scrim`'s 40 — measured live: consolidating the three popup families into one shared block had accidentally dropped all three from `.wikilink-popup`/`.ticketref-popup`'s prior 50 to `.mention-popup`'s old 30, invisible behind any open sheet.** Mutation: any value ≤ 40. `packages/editor/test/editor-css-binding.test.ts`.
 
 ## Editor skin: unstyled content/chips/chrome, escape-chip removal, tables + floating toolbar (owner request+ruling, 2026-09-24) — block `9.338`–`9.367`
 
@@ -438,4 +453,4 @@ colour-free; removing the visible "Keep … as text" escape chip while KEEPING `
 `undoInputRule` repair (owner ruling — spec §2's chip mechanic withdrawn); and skinning tables plus
 porting the owner's knowledge-base `TableFloatingToolbar` (9 row/column/header/delete actions). Explicitly
 excludes the suggestion popups and the main toolbar (`task/editor-polish`'s own scope). Cases file: this
-one. Minted: none yet — this is the reservation commit; the lane fills this block.*
+one.*

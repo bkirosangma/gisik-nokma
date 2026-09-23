@@ -33,13 +33,47 @@
   max-width: 50%;
 }
 
-/* Mention picker popup and the mention node itself (spec §2's one non-input-rule
-   trigger). Structure only, under the same rule as everything above: the edges
-   are drawn with `currentColor`, and the surface the popup sits on is the
-   host's to supply from the one origin named at the top of this file. */
+/* The three suggestion popups — mention (`@`, spec §2's one non-input-rule
+   trigger), wiki-link (`[[`/`:note`, spec §8.5) and ticket-ref (`:ticket`,
+   spec §14) — share ONE structural shape, under the same rule as everything
+   above: the edges are drawn with `currentColor`, and the surface, radius
+   and shadow the popup sits on are the host's to supply (bug fix, owner
+   report 2026-09-23: "the inline :note menu is also unstyled").
+   `packages/editor/src/extensions/suggestion-popup-position.ts` sets
+   `position: fixed` on the element directly; nothing here repeats it.
+
+   THREE SEPARATE RULES, not one comma-joined list, on purpose: `mention.
+   test.ts` and `wiki-link.test.ts` each scan this file with
+   `/\.(family-prefix)[a-z_-]*\s*\{/`, which matches a class only when it is
+   the LAST selector directly before `{` — a class earlier in a shared,
+   cross-family comma list (before a `,`) is invisible to its own family's
+   scan. Identical bodies, repeated, is what keeps every family's contract
+   test seeing its own classes declared.
+
+   `z-index: 50`, not 30 (measured live on :3047, 2026-09-24, in a ticket
+   sheet's comment box): `.gn-sheet__scrim` is `position: fixed; z-index: 40`
+   (`packages/ui/src/ui.css`), and EVERY popup here is a `position: fixed`
+   sibling of it, appended straight to `document.body` — so a popup opened
+   from inside a sheet, which is the reported bug's own reproduction, is a
+   stacking-context comparison against the scrim, not a DOM-order one.
+   `.wikilink-popup`/`.ticketref-popup` already carried 50 before this file's
+   three families were consolidated into one shared block; that value is
+   restored here rather than left at `.mention-popup`'s old 30, and
+   `.mention-popup` is raised to match — `@mention` inside a ticket comment
+   has the identical scrim beneath it. `apps/web/app/globals.css`'s z-index
+   scale comment is corrected in the same commit. */
 .mention-popup {
-  position: absolute;
-  z-index: 30;
+  z-index: 50;
+  min-width: 10rem;
+  border: 1px solid currentColor;
+}
+.wikilink-popup {
+  z-index: 50;
+  min-width: 10rem;
+  border: 1px solid currentColor;
+}
+.ticketref-popup {
+  z-index: 50;
   min-width: 10rem;
   border: 1px solid currentColor;
 }
@@ -47,9 +81,22 @@
   display: flex;
   flex-direction: column;
 }
-/* The result count, for screen readers only. Removed from the visual flow
-   without `display: none`, which would take it out of the accessibility tree
-   too and announce nothing. */
+.wikilink-popup__list {
+  display: flex;
+  flex-direction: column;
+}
+.ticketref-popup__list {
+  display: flex;
+  flex-direction: column;
+}
+/* The result count. For mention and wiki-link this is screen-reader only,
+   removed from the visual flow without `display: none` (which would take it
+   out of the accessibility tree too and announce nothing) — a plain "N
+   match" count carries nothing a sighted caller needs that the row list does
+   not already show. `.ticketref-popup__status` is the one exception
+   (Unit 3 ruling, 2026-09-24): it can ALSO read "Search needs a connection",
+   a real state, and the host draws it visible and muted for that reason —
+   see `apps/web/app/globals.css`. */
 .mention-popup__status {
   position: absolute;
   width: 1px;
@@ -61,6 +108,20 @@
   white-space: nowrap;
   border: 0;
 }
+.wikilink-popup__status {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  margin: -1px;
+  padding: 0;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+.ticketref-popup__status {
+  padding: 0.25rem 0.5rem 0;
+}
 .mention-popup__item {
   text-align: left;
   padding: 0.25rem 0.5rem;
@@ -70,9 +131,42 @@
   font: inherit;
   color: inherit;
 }
+.wikilink-popup__item {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+.ticketref-popup__item {
+  text-align: left;
+  padding: 0.25rem 0.5rem;
+  cursor: pointer;
+  border: 0;
+  background: none;
+  font: inherit;
+  color: inherit;
+}
+/* Selected state is a BACKGROUND, drawn by the host (owner request,
+   2026-09-23) — `apps/web/app/globals.css`. The selector stays here, with no
+   declaration, so the BEM contract tests above still see the class as real;
+   it is not an outline any more because these rows are never DOM-focused
+   (the contenteditable keeps focus throughout; `aria-activedescendant`
+   carries the selection to assistive tech instead), so an outline here was a
+   focus-ring convention borrowed for a control that is never focused. */
 .mention-popup__item--selected {
-  outline: 1px solid currentColor;
-  outline-offset: -1px;
+}
+.wikilink-popup__item--selected {
+}
+.ticketref-popup__item--selected {
+}
+.ticketref-popup__key {
+  display: inline-block;
+  margin-right: 0.4rem;
+  padding: 0.05rem 0.35rem;
+  border-radius: 999px;
 }
 .editor-mention {
   white-space: nowrap;
@@ -592,25 +686,9 @@
   text-decoration: underline wavy;
   cursor: help;
 }
-.wikilink-popup {
-  background: Canvas;
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  padding: 4px;
-  z-index: 50;
-}
-.wikilink-popup__list { display: flex; flex-direction: column; }
-.wikilink-popup__item { padding: 4px 8px; cursor: pointer; }
-/* Selection is never colour alone (spec): the active row is outlined, and
-   `aria-selected` carries the same fact to a screen reader. */
-.wikilink-popup__item--selected { outline: 2px solid currentColor; }
-.wikilink-popup__status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
+/* `.wikilink-popup` and its parts are the shared suggestion-popup rules
+   above (`.mention-popup, .wikilink-popup, .ticketref-popup { … }`, near the
+   top of this file) — not repeated here. */
 .wikilink-preview {
   position: absolute;
   max-width: 24rem;
@@ -621,26 +699,10 @@
   z-index: 50;
 }
 
-/* The ticket-ref chip and its `:ticket` picker (spec §14, Plan 7 Task 1).
-   Structure only, like every block above: this file names no colour. */
+/* The ticket-ref chip (spec §14, Plan 7 Task 1). Structure only, like every
+   block above: this file names no colour. `.ticketref-popup` and its parts
+   are the shared suggestion-popup rules near the top of this file. */
 .editor-ticketref { overflow-wrap: anywhere; }
-.ticketref-popup {
-  background: Canvas;
-  border: 1px solid currentColor;
-  border-radius: 6px;
-  padding: 4px;
-  z-index: 50;
-}
-.ticketref-popup__list { display: flex; flex-direction: column; }
-.ticketref-popup__item { padding: 4px 8px; cursor: pointer; }
-.ticketref-popup__item--selected { outline: 2px solid currentColor; }
-.ticketref-popup__status {
-  position: absolute;
-  width: 1px;
-  height: 1px;
-  overflow: hidden;
-  clip-path: inset(50%);
-}
 
 /* The reading rail (spec §8.2, Plan 4 Task 7). Structure only, like everything
    above — and NO width rule: the source gated on a 1100px viewport inside the

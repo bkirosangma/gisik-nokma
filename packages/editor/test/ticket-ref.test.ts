@@ -84,6 +84,12 @@ describe('9.301-9.306 ticketRef', () => {
     });
     const rows = [...document.querySelectorAll('.ticketref-popup__item')].map((el) => el.textContent);
     expect(rows).toEqual(['SHOP-8 Compressor log']);
+    // THE KEY IS ITS OWN ELEMENT (Unit 3 styling, 2026-09-24, folded into
+    // 9.302 rather than a new case — same row, same render): a muted chip
+    // apart from the title, not a substring of one text node — `textContent`
+    // above still reads "KEY title" unchanged regardless.
+    const keyChip = document.querySelector('.ticketref-popup__item .ticketref-popup__key');
+    expect(keyChip?.textContent).toBe('SHOP-8');
 
     editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
     const para = asJson(editor).content?.[0];
@@ -192,6 +198,71 @@ describe('9.301-9.306 ticketRef', () => {
         '1 ticket matches',
       );
     });
+    editor.destroy();
+  });
+
+  /**
+   * 9.318 — the sequence guard (Unit 3 ruling, planner via owner, 2026-09-24).
+   * `@tiptap/suggestion` issues a new `items()` call on every keystroke
+   * without waiting for the previous one, and its own abort guard protects
+   * only the ITEMS it renders — an aborted call's resolution never repaints
+   * the popup, so releasing the stale call alone proves nothing (`@tiptap/
+   * suggestion`'s own staleness check would mask an unguarded flag exactly as
+   * well as a guarded one). What is NOT protected is this file's
+   * `searchUnavailable` variable itself: the stale call's `catch` still runs
+   * and still writes it, and the wrong value sits there, invisible, until
+   * SOMETHING ELSE calls `paint()` — an arrow key, say, which does not issue
+   * a new `items()` call at all. That is the repaint this case forces, and
+   * the reason the DOM only lies once no fresh `items()` call is left to
+   * cover for it.
+   */
+  it('9.318 an older call that fails and resolves LAST must not overwrite a newer success — an ArrowDown after the stale rejection lands must still repaint the count, not the connection status; mutation: drop the sequence guard', async () => {
+    let releaseFirst: () => void = () => {};
+    const held = new Promise<void>((resolve) => {
+      releaseFirst = resolve;
+    });
+    let calls = 0;
+    const queryTickets = vi.fn(async (q: string) => {
+      calls += 1;
+      if (calls === 1) {
+        await held; // the empty-query call: kept open past the second call's own resolution
+        throw new Error('offline');
+      }
+      return TICKETS.filter((t) => t.title.toLowerCase().includes(q.toLowerCase()));
+    });
+    const editor = createTestEditor({ queryTickets });
+
+    typeText(editor, ':ticket'); // call #1 starts (query ''), held open
+    await vi.waitFor(() => expect(queryTickets).toHaveBeenCalledTimes(1));
+    typeText(editor, ' comp'); // call #2 starts (query 'comp') and resolves normally
+    await vi.waitFor(() => {
+      expect(document.querySelector('.ticketref-popup__status')?.textContent).toBe(
+        '1 ticket matches',
+      );
+    });
+
+    // Release call #1's rejection — issued FIRST, but settling LAST. Give its
+    // microtasks (the `await held`, the throw, the `catch`) a few turns to
+    // write `searchUnavailable`, still with NO repaint triggered by either
+    // call — `@tiptap/suggestion` discards call #1's own `onUpdate` as stale.
+    releaseFirst();
+    await Promise.resolve();
+    await Promise.resolve();
+    await Promise.resolve();
+
+    // FORCE A REPAINT that issues no new `items()` call — `onKeyDown`'s
+    // ArrowDown branch calls `paint()` directly, reading whatever
+    // `searchUnavailable` currently holds. This is what the DOM's own status
+    // text could not show without: the corrupted flag has nothing else left
+    // to repaint it into view.
+    editor.view.dom.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+
+    expect(document.querySelector('.ticketref-popup__status')?.textContent).toBe(
+      '1 ticket matches',
+    );
+    const rows = [...document.querySelectorAll('.ticketref-popup__item')].map((el) => el.textContent);
+    expect(rows).toEqual(['SHOP-8 Compressor log']);
+
     editor.destroy();
   });
 });
