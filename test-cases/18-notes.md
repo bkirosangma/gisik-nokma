@@ -99,3 +99,13 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.073 — the note events route returns the note's full ledger in `seq` order to a reader and 404 to a non-reader** (same body as an unknown id). Mutation: skip the readability check.
 - ✅ **18.074 — the workspace bootstrap carries the events of every readable note and none of an unreadable one.** Mutation: include all notes.
 - ✅ **18.075 — the route's `LedgerEventView` shape equals the one `GET /v1/tickets/:id/events` (or the existing ticket bootstrap) returns** — same field names, so the client's one parser reads both. Mutation: rename `workspace_seq`.
+
+## 18.9 Sync — client
+
+- ✅ **18.076 — `migrateLocal` on a version-1 database adds `notes` and `note_comments` and leaves every existing table's columns unchanged** (`PRAGMA table_info` before/after equal for `tickets`). Mutation: add a column to `tickets`.
+- ✅ **18.077 — applying a note's events folds a `notes` row equal to `applyNoteEvent`'s state** (the §3.4 example-1 sequence → scope `project`, attachments `[]`). Mutation: fold from the last event only.
+- ✅ **18.078 — `comment.added` on a note lands in `note_comments` and does not touch `notes.seq`;** control: a ticket comment does not touch `note_comments`. Mutation: fold comments into the note row.
+- ✅ **18.079 — `purgeEntity(noteId)` removes the note's `events`, `notes` row and `note_comments`, and leaves the outbox** (the existing rule). Mutation: skip `note_comments`.
+- ✅ **18.080 — `revokeScope` (workspace) removes only that workspace's notes.** Mutation: delete unscoped.
+- ✅ **18.081 — `loadNoteEvents` is idempotent:** loading the same events twice leaves one row per event and the same `notes` row. Mutation: `INSERT` without `OR IGNORE`.
+- ✅ **18.082 — `listNotesForTicket` returns the notes whose `attached_ticket_ids` JSON contains the ticket.** Mutation: match on `home_project_id`.

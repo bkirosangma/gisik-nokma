@@ -1,15 +1,18 @@
 import {
+  applyNoteEvent,
   applyTicketEvent,
   claimContestedPayloadSchema,
   claimContestedResolvedPayloadSchema,
   CONTEST_EVENT_TYPES,
   docToPlainText,
   foldTicketToWorkflowVersion,
+  NOTE_EVENT_TYPES,
   TICKET_EVENT_TYPES,
   ticketTypeDefSchema,
   workflowDefinedPayloadSchema,
   type EventEnvelope,
   type LedgerEvent,
+  type NoteState,
   type PublishedWorkflowDef,
   type ReachGrantedTicket,
   type SubmittedEvent,
@@ -117,6 +120,23 @@ export type LocalContest = {
 
 export type ReplicaTicket = { ticketId: string; confirmed: TicketState | null; contests: LocalContest[] };
 
+/**
+ * One comment filed against a note, as the replica holds it.
+ *
+ * `workspaceSeq` rides beside the server's public `NoteComment` (which omits
+ * it) because the ORDER lives in this column and a local read that dropped it
+ * would have to re-sort by something else — `recordedAt` is a string column
+ * whose comparison happens to work, and depending on that here would be a
+ * second spelling of "when this happened".
+ */
+export type LocalNoteComment = {
+  commentId: string;
+  authorId: string;
+  body: unknown;
+  recordedAt: string;
+  workspaceSeq: number;
+};
+
 export type Replica = {
   loadBootstrap(data: BootstrapResponse): Promise<void>;
   /**
@@ -152,6 +172,35 @@ export type Replica = {
   applyServerItem(item: SyncItem): Promise<{ applied: boolean }>;
   purgeEntity(entityId: string): Promise<void>;
   revokeScope(instruction: ScopeRevokedInstruction): Promise<void>;
+  /**
+   * The note reads (notes series, Plan 2 of 6, spec §5.3). Seven of them, and
+   * `searchNotes` is NOT among them — local note search is Plan 3's, and
+   * `ReplicaGapError` is how its absence is spelled rather than an empty array.
+   */
+  getNote(noteId: string): Promise<NoteState | null>;
+  /** Non-deleted notes in the workspace, most recently updated first. */
+  listNotes(workspaceId: string): Promise<NoteState[]>;
+  /** The deleted ones — the local half of the undo list. */
+  listDeletedNotes(workspaceId: string): Promise<NoteState[]>;
+  /**
+   * Every note id this replica holds, deleted ones included — what the next
+   * `reconcile` presents as `heldNoteIds`. NOT `listNotes`, and the difference
+   * is the whole point: a device must offer up the ids it holds, and it still
+   * holds the deleted ones.
+   */
+  listNoteIds(workspaceId: string): Promise<string[]>;
+  listNotesForTicket(workspaceId: string, ticketId: string): Promise<NoteState[]>;
+  listNoteComments(noteId: string): Promise<LocalNoteComment[]>;
+  /**
+   * Store a note's history and fold it. The pull-shaped half of spec §5.1: a
+   * `reach-granted` notice named a note, `GET /v1/notes/:id/events` answered,
+   * and this is where the answer lands.
+   *
+   * IDEMPOTENT, because delivery is at-least-once: the same events loaded twice
+   * leave one row per event and the same note row. A device cut off mid-pull
+   * re-fetches the whole history, and that must not be an error.
+   */
+  loadNoteEvents(events: readonly LedgerEvent[]): Promise<void>;
   getTicket(ticketId: string): Promise<ReplicaTicket | null>;
   listTickets(workspaceId: string): Promise<ReplicaTicket[]>;
   listContests(
@@ -252,6 +301,40 @@ export async function createReplica(deps: { storage: SyncStorage }): Promise<Rep
   async function insertEnvelope(tx: SyncStorage, env: LedgerEvent): Promise<void> {
     await tx.run(
       `INSERT INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+      [
+        env.id,
+        env.workspaceId,
+        env.entity.kind,
+        env.entity.id,
+        env.type,
+        env.version,
+        JSON.stringify(env.payload),
+        env.actorId,
+        env.origin,
+        env.clientTime,
+        env.serverTime,
+        env.seq,
+        env.workspaceSeq,
+      ],
+    );
+  }
+
+  /**
+   * The same row as `insertEnvelope`, but tolerant of one already being there.
+   *
+   * **`insertEnvelope` is NOT changed to `OR IGNORE` and the two must not be
+   * merged.** The stream arm's dedupe is a deliberate pre-read plus a
+   * `{ applied: false }` return, because a caller has to be told whether the
+   * frame it just handed over was new — that is what makes delivery
+   * at-least-once safe to reason about. A pull has no such answer to give: it
+   * re-fetches a whole history by design and every event in it may already be
+   * held, so "ignore if present" is the whole contract and there is nothing to
+   * report.
+   */
+  async function insertEnvelopeIfAbsent(tx: SyncStorage, env: LedgerEvent): Promise<void> {
+    await tx.run(
+      `INSERT OR IGNORE INTO events (id, workspace_id, entity_kind, entity_id, type, version, payload, actor_id, origin, client_time, server_time, seq, workspace_seq)
        VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
       [
         env.id,
@@ -744,6 +827,124 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     await upsertTicket(tx, state);
   }
 
+  /**
+   * Write one note head row from the reducer's state, whole-row.
+   *
+   * `ON CONFLICT ... DO UPDATE` on every column rather than a partial write:
+   * the reducer's state IS the row, and a partial update is how a column
+   * survives a transition that should have cleared it — `scope_before_inherit`
+   * is the one that visibly does (a `note.scope_set` off `inherit` nulls it).
+   */
+  async function upsertNote(tx: SyncStorage, state: NoteState): Promise<void> {
+    await tx.run(
+      `INSERT INTO notes (note_id, workspace_id, home_project_id, author_id, title, body,
+                          scope, scope_before_inherit, attached_ticket_ids, deleted,
+                          created_at, updated_at, last_body_event_id, seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(note_id) DO UPDATE SET
+         workspace_id = excluded.workspace_id, home_project_id = excluded.home_project_id,
+         author_id = excluded.author_id, title = excluded.title, body = excluded.body,
+         scope = excluded.scope, scope_before_inherit = excluded.scope_before_inherit,
+         attached_ticket_ids = excluded.attached_ticket_ids, deleted = excluded.deleted,
+         created_at = excluded.created_at, updated_at = excluded.updated_at,
+         last_body_event_id = excluded.last_body_event_id, seq = excluded.seq`,
+      [
+        state.noteId,
+        state.workspaceId,
+        state.homeProjectId,
+        state.authorId,
+        state.title,
+        JSON.stringify(state.body),
+        JSON.stringify(state.scope),
+        state.scopeBeforeInherit === null ? null : JSON.stringify(state.scopeBeforeInherit),
+        JSON.stringify(state.attachedTicketIds),
+        state.deleted ? 1 : 0,
+        state.createdAt,
+        state.updatedAt,
+        state.lastBodyEventId,
+        state.seq,
+      ],
+    );
+  }
+
+  /**
+   * Replay a note's whole local history through the SHARED reducer and write
+   * the result. Server and device fold with one function, which is the same
+   * arrangement `refoldTicket` has and for the same reason.
+   *
+   * ## Why it replays from the ledger rather than folding forward
+   *
+   * `refoldTicket` reads a snapshot and folds the tail, because tickets HAVE
+   * snapshots. Notes have none (spec §5.3 — a note's history is short and the
+   * ledger already holds it), so there is nothing to start from and the whole
+   * stream is cheap. That also makes the fold IDEMPOTENT for free: replaying
+   * everything yields the same row however many times it runs, which is what
+   * makes `loadNoteEvents` safe to call on a device that was cut off mid-pull.
+   *
+   * ## `comment.added` is skipped on the way IN, not on the way OUT
+   *
+   * The caller dispatches a comment to `applyNoteComment` and never reaches
+   * this function for one — but a comment already stored IS replayed here when
+   * a later note event refolds, and `applyNoteEvent` folds it to no change
+   * except `seq`/`updatedAt`. That is why the head row's `seq` can advance past
+   * a comment without the comment having moved any state: the reducer says so,
+   * and `proj_notes` on the server behaves identically because it runs the same
+   * function over the same stream.
+   */
+  async function refoldNote(tx: SyncStorage, noteId: string): Promise<void> {
+    const eventRows = await tx.all(
+      "SELECT * FROM events WHERE entity_kind = 'note' AND entity_id = ? ORDER BY seq",
+      [noteId],
+    );
+    let state: NoteState | null = null;
+    for (const row of eventRows) {
+      const env = rowToEnvelope(row);
+      if ((NOTE_EVENT_TYPES as readonly string[]).includes(env.type)) state = applyNoteEvent(state, env);
+    }
+    if (state === null) return;
+    await upsertNote(tx, state);
+  }
+
+  /** One `comment.added` filed against a note. `comment_id` IS the event id. */
+  async function applyNoteComment(tx: SyncStorage, env: LedgerEvent): Promise<void> {
+    await tx.run(
+      `INSERT INTO note_comments (comment_id, workspace_id, note_id, author_id, body, recorded_at, workspace_seq)
+       VALUES (?, ?, ?, ?, ?, ?, ?)
+       ON CONFLICT(comment_id) DO UPDATE SET
+         body = excluded.body, recorded_at = excluded.recorded_at, workspace_seq = excluded.workspace_seq`,
+      [
+        env.id,
+        env.workspaceId,
+        env.entity.id,
+        env.actorId,
+        JSON.stringify((env.payload as { body?: unknown }).body ?? null),
+        env.serverTime,
+        env.workspaceSeq,
+      ],
+    );
+  }
+
+  function rowToNote(row: SqlRow): NoteState {
+    const pre = row.scope_before_inherit;
+    return {
+      noteId: row.note_id as string,
+      workspaceId: row.workspace_id as string,
+      homeProjectId: row.home_project_id as string,
+      authorId: row.author_id as string,
+      title: row.title as string,
+      body: JSON.parse(row.body as string) as unknown,
+      scope: JSON.parse(row.scope as string) as NoteState['scope'],
+      scopeBeforeInherit:
+        pre === null || pre === undefined ? null : (JSON.parse(pre as string) as NoteState['scope']),
+      attachedTicketIds: JSON.parse(row.attached_ticket_ids as string) as string[],
+      deleted: Number(row.deleted) === 1,
+      createdAt: row.created_at as string,
+      updatedAt: row.updated_at as string,
+      lastBodyEventId: row.last_body_event_id as string,
+      seq: Number(row.seq),
+    };
+  }
+
   async function contestsFor(tx: SyncStorage, ticketId: string): Promise<LocalContest[]> {
     const rows = await tx.all('SELECT * FROM contests WHERE ticket_id = ? ORDER BY contested_at, contested_event_id', [
       ticketId,
@@ -1030,6 +1231,25 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           await applyContest(tx, env);
         } else if (env.entity.kind === 'ticket' && FOLDING_TICKET_TYPES.includes(env.type)) {
           await refoldTicket(tx, env.entity.id, await buildLocalDeps(tx));
+        } else if (env.entity.kind === 'note') {
+          // NOTE the absence of a `FOLDING_NOTE_TYPES` guard beside the kind
+          // test, which the ticket arm above has. It is not an oversight and
+          // must not be added: `FOLDING_TICKET_TYPES` exists because tickets
+          // carry event types the reducer does NOT fold (`visibility.set`, the
+          // contests, and the content types a snapshot must still ship), and a
+          // note has none of those — `applyNoteEvent` covers the whole note
+          // vocabulary and THROWS on anything else. So an unrecognised note
+          // event is a loud failure here, which is the direction that matters:
+          // a note's head row is folded from its history, and a silently
+          // skipped event would be a note that quietly disagrees with the
+          // server.
+          //
+          // A COMMENT goes to its own table and does NOT refold the head row.
+          // The reducer folds it to no state change, so a refold would rewrite
+          // that row for nothing AND advance `notes.seq` past an event that
+          // moved no note state (case 18.078).
+          if (env.type === 'comment.added') await applyNoteComment(tx, env);
+          else await refoldNote(tx, env.entity.id);
         }
         // A ticket-entity event the reducer does not fold (`visibility.set`)
         // reaches none of the branches above and is simply stored. That is the
@@ -1070,6 +1290,12 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         // did not author themselves.
         if (me === null) await tx.run('DELETE FROM contests WHERE ticket_id = ?', [entityId]);
         else await tx.run('DELETE FROM contests WHERE ticket_id = ? AND claimant_id <> ?', [entityId, me.userId]);
+        // A note's row and its comments go with its events. `entityId` is an id
+        // from ONE namespace, so these two statements cannot collide with the
+        // ticket ones above — a note id is not a ticket id, and a purge naming
+        // either must clear whichever it names.
+        await tx.run('DELETE FROM notes WHERE note_id = ?', [entityId]);
+        await tx.run('DELETE FROM note_comments WHERE note_id = ?', [entityId]);
         // Outbox rows for the purged ticket STAY: they are the user's claims in
         // transit and must go up, contest, and surface — nothing silently vanishes.
       });
@@ -1102,6 +1328,20 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
           if (me === null) await tx.run('DELETE FROM contests WHERE ticket_id = ?', [ticketId]);
           else await tx.run('DELETE FROM contests WHERE ticket_id = ? AND claimant_id <> ?', [ticketId, me.userId]);
         }
+        // NOTES, and this one is SCOPED BY WORKSPACE — the statement above
+        // reaches a note by ITS OWN id, which is right for a purge and wrong
+        // here. `revokeScope` is handed a workspace (optionally a project) and
+        // the tickets it removes are found BY workspace; a note would be
+        // reached only through `notes.workspace_id`, and a `DELETE` without that
+        // clause takes every workspace's notes (case 18.080).
+        //
+        // The project branch is not implemented and does not need to be: a
+        // `scope-revoked` with a `projectId` is refused at the door
+        // (`visible-events-for.ts` emits none, and the hub throws on one), and
+        // this function's own `projectId === undefined` branch below is where
+        // the workspace-wide case is finished off.
+        await tx.run('DELETE FROM notes WHERE workspace_id = ?', [instruction.workspaceId]);
+        await tx.run('DELETE FROM note_comments WHERE workspace_id = ?', [instruction.workspaceId]);
         if (instruction.projectId === undefined) {
           // Losing the workspace loses its definitions and cursor too — a replica
           // for a workspace you are not in should hold nothing of it beyond your
@@ -1137,6 +1377,87 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         confirmed: JSON.parse(rows[0]!.state as string) as TicketState,
         contests: await contestsFor(storage, ticketId),
       };
+    },
+
+    async getNote(noteId) {
+      const rows = await storage.all('SELECT * FROM notes WHERE note_id = ?', [noteId]);
+      const row = rows[0];
+      return row === undefined ? null : rowToNote(row);
+    },
+
+    async listNotes(workspaceId) {
+      // `seq DESC` as the tiebreak rather than `note_id`: two notes saved in the
+      // same millisecond are ordered by how far their own histories got, which
+      // is the closest thing to "which one changed last" the row holds.
+      const rows = await storage.all(
+        'SELECT * FROM notes WHERE workspace_id = ? AND deleted = 0 ORDER BY updated_at DESC, seq DESC',
+        [workspaceId],
+      );
+      return rows.map(rowToNote);
+    },
+
+    async listDeletedNotes(workspaceId) {
+      const rows = await storage.all(
+        'SELECT * FROM notes WHERE workspace_id = ? AND deleted = 1 ORDER BY updated_at DESC, seq DESC',
+        [workspaceId],
+      );
+      return rows.map(rowToNote);
+    },
+
+    async listNoteIds(workspaceId) {
+      const rows = await storage.all('SELECT note_id FROM notes WHERE workspace_id = ? ORDER BY note_id', [
+        workspaceId,
+      ]);
+      return rows.map((r) => r.note_id as string);
+    },
+
+    async listNotesForTicket(workspaceId, ticketId) {
+      // `json_each` over the stored array, which is why `attached_ticket_ids` is
+      // a JSON column rather than a join table: the replica never needs to read
+      // an attachment by ticket except here, and here the column itself can
+      // answer. NOT a `LIKE '%id%'` — a substring match against a JSON array
+      // finds `01ABC` inside `01ABCD`, which is a wrong answer with no failing
+      // signal.
+      const rows = await storage.all(
+        `SELECT n.* FROM notes n
+          WHERE n.workspace_id = ? AND n.deleted = 0
+            AND EXISTS (SELECT 1 FROM json_each(n.attached_ticket_ids) WHERE json_each.value = ?)
+          ORDER BY n.updated_at DESC, n.seq DESC`,
+        [workspaceId, ticketId],
+      );
+      return rows.map(rowToNote);
+    },
+
+    async listNoteComments(noteId) {
+      const rows = await storage.all(
+        'SELECT * FROM note_comments WHERE note_id = ? ORDER BY workspace_seq',
+        [noteId],
+      );
+      return rows.map((row) => ({
+        commentId: row.comment_id as string,
+        authorId: row.author_id as string,
+        body: JSON.parse(row.body as string) as unknown,
+        recordedAt: row.recorded_at as string,
+        workspaceSeq: Number(row.workspace_seq),
+      }));
+    },
+
+    async loadNoteEvents(events) {
+      await storage.transaction(async (tx) => {
+        const touched = new Set<string>();
+        for (const env of events) {
+          await insertEnvelopeIfAbsent(tx, env);
+          if (env.entity.kind !== 'note') continue;
+          if (env.type === 'comment.added') await applyNoteComment(tx, env);
+          else touched.add(env.entity.id);
+        }
+        // One refold per note, AFTER the whole batch is stored — not one per
+        // event. A refold replays that note's entire history, so doing it inside
+        // the loop would replay it once per event, which for a three-save note
+        // is nine passes over the same rows for one answer.
+        for (const noteId of touched) await refoldNote(tx, noteId);
+      });
+      notify();
     },
 
     async listTickets(workspaceId) {
