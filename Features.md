@@ -1459,6 +1459,11 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   into the body, Enter on an empty last line leaves the block, Backspace in an empty summary removes
   it; the folded state is saved with the document for an editor and is view-only for a reader
   (spec §8.4). `packages/editor/src/extensions/collapsible.ts`
+- ✅ **Code blocks carry a Copy button, and the toolbar gained three controls** — the strip keeps the
+  prototype's six (`B i code link list quote`) and appends Task item, Code block and Collapsible. The
+  code block's node view keeps its name (`codeBlock`) and its two input rules, so the document is
+  unchanged and only its chrome is new. `packages/editor/src/extensions/code-block-copy.ts`,
+  `packages/editor/src/components/EditorToolbar.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

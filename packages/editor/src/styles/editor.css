@@ -532,3 +532,17 @@
   content: 'Title';
   opacity: 0.5;
 }
+
+/* The code block's Copy button (spec §8.2, Plan 4 Task 4). `position:
+   relative` here is what makes the button's `absolute` mean "in this block's
+   corner" rather than "in the page's" — the pair is one placement, and the
+   binding case asserts them together for that reason. No colour: this file's
+   standing rule, and the button inherits the block's ink. */
+.editor-codeblock { position: relative; }
+.editor-codeblock__copy {
+  position: absolute;
+  top: 0.375rem;
+  right: 0.375rem;
+  font: inherit;
+  cursor: pointer;
+}

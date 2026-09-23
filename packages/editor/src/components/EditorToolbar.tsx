@@ -11,10 +11,11 @@ import type { Editor } from '@tiptap/react';
  * Every button below calls a command the installed extension list ALREADY
  * registers. `buildEditorExtensions` (`schema/extensions.ts`) builds from
  * `StarterKit` plus `Link`, `Placeholder`, `Table`, `TicketImage` and
- * `Mention`; `StarterKit.configure` switches off exactly three things —
- * `document` (replaced by `VersionedDocument`), `link` (reconfigured below it)
- * and `underline` (outside schema v1's vocabulary) — so `bold`, `italic`,
- * `code`, `bulletList` and `blockquote` all arrive with it. The six commands
+ * `Mention`; `StarterKit.configure` switches off FOUR things — `document`
+ * (replaced by `VersionedDocument`), `link` (reconfigured below it),
+ * `underline` (outside the vocabulary) and, since Plan 4 Task 4, `codeBlock`
+ * (replaced by `CodeBlockWithCopy`) — so `bold`, `italic`, `code`,
+ * `bulletList` and `blockquote` all arrive with it. The six commands
  * were checked against the INSTALLED packages, not the library's docs:
  * `toggleBold` in extension-bold@3.30.5, `toggleItalic` in
  * extension-italic@3.30.5, `toggleCode` in extension-code@3.30.5,
@@ -172,6 +173,33 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       name: 'Quote',
       active: editor.isActive('blockquote'),
       run: () => editor.chain().focus().toggleBlockquote().run(),
+    },
+    // THE NOTES PORT'S THREE (Plan 4 Task 4), after the prototype's six rather
+    // than inserted among them: the prototype has no counterpart for any of
+    // them, so the strip keeps its transcribed order and grows at the end. The
+    // commands are `toggleTaskList` (extension-task-list), `toggleCodeBlock`
+    // (extension-code-block) and `setDetails` (extension-details, whose own
+    // `setDetails` inserts the same shape `Collapsible`'s input rule builds).
+    {
+      key: 'task',
+      label: '☐',
+      name: 'Task item',
+      active: editor.isActive('taskItem'),
+      run: () => editor.chain().focus().toggleTaskList().run(),
+    },
+    {
+      key: 'codeBlock',
+      label: '</>',
+      name: 'Code block',
+      active: editor.isActive('codeBlock'),
+      run: () => editor.chain().focus().toggleCodeBlock().run(),
+    },
+    {
+      key: 'collapsible',
+      label: '▸',
+      name: 'Collapsible',
+      active: editor.isActive('details'),
+      run: () => editor.chain().focus().setDetails().run(),
     },
   ];
 

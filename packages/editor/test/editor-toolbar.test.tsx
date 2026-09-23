@@ -232,7 +232,17 @@ describe('the editor toolbar (16.85)', () => {
     const names = Array.from(view.container.querySelectorAll('.ticket-editor__tool')).map((el) =>
       el.getAttribute('aria-label'),
     );
-    expect(names).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
+    // THE PROTOTYPE'S SIX, ASSERTED AS A PREFIX RATHER THAN AS THE WHOLE STRIP.
+    // Plan 4 Task 4 widens the strip with three controls the prototype has no
+    // counterpart for (Task item, Code block, Collapsible — case 9.274), and
+    // they are appended AFTER the transcribed six so the transcription this
+    // case exists to protect stays checkable. The alternative — rewriting the
+    // literal to nine names — would leave the order of the prototype's six
+    // pinned by nothing but their presence in a longer list.
+    expect(names.slice(0, 6)).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
+    // …and the port's three are the ones that follow, in their own order, so a
+    // future control cannot slip in between the six and these three unnoticed.
+    expect(names.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible']);
     expect(view.container.querySelector('.ticket-editor__hint')?.textContent).toBe(MARKDOWN_HINT);
     view.unmount();
   });
@@ -322,5 +332,59 @@ describe('13.1154 the editor strip takes the product\'s fill, not an outline', (
     expect(tool, 'a fallback value was added — it would change the webview paint').not.toMatch(
       /var\(--gn-[a-z-]+,\s*[^)]+\)/,
     );
+  });
+});
+
+/**
+ * 9.274 — THE NOTES PORT'S THREE NEW CONTROLS (Plan 4 Task 4).
+ *
+ * Same standard as every case above, for the same stated reason: not one
+ * assertion here is that a button is on screen. Each clicks a control and then
+ * reads the DOCUMENT, so a button that rendered and did nothing fails. The
+ * three controls are asserted in ONE `it` with Bold as the control arm, because
+ * the property is "the strip grew by three working controls" — and the control
+ * arm is what distinguishes that from "the strip is clickable".
+ *
+ * Each control gets its own mount: `toggleTaskList`, `toggleCodeBlock` and
+ * `setDetails` each transform the block they are applied to, so driving all
+ * three into one document would make each assertion depend on the previous
+ * click's shape rather than on its own command.
+ */
+describe('9.274 the toolbar gains task, code block and collapsible', () => {
+  it('9.274 Task item, Code block and Collapsible each change the document; Bold still toggles bold', async () => {
+    const task = await mount(makeProps());
+    task.editor.commands.selectAll();
+    tool(task.view, 'Task item').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(task.editor.getJSON())).toContain('"type":"taskList"');
+    });
+    task.view.unmount();
+
+    const code = await mount(makeProps());
+    code.editor.commands.selectAll();
+    tool(code.view, 'Code block').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(code.editor.getJSON())).toContain('"type":"codeBlock"');
+    });
+    code.view.unmount();
+
+    const collapsible = await mount(makeProps());
+    collapsible.editor.commands.selectAll();
+    tool(collapsible.view, 'Collapsible').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(collapsible.editor.getJSON())).toContain('"type":"details"');
+    });
+    collapsible.view.unmount();
+
+    // THE CONTROL ARM, in the same `it`: an older control still works, so a
+    // failure above is about the new entry rather than about the strip having
+    // stopped working altogether.
+    const bold = await mount(makeProps());
+    bold.editor.commands.selectAll();
+    tool(bold.view, 'Bold').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(bold.editor.getJSON())).toContain('"type":"bold"');
+    });
+    bold.view.unmount();
   });
 });

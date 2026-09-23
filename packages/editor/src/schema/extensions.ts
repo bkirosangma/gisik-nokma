@@ -14,6 +14,7 @@ import {
   DetailsSummary,
 } from '@tiptap/extension-details';
 import { VersionedDocument } from './versioned-document.js';
+import { CodeBlockWithCopy } from '../extensions/code-block-copy.js';
 import { Collapsible } from '../extensions/collapsible.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
@@ -73,6 +74,12 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       link: false,
       // Outside document schema v1's closed mark vocabulary.
       underline: false,
+      // REPLACED, not removed: `CodeBlockWithCopy` below extends the same node
+      // and keeps its name, so leaving StarterKit's on would register two
+      // `codeBlock` extensions and the schema would take one of them by
+      // accident. The rule census is the check — `codeBlock: 2` is unchanged,
+      // which is what says the replacement kept both input rules.
+      codeBlock: false,
     }),
     VersionedDocument,
     // SPEC §2 SAYS "NOTHING SILENTLY BECOMES MARKUP". THE OPTIONS BELOW DO
@@ -198,6 +205,10 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     }),
     DetailsSummary,
     DetailsContent,
+    // The code block, with its Copy button. Placed where StarterKit's own
+    // `codeBlock` would have been (the disable above), so the extension LIST
+    // order — and therefore the census and the schema — is unchanged.
+    CodeBlockWithCopy,
     // The `< ` rule and the Enter/Backspace keymap the Details extension does
     // not ship. It registers NO node of its own — it is an `Extension`, not a
     // `Node` — so it adds one line to the input-rule census and nothing to the

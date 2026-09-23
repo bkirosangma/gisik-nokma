@@ -255,3 +255,27 @@ describe('9.272 the collapsible block is styled', () => {
     expect(declared(box, 'cursor')).toBeNull();
   });
 });
+
+/**
+ * 9.275 — THE CODE BLOCK'S COPY BUTTON (Plan 4 Task 4). Same split as
+ * everything above: jsdom applies no stylesheet, so the only place the button's
+ * placement can be checked is the file. `position: relative` on the block is
+ * what makes the button's `position: absolute` mean "in this block's corner"
+ * rather than "in the page's", and the pair is asserted together because either
+ * one alone is a placement that does not work.
+ */
+describe('9.275 the code block copy button is placed', () => {
+  it('9.275 .editor-codeblock is a containing block and the copy button is positioned in it', () => {
+    const box = ruleBody(EDITOR_CSS, '.editor-codeblock');
+    expect(declared(box, 'position')).toBe('relative');
+
+    const copy = ruleBody(EDITOR_CSS, '.editor-codeblock__copy');
+    expect(declared(copy, 'position')).toBe('absolute');
+
+    // CONTROL, same `it`: the two selectors must reach DIFFERENT rules.
+    // `ruleBody` is a first-match substring search, so a block rule written
+    // `.editor-codeblock__copy` by mistake would let the box arm read the
+    // button's declarations and pass with no block rule in the file.
+    expect(copy).not.toBe(box);
+  });
+});
