@@ -3522,15 +3522,27 @@ conditional on key/due alone) in place — same ids, `packages/app-core/test/vie
   fields, keyed, for a real seeded hierarchy, and the epic's own card (a root, and its own nearest
   ancestor-or-self) gets `parent: null` with `epic` naming itself. —
   (`apps/server/test/read/ancestry.test.ts`, `apps/server/test/routes/board.test.ts`)
-- **13.1461** ✅ A parent behind an explicit list this viewer is not on is not named (`parent: null`);
-  the control — the SAME ticket viewed as a member ON that list — names it. —
+- **13.1461** ✅ CORRECTED (controller mutation, 2026-09-23 — the first version PASSED with `AND
+  ${visible}` deleted from `ancestryCte`'s recursive term, because its child had no `visibility.set` of
+  its own and so INHERITED its hidden parent's audience, making the anchor exclude the row before the
+  recursive step ever ran). Rebuilt on `list.test.ts`'s own 7.80 shape: a child under an explicit-owner-
+  only parent, given its OWN `visibility.set` naming owner AND member — so the member CAN see the child
+  (asserted FIRST via the independent `canSee` oracle, not `boardAncestryFor` itself) but gets `parent:
+  null`, because the walk climbs into the parent and the parent is where it is stopped. CONTROL — the
+  owner, who may see the parent too, gets it named. Re-run against the controller's exact mutation:
+  RED (both this case and 13.1463 failed); restored from the committed tree, GREEN again. —
   (`apps/server/test/read/ancestry.test.ts`)
 - **13.1462** ✅ A soft-deleted immediate parent is not named, even to the OWNER who could otherwise see
   it — `LIVE_TICKET_WHERE` on the recursive term stops the walk exactly as an invisible link does; killed
   by a planted mutation dropping that conjunct (measured: 1 failed, restored to green). —
   (`apps/server/test/read/ancestry.test.ts`)
-- **13.1463** ✅ An epic reachable only through an invisible link is not named, over the SAME hidden
-  ticket 13.1461 names for the parent arm — one predicate, both arms. —
+- **13.1463** ✅ CORRECTED, the SAME defect and the SAME fix shape as 13.1461. Builds the real three-level
+  case: an epic (root) → a hidden middle ticket (explicit: owner only, child of the epic) → a visible
+  grandchild (its OWN `visibility.set` naming owner and member, child of the hidden middle ticket). The
+  member CAN see the grandchild (independent `canSee` control, first) but gets `epic: null`, because the
+  walk must climb THROUGH the hidden middle ticket to reach the epic and is stopped there. CONTROL — the
+  owner, who may see every hop, gets the real epic. Re-run against the controller's exact mutation: RED;
+  restored, GREEN. —
   (`apps/server/test/read/ancestry.test.ts`)
 - **13.1464** ✅ `mapBoardCard` carries a real `parent`/`epic` object whole (key included, and a `key:
   null` on a real object survives); a MISSING `parent`/`epic` key throws `MappingError` naming the path,
