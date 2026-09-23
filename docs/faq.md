@@ -7,7 +7,7 @@ Answers here say "I don't know" where nobody knows. That is on purpose.
 
 **Jump to:** [Signing in](#signing-in) · [Workspaces and projects](#workspaces-and-projects) ·
 [People and roles](#people-and-roles) · [Jobs](#jobs) · [Stages and moves](#stages-and-moves) ·
-[Writing, comments and files](#writing-comments-and-files) ·
+[Writing, comments and files](#writing-comments-and-files) · [Notes](#notes) ·
 [Boards, lists and dates](#boards-lists-and-dates) ·
 [Being told things](#being-told-things) · [Privacy](#privacy) ·
 [Finding things](#finding-things) · [Offline, phone and desktop](#offline-phone-and-desktop) ·
@@ -525,6 +525,63 @@ as an open question rather than a no.
 
 ---
 
+## Notes
+
+**What is a note, and how is it different from a job?**
+A note is a page of writing that belongs to a workspace or a project, not to a job. Use it for anything
+that is not one piece of work — a log, a parts list, something you want to keep after the job it came
+from closes. Find it at **Notes** in the nav, left of Inbox.
+
+**Who can read my note?**
+Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
+workspace except guests, **This project** means everyone actually on that project, **Same as the
+ticket** means whoever can see any job it is attached to, and **Specific people** means exactly the
+people you chose. You, as its author, always read your own note whatever its Scope.
+
+**Can the workspace owner read my private note?**
+Yes. The owner reads every note in the workspace, whatever its Scope — that is not something you can
+turn off from the note's side.
+
+**Can an admin read notes I haven't shared with them?**
+No, not by virtue of being an admin. An admin reads a note under the same rule as anyone else: their
+own, anything workspace-wide, anything on a project they are actually a member of, anything naming them,
+or anything shared the way a job they can see is. Being an admin gives no extra reach into notes — only
+the owner gets that.
+
+**Why can't I find a note I know exists?**
+A few reasons, in order of likelihood: its Scope does not include you; it was deleted (check the
+Deleted group, if you may see it); your search words do not spell-match closely enough and it has not
+been found by meaning yet, because meaning search only understands English; or you are searching from
+the wrong workspace or project section of the tree.
+
+**Does search understand other languages, or Garo?**
+Word-based search does — including its near-miss spelling correction. Meaning-based search is an
+English-only model today; a Garo-tuned one is a planned follow-up, not built.
+
+**What happens to a note when I delete the job it is on?**
+The note stays attached — deleting a job does not detach anything. But a deleted job no longer counts
+as active work, so if the note's Scope is **Same as the ticket** and this was its only attached job, nobody but
+you (its author) and the workspace owner can read it until it is detached or restored. Restoring the
+job restores that reach automatically, with nothing to redo.
+
+**Can I get back an old version of a note?**
+Yes. Open **History** from the note's byline, pick a version, and press **Restore** — if you can edit
+the note. A reader can open History and look, but not put an old version back.
+
+**Why does a link in a comment show a title I can't open?**
+Because the chip shows the title the note (or job) had when the link was written, even to someone who
+cannot open it. That is today's behaviour; whether it should instead hide the title is an open question
+the product owner is still deciding.
+
+**Can I delete a note?**
+Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up
+in the Deleted group, Restore works and brings it back exactly as it was.
+
+**What happens if someone stops sharing a note with me while I have it open?**
+You are taken back to the Notes list with a message: "That note is no longer shared with you".
+
+---
+
 ## Boards, lists and dates
 
 **Why doesn't the "Only tickets in progress" switch change the Board?**
@@ -762,17 +819,21 @@ project in the workspace at once, bolds the matching words in a snippet, ranks t
 comment matches, only ever returns things you are allowed to see, and counts its fifty results *after*
 removing the hidden ones — so you get fifty things you can actually open, not a padded list.
 
-None of it is reachable. It is a finished engine with no steering wheel bolted on.
+**It is reachable now, but only narrowly.** Type `:ticket ` followed by a few words, in a job's comment
+box or in a note, and a picker opens over this same engine's results. There is still no general search
+screen of its own — nowhere you type a query and read this engine's results directly, the way the two
+narrowing boxes let you read theirs.
 
 **Is there a search anywhere at all?**
-Two places, and both of them only narrow something already on screen. On the **phone app's board
-screen** — where, offline, it says "searching offline copy" underneath, so you know the results might
-be a little out of date. And on the **website's project board**, in the box above the tabs.
+Three places now, and only one of them is the deep search. On the **phone app's board screen** — where,
+offline, it says "searching offline copy" underneath, so you know the results might be a little out of
+date — and on the **website's project board**, in the box above the tabs, both only narrow something
+already on screen. The `:ticket ` picker (§15) reaches the deep search described just above, narrowed
+to jobs and only from inside a comment or a note — still not a screen of its own. Notes (§15) have a
+separate search again, on the Notes page: its own engine, and it only searches notes.
 
-Neither of those is the deep search described just above. That one is still on no screen.
-
-**If the deep search worked, what would catch me out?**
-Two things:
+**If I use the deep search through the `:ticket` picker, what would catch me out?**
+Two things, on the ticket-search half at least — the picker inherits the engine's own limits:
 
 - **It matches words exactly as typed.** Searching "licences" will not find "licence". No plurals, no
   word-stem cleverness.

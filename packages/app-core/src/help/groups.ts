@@ -125,6 +125,11 @@ export const HELP_GROUPS: Readonly<Partial<Record<HelpDocument['id'], readonly H
         '14-the-time-zone-and-other-things-worth-knowing',
       ],
     },
+    {
+      id: 'manual-notes',
+      title: 'Notes',
+      sectionIds: ['15-notes'],
+    },
   ],
 };
 

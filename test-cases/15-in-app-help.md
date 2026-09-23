@@ -24,7 +24,11 @@ to make it work.*
 
 ## Search (`packages/app-core`)
 
-*Currently the only search a web user can reach at all — the product has none of its own.*
+*Until the notes release (2026-09-23) this was the only search a web user could reach at all — the
+product had none of its own. The product now has two: the Notes page's own search, and the deep
+ticket-search engine, reachable only through the `:ticket` picker in a comment or a note (manual §15,
+FAQ "Finding things"). Neither is this one — this section covers the help browser's search over the
+manual and FAQ text, not either of those.*
 
 - **15.6** ✅ Conjunctive and order-independent: "due date" and "date due" return the same set, and one absent term kills the query rather than falling back to OR — (`packages/app-core/test/help/search.test.ts`)
 - **15.7** ✅ A title hit outranks a body mention — (`packages/app-core/test/help/search.test.ts`)
@@ -383,7 +387,17 @@ query. Cases 13.266–13.267 and the mutation record at 13.x name the old class 
 *Allocated 2026-09-23 by the controller against `origin/release/notes` `4d12ae02` (table tip `15.35`),
 for `task/help-notes`: the manual's new "§15 — Notes" section, the FAQ's new "Notes" section, the
 correction of the FAQ's now-false "Finding things" claims, and (addendum, owner "yes pls") documenting
-starting-status and board-card-badges in the existing sections. Cases file: this one. Minted: none yet
-— this is the reservation commit; the lane fills this block.*
+starting-status and board-card-badges in the existing sections. Cases file: this one.
+
+- **15.36** ✅ The generated corpus carries the manual's "§15 — Notes" section (last in document order,
+  its nine subsections) and the FAQ's "Notes" section (8–12 real questions) — against the real generated
+  content, not a fixture — (`packages/app-core/test/help/notes-sections.test.ts`)
+- **15.37** ✅ Every quoted UI string the help-notes task wrote (Units 1–2 so far; extended in Unit 4) is
+  real product copy, checked against `apps/` + `packages/` via `productText`/`quotedSpans`
+  (`scripts/help-content.mjs`) rather than hand-typed literals in the test — mutation: alter one checked
+  quote to an invented string → red, naming the string; verified and reverted 2026-09-23 —
+  (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`)
+
+Minted so far: 15.36–15.37. 15.38–15.50 remain for Units 3–4 and any further cases this lane needs.
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*
