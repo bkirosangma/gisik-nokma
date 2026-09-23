@@ -82,7 +82,7 @@ function source(
   // `ingest` is on `DataSource`, not on the query — it is the SECOND argument
   // of `createFakeDataSource`, which is why a case that refuses a claim passes
   // it here rather than in the query overrides.
-  ingestScript?: (events: unknown[]) => Array<Record<string, unknown>>,
+  ingestScript?: IngestScript,
 ) {
   return createFakeDataSource(
     {
@@ -100,7 +100,7 @@ function source(
       getTicketComments: async () => [COMMENT],
       ...overrides,
     },
-    ingestScript as never,
+    ingestScript,
   );
 }
 
@@ -281,7 +281,9 @@ describe('TicketSheet — the comment thread and its box', () => {
     // A source that refuses the claim. `emitAttachmentAdded` must reject: the
     // editor awaits it before inserting the node, and resolving quietly would
     // put a picture into the document naming an attachment no event records.
-    const refusing = source({}, () => [{ status: 'refused', rule: 'r', reason: 'the server said no' }]);
+    const refusing = source({}, (events) =>
+      events.map((event) => ({ status: 'refused' as const, eventId: event.id, rule: 'r', reason: 'the server said no' })),
+    );
     renderSheet(refusing, { editorSlot: fakeEditorSlot(seen) });
     const section = await screen.findByTestId('sheet-comments');
 
