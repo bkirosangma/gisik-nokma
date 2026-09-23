@@ -50,7 +50,7 @@ export {
   readingTimeMinutes,
   type ReadingMeta,
 } from './reading/reading-meta.js';
-export { ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
+export { MIN_HEADINGS, ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
 export { UploadRefusedError, uploadAttachmentHttp, uploadNoteAttachmentHttp, type UploadResult } from './upload.js';
 export {
   attachmentPasteKey,

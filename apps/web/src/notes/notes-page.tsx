@@ -4,7 +4,7 @@ import Link from 'next/link';
 import { useCallback, useEffect, useRef, useState } from 'react';
 import { usePathname, useRouter } from 'next/navigation';
 import { Button, Toast } from '@gisik-nokma/ui';
-import { ReadingTOC, type ReadingMeta } from '@gisik-nokma/editor';
+import type { ReadingMeta } from '@gisik-nokma/editor';
 import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteScopeMode } from '@gisik-nokma/domain';
 import { AppNav } from '../app-nav.js';
@@ -13,6 +13,7 @@ import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.j
 import { CreateNoteDialog } from './create-note-dialog.js';
 import { NoteDocument } from './note-document.js';
 import { NotesSearchHeader } from './notes-search-header.js';
+import { TocLauncher } from './toc-launcher.js';
 import { WorkspaceNotesSection } from './workspace-notes-section.js';
 
 /**
@@ -176,7 +177,7 @@ export function NotesPage({ noteId }: { noteId?: string }) {
   }, [dataSource, workspaces]);
 
   return (
-    <main id="gn-main" className="gn-shell">
+    <main id="gn-main" className="gn-shell gn-shell--wide">
       <AppNav />
       <div className="gn-notes" data-testid="notes-page">
         <div className="gn-notes__header">
@@ -293,14 +294,19 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           {/* `aria-label` stays on THIS wrapper, not on `ReadingTOC`'s own
               inner `<nav>` — case 18.181 (Task 1) already asserts this
               `complementary` landmark exists with no note open, when
-              `ReadingTOC` renders nothing at all (fewer than 3 headings is
-              its own gate, and an unopened note has none). Yes, once the TOC
-              DOES render, its inner `<nav aria-label="On this page">` nests
-              inside a `complementary` region of the same name — redundant,
-              not broken; the alternative breaks the region that has to exist
-              before any heading does. */}
+              `TocLauncher` renders nothing at all (fewer than MIN_HEADINGS
+              is its own gate, and an unopened note has none). Yes, once the
+              panel DOES render, `ReadingTOC`'s inner `<nav aria-label="On
+              this page">` nests inside a `complementary` region of the same
+              name — redundant, not broken; the alternative breaks the region
+              that has to exist before any heading does.
+
+              REPURPOSED (owner request 2026-09-23) from a right-hand column,
+              visible only above 64rem, to a fixed floating launcher visible
+              at every width — see this class's own docblock in globals.css.
+              `TocLauncher` wraps `ReadingTOC` rather than replacing it. */}
           <aside className="gn-notes__toc" aria-label="On this page">
-            <ReadingTOC headings={headings} scrollContainerRef={editorRootRef} />
+            <TocLauncher headings={headings} scrollContainerRef={editorRootRef} />
           </aside>
         </div>
       </div>
