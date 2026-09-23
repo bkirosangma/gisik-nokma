@@ -791,10 +791,16 @@ describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', (
     const doingColumn = await screen.findByRole('region', { name: 'Doing' });
     await user.click(within(doingColumn).getByRole('button', { name: 'Add a ticket' }));
 
-    // Pre-filled: `epic` is `WORKSPACE_TYPES`' FIRST entry sharing `wf-errands`
-    // (the planner default — "the first is pre-selected"), and the status is
-    // the column's own `doing`, not the workflow's `todo`.
-    expect(screen.getByLabelText('Type')).toHaveValue('Epic');
+    // Pre-filled: `epic` is `WORKSPACE_TYPES`' FIRST entry sharing
+    // `wf-errands`, and it is NOT what renders — `task` is, because this
+    // dialog asks `defaultRootTypeFor` over the types sharing the workflow
+    // rather than a bare first-match (measured deviation from the design's
+    // literal "the first is pre-selected": an epic created into a column
+    // vanishes from every column the board draws, `isEpic`'s filter, owner
+    // ruling 2026-09-20 — the exact defect E5-16 already named once for the
+    // header's own default). The status is the column's own `doing`, not the
+    // workflow's `todo`.
+    expect(screen.getByLabelText('Type')).toHaveValue('Task');
     expect(screen.getByRole('button', { name: /Starting status/ })).toHaveTextContent('Doing');
     expect(screen.getByRole('checkbox', { name: 'Starts in the backlog?' })).not.toBeChecked();
 
@@ -807,7 +813,7 @@ describe('13.1442 a board column pre-fills the New-ticket dialog, end to end', (
       throw new Error(`expected one ticket.created event, got ${JSON.stringify(ingested)}`);
     }
     expect((columnEvent.payload as Record<string, unknown>)['stateId']).toBe('doing');
-    expect((columnEvent.payload as Record<string, unknown>)['typeId']).toBe('epic');
+    expect((columnEvent.payload as Record<string, unknown>)['typeId']).toBe('task');
 
     // CONTROL, same render: a successful Create already closed the dialog
     // (`create-ticket-flow.tsx`'s own `setDialogOpen(false)` on `committed`),

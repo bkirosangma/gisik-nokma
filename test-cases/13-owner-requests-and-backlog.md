@@ -3568,7 +3568,10 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   onCreateTicket?` widens to `(selection?: {workflowId, stateId}) => void`; the empty-column card reads
   `group.workflowId`/`column.stateId`, both already in scope from the `.map` that renders it. Mutation-
   witnessed: always rendering the button (dropping the `column.creatable` term from the gate) reddens
-  `13.1432`'s control half, `expected <button>… to be null` — restored from the committed tree. —
+  `13.1432`'s PRIMARY assertion — the `creatable: false` `Done` column now shows the button too,
+  `expected <button>… to be null` — restored from the committed tree. (`13.1432`'s own sibling-column
+  control, that `To do` still shows the button, is unaffected by this mutation either way, since it was
+  never the arm in question.) —
   (`packages/app-core/test/views/board.test.tsx`)
 - **13.1432** ✅ A `creatable: false` empty column shows the empty copy only — no `+` icon, no button —
   while its `creatable: true` sibling in the SAME render still shows the button (control, same `it`, so a
@@ -3594,6 +3597,15 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   half); the server's `isCreatableState(def, state.id)` hardcoded to `true` reddens the `done` row's
   `creatable: false` expectation. Both restored from the committed tree. —
   (`packages/app-core/test/online/mappers.test.ts`, `apps/server/test/routes/board.test.ts`)
+- **13.1434a** ✅ (suffixed — the UI block is fully spent; `check-case-citations`' ratchet skips suffixed
+  ids, so this citation is by hand.) The REPLICA's own `isCreatableState` derivation
+  (`replica-data-source.ts`'s `getBoard`), UNWITNESSED by any assertion on the VALUE until this case — the
+  earlier fixture edits this branch needed only satisfied the typecheck each `creatable` addition required.
+  `wfV1` (this file's own fixture): three non-terminal states (`todo`, `doing`, `waiting` — the last
+  `blocked` too, independent axis) read `creatable: true`; the terminal `done` reads `false`.
+  Mutation-witnessed: hardcoding the derivation to `creatable: true` reddens the `done` expectation,
+  restored from the committed tree (`git checkout --`, since the tree was clean before this run). —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
 
 - **13.1435** ✅ The Starting-status select lists only `creatable` states and defaults to the workflow's
   own `initialStateId`. `NewTicketDialog` filters `workflowStates`'s FULL per-state list itself
@@ -3643,9 +3655,27 @@ is the section immediately above and is not this one). Branch `task/starting-sta
   `rememberNewTicketStart` (which the design's own open-effect docblock states explicitly: that write
   belongs to the person's own deliberate toggle, not to a board click answering a different question). —
   (`packages/app-core/test/views/new-ticket-dialog.test.tsx`)
+- **13.1441a** ✅ (suffixed — the UI block is fully spent; cited by hand, the ratchet skips suffixed ids.)
+  The INLINE `stateRefusal` precheck — `CreateTicketFlow.create`'s own state-creatable branch, `setStateRefusal`,
+  the reason rendered under the dialog's Starting-status select — UNWITNESSED by any test until this case,
+  despite being real, shipped code. REACHABLE IN PRODUCTION, not dormant: `apps/web/src/providers.tsx` wires
+  `cache-feed.ts`'s `cache.upsertWorkflowDef(def)` into the real `ClientStateCache` on every mount, so the web
+  app's `CreateTicketFlow` genuinely holds workflow defs this precheck can disagree with `workflowStates`
+  about. New file `create-ticket-flow.test.tsx`: a cache whose def marks `locked` `creatable: false` while
+  `workflowStates` offers it as creatable (the one way this branch can fire — the select's own options are
+  already filtered, so an ordinary session cannot pick a state its own `workflowStates` refused); pressing
+  Create submits NOTHING and the sentence `workflowStateNotCreatableRefusal` builds renders inside the open
+  dialog. Mutation-witnessed: gating the branch on `false && ...` (skip it entirely) reddens with the event
+  actually reaching `source.ingested`, restored from the committed tree (`git checkout --`). —
+  (`packages/app-core/test/views/create-ticket-flow.test.tsx`)
 
-**A same-commit effect-ordering defect, found and fixed before any of the above landed, worth recording
-because it would have reproduced for any caller who opens with a resolved `workflowStates`.** The "empty on
+**A same-commit effect-ordering defect, found and fixed before any of the above landed, worth recording as
+measured rather than as a general claim about every caller.** Measured against THIS file's own fixtures,
+whose `workflowStates` functions close over a stable, describe-scoped constant — `page.tsx`'s own
+`workflowStatesFor` builds a fresh object literal on every call instead, and whether that difference changes
+the reproduction was not separately tested; the mechanism below (same-commit `setState` batching across two
+effects) does not obviously depend on `workflowStates`'s object identity, but that is reasoning, not a
+second measurement. The "empty on
 OPEN" effect (E2-37) and the Starting-status reseed effect both fire in the SAME commit on every open — and
 both are declared as separate `useEffect`s that call `setStateId`. The open effect's original text set a
 bare `''` ("nothing chosen yet, the reseed effect will fill it in"), relying on the reseed effect — declared

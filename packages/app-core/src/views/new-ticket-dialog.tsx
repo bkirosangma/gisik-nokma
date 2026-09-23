@@ -570,13 +570,29 @@ export function NewTicketDialog({
      * `initialSelection` (starting-status design, 2026-09-23) — a board
      * column's own identity, present only when THIS open came from a
      * column's "Add a ticket" rather than the header's unscoped one.
-     * `matchedType` is the design's own planner default: "when several
-     * types share the column's workflow the first is pre-selected" — the
-     * FIRST `typeOption` whose `workflowId` matches, not `defaultRootTypeFor`
-     * over that subset, because a board column already names a fixed
-     * starting status and the root-legality question `defaultRootTypeFor`
-     * exists to answer (E5-16) does not apply to a type the person can still
-     * change by hand.
+     *
+     * ⚠ **DEVIATES from the design's literal text, and the deviation is
+     * measured, not a guess.** The design says "the first is pre-selected" —
+     * a bare `typeOptions.find`. Read literally, that is `typeOptions[0]`
+     * among the types sharing the column's workflow, which is EXACTLY
+     * E5-16's own defect (`defaultRootTypeFor`'s docblock, `:57`): the ladder
+     * arrives rank-ascending, so the "first" type sharing any workflow is
+     * whichever epic sits on it. **A root ticket, every time** — a
+     * board-column create carries no parent — so `defaultRootTypeFor`'s
+     * root-legality question DOES apply here, contrary to this component's
+     * own earlier reasoning (corrected, not merely superseded): an epic
+     * created into a column is accepted by the engine and then vanishes from
+     * every column that receives it, because `isEpic(card.typeId)` filters it
+     * out of `column.cards` before the board ever draws it (owner ruling,
+     * 2026-09-20, `page.tsx`'s `isEpic` filter) — the empty column stays
+     * empty, defeating the request's own point. `matchedType` therefore asks
+     * `defaultRootTypeFor` over the types sharing that workflow — the SAME
+     * "deepest legal type is the everyday one" answer E5-16 already gives the
+     * header's own default, not a second opinion — and falls back to the
+     * first SHARING type only when none of them is root-legal at all (every
+     * type on that workflow needs a parent): something pre-filled is still
+     * better than nothing, and a person who dislikes the pick can still
+     * change it by hand.
      *
      * An unmatched `workflowId` — no type on this project shares that
      * workflow — falls through to the ordinary, no-selection path below
@@ -584,10 +600,12 @@ export function NewTicketDialog({
      * selection" is a statement about the WHOLE selection, not the type
      * alone.
      */
-    const matchedType =
+    const sharingTypes =
       initialSelection === undefined
-        ? undefined
-        : typeOptions.find((option) => option.workflowId === initialSelection.workflowId);
+        ? []
+        : typeOptions.filter((option) => option.workflowId === initialSelection.workflowId);
+    const matchedType =
+      sharingTypes.length === 0 ? undefined : (defaultRootTypeFor(sharingTypes) ?? sharingTypes[0]);
     if (initialSelection !== undefined && matchedType !== undefined) {
       setTypeId(matchedType.id);
       // Computed DIRECTLY here rather than left as a bare `''` for the

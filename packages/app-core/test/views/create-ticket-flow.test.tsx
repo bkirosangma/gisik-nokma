@@ -1,7 +1,9 @@
 import { fireEvent, render, screen } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import type { SubmittedEvent } from '@gisik-nokma/domain';
+import { label, type SubmittedEvent, type WorkflowDef } from '@gisik-nokma/domain';
+import { workflowStateNotCreatableRefusal } from '@gisik-nokma/rule-engine';
+import { createClientStateCache } from '../../src/cache.js';
 import { CreateTicketFlow } from '../../src/views/create-ticket-flow.js';
 import { createFakeDataSource, type FakeDataSource } from '../helpers/fake-data-source.js';
 import { WS } from '../helpers/seed.js';
@@ -81,5 +83,94 @@ describe('13.1444 the birth start/due date reach ticket.created as {date} object
     const payload = ticketCreatedPayload(source);
     expect(payload).not.toHaveProperty('startDate');
     expect(payload).not.toHaveProperty('dueDate');
+  });
+});
+
+/**
+ * Case 13.1441a — the inline `stateRefusal` precheck (starting-status
+ * design, 2026-09-23), UNWITNESSED until this case: `create-ticket-flow.tsx`
+ * gained a whole branch — the state-creatable half of `precheckEvent`,
+ * `setStateRefusal`, the reason rendered under the dialog's Starting-status
+ * select — and no test exercised it. Suffixed because the UI block
+ * (`13.1431`–`13.1445`) is fully spent; `check-case-citations`' ratchet skips
+ * suffixed ids (case-citation-ratchet-skips-suffixed-ids), so this citation
+ * is by hand.
+ *
+ * REACHABLE IN PRODUCTION, not dormant: `apps/web/src/providers.tsx` wires
+ * `cache-feed.ts`'s `cache.upsertWorkflowDef(def)` into the real
+ * `ClientStateCache` every mount, so the web app's `CreateTicketFlow`
+ * genuinely holds workflow defs this precheck can disagree with
+ * `workflowStates` about — this is not a path that only a test can reach.
+ */
+describe('13.1441a the inline stateRefusal precheck — a cache that disagrees with workflowStates', () => {
+  it('refuses locally, submits NOTHING, and renders the reason under the select', async () => {
+    const user = userEvent.setup();
+    const source = createFakeDataSource();
+    const cache = createClientStateCache();
+    /**
+     * The CACHE's own belief: `locked` is `creatable: false`. `workflowStates`
+     * below — the UI's own read, built independently in this fixture — offers
+     * `locked` as creatable anyway, the one way this branch can fire at all
+     * (the select's own options are already filtered to `creatable`, so an
+     * ordinary session can't pick a state its own `workflowStates` refused to
+     * offer).
+     */
+    const def: WorkflowDef = {
+      id: 'wf-errand',
+      version: 1,
+      name: 'Errand',
+      initialStateId: 'todo',
+      states: [
+        { id: 'todo', name: 'To do', category: 'open' },
+        { id: 'locked', name: 'Locked', category: 'active', creatable: false },
+      ],
+      transitions: [],
+    };
+    cache.upsertWorkflowDef(def);
+
+    render(
+      <CreateTicketFlow
+        dataSource={source}
+        cache={cache}
+        workspaceId={WS}
+        projectId="01J9GPRJ000000000000000000"
+        currentUserId="user_kiro"
+        typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }]}
+        workflowStates={(workflowId) =>
+          workflowId === 'wf-errand'
+            ? {
+                initialStateId: 'todo',
+                states: [
+                  { id: 'todo', name: 'To do', category: 'open', creatable: true },
+                  // The disagreement: the UI's own read says `locked` IS creatable.
+                  { id: 'locked', name: 'Locked', category: 'active', creatable: true },
+                ],
+              }
+            : null
+        }
+        parentCandidates={[]}
+        assigneeCandidates={[]}
+        onCreated={() => undefined}
+      />,
+    );
+    await user.click(screen.getByRole('button', { name: 'New ticket' }));
+    fireEvent.change(screen.getByLabelText('Title'), { target: { value: 'Renew the trade licence' } });
+    // Backlog defaults to ON, which disables the select — OFF it first.
+    await user.click(screen.getByRole('checkbox', { name: 'Starts in the backlog?' }));
+    await user.click(screen.getByRole('button', { name: /Starting status/ }));
+    await user.click(await screen.findByRole('option', { name: 'Locked' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Create' }));
+
+    // NOTHING submitted — the refusal is caught before `submitChildEvent` is
+    // ever reached.
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(source.ingested).toHaveLength(0);
+
+    // The SAME sentence `checks/hierarchy.ts` would refuse with, rendered
+    // INSIDE the dialog, under the select — not the flow's own below-dialog
+    // `failure` paragraph.
+    const reason = workflowStateNotCreatableRefusal(label(def, 'locked'));
+    expect(await screen.findByText(reason)).toBeInTheDocument();
+    expect(screen.getByRole('dialog', { name: 'New ticket' })).toBeInTheDocument();
   });
 });

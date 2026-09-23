@@ -1011,10 +1011,15 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     expect(within(todo).getByRole('button', { name: 'Add a ticket' })).toBeInTheDocument();
   });
 
-  it('13.1433 the empty-board "Create a ticket" button calls onCreateTicket with NO argument', async () => {
+  it('13.1433 the empty-board "Create a ticket" button calls onCreateTicket with NO argument — control, same render: a creatable empty column in the SAME board still calls it WITH its own selection', async () => {
     const user = userEvent.setup();
-    const calls: unknown[][] = [];
-    const board: BoardView = { projectId: 'prj_1', groups: [] };
+    const calls: Array<Array<{ workflowId: string; stateId: string } | undefined>> = [];
+    // `errandBoard()` (this file's own fixture, above): one group, `totalCards
+    // > 0` from `boardCardSeed()`'s default card in `doing` — NOT the fixture
+    // for this case. Zero cards everywhere, so BOTH the whole-board banner
+    // AND the 'To do' column's own empty state render on the SAME screen —
+    // the case R6 names, and the one render that can hold both calls apart.
+    const board = errandBoard([]);
     render(
       <Board
         board={board}
@@ -1028,6 +1033,15 @@ describe('Board — "Add a ticket" is gated on column.creatable (starting-status
     // {onCreateTicket}`) shows as `calls[0]` holding a `MouseEvent`, and a
     // regression that passes `undefined` explicitly shows as length 1.
     expect(calls).toEqual([[]]);
+
+    // CONTROL, same render, same `it`: the empty 'To do' column's OWN "Add a
+    // ticket" — a DIFFERENT button, on the SAME screen — calls the SAME
+    // handler WITH its column's own identity, so the assertion above is not
+    // vacuously true of a handler that never receives an argument at all.
+    calls.length = 0;
+    const todo = screen.getByRole('region', { name: 'To do' });
+    await user.click(within(todo).getByRole('button', { name: 'Add a ticket' }));
+    expect(calls).toEqual([[{ workflowId: 'wf-errand', stateId: 'todo' }]]);
   });
 });
 

@@ -1739,7 +1739,19 @@ describe('13.1367 the dialog names an assignee, and the roster it offers is the 
  * always `task` when nothing else says otherwise.
  */
 describe('13.1435–13.1441 the Starting status select', () => {
+  /**
+   * `epic` is listed FIRST and shares `wf-errand` with `task` — deliberately,
+   * so 13.1440 can tell "the first typeOption sharing the workflow" (the
+   * design's literal text, and E5-16's own defect: the ladder arrives
+   * rank-ascending, so an epic is always first) apart from `defaultRootTypeFor`
+   * over that subset (this component's actual, measured behaviour — an epic
+   * created into a column vanishes from every column, `isEpic`'s board
+   * filter, owner ruling 2026-09-20). `task`'s rank (3) beats `epic`'s (1),
+   * so `defaultRootTypeFor` picks `task` even though `epic` sits first in
+   * this array.
+   */
   const TYPES = [
+    { id: 'epic', name: 'Epic', rank: 1, workflowId: 'wf-errand' },
     { id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' },
     { id: 'errand', name: 'Errand', rank: 2, workflowId: 'wf-errand' },
     { id: 'chore', name: 'Chore', rank: 1, workflowId: 'wf-chore' },
@@ -1807,7 +1819,8 @@ describe('13.1435–13.1441 the Starting status select', () => {
     expect(within(listbox).queryByRole('option', { name: 'Locked' })).toBeNull();
   });
 
-  it('13.1436 is disabled with a helper sentence while "Starts in the backlog?" is ON', () => {
+  it('13.1436 is disabled with a helper sentence while "Starts in the backlog?" is ON', async () => {
+    const user = userEvent.setup();
     // No record in storage: the switch's own default is ON (backlog), so
     // this is the ordinary open with nothing touched.
     render(<NewTicketDialog {...baseProps()} />);
@@ -1816,6 +1829,13 @@ describe('13.1435–13.1441 the Starting status select', () => {
     expect(screen.getByRole('status')).toHaveTextContent(
       'A backlog ticket starts in To do when it enters focus',
     );
+
+    // CONTROL, same dialog, same `it`: switched OFF, the select is live
+    // again and the helper sentence is gone — the disabled state above is
+    // this switch's doing, not a permanently disabled control.
+    await user.click(backlogSwitch());
+    expect(statusTrigger()).not.toBeDisabled();
+    expect(screen.queryByRole('status')).toBeNull();
   });
 
   it('13.1437 re-enables with the PREVIOUS value when the switch is switched back OFF', async () => {
@@ -1883,28 +1903,47 @@ describe('13.1435–13.1441 the Starting status select', () => {
     expect(onCreate).toHaveBeenCalledWith(expect.objectContaining({ stateId: 'doing' }));
   });
 
-  it('13.1440 initialSelection pre-fills the type and status and switches "Starts in the backlog?" OFF', () => {
-    render(
+  it('13.1440 initialSelection pre-fills the type and status and switches "Starts in the backlog?" OFF, and an unmatched workflow is ignored entirely (control, same dialog)', () => {
+    const { rerender } = render(
       <NewTicketDialog
-        {...baseProps({ initialSelection: { workflowId: 'wf-errand', stateId: 'doing' } })}
+        {...baseProps({
+          open: false,
+          initialSelection: { workflowId: 'wf-errand', stateId: 'doing' },
+        })}
       />,
     );
-    // `task` and `errand` both share `wf-errand`; `task` is listed FIRST in
-    // `typeOptions` (the planner default: "the first is pre-selected").
+    // The OPEN transition, not a fresh mount: the effect this case is about
+    // keys on `[open]`, and a dialog rendered already-open never exercises a
+    // close→open transition — only `rerender`ing across one does.
+    rerender(
+      <NewTicketDialog
+        {...baseProps({
+          open: true,
+          initialSelection: { workflowId: 'wf-errand', stateId: 'doing' },
+        })}
+      />,
+    );
+    // `epic` and `task` both share `wf-errand`, `epic` is listed FIRST (see
+    // this block's own `TYPES` docblock) — and `task` is the one that
+    // renders, because this component asks `defaultRootTypeFor` over the
+    // types sharing the workflow, not a bare first-match: an epic created
+    // into a column would vanish from it (`isEpic`'s board filter), which
+    // "the first is pre-selected" read literally would have shipped.
     expect(screen.getByLabelText('Type')).toHaveValue('Task');
     expect(statusTrigger()).toHaveTextContent('Doing');
     expect(backlogSwitch()).not.toBeChecked();
-  });
 
-  it('13.1440 CONTROL — an initialSelection naming a workflow no type shares is ignored entirely', () => {
-    render(
+    // CONTROL, same dialog instance, same `it`: closed, then reopened with a
+    // `workflowId` NO type on this project shares — ignored ENTIRELY, not
+    // merely type-less. The ordinary open: the default type (`task`, highest
+    // rank among ALL of `TYPES`), its own initial state (`To do`), and the
+    // switch at ITS ordinary default (backlog ON, nothing stored).
+    rerender(<NewTicketDialog {...baseProps({ open: false })} />);
+    rerender(
       <NewTicketDialog
         {...baseProps({ initialSelection: { workflowId: 'wf-nonexistent', stateId: 'x' } })}
       />,
     );
-    // The ordinary open, exactly as if no selection had been passed: the
-    // default type (`task`, highest rank), its own initial state, and the
-    // switch at ITS ordinary default (backlog ON, nothing stored).
     expect(screen.getByLabelText('Type')).toHaveValue('Task');
     expect(statusTrigger()).toHaveTextContent('To do');
     expect(backlogSwitch()).toBeChecked();
