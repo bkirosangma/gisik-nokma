@@ -2687,9 +2687,11 @@ export const SERVING_GAPS: Readonly<Record<string, readonly Absence[]>> = {
  *
  * ## `attachedTickets` is mapped field by field
  *
- * `ticketId`, `key` and `title` are each read as required strings. A row missing
- * one is a server change this mapper has not caught up with, and defaulting
- * `key` to `''` would render a chip with no key rather than report it.
+ * `ticketId`, `projectId`, `key` and `title` are each read as required strings.
+ * A row missing one is a server change this mapper has not caught up with, and
+ * defaulting `key` to `''` would render a chip with no key rather than report
+ * it. `projectId` was added additively (notes series, Plan 6 of 7) so the
+ * byline can build the canonical `ticketSheetPath`.
  */
 function noteScopeOf(raw: unknown, path: string): NoteScope {
   const record = asRecord(raw, path);
@@ -2728,6 +2730,7 @@ function noteSummaryOf(row: Record<string, unknown>, path: string): NoteSummary 
       const ticket = asRecord(entry, ticketPath);
       return {
         ticketId: asString(ticket['ticketId'], `${ticketPath}.ticketId`),
+        projectId: asString(ticket['projectId'], `${ticketPath}.projectId`),
         key: asString(ticket['key'], `${ticketPath}.key`),
         title: asString(ticket['title'], `${ticketPath}.title`),
       };
