@@ -1,6 +1,7 @@
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import {
   BACKLOG_STATE_ID,
+  isCreatableState,
   type BoardColumn,
   type BoardResponse,
   type PublishedWorkflowDef,
@@ -156,6 +157,12 @@ export async function readBoard(
         // is dropped rather than carried: a cast there would hide the day the
         // field's type changed underneath this.
         blocked: state.blocked === true,
+        // THE ONE HELPER, USED EVERYWHERE (starting-status design, 2026-09-23):
+        // `isCreatableState` is asked here rather than re-reading `state.creatable`
+        // directly, because a state can also be uncreatable by CATEGORY (terminal)
+        // or by ID (the universal Backlog never reaches this loop, but the helper's
+        // rule is asked uniformly rather than re-decided at each site).
+        creatable: isCreatableState(def, state.id),
         cards: columnCards,
       });
     }
@@ -261,6 +268,10 @@ function appendStragglerColumns(
       name: stateId,
       category: stateCategory,
       blocked: false,
+      // `false` for the same reason `blocked` is, immediately above: the flag
+      // lives on a published definition and a straggler names none — nothing
+      // says this state may receive a new ticket, so nothing does.
+      creatable: false,
       cards: bucket,
     });
   }

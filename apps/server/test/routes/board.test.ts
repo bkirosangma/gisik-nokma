@@ -173,12 +173,17 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
         name: c.name,
         category: c.category,
         blocked: c.blocked,
+        creatable: c.creatable,
       })),
     ).toEqual([
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'todo', name: 'To do', category: 'open', blocked: false },
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'doing', name: 'Doing', category: 'active', blocked: false },
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true },
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'done', name: 'Done', category: 'terminal', blocked: false },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, creatable: true },
+      // 13.1434's server half — `isCreatableState` reads TERMINAL off the
+      // definition, independent of `blocked`, which the three rows above
+      // hold constant at every other value: `false` here is the one thing
+      // that changes when the category does.
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false },
     ]);
   });
 

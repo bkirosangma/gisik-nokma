@@ -3555,3 +3555,42 @@ with the same `dueDateValueSchema` import and omits empty inputs, with no preche
   source-only left the cache stale and stayed green for the wrong reason), restored from the committed
   tree. `13.1450` stays unspent. —
   (`packages/rule-engine/test/fields.test.ts`)
+
+## Board read + view, the New ticket form, and the page (starting-status design, 2026-09-23) — UI half
+
+*Block `13.1431`–`13.1445`, the UI half of `task/starting-status`'s `13.1431`–`13.1450` (the controller's
+split of a shared id space — see `13-hig-per-screen.md`'s block table; the DOMAIN half, `13.1446`–`13.1450`,
+is the section immediately above and is not this one). Branch `task/starting-status-ui`, cut from
+`origin/release/notes` after the domain half landed.*
+
+- **13.1431** ✅ A `creatable` empty column shows "Add a ticket", and the click passes that column's own
+  `{workflowId, stateId}` — not the unscoped handler the button used to call. `board.tsx`'s `BoardProps.
+  onCreateTicket?` widens to `(selection?: {workflowId, stateId}) => void`; the empty-column card reads
+  `group.workflowId`/`column.stateId`, both already in scope from the `.map` that renders it. Mutation-
+  witnessed: always rendering the button (dropping the `column.creatable` term from the gate) reddens
+  `13.1432`'s control half, `expected <button>… to be null` — restored from the committed tree. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1432** ✅ A `creatable: false` empty column shows the empty copy only — no `+` icon, no button —
+  while its `creatable: true` sibling in the SAME render still shows the button (control, same `it`, so a
+  gate that suppressed the button everywhere could not pass). This is the case the mutation above reddens. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1433** ✅ The empty-BOARD "Create a ticket" button calls `onCreateTicket` with **zero** arguments,
+  not `[undefined]` and not the click event. `onClick={onCreateTicket}` would hand React's `MouseEvent`
+  through as `selection` the moment the prop widened — caught here by asserting `calls` (built from the
+  handler's own rest-args) equals `[[]]`, which a `MouseEvent` payload or an explicit `undefined` argument
+  both fail differently than an assertion on `selection` alone would. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1434** ✅ `creatable` is REQUIRED on the wire `BoardColumn` (`packages/domain/src/read-models.ts`)
+  for the identical reason `blocked` already is: `mapBoardColumn` REFUSES an unreadable or absent flag
+  (`asBoolean`) rather than defaulting it, and both real booleans travel — proven with `body.columns[0]`
+  `creatable: true` against `body.columns[1]` `creatable: false`, independent of `blocked` (a workflow
+  setting can forbid creation in a non-terminal state too, so the two flags are asserted as independent
+  axes rather than one standing in for the other). The SERVER half of the same fact is asserted separately
+  against a real published workflow (`todo`/`doing`/`waiting` — open or active, `creatable: true` — against
+  the terminal `done`, `creatable: false`): `readBoard`'s column loop reads `isCreatableState(def, state.
+  id)`, and `appendStragglerColumns` — no published definition to read the flag off — is always `false`,
+  mirroring `blocked`'s own straggler convention. Mutation-witnessed twice: the mapper's `asBoolean` call
+  loosened to `record['creatable'] === true` reddens `expected [Function] to throw an error` (the REFUSAL
+  half); the server's `isCreatableState(def, state.id)` hardcoded to `true` reddens the `done` row's
+  `creatable: false` expectation. Both restored from the committed tree. —
+  (`packages/app-core/test/online/mappers.test.ts`, `apps/server/test/routes/board.test.ts`)

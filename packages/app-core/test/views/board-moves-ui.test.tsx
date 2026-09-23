@@ -24,10 +24,10 @@ function errandGroup(cards = [boardCardSeed()]): BoardGroup {
     workflowVersion: 1,
     workflowName: 'Errand',
     columns: [
-      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, cards },
-      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards: [] },
-      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, cards: [] },
-      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, cards: [] },
+      { stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true, cards },
+      { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [] },
+      { stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, creatable: true, cards: [] },
+      { stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false, cards: [] },
     ],
   };
 }

@@ -54,8 +54,19 @@ export type BoardProps = {
    * tested (`board.test.tsx`): with a handler the button is there and clicking
    * it calls the handler; without one there is no button and the sentence is
    * still on screen.
+   *
+   * `selection` is OPTIONAL on every call (starting-status design, 2026-09-23):
+   * the whole-board button (`emptyBanner`) and the empty-board banner call it
+   * with none, exactly as before this parameter existed. A creatable
+   * empty-COLUMN's own "Add a ticket" calls it WITH one — `{workflowId,
+   * stateId}`, that column's own identity — so the shell can pre-fill the
+   * New-ticket dialog's type and status. Widening an existing required-arity
+   * callback rather than adding a second prop: every call site already reads
+   * `onCreateTicket === undefined` to decide whether the affordance renders at
+   * all, and a second prop would have to agree with the first about that
+   * every time either one changed.
    */
-  onCreateTicket?: () => void;
+  onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   /**
    * Whether `board` is a NARROWED view — the shell's client-side board filter
    * (`boardNarrowing` in `page.tsx`) has dropped some of this project's real
@@ -789,7 +800,17 @@ export function Board({ board, onOpenTicket, onCreateTicket, isNarrowed, epicsHi
               : EMPTY_BOARD_COPY}
         </p>
         {onCreateTicket !== undefined ? (
-          <button type="button" className="gn-board__empty-create" onClick={onCreateTicket}>
+          // NOT `onClick={onCreateTicket}` (starting-status design, 2026-09-23):
+          // `onCreateTicket` now takes an optional `selection`, and a bare
+          // handler reference would hand React's click event to that
+          // parameter instead. This button has no column to name, so it calls
+          // with no argument at all, exactly as it did before the parameter
+          // existed.
+          <button
+            type="button"
+            className="gn-board__empty-create"
+            onClick={() => onCreateTicket()}
+          >
             Create a ticket
           </button>
         ) : null}
@@ -930,7 +951,7 @@ function BoardGroupSection({
   /** The person's opposite choice. `Board`'s `toggleGroup` owns what that means. */
   onToggleWorkflow: () => void;
   onOpenTicket: (ticketId: string) => void;
-  onCreateTicket?: () => void;
+  onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   arrows: ((card: BoardCardData, fromStateId: string) => ReactNode) | null;
   /**
    * Board-prototype-port Task 14. `null` on the plain, `moves`-less path —
@@ -1121,19 +1142,26 @@ function BoardGroupSection({
              * `inbox/icons.tsx`'s `NotificationIcon`) and carries no
              * information text does not already say.
              *
-             * The action reuses `onCreateTicket` UNSCOPED — the same
-             * handler `emptyBanner`'s button already calls, with no
-             * column argument, because `BoardProps` carries none to
-             * pass and adding one is outside this task. Labelled "Add a
-             * ticket" rather than repeating `emptyBanner`'s "Create a
-             * ticket" for two reasons: it matches the prototype's own
-             * per-column copy, and a board can render both an
-             * `emptyBanner` button and one of these per empty column at
-             * once (R6) — an identical accessible name on every one of
-             * them would be indistinguishable by role and name alike.
-             * Different wording does NOT claim the created ticket lands
-             * in THIS column; the handler has no way to place it there,
-             * and that is unchanged by this task.
+             * The action reuses `onCreateTicket`, now SCOPED to this column
+             * (starting-status design, 2026-09-23 — the docblock's old claim
+             * that scoping it was "outside this task" is what this task closes):
+             * `{workflowId: group.workflowId, stateId: column.stateId}`, this
+             * column's own identity, so the shell can pre-fill the New-ticket
+             * dialog's type and status. Labelled "Add a ticket" rather than
+             * repeating `emptyBanner`'s "Create a ticket" for two reasons: it
+             * matches the prototype's own per-column copy, and a board can
+             * render both an `emptyBanner` button and one of these per empty
+             * column at once (R6) — an identical accessible name on every one
+             * of them would be indistinguishable by role and name alike.
+             *
+             * GATED ON `column.creatable`, not merely on `onCreateTicket` being
+             * passed (starting-status design): a state a workflow forbids
+             * creating tickets in shows no Add button even when empty and even
+             * when the shell has wired the handler — `EMPTY_COLUMN_COPY` alone
+             * says the column is empty, without inviting an action the engine
+             * would refuse. `isCreatableState` is the one place that decides
+             * this, read off the column by the server/mapper/replica sites that
+             * build it, never re-derived here.
              */}
             {column.cards.length === 0 ? (
               <div className="gn-board__column-empty">
@@ -1141,8 +1169,8 @@ function BoardGroupSection({
                     a CONTROL, and it must never render unaccompanied — a glyph
                     that looks pressable with nothing behind it is the dead
                     affordance this board refuses elsewhere. Gated on the same
-                    prop the button below is. */}
-                {onCreateTicket !== undefined ? (
+                    condition the button below is. */}
+                {onCreateTicket !== undefined && column.creatable ? (
                   <span className="gn-board__column-empty-icon" aria-hidden="true">
                   <svg
                     width="18"
@@ -1160,8 +1188,14 @@ function BoardGroupSection({
                 <p className="gn-board__column-empty-copy">
                   {column.epicsHidden === true ? EMPTY_COLUMN_EPICS_COPY : EMPTY_COLUMN_COPY}
                 </p>
-                {onCreateTicket !== undefined ? (
-                  <Button onClick={onCreateTicket}>Add a ticket</Button>
+                {onCreateTicket !== undefined && column.creatable ? (
+                  <Button
+                    onClick={() =>
+                      onCreateTicket({ workflowId: group.workflowId, stateId: column.stateId })
+                    }
+                  >
+                    Add a ticket
+                  </Button>
                 ) : null}
               </div>
             ) : null}
@@ -1215,7 +1249,7 @@ function BoardGroupWithMoves({
   /** See the prop of the same name on `BoardGroupSection`. */
   onToggleWorkflow: () => void;
   onOpenTicket: (ticketId: string) => void;
-  onCreateTicket?: () => void;
+  onCreateTicket?: (selection?: { workflowId: string; stateId: string }) => void;
   moves: BoardMoveCapability;
   /** Board-prototype-port Task 14 — see `MoveRegistry`'s own docblock. Owned by `Board`, threaded through unchanged. */
   moveRegistry: MutableRefObject<MoveRegistry>;

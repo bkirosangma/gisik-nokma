@@ -20,7 +20,7 @@ const card: BoardCard = {
   priority: { value: 'P2', claim: { actorId: 'u1', actorName: 'Ada', clientTime: '', serverTime: '' } },
 };
 const column: BoardColumn = {
-  stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, cards: [card],
+  stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [card],
 };
 
 /** The same ticket as the list sees it — every field the board's view-model dropped. */

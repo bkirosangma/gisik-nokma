@@ -14,6 +14,7 @@ import {
   BACKLOG_STATE_ID,
   IST_DAY_REGEX,
   PRIORITIES,
+  isCreatableState,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
@@ -1365,6 +1366,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
               name: state.stateId,
               category: state.stateCategory,
               blocked: false,
+              // `false`, the SAME straggler convention `blocked` sets one line
+              // up: the flag lives on a definition and there is none here
+              // (starting-status design, 2026-09-23).
+              creatable: false,
               cards: [card],
             });
           } else {
@@ -1385,6 +1390,11 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
               name: s.name,
               category: s.category,
               blocked: s.blocked === true,
+              // THE ONE HELPER, USED EVERYWHERE (starting-status design,
+              // 2026-09-23) — the same `isCreatableState` the server board
+              // read and the client mapper ask, so the offline replica cannot
+              // answer this question differently.
+              creatable: isCreatableState(def, s.id),
               cards: [],
             })),
           };
