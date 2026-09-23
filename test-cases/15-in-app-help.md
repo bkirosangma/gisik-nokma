@@ -24,7 +24,11 @@ to make it work.*
 
 ## Search (`packages/app-core`)
 
-*Currently the only search a web user can reach at all — the product has none of its own.*
+*Until the notes release (2026-09-23) this was the only search a web user could reach at all — the
+product had none of its own. The product now has two: the Notes page's own search, and the deep
+ticket-search engine, reachable only through the `:ticket` picker in a comment or a note (manual §15,
+FAQ "Finding things"). Neither is this one — this section covers the help browser's search over the
+manual and FAQ text, not either of those.*
 
 - **15.6** ✅ Conjunctive and order-independent: "due date" and "date due" return the same set, and one absent term kills the query rather than falling back to OR — (`packages/app-core/test/help/search.test.ts`)
 - **15.7** ✅ A title hit outranks a body mention — (`packages/app-core/test/help/search.test.ts`)
@@ -377,5 +381,36 @@ prove the 40rem breakpoint fired; that spec guards its assertion with `if (… !
 aimed at a deleted selector would have turned a firing check into a silently SKIPPED one. The
 discriminator moved to `.gn-help__h2`'s font-size, the other declaration already in the same media
 query. Cases 13.266–13.267 and the mutation record at 13.x name the old class as history.*
+
+## Notes manual & FAQ sections (owner request, 2026-09-23) — block `15.36`–`15.50`
+
+*Allocated 2026-09-23 by the controller against `origin/release/notes` `4d12ae02` (table tip `15.35`),
+for `task/help-notes`: the manual's new "§15 — Notes" section, the FAQ's new "Notes" section, the
+correction of the FAQ's now-false "Finding things" claims, and (addendum, owner "yes pls") documenting
+starting-status and board-card-badges in the existing sections. Cases file: this one.
+
+- **15.36** ✅ The generated corpus carries the manual's "§15 — Notes" section (last in document order,
+  its nine subsections) and the FAQ's "Notes" section (8–12 real questions) — against the real generated
+  content, not a fixture — (`packages/app-core/test/help/notes-sections.test.ts`)
+- **15.37** ✅ Every quoted UI string the help-notes task wrote — the notes sections (Units 1–2) AND, from
+  Unit 4, the starting-status/board-badge passages it touched in §5, §8, §11 and two FAQ sections — is
+  real product copy or a legitimate declared-absent worked example, checked with `check:help`'s own
+  `compareAbsent` ratchet against the real `help-quoted-strings-absent.json`, not a stricter ad hoc rule
+  (an earlier draft's blanket "must be in product" flagged eight pre-existing, already-baselined spans
+  in the touched-but-not-authored parts of those entries as false failures). Strings are read out of the
+  already-parsed content at runtime, never typed as literals in the test file itself — the file lives
+  under `packages/`, inside the real gate's own haystack, and one draft of this docblock's own prose
+  proved the trap by quoting a baselined example and rotting the baseline the moment the file existed.
+  Mutation: alter one checked quote to an invented string → red, naming the string; verified and
+  reverted 2026-09-23 — (`packages/app-core/test/help/notes-sections-quoted-strings.test.ts`)
+
+Case 15.3 (`test-cases/15-in-app-help.md:21`) was re-witnessed the same way, not re-minted: help-notes
+Unit 4d's `docs/manual.md` edit made the sentence it pins ("It will not get you a due date") read as a
+wider claim than true once starting-status gave the New ticket window its own date inputs, so the case
+now pins the RE-corrected, scoped sentence ("This particular box will not get you a due date") instead,
+plus a guard against the wider claim returning — updated in the same commit as the manual edit it
+tracks (`packages/app-core/test/help/search.test.ts`).
+
+Minted: 15.36–15.37. 15.38–15.50 remain for any further cases this lane needs.
 
 *15.14–15.16 are honest ❌ rather than quiet omissions. What they would cover is the drawing, not the content or the search; both of those are pinned above, and the two DOM surfaces share one component so there is one thing to test rather than two. Owner: whoever next touches the help surfaces — most naturally alongside pre-launch checklist items 6 and 7, which will exercise these screens in a real viewport anyway.*

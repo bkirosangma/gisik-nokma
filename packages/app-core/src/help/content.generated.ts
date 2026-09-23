@@ -1825,6 +1825,14 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
+                      "text": "Starts in the backlog?"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — a switch, remembered from your last answer. On means the job waits, unordered work with a Start button, until somebody starts it (§8); off means it is born straight into a stage. - "
+                    },
+                    {
+                      "kind": "bold",
                       "text": "Type"
                     },
                     {
@@ -1865,6 +1873,14 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "bold",
+                      "text": "Description"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the same editor a job's own description box uses (§5, below). - "
+                    },
+                    {
+                      "kind": "bold",
                       "text": "Parent"
                     },
                     {
@@ -1877,7 +1893,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ". Leave it alone unless this job is part of a bigger one (§6)."
+                      "text": ". Leave it alone unless this job is part of a bigger one (§6). - "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Assignee"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — who the job is on, or leave it unassigned."
                     }
                   ],
                   [
@@ -2608,11 +2632,11 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "It will not get you a due date."
+                    "text": "This particular box will not get you a due date."
                   },
                   {
                     "kind": "text",
-                    "text": " The box is a plain typing box, and the built-in \"needed by\" and \"start\" dates do not accept plain typed text — they expect a day "
+                    "text": " It is a plain typing box, and the built-in \"needed by\" and \"start\" dates do not accept plain typed text — they expect a day "
                   },
                   {
                     "kind": "italic",
@@ -2628,7 +2652,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": "  "
+                    "text": " (You can still set both dates properly — as a real date box, no typing — when you create the job, or afterwards on its own panel; §5.)  "
                   },
                   {
                     "kind": "bold",
@@ -3918,7 +3942,61 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
+                    "text": "Three more badges, when they apply: an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "epic chip"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the card's own top line, above the title, when the job belongs to one — press it to open that epic. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "parent-key badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside the job's own key, when it sits under a job that is not already named by the epic chip — press it to open that parent. And every card carries its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "priority badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — a coloured icon and P1/P2/P3, tinting the whole card: red fire for P1, green leaf for P2, frozen-blue snowflake for P3."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
                     "text": "Columns are grouped by which set of stages they belong to, so if two job types use different arrangements you get two clearly separated groups rather than one confusing mess."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "An empty column's own Add button starts the job there."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add a ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in an empty column and the New ticket window opens with that column's status already chosen, the backlog switch off, and a job type from that workflow pre-picked. A column whose stage does not allow a job to start there — your admin can turn this off per stage (§11) — shows no Add button at all, even empty."
                   }
                 ]
               },
@@ -4563,7 +4641,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The deep search is a different thing again: the one that looks through every title, description and comment in the workspace at once is on no screen at all. It is a finished engine with no steering wheel bolted on."
+                    "text": "The deep search is a different thing again: the one that looks through every title, description and comment in the workspace at once. It has no screen of its own — you reach it only by typing "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket "
+                  },
+                  {
+                    "kind": "text",
+                    "text": " followed by a few words in a job's comment box or in a note (§15), which opens a picker over its results. There is still nowhere you type a query and read this engine's own results directly."
                   }
                 ]
               }
@@ -6140,6 +6226,32 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": " — which stage new jobs begin in."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "A \"Tickets can start here\" tick box"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — on by default; untick it to stop a job being born straight into that stage (the Starting status picker on the New ticket window will not offer it, §5). Greyed out and stuck on for the stage your start marker points to, with the note "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"The start state always allows new tickets\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", and for a finished stage, with the note "
+                    },
+                    {
+                      "kind": "italic",
+                      "text": "\"A done state can't be a starting status\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": "."
+                    }
                   ]
                 ]
               },
@@ -7513,6 +7625,686 @@ export const HELP_CONTENT: HelpContent = [
             ]
           }
         ]
+      },
+      {
+        "id": "15-notes",
+        "title": "§15 — Notes",
+        "intro": [],
+        "entries": [
+          {
+            "id": "what-a-note-is",
+            "title": "What a note is",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A note is a page of writing that belongs to a workspace or a project — not to a job. Use one for anything that is not a single piece of work: a maintenance log, a parts list, a write-up you want to keep even after the job it came from is closed. A note can be attached to a job as well, but it does not have to be, and attaching it does not make it that job's property."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Notes have their own place: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the left-hand nav, immediately above "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Inbox"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Click it and you are at "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "/notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", which lists every workspace and project you belong to and the notes filed in each."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "making-a-note",
+            "title": "Making a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". A window opens with three things:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Title"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — what the note is about."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Home"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — the workspace, or one of its projects, the note is filed in. A note lives in exactly one place."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Scope"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — who can see it (below)."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Choose a Home first if you want a project-level note: changing Home away from a project puts Scope back to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Private"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", so you are never left with a Scope the note cannot actually have."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Create"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If you belong to no workspace yet, the window says so instead of showing you a form that cannot succeed."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "who-can-see-your-note",
+            "title": "Who can see your note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The Scope picker offers up to five choices, in the product's own words:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Private"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — only you."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Workspace"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — everyone in the workspace, except guests."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "This project"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — everyone actually on that project, except guests. Being an admin does not put you on a project you are not a member of."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Same as the ticket"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — visible to whoever can see any one of the jobs the note is attached to. This choice only appears when the note has a job to inherit from."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Specific people"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " — only the people you pick, from a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Who can see it"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " list."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Two things about the reader rule are easy to get wrong:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "The workspace owner reads every note"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", whatever its scope. That is not a Scope choice — it is true of the owner regardless of what you pick."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "An admin does not."
+                    },
+                    {
+                      "kind": "text",
+                      "text": " An admin reads a note under the exact same rule as anyone else: their own notes, anything scoped to the whole workspace, anything on a project they are actually a member of, anything naming them by name, or anything shared the same way as a job they can already see. Being an admin gives no extra reach into notes."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The author always reads their own note, whatever its scope — that is what "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Private"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " means."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "writing-a-note",
+            "title": "Writing a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Notes save themselves."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " A couple of seconds after you stop typing, your change is sent — not on every keystroke. Until it is accepted the footer says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Saving…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; once it is, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Saved"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If it cannot reach the server your change is not lost: it is kept on this device and the footer says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Not saved (kept on this device)"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " until it goes through. Leaving the note, switching away, or closing the tab all flush a change in progress rather than dropping it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " keeps every version you have saved, newest first, each one named by who saved it and when. Open one and it opens read-only with a banner reading "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Viewing version from …"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "; press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to bring the note back to that text (only if you can edit the note — a reader can open History and read old versions, just not put one back)."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A note with several headings gets a small floating button, bottom left, labelled \"On this page\"."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "finding-a-note",
+            "title": "Finding a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The Notes page lists your notes as a tree, grouped by workspace and project, newest first, with a title filter that narrows every group as you type."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "There is also a search box. Type into it and two things happen: spelling matches — the words you typed, allowing for a near miss — appear almost immediately, and matches "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "by meaning"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " are added a little after, without reordering what is already on screen. If your words got corrected before searching, a line tells you so: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Showing results for …"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Meaning search only understands English."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Word-based search — including the near-miss correction — also covers Garo. A meaning-aware model for Garo is not built yet (see below). The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Author"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Scope"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " filters narrow every group's search at once."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "a-job-s-own-notes",
+            "title": "A job's own notes",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A job's panel has its own "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes · N"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " section, between Subtasks and Comments, listing every note attached to it that you can read."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attach note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to open a picker: type to search your existing notes, or keep typing something new and an option appears — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New note: …"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — that writes the note and attaches it in one step, born with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Same as the ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " scope."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Each attached note is a badge with an × on it (if you can edit the job) that detaches it — the note itself is not deleted, only unlinked from this job. Detaching shows a toast you can undo."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "linking-to-a-job-or-another-note",
+            "title": "Linking to a job or another note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Typing "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket "
+                  },
+                  {
+                    "kind": "text",
+                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Typing "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":note "
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (or "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "[["
+                  },
+                  {
+                    "kind": "text",
+                    "text": ") the same way opens a picker over the notes you can read, and inserts a link to the one you pick."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Tagging a note in a job's own comment attaches that note to the job"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — the same as pressing Attach note yourself. Referencing a note inside the note's own comments does not attach anything anywhere."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "deleting-a-note-and-getting-it-back",
+            "title": "Deleting a note, and getting it back",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A deleted note goes into a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " group on the Notes page, with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button — you always see your own there, and an owner or admin sees everyone's. Restoring it brings it back exactly as it was; while deleted, the note is read-only for everyone, its own author included."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "As of this writing there is no Delete button on a note's own page"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — nothing in the product yet puts a note there for you. The Restore machinery is ready and working; only the control that starts it is still missing."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If a note you have open stops being shared with you — someone narrowed its scope, or detached the last job it inherited from — you are taken back to the Notes list with a message: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "That note is no longer shared with you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-notes-cannot-do-yet",
+            "title": "What notes cannot do yet",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Honestly, not everything:"
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "text",
+                      "text": "You cannot comment on one particular passage — a comment is on the note as a whole."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "A note cannot contain another note as a sub-page."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Notes have no screen yet on the phone or desktop apps — only the website has one."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Meaning search understands English only; a Garo-tuned model is a planned follow-up, not built."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "There is no list on a note or a job showing what else links to it."
+                    }
+                  ]
+                ]
+              }
+            ]
+          }
+        ]
       }
     ]
   },
@@ -7608,6 +8400,15 @@ export const HELP_CONTENT: HelpContent = [
             "kind": "link",
             "text": "Writing, comments and files",
             "href": "#writing-comments-and-files"
+          },
+          {
+            "kind": "text",
+            "text": " · "
+          },
+          {
+            "kind": "link",
+            "text": "Notes",
+            "href": "#notes"
           },
           {
             "kind": "text",
@@ -8550,6 +9351,68 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": "Worth knowing about — but it is no longer the only way to put a date on a calendar, and it is not how you set the built-in due date."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-set-the-dates-when-i-create-the-job-instead-of-afterwa",
+            "title": "Can I set the dates when I create the job, instead of afterwards?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes. The New ticket window has its own "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Start date"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Due date"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " boxes — real date pickers, empty by default, not the typing box above. Leave either blank to create the job with no claim on that date."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-choose-which-stage-a-new-job-starts-in",
+            "title": "Can I choose which stage a new job starts in?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes, if your workflow allows it. The New ticket window has a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Starting status"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker, defaulting to the workflow's first stage; it is disabled while "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Starts in the backlog?"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is on, since a backlog job has no starting stage yet. A stage your admin marked as not allowing new jobs is never offered."
                   }
                 ]
               }
@@ -9757,10 +10620,339 @@ export const HELP_CONTENT: HelpContent = [
         ]
       },
       {
+        "id": "notes",
+        "title": "Notes",
+        "intro": [],
+        "entries": [
+          {
+            "id": "what-is-a-note-and-how-is-it-different-from-a-job",
+            "title": "What is a note, and how is it different from a job?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A note is a page of writing that belongs to a workspace or a project, not to a job. Use it for anything that is not one piece of work — a log, a parts list, something you want to keep after the job it came from closes. Find it at "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Notes"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the nav, left of Inbox."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "who-can-read-my-note",
+            "title": "Who can read my note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Whoever the Scope you picked names — "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Private"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " means only you, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Workspace"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " means everyone in the workspace except guests, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "This project"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " means everyone actually on that project, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Same as the ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " means whoever can see any job it is attached to, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Specific people"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " means exactly the people you chose. You, as its author, always read your own note whatever its Scope."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-the-workspace-owner-read-my-private-note",
+            "title": "Can the workspace owner read my private note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes. The owner reads every note in the workspace, whatever its Scope — that is not something you can turn off from the note's side."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-an-admin-read-notes-i-haven-t-shared-with-them",
+            "title": "Can an admin read notes I haven't shared with them?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "No, not by virtue of being an admin. An admin reads a note under the same rule as anyone else: their own, anything workspace-wide, anything on a project they are actually a member of, anything naming them, or anything shared the way a job they can see is. Being an admin gives no extra reach into notes — only the owner gets that."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-can-t-i-find-a-note-i-know-exists",
+            "title": "Why can't I find a note I know exists?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A few reasons, in order of likelihood: its Scope does not include you; it was deleted (check the Deleted group, if you may see it); your search words do not spell-match closely enough and it has not been found by meaning yet, because meaning search only understands English; or you are searching from the wrong workspace or project section of the tree."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "does-search-understand-other-languages-or-garo",
+            "title": "Does search understand other languages, or Garo?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Word-based search does — including its near-miss spelling correction. Meaning-based search is an English-only model today; a Garo-tuned one is a planned follow-up, not built."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-happens-to-a-note-when-i-delete-the-job-it-is-on",
+            "title": "What happens to a note when I delete the job it is on?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "The note stays attached — deleting a job does not detach anything. But a deleted job no longer counts as active work, so if the note's Scope is "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Same as the ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and this was its only attached job, nobody but you (its author) and the workspace owner can read it until it is detached or restored. Restoring the job restores that reach automatically, with nothing to redo."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-get-back-an-old-version-of-a-note",
+            "title": "Can I get back an old version of a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes. Open "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " from the note's byline, pick a version, and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — if you can edit the note. A reader can open History and look, but not put an old version back."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-does-a-link-in-a-comment-show-a-title-i-can-t-open",
+            "title": "Why does a link in a comment show a title I can't open?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Because the chip shows the title the note (or job) had when the link was written, even to someone who cannot open it. That is today's behaviour; whether it should instead hide the title is an open question the product owner is still deciding."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-delete-a-note",
+            "title": "Can I delete a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up in the Deleted group, Restore works and brings it back exactly as it was."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-happens-if-someone-stops-sharing-a-note-with-me-while-i",
+            "title": "What happens if someone stops sharing a note with me while I have it open?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "You are taken back to the Notes list with a message: \"That note is no longer shared with you\"."
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      },
+      {
         "id": "boards-lists-and-dates",
         "title": "Boards, lists and dates",
         "intro": [],
         "entries": [
+          {
+            "id": "can-a-new-job-start-in-a-column-other-than-the-first",
+            "title": "Can a new job start in a column other than the first?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes — press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Add a ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the empty column you want, rather than the top-level "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "New ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button, and the window opens with that column's stage already chosen and the backlog switch off."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-is-there-no-add-button-on-this-column",
+            "title": "Why is there no Add button on this column?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Your admin turned off \"Tickets can start here\" for that stage (the manual's stage-setup section) — a job cannot be born there, so the column offers no way to try. It can still receive jobs moved into it from elsewhere; only starting a brand new one there is blocked."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-do-the-coloured-badges-on-a-card-mean",
+            "title": "What do the coloured badges on a card mean?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Three, when they apply. The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "priority badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — a coloured icon and P1/P2/P3, tinting the whole card — is always there: red fire for P1, green leaf for P2, frozen-blue snowflake for P3. An "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "epic chip"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the card's top line names the epic it belongs to, if any. A "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "parent-key badge"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside the job's key names its immediate parent, if that parent is not already the epic chip's own job."
+                  }
+                ]
+              }
+            ]
+          },
           {
             "id": "why-doesn-t-the-only-tickets-in-progress-switch-change-the-b",
             "title": "Why doesn't the \"Only tickets in progress\" switch change the Board?",
@@ -10713,8 +11905,20 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "It is reachable now, but only narrowly."
+                  },
+                  {
                     "kind": "text",
-                    "text": "None of it is reachable. It is a finished engine with no steering wheel bolted on."
+                    "text": " Type "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket "
+                  },
+                  {
+                    "kind": "text",
+                    "text": " followed by a few words, in a job's comment box or in a note, and a picker opens over this same engine's results. There is still no general search screen of its own — nowhere you type a query and read this engine's results directly, the way the two narrowing boxes let you read theirs."
                   }
                 ]
               }
@@ -10729,7 +11933,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Two places, and both of them only narrow something already on screen. On the "
+                    "text": "Three places now, and only one of them is the deep search. On the "
                   },
                   {
                     "kind": "bold",
@@ -10737,7 +11941,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — where, offline, it says \"searching offline copy\" underneath, so you know the results might be a little out of date. And on the "
+                    "text": " — where, offline, it says \"searching offline copy\" underneath, so you know the results might be a little out of date — and on the "
                   },
                   {
                     "kind": "bold",
@@ -10745,31 +11949,30 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ", in the box above the tabs."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
+                    "text": ", in the box above the tabs, both only narrow something already on screen. The "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket "
+                  },
                   {
                     "kind": "text",
-                    "text": "Neither of those is the deep search described just above. That one is still on no screen."
+                    "text": " picker reaches the deep search described just above, narrowed to jobs and only from inside a comment or a note (the manual's Notes section) — still not a screen of its own. Notes have a separate search again, on the Notes page: its own engine, and it only searches notes."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "if-the-deep-search-worked-what-would-catch-me-out",
-            "title": "If the deep search worked, what would catch me out?",
+            "id": "if-i-use-the-deep-search-through-the-ticket-picker-what-woul",
+            "title": "If I use the deep search through the `:ticket` picker, what would catch me out?",
             "blocks": [
               {
                 "kind": "paragraph",
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Two things:"
+                    "text": "Two things, on the ticket-search half at least — the picker inherits the engine's own limits:"
                   }
                 ]
               },

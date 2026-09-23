@@ -397,7 +397,12 @@ const PRODUCT_SKIP = new Set(['node_modules', '.next', 'dist', 'coverage', '.tur
  */
 const GENERATED_COPY = 'packages/app-core/src/help/content.generated.ts';
 
-/** Every product file's text, joined — the haystack a quoted string is looked for in. */
+/**
+ * Every product file's text, joined — the haystack a quoted string is looked for in.
+ *
+ * @param {string} root
+ * @returns {string}
+ */
 export function productText(root) {
   const parts = [];
   const walk = (dir) => {
