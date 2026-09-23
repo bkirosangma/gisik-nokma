@@ -1338,3 +1338,132 @@ describe('16.56 the attachments read refuses although the local ledger holds the
     expect(absence?.owner).toMatch(/^Plan 10 — /);
   });
 });
+
+/**
+ * Owner request, 2026-09-23 (board-card badges) — the offline board's own
+ * `parent`/`epic`, via `boardHierarchyOf` (`replica-data-source.ts`).
+ *
+ * `fixture()` already gives every case `epicId` (`TYPE_EPIC`, root, titled
+ * "Registrations") and `taskId` (its DIRECT child) for free — the exact
+ * shape `apps/server/test/read/ancestry.test.ts` builds from `world.epicId`/
+ * `world.taskInEpicId`, so this suite is that one's offline mirror.
+ *
+ * Case ids from the task's own block, §13 (13.1451-13.1470).
+ */
+describe('13.1465 boardHierarchyOf — the offline board draws parent/epic, deleted-safe', () => {
+  it("13.1465 a direct child of the epic: parent and epic are the SAME ticket — key null on both, honestly (the replica cannot compose one)", async () => {
+    const { ds, epicId, taskId } = await fixture();
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === taskId);
+    expect(card?.parent).toEqual({ ticketId: epicId, key: null });
+    expect(card?.epic).toEqual({ ticketId: epicId, key: null, title: 'Registrations' });
+  });
+
+  it('13.1465 a grandchild of the epic: parent and epic DIFFER — the epic title still resolves offline, from the local ledger', async () => {
+    const { ds, replica, epicId, taskId } = await fixture();
+    const grandchildId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: grandchildId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: taskId,
+        title: 'Chase the stamp duty office',
+      }),
+    );
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === grandchildId);
+    expect(card?.parent).toEqual({ ticketId: taskId, key: null });
+    expect(card?.epic).toEqual({ ticketId: epicId, key: null, title: 'Registrations' });
+  });
+
+  it('13.1465 a root ticket (no parent) gets null for both', async () => {
+    const { ds, replica } = await fixture();
+    const rootId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: rootId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'A root errand',
+      }),
+    );
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === rootId);
+    expect(card?.parent).toBeNull();
+    expect(card?.epic).toBeNull();
+  });
+
+  /**
+   * 13.1466 — DELETED-SAFE, unlike `epicAncestorOf`/`confirmedById`'s own
+   * `byId`, which deliberately keep a deleted ticket reachable for the LIST's
+   * own reasons (`boardHierarchyOf`'s own docblock). A live device must not
+   * name a deleted parent, or walk THROUGH a deleted hop to an epic beyond
+   * it — mirrors `apps/server/test/read/ancestry.test.ts`'s 13.1462/13.1463,
+   * which pin the server's identical rule over `LIVE_TICKET_WHERE`.
+   */
+  it('13.1466 a soft-deleted immediate parent is not named, even though the replica still holds the ticket', async () => {
+    const { ds, replica } = await fixture();
+    const parentId = newUlid();
+    const childId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: parentId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: null,
+        title: 'Renamed the till float',
+      }),
+    );
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: childId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId,
+        title: 'Balance the till',
+      }),
+    );
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: parentId }, 'ticket.deleted', {}));
+
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === childId);
+    expect(card?.parent).toBeNull();
+  });
+
+  it('13.1466 an epic reached only by walking through a soft-deleted hop is not named', async () => {
+    const { ds, replica, epicId, taskId } = await fixture();
+    const grandchildId = newUlid();
+    await replica.applyServerItem(
+      envelope({ kind: 'ticket', id: grandchildId }, 'ticket.created', {
+        typeId: TYPE_TASK,
+        projectId: PROJECT,
+        parentId: taskId,
+        title: 'Chase the stamp duty office',
+      }),
+    );
+    // `taskId` is the hop between the grandchild and `epicId` — deleting it
+    // must stop the epic walk, exactly as it stops the parent badge.
+    await replica.applyServerItem(envelope({ kind: 'ticket', id: taskId }, 'ticket.deleted', {}));
+
+    const board = await ds.query.getBoard(PROJECT);
+    const card = board.groups
+      .flatMap((group) => group.columns)
+      .flatMap((column) => column.cards)
+      .find((candidate) => candidate.ticketId === grandchildId);
+    expect(card?.parent).toBeNull();
+    expect(card?.epic).toBeNull();
+    // Positive control: `epicId` itself is untouched, so a walk that ignored
+    // the deleted hop and jumped straight to it would still (wrongly) find it.
+    expect(epicId).not.toBe(taskId);
+  });
+});

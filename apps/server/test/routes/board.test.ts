@@ -269,6 +269,42 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
     // shape a route emits when it has nothing to say.
     expect(doing?.cards[0]?.rollup).toBeNull();
   });
+
+  /**
+   * 13.1460 — THIS DOOR CARRIES `parent`/`epic` (owner request, 2026-09-23,
+   * board-card badges). `world.taskInEpicId` is a DIRECT child of
+   * `world.epicId`, so both facts name the SAME ticket — the view's dedup
+   * rule (`BoardCard.parent`'s own docblock), not this door's. The epic
+   * ITSELF (`world.epicId`, the `todo` card above) is a project-mode ROOT
+   * with no parent and no epic ancestor of its own — the control that proves
+   * the fields are not populated unconditionally.
+   */
+  it('13.1460 the wire carries the immediate parent and the epic, each with a composed key', async () => {
+    const board = await boardOf('member', read.world.projectId);
+    const doing = board.columns.find((c) => c.stateId === 'doing');
+    const taskInEpic = doing?.cards[0];
+    expect(taskInEpic?.ticketId).toBe(read.world.taskInEpicId);
+    expect(taskInEpic?.parent?.ticketId).toBe(read.world.epicId);
+    expect(taskInEpic?.parent?.key).toMatch(/^\S+-\d+$/);
+    expect(taskInEpic?.epic).toEqual({
+      ticketId: read.world.epicId,
+      key: taskInEpic?.parent?.key,
+      title: 'Registrations drive',
+    });
+
+    // The epic's OWN card: a ROOT (no parent), and its OWN epic ancestor is
+    // ITSELF — `epicAncestors`' walk is ancestor-OR-SELF (its own docblock),
+    // unchanged by the move, so a card whose type IS the epic rank finds no
+    // ancestor to climb to before it already matches.
+    const todo = board.columns.find((c) => c.stateId === 'todo');
+    expect(todo?.cards[0]?.ticketId).toBe(read.world.epicId);
+    expect(todo?.cards[0]?.parent).toBeNull();
+    expect(todo?.cards[0]?.epic).toEqual({
+      ticketId: read.world.epicId,
+      key: taskInEpic?.parent?.key,
+      title: 'Registrations drive',
+    });
+  });
 });
 
 describe('GET /v1/projects/:projectId/board — visibility', () => {

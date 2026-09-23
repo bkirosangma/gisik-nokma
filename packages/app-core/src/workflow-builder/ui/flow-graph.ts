@@ -9,6 +9,7 @@ export type StateNodeData = {
   category: 'open' | 'active' | 'terminal';
   blocked: boolean;
   isInitial: boolean;
+  creatable: boolean;
 };
 
 export type TransitionEdgeData = { index: number; summaries: string[] };
@@ -30,6 +31,7 @@ export function toFlowGraph(
       category: state.category,
       blocked: state.blocked === true,
       isInitial: state.id === draft.def.initialStateId,
+      creatable: state.creatable !== false,
     } satisfies StateNodeData,
     selected: draft.selection.kind === 'state' && draft.selection.stateId === state.id,
   }));

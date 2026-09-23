@@ -301,9 +301,10 @@ describe('no authoring action is reachable by any path the builder screen offers
     const memberControls = valueControls();
     // Enumerated, not counted alone: 1 workflow-name textbox + 5 category
     // pickers (Select trigger buttons, since Phase 2 Wave B Task 1) + 5
-    // blocked checkboxes, one pair per errand state. A zero here would make
-    // "every one of them is disabled" vacuously true.
-    expect(memberControls).toHaveLength(11);
+    // blocked checkboxes + 5 "Tickets can start here" checkboxes (starting-
+    // status design, 2026-09-23), one of each pair per errand state. A zero
+    // here would make "every one of them is disabled" vacuously true.
+    expect(memberControls).toHaveLength(16);
     for (const control of memberControls) expect(control).toBeDisabled();
     // Read-only is not hidden: nothing was omitted, only frozen. One category
     // picker per state, all five still on screen. Role changed combobox->button
@@ -313,13 +314,26 @@ describe('no authoring action is reachable by any path the builder screen offers
     expect(screen.getAllByRole('button', { name: /Category/ })).toHaveLength(5);
   });
 
-  it('control: the admin render has the SAME controls, every one of them enabled', async () => {
+  it('control: the admin render has the SAME controls, every one enabled except the two the starting-status design disables structurally', async () => {
     renderBuilder(adminSession);
     await screen.findByRole('textbox', { name: 'Workflow name' });
     await screen.findByText('Later');
     const adminControls = valueControls();
-    expect(adminControls).toHaveLength(11);
-    for (const control of adminControls) expect(control).toBeEnabled();
+    expect(adminControls).toHaveLength(16);
+    // "Tickets can start here" on the start state and on a terminal state
+    // (here: "Later" and "Done") is disabled by the starting-status design
+    // regardless of canAuthor — it is a structural constraint, not an
+    // authoring gate (state-node.tsx, cases 10.136/10.137 in canvas.test.tsx).
+    // Naming them out keeps this test measuring the role gate alone, the same
+    // way the ticket-type editor's equivalent test names its own exceptions.
+    const structurallyDisabled = new Set([
+      within(screen.getByTestId('state-node-later')).getByRole('checkbox', { name: 'Tickets can start here' }),
+      within(screen.getByTestId('state-node-done')).getByRole('checkbox', { name: 'Tickets can start here' }),
+    ]);
+    for (const control of adminControls) {
+      if (structurallyDisabled.has(control)) expect(control).toBeDisabled();
+      else expect(control).toBeEnabled();
+    }
   });
 
   /**

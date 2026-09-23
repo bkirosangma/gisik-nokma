@@ -242,9 +242,14 @@ const BOARD: BoardResponse = {
           },
           rollup: null,
           closed: null,
-          // `BoardResponse.columns[].cards` is the domain's `TicketCard[]`, so
-          // this fixture carries the same REQUIRED key the list fixture does.
+          // `BoardResponse.columns[].cards` is the domain's `BoardTicketCard[]`,
+          // so this fixture carries the same REQUIRED key the list fixture does.
           rank: null,
+          // Owner request, 2026-09-23: `parent`/`epic` REQUIRED on the wire's
+          // board card. `null`/`null` — a root ticket under no epic — is the
+          // default this suite is not about.
+          parent: null,
+          epic: null,
         },
       ],
     },

@@ -28,6 +28,7 @@ export type DraftActions = {
   renameState(stateId: string, name: string): void;
   setStateCategory(stateId: string, category: StateCategory): void;
   setStateBlocked(stateId: string, blocked: boolean): void;
+  setStateCreatable(stateId: string, creatable: boolean): void;
   setInitialState(stateId: string): void;
   removeState(stateId: string): void;
   moveState(nodeId: string, position: StatePosition): void;
@@ -171,6 +172,13 @@ export function createDraftStore(initial: WorkflowDraft): DraftStore {
       mapState(stateId, (found) => {
         if (blocked) return { ...found, blocked: true };
         const { blocked: _cleared, ...rest } = found;
+        return rest;
+      });
+    },
+    setStateCreatable(stateId, creatable) {
+      mapState(stateId, (found) => {
+        if (!creatable) return { ...found, creatable: false };
+        const { creatable: _cleared, ...rest } = found;
         return rest;
       });
     },

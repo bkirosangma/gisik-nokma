@@ -3556,6 +3556,93 @@ with the same `dueDateValueSchema` import and omits empty inputs, with no preche
   tree. `13.1450` stays unspent. —
   (`packages/rule-engine/test/fields.test.ts`)
 
+## 13.1451–13.1466 — board card badges: priority icon + tint, parent-key badge, epic chip (owner request, 2026-09-23)
+
+Block `13.1451`–`13.1470` (`13-hig-per-screen.md`'s allocation table has the row). `BoardTicketCard`
+(`packages/domain/src/read-models.ts`) gains `parent`/`epic`, each `null` unless BOTH visible and
+composable — no existence leak, the same rule `ListCard.epicId` already applies one ancestor further up,
+widened here to the immediate parent too. The server derives both from ONE recursive walk
+(`apps/server/src/read/ancestry.ts`'s `boardAncestryFor`, sharing `epicAncestors`' own `ancestryCte` —
+`epicAncestors` itself MOVED here verbatim from `routes/list.ts`, behaviour unchanged, pinned by its own
+case below); the offline replica mirrors it with a DELETED-safe walk of its own
+(`replica-data-source.ts`'s `boardHierarchyOf`) since `confirmedById`'s `byId` deliberately keeps a
+deleted ticket reachable for the LIST's own reasons. The priority badge draws a hand-drawn 24×24 glyph per
+level (fire/leaf/snowflake, `packages/ui/src/icons/priority-icons.tsx`) and the card's own surface is
+tinted by it — a scoped, owner-authorised reopening of the standing refusal against a general
+danger/success wash on record at `.gn-visibility__standing-mode` (`ui.css`), new roles named for this
+feature only. Supersedes `13.1237`–`13.1238` (only P1 took the tone) and `13.1281` (the keys row was
+conditional on key/due alone) in place — same ids, `packages/app-core/test/views/board.test.tsx`.
+
+- **13.1451** ✅ Every priority level renders its own icon (an `<svg>` as the badge's first child,
+  `aria-hidden`) and its own `--p1`/`--p2`/`--p3` modifier class, never another level's — and each of the
+  four icon components is a real 24×24 `currentColor` `aria-hidden` SVG with a `size` override. —
+  (`packages/app-core/test/views/board.test.tsx`, `packages/ui/test/priority-icons.test.tsx`)
+- **13.1452** ✅ The CARD itself (not only the badge) carries `gn-board-card--p1`/`--p2`/`--p3`, each
+  level distinct — the card's OWN tint modifier, separate from the badge's. —
+  (`packages/app-core/test/views/board.test.tsx`)
+- **13.1453** ✅ For all three priorities, all three styles and both themes: the priority ink, the card's
+  `text`/`textMuted`, and the move-arrows' ghost button (`textAccent` on `fillTertiary`, itself composited
+  over the SAME wash) all clear WCAG AA 4.5:1 on `over(tint, surfaceRaised)` — with the anti-vacuous
+  control that the wash actually changes the ground. — (`packages/ui/test/tokens.test.ts`)
+- **13.1454**–**13.1455** ✅ The parent-key badge is the meta-line's first child (left of the card's own
+  key) and clicking it — `getByRole('button', {name: 'Open parent OPS-12'})` — calls `onOpenTicket` with
+  the PARENT's id exactly once. — (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1456**–**13.1457** ✅ The epic chip is the card's first element child (above the title) and
+  clicking it opens the EPIC once; a card with `epic: null` renders no chip at all and the title button
+  is the card's first child instead. — (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1458**–**13.1459** ✅ When the immediate parent IS the epic, no parent badge renders and the epic
+  chip alone names it; the control — a grandchild whose parent and epic differ — renders BOTH. —
+  (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1460** ✅ `boardAncestryFor` returns the SAME ticket as both `parent` and `epic` for a direct
+  child of the epic, and two DIFFERENT tickets for a grandchild; `epicAncestors` (moved, unchanged) still
+  finds the epic by name and title; `keysForAncestors` composes the derived `CCRE-<n>` key and
+  de-duplicates one ancestor shared by two cards to one lookup; the live HTTP response carries both
+  fields, keyed, for a real seeded hierarchy, and the epic's own card (a root, and its own nearest
+  ancestor-or-self) gets `parent: null` with `epic` naming itself. —
+  (`apps/server/test/read/ancestry.test.ts`, `apps/server/test/routes/board.test.ts`)
+- **13.1461** ✅ CORRECTED (controller mutation, 2026-09-23 — the first version PASSED with `AND
+  ${visible}` deleted from `ancestryCte`'s recursive term, because its child had no `visibility.set` of
+  its own and so INHERITED its hidden parent's audience, making the anchor exclude the row before the
+  recursive step ever ran). Rebuilt on `list.test.ts`'s own 7.80 shape: a child under an explicit-owner-
+  only parent, given its OWN `visibility.set` naming owner AND member — so the member CAN see the child
+  (asserted FIRST via the independent `canSee` oracle, not `boardAncestryFor` itself) but gets `parent:
+  null`, because the walk climbs into the parent and the parent is where it is stopped. CONTROL — the
+  owner, who may see the parent too, gets it named. Re-run against the controller's exact mutation:
+  RED (both this case and 13.1463 failed); restored from the committed tree, GREEN again. —
+  (`apps/server/test/read/ancestry.test.ts`)
+- **13.1462** ✅ A soft-deleted immediate parent is not named, even to the OWNER who could otherwise see
+  it — `LIVE_TICKET_WHERE` on the recursive term stops the walk exactly as an invisible link does; killed
+  by a planted mutation dropping that conjunct (measured: 1 failed, restored to green). —
+  (`apps/server/test/read/ancestry.test.ts`)
+- **13.1463** ✅ CORRECTED, the SAME defect and the SAME fix shape as 13.1461. Builds the real three-level
+  case: an epic (root) → a hidden middle ticket (explicit: owner only, child of the epic) → a visible
+  grandchild (its OWN `visibility.set` naming owner and member, child of the hidden middle ticket). The
+  member CAN see the grandchild (independent `canSee` control, first) but gets `epic: null`, because the
+  walk must climb THROUGH the hidden middle ticket to reach the epic and is stopped there. CONTROL — the
+  owner, who may see every hop, gets the real epic. Re-run against the controller's exact mutation: RED;
+  restored, GREEN. —
+  (`apps/server/test/read/ancestry.test.ts`)
+- **13.1464** ✅ `mapBoardCard` carries a real `parent`/`epic` object whole (key included, and a `key:
+  null` on a real object survives); a MISSING `parent`/`epic` key throws `MappingError` naming the path,
+  and a `parent` object missing its own `ticketId` throws naming the nested path — an absent field is not
+  this shape's spelling of `null`. — (`packages/app-core/test/online/mappers.test.ts`)
+- **13.1465** ✅ Offline: a direct child of the epic gets the epic as BOTH `parent` and `epic` (key
+  `null` on both, honestly — the replica cannot compose one); a grandchild's `parent`/`epic` differ, with
+  the epic's TITLE still resolving from the local ledger; a root ticket gets `null` for both. —
+  (`packages/app-core/test/replica/replica-data-source.test.ts`)
+- **13.1466** ✅ Offline, DELETED-safe: a soft-deleted immediate parent is not named even though the
+  replica still holds the ticket, and an epic reachable only by walking THROUGH a deleted hop is not
+  named either — both killed by a planted mutation dropping the offline `isLive` check (measured: 2
+  failed, restored to green). — (`packages/app-core/test/replica/replica-data-source.test.ts`)
+
+`13.1467`–`13.1470` are unspent, held for a future round on this feature rather than borrowed elsewhere.
+
+**Regression, measured rather than assumed:** the full `apps/server` suite (1919 passed, 7 skipped), the
+full `packages/app-core` suite (2038 passed, including the pre-existing board suites — `board.test.tsx`,
+`board-workflow-collapse.test.tsx` (the `13.1409` collapse block), `board-filter.test.ts`), the full
+`packages/ui` suite (455 passed) and the full `apps/web` suite (838 passed) were each run green AFTER this
+block, under Node v22.23.2.
+
 ## The brand glyph, the favicon, the nav tile, and a wide/tall Notes page (owner request 2026-09-23 ~20:20 IST, relayed by the planner)
 
 *Block `13.1471`–`13.1490`, allocated by the controller before this lane started (`13-hig-per-screen.md`'s block table). Five units: `BrandMark` (one origin for the glyph), the favicon, a non-interactive nav brand tile, a wide/tall `/notes` page (Confluence-style, one document column), and a floating table-of-contents button replacing the right-hand TOC column.*

@@ -404,7 +404,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
     const openNote = noteDetail({
       noteId: OPEN_NOTE,
       title: 'Compressor log',
-      attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+      attachedTickets: [{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }],
       body: body([paragraph('Compressor stopped')]),
     });
     const groupNote = noteSummary({ noteId: GROUP_NOTE, homeProjectId: P_COLD, title: 'Freezer audit' });

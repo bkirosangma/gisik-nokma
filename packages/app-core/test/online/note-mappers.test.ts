@@ -27,7 +27,7 @@ const summary = {
   authorId: 'u',
   title: 'T',
   scope: { mode: 'explicit', userIds: ['u2'] },
-  attachedTickets: [{ ticketId: 't', key: 'SHOP-1', title: 'Tk' }],
+  attachedTickets: [{ ticketId: 't', projectId: 'p', key: 'SHOP-1', title: 'Tk' }],
   deleted: false,
   createdAt: '2026-09-23T00:00:00.000Z',
   updatedAt: '2026-09-23T00:00:01.000Z',
