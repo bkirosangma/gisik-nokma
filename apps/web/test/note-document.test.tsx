@@ -307,7 +307,25 @@ describe('18.11 The Notes page — the document', () => {
     stubSlot = true;
     capturedSlotProps = [];
     renderDocument();
-    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+
+    // `treeNotes` loads in its OWN effect, gated on `note` rather than fired
+    // alongside it, so the slot's first render (which satisfies "rendered at
+    // least once") can predate that load — a race the earlier version of this
+    // case had, intermittently reading the pre-load closures. Wait for the
+    // settled answer instead of for the mere fact of a render.
+    //
+    // The sentinel is `queryNotes('co')` carrying BOTH notes, not
+    // `resolveNoteTitle(OTHER_NOTE) !== null` — 18.202's own mutation answers
+    // the id itself (truthy) for an id `treeNotes` does not yet hold, which
+    // would satisfy a `resolveNoteTitle`-based sentinel on the very first,
+    // pre-load render and race ahead exactly as before, just on a target the
+    // mutation cannot touch: `queryNotes` never falls back to the query text.
+    await waitFor(async () => {
+      const queryNotes = slotProps().queryNotes as (
+        q: string,
+      ) => Promise<Array<{ noteId: string; title: string }>>;
+      expect((await queryNotes('co')).map((hit) => hit.noteId)).toContain(OTHER_NOTE);
+    });
 
     const queryNotes = slotProps().queryNotes as (q: string) => Promise<Array<{ noteId: string; title: string }>>;
     const resolveNoteTitle = slotProps().resolveNoteTitle as (id: string) => string | null;

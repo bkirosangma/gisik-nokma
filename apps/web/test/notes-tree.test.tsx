@@ -2,7 +2,7 @@ import { render, screen, waitFor } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
-import type { NoteSummary, SubmittedEvent } from '@gisik-nokma/domain';
+import { EMPTY_NOTE_DOC, type NoteDetail, type NoteSummary, type SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -117,6 +117,17 @@ function world(opts: { ws?: WorkspaceRef; deleted?: () => NoteSummary[] } = {}) 
     getMyWorkspaces: async () => [opts.ws ?? workspace()],
     getNotes: async () => LIVE,
     getDeletedNotes: async () => (opts.deleted ?? (() => []))(),
+    // 18.188 opens `/notes/<id>` through the page, which — since Task 4 —
+    // mounts the real `NoteDocument` in the document pane rather than the
+    // Task 1 placeholder. Nothing here asserts on that pane, but the
+    // document's own effect still awaits `getNote`, and this helper's
+    // un-stubbed reads reject BY NAME (see stub-services.ts): a case that
+    // does not stub it now gets a real answer instead of an unhandled
+    // rejection out of a `useEffect`.
+    getNote: async (_workspaceId: string, noteId: string): Promise<NoteDetail | null> => {
+      const found = [...LIVE, ...(opts.deleted ?? (() => []))()].find((candidate) => candidate.noteId === noteId);
+      return found === undefined ? null : { ...found, body: EMPTY_NOTE_DOC, schemaVersion: 2 };
+    },
   });
 }
 
