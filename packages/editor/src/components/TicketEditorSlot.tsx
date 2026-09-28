@@ -121,6 +121,8 @@ export type EditorSlotProps = {
   // fails a build.
   queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  // Trash series Plan 3 — the twin of `packages/app-core/src/views/editor-slot.tsx`'s field (9.75 compares names).
+  isPurged?: (kind: 'ticket' | 'note', id: string) => boolean;
   /**
    * Contract-required, and THIS IMPLEMENTATION READS NEITHER — said plainly
    * rather than dressed up as a guarantee. Both scopes arrive already baked
@@ -454,6 +456,7 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         {...(props.resolveTicketHref === undefined
           ? {}
           : { resolveTicketHref: props.resolveTicketHref })}
+        {...(props.isPurged === undefined ? {} : { isPurged: props.isPurged })}
         uploadAttachment={uploadOrRefuse}
         // The host owns event emission. Non-image uploads reach the ticket's
         // attachment list the same way — through this event and the ledger —

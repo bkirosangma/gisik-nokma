@@ -259,8 +259,10 @@ describe('9.341 editor skin — declared coverage', () => {
       'editor-image--inline-right',
       'editor-mention',
       'editor-ticketref',
+      'editor-ticketref--purged',
       'editor-wikilink',
       'editor-wikilink--missing',
+      'editor-wikilink--purged',
       'wikilink-preview',
     ];
     for (const cls of measured) {
@@ -376,6 +378,8 @@ const GALLERY_DOC = {
     },
     { type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Note' } }] },
     { type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'gone', title: 'Missing' } }] },
+    { type: 'paragraph', content: [{ type: 'ticketRef', attrs: { ticketId: 'purged', projectId: 'p1', key: 'AB-2', title: 'y' } }] },
+    { type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'purged', title: 'Erased' } }] },
     {
       type: 'image',
       attrs: { src: 'https://example.com/a.png', alt: 'a', wrap: 'block', attachmentId: 'att1' },
@@ -443,6 +447,7 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     extensions: buildEditorExtensions({
       resolveNoteTitle: (id) => (id === 'gone' ? null : 'Note'),
       headingLink: (id) => `#${id}`,
+      isPurged: (_kind, id) => id === 'purged',
     }),
     content: GALLERY_DOC,
   });

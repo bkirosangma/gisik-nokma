@@ -8,7 +8,7 @@
  * next time a module in this package grows a new export.
  */
 export type { SqlRow, SqlValue, SyncStorage } from './storage/storage.js';
-export { LOCAL_SCHEMA_VERSION, migrateLocal } from './storage/schema.js';
+export { LOCAL_SCHEMA_VERSION, LOCAL_TABLE_RULES, migrateLocal } from './storage/schema.js';
 export { buildLocalDeps, workflowVersionsOf } from './replica/local-deps.js';
 export { isSyncInstruction } from './replica/sync-item.js';
 export type {
@@ -33,7 +33,8 @@ export { buildLocalEngineContext, buildPendingOverlay } from './precheck/local-c
 export type { LocalContextDeps, PendingOverlay } from './precheck/local-context.js';
 export { backoffMs, createOutbox } from './outbox/outbox.js';
 export type { EnqueueResult, Outbox, OutboxItem, PendingTicket, SyncEventResult } from './outbox/outbox.js';
-export { createSyncEngine, TicketPullNotFound } from './engine/sync-engine.js';
+export type { SyncNotice } from './outbox/notices.js';
+export { createSyncEngine, HttpStatusError, TicketPullNotFound, WorkspaceAccessLost } from './engine/sync-engine.js';
 export type {
   ApplyFailure,
   ReconcileAnswer,

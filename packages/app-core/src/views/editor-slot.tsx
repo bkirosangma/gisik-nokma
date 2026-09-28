@@ -179,6 +179,9 @@ export type EditorSlotProps = {
   // transcription case compares.
   queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  // Trash series Plan 3 — which chips point at permanently erased items; the twin
+  // of `packages/editor/src/components/TicketEditorSlot.tsx`'s field.
+  isPurged?: (kind: 'ticket' | 'note', id: string) => boolean;
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
   /**

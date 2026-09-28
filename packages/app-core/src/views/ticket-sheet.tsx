@@ -34,6 +34,7 @@ import { TicketNotesSection } from './ticket-notes-section.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
+import { usePurgedPredicate } from './use-purged-predicate.js';
 
 /**
  * The Attachments tab's "Attach a file" button `accept` hint (Unit 5(b)) —
@@ -987,6 +988,23 @@ export function TicketSheet({
    */
   const ticketTypes = useLiveQuery(dataSource, workspaceId, `${workspaceId}:ticket-types`, () =>
     dataSource.query.getTicketTypes(workspaceId),
+  );
+
+  /**
+   * Trash Plan 3 — which chips in this ticket's STORED documents point at
+   * permanently erased items. Hooks run before the early returns below, so the
+   * documents are read off `read.data` rather than off `descriptionClaim`.
+   */
+  // Two predicates, one session cache: the description's editor waits only for
+  // the description's own chips (Task 8), never for the thread's.
+  const purgedDescription = usePurgedPredicate(
+    dataSource.query,
+    [read.data?.ticket.fields['description']?.value],
+    read.data !== null,
+  );
+  const purgedComments = usePurgedPredicate(
+    dataSource.query,
+    (comments.data ?? []).map((comment) => comment.body),
   );
 
   if (read.error !== null) {
@@ -3240,6 +3258,7 @@ export function TicketSheet({
                 passed unconditionally because the read-only fallback ignores
                 every capability prop on purpose.
               */}
+              {purgedDescription.ready ? (
               <EditorSlot
                 mode="description"
                 // The composer is NAMED BY the `<dt>` above rather than given
@@ -3257,8 +3276,10 @@ export function TicketSheet({
                 queryNotes={queryNotes}
                 {...(queryTickets === undefined ? {} : { queryTickets })}
                 {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                isPurged={purgedDescription.isPurged}
                 onError={reportEditorError}
               />
+              ) : null}
               <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
           </section>
           <dl className="gn-ticket-sheet__fields">
@@ -3910,6 +3931,7 @@ export function TicketSheet({
             commentsUnavailable={comments.error ?? undefined}
             nameOf={nameOf}
             {...(resolveTicketHref === undefined ? {} : { ticketHref: resolveTicketHref })}
+            isPurged={purgedComments.isPurged}
             composer={
               editorSlot === undefined ? undefined : (
                 <EditorSlot
@@ -3927,6 +3949,7 @@ export function TicketSheet({
                   queryNotes={queryNotes}
                   {...(queryTickets === undefined ? {} : { queryTickets })}
                   {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                  isPurged={purgedComments.isPurged}
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}

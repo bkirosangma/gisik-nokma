@@ -1,14 +1,16 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it } from 'vitest';
-import type { DeletedItem, IngestResult, SubmittedEvent } from '@gisik-nokma/domain';
+import { formatIstInstant, type DeletedItem, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import { DeletedItemsSection } from '../../src/account/deleted-items-section.js';
+import { DeletedItemsFromCache } from '../../src/deleted-items-from-cache.js';
 import { ReplicaGapError } from '../../src/replica/replica-data-source.js';
 import {
   DELETED_ITEMS_EMPTY,
   DELETED_ITEMS_OFFLINE,
   PURGE_UNDER_WAY,
   UNMARK_BEFORE_RESTORE,
+  deletedItemsAsOf,
   deletedItemsFailed,
   markItemName,
   restoreItemName,
@@ -203,5 +205,39 @@ describe('19.251–19.256 Account → Deleted items', () => {
     fireEvent.click(screen.getByRole('button', { name: markItemName(TICKET_ROW.label) }));
     expect(source.ingested).toHaveLength(1);
     await act(async () => releaseRead());
+  });
+});
+
+describe('19.198–19.199 the saved copy, offline', () => {
+  const READ_AT = '2026-09-30T04:30:00.000Z';
+
+  it('19.198 draws the saved rows read-only under the as-of line', async () => {
+    mount([new DeletedItemsFromCache([TICKET_ROW, MARKED_NOTE], READ_AT)]);
+    expect(await screen.findByText(deletedItemsAsOf(formatIstInstant(READ_AT)))).toBeInTheDocument();
+    expect(rowOf('tkt1')).toBeInTheDocument();
+    expect(rowOf('note1')).toBeInTheDocument();
+    expect(within(screen.getByRole('list')).queryAllByRole('button')).toEqual([]);
+    expect(screen.queryByText(UNMARK_BEFORE_RESTORE)).toBeNull();
+    expect(screen.queryByText(DELETED_ITEMS_OFFLINE)).toBeNull();
+    cleanup();
+    // CONTROL
+    mount([new ReplicaGapError('getDeletedItems', [])]);
+    expect(await screen.findByText(DELETED_ITEMS_OFFLINE)).toBeInTheDocument();
+    expect(screen.queryByText(DELETED_ITEMS_EMPTY)).toBeNull();
+  });
+
+  it('19.199 pins the copy; an empty saved list is "Nothing deleted." as of then', async () => {
+    expect(deletedItemsAsOf('30 Sep 2026, 10:00')).toBe(
+      'Deleted items as of 30 Sep 2026, 10:00, saved on this device. Restoring and marking need a connection.',
+    );
+    mount([new DeletedItemsFromCache([], READ_AT)]);
+    expect(await screen.findByText(DELETED_ITEMS_EMPTY)).toBeInTheDocument();
+    expect(screen.getByText(deletedItemsAsOf(formatIstInstant(READ_AT)))).toBeInTheDocument();
+    expect(screen.queryByText(DELETED_ITEMS_OFFLINE)).toBeNull();
+    cleanup();
+    // CONTROL
+    mount([[]]);
+    expect(await screen.findByText(DELETED_ITEMS_EMPTY)).toBeInTheDocument();
+    expect(screen.queryByText(/saved on this device/)).toBeNull();
   });
 });

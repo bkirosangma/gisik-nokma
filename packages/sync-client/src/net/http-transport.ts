@@ -1,6 +1,6 @@
-import type { LedgerEvent, ServerStreamFrame, SubmittedEvent } from '@gisik-nokma/domain';
+import { isPurgedRef, type LedgerEvent, type PurgedRef, type ServerStreamFrame, type SubmittedEvent } from '@gisik-nokma/domain';
 import { viewToEnvelope, type BootstrapResponse, type LedgerEventView, type TicketBootstrap } from '../replica/replica.js';
-import { NotePullNotFound, TicketPullNotFound } from '../engine/sync-engine.js';
+import { HttpStatusError, NotePullNotFound, TicketPullNotFound, WorkspaceAccessLost } from '../engine/sync-engine.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
   ReconcileAnswer,
@@ -189,6 +189,7 @@ export function createHttpTransport(opts: {
     async bootstrap(workspaceId: string): Promise<BootstrapResponse> {
       const url = `${opts.baseUrl}/v1/sync/bootstrap?workspaceId=${encodeURIComponent(workspaceId)}`;
       const res = await doFetch(url, { headers });
+      if (res.status === 403) throw new WorkspaceAccessLost(workspaceId, `bootstrap failed: ${res.status}`);
       if (!res.ok) throw new Error(`bootstrap failed: ${res.status}`);
       return (await res.json()) as BootstrapResponse;
     },
@@ -225,6 +226,27 @@ export function createHttpTransport(opts: {
       // concluding it had nothing to give back.
       if (!res.ok) throw new Error(`reconcile failed: ${res.status}`);
       return (await res.json()) as ReconcileAnswer;
+    },
+
+    async purgedLookup(ids: string[]): Promise<PurgedRef[]> {
+      const res = await doFetch(`${opts.baseUrl}/v1/purged-lookup`, {
+        method: 'POST',
+        headers,
+        body: JSON.stringify({ ids }),
+      });
+      if (!res.ok) throw new Error(`purged-lookup failed: ${res.status}`);
+      const body = (await res.json()) as { purged?: unknown };
+      // Read defensively, as every frame above is: an entry that is not a
+      // lifecycle ref is dropped, never guessed at.
+      return Array.isArray(body.purged) ? body.purged.filter(isPurgedRef) : [];
+    },
+
+    async deletedItems(): Promise<unknown> {
+      const res = await doFetch(`${opts.baseUrl}/v1/me/deleted-items`, { headers });
+      // A typed status answer, not a bare `Error`: `getDeletedItems` on the replica
+      // serves its saved copy for a transport failure ONLY, never for this.
+      if (!res.ok) throw new HttpStatusError(`deleted-items failed: ${res.status}`, res.status);
+      return res.json();
     },
 
     async bootstrapTicket(workspaceId: string, ticketId: string): Promise<TicketBootstrap> {

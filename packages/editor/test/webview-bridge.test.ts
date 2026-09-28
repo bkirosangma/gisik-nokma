@@ -239,3 +239,44 @@ describe('9.310 ticket-lookup messages', () => {
     expect(parseHostMessage({ bridge: 1, kind: 'ticketResults', requestId: 'r1' })).toBeNull();
   });
 });
+
+describe('19.194 loadDoc carries the purged ids', () => {
+  it('19.194 parses purgedIds, drops non-strings, and applies them before setContent', () => {
+    const parsed = parseHostMessage({ bridge: 1, kind: 'loadDoc', doc: null, editable: true, purgedIds: ['gone', 7, 'x'] });
+    expect(parsed).toEqual({ bridge: 1, kind: 'loadDoc', doc: null, editable: true, purgedIds: ['gone', 'x'] });
+
+    let purged: ReadonlySet<string> = new Set();
+    const editor = createTestEditor({ isPurged: (_kind, id) => purged.has(id) });
+    const bridge = createEditorBridge({
+      editor,
+      post: () => undefined,
+      onPurgedIds: (ids) => {
+        purged = new Set(ids);
+      },
+    });
+    bridge.handleHostMessage({
+      bridge: 1,
+      kind: 'loadDoc',
+      doc: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [{ type: 'ticketRef', attrs: { ticketId: 'gone', projectId: 'p', key: 'K-1', title: 'Stored title' } }],
+          },
+        ],
+      },
+      editable: true,
+      purgedIds: ['gone'],
+    });
+    expect(editor.view.dom.querySelector('.editor-ticketref--purged')?.textContent).toBe('Deleted item');
+    editor.destroy();
+    // CONTROL
+    expect(parseHostMessage({ bridge: 1, kind: 'loadDoc', doc: null, editable: true })).toEqual({
+      bridge: 1,
+      kind: 'loadDoc',
+      doc: null,
+      editable: true,
+    });
+  });
+});

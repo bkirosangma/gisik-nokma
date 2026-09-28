@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import type { BoardResponse, MemberListResponse } from '@gisik-nokma/domain';
+import { newUlid, PURGED_LOOKUP_MAX_IDS, type BoardResponse, type MemberListResponse } from '@gisik-nokma/domain';
 import {
   MAX_INGEST_BATCH,
   createOnlineDataSource,
@@ -1501,5 +1501,30 @@ describe('E5-25 a write that ends in a 401 is a session that ended', () => {
     expect(writeFailureRefusalClass('We could not reach the server for this move — x')).toBe(
       'gn-refusal gn-refusal--transport',
     );
+  });
+});
+
+describe('19.189 purgedAmong — the online twin', () => {
+  it('19.189 posts unique ids in chunks of at most 500, maps the answer, and refuses a malformed row', async () => {
+    const hit = newUlid();
+    const { fetchImpl, calls } = recordingFetch({ '/v1/purged-lookup': { purged: [{ kind: 'ticket', id: hit }] } });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    const ulids = Array.from({ length: 1001 }, () => newUlid());
+    // A duplicate is asked once; a legacy non-ULID chip id is never sent (the route would 400 its chunk).
+    const answer = await source.query.purgedAmong([...ulids, ulids[0]!, 'legacy-chip-id']);
+    expect(calls.map((call) => JSON.parse(String(call.init?.body)).ids.length)).toEqual([500, 500, 1]);
+    expect(calls.flatMap((call) => JSON.parse(String(call.init?.body)).ids as string[])).not.toContain('legacy-chip-id');
+    expect(calls.every((call) => call.input === 'http://server.test/v1/purged-lookup')).toBe(true);
+    expect(answer).toContainEqual({ kind: 'ticket', id: hit });
+    expect(PURGED_LOOKUP_MAX_IDS).toBe(500);
+
+    const bad = recordingFetch({ '/v1/purged-lookup': { purged: [{ kind: 'workflow', id: hit }] } });
+    await expect(
+      createOnlineDataSource({ baseUrl: '', fetchImpl: bad.fetchImpl }).query.purgedAmong([hit]),
+    ).rejects.toBeInstanceOf(MappingError);
+    // CONTROL
+    const none = recordingFetch({});
+    expect(await createOnlineDataSource({ baseUrl: '', fetchImpl: none.fetchImpl }).query.purgedAmong([])).toEqual([]);
+    expect(none.calls).toEqual([]);
   });
 });

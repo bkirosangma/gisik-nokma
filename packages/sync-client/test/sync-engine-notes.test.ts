@@ -143,6 +143,12 @@ function fakeTransport(script: Script): SyncTransport {
       script.reconcileCalls.push({ workspaceId, heldIds, heldNoteIds });
       return script.reconcileImpl(workspaceId, heldIds, heldNoteIds);
     },
+    async purgedLookup() {
+      return [];
+    },
+    async deletedItems() {
+      return { items: [] };
+    },
     async bootstrapTicket(_workspaceId, ticketId) {
       throw new Error(`fakeTransport: unexpected ticket pull for ${ticketId}`);
     },

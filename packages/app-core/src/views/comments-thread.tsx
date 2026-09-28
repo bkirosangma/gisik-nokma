@@ -1,4 +1,5 @@
 import type { ReactElement, ReactNode } from 'react';
+import type { PurgedPredicate } from '@gisik-nokma/domain';
 import { formatDateTime } from '../provenance.js';
 import { renderCommentBody } from './comment-body.js';
 
@@ -107,6 +108,8 @@ export type CommentsThreadProps = {
    * this thread's comments renders as a plain span.
    */
   ticketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  /** Trash Plan 3: which chips point at erased items (they draw "Deleted item"). */
+  isPurged?: PurgedPredicate;
 };
 
 /**
@@ -133,16 +136,18 @@ function CommentItem({
   comment,
   nameOf,
   ticketHref,
+  isPurged,
 }: {
   comment: TicketComment;
   nameOf: (actorId: string) => string;
   ticketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  isPurged?: PurgedPredicate;
 }): ReactElement {
   const name = nameOf(comment.authorId);
   // F3 — the body is rendered as the DOCUMENT the composer wrote, not as its
   // plain text. `docToPlainText` still serves the search projection and the
   // notifications; it is a display of last resort and never was this one.
-  const text = ticketHref === undefined ? renderCommentBody(comment.body) : renderCommentBody(comment.body, ticketHref);
+  const text = renderCommentBody(comment.body, ticketHref ?? (() => null), isPurged ?? (() => false));
   return (
     <li className="gn-comment" data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
@@ -183,6 +188,7 @@ export function CommentsThread({
   nameOf,
   composer,
   ticketHref,
+  isPurged,
 }: CommentsThreadProps): ReactElement {
   // THREE FACTS, THREE ARMS — and the ORDER of these two lines is the whole
   // fix. A failure outranks a wait: `useLiveQuery` leaves `data` at `null` after
@@ -244,7 +250,7 @@ export function CommentsThread({
       ) : (
         <ul className="gn-comments__list">
           {comments.map((comment) => (
-            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} ticketHref={ticketHref} />
+            <CommentItem key={comment.commentId} comment={comment} nameOf={nameOf} ticketHref={ticketHref} isPurged={isPurged} />
           ))}
         </ul>
       )}

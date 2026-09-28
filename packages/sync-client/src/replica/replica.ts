@@ -1,9 +1,10 @@
 import {
   applyNoteEvent,
-  applyTicketEvent,
+  foldTicketEvent,
   claimContestedPayloadSchema,
   claimContestedResolvedPayloadSchema,
   CONTEST_EVENT_TYPES,
+  collectDocReferences,
   docToPlainText,
   foldTicketToWorkflowVersion,
   NOTE_EVENT_TYPES,
@@ -13,6 +14,7 @@ import {
   type EventEnvelope,
   type LedgerEvent,
   type NoteState,
+  type PurgedRef,
   type PublishedWorkflowDef,
   type ReachGrantedTicket,
   type SubmittedEvent,
@@ -20,6 +22,7 @@ import {
   type TicketStateDeps,
   type WorkspaceRole,
 } from '@gisik-nokma/domain';
+import { dropOutboxRowsAsNotices } from '../outbox/notices.js';
 import { migrateLocal } from '../storage/schema.js';
 import type { SqlRow, SyncStorage } from '../storage/storage.js';
 import { buildLocalDeps, workflowVersionsOf } from './local-deps.js';
@@ -262,6 +265,29 @@ export type Replica = {
   applyServerItem(item: SyncItem): Promise<{ applied: boolean }>;
   purgeEntity(entityId: string): Promise<void>;
   revokeScope(instruction: ScopeRevokedInstruction): Promise<void>;
+  /**
+   * PERMANENT ERASURE (trash series Plan 3, D2) — NOT `purgeEntity`. Deletes
+   * everything this device holds of the named items and their LOCAL subtree
+   * (a ticket's children by `parent_id`; a project's tickets and homed notes; a
+   * workspace's every row), the device's own contest stubs included; turns
+   * each queued claim about them into a `sync_notices` row; records every
+   * erased id in `purged_ids`; strips them from the Deleted-items cache.
+   * Answers what was recorded, subtree included.
+   */
+  eraseEntities(refs: readonly PurgedRef[]): Promise<{ erased: PurgedRef[] }>;
+  /** Of `ids`, those `eraseEntities` recorded — the chips' predicate on a replica. */
+  purgedAmong(ids: readonly string[]): Promise<PurgedRef[]>;
+  /**
+   * Every id this device could hold something of in `workspaceId`, for the
+   * purged-id lookup (D5): the workspace, held tickets and notes, contest and
+   * outbox targets (a `purgeEntity`d ticket's own stub and queued claims
+   * survive it), and every chip id inside a held body. Ids already recorded
+   * are left out.
+   */
+  purgeLookupCandidates(workspaceId: string): Promise<string[]>;
+  /** The last online `GET /v1/me/deleted-items` body (D9), as served. */
+  cacheDeletedItems(body: unknown, fetchedAt: string): Promise<void>;
+  readDeletedItemsCache(): Promise<{ body: unknown; fetchedAt: string } | null>;
   /**
    * The note reads (notes series, Plan 2 of 6, spec §5.3). Seven of them, and
    * `searchNotes` is NOT among them — local note search is Plan 3's, and
@@ -918,7 +944,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     );
     for (const row of eventRows) {
       const env = rowToEnvelope(row);
-      if (FOLDING_TICKET_TYPES.includes(env.type)) state = applyTicketEvent(state, env, localDeps);
+      if (FOLDING_TICKET_TYPES.includes(env.type)) state = foldTicketEvent(state, env, localDeps);
     }
     if (state === undefined) return;
     await upsertTicket(tx, state);
@@ -1072,6 +1098,148 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       ticketId,
     ]);
     return rows.map(rowToContest);
+  }
+
+
+  /**
+   * The LOCAL erasure set (trash Plan 3, D3): the named items plus what this
+   * device holds under them. The server's registry already lists every member
+   * of its own set, so this is the belt for a lookup that named only the top.
+   */
+  async function localErasureSet(
+    tx: SyncStorage,
+    refs: readonly PurgedRef[],
+  ): Promise<{ workspaces: Set<string>; projects: Set<string>; tickets: Set<string>; notes: Set<string> }> {
+    const workspaces = new Set<string>();
+    const projects = new Set<string>();
+    const tickets = new Set<string>();
+    const notes = new Set<string>();
+    for (const ref of refs) {
+      if (ref.kind === 'workspace') workspaces.add(ref.id);
+      else if (ref.kind === 'project') projects.add(ref.id);
+      else if (ref.kind === 'ticket') tickets.add(ref.id);
+      else notes.add(ref.id);
+    }
+    if (projects.size > 0) {
+      for (const row of await tx.all('SELECT ticket_id, state FROM tickets', [])) {
+        const state = JSON.parse(row['state'] as string) as TicketState;
+        if (projects.has(state.projectId)) tickets.add(row['ticket_id'] as string);
+      }
+      for (const row of await tx.all('SELECT note_id, home_project_id FROM notes', [])) {
+        if (projects.has(row['home_project_id'] as string)) notes.add(row['note_id'] as string);
+      }
+    }
+    let frontier = [...tickets];
+    while (frontier.length > 0) {
+      const next: string[] = [];
+      for (const parentId of frontier) {
+        for (const row of await tx.all('SELECT ticket_id FROM tickets WHERE parent_id = ?', [parentId])) {
+          const childId = row['ticket_id'] as string;
+          if (!tickets.has(childId)) {
+            tickets.add(childId);
+            next.push(childId);
+          }
+        }
+      }
+      frontier = next;
+    }
+    return { workspaces, projects, tickets, notes };
+  }
+
+  async function eraseTicketIn(tx: SyncStorage, ticketId: string, at: string): Promise<void> {
+    await dropOutboxRowsAsNotices(
+      tx,
+      await tx.all("SELECT * FROM outbox WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]),
+      at,
+    );
+    await tx.run("DELETE FROM events WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
+    await tx.run('DELETE FROM tickets WHERE ticket_id = ?', [ticketId]);
+    await tx.run("DELETE FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
+    await tx.run("DELETE FROM snapshot_provenance WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
+    // EVERY contest, the device's own stub included — the one line on which this
+    // differs from `purgeEntity` (D2). A stub embeds the refused claim whole, and
+    // a purge is an erasure, not a loss of access.
+    await tx.run('DELETE FROM contests WHERE ticket_id = ?', [ticketId]);
+  }
+
+  async function eraseNoteIn(tx: SyncStorage, noteId: string, at: string): Promise<void> {
+    await dropOutboxRowsAsNotices(
+      tx,
+      await tx.all("SELECT * FROM outbox WHERE entity_kind = 'note' AND entity_id = ?", [noteId]),
+      at,
+    );
+    await tx.run("DELETE FROM events WHERE entity_kind = 'note' AND entity_id = ?", [noteId]);
+    await tx.run('DELETE FROM notes WHERE note_id = ?', [noteId]);
+    await tx.run('DELETE FROM note_comments WHERE note_id = ?', [noteId]);
+  }
+
+  /** Everything the workspace owns on this device; answers the ticket and note ids it held. */
+  async function eraseWorkspaceIn(
+    tx: SyncStorage,
+    workspaceId: string,
+    at: string,
+  ): Promise<{ tickets: string[]; notes: string[] }> {
+    await dropOutboxRowsAsNotices(tx, await tx.all('SELECT * FROM outbox WHERE workspace_id = ?', [workspaceId]), at);
+    const tickets = (await tx.all('SELECT ticket_id FROM tickets WHERE workspace_id = ?', [workspaceId])).map(
+      (row) => row['ticket_id'] as string,
+    );
+    const notes = (await tx.all('SELECT note_id FROM notes WHERE workspace_id = ?', [workspaceId])).map(
+      (row) => row['note_id'] as string,
+    );
+    // `snapshots`/`snapshot_provenance` carry no workspace id: by ticket.
+    for (const ticketId of tickets) {
+      await tx.run("DELETE FROM snapshots WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
+      await tx.run("DELETE FROM snapshot_provenance WHERE entity_kind = 'ticket' AND entity_id = ?", [ticketId]);
+    }
+    for (const table of ['events', 'tickets', 'notes', 'note_comments', 'contests']) {
+      await tx.run(`DELETE FROM ${table} WHERE workspace_id = ?`, [workspaceId]);
+    }
+    // One workspace per replica — the assumption `revokeScope`'s whole-workspace
+    // arm already makes for these two tables.
+    await tx.run('DELETE FROM workflows', []);
+    await tx.run('DELETE FROM ticket_types', []);
+    // BOTH pending-pull keys (revokeScope forgets the note one).
+    for (const key of [`cursor:${workspaceId}`, pendingPullsKey(workspaceId), pendingPullsKey(workspaceId, 'note')]) {
+      await tx.run('DELETE FROM meta WHERE key = ?', [key]);
+    }
+    return { tickets, notes };
+  }
+
+  async function stripPendingPulls(tx: SyncStorage, ids: ReadonlySet<string>): Promise<void> {
+    const rows = await tx.all(
+      "SELECT key, value FROM meta WHERE key LIKE 'pending-pulls:%' OR key LIKE 'pending-note-pulls:%'",
+      [],
+    );
+    for (const row of rows) {
+      const held = parsePendingPulls(row['value']).filter((entry) => !ids.has(entry.id));
+      await tx.run('UPDATE meta SET value = ? WHERE key = ?', [JSON.stringify(held), row['key'] as string]);
+    }
+  }
+
+  async function stripDeletedItemsCache(
+    tx: SyncStorage,
+    ids: ReadonlySet<string>,
+    workspaces: ReadonlySet<string>,
+  ): Promise<void> {
+    for (const row of await tx.all('SELECT cache_key, payload FROM deleted_items_cache', [])) {
+      const body = JSON.parse(row['payload'] as string) as { items?: unknown };
+      if (!Array.isArray(body.items)) continue;
+      const kept = body.items.filter((item: unknown) => {
+        const entry = (typeof item === 'object' && item !== null ? item : {}) as {
+          id?: unknown;
+          workspaceId?: unknown;
+          projectId?: unknown;
+        };
+        if (typeof entry.id === 'string' && ids.has(entry.id)) return false;
+        // An erased project takes its cached tickets (review fix I-2).
+        if (typeof entry.projectId === 'string' && ids.has(entry.projectId)) return false;
+        return !(typeof entry.workspaceId === 'string' && workspaces.has(entry.workspaceId));
+      });
+      await tx.run('UPDATE deleted_items_cache SET payload = ? WHERE cache_key = ?', [
+        JSON.stringify({ ...body, items: kept }),
+        row['cache_key'] as string,
+      ]);
+    }
   }
 
   const replica: Replica = {
@@ -1353,6 +1521,10 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       if (isSyncInstruction(item)) return applyInstruction(item);
 
       const env = item;
+      // Trash Plan 3 (D3): a tombstone is NEVER stored — it names an item this
+      // device must now erase, and the engine answers it with a lookup. Storing
+      // it would put a row about an erased entity into the local ledger.
+      if (env.type === 'purge.completed') return { applied: false };
       const applied = await storage.transaction(async (tx) => {
         const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
         if (dupe.length > 0) return false;
@@ -1508,6 +1680,127 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       notify();
     },
 
+    async eraseEntities(refs) {
+      if (refs.length === 0) return { erased: [] };
+      const at = new Date().toISOString();
+      const erased = await storage.transaction(async (tx) => {
+        const set = await localErasureSet(tx, refs);
+        const recorded: PurgedRef[] = [];
+        for (const workspaceId of set.workspaces) {
+          const held = await eraseWorkspaceIn(tx, workspaceId, at);
+          recorded.push({ kind: 'workspace', id: workspaceId });
+          for (const id of held.tickets) set.tickets.add(id);
+          for (const id of held.notes) set.notes.add(id);
+        }
+        for (const id of set.projects) recorded.push({ kind: 'project', id });
+        for (const id of set.tickets) {
+          await eraseTicketIn(tx, id, at);
+          recorded.push({ kind: 'ticket', id });
+        }
+        for (const id of set.notes) {
+          await eraseNoteIn(tx, id, at);
+          recorded.push({ kind: 'note', id });
+        }
+        for (const ref of recorded) {
+          await tx.run(
+            `INSERT INTO purged_ids (entity_kind, entity_id, recorded_at) VALUES (?, ?, ?)
+             ON CONFLICT(entity_kind, entity_id) DO NOTHING`,
+            [ref.kind, ref.id, at],
+          );
+        }
+        const ids = new Set(recorded.map((ref) => ref.id));
+        await stripPendingPulls(tx, ids);
+        await stripDeletedItemsCache(tx, ids, set.workspaces);
+        return recorded;
+      });
+      notify();
+      return { erased };
+    },
+
+    async purgedAmong(ids) {
+      if (ids.length === 0) return [];
+      const rows = await storage.all(
+        `SELECT entity_kind, entity_id FROM purged_ids
+          WHERE entity_id IN (SELECT value FROM json_each(?))
+          ORDER BY entity_kind, entity_id`,
+        [JSON.stringify(ids)],
+      );
+      return rows.map((row) => ({ kind: row['entity_kind'] as PurgedRef['kind'], id: row['entity_id'] as string }));
+    },
+
+    async purgeLookupCandidates(workspaceId) {
+      const ids = new Set<string>([workspaceId]);
+      const take = (rows: SqlRow[], column: string): void => {
+        for (const row of rows) {
+          const value = row[column];
+          if (typeof value === 'string' && value !== '') ids.add(value);
+        }
+      };
+      take(await storage.all('SELECT ticket_id FROM tickets WHERE workspace_id = ?', [workspaceId]), 'ticket_id');
+      take(await storage.all('SELECT note_id FROM notes WHERE workspace_id = ?', [workspaceId]), 'note_id');
+      take(await storage.all('SELECT ticket_id FROM contests WHERE workspace_id = ?', [workspaceId]), 'ticket_id');
+      take(
+        await storage.all(
+          "SELECT entity_id FROM outbox WHERE workspace_id = ? AND entity_kind IN ('ticket', 'note')",
+          [workspaceId],
+        ),
+        'entity_id',
+      );
+      const bodies: unknown[] = [];
+      for (const row of await storage.all('SELECT body FROM notes WHERE workspace_id = ?', [workspaceId])) {
+        bodies.push(JSON.parse(row['body'] as string));
+      }
+      for (const row of await storage.all('SELECT body FROM note_comments WHERE workspace_id = ?', [workspaceId])) {
+        bodies.push(JSON.parse(row['body'] as string));
+      }
+      for (const row of await storage.all(
+        "SELECT payload FROM events WHERE workspace_id = ? AND type IN ('comment.added', 'ticket.field_set')",
+        [workspaceId],
+      )) {
+        const payload = JSON.parse(row['payload'] as string) as { body?: unknown; value?: unknown };
+        bodies.push(payload.body ?? payload.value);
+      }
+      for (const body of bodies) {
+        const refs = collectDocReferences(body);
+        for (const id of [...refs.ticketIds, ...refs.noteIds]) ids.add(id);
+      }
+      // The Deleted-items cache is content this device holds about items it may
+      // hold nothing else of (another workspace, a project): its ids must be
+      // asked about too, or a purge of a cached item never reaches its label
+      // (review fix I-2). `body` is untrusted JSON; only string ids are taken.
+      for (const row of await storage.all('SELECT payload FROM deleted_items_cache', [])) {
+        const cached = JSON.parse(row['payload'] as string) as { items?: unknown };
+        if (!Array.isArray(cached.items)) continue;
+        for (const item of cached.items) {
+          const entry = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+          for (const key of ['id', 'projectId', 'workspaceId']) {
+            const value = entry[key];
+            if (typeof value === 'string' && value !== '') ids.add(value);
+          }
+        }
+      }
+      const known = new Set(
+        (await storage.all('SELECT entity_id FROM purged_ids', [])).map((row) => row['entity_id'] as string),
+      );
+      return [...ids].filter((id) => !known.has(id)).sort();
+    },
+
+    async cacheDeletedItems(body, fetchedAt) {
+      await storage.run(
+        `INSERT INTO deleted_items_cache (cache_key, payload, fetched_at) VALUES ('me', ?, ?)
+         ON CONFLICT(cache_key) DO UPDATE SET payload = excluded.payload, fetched_at = excluded.fetched_at`,
+        [JSON.stringify(body), fetchedAt],
+      );
+    },
+
+    async readDeletedItemsCache() {
+      const rows = await storage.all("SELECT payload, fetched_at FROM deleted_items_cache WHERE cache_key = 'me'", []);
+      const row = rows[0];
+      return row === undefined
+        ? null
+        : { body: JSON.parse(row['payload'] as string) as unknown, fetchedAt: row['fetched_at'] as string };
+    },
+
     async getTicket(ticketId) {
       const rows = await storage.all('SELECT * FROM tickets WHERE ticket_id = ?', [ticketId]);
       if (rows.length === 0) return null;
@@ -1646,13 +1939,21 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         const title = titleOf(JSON.parse(row.state as string) as TicketState);
         if (title.toLowerCase().includes(text.toLowerCase())) hits.set(row.ticket_id as string, title);
       }
+      // Spec §5.6/§5.7: an erased item's title stops matching inside surviving
+      // comments, the same rule the server's search applies (review fix I-3).
+      const purged = new Set(
+        (await storage.all('SELECT entity_kind, entity_id FROM purged_ids', [])).map(
+          (row) => `${row['entity_kind'] as string}:${row['entity_id'] as string}`,
+        ),
+      );
+      const isPurged = (kind: 'ticket' | 'note', id: string): boolean => purged.has(`${kind}:${id}`);
       const comments = await storage.all(
         "SELECT entity_id, payload FROM events WHERE workspace_id = ? AND type = 'comment.added' AND LOWER(payload) LIKE ?",
         [workspaceId, needle],
       );
       for (const row of comments) {
         const body = (JSON.parse(row.payload as string) as { body: unknown }).body;
-        if (!docToPlainText(body).toLowerCase().includes(text.toLowerCase())) continue;
+        if (!docToPlainText(body, { isPurged }).toLowerCase().includes(text.toLowerCase())) continue;
         if (hits.has(row.entity_id as string)) continue;
         const owning = await storage.all('SELECT state FROM tickets WHERE ticket_id = ?', [row.entity_id as string]);
         if (owning.length === 0) continue; // a comment on a ticket we no longer hold

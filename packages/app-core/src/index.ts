@@ -343,6 +343,8 @@ export { ContestBanner } from './contests/contest-banner.js';
 export { buildReopenPair, nonTerminalStates } from './offline/reopen-pair.js';
 export { ClockSkewBadge, formatClockSkew } from './history/clock-skew-badge.js';
 export { SyncStatusBar, syncStatusLabel } from './sync/sync-status-bar.js';
+export { usePurgedPredicate, type PurgedLookupQuery, type PurgedPredicateState } from './views/use-purged-predicate.js';
+export { SyncNotices, SYNC_NOTICE_DISMISS, failedClaimNotice, type SyncNoticeView } from './sync/sync-notices.js';
 // Account/help-screens plan, Task 6 — the Notifications section of
 // `/account` and the abstract half of its gateway. The concrete HTTP
 // adapter (`createHttpNotificationPreferencesGateway`) is a `./online`
@@ -397,3 +399,4 @@ export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
 
 export { DeleteDialog, type DeleteDialogProps } from './views/delete-dialog.js';
 export { DeletedItemsSection, type DeletedItemsSectionProps } from './account/deleted-items-section.js';
+export { DeletedItemsFromCache, cachedDeletedItemsOf } from './deleted-items-from-cache.js';

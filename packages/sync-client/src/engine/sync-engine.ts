@@ -1,4 +1,4 @@
-import type { LedgerEvent, SubmittedEvent } from '@gisik-nokma/domain';
+import { PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type LedgerEvent, type PurgedRef, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { BootstrapResponse, Replica, TicketBootstrap } from '../replica/replica.js';
 import { isSyncInstruction, type SyncItem } from '../replica/sync-item.js';
 import type { Outbox, SyncEventResult } from '../outbox/outbox.js';
@@ -111,6 +111,15 @@ export type SyncTransport = {
    * the compiler is the enumerator.
    */
   bootstrapNote(workspaceId: string, noteId: string): Promise<{ events: LedgerEvent[] }>;
+  /**
+   * `POST /v1/purged-lookup` (trash series Plan 3, D1): which of `ids` were
+   * permanently erased. At most `PURGED_LOOKUP_MAX_IDS` per call — the engine
+   * chunks. REQUIRED, not optional (D12): an optional member compiles on every
+   * fake and silently never erases anything.
+   */
+  purgedLookup(ids: string[]): Promise<PurgedRef[]>;
+  /** `GET /v1/me/deleted-items`, the body as served — the replica data source maps and caches it (D9). */
+  deletedItems(): Promise<unknown>;
 };
 
 export type SyncStatus = 'offline' | 'connecting' | 'catching-up' | 'live';
@@ -159,6 +168,41 @@ export class NotePullNotFound extends Error {
     this.noteId = noteId;
   }
 }
+
+/**
+ * The server answered 403 `not_a_member` on bootstrap (trash series Plan 3,
+ * D5). The message is exactly the one the transport threw before this class
+ * existed (`bootstrap failed: 403`), so nothing reading it changes; the TYPE
+ * is what lets `start()` ask whether the workspace was purged.
+ */
+export class WorkspaceAccessLost extends Error {
+  readonly workspaceId: string;
+  constructor(workspaceId: string, message: string) {
+    super(message);
+    this.name = 'WorkspaceAccessLost';
+    this.workspaceId = workspaceId;
+  }
+}
+
+/**
+ * The server ANSWERED with a non-2xx status (trash series Plan 3 review fix,
+ * M-3). The message is exactly the one the transport threw before this class
+ * existed, so nothing reading it changes; the TYPE is what lets a reader tell
+ * "the server said no" (401 signed out, 403, 500 — surface it, as online) from
+ * "no answer at all" (a `fetch` that rejected — the only thing a saved copy may
+ * stand in for).
+ */
+export class HttpStatusError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'HttpStatusError';
+    this.status = status;
+  }
+}
+
+/** The stream's membership refusal (`apps/server/src/stream/routes.ts`'s `NOT_A_MEMBER_ERROR`), mirrored: this package may not import the server. */
+const NOT_A_MEMBER_CODE = 'not-a-member';
 
 /**
  * A frame this replica could not fold.
@@ -274,6 +318,15 @@ export type SyncEngine = {
    */
   onPullApplied(cb: (info: { kind: 'ticket' | 'note'; id: string }) => void): () => void;
   /**
+   * Fires after something this device HOLDS or OWES the person a sentence about
+   * changed without any frame announcing it (trash Plan 3, review fix I-1): a
+   * flushed claim the server refused (a purge notice, or a failed row) and an
+   * erase a purge lookup caused. Both happen AFTER the `live` status a shell
+   * reads notices on, so without this a quiet workspace shows neither until
+   * some unrelated frame arrives. Content-free: it says "re-read", nothing more.
+   */
+  onNoticesChanged(cb: () => void): () => void;
+  /**
    * Ask the server which of the tickets this replica holds are no longer this
    * user's, and delete those — closure 5's NARROW half, case 6.104's residual.
    *
@@ -294,6 +347,17 @@ export type SyncEngine = {
    * the schedule — on a stable socket the schedule never fires again.
    */
   reconcile(workspaceId: string): Promise<{ presented: number; purged: string[] }>;
+  /**
+   * Asks the purged-id lookup about everything this device could hold in
+   * `workspaceId` (`replica.purgeLookupCandidates`) plus `extraIds`, in chunks
+   * of `PURGED_LOOKUP_MAX_IDS`, and erases what comes back (trash Plan 3, D5).
+   * A failing chunk is recorded (`lastPurgeLookupError`) and the rest still
+   * run. When the workspace itself is named, the stream ends.
+   */
+  learnPurges(workspaceId: string, extraIds?: readonly string[]): Promise<{ erased: string[] }>;
+  lastPurgeLookupError(): string | null;
+  /** The online Deleted-items body through the transport (D9); rejects when offline. */
+  fetchDeletedItems(): Promise<unknown>;
 };
 
 function messageOf(err: unknown): string {
@@ -477,9 +541,11 @@ export function createSyncEngine(deps: {
   let reconciling: Promise<{ presented: number; purged: string[] }> | null = null;
   /** When the last automatic reconcile ran. See `RECONCILE_MIN_INTERVAL_MS`. */
   let lastReconcileAt = 0;
+  let purgeLookupError: string | null = null;
   const statusListeners = new Set<(s: SyncStatus) => void>();
   const itemListeners = new Set<(item: SyncItem) => void>();
   const pullAppliedListeners = new Set<(info: { kind: 'ticket' | 'note'; id: string }) => void>();
+  const noticesChangedListeners = new Set<() => void>();
 
   function setStatus(next: SyncStatus): void {
     if (next === currentStatus) return;
@@ -648,6 +714,16 @@ export function createSyncEngine(deps: {
    * listener that only heard about notes would be a second, narrower rule
    * waiting to be discovered.
    */
+  function notifyNoticesChanged(): void {
+    for (const cb of noticesChangedListeners) {
+      try {
+        cb();
+      } catch {
+        // a shell's callback; see notifyPullApplied
+      }
+    }
+  }
+
   function notifyPullApplied(info: { kind: 'ticket' | 'note'; id: string }): void {
     for (const cb of pullAppliedListeners) {
       // A listener is a shell's callback and its throw is its own business:
@@ -696,6 +772,41 @@ export function createSyncEngine(deps: {
     } finally {
       if (timer !== undefined) clearTimeout(timer);
     }
+  }
+
+  async function learnPurges(ws: string, extraIds: readonly string[] = []): Promise<{ erased: string[] }> {
+    // ULIDs only: the route refuses a whole body for one malformed id (19.162),
+    // and a legacy chip id inside a stored document would otherwise cost its
+    // entire chunk on every pass.
+    const ids = [...new Set([...(await replica.purgeLookupCandidates(ws)), ...extraIds])].filter((id) =>
+      ULID_REGEX.test(id),
+    );
+    const asked = new Set(ids);
+    const found: PurgedRef[] = [];
+    purgeLookupError = null;
+    for (let i = 0; i < ids.length; i += PURGED_LOOKUP_MAX_IDS) {
+      const chunk = ids.slice(i, i + PURGED_LOOKUP_MAX_IDS);
+      try {
+        // Only what was asked: a server naming an id this device never sent
+        // changes nothing here.
+        for (const ref of await transport.purgedLookup(chunk)) if (asked.has(ref.id)) found.push(ref);
+      } catch (err) {
+        // One chunk failing must not cost the others their answer; the next
+        // pass asks again.
+        purgeLookupError = messageOf(err);
+      }
+    }
+    if (found.length === 0) return { erased: [] };
+    const { erased } = await replica.eraseEntities(found);
+    notifyNoticesChanged();
+    if (found.some((ref) => ref.kind === 'workspace' && ref.id === ws)) {
+      // The whole-workspace `scope-revoked` precedent (`applyOne`): nothing is
+      // left to stream, and a reconnect would only earn `not-a-member` again.
+      // `streamEnded` BEFORE `closeStream`, so `onClose` does not reconnect.
+      streamEnded = true;
+      closeStream();
+    }
+    return { erased: erased.map((ref) => ref.id) };
   }
 
   /**
@@ -828,6 +939,16 @@ export function createSyncEngine(deps: {
       streamEnded = true;
       closeStream();
     }
+    // Trash Plan 3 (D3): a tombstone that DID reach this device (a project's —
+    // the only kind the stream can deliver) is never stored; it is a reason to
+    // ask, and the answer erases the item and its local subtree.
+    if (!isSyncInstruction(item) && item.type === 'purge.completed') {
+      try {
+        await learnPurges(item.workspaceId, [item.entity.id]);
+      } catch {
+        // The next reconcile pass asks again.
+      }
+    }
     // AFTER the fold and after the revocation branch, so a subscriber that
     // re-queries on this signal reads a store that already contains the item —
     // or, for a revocation, one that has already emptied itself. A listener
@@ -877,16 +998,30 @@ export function createSyncEngine(deps: {
             // not brick this client: reconcile is idempotent (every action it
             // takes is a delete) and a missed one is retried at the next
             // catch-up, so there is nothing a stall would protect.
+            // `null` = the interval gate did not open this time; an ARRAY (even
+            // empty) = a pass ran, and the lookup follows it in its own `try`
+            // (trash Plan 3, D5) — reconcile has just `purgeEntity`d every
+            // erased ticket and note (`canSee` is false), so its `purged` ids go
+            // along as extras or they would never be asked about.
+            let reconciled: string[] | null = null;
             try {
               if (Date.now() - lastReconcileAt >= RECONCILE_MIN_INTERVAL_MS) {
                 lastReconcileAt = Date.now();
-                await engine.reconcile(ws);
+                reconciled = [];
+                reconciled = (await engine.reconcile(ws)).purged;
               }
             } catch {
               // See above. `lastReconcileAt` is deliberately stamped BEFORE the
               // attempt rather than after it: a reconcile that fails fast would
               // otherwise be retried at full rate on a flapping socket, which
               // is the storm the interval exists to prevent.
+            }
+            if (reconciled !== null) {
+              try {
+                await learnPurges(ws, reconciled);
+              } catch {
+                // Idempotent and retried at the next pass, like reconcile.
+              }
             }
           })
           .catch((err: unknown) => stall(err, null));
@@ -897,6 +1032,16 @@ export function createSyncEngine(deps: {
         // stream that errors has not caught up, and pretending otherwise would
         // silently skip whatever it did not send.
         lastStreamError = err;
+        // Trash Plan 3 (D5): a purged workspace answers every subscribe with
+        // `not-a-member` and never reaches `caught-up`, so this is the only
+        // moment such a device can ask. A plain revoke answers nothing here.
+        if (err.code === NOT_A_MEMBER_CODE && workspaceId !== null) {
+          const ws = workspaceId;
+          applyChain = applyChain.then(() => learnPurges(ws)).then(
+            () => undefined,
+            () => undefined,
+          );
+        }
       },
       onClose: () => {
         handle = null;
@@ -979,7 +1124,25 @@ export function createSyncEngine(deps: {
       lastStreamError = null;
       setStatus('connecting');
       if (await needsBootstrap(ws)) {
-        const body = await transport.bootstrap(ws);
+        let body: BootstrapResponse;
+        try {
+          body = await transport.bootstrap(ws);
+        } catch (err) {
+          // Trash Plan 3 (D5): a 403 is either a revoke or a purge. Ask; a
+          // purge empties this device and ends here, anything else is the
+          // failure it always was.
+          if (err instanceof WorkspaceAccessLost) {
+            await learnPurges(ws);
+            // A relaunch after the purge: the workspace is already recorded, so
+            // the lookup had nothing to ask — the recorded answer is the answer
+            // (review fix I-4).
+            if (!streamEnded && (await replica.purgedAmong([ws])).some((ref) => ref.kind === 'workspace')) {
+              streamEnded = true;
+            }
+            if (streamEnded) return;
+          }
+          throw err;
+        }
         await replica.loadBootstrap(body);
       }
       subscribe(await replica.getCursor(ws));
@@ -1099,6 +1262,8 @@ export function createSyncEngine(deps: {
             for (let i = 0; i < batch.length; i += 1) {
               try {
                 await outbox.applyResult(batch[i]!.eventId, results[i]!);
+                // A refusal moved a row into a notice or a failed row.
+                if (results[i]!.status === 'refused' || results[i]!.status === 'invalid') notifyNoticesChanged();
               } catch (err) {
                 await outbox.recordFailure(ids.slice(i), messageOf(err));
                 stall(err, null);
@@ -1117,6 +1282,9 @@ export function createSyncEngine(deps: {
     lastError: () => lastStreamError,
     lastApplyFailure: () => applyFailure,
     lastAbandonedPull: () => abandonedPull,
+    learnPurges: (ws, extraIds) => learnPurges(ws, extraIds),
+    lastPurgeLookupError: () => purgeLookupError,
+    fetchDeletedItems: () => transport.deletedItems(),
 
     async settled() {
       // The chain grows while it is awaited — an item's link can enqueue a
@@ -1140,6 +1308,13 @@ export function createSyncEngine(deps: {
       itemListeners.add(cb);
       return () => {
         itemListeners.delete(cb);
+      };
+    },
+
+    onNoticesChanged(cb) {
+      noticesChangedListeners.add(cb);
+      return () => {
+        noticesChangedListeners.delete(cb);
       };
     },
 

@@ -271,6 +271,12 @@ function fakeTransport(script: Script): SyncTransport {
       script.reconcileCalls.push({ workspaceId, heldIds });
       return script.reconcileImpl(workspaceId, heldIds);
     },
+    async purgedLookup() {
+      return [];
+    },
+    async deletedItems() {
+      return { items: [] };
+    },
     openStream(_ws, afterSeq, handlers) {
       script.subscribes.push({ afterSeq });
       script.handlers = handlers;
