@@ -16,6 +16,9 @@ HEREDOC_START = re.compile(r"<<-?\s*[\"\']?([A-Za-z_][A-Za-z0-9_]*)[\"\']?")
 TEXT_EMITTERS = ("echo", "printf", "cat")
 SEGMENT_SEP = re.compile(r"&&|\|\||;|\|")
 ENV_ASSIGNMENT = re.compile(r"^[A-Za-z_][A-Za-z0-9_]*=")
+SHELL_KEYWORDS = ("do", "then", "else", "elif", "if", "while", "until", "!", "{", "(", "time")
+# A lane target is any gisik: window except the literal controller 0 — `gisik:$w`, `gisik:"$w"` and `gisik:${w}` included.
+LANE_TARGET = re.compile(r"-t\s+[\"']?gisik:(?!0(?![0-9$]))")
 
 
 def strip_heredoc_bodies(command):
@@ -34,8 +37,11 @@ def strip_heredoc_bodies(command):
 
 def words_of(segment):
     # Env assignments and wrapper words (incl. an interpreter: `bash /tmp/gate/gate.sh`) precede the real command.
+    # Shell keywords too: `for w in 2 3; do tmux kill-window -t gisik:$w; done` splits on `;` into a segment that starts
+    # with `do`, which read as prose and let the kill through (planner, 2026-09-28).
     words = segment.split()
-    while words and (ENV_ASSIGNMENT.match(words[0]) or words[0] in ("env", "time", "exec", "command", "sudo", "bash", "sh", "zsh")):
+    while words and (ENV_ASSIGNMENT.match(words[0]) or words[0] in ("env", "time", "exec", "command", "sudo", "bash", "sh", "zsh")
+                     or words[0] in SHELL_KEYWORDS):
         words.pop(0)
     return words
 
@@ -69,7 +75,9 @@ def decide(segment, cwd):
             return "ctl land <pr> (it comments the gate)"
         return None
     if first == "tmux":
-        if re.match(r"(kill-window|new-window)\b", rest) and re.search(r"-t\s+gisik:[1-9]", rest):
+        if re.match(r"kill-window\b", rest) and LANE_TARGET.search(rest):
+            return "ctl close <window> (idle lane) or ctl restart <window> <worktree> <brief>"
+        if re.match(r"new-window\b", rest) and LANE_TARGET.search(rest):
             return "ctl restart <window> <worktree> <brief>"
         if re.match(r"send-keys\b", rest) and "gisik" in rest:
             return "ctl dispatch <window> <file>"
@@ -117,6 +125,14 @@ TABLE = [  # (command, cwd, refused?)
     ("tmux kill-window -t gisik:1", "/tmp", True),
     ("tmux new-window -t gisik:3 -n exec3 -c /x", "/tmp", True),
     ("tmux kill-window -t gisik:0", "/tmp", False),
+    ("for w in 2 3 4; do tmux kill-window -t gisik:$w; done", "/tmp", True),
+    ("tmux kill-window -t gisik:$w", "/tmp", True),
+    ("tmux kill-window -t \"gisik:${w}\"", "/tmp", True),
+    ("tmux kill-window -t gisik:12", "/tmp", True),
+    ("tmux kill-window -t gisik:07", "/tmp", True),
+    ("if true; then tmux new-window -t gisik:5 -n x; fi", "/tmp", True),
+    ("while read w; do tmux send-keys -t gisik:$w Enter; done < f", "/tmp", True),
+    ("scripts/ctl/ctl close 3", "/tmp", False),
     ("tmux send-keys -t gisik:2 Enter", "/tmp", True),
     ("tmux capture-pane -p -t gisik:2", "/tmp", False),
     ("tmux load-buffer -b x f && tmux paste-buffer -b x -d -t gisik:2", "/tmp", False),
