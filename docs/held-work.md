@@ -22,20 +22,13 @@ Readings (commits) were taken at 2026-09-24 ~01:05 IST. Re-check each with `git 
 - **Release branch:** `release/trash`, at `cd84f0027f9cd4fe6f7a9d4c5b0b326f9507ac96` when held; fast-forwarded to `dd6d7ed790eb66d1dccaeb339d0a94513edc21b4` on resume. It was stacked on `release/notes` because trash depends on notes code (the note entity, notes projections, note authority); notes shipped to `main` on 2026-09-24 (#733), and the resume fast-forward means `release/trash` now contains all of it.
 - **Spec:** `docs/superpowers/specs/2026-09-23-trash-and-purge-design.md` (owner-approved; decisions T1–T10).
 - **Plan 1:** `docs/superpowers/plans/2026-09-23-trash-1-lifecycle-core.md`.
-- **Branch:** `task/trash-1-lifecycle-core` at `0236d334f362754593ed31f24447d1718ff30bf1`. Tasks 1–6 are done: vocabulary, projection, authority, state refusals, deleted-workspace containment, deleted-project containment.
-- **Left in Plan 1:**
-  - Task 7: `GET /v1/me/deleted-items`.
-  - Task 8: the client `getDeletedItems()` contract.
-  - Then the PR `--base release/trash`.
-- **Left in the series (not yet written):**
-  - Plan 2: the purge engine and backup retention.
-  - Plan 3: replica and sync.
-  - Plan 4: UI (the delete dialog with its "Delete permanently" switch, archive/delete on cards, Account → Deleted items).
-  - Plans are written only after Plan 1 lands, against the landed tree.
+- **Plan 1 LANDED 2026-09-28** — PR #737, merge `218a00a994c8da27184abf943350681ad65518c3` (Tasks 1–8; cases 19.001–19.071).
+- **Plan 2 written 2026-09-29** — `docs/superpowers/plans/2026-09-28-trash-2-purge-engine.md` (10 tasks, cases 19.081–19.159; deviations D1–D13 in the plan). Owner ruling **T11** (2026-09-28, "A"): a purge erases the item, not other documents' quotes of it.
+- **Owner 2026-09-29:** Plans 2, 3 and 4 execute overnight without per-plan review; the editor work (editor-polish #739, editor-skin #738) and the full trash series (Plans 1–4) **release together** from `release/trash`.
+- **Left in the series:** Plan 3 (replica + sync, after Plan 2 lands), Plan 4 (UI; may run beside Plan 2).
 - **Case block:** `test-cases/19-trash.md`. P1 `19.001`–`19.080`, P2 `19.081`–`19.160`, P3 `19.161`–`19.200`, P4 `19.201`–`19.260`.
-- **Before Plan 2:** two read-only production measurements need the owner's OK.
-  - Can the migration role create a `SECURITY DEFINER` function on DO managed Postgres?
-  - Does the backup bucket already have a lifecycle rule?
+- **Production probes (measured 2026-09-28, owner OK):** `doadmin` (not superuser) CAN create the `SECURITY DEFINER` purge function (scratch DB, dropped) — but the app also connects as `doadmin`, so the trigger is the only guard; neither `gisik-nokma-backups` nor `gisik-nokma-attachments` has a lifecycle rule (404 `NoSuchLifecycleConfiguration`).
+- **Release step owed (Plan 2 Task 9):** the backup worker needs `OBJECT_STORE=s3` + `OBJECT_STORE_S3_BUCKET` applied with `doctl apps update` (a push does not apply the spec); this also arms the 30-day orphan sweep against the real bucket for the first time — dry-run it first.
 - **Briefs:** `docs/lanes/held/LANE-trash-plan-2026-09-23.md` and `docs/lanes/held/CTL-HANDOFF-trash-series-2026-09-23.md`. PRs go `--base release/trash`, not `release/notes`.
 
 ## 2. Editor polish — the units not in the notes release

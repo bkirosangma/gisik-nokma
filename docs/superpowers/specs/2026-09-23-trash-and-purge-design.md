@@ -25,6 +25,7 @@
 | T8 | Workspace archive works exactly like project archive: hides from lists of live work, removes nobody's access, reversible. | planner assumption, owner did not object |
 | T9 | An unmarked soft-deleted item stays in Deleted items **indefinitely**; the 15 days start at the MARK, not at the delete. | planner assumption, owner did not object |
 | T10 | Soft-deleting a workspace or project hides it **and everything inside it** from every member at once; restoring brings everything back. | planner assumption, owner did not object |
+| T11 | **A purge erases the item, not other documents' quotes of it.** A `ticketRef` chip in a surviving comment, description or note keeps the key and title its author saw (as the 2026-09-24 reference-chip ruling already holds). Search stops matching it (Plan 2) and the chip renders "Deleted item" (Plan 3); the bytes stay inside the surviving document and its ledger rows and are not rewritten. Chosen over rewriting survivors, which would widen the sanctioned purge path to other items' history. | owner: "A" (2026-09-28) |
 
 ## 3. What exists today (measured)
 
@@ -86,7 +87,7 @@ The plan's first task enumerates every table (28 today, §3) and assigns each a 
 
 ### 5.6 Survivors (T5)
 
-- A `ticketRef` chip or `wikiLink` in a surviving comment or note body whose target is purged renders **"Deleted item"** (no key, no title, no link). The stored document is not rewritten; the renderer resolves the id and finds nothing. Search indexes (which store rendered text) are re-derived for the affected surviving rows so the purged title stops matching.
+- A `ticketRef` chip or `wikiLink` in a surviving comment or note body whose target is purged renders **"Deleted item"** (no key, no title, no link). The stored document is not rewritten (T11). *Correction 2026-09-28:* no renderer resolves a chip by id today — the key and title are baked into the chip's attrs (`packages/editor/src/extensions/ticket-ref.ts`, `packages/app-core/src/views/comment-body.tsx`) — so rendering "Deleted item" needs the client to know the purged ids; that is Plan 3's work (§5.7). Search indexes (which store rendered text) are re-derived for the affected surviving rows so the purged title stops matching.
 - A surviving note attached to a purged ticket is detached: its `proj_note_attachments` row goes; the note is untouched.
 - A surviving child ticket whose parent is purged cannot exist (children are in the erasure set); any surviving ticket-to-ticket link to a purged ticket (whatever link kinds the tree has — the §5.5 enumeration names them) is dropped from the projection.
 - `verify-projections` must stay green after a purge: live and rebuild both read the post-purge ledger, so they agree. The plan adds a case that purges and then runs the verifier.
