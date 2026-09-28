@@ -6,6 +6,9 @@ import { projectPrefixesInWorkspace } from './visible-projects.js';
 import { ticketNumbers } from './ticket-numbers.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 
+/** A row before the deleter's name is joined on (`withDeleterNames`, below). */
+type UnnamedDeletedItem = Omit<DeletedItem, 'deletedByName'>;
+
 /**
  * `GET /v1/me/deleted-items` (trash series, Plan 1 Task 7, spec §6.3's read).
  *
@@ -30,7 +33,7 @@ import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
  * children, applied here by construction rather than by a second filter.
  */
 export async function readDeletedItems(db: Queryable, userId: string): Promise<DeletedItem[]> {
-  const items: DeletedItem[] = [];
+  const items: UnnamedDeletedItem[] = [];
 
   const { rows: memberships } = await db.query<{ workspace_id: string; role: string; deleted_at: Date | null }>(
     `SELECT m.workspace_id, m.role, pw.deleted_at
@@ -73,10 +76,10 @@ export async function readDeletedItems(db: Queryable, userId: string): Promise<D
   }
 
   items.sort((a, b) => (a.deletedAt < b.deletedAt ? 1 : a.deletedAt > b.deletedAt ? -1 : a.id < b.id ? -1 : 1));
-  return items;
+  return withDeleterNames(db, items);
 }
 
-async function deletedWorkspaceItem(db: Queryable, workspaceId: string): Promise<DeletedItem> {
+async function deletedWorkspaceItem(db: Queryable, workspaceId: string): Promise<UnnamedDeletedItem> {
   const identity = await workspaceIdentityFromLedger(db, workspaceId);
   const { rows } = await db.query<{ deleted_at: Date; deleted_by: string; purge_marked_at: Date | null }>(
     'SELECT deleted_at, deleted_by, purge_marked_at FROM proj_workspaces WHERE workspace_id = $1',
@@ -106,7 +109,7 @@ async function deletedWorkspaceItem(db: Queryable, workspaceId: string): Promise
   };
 }
 
-async function deletedProjectItems(db: Queryable, workspaceId: string, workspaceName: string): Promise<DeletedItem[]> {
+async function deletedProjectItems(db: Queryable, workspaceId: string, workspaceName: string): Promise<UnnamedDeletedItem[]> {
   const { rows } = await db.query<{
     project_id: string;
     name: string;
@@ -117,7 +120,7 @@ async function deletedProjectItems(db: Queryable, workspaceId: string, workspace
     'SELECT project_id, name, deleted_at, deleted_by, purge_marked_at FROM proj_projects WHERE workspace_id = $1 AND deleted_at IS NOT NULL',
     [workspaceId],
   );
-  const items: DeletedItem[] = [];
+  const items: UnnamedDeletedItem[] = [];
   for (const row of rows) {
     const purgeMarkedAt = row.purge_marked_at?.toISOString() ?? null;
     items.push({
@@ -153,7 +156,7 @@ async function deletedTicketItems(
   workspaceId: string,
   workspaceName: string,
   adminProjectIds: readonly string[] | null,
-): Promise<DeletedItem[]> {
+): Promise<UnnamedDeletedItem[]> {
   const params: unknown[] = [workspaceId];
   let projectFilter = '';
   if (adminProjectIds !== null) {
@@ -216,7 +219,7 @@ async function deletedNoteItems(
   workspaceId: string,
   workspaceName: string,
   deletedNotes: readonly { noteId: string; homeProjectId: string; title: string }[],
-): Promise<DeletedItem[]> {
+): Promise<UnnamedDeletedItem[]> {
   const { rows } = await db.query<{
     note_id: string;
     deleted_at: Date;
@@ -228,7 +231,7 @@ async function deletedNoteItems(
   const meta = new Map(rows.map((row) => [row.note_id, row]));
   const projectNames = await projectNamesInWorkspace(db, workspaceId);
 
-  const items: DeletedItem[] = [];
+  const items: UnnamedDeletedItem[] = [];
   for (const note of deletedNotes) {
     const row = meta.get(note.noteId);
     if (row === undefined) continue;
@@ -281,4 +284,23 @@ async function containedCount(
     total += Number(rows[0]!.count);
   }
   return total;
+}
+
+/**
+ * Joins each row's deleter onto a display name in ONE read (trash Plan 4, D1,
+ * case 19.206). `"user"` is better-auth's table; the LEFT-JOIN semantics of
+ * `routes/my-invitations.ts`'s `pendingFor` — a user who has gone is `null` —
+ * are reproduced by the `?? null` on the map lookup, and a blank name is `null`
+ * too (`NULLIF(btrim(…), '')`), so the screen says "someone" rather than
+ * printing an empty name.
+ */
+async function withDeleterNames(db: Queryable, items: readonly UnnamedDeletedItem[]): Promise<DeletedItem[]> {
+  if (items.length === 0) return [];
+  const ids = [...new Set(items.map((item) => item.deletedBy))];
+  const { rows } = await db.query<{ id: string; name: string | null }>(
+    `SELECT "id", NULLIF(btrim("name"), '') AS name FROM "user" WHERE "id" = ANY($1)`,
+    [ids],
+  );
+  const names = new Map(rows.map((row) => [row.id, row.name]));
+  return items.map((item) => ({ ...item, deletedByName: names.get(item.deletedBy) ?? null }));
 }

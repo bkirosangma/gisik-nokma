@@ -92,3 +92,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.202 — `Dialog role="alertdialog"` renders `role="alertdialog"` named by its title;** control: no `role` prop renders `role="dialog"`. Mutation: hard-code `role="dialog"`.
 - ✅ **19.203 — `Dialog describedBy` sets `aria-describedby`, so the panel's accessible description is that element's text;** control: without it the panel has no `aria-describedby` attribute. Mutation: drop the attribute.
 - ✅ **19.204 — `Button` forwards `ref` to its `<button>`;** control: the ref's element is the one the role query finds, with the variant class on it. Mutation: destructure `ref` out of the props and drop it.
+
+## 19.20 Deleted items — who deleted it
+
+- ✅ **19.206 — each row carries `deletedByName`: the deleter's name for a project the owner deleted and for one an admin deleted, and `null` once the admin's name is blank;** control: the two rows carry two different names (a join on the caller would give both the owner's). Mutation: join `"user"` on the CALLER's id instead of `deleted_by`.
+- ✅ **19.207 — the online mapper maps `deletedByName` and refuses a row without the key;** control: `null` round-trips as `null`. Mutation: default a missing `deletedByName` to `null`.

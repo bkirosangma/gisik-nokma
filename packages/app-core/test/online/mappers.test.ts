@@ -2847,6 +2847,7 @@ describe('19.070 mapDeletedItems maps every field and refuses a row missing purg
           projectName: 'Shop operations',
           label: 'CCSO-3 Renew the lease',
           deletedBy: 'usr1',
+          deletedByName: 'Kiro',
           deletedAt: '2026-09-28T10:00:00.000Z',
           purgeMarkedAt: '2026-09-28T11:00:00.000Z',
           purgeDueAt: '2026-10-13T11:00:00.000Z',
@@ -2880,6 +2881,19 @@ describe('19.070 mapDeletedItems maps every field and refuses a row missing purg
 
     // CONTROL: the identical row WITH the key parses.
     expect(() => mapDeletedItems(fullRow())).not.toThrow();
+  });
+
+  it('19.207 maps deletedByName, refuses a row WITHOUT the key, and keeps null as null', () => {
+    expect(mapDeletedItems(fullRow())[0]!.deletedByName).toBe('Kiro');
+
+    const withoutKey = fullRow() as { items: Record<string, unknown>[] };
+    delete withoutKey.items[0]!['deletedByName'];
+    expect(() => mapDeletedItems(withoutKey)).toThrow(MappingError);
+
+    // CONTROL — null is one of the two honest values (a blank or vanished name).
+    const nulled = fullRow();
+    nulled.items[0]!.deletedByName = null;
+    expect(mapDeletedItems(nulled)[0]!.deletedByName).toBeNull();
   });
 });
 

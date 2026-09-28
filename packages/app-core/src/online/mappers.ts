@@ -2915,6 +2915,7 @@ export function mapDeletedItems(raw: unknown): DeletedItem[] {
       projectName: asStringOrNull(item, 'projectName', `${path}.projectName`),
       label: asString(item['label'], `${path}.label`),
       deletedBy: asString(item['deletedBy'], `${path}.deletedBy`),
+      deletedByName: asStringOrNull(item, 'deletedByName', `${path}.deletedByName`),
       deletedAt: asString(item['deletedAt'], `${path}.deletedAt`),
       purgeMarkedAt: asStringOrNull(item, 'purgeMarkedAt', `${path}.purgeMarkedAt`),
       purgeDueAt: asStringOrNull(item, 'purgeDueAt', `${path}.purgeDueAt`),

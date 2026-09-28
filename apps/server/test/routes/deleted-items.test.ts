@@ -427,3 +427,31 @@ describe('19.067 a signed-out caller gets 401', () => {
     expect(status).toBe(200);
   });
 });
+
+describe('19.206 each row names who deleted it: deletedByName', () => {
+  it('19.206 the owner and an admin are each named on their own row; a blank name is null', async () => {
+    const owner = await signedIn();
+    const admin = await signedIn();
+    await db.pool.query('UPDATE "user" SET "name" = $2 WHERE "id" = $1', [owner.userId, 'Kiro']);
+    await db.pool.query('UPDATE "user" SET "name" = $2 WHERE "id" = $1', [admin.userId, 'Anselma Marak']);
+    const ws = await found(owner, 'Named deleters');
+    await seedMember(db.pool, ws, admin.userId, 'admin');
+    const byOwner = newUlid();
+    const byAdmin = newUlid();
+    await createProject(owner, ws, byOwner, 'Deleted by the owner');
+    await createProject(owner, ws, byAdmin, 'Deleted by the admin');
+    await deleteProject(owner, ws, byOwner);
+    await deleteProject(admin, ws, byAdmin);
+
+    let { items } = await deletedItems(owner);
+    // CONTROL in the same `it`: two rows, two DIFFERENT names — a join on the
+    // caller would name the owner on both.
+    expect(items.find((item) => item.id === byOwner)?.deletedByName).toBe('Kiro');
+    expect(items.find((item) => item.id === byAdmin)?.deletedByName).toBe('Anselma Marak');
+
+    await db.pool.query('UPDATE "user" SET "name" = $2 WHERE "id" = $1', [admin.userId, '   ']);
+    ({ items } = await deletedItems(owner));
+    expect(items.find((item) => item.id === byAdmin)?.deletedByName).toBeNull();
+    expect(items.find((item) => item.id === byOwner)?.deletedByName).toBe('Kiro');
+  });
+});
