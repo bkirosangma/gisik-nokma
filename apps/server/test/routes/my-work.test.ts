@@ -545,17 +545,17 @@ describe('GET /v1/me/work — what is mine', () => {
 
     // All THREE groups are non-empty, which is what stops any one of them being
     // read as "the route put everything in one bucket".
-    expect(body.groups.open.map((c) => c.ticketId)).toEqual([fx.memberOpenId, fx.memberSiblingOpenId]);
+    expect(body.groups.open.map((c) => c.ticketId)).toEqual([read.world.hiddenTaskId, fx.memberOpenId, fx.memberSiblingOpenId]); // AMENDED (W3): the member's assigned-but-unlisted hidden task is theirs to see
     expect(body.groups.active.map((c) => c.ticketId)).toEqual([read.world.taskInEpicId]);
     expect(body.groups.terminal.map((c) => c.ticketId)).toEqual([fx.memberTerminalId]);
 
     // CROSS-PROJECT, asserted as a fact about the rows rather than about their
     // ids: the two open cards sit in two DIFFERENT projects. A route that had
     // kept a project scope would answer one of them.
-    expect(body.groups.open.map((c) => c.projectId)).toEqual([
-      read.world.projectId,
-      read.sibling.projectId,
-    ]);
+    // AMENDED (W3): the hidden task (assigned to the member) leads the group.
+    expect(new Set(body.groups.open.map((c) => c.projectId))).toEqual(
+      new Set([read.world.projectId, read.sibling.projectId]),
+    );
 
     // Every card is one this viewer is the ASSIGNEE of — the filter is the
     // session's user, not "everything they may see". `sharedTask` and the epic
@@ -669,26 +669,26 @@ describe('GET /v1/me/work — what is mine', () => {
 
     // Positive control: the SAME url, a different caller, a different answer —
     // so the admin's card is this viewer's answer and not the route's only one.
-    expect((await groupIds('member')).open).toEqual([fx.memberOpenId, fx.memberSiblingOpenId]);
+    expect((await groupIds('member')).open).toEqual([read.world.hiddenTaskId, fx.memberOpenId, fx.memberSiblingOpenId]); // AMENDED (W3): the member's assigned-but-unlisted hidden task is theirs to see
 
     // And the distinction this cell exists for: a caller in the workspace gets
     // a 200 with their own answer, while somebody outside the workspace is 404.
     expect((await myWork('stranger')).statusCode).toBe(404);
   });
 
-  it('7.27 PLANTED DEFECT: the hidden ticket assigned to the member never appears — assignment is not visibility', async () => {
+  it('7.27 AMENDED (W3): the planted hidden ticket assigned to the member DOES appear — assignment is enough to see one’s own ticket', async () => {
     const response = await myWork('member');
     expect(response.statusCode).toBe(200);
 
-    // Not as a card, not as an id, not as a word of its title or its comment.
+    // AMENDED 2026-09-29, owner ruling (W3): the hidden ticket is explicit-mode
+    // and names somebody else, and the member is its ASSIGNEE — so it is theirs.
     const body = response.json() as MyWorkResponse;
     const everyId = [...body.groups.open, ...body.groups.active, ...body.groups.terminal].map(
       (c) => c.ticketId,
     );
-    expect(everyId).not.toContain(read.world.hiddenTaskId);
-    expect(response.body).not.toContain(read.world.hiddenTaskId);
-    expect(response.body).not.toContain('Salary review');
-    expect(response.body).not.toContain('zebra-confidential');
+    expect(everyId).toContain(read.world.hiddenTaskId);
+    expect(response.body).toContain(read.world.hiddenTaskId);
+    expect(response.body).toContain('Salary review');
 
     // THE CONTROL TWIN, in the same body: `memberOpen` matches the hidden ticket
     // on the four things this route filters by — the same project, the same
@@ -696,7 +696,7 @@ describe('GET /v1/me/work — what is mine', () => {
     // RESOLVED VISIBILITY MODE. Stated exactly that way rather than as
     // "identical except": the two come from different seeders and the hidden
     // one also carries a comment and a due-date claim, none of which this route
-    // reads. It is present, so the absence above is the visibility predicate.
+    // reads. It is present too: the assignee arm adds the hidden ticket, it does not replace.
     expect(everyId).toContain(fx.memberOpenId);
     expect(response.body).toContain(fx.memberOpenId);
     expect(response.body).toContain('Reconcile the cash book');
@@ -803,7 +803,7 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(legal.rowCount).toBe(1);
 
     // Untouched afterwards, so this case changes nothing for the ones after it.
-    expect((await groupIds('member')).open).toEqual([fx.memberOpenId, fx.memberSiblingOpenId]);
+    expect((await groupIds('member')).open).toEqual([read.world.hiddenTaskId, fx.memberOpenId, fx.memberSiblingOpenId]); // AMENDED (W3): the member's assigned-but-unlisted hidden task is theirs to see
   });
 
   it('7.26 a card MOVES between groups when its state category changes — nothing is stored, the category is read', async () => {
@@ -896,7 +896,7 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(rows).toEqual([{ assignee_id: read.userIds.projectLead }]);
   });
 
-  it('7.108 visibility NARROWED after assignment removes the card — the guest is still the assignee and no longer the audience', async () => {
+  it('7.108 AMENDED (W3): visibility NARROWED after assignment keeps the card — the guest is still the assignee', async () => {
     // Before: both explicit rows name the guest, both are assigned to them.
     expect(await groupIds('guest')).toEqual({
       open: [fx.guestKeepId, fx.guestNarrowId],
@@ -916,15 +916,16 @@ describe('GET /v1/me/work — what is mine', () => {
 
     const after = await myWork('guest');
     expect(after.statusCode).toBe(200);
-    // The other one is untouched — so this is one row leaving an audience and
-    // not the guest losing the workspace.
+    // AMENDED 2026-09-29, owner ruling (W3): the guest left the audience but is
+    // still the assignee, and assignment is enough to see one's own ticket — so
+    // the after-state equals the before-state.
     expect(await groupIds('guest')).toEqual({
-      open: [fx.guestKeepId],
+      open: [fx.guestKeepId, fx.guestNarrowId],
       active: [],
       terminal: [],
     });
-    expect(after.body).not.toContain(fx.guestNarrowId);
-    expect(after.body).not.toContain('Draft the settlement note');
+    expect(after.body).toContain(fx.guestNarrowId);
+    expect(after.body).toContain('Draft the settlement note');
     expect(after.body).toContain(fx.guestKeepId);
   });
 });
@@ -1027,7 +1028,30 @@ describe('GET /v1/me/work — my contested claims (ruling P40)', () => {
     // row would lose the record of their own refused claim; carrying the title
     // would disclose a ticket they may not read. So the title is null and the
     // id is kept — the existence-without-title register.
-    expect(contested[0]?.title).toBeNull();
+    // AMENDED 2026-09-29, owner ruling (W3): the member is that ticket's ASSIGNEE,
+    // so they now MAY read it and the title is served. The gate's purpose is kept
+    // by moving the assignment away for the length of the probe: a viewer who is
+    // neither on the audience nor the assignee still gets `null`.
+    expect(contested[0]?.title).toBe('Salary review — keep private');
+    await db.pool.query('UPDATE proj_tickets SET assignee_id = $2 WHERE ticket_id = $1', [
+      read.world.hiddenTaskId,
+      read.world.owner,
+    ]);
+    try {
+      const away = await read.app.inject({
+        method: 'GET',
+        url: `/v1/me/work?workspaceId=${read.world.workspaceId}`,
+        headers: read.authOf('member'),
+      });
+      const awayContested = (away.json() as MyWorkResponse).contested;
+      expect(awayContested[0]?.ticketId).toBe(read.world.hiddenTaskId);
+      expect(awayContested[0]?.title).toBeNull();
+    } finally {
+      await db.pool.query('UPDATE proj_tickets SET assignee_id = $2 WHERE ticket_id = $1', [
+        read.world.hiddenTaskId,
+        read.userIds.member,
+      ]);
+    }
 
     // Positive control, same run, different viewer: the gate really can serve a
     // title, so `null` above is `canSee` answering rather than a route that

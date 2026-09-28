@@ -175,6 +175,34 @@ export async function getResolvedVisibility(
 }
 
 /**
+ * THE ASSIGNEE ARM (owner ruling 2026-09-29, access plan W3): "if an assignee is
+ * assigned, even if that person does not have visibility to the workspace or
+ * project, they can still get visibility to just that single ticket."
+ *
+ * Kept OUT of `canSeeResolved` deliberately. That function is the AUDIENCE
+ * rule, and it has callers that must not widen with an assignment:
+ * `canReadNote`'s inherit arm (a note is not opened by assigning its ticket),
+ * the rollup's `restrictedCount` and the restricted-parent chip (the ticket's
+ * relatives are not opened either). `canSee` — the one-ticket question — is the
+ * only reader that ORs this in; its SQL twin is `assigneeArmWhere`.
+ *
+ * A workspace role is still required: an assignee put out of the workspace keeps
+ * their name on the head row (`membership.revoked` touches no ticket) and sees
+ * nothing (case 6.193).
+ */
+export function assigneeSees(eff: EffectiveRole, userId: string, assigneeId: string | null): boolean {
+  return eff.workspaceRole !== null && assigneeId !== null && assigneeId === userId;
+}
+
+async function currentAssignee(db: Queryable, ticketId: string): Promise<string | null> {
+  const { rows } = await db.query<{ assignee_id: string | null }>(
+    'SELECT assignee_id FROM proj_tickets WHERE ticket_id = $1',
+    [ticketId],
+  );
+  return rows[0]?.assignee_id ?? null;
+}
+
+/**
  * May this user see this ticket?
  *
  * ## Membership is read through `resolveEffectiveRole`, never by a direct
@@ -248,6 +276,11 @@ export async function getResolvedVisibility(
  * ticket the viewer may not see. Task 8's route turns both into the same 404,
  * so a member probing ids learns nothing; giving them different answers here
  * would put the oracle one layer down instead of removing it.
+ *
+ * ## The assignee arm (W3)
+ *
+ * `canSeeResolved` OR `assigneeSees`. The head row's CURRENT `assignee_id` is
+ * read, so reassigning takes the ticket away at once.
  */
 export async function canSee(db: Queryable, userId: string, ticketId: string): Promise<boolean> {
   const v = await getResolvedVisibility(db, ticketId);
@@ -255,5 +288,7 @@ export async function canSee(db: Queryable, userId: string, ticketId: string): P
     return false;
   }
   const eff = await resolveEffectiveRole(db, userId, v.workspaceId);
-  return canSeeResolved(eff, userId, v);
+  if (canSeeResolved(eff, userId, v)) return true;
+  // Only when the audience says no — the common answer costs no second read.
+  return assigneeSees(eff, userId, await currentAssignee(db, ticketId));
 }
