@@ -7,6 +7,7 @@ import type {
   AttentionResponse,
   BoardResponse,
   BoardTicketCard,
+  DeletedItemsRead,
   MemberListResponse,
   ListCard,
   ListResponse,
@@ -24,6 +25,7 @@ import {
   mapActors,
   mapAttention,
   mapBoardView,
+  mapDeletedItems,
   mapHistory,
   mapIngestResults,
   mapListPage,
@@ -2824,6 +2826,60 @@ describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
     // assertions above would also pass if `mapWorkspaceRefs` refused this body
     // for an unrelated reason.
     expect(() => mapWorkspaceRefs(body([row({})]))).not.toThrow();
+  });
+});
+
+/**
+ * 19.070-19.071 — `GET /v1/me/deleted-items` → `DeletedItem[]` (trash series,
+ * Plan 1 Task 8). Only the online twin's mapper is exercised here; the
+ * replica twin's `ReplicaGapError` is 19.071, in `replica-data-source.test.ts`.
+ */
+describe('19.070 mapDeletedItems maps every field and refuses a row missing purgeDueAt', () => {
+  function fullRow(): DeletedItemsRead {
+    return {
+      items: [
+        {
+          kind: 'ticket',
+          id: 'tkt1',
+          workspaceId: 'ws1',
+          workspaceName: 'Convenience Corner',
+          projectId: 'prj1',
+          projectName: 'Shop operations',
+          label: 'CCSO-3 Renew the lease',
+          deletedBy: 'usr1',
+          deletedAt: '2026-09-28T10:00:00.000Z',
+          purgeMarkedAt: '2026-09-28T11:00:00.000Z',
+          purgeDueAt: '2026-10-13T11:00:00.000Z',
+          containedCount: 0,
+        },
+      ],
+    };
+  }
+
+  it('a full row round-trips', () => {
+    expect(mapDeletedItems(fullRow())).toEqual(fullRow().items);
+  });
+
+  it('null is a real value for projectId/projectName/purgeMarkedAt/purgeDueAt, not a MappingError', () => {
+    const body = fullRow();
+    const [item] = body.items;
+    item!.projectId = null;
+    item!.projectName = null;
+    item!.purgeMarkedAt = null;
+    item!.purgeDueAt = null;
+    expect(mapDeletedItems(body)).toEqual(body.items);
+  });
+
+  it('refuses a row missing purgeDueAt rather than defaulting it to null', () => {
+    const body = fullRow() as { items: Record<string, unknown>[] };
+    delete body.items[0]!['purgeDueAt'];
+    expect(() => mapDeletedItems(body)).toThrow(MappingError);
+    // The path, so the failure says WHICH row forgot it — the same discipline
+    // `mapWorkspaceRefs`'s description case (13.983) holds itself to.
+    expect(() => mapDeletedItems(body)).toThrow(/items\[0\]\.purgeDueAt/);
+
+    // CONTROL: the identical row WITH the key parses.
+    expect(() => mapDeletedItems(fullRow())).not.toThrow();
   });
 });
 
