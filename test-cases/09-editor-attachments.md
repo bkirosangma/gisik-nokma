@@ -567,3 +567,13 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - 🧪 **9.430 — browser: type in a note, kill the network, reload — the note opens with the banner in both themes, the accent stripe and both buttons legible, Keep and Discard reachable by Tab and their focus ring visible.**
 - ✅ **9.431 — the editor skin styles all six heading levels: sizes never grow going down and step through more than three values, none is below `0.875rem`, H6 is `--gn-text-muted`, and H4–H6 use no colour literal.** (`apps/web/test/draft-restore-banner.test.tsx`)
 - 🧪 **9.432 — browser, light AND dark: a note holding one heading of each level H1–H6 reads as a descending ladder, H4–H6 distinguishable from body text by weight, and a heading that wraps onto two lines keeps its line height.**
+
+## Collapsible fold control (owner report 2026-09-29) — block `9.451`–`9.455`
+
+*Allocated against `origin/release/trash` (tip `9.432`; `9.433`–`9.450` are `task/kb-editor-parity`'s reserved block and are not touched). The fold button the Details node view renders is empty and the stylesheet drew nothing, so it was a 0 × 0 box.*
+
+- ✅ **9.451 — the fold button's rule gives it a hit area of at least 24 px, a `::before` chevron with content, an open-state rule that turns it (a different `rotate()`), a `:focus-visible` outline, room for it in the summary's padding, and a `prefers-reduced-motion` opt-out of the turn.** Mutation: drop the chevron's `content` → red. (`packages/editor/test/collapsible.test.ts`)
+- ✅ **9.452 — `aria-expanded` follows the block ("true" open, "false" folded); a click folds it (body `hidden`, `open: false` in the document) and unfolds it; a document saved folded arrives folded.** Mutation: remove `aria-expanded` from `renderToggleButton` → red. (`packages/editor/test/collapsible.test.ts`)
+- ✅ **9.453 — in a read-only rendering the button folds and unfolds the body too (a reader starts folded), and the document is unchanged.** (`packages/editor/test/collapsible.test.ts`)
+- ✅ **9.454 — Enter and Space on the focused fold button toggle it once and add or split no block; control: Enter in the summary still goes into the body and does not toggle (9.269).** Mutation: skip the key handler → red. (`packages/editor/test/collapsible.test.ts`)
+- 🧪 **9.455 — browser: a note holding a collapsible shows a chevron at the block's top-left, pointing down when open; click, Enter and Space each fold or unfold it once; focus stays on the button after a key; the ring is visible when tabbed to.** Measured 2026-09-29 on the webview build (0 × 0 before, 24 × 24 after; real Enter/Space via the browser); `/notes` in both themes not painted by the lane.

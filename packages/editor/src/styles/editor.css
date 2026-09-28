@@ -931,6 +931,8 @@
   border-radius: 8px;
   padding: 6px 10px;
   margin: 8px 0;
+  /* The containing block of the fold button, which is taken out of flow below. */
+  position: relative;
 }
 /* ⚠ THE SELECTOR HERE WAS `.editor-details > summary` AND IT MATCHED NOTHING.
    The Details extension renders a NODE VIEW, and its DOM is
@@ -947,6 +949,11 @@
    nothing is red rather than merely present. */
 .editor-details summary {
   font-weight: 600;
+  /* Room for the fold button (1.5rem wide, placed at the block's left edge)
+     and a line box the height of that button, so the chevron sits on the
+     title's first line rather than between two. */
+  padding-left: 1.75rem;
+  line-height: 1.5rem;
 }
 /* THE FOLD CONTROL IS THE BUTTON, NOT THE SUMMARY — measured: clicking the
    button dispatches the document change, and the summary is not clickable at
@@ -959,6 +966,49 @@
   background: none;
   padding: 0;
   cursor: pointer;
+  /* ⚠ THE BUTTON IS EMPTY — the Details extension renders it with no content
+     and leaves the indicator to the host stylesheet, and this rule used to
+     stop at the reset above, which left a 0 x 0 box: a control nobody could
+     see or press (owner: "i dont see anyway i can collapse the section").
+     Measured at 0 x 0 in a browser before, 24 x 24 after. 24px is WCAG 2.2's
+     minimum target size; the chevron is the `::before` below. It is placed
+     absolutely so the summary keeps its own line box. */
+  position: absolute;
+  top: 6px;
+  left: 6px;
+  width: 1.5rem;
+  height: 1.5rem;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: inherit;
+  border-radius: 4px;
+}
+/* The chevron: two edges of a square, drawn in `currentColor` like every other
+   edge here. Turned so it points RIGHT when folded and DOWN when open — a 90°
+   turn, which is the disclosure convention. */
+.editor-details > button::before {
+  content: '';
+  width: 0.5em;
+  height: 0.5em;
+  border-right: 2px solid currentColor;
+  border-bottom: 2px solid currentColor;
+  transform: rotate(-45deg);
+  transition: transform 150ms ease;
+}
+.editor-details.is-open > button::before {
+  transform: rotate(45deg);
+}
+/* This button is the ONLY way to fold, so keyboard focus must be visible. The
+   colour is the host's (`currentColor` here; the web skin names its ring). */
+.editor-details > button:focus-visible {
+  outline: 2px solid currentColor;
+  outline-offset: 1px;
+}
+@media (prefers-reduced-motion: reduce) {
+  .editor-details > button::before {
+    transition: none;
+  }
 }
 /* ⚠ A PLACEHOLDER RULE STOOD HERE AND WAS REMOVED AS DEAD CSS, and the way it
    failed is the reason this note is this long.

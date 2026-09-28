@@ -1532,7 +1532,14 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 - ✅ **A collapsible block** — start a line with `< `, the rest of the line is the title, Enter moves
   into the body, Enter on an empty last line leaves the block, Backspace in an empty summary removes
   it; the folded state is saved with the document for an editor and is view-only for a reader
-  (spec §8.4). `packages/editor/src/extensions/collapsible.ts`
+  (spec §8.4). **The fold control is a visible 24 × 24 chevron** (owner: "i dont see anyway i can
+  collapse the section", 2026-09-29): the Details node view renders its `<button>` empty and the
+  stylesheet drew nothing, so it measured 0 × 0. It now points right when folded and down when open,
+  carries `aria-expanded`, a focus ring and hover fill, and Enter/Space on it fold and unfold without
+  editing the note (ProseMirror used to consume the key and split a block). The chevron is the only
+  fold control — clicking the title places the caret, because the title is editable text.
+  `packages/editor/src/extensions/collapsible.ts`, `packages/editor/src/styles/editor.css`,
+  `apps/web/app/globals.css`
 - ✅ **Wiki-links between notes** — type `[[` to pick a note; the link stores the note id and the title
   it had, follows renames through `resolveNoteTitle`, hovers a preview card, and renders as a missing
   pill when the target is gone or unreadable (spec §8.5). **The pill is not red**, which is a deviation

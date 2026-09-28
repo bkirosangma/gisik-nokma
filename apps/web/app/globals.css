@@ -4013,6 +4013,20 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-fill-quaternary);
   border: none;
 }
+/* The fold button's states (the shape and size are editor.css's): the chevron
+   reads as secondary ink until the pointer or keyboard is on it, and the ring
+   is the house focus ring. */
+.ticket-editor__content .editor-details > button {
+  color: var(--gn-text-muted);
+}
+.ticket-editor__content .editor-details > button:hover {
+  background: var(--gn-fill-tertiary);
+  color: inherit;
+}
+.ticket-editor__content .editor-details > button:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
 
 /* Chips: distinguished from plain text and from each other WITHOUT colour
    alone (house rule), and never underlined on hover (the note-badge rule,
