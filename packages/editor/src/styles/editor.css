@@ -707,6 +707,25 @@
   margin-top: 0;
   border-radius: 0;
 }
+/* THE TOOLTIP OPENS BELOW HERE (owner, 2026-09-29: the note editor and the note
+   comment editor showed no toolbar tooltip). The default placement above is
+   `bottom: 100%` — and in a slot the toolbar is the TOP row of a wrapper that is
+   `overflow: hidden`, so the whole panel sat above the clip edge (measured:
+   tooltip 171.4–200.0px, slot top 200.0px) and was clipped away. Every composer
+   host is a slot, so this is the fix at the cause, not per host; the wrapper
+   keeps its clip (it owns the corners). Below the button is inside the box.
+   Left-anchored to the button rather than centred: a button 8px from the slot's
+   left edge would lose the left third of a centred panel to the same clip. A
+   panel that still overshoots the right edge (a long name on a wrapped row, the
+   last button) is shifted back in by `ToolButton`'s layout effect, which can
+   measure where CSS cannot. */
+.editor-slot .ticket-editor__tooltip {
+  top: 100%;
+  bottom: auto;
+  left: 0;
+  transform: none;
+  margin: 6px 0 0;
+}
 /* The prototype's field: the typing area IS the box, set at the 17px/22px step
    the rest of the sheet's reading text uses.
 
