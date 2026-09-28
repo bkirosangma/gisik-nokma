@@ -63,3 +63,45 @@ beforeEach(() => {
  * set here.
  */
 (globalThis as { IS_REACT_ACT_ENVIRONMENT?: boolean }).IS_REACT_ACT_ENVIRONMENT = true;
+
+/**
+ * THE jsdom SHIMS PROSEMIRROR AND POPUP POSITIONING NEED — copied from
+ * `packages/editor/test/setup.ts`, which carries the same block for the same
+ * reason (its own docblock): jsdom implements none of
+ * `getClientRects`/`getBoundingClientRect`/`scrollIntoView`, so ProseMirror's
+ * `coordsAtPos` (reached from `commands.focus('end')`, case 13.1488) and
+ * suggestion-popup positioning throw under test. Guarded with `if (!…)`
+ * rather than assigned outright, so a future jsdom that implements one keeps
+ * its own. `Element.prototype.scrollTo` is the ONE addition beyond the
+ * editor package's set — `ReadingTOC.tsx`'s own click handler (case 13.1483)
+ * calls `root.scrollTo(...)` on the scroll CONTAINER, a plain `scrollTo`,
+ * not `scrollIntoView`.
+ */
+const emptyRectList = (): DOMRectList =>
+  Object.assign([], { item: () => null }) as unknown as DOMRectList;
+
+const emptyRect = (): DOMRect =>
+  ({
+    top: 0,
+    bottom: 0,
+    left: 0,
+    right: 0,
+    width: 0,
+    height: 0,
+    x: 0,
+    y: 0,
+    toJSON: () => ({}),
+  }) as DOMRect;
+
+if (!Range.prototype.getClientRects) Range.prototype.getClientRects = emptyRectList;
+if (!Element.prototype.getClientRects) Element.prototype.getClientRects = emptyRectList;
+if (!Range.prototype.getBoundingClientRect) Range.prototype.getBoundingClientRect = emptyRect;
+if (!Element.prototype.scrollIntoView) Element.prototype.scrollIntoView = function () {};
+if (!Element.prototype.scrollTo) Element.prototype.scrollTo = function () {};
+if (!('ResizeObserver' in globalThis)) {
+  (globalThis as { ResizeObserver?: unknown }).ResizeObserver = class {
+    observe(): void {}
+    unobserve(): void {}
+    disconnect(): void {}
+  };
+}

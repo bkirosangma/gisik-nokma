@@ -1,4 +1,5 @@
-// Types for the two exports `packages/app-core/test/help/corpus-vs-product.test.ts` imports (F2).
+// Types for the exports app-core's test suite imports (F2; extended for the
+// help-notes task's `notes-sections-quoted-strings.test.ts`).
 // The script itself is untyped `.mjs`; app-core's typecheck includes `test/`, so the import needs a declaration.
 export function quotedSpans(text: string): string[];
 export function compareAbsent(args: {
@@ -10,3 +11,6 @@ export function compareAbsent(args: {
   undeclared: Array<{ source: string; span: string }>;
   resolved: string[];
 };
+// Walks `root`'s `apps/` + `packages/` trees and returns every product file's
+// text, joined — the haystack `compareAbsent` looks a quoted string up in.
+export function productText(root: string): string;

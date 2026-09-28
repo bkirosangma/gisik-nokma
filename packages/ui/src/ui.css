@@ -1170,6 +1170,98 @@ a.gn-ticket-sheet__crumb--link {
    the rest. Case 13.464 asserts the ABSENCE of a `border-radius` declaration
    here, so a future round cannot quietly reintroduce the literal. */
 .gn-board-card { padding: 0.875rem; }
+/* The priority card tint (owner request, 2026-09-23: "the entire card
+   surface is tinted by priority"). TWO layers, not one: a `linear-gradient`
+   of the alpha wash repeated as both stops, painted OVER the opaque
+   `--gn-surface-raised` `.gn-card` already sets — never the wash alone as
+   `background`, which would composite against whatever sits BEHIND this
+   card in the DOM (`.gn-board__column`'s `--gn-surface-sunken`, a colour
+   this feature was never measured against). The measured ground is the
+   CARD's own surface, exactly as `tokens.ts`'s
+   `priorityTintP1Light`/etc. docblock states and `tokens.test.ts`'s
+   "the priority tint composites legibly…" suite proves. Equal specificity to
+   `.gn-card`'s own rule (both single-class), so source order is what makes
+   this win — declared after it, like every other `.gn-board-card` rule in
+   this file. */
+.gn-board-card--p1 {
+  background: linear-gradient(var(--gn-priority-p1-tint), var(--gn-priority-p1-tint)), var(--gn-surface-raised);
+}
+.gn-board-card--p2 {
+  background: linear-gradient(var(--gn-priority-p2-tint), var(--gn-priority-p2-tint)), var(--gn-surface-raised);
+}
+.gn-board-card--p3 {
+  background: linear-gradient(var(--gn-priority-p3-tint), var(--gn-priority-p3-tint)), var(--gn-surface-raised);
+}
+/* The epic chip (owner ruling, 2026-09-23: the card's TOP LINE, above the
+   title — a flag icon + the epic's title, truncated). A real button, not a
+   label: it opens the epic's sheet. `min-height` is the SAME dense-in-list
+   24px floor `.gn-board-card__provenance` below already uses — a bare text
+   disclosure on the densest surface in the product, not this card's own
+   open control. `max-width: 100%` plus the title span's own
+   `text-overflow` is what keeps a long epic name from pushing the card
+   wider than its column.
+   `display: flex` — CORRECTED 2026-09-23 (owner bug report, case
+   13.1467/13.1468): this was `inline-flex`, and `.gn-board-card` itself
+   sets only padding (no `display: flex` of its own), so the chip shared a
+   line with the next sibling — `.gn-board-card__title`, a `<button>`,
+   inline-level by default — whenever both fit. `width: fit-content` keeps
+   the now-block-level chip's own hit area (and its focus ring) sized to
+   its content instead of stretching to the card's full width. */
+.gn-board-card__epic {
+  display: flex;
+  width: fit-content;
+  align-items: center;
+  gap: 0.25rem;
+  max-width: 100%;
+  min-height: 1.5rem;
+  margin: 0 0 0.3rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-board-card__epic:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 1px; }
+.gn-board-card__epic-title {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+/* The parent-key badge (owner request, 2026-09-23), LEFT of the card's own
+   key in the keys row below — a real button, clickable, that opens the
+   parent's sheet. `--gn-text-accent` (a link colour, not the row's own muted
+   ink) is what tells it apart from the plain `key`/`due` text beside it at a
+   glance, the same role `.gn-board-card__move`'s own label already draws in
+   this ink. */
+.gn-board-card__parent-key {
+  display: inline-flex;
+  align-items: center;
+  min-height: 1.5rem;
+  padding: 0;
+  border: none;
+  background: none;
+  font: inherit;
+  font-size: 0.8rem;
+  font-weight: 600;
+  color: var(--gn-text-accent);
+  cursor: pointer;
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+.gn-board-card__parent-key:hover { text-decoration: none; }
+/* ONE rule for this selector, not two — `rule()` (`components.test.tsx`) is
+   a first-match substring regex with no selector parser and no comment
+   stripping, so a second declaration block using this same selector text
+   ANYWHERE later in this file — even inside a comment — would silently
+   steal every future lookup of it that landed on it first in source order. */
+.gn-board-card__parent-key:focus-visible {
+  text-decoration: none;
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
 /* Spec row "Card, in transit": a dashed warning outline. `card.pending` is
    already read by `BoardCardView` (board.tsx, the "claim in transit" chip) —
    wired onto the card container's className alongside `gn-board-card` rather
@@ -1243,20 +1335,60 @@ a.gn-ticket-sheet__crumb--link {
    small label needs 4.5, and the pair is the same one.  */
 .gn-board-card__due { color: var(--gn-text-muted); font-size: 0.8rem; }
 .gn-board-card__due--late { color: var(--gn-danger); font-weight: 600; }
-/* The prototype's meta line under the chips (`desktop.dc.html:2496-2504`), key first
-   (owner, 2026-09-22). One muted 13px run — `GN-1101 · 19 Oct 2026` — in the ink the
-   due label already wears, so the two halves read as one sentence; the late tone on
-   the due half stays its own. */
-.gn-board-card__meta-line { margin: 0.25rem 0 0; font-size: 0.8rem; line-height: 1.125rem; color: var(--gn-text-muted); }
+/* THE KEYS ROW (owner request, 2026-09-23; formerly "the prototype's meta
+   line under the chips", `desktop.dc.html:2496-2504`, key first, owner
+   2026-09-22): `[parent key badge] key [priority badge]`, then the due
+   label. SUPERSEDED FROM A PLAIN INLINE PARAGRAPH TO A FLEX ROW — this line
+   now holds real `<button>`s (the parent badge, the priority badge is not
+   one but still needs icon+text layout) beside the plain `key`/`due` text
+   runs, which an inline `<p>` cannot lay out with consistent baseline
+   alignment and a controlled gap the way `flex` can. `flex-wrap: wrap` is
+   the same defensive call `.gn-board__rail`/`.gn-board-card__meta` already
+   make: a card is a fixed-width column, and a long key or a long badge
+   set must not overflow it. The key/due pair still reads as "one sentence"
+   in the muted ink `.gn-board-card__key`/`.gn-board-card__due` set on
+   themselves, with `·` still the explicit separator BETWEEN THEM — the
+   badges beside them are visually distinct pills/links, so `gap` alone
+   separates those, the same idiom `.gn-board-card__meta` above already
+   uses for its own row of chips. */
+.gn-board-card__meta-line {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 0.375rem;
+  margin: 0.25rem 0 0;
+  font-size: 0.8rem;
+  line-height: 1.125rem;
+  color: var(--gn-text-muted);
+}
 .gn-board-card__key { color: var(--gn-text-muted); }
 .gn-board-card__meta-sep { color: var(--gn-text-muted); }
-/* Spec 2026-09-22: every card carries a priority, and P1 takes the SAME ink the
-   late due label uses — the pair measured in the block above, on the same
-   ground, clearing 4.5 in all six style×theme combinations. P2 is the default
-   and is drawn (the level is a fact on every card) but not emphasised: a badge
-   that shouted on every card would say nothing. */
-.gn-board-card__priority { color: var(--gn-text-muted); font-size: 0.8rem; font-weight: 600; }
+/* THE PRIORITY BADGE (owner request, 2026-09-23, superseding spec
+   2026-09-22's "only P1 takes the tone" — see case 13.1451/13.1452's own
+   citation of the superseded cases). Every level now carries its own icon
+   AND its own ink — P1 red fire, P2 green leaf, P3 frozen-blue snowflake —
+   because the tinted card SURFACE is now the thing that would make a
+   uniformly-muted badge invisible on its own ground; the badge's job moved
+   from "the only priority signal" to "the LEGIBLE one on a coloured card",
+   which every level needs equally. `display: inline-flex` lays the icon
+   beside the text with a small `gap`; the icon inherits this element's own
+   `color` via `currentColor` (`packages/ui/src/icons/priority-icons.tsx`),
+   so one declaration per modifier sets both. P1/P2 reuse the EXISTING
+   `danger`/`success` roles — "reuses the … family" in the literal sense,
+   not merely a similar hue — already measured against this card's tinted
+   ground by `tokens.test.ts`'s "the priority tint composites legibly…"
+   suite; P3 is the one new ink role, `--gn-priority-p3`, measured there too. */
+.gn-board-card__priority {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.2rem;
+  color: var(--gn-text-muted);
+  font-size: 0.8rem;
+  font-weight: 600;
+}
 .gn-board-card__priority--p1 { color: var(--gn-danger); }
+.gn-board-card__priority--p2 { color: var(--gn-success); }
+.gn-board-card__priority--p3 { color: var(--gn-priority-p3); }
 .gn-board-card__provenance {
   font: inherit;
   font-size: 0.78rem;
@@ -2318,6 +2450,11 @@ a.gn-ticket-sheet__crumb--link {
    change. A distinct class keeps both rules addressable, and `.gn-field__input`
    still supplies the box itself. */
 .gn-ticket-sheet__subtask-add .gn-ticket-sheet__subtask-input { flex: 1; min-width: 12.5rem; }
+/* The ticket's Notes section (notes series, Plan 6 of 7, spec §10.1) — the
+   caption is `.gn-ticket-sheet__caption`, already shared with Subtasks and
+   Comments, so only the badge row and the Attach button need their own rule. */
+.gn-ticket-sheet__note-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0.5rem 0; }
+.gn-ticket-sheet__attach { margin-top: 0.5rem; }
 button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }
@@ -2601,12 +2738,17 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    ⚠ AND THE TINTED FILL IS NOT TRANSCRIBED, for a reason that lives elsewhere
    and is named here so the omission does not read as an oversight: the
    prototype paints the restricted pill `--tintPurple`/`--purple` and the open
-   one `--tintSuccess`/`--success`. **This product has no tint role for either**
+   one `--tintSuccess`/`--success`. **This pill has no tint role for either**
    — `tokens.ts` records that the export's `--tintDanger`/`--tintPink`/
-   `--tintPurple`/`--tintSuccess` washes were deliberately not ported, and
-   `tintWarning` is the only wash that exists. Inventing a purple wash to match
-   a prototype would be adding a token on a styling task's authority, so the
-   pill takes a neutral fill and the TONE is carried by the dot alone. */
+   `--tintPurple`/`--tintSuccess` washes were deliberately not ported here.
+   Inventing a purple wash to match a prototype would be adding a token on a
+   STYLING TASK's authority, so the pill takes a neutral fill and the TONE is
+   carried by the dot alone. **UPDATED 2026-09-23**: `tintWarning` is no
+   longer the only wash — the board card's priority tint
+   (`priorityP1Tint`/`priorityP2Tint`/`priorityP3Tint`, `tokens.ts`) exists
+   now, scoped to that ONE owner-authorised feature. It is not a general
+   `tintDanger`/`tintSuccess` this pill could reach for: the refusal above
+   still holds for anything reached on a styling task's own authority. */
 .gn-visibility__standing-mode {
   display: inline-flex;
   align-items: center;
@@ -2906,6 +3048,7 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-state-node__initial-badge { color: var(--gn-text-accent); font-size: 0.75rem; font-weight: 600; }
 .gn-state-node__category { display: flex; flex-direction: column; gap: 0.1rem; margin-top: 0.4rem; font-size: 0.8rem; color: var(--gn-text-muted); }
 .gn-state-node__blocked { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
+.gn-state-node__creatable { display: flex; align-items: center; gap: 0.3rem; margin-top: 0.4rem; font-size: 0.8rem; }
 
 .gn-any-state-node {
   background: var(--gn-surface-raised);
@@ -7086,6 +7229,11 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    the title (`renderNode`), so the ink is the only thing this adds — the
    accent and the wrap come from `.gn-comment__body a` above. */
 .gn-comment__wikilink { overflow-wrap: anywhere; }
+/* The ticket-ref chip (spec §14.2, Plan 7 Task 3): the same reasoning as the
+   wiki-link rule above — the link is what carries the accent and the wrap
+   (`.gn-comment__body a`), this rule only adds the one thing a span rendering
+   still needs. */
+.gn-comment__ticketref { overflow-wrap: anywhere; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {
@@ -7153,8 +7301,33 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   text-decoration: none;
 }
 
+/* NO underline on hover any more (owner request, task/notes-badge-sheet,
+   2026-09-24): the title now opens the ticket sheet in place rather than
+   navigating, and underline-on-hover-then-gone read as "this is about to
+   take you somewhere", which is no longer what a plain click does. */
 .gn-note-badge__title:hover {
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+/* The affordance replacing the underline, on the CHIP rather than the title
+   alone: `.gn-note-badge__title` carries no padding of its own (only the
+   parent does), so a background painted on the title alone would be a
+   sharp-cornered patch tight around the glyphs. A `filter`, not a hard-coded
+   background token, because this chip paints one of FIVE tints
+   (`--private`/`--workspace`/`--project`/`--inherit`/`--explicit`, below) —
+   a fixed hover background would be a no-op on `--inherit` (already
+   `--gn-fill-secondary`) and would repaint the × in the exact colour its own
+   `:hover` rule already uses. `brightness` shifts background AND ink
+   together, by the same ratio, whichever tint is underneath, and needs no
+   new entry in `CONTRAST_PAIRS` (a relative filter, not a new named pair). */
+.gn-note-badge:hover {
+  filter: brightness(0.95);
+}
+
+.gn-note-badge__title:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+  text-decoration: none;
 }
 
 /* The ✕. A 1.5rem square — under the 2.75rem tap floor the nav's own rule sets,

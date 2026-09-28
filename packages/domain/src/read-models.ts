@@ -259,6 +259,36 @@ export type TicketCard = {
  * alternative, carrying the workflow's LATEST version on a column no definition
  * names, would file that column under a definition it was never folded into.
  */
+/**
+ * A `TicketCard` plus the two hierarchy facts the BOARD — and only the board —
+ * also serves (owner request, 2026-09-23: parent-key badge, epic chip). The
+ * SAME reasoning `ListCard`'s own docblock states for why it is a separate
+ * type and not two fields on `TicketCard` applies here word for word:
+ * `TicketCard` is shared by search, My Work and the attention strip, and a
+ * field addition that closes a gap on the board would half-close a
+ * differently-shaped one on three surfaces that never asked for it.
+ *
+ * - `parent` — this ticket's IMMEDIATE parent, or `null` when it has none OR
+ *   this viewer may not see it. Unlike `TicketCard.parentId` (an existence
+ *   leak the single-ticket read deliberately makes, spec §6), the board makes
+ *   NO existence leak at all: an unreadable parent is indistinguishable from
+ *   no parent, exactly the choice `ListCard.epicId` already makes for the
+ *   epic walk one ancestor further up. A parent badge naming a ticket this
+ *   viewer cannot open would BE a leak, so this field follows the epic rule
+ *   rather than the single-ticket route's.
+ * - `epic` — the nearest ancestor-or-self whose type carries the EPIC rank AND
+ *   which this viewer may see; `null` when there is none or the walk is
+ *   stopped by a link the viewer may not follow. Exactly `epicId`'s own rule
+ *   (`ancestry.ts`'s `epicAncestors`), widened to also carry the `key` and
+ *   `title` the board's chip needs to draw ITSELF — `ListCard.epicId` never
+ *   needed a title on the card because the list only draws it once, on the
+ *   GROUP heading, not per card.
+ */
+export type BoardTicketCard = TicketCard & {
+  parent: { ticketId: string; key: string | null } | null;
+  epic: { ticketId: string; key: string | null; title: string } | null;
+};
+
 export type BoardColumn = {
   workflowId: string;
   workflowName: string;
@@ -267,7 +297,16 @@ export type BoardColumn = {
   name: string;
   category: StateCategory;
   blocked: boolean;
-  cards: TicketCard[];
+  /**
+   * Whether a NEW ticket may be born in this state (starting-status design,
+   * 2026-09-23) — `isCreatableState(def, stateId)`, read straight off the
+   * published definition the same way `blocked` is, immediately above. The
+   * board's empty-column "Add a ticket" button reads this rather than
+   * re-deriving it, so the client and the server can never disagree about
+   * which columns may receive a new ticket.
+   */
+  creatable: boolean;
+  cards: BoardTicketCard[];
 };
 
 export type BoardResponse = { projectId: string; workspaceId: string; columns: BoardColumn[] };
@@ -801,6 +840,11 @@ export type MigrationOutcome =
  * which is why the field is on the READ model and not derived client-side from
  * an id list.
  *
+ * `projectId` was added additively (notes series, Plan 6 of 7) so a note's
+ * byline can link to the ticket's own project page (`ticketSheetPath`) instead
+ * of the id-only My Work door — the same reason `key` and `title` are carried
+ * rather than looked up.
+ *
  * `NoteVersion` is a POINTER, not a snapshot: a version is an event, and the
  * history screen lists pointers until one is opened, at which point
  * `getNoteVersion` fetches that event's body. Storing every version's body in
@@ -818,7 +862,7 @@ export type NoteSummary = {
   authorId: string;
   title: string;
   scope: NoteScope;
-  attachedTickets: { ticketId: string; key: string; title: string }[];
+  attachedTickets: { ticketId: string; projectId: string; key: string; title: string }[];
   deleted: boolean;
   createdAt: string;
   updatedAt: string;

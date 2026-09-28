@@ -173,12 +173,17 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
         name: c.name,
         category: c.category,
         blocked: c.blocked,
+        creatable: c.creatable,
       })),
     ).toEqual([
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'todo', name: 'To do', category: 'open', blocked: false },
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'doing', name: 'Doing', category: 'active', blocked: false },
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true },
-      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'done', name: 'Done', category: 'terminal', blocked: false },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'todo', name: 'To do', category: 'open', blocked: false, creatable: true },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true },
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'waiting', name: 'Waiting on counterparty', category: 'active', blocked: true, creatable: true },
+      // 13.1434's server half — `isCreatableState` reads TERMINAL off the
+      // definition, independent of `blocked`, which the three rows above
+      // hold constant at every other value: `false` here is the one thing
+      // that changes when the category does.
+      { workflowId: 'wf-errands', workflowName: 'Errands', workflowVersion: 1, stateId: 'done', name: 'Done', category: 'terminal', blocked: false, creatable: false },
     ]);
   });
 
@@ -268,6 +273,42 @@ describe('GET /v1/projects/:projectId/board — the columns', () => {
     // `null`, so `restrictedCount: 0` above is a counted zero and not the
     // shape a route emits when it has nothing to say.
     expect(doing?.cards[0]?.rollup).toBeNull();
+  });
+
+  /**
+   * 13.1460 — THIS DOOR CARRIES `parent`/`epic` (owner request, 2026-09-23,
+   * board-card badges). `world.taskInEpicId` is a DIRECT child of
+   * `world.epicId`, so both facts name the SAME ticket — the view's dedup
+   * rule (`BoardCard.parent`'s own docblock), not this door's. The epic
+   * ITSELF (`world.epicId`, the `todo` card above) is a project-mode ROOT
+   * with no parent and no epic ancestor of its own — the control that proves
+   * the fields are not populated unconditionally.
+   */
+  it('13.1460 the wire carries the immediate parent and the epic, each with a composed key', async () => {
+    const board = await boardOf('member', read.world.projectId);
+    const doing = board.columns.find((c) => c.stateId === 'doing');
+    const taskInEpic = doing?.cards[0];
+    expect(taskInEpic?.ticketId).toBe(read.world.taskInEpicId);
+    expect(taskInEpic?.parent?.ticketId).toBe(read.world.epicId);
+    expect(taskInEpic?.parent?.key).toMatch(/^\S+-\d+$/);
+    expect(taskInEpic?.epic).toEqual({
+      ticketId: read.world.epicId,
+      key: taskInEpic?.parent?.key,
+      title: 'Registrations drive',
+    });
+
+    // The epic's OWN card: a ROOT (no parent), and its OWN epic ancestor is
+    // ITSELF — `epicAncestors`' walk is ancestor-OR-SELF (its own docblock),
+    // unchanged by the move, so a card whose type IS the epic rank finds no
+    // ancestor to climb to before it already matches.
+    const todo = board.columns.find((c) => c.stateId === 'todo');
+    expect(todo?.cards[0]?.ticketId).toBe(read.world.epicId);
+    expect(todo?.cards[0]?.parent).toBeNull();
+    expect(todo?.cards[0]?.epic).toEqual({
+      ticketId: read.world.epicId,
+      key: taskInEpic?.parent?.key,
+      title: 'Registrations drive',
+    });
   });
 });
 

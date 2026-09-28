@@ -20,6 +20,7 @@ import { MarkdownClipboard } from '../extensions/markdown-clipboard.js';
 import { TicketImage } from '../extensions/ticket-image.js';
 import { Mention, type MentionCandidate } from '../extensions/mention.js';
 import { WikiLink, type NoteLinkCandidate } from '../extensions/wiki-link.js';
+import { TicketRef, type TicketRefCandidate } from '../extensions/ticket-ref.js';
 import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
 
 export type EditorSchemaOptions = {
@@ -52,6 +53,14 @@ export type EditorSchemaOptions = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  /**
+   * Ticket-reference data source (Plan 7 Task 1). Both optional and both
+   * default to "nothing offered" — a picker with no candidates and a chip
+   * with no link — which keeps this widening additive for every existing
+   * mount, the same rule `queryNotes`/`resolveNoteTitle` follow above.
+   */
+  queryTickets?: (query: string) => Promise<TicketRefCandidate[]>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
 };
 
 /**
@@ -123,24 +132,26 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     //     paragraph, and pins the typed half (9.95) on the typing path, since a
     //     paste-path case stays green with the option OFF and would prove
     //     nothing about it.
-    //     ⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT WIDENS THE ESCAPE
-    //     MECHANIC BY EXACTLY ONE TOO. An earlier version of this comment said
-    //     the opposite — that a typed link "offers no escape suggestion where
-    //     `**due soon**` does", an asymmetry whose cause it left unestablished
-    //     and whose owner it named. **That sentence is FALSE, and E2-46 is the
-    //     correction.** `test/escape-suggestion.test.ts` (9.96) measures both
-    //     triggers under both conditions: typing `see [the doc](https://gst.gov.in)`
-    //     offers `Keep "see [the doc](https://gst.gov.in)" as text` exactly as
-    //     typing `x **b**` offers its own. What the recorded probes were
-    //     actually comparing was TEXT AFTER THE TRIGGER — the link probe typed
-    //     `… now` and the bold probe typed nothing — and continuing to type
-    //     dismisses the suggestion by design (`escape-suggestion.ts`'s `apply`,
-    //     "dismiss by continuing to type or clicking elsewhere"; case 9.92).
-    //     So the link chip was dismissed, not absent, and the bold chip was
-    //     live. The typed link is now a row in that file's trigger table, so
-    //     the coverage is WITNESSED rather than declared, and the 2x2 in 9.96
-    //     is the control that distinguishes the trigger from the probe's
-    //     conditions.
+    //     ⚠ IT WIDENS THE RULE CENSUS BY EXACTLY ONE, AND IT WIDENS THE
+    //     BACKSPACE-UNDO REPAIR BY EXACTLY ONE TOO (the escape mechanic's
+    //     visible chip offer is WITHDRAWN, owner ruling 2026-09-24 — what
+    //     remains is `escape-suggestion.ts`'s undo-on-Backspace repair). An
+    //     earlier version of this comment said a typed link "offers no escape
+    //     suggestion where `**due soon**` does", an asymmetry whose cause it
+    //     left unestablished and whose owner it named. **That sentence was
+    //     FALSE, and E2-46 was the correction, before the chip existed to
+    //     argue about.** `test/escape-suggestion.test.ts`'s 2x2 case measures
+    //     both triggers under both conditions: typing `see [the
+    //     doc](https://gst.gov.in)` leaves the SAME undo-able record as typing
+    //     `x **b**` does. What the recorded probes were actually comparing was
+    //     TEXT AFTER THE TRIGGER — the link probe typed `… now` and the bold
+    //     probe typed nothing — and continuing to type clears the record by
+    //     design (`escape-suggestion.ts`'s `apply`: further typing closes the
+    //     undo window; case 9.92). So the link's window had already closed and
+    //     the bold one's was still open. The typed link is now a row in that
+    //     file's trigger table, so the coverage is WITNESSED rather than
+    //     declared, and the 2x2 is the control that distinguishes the trigger
+    //     from the probe's conditions.
     //
     // Still live, counted on the extension list this function builds, at
     // tiptap 3.30.5: SEVEN PASTE RULES across five extensions (`bold` 2,
@@ -288,6 +299,16 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
         ? {}
         : { onNavigateNote: options.onNavigateNote }),
     }),
+    // The ticket-ref node (Plan 7 Task 1). Both options are spelled with `??`
+    // like `queryNotes`'s: the fallback is a VALUE, not a default being
+    // protected from an explicit `undefined` — `resolveTicketHref` has no
+    // three-way "no resolver at all" answer the way `resolveNoteTitle` does,
+    // so there is nothing here for `mergeDeep`'s `undefined`-replaces-default
+    // behaviour to catch out.
+    TicketRef.configure({
+      queryTickets: options.queryTickets ?? (async () => []),
+      resolveTicketHref: options.resolveTicketHref ?? (() => null),
+    }),
     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
     // input rules OFFER — it is not a constraint on stored documents, and it
@@ -311,11 +332,13 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // door stays the cheaper place to enforce a range.
     // A test pins the positive half: 1–6 survive a round trip, so a change
     // that clamps or drops them fails.
-    // Task 5: the escape-suggestion mechanic (spec §2's named requirement).
-    // Every surface gets it; see extensions/escape-suggestion.ts for the
-    // mechanism and for why "Task 5's change is what makes them fail" above
-    // does not extend to the two paste-rule tests in test/schema.test.ts —
-    // this extension owns the typed (input-rule) trigger table only.
+    // Task 5: the Backspace-undo repair for spec §2's reserved sequences
+    // (the visible chip this mechanic originally surfaced is WITHDRAWN, owner
+    // ruling 2026-09-24 — see extensions/escape-suggestion.ts's own docblock).
+    // Every surface gets it; see that file for the mechanism and for why
+    // "Task 5's change is what makes them fail" above does not extend to the
+    // two paste-rule tests in test/schema.test.ts — this extension owns the
+    // typed (input-rule) trigger table only.
     EscapeSuggestion,
     // Markdown on the clipboard (Plan 4 Task 6). An `Extension` with no node
     // and no rule of its own — two `editorProps` handlers — so it moves

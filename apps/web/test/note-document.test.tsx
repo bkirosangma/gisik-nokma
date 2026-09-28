@@ -2,7 +2,7 @@ import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { noteDraftKey } from '../src/notes/use-note-autosave.js';
@@ -96,7 +96,7 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
     authorId: 'u_kiro',
     title: 'Compressor log',
     scope: { mode: 'private' },
-    attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+    attachedTickets: [{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }],
     deleted: false,
     createdAt: '2026-09-23T06:00:00.000Z',
     updatedAt: '2026-09-23T06:00:00.000Z',
@@ -106,9 +106,12 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
   };
 }
 
-function world(opts: { note?: NoteDetail; role?: string } = {}) {
+function world(
+  opts: { note?: NoteDetail; role?: string; search?: DataSourceQuery['search'] } = {},
+) {
   const services = stubServices({
     getMyWorkspaces: async () => [{ ...WS_A_REF, role: opts.role ?? 'owner' }],
+    ...(opts.search === undefined ? {} : { search: opts.search }),
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
@@ -200,8 +203,9 @@ describe('18.11 The Notes page — the document', () => {
     expect(await screen.findByText('Kiro')).toBeInTheDocument();
     expect(screen.getByText(/edited/i)).toBeInTheDocument();
     expect(screen.getByTestId('note-scope')).toHaveTextContent('Private');
+    // 18.253 — the canonical sheet path, not the id-only My Work door.
     const badge = screen.getByRole('link', { name: 'Renew the trade licence' });
-    expect(badge).toHaveAttribute('href', `${'/w/' + WS_A}/my-work?ticket=${TICKET}`);
+    expect(badge).toHaveAttribute('href', `/w/${WS_A}/p/${P_COLD}?ticket=${TICKET}`);
     expect(screen.getByTestId('note-reading-time')).toBeInTheDocument();
 
     // The editor, over the loaded body. MUTATION TARGET: an empty `doc` empties
@@ -212,6 +216,32 @@ describe('18.11 The Notes page — the document', () => {
       ),
     );
     expect(slotProps().mode).toBe('note');
+  });
+
+  /**
+   * 18.334 — an absent breadcrumb level renders no segment and no
+   * separator (owner report, 2026-09-24): a note's crumb read "Convenience
+   * Corner /  / Furniture", an empty middle segment with its own separator
+   * either side. Root cause: a WORKSPACE-scoped note's `homeProjectId` is
+   * legitimately `''` (`note-state.ts` refuses an empty one only for
+   * `scope.mode === 'project'`), `.find()` over that finds no project, and
+   * the OLD JSX rendered the `<li>` regardless of whether it had a name —
+   * `?? ''` painted over the miss with an empty string instead of omitting
+   * the slot. `.gn-breadcrumb__item + .gn-breadcrumb__item::before` draws
+   * `/` only between two RENDERED siblings, so omitting the `<li>` removes
+   * its separator for free.
+   */
+  it('18.334 a workspace-scoped note (no project) shows exactly the two non-empty levels', async () => {
+    renderDocument({ note: noteDetail({ homeProjectId: '' }) });
+
+    const crumb = await screen.findByRole('navigation', { name: 'Breadcrumb' });
+    const items = within(crumb).getAllByRole('listitem');
+    // MUTATION TARGET: reverting to `?? ''` on the project slot puts a
+    // THIRD, empty `<li>` back — this fails on COUNT, not merely on text,
+    // so an empty item hiding behind a passing `toHaveTextContent` cannot
+    // slip through.
+    expect(items.map((item) => item.textContent)).toEqual(['Garo Hills Logistics', 'Compressor log']);
+    expect(items).toHaveLength(2);
   });
 
   /**
@@ -367,6 +397,43 @@ describe('18.11 The Notes page — the document', () => {
 
     onNavigateNote('01J9NUNKNOWN000000000000000');
     expect(routerPush).toHaveBeenCalledWith('/notes/01J9NUNKNOWN000000000000000');
+  });
+
+  /**
+   * 18.273 — Plan 7 Task 4 (spec §14): the note page supplies the SAME two
+   * ticket-ref callbacks to its editor (this case) and its comment thread
+   * (`note-comments.test.tsx`). Same shape as 18.202's read: `stubSlot`
+   * renders `null` so the closures can be called directly.
+   */
+  it('18.273 supplies queryTickets and resolveTicketHref to the note editor', async () => {
+    stubSlot = true;
+    capturedSlotProps = [];
+    const search = vi.fn(async (_workspaceId: string, _text: string) => [
+      { ticketId: TICKET, projectId: P_COLD, title: 'Renew the trade licence', snippet: '', matchedIn: 'title' as const, key: 'CCSO-1183' },
+    ]);
+    render(
+      <Providers services={world({ search })}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+
+    await waitFor(() => {
+      expect(slotProps().queryTickets).toBeDefined();
+    });
+    const queryTickets = slotProps().queryTickets as (
+      q: string,
+    ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+    const resolveTicketHref = slotProps().resolveTicketHref as (ref: {
+      ticketId: string;
+      projectId: string;
+    }) => string | null;
+
+    const hits = await queryTickets('licence');
+    expect(search).toHaveBeenCalledWith(WS_A, 'licence');
+    expect(hits).toEqual([{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }]);
+    expect(resolveTicketHref({ ticketId: TICKET, projectId: P_COLD })).toBe(
+      `/w/${WS_A}/p/${P_COLD}?ticket=${TICKET}`,
+    );
   });
 
   /**
@@ -557,5 +624,32 @@ describe('History → Restore reaches the live editor, not just the server recor
       expect(editor.querySelector('.ProseMirror')?.textContent ?? '').toContain('the old words'),
     );
     expect(editor.querySelector('.ProseMirror')?.textContent ?? '').not.toContain('the current words');
+  });
+});
+
+/**
+ * 13.1488 — clicking the padded empty area below short text focuses the
+ * editor (owner, 2026-09-23: the notes page should "feel like its a note" —
+ * `.gn-notes__editor`'s own `min-height`, `globals.css`, is the OTHER half of
+ * this request). The wrapper `<div className="gn-notes__editor" ...>` is the
+ * click target this reuses — a click landing INSIDE the editor's own content
+ * never reaches this handler (`event.target !== event.currentTarget`), so
+ * ProseMirror's own click-to-position-caret behaviour is untouched; this is
+ * for the empty space the `min-height` adds, which has nothing else to catch
+ * the click.
+ */
+describe('13.1488 clicking below the text focuses the editor', () => {
+  /** MUTATION TARGET: drop the wrapper's onClick handler. */
+  it('a click on the wrapper itself (not the editor content) focuses the editor', async () => {
+    renderDocument();
+    const wrapper = await screen.findByTestId('note-editor');
+    // SCOPED to the wrapper: a second `TicketEditorSlot` (the comment
+    // composer, mode: 'comment') mounts elsewhere on this same page.
+    const textbox = await within(wrapper).findByRole('textbox');
+    expect(textbox).not.toHaveFocus(); // CONTROL: not focused before the click.
+
+    fireEvent.click(wrapper);
+
+    await waitFor(() => expect(textbox).toHaveFocus());
   });
 });

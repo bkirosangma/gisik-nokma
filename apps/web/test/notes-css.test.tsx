@@ -121,26 +121,30 @@ describe('18.226 the scanners are proven against planted input before they are t
   });
 });
 
-describe('18.224 the two-column layout and its breakpoints', () => {
+describe('18.224 the two-column layout and its ONE breakpoint', () => {
   /**
-   * The base grid, and the two breakpoints — REUSED, not invented (`60rem` is
-   * `.gn-shell`'s own step-down, `64rem` is the workflow builder's rail
-   * collapse; globals.css's own comment names both). This reads the
-   * STYLESHEET directly rather than a rendered viewport — jsdom has no layout
-   * engine to make a real breakpoint switch observable.
+   * AMENDED (owner request 2026-09-23, brand-mark-wide-notes Unit 4) — the
+   * right-hand TOC column and its `min-width: 64rem` breakpoint are REMOVED
+   * by owner request, replaced by the floating `TocLauncher` (13.1479+),
+   * available at every width instead of gated on a third breakpoint. The
+   * document column is now two tracks (`18rem minmax(0, 1fr)`) at every width
+   * above `60rem`, not three above `64rem` — this case now pins that there is
+   * exactly ONE breakpoint left touching `.gn-notes`, and that no value
+   * anywhere in the file still declares a third track, so a value reverted
+   * from a stale branch or pasted back by a future edit reddens here.
    *
    * Mutation: `60rem` → `59rem` on the `@media (max-width: 60rem)` line —
    * this test's own pinned condition string goes red.
    */
-  it('pins the base grid and the two breakpoints, and no other value touches .gn-notes', () => {
+  it('pins the base grid and its ONE breakpoint, and no rule anywhere declares a third track', () => {
     const base = declarationsFor(CSS, '.gn-notes__body');
     expect(base).not.toBeNull();
     expect(base ?? '').toMatch(/grid-template-columns:\s*18rem minmax\(0, 1fr\);/);
 
     const blocks = mediaBlocksTouching(CSS, 'gn-notes');
-    // EXACT set, in file order: a third breakpoint value on a `.gn-notes`
-    // selector anywhere in the file would add a THIRD entry here.
-    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem', 'min-width: 64rem']);
+    // EXACT set, in file order: a reintroduced `min-width: 64rem` breakpoint
+    // on a `.gn-notes` selector anywhere in the file would add it back here.
+    expect(blocks.map((b) => b.condition)).toEqual(['max-width: 60rem']);
 
     const narrow = blocks[0]!.body;
     expect(narrow).toMatch(/\.gn-notes__body\s*\{[^}]*grid-template-columns:\s*minmax\(0, 1fr\);/);
@@ -148,13 +152,101 @@ describe('18.224 the two-column layout and its breakpoints', () => {
     expect(narrow).toMatch(/\.gn-notes__tree--drawer\s*\{[^}]*display:\s*none;/);
     expect(narrow).toMatch(/\.gn-notes__tree--drawer\[data-open='true'\]\s*\{[^}]*display:\s*block;/);
 
-    const wide = blocks[1]!.body;
-    expect(wide).toMatch(/\.gn-notes__body\s*\{[^}]*grid-template-columns:\s*18rem minmax\(0, 1fr\) 14rem;/);
-    expect(wide).toMatch(/\.gn-notes__toc\s*\{[^}]*display:\s*block;/);
+    // The stronger, file-wide form advisor flagged: not merely "the removed
+    // BLOCK is gone" but "the removed VALUE is nowhere", comments stripped —
+    // a docblock quoting the old rule would otherwise still match a naive scan.
+    expect(stripComments(CSS)).not.toMatch(/grid-template-columns:\s*18rem minmax\(0, 1fr\) 14rem/);
+  });
 
-    // The rest-state defaults the two breakpoints override.
-    expect(declarationsFor(CSS, '.gn-notes__toc')).toMatch(/display:\s*none;/);
-    expect(declarationsFor(CSS, '.gn-notes__tree-toggle')).toMatch(/display:\s*none;/);
+  /**
+   * 13.1485 — the notes page is WIDE (owner: "the width is too narrow ...
+   * basically the entire page minus the left pane") — `.gn-shell`'s own
+   * `80rem` cap is lifted by a MODIFIER class (`.gn-shell`'s shared by every
+   * route; only the notes page's own `<main>` carries the modifier) rather
+   * than edited in place, and `.gn-notes`'s own `73.75rem` cap is dropped
+   * directly — it is already page-scoped (globals.css's own docblock: no
+   * `app-core` component renders a `.gn-notes*` class).
+   *
+   * Source order asserted, not merely presence: `.gn-shell--wide` must come
+   * AFTER `.gn-shell` in the file, since the two selectors carry EQUAL
+   * specificity (one class each) and only source order decides the tie.
+   * MUTATION TARGET: move `.gn-shell--wide` above `.gn-shell`.
+   */
+  it('13.1485 .gn-shell--wide lifts the cap, declared AFTER .gn-shell for the specificity tie', () => {
+    const stripped = stripComments(CSS);
+    const shellIndex = stripped.indexOf('.gn-shell {');
+    const wideIndex = stripped.indexOf('.gn-shell--wide');
+    expect(shellIndex).toBeGreaterThan(-1);
+    expect(wideIndex).toBeGreaterThan(shellIndex);
+
+    const wideRule = declarationsFor(CSS, '.gn-shell--wide');
+    expect(wideRule).not.toBeNull();
+    expect(wideRule ?? '').toMatch(/max-width:\s*none;/);
+
+    const notesRule = declarationsFor(CSS, '.gn-notes');
+    expect(notesRule).not.toBeNull();
+    expect(notesRule ?? '').toMatch(/max-width:\s*none;/);
+  });
+
+  /** The CSS rule from the case above only matters if the page's `<main>` actually carries the modifier. */
+  it('13.1485b the rendered <main> carries BOTH gn-shell and gn-shell--wide', async () => {
+    const services = stubServices({ getMyWorkspaces: async () => [], getMembers: async () => [] });
+    render(
+      <Providers services={services}>
+        <NotesPage />
+      </Providers>,
+    );
+    const notesDiv = await screen.findByTestId('notes-page');
+    expect(notesDiv.closest('main')).toHaveClass('gn-shell', 'gn-shell--wide');
+  });
+
+  /**
+   * 13.1486 — the editor area has a real MINIMUM height (owner: "the height
+   * should also be enough to feel like its a note"), reusing
+   * `--app-nav-offset` (globals.css `:root`) with its own `0px` fallback
+   * rather than a second magic number for the same fact.
+   */
+  it('13.1486 .gn-notes__editor carries a min-height built from --app-nav-offset', () => {
+    const rule = declarationsFor(CSS, '.gn-notes__editor');
+    expect(rule).not.toBeNull();
+    expect(rule ?? '').toMatch(/min-height:\s*calc\(100dvh - var\(--app-nav-offset,\s*0px\)/);
+  });
+
+  /**
+   * 13.1489 — Confluence-style inner padding on the document column (owner:
+   * "take inspiration from confluence").
+   */
+  it('13.1489 .gn-notes__document carries clamp()-based horizontal padding', () => {
+    const rule = declarationsFor(CSS, '.gn-notes__document');
+    expect(rule).not.toBeNull();
+    expect(rule ?? '').toMatch(/padding:\s*0\s+clamp\(/);
+  });
+});
+
+/**
+ * 13.1490 — `.gn-notes__toc` (owner: "a small floating icon at the left
+ * bottom of the screen") — the SAME `<aside aria-label="On this page">` case
+ * 18.181 already requires present with no note open now DOUBLES as the
+ * floating launcher's fixed container, instead of the removed
+ * display:none/64rem pair. `z-index: 30` matches `.gn-select__panel`/
+ * `.gn-popover`'s own tier (`packages/ui/src/ui.css`) — below
+ * `.gn-dialog__scrim`/`.gn-sheet__scrim` (40) and `.gn-toast-layer` (60), as
+ * the brief requires.
+ */
+describe('13.1490 .gn-notes__toc is the floating launcher’s fixed container', () => {
+  it('is fixed, bottom-left, safe-area aware, and below the dialog/toast tiers', () => {
+    const rule = declarationsFor(CSS, '.gn-notes__toc');
+    expect(rule).not.toBeNull();
+    const body = rule ?? '';
+    expect(body).toMatch(/position:\s*fixed;/);
+    expect(body).toMatch(/left:/);
+    expect(body).toMatch(/bottom:/);
+    expect(body).toMatch(/env\(safe-area-inset-/);
+    expect(body).toMatch(/z-index:\s*30;/);
+    // Below the dialog/sheet scrim (40) and the toast layer (60) — never above.
+    const zIndexMatch = /z-index:\s*(\d+);/.exec(body);
+    expect(zIndexMatch).not.toBeNull();
+    expect(Number(zIndexMatch![1])).toBeLessThan(40);
   });
 });
 
@@ -219,18 +311,25 @@ function noteDetail(over: Partial<NoteDetail> & { noteId: string }): NoteDetail 
 
 describe('18.225 the TOC lists headings at three or more, and nothing below that', () => {
   /**
-   * `extractReadingMeta` (packages/editor, case 9.288) already gates
-   * `ReadingTOC` at three headings — this proves the WIRING this task built
-   * reaches it: `NoteDocument`'s heading-reporting effect, up through
-   * `onHeadingsChange`, into `NotesPage`'s `<aside>`. A doc with three
-   * `heading` nodes shows the rail; one with two shows nothing.
+   * AMENDED (brand-mark-wide-notes Unit 5) — `NotesPage`'s `<aside>` now
+   * wraps `TocLauncher` (13.1479-13.1484) rather than rendering `ReadingTOC`
+   * directly, so the rail is no longer visible without a click: opening the
+   * launcher button is now part of proving the wiring, not a change to what
+   * is proven. `extractReadingMeta` (packages/editor, case 9.288) already
+   * gates `ReadingTOC` at three headings, and `TocLauncher` re-gates its
+   * OWN button on the exported `MIN_HEADINGS` (13.1478/13.1479) — this case
+   * proves the WIRING built here reaches both: `NoteDocument`'s
+   * heading-reporting effect, up through `onHeadingsChange`, into
+   * `NotesPage`'s `<aside>`. A doc with three `heading` nodes shows the
+   * button, and opening it shows the rail; one with two shows neither.
    *
    * Mutation: drop `onHeadingsChange={setHeadings}` from `NotesPage`'s
    * `<NoteDocument .../>` call — headings never reach the TOC, and BOTH arms
-   * below go red (the three-heading arm finds nothing, and the two-heading
-   * arm's "nothing" assertion is no longer proof of the gate).
+   * below go red (the three-heading arm finds no button to click, and the
+   * two-heading arm's "no button" assertion is no longer proof of the gate).
    */
-  it('three headings render the rail; two render nothing', async () => {
+  it('three headings render the launcher button, opened it shows the rail; two render no button at all', async () => {
+    const user = userEvent.setup();
     const threeHeadingsNote = noteDetail({
       noteId: OPEN_NOTE,
       title: 'Cold room log',
@@ -249,10 +348,14 @@ describe('18.225 the TOC lists headings at three or more, and nothing below that
       </Providers>,
     );
     await screen.findByTestId('note-document');
+    const launcher = await screen.findByRole('button', { name: 'On this page' });
+    await user.click(launcher);
     await waitFor(() => expect(screen.getAllByRole('link', { name: /Overview|Readings|Actions/ })).toHaveLength(3));
     first.unmount();
 
-    // CONTROL — the same wiring, two headings: the rail draws nothing.
+    // CONTROL — the same wiring, two headings: no launcher button at all,
+    // which is the STRONGER, already-verified `TocLauncher` gate (13.1479)
+    // rather than merely "the rail's own links are absent".
     const twoHeadingsNote = noteDetail({
       noteId: OPEN_NOTE,
       title: 'Cold room log',
@@ -276,7 +379,7 @@ describe('18.225 the TOC lists headings at three or more, and nothing below that
     await act(async () => {
       await new Promise((resolve) => setTimeout(resolve, 50));
     });
-    expect(screen.queryByRole('link', { name: 'Overview' })).toBeNull();
+    expect(screen.queryByRole('button', { name: 'On this page' })).toBeNull();
     unmount();
   });
 });
@@ -302,7 +405,7 @@ describe('18.226 every class the Notes page renders is a class globals.css style
     const openNote = noteDetail({
       noteId: OPEN_NOTE,
       title: 'Compressor log',
-      attachedTickets: [{ ticketId: TICKET, key: 'CCSO-1183', title: 'Renew the trade licence' }],
+      attachedTickets: [{ ticketId: TICKET, projectId: P_COLD, key: 'CCSO-1183', title: 'Renew the trade licence' }],
       body: body([paragraph('Compressor stopped')]),
     });
     const groupNote = noteSummary({ noteId: GROUP_NOTE, homeProjectId: P_COLD, title: 'Freezer audit' });

@@ -513,3 +513,4 @@ retired override now points at directly (`dockerfile:`, alongside the `target: d
   13.1428 measurement, and whether the `backup` worker's layers come back CACHED once `server`'s build
   has already primed the registry cache (the two share `apps/server/Dockerfile`). Not yet run — left 🧪
   with this recipe.
+  **Reading 2026-09-28 (planner, build log of production deployment 59ccb812 — the notes release, 2026-09-23 21:00Z):** the first build of the new Dockerfiles. `RUN pnpm fetch` had NO cached layer on web, server or backup (3 × "No cached layer found for cmd RUN pnpm fetch"; 5 × "Found cached layer" for earlier layers); backup did not reuse server's layers in the same build. Wall time: web 21:00:41→21:05:21 (4m40s), server 21:00:46→21:04:55 (4m09s). A first build cannot hit a cache for a new step, so this is not yet the verdict: stays 🧪 until the NEXT deploy's build log is read.

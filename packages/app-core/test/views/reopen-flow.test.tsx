@@ -228,7 +228,8 @@ function renderFlow(
       workspaceId={WS}
       projectId="01J9GPRJ000000000000000000"
       currentUserId="user_kiro"
-      typeOptions={[{ id: 'task', name: 'Task', rank: 3 }]}
+      typeOptions={[{ id: 'task', name: 'Task', rank: 3, workflowId: 'wf-errand' }]}
+      workflowStates={() => null}
       parentCandidates={extra.parentCandidates ?? [{ id: PARENT, title: 'Registrations' }]}
       // The roster the Assignee picker offers (owner request 2026-09-23). Empty
       // here: no case in this file is about the assignee, and `[]` leaves the

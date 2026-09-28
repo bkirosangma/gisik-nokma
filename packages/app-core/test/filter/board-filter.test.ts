@@ -18,9 +18,14 @@ const card: BoardCard = {
   // carries the birth default the reducer writes, attributed to the same actor
   // as the state provenance above.
   priority: { value: 'P2', claim: { actorId: 'u1', actorName: 'Ada', clientTime: '', serverTime: '' } },
+  // Owner request, 2026-09-23: `parent`/`epic` REQUIRED on `BoardCard`. This
+  // ticket has neither — the board predicate has no hierarchy axis to narrow
+  // by anyway, the same reason `dueDate: null`'s own comment above gives.
+  parent: null,
+  epic: null,
 };
 const column: BoardColumn = {
-  stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, cards: [card],
+  stateId: 's-doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards: [card],
 };
 
 /** The same ticket as the list sees it — every field the board's view-model dropped. */

@@ -99,6 +99,11 @@ function card(overrides: Partial<BoardCard> = {}): BoardCard {
     cause: null,
     rollup: null,
     pending: false,
+    // Owner request, 2026-09-23: REQUIRED on `BoardCard`; `null`/`null` is a
+    // root ticket under no epic, the same default `boardCardSeed` uses. No
+    // case in this file is about either badge.
+    parent: null,
+    epic: null,
     ...overrides,
   };
 }
@@ -119,7 +124,7 @@ function boardOf(cards: BoardCard[]): BoardView {
         workflowVersion: 1,
         workflowName: 'Basic',
         columns: [
-          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, cards },
+          { stateId: 'doing', name: 'Doing', category: 'active', blocked: false, creatable: true, cards },
         ],
       },
     ],
@@ -690,6 +695,7 @@ const defaultWorkflow: BoardGroup = {
       name: 'To do',
       category: 'open',
       blocked: false,
+      creatable: true,
       cards: [card({ ticketId: 'd_1', title: 'Default lane card one' })],
     },
     {
@@ -697,6 +703,7 @@ const defaultWorkflow: BoardGroup = {
       name: 'Doing',
       category: 'active',
       blocked: false,
+      creatable: true,
       cards: [card({ ticketId: 'd_2', title: 'Default lane card two' })],
     },
   ],
@@ -713,6 +720,7 @@ const bugWorkflow: BoardGroup = {
       name: 'Triage',
       category: 'open',
       blocked: false,
+      creatable: true,
       cards: [
         card({ ticketId: 'b_1', title: 'Bug lane card one' }),
         card({ ticketId: 'b_2', title: 'Bug lane card two' }),
@@ -723,6 +731,7 @@ const bugWorkflow: BoardGroup = {
       name: 'Fixing',
       category: 'active',
       blocked: false,
+      creatable: true,
       cards: [card({ ticketId: 'b_3', title: 'Bug lane card three' })],
     },
   ],
@@ -734,8 +743,8 @@ const emptyWorkflow: BoardGroup = {
   workflowVersion: 1,
   workflowName: 'Onboarding',
   columns: [
-    { stateId: 'intake', name: 'Intake', category: 'open', blocked: false, cards: [] },
-    { stateId: 'review', name: 'Review', category: 'active', blocked: false, cards: [] },
+    { stateId: 'intake', name: 'Intake', category: 'open', blocked: false, creatable: true, cards: [] },
+    { stateId: 'review', name: 'Review', category: 'active', blocked: false, creatable: true, cards: [] },
   ],
 };
 
@@ -750,6 +759,7 @@ const otherWorkflow: BoardGroup = {
       name: 'Open',
       category: 'open',
       blocked: false,
+      creatable: true,
       cards: [card({ ticketId: 'o_1', title: 'Support lane card one' })],
     },
   ],

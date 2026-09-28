@@ -115,6 +115,12 @@ type AppCoreEditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  // 9.309 — the ticket-ref two (Plan 7 Task 1), transcribed with the same name
+  // and inline shape so the case above, which compares this type's field
+  // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if
+  // either half gains a prop the other does not have.
+  queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+  resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
   // V7 — mirrored from app-core's seam, and the TYPE is part of the parity the
@@ -200,6 +206,31 @@ describe('the <EditorSlot> contract, written twice', () => {
     // NOT here — it lives on `TicketEditorSlotProps`, a separate type, which is
     // the whole reason app-core never has to name `@tiptap/core`'s `Editor`.
     expect([...thisHalfFields].sort()).toEqual([...appCoreFields].sort());
+  });
+
+  /**
+   * 9.309 — Plan 7 Task 1's two ticket-reference options, threaded through
+   * this twice-written contract the same way the wiki-link four are: named in
+   * all three declarations the set-equality case above already compares.
+   */
+  it('9.309 the twin transcription covers queryTickets and resolveTicketHref in both files', () => {
+    const appCoreFields = fieldNamesOf(
+      readFileSync(APP_CORE_SLOT_SOURCE, 'utf8'),
+      'export type EditorSlotProps = {',
+    );
+    const transcribedFields = fieldNamesOf(
+      readFileSync(OWN_SOURCE, 'utf8'),
+      'type AppCoreEditorSlotProps = {',
+    );
+    const thisHalfFields = fieldNamesOf(
+      readFileSync(THIS_HALF_SOURCE, 'utf8'),
+      'export type EditorSlotProps = {',
+    );
+    for (const field of ['queryTickets', 'resolveTicketHref']) {
+      expect(appCoreFields, `app-core's own declaration is missing ${field}`).toContain(field);
+      expect(transcribedFields, `the transcription is missing ${field}`).toContain(field);
+      expect(thisHalfFields, `this package's own declaration is missing ${field}`).toContain(field);
+    }
   });
 });
 

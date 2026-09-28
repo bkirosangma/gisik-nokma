@@ -324,6 +324,45 @@ describe('9.282 the wiki-link and its missing pill are styled apart', () => {
 });
 
 /**
+ * 9.306 — THE TICKET-REF CHIP AND ITS `:ticket` PICKER (spec §14, Plan 7 Task
+ * 1). Same split as the wiki-link case above: jsdom applies no stylesheet, so
+ * this file is the only place a missing rule can be seen at all.
+ */
+describe('9.306 the ticket-ref chip and its picker are styled', () => {
+  it('9.306 .editor-ticketref and .ticketref-popup both carry rules in editor.css', () => {
+    const chip = ruleBody(EDITOR_CSS, '.editor-ticketref');
+    const popup = ruleBody(EDITOR_CSS, '.ticketref-popup');
+    // CONTROL: the two selectors must reach DIFFERENT rules — `ruleBody` is a
+    // first-match substring search, so a popup rule absent from the file
+    // would let this arm read the chip's own rule and pass with no popup
+    // styling at all, which is the mutation this case names.
+    expect(popup).not.toBe(chip);
+  });
+});
+
+/**
+ * 9.322 — the popups' `z-index` outranks a ticket sheet's own scrim (bug
+ * fix, 2026-09-24, measured live on :3047 in a ticket sheet's comment box).
+ * `.gn-sheet__scrim` is `position: fixed; z-index: 40` (`packages/ui/src/
+ * ui.css`); every popup here is ALSO `position: fixed`, appended straight to
+ * `document.body` as a sibling of the scrim — so a popup opened from inside
+ * a sheet (the reported bug's own reproduction: "in a ticket-sheet comment")
+ * is a real stacking-context comparison against it, not a DOM-order one.
+ * `.wikilink-popup`/`.ticketref-popup` carried 50 before the three popup
+ * families were consolidated into one shared block, and the consolidation
+ * accidentally dropped all three to `.mention-popup`'s old 30 — invisible
+ * behind the scrim, measured live before this case existed.
+ */
+describe('9.322 the suggestion popups outrank a sheet scrim', () => {
+  it('9.322 .mention-popup, .wikilink-popup and .ticketref-popup each declare z-index: 50, above .gn-sheet__scrim\'s 40', () => {
+    for (const selector of ['.mention-popup', '.wikilink-popup', '.ticketref-popup']) {
+      const body = ruleBody(EDITOR_CSS, selector);
+      expect(declared(body, 'z-index'), `${selector}'s z-index`).toBe('50');
+    }
+  });
+});
+
+/**
  * 9.288–9.290 — THE READING RAIL'S STYLES (Plan 4 Task 7). Same split as
  * everything above: the markup is asserted in `reading-toc.test.tsx`, and what
  * makes the rail READ as an outline is the per-level indent and the weight on

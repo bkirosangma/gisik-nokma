@@ -98,6 +98,12 @@ describe('18.227 the checked-in bundle at THIS head is not stale', () => {
    * `build:webview` yet, which `--check`'s own CLI already treats as "not
    * an error"), but `stale` never is: that is exactly the drift Task 4's
    * `packages/editor` changes could have left behind uncaught.
+   *
+   * Case 18.281 (Notes Plan 7, Task 6) is this same assertion re-run after
+   * Tasks 1-3 touched `packages/editor/src` (the `ticketRef` node, the
+   * `:note` trigger, the bridge) — the close regenerated the bundle
+   * (`build:webview` + `generate:editor-html`) precisely so this check
+   * reports `ok` rather than `stale` at that head.
    */
   it('checkFreshness against the real paths is ok or no-bundle, never stale', () => {
     const result = checkFreshness(BUNDLE_PATH, OUT_PATH);
