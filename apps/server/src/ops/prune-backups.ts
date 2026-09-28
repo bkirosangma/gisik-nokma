@@ -1,5 +1,5 @@
 import { DeleteObjectCommand, ListObjectsV2Command, type _Object } from '@aws-sdk/client-s3';
-import type { ErrorAlerter } from '../alerts/error-alerter.js';
+import { alertWithoutWaiting, type ErrorAlerter } from '../alerts/error-alerter.js';
 import type { BackupS3Target } from './object-sink.js';
 
 /**
@@ -109,7 +109,7 @@ export async function runThenPrune(
     report = await prune();
   } catch (error) {
     log(`backup prune after ${name} failed`, error);
-    await alerter.notify(`backup:prune-after-${name}`, error);
+    alertWithoutWaiting(alerter, `backup:prune-after-${name}`, error);
     return;
   }
   console.log(
@@ -122,7 +122,8 @@ export async function runThenPrune(
     }),
   );
   if (report.errors.length > 0) {
-    await alerter.notify(
+    alertWithoutWaiting(
+      alerter,
       `backup:prune-after-${name}`,
       new Error(`backup prune could not delete ${report.errors.length} object(s): ${report.errors.join('; ')}`),
     );
