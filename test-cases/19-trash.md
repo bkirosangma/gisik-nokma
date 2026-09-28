@@ -85,3 +85,10 @@ the number you added — an unchanged count has reported a clean sweep over case
 
 - ✅ **19.070 — the online twin maps every `DeletedItem` field and refuses a row missing `purgeDueAt`;** control: a full row round-trips. Mutation: default a missing `purgeDueAt` to null.
 - ✅ **19.071 — the replica twin rejects with `ReplicaGapError`;** control: `getMyWorkspaces` on the same replica resolves. Mutation: resolve `[]` (an empty list would tell a person they have nothing deleted, when nobody was asked).
+
+## 19.19 UI primitives
+
+- ✅ **19.201 — `Dialog` with `initialFocusRef` puts focus on that element when it opens;** control: the same dialog without the prop focuses its own panel (ruling P8's default). Mutation: ignore `initialFocusRef` in the focus effect.
+- ✅ **19.202 — `Dialog role="alertdialog"` renders `role="alertdialog"` named by its title;** control: no `role` prop renders `role="dialog"`. Mutation: hard-code `role="dialog"`.
+- ✅ **19.203 — `Dialog describedBy` sets `aria-describedby`, so the panel's accessible description is that element's text;** control: without it the panel has no `aria-describedby` attribute. Mutation: drop the attribute.
+- ✅ **19.204 — `Button` forwards `ref` to its `<button>`;** control: the ref's element is the one the role query finds, with the variant class on it. Mutation: destructure `ref` out of the props and drop it.
