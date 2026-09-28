@@ -149,6 +149,8 @@ const idleTransport: SyncTransport = {
   bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
   bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
   reconcile: () => Promise.reject(new Error('offline')),
+  purgedLookup: () => Promise.reject(new Error('offline')),
+  deletedItems: () => Promise.reject(new Error('offline')),
 };
 
 type Fixture = {
@@ -664,6 +666,8 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
         bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
         reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [], restrictedNotes: [] }),
+        purgedLookup: () => Promise.resolve([]),
+        deletedItems: () => Promise.resolve({ items: [] }),
       },
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });

@@ -1515,6 +1515,10 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       if (isSyncInstruction(item)) return applyInstruction(item);
 
       const env = item;
+      // Trash Plan 3 (D3): a tombstone is NEVER stored — it names an item this
+      // device must now erase, and the engine answers it with a lookup. Storing
+      // it would put a row about an erased entity into the local ledger.
+      if (env.type === 'purge.completed') return { applied: false };
       const applied = await storage.transaction(async (tx) => {
         const dupe = await tx.all('SELECT 1 FROM events WHERE id = ?', [env.id]);
         if (dupe.length > 0) return false;

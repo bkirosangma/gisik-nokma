@@ -34,7 +34,7 @@ export type { LocalContextDeps, PendingOverlay } from './precheck/local-context.
 export { backoffMs, createOutbox } from './outbox/outbox.js';
 export type { EnqueueResult, Outbox, OutboxItem, PendingTicket, SyncEventResult } from './outbox/outbox.js';
 export type { SyncNotice } from './outbox/notices.js';
-export { createSyncEngine, TicketPullNotFound } from './engine/sync-engine.js';
+export { createSyncEngine, TicketPullNotFound, WorkspaceAccessLost } from './engine/sync-engine.js';
 export type {
   ApplyFailure,
   ReconcileAnswer,
