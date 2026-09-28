@@ -284,4 +284,46 @@ describe('table floating toolbar', () => {
     }
     view.unmount();
   });
+
+  it('does not float above the content area (and so cannot cover the main toolbar) when the table is the very first node', async () => {
+    // Reproduces a live-browser finding: a table with nothing above it inside
+    // `.ticket-editor__content` sits right at the content area's own top edge
+    // (44px below the main toolbar, in the measured case). The unclamped
+    // math (`table.top - anchor.top - 36`) then computes a NEGATIVE offset
+    // into the main-toolbar's own band — measured live, the floating
+    // toolbar's box visibly overlapped and obscured the formatting
+    // toolbar's icons.
+    const { view, editor } = await mount(makeProps({ initialDoc: TABLE_DOC }));
+    const anchor = view.container.querySelector('.ticket-editor') as HTMLElement;
+    const content = view.container.querySelector('.ticket-editor__content') as HTMLElement;
+    const table = view.container.querySelector('table') as HTMLTableElement;
+    const rectFor = (top: number, left = 0): DOMRect =>
+      ({ top, left, bottom: top + 40, right: left + 100, width: 100, height: 40, x: left, y: top, toJSON() {} }) as DOMRect;
+    const mockRect = (el: HTMLElement, top: number) =>
+      Object.defineProperty(el, 'getBoundingClientRect', { value: () => rectFor(top), configurable: true });
+    mockRect(anchor, 0);
+    mockRect(content, 44);
+    mockRect(table, 44);
+    // The cursor-tracking effect ran once already on mount (ProseMirror's own
+    // default initial selection already sits inside the first cell of a
+    // table-only doc), so `table` state is already set and its identity does
+    // not change again — the `[table]`-keyed position effect would never
+    // re-run to pick up the mocks above without an explicit nudge. `resize`
+    // is one of the events that effect's own listener responds to.
+    window.dispatchEvent(new Event('resize'));
+
+    // The content area starts at 44 (relative to the anchor) — the toolbar
+    // must never render above that, which is where the main toolbar lives.
+    // Waited for directly (not read once): `updatePos` runs a first time on
+    // mount with jsdom's default zero rects before the mocks above are even
+    // in place, and that stale render also happens to clamp to a value
+    // (`0`) that a looser "isn't the unclamped -36" check would have let
+    // slip through as a false pass.
+    await vi.waitFor(() => {
+      const toolbar = view.container.querySelector('.table-toolbar') as HTMLElement | null;
+      expect(toolbar).not.toBeNull();
+      expect(Number.parseFloat(toolbar!.style.top)).toBeGreaterThanOrEqual(44);
+    });
+    view.unmount();
+  });
 });

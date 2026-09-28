@@ -105,6 +105,15 @@ export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarP
       return;
     }
     const anchor = table.closest('.ticket-editor') as HTMLElement | null;
+    // The clamp floor: a table with nothing above it inside `.ticket-editor__
+    // content` starts right at the content area's own top edge, just below
+    // the main formatting toolbar — measured live, `t.top - a.top - 36` there
+    // goes NEGATIVE, floating this toolbar up into the main toolbar's own
+    // band and visibly covering its icons. `.ticket-editor__content` (not
+    // `.ticket-editor`) is the boundary: it is what sits below the main
+    // toolbar, so clamping to its top keeps this toolbar out of that band
+    // without hard-coding the main toolbar's height.
+    const content = anchor?.querySelector('.ticket-editor__content') as HTMLElement | null;
     const updatePos = () => {
       if (!anchor || !table.isConnected) {
         setPos(null);
@@ -112,7 +121,9 @@ export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarP
       }
       const a = anchor.getBoundingClientRect();
       const t = table.getBoundingClientRect();
-      setPos({ top: t.top - a.top - 36, left: t.left - a.left });
+      const desiredTop = t.top - a.top - 36;
+      const minTop = content ? content.getBoundingClientRect().top - a.top : desiredTop;
+      setPos({ top: Math.max(desiredTop, minTop), left: t.left - a.left });
     };
     updatePos();
     // jsdom has no ResizeObserver by default; guard rather than crash under test.
