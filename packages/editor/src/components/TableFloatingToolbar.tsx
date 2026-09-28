@@ -135,6 +135,23 @@ export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarP
   if (!editable || !editor || editor.isDestroyed || !table || !pos) return null;
 
   const run = (cmd: Cmd) => editor.chain().focus()[cmd]().run();
+  /**
+   * Investigated and found INERT for all nine commands here, not fixed:
+   * a React-staleness concern was raised — a command that leaves the active
+   * cell's `<table>` DOM node identity-equal (e.g. a header toggle) would
+   * make `setTable` bail, and a forced-repaint subscription (the shape
+   * `EditorToolbar.tsx` uses for its own `isActive` reads) would be needed
+   * to keep `canRun` fresh. Traced into the installed prosemirror-tables@1.8.5
+   * source (`deleteRow`/`deleteColumn`/`toggleHeader*`, dist/index.js) and
+   * every one of them checks ONLY `isInTable(state)` when called without a
+   * `dispatch` (which is exactly how `.can()` calls them) — the "last row",
+   * "last column" etc. guards live INSIDE the `if (dispatch)` branch only,
+   * so `can()` can never see them. Concretely: `canRun('deleteRow')` is
+   * `true` even on a table's only remaining row, and clicking it is a
+   * silent no-op rather than a disabled button — a real, if minor and
+   * library-inherited, UX gap, not something a repaint would fix, since
+   * `disabled` never becomes stale when it never becomes `true` at all.
+   */
   const canRun = (cmd: Cmd) => editor.can()[cmd]();
 
   return (
@@ -142,7 +159,9 @@ export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarP
       className="table-toolbar"
       role="toolbar"
       aria-label="Table"
-      style={{ position: 'absolute', top: pos.top, left: pos.left }}
+      // `position: absolute` itself is `.table-toolbar`'s own rule
+      // (editor.css) — only the dynamic per-render coordinates are inline.
+      style={{ top: pos.top, left: pos.left }}
       // Prevent a click from stealing selection away from the editor.
       onMouseDown={(event) => event.preventDefault()}
     >

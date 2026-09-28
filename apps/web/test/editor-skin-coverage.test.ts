@@ -1,5 +1,5 @@
-import { readFileSync } from 'node:fs';
-import { dirname, resolve } from 'node:path';
+import { readdirSync, readFileSync } from 'node:fs';
+import { dirname, resolve, sep } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it, vi } from 'vitest';
 import { Editor } from '@tiptap/core';
@@ -8,6 +8,7 @@ import { buildEditorExtensions, IMAGE_WRAP_MODES } from '@gisik-nokma/editor';
 const TEST_DIR = dirname(fileURLToPath(import.meta.url));
 const GLOBALS_CSS_PATH = resolve(TEST_DIR, '../app/globals.css');
 const EDITOR_SRC = resolve(TEST_DIR, '../../../packages/editor/src');
+const EDITOR_CSS_PATH = resolve(EDITOR_SRC, 'styles/editor.css');
 
 function stripComments(css: string): string {
   return css.replace(/\/\*[\s\S]*?\*\//g, '');
@@ -22,28 +23,30 @@ function stripComments(css: string): string {
  * kind of list, and it was already stale by 3 classes — the image-wrap
  * modifiers below — before a line of CSS existed).
  *
- * Scope: a fixed, documented file list — the extension/schema files that
- * render editor CONTENT (nodes/marks/chips/chrome). Deliberately excluded by
- * omission, not a second hand-typed exclude array:
+ * Scope: EVERY `.ts`/`.tsx` file under `packages/editor/src` (recursively,
+ * test files excluded), MINUS a documented exclude list
+ * (`EXCLUDED_EDITOR_FILES`, below) — a file, not a class name, is what gets
+ * excluded, so a class added anywhere else in the package (a new extension,
+ * a new node view) is picked up automatically. The excluded files:
  * - `mention-popup.ts` / `ticket-ref-popup.ts` / `wiki-link-popup.ts` — the
  *   suggestion popups, task/editor-polish's scope, already skinned.
  * - `EditorToolbar.tsx` — the main toolbar, task/editor-polish's scope,
  *   already skinned.
  * - `AttachmentListItem.tsx` / `EvidencePicker.tsx` / `UploadChips.tsx` /
- *   `ImageWrapMenu.tsx` / `TicketEditorSlot.tsx` — attachment/upload chrome,
- *   an unrelated feature area (some of it deliberately unstyled per
+ *   `ImageWrapMenu.tsx` — attachment/upload chrome, an unrelated feature
+ *   area (some of it deliberately unstyled per
  *   `test/attachment-list-item.test.tsx` — a coverage list that included it
  *   would fight that contract).
  * - `ReadingTOC.tsx` / `reading-meta.ts` — the reading-view table of
  *   contents, unrelated feature.
- * - `TicketEditor.tsx` — bare `.ticket-editor`/`.ticket-editor__toolbar`
- *   structural chrome, not content this lane skins.
- * - `escape-suggestion.ts` / `collapsible.ts` — behaviour-only, emit no DOM
- *   class (confirmed: escape-suggestion's chip was removed in Unit R;
- *   collapsible.ts has zero `class`/`className` sites).
- *
- * `components/TableFloatingToolbar.tsx` joins this list once it exists
- * (Task 5) — its own classes flow through the same extractor.
+ * - `TicketEditor.tsx` / `TicketEditorSlot.tsx` — bare `.ticket-editor`/
+ *   `.ticket-editor__toolbar`/`.ticket-editor__hint`/footer structural
+ *   chrome, not content this lane skins.
+ * - `webview/*` — bridge/infra files, not a rendering surface.
+ * `escape-suggestion.ts`/`collapsible.ts` are NOT excluded (nothing to
+ * exclude them for: escape-suggestion's chip was removed in Unit R and
+ * collapsible.ts has zero `class`/`className` sites) — left in the scan so a
+ * class added to either later is still caught.
  *
  * Extraction: finds `class`/`className` ASSIGNMENT sites (`class:`,
  * `className =`), reads the bounded expression that follows (stops at the
@@ -70,16 +73,49 @@ function stripComments(css: string): string {
  * class built outside the bounded window) could still slip past this
  * extractor undetected — the general risk of any regex-based source scan.
  */
+/**
+ * Files EXCLUDED from the scan below, each for a documented reason — the
+ * "self-checking exclusion list" the brief asks for is enforced by omitting
+ * FILES, not by a second hand-typed list of class names (which is exactly
+ * the shape that let this plan's own image-wrap-mode classes go unnoticed
+ * the first time around).
+ */
+const EXCLUDED_EDITOR_FILES = new Set([
+  // Suggestion popups — task/editor-polish's scope, already skinned.
+  'extensions/mention-popup.ts',
+  'extensions/ticket-ref-popup.ts',
+  'extensions/wiki-link-popup.ts',
+  // The main toolbar — task/editor-polish's scope, already skinned.
+  'components/EditorToolbar.tsx',
+  // Attachment/upload chrome — an unrelated feature area; some of it
+  // (`.attachment-item--upload`/`__name`) is deliberately UNSTYLED per an
+  // existing test (`apps/web/test/attachment-list-item.test.tsx`), and a
+  // scan that included it would fight that contract.
+  'components/AttachmentListItem.tsx',
+  'components/EvidencePicker.tsx',
+  'components/ImageWrapMenu.tsx',
+  'components/UploadChips.tsx',
+  // Bare `.ticket-editor`/`.ticket-editor__toolbar`/`.ticket-editor__hint`
+  // structural chrome — not this lane's content skin.
+  'components/TicketEditor.tsx',
+  'components/TicketEditorSlot.tsx',
+  // The reading-view table of contents — unrelated feature.
+  'reading/ReadingTOC.tsx',
+  'reading/reading-meta.ts',
+  // Webview bridge/infra — no content classes, not a rendering surface.
+  'webview/bridge.ts',
+  'webview/create-editor-bridge.ts',
+  'webview/entry.tsx',
+]);
+
+/** Recursively lists every `.ts`/`.tsx` source file under `dir`, relative to it. */
+function listSourceFiles(dir: string): string[] {
+  const entries = readdirSync(dir, { recursive: true }) as string[];
+  return entries.filter((rel) => (rel.endsWith('.ts') || rel.endsWith('.tsx')) && !rel.endsWith('.test.ts') && !rel.endsWith('.test.tsx'));
+}
+
 function extractDeclaredEditorClasses(): string[] {
-  const files = [
-    'schema/extensions.ts',
-    'extensions/mention.ts',
-    'extensions/ticket-ref.ts',
-    'extensions/wiki-link.ts',
-    'extensions/code-block-copy.ts',
-    'extensions/ticket-image.ts',
-    'components/TableFloatingToolbar.tsx',
-  ];
+  const files = listSourceFiles(EDITOR_SRC).filter((rel) => !EXCLUDED_EDITOR_FILES.has(rel.split(sep).join('/')));
   const assignRe = /\b(?:class|className)\s*[:=]\s*/g;
   const stringRe = /(['"`])((?:\\.|(?!\1)[\s\S])*?)\1/g;
   const dynamicRe = /\$\{[^}]*\}/g;
@@ -103,12 +139,7 @@ function extractDeclaredEditorClasses(): string[] {
 
   const found = new Set<string>();
   for (const relPath of files) {
-    let text: string;
-    try {
-      text = readFileSync(resolve(EDITOR_SRC, relPath), 'utf8');
-    } catch {
-      continue; // TableFloatingToolbar.tsx doesn't exist until Task 5.
-    }
+    const text = readFileSync(resolve(EDITOR_SRC, relPath), 'utf8');
     assignRe.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = assignRe.exec(text))) {
@@ -189,22 +220,48 @@ const TABLE_SELECTORS: readonly string[] = ['table', 'th', 'td', '.selectedCell'
 
 describe('9.341 editor skin — declared coverage', () => {
   const bare = stripComments(readFileSync(GLOBALS_CSS_PATH, 'utf8'));
+  // A class the editor emits needs a rule SOMEWHERE, not specifically in
+  // globals.css: a purely structural, colour-free class (e.g.
+  // `.table-toolbar__group`, a bare flex wrapper) is fully and correctly
+  // covered by editor.css alone, and requiring a redundant globals.css entry
+  // for it would fight editor.css's own "structure only" header rule rather
+  // than serve the brief's actual concern (every class gets a rule; colour,
+  // when a class needs any, comes only from globals.css — that second
+  // constraint is enforced separately, by the colour-scan test over
+  // editor.css, not by this one).
+  const bareWithStructure = bare + '\n' + stripComments(readFileSync(EDITOR_CSS_PATH, 'utf8'));
   const declaredClasses = extractDeclaredEditorClasses();
 
   it('the extractor found the classes measured from source at plan-resume time', () => {
-    // A positive control (this repo's own recorded remedy for a proxy/tooling
-    // silent-wrong-answer): if this list ever comes back empty or drastically
-    // short, something upstream broke silently rather than the skin being
-    // incomplete.
-    expect(declaredClasses.length).toBeGreaterThanOrEqual(8);
+    // A positive control matched by MEMBERSHIP, not just count (this repo's
+    // recorded lesson: a count alone can be a plausible wrong number just as
+    // easily as a right one) — the 12 classes measured from source at
+    // plan-resume time must all still be found, whatever else changes.
+    const measured = [
+      'editor-codeblock',
+      'editor-codeblock__copy',
+      'editor-details',
+      'editor-image',
+      'editor-image--block',
+      'editor-image--inline-left',
+      'editor-image--inline-right',
+      'editor-mention',
+      'editor-ticketref',
+      'editor-wikilink',
+      'editor-wikilink--missing',
+      'wikilink-preview',
+    ];
+    for (const cls of measured) {
+      expect(declaredClasses, `expected ${cls} among the extracted classes`).toContain(cls);
+    }
   });
 
-  it.each(declaredClasses)('globals.css declares a rule matching .%s', (cls) => {
+  it.each(declaredClasses)('globals.css or editor.css declares a rule matching .%s', (cls) => {
     // Class-boundary match: the selector text contains `.cls` not immediately
     // followed by a class-name character (letter/digit/-/_) — `.editor-
     // codeblock` must not be satisfied by `.editor-codeblock__copy`.
     const pattern = new RegExp(`\\.${cls}(?![\\w-])`);
-    expect(pattern.test(bare), `no rule selecting .${cls} in apps/web/app/globals.css`).toBe(true);
+    expect(pattern.test(bareWithStructure), `no rule selecting .${cls} in globals.css or editor.css`).toBe(true);
   });
 
   it.each(EXPLICIT_SELECTORS)('globals.css declares a rule for bare element %s (scoped)', (sel) => {
@@ -455,5 +512,55 @@ describe('9.344 the code-block copy button hides via opacity, not display/visibi
 
   it('a hover/focus-within/focus-visible rule restores opacity: 1', () => {
     expect(bare).toMatch(/\.editor-codeblock:hover \.editor-codeblock__copy,[\s\S]{0,300}opacity:\s*1/);
+  });
+});
+
+/**
+ * Chips must not be distinguished by colour alone (house rule, and WCAG
+ * 1.4.1 for the live wiki-link specifically, which has no border or fill of
+ * its own the way the mention/ticketref chips do). Pinned here because each
+ * was a real, silent gap this plan's own first draft shipped with.
+ */
+describe('editor skin — colour-alone and token-collision regressions', () => {
+  const bare = stripComments(readFileSync(GLOBALS_CSS_PATH, 'utf8'));
+
+  function ruleBody(css: string, selector: string): string {
+    const start = css.indexOf(`${selector} {`);
+    expect(start, `no rule for \`${selector}\``).toBeGreaterThan(-1);
+    return css.slice(start, css.indexOf('}', start));
+  }
+
+  it('a LIVE wiki-link is underlined at rest (not colour alone) and loses the underline only on hover', () => {
+    const rest = ruleBody(bare, '.ticket-editor__content .editor-wikilink');
+    expect(rest).toMatch(/text-decoration:\s*underline(?!\s+wavy)/);
+    const hover = ruleBody(bare, '.ticket-editor__content .editor-wikilink:not(.editor-wikilink--missing):hover');
+    expect(hover).toContain('text-decoration: none');
+  });
+
+  it('the missing wiki-link keeps its wavy underline even though the live rule sets a solid one', () => {
+    const missing = ruleBody(bare, '.ticket-editor__content .editor-wikilink--missing');
+    expect(missing).toMatch(/text-decoration:\s*underline\s+wavy/);
+  });
+
+  it('a ticketRef chip with a real href does not also wear the UA default link underline', () => {
+    const body = ruleBody(bare, '.ticket-editor__content .editor-ticketref');
+    expect(body).toContain('text-decoration: none');
+  });
+
+  it('.selectedCell uses a DIFFERENT fill token than th, so a selected header cell reads as selected', () => {
+    const th = ruleBody(bare, '.ticket-editor__content th,\n.gn-comment__table th');
+    const selected = ruleBody(bare, '.ticket-editor__content .selectedCell');
+    const thToken = /background:\s*var\((--gn-[\w-]+)\)/.exec(th)?.[1];
+    const selectedToken = /background:\s*var\((--gn-[\w-]+)\)/.exec(selected)?.[1];
+    expect(thToken).toBeDefined();
+    expect(selectedToken).toBeDefined();
+    expect(selectedToken).not.toBe(thToken);
+  });
+
+  it('the code block copy button stays reachable when a long line scrolls (overflow on pre, not the block)', () => {
+    const block = ruleBody(bare, '.ticket-editor__content .editor-codeblock');
+    expect(block).not.toMatch(/overflow-x/);
+    const pre = ruleBody(bare, '.ticket-editor__content .editor-codeblock pre');
+    expect(pre).toContain('overflow-x: auto');
   });
 });

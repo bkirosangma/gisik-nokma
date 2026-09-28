@@ -3909,19 +3909,25 @@ input, textarea, select { font-family: inherit; }
 
 /* The fenced code block. `.editor-codeblock`'s own `position: relative` is
    editor.css's; this is its surface. `pre code` resets the inline-code rule
-   above so the block does not draw a fill inside a fill. */
+   above so the block does not draw a fill inside a fill. `overflow-x` sits on
+   the INNER `pre`, not on `.editor-codeblock` itself: `.editor-codeblock` is
+   the copy button's containing block (`position: relative`/`absolute`), and
+   an overflow container also clips/scrolls its absolutely-positioned
+   descendants — putting the scroll on the outer box would carry the
+   corner-anchored copy button away with a long line instead of leaving it
+   pinned in view. */
 .ticket-editor__content .editor-codeblock {
   background: var(--gn-fill-quaternary);
   border-radius: var(--gn-radius-control);
   padding: 0.75rem 1rem;
   margin: 0.5rem 0;
-  overflow-x: auto;
 }
 .ticket-editor__content .editor-codeblock pre {
   margin: 0;
   font-family: var(--gn-font-mono);
   font-size: 0.875rem;
   line-height: 1.5;
+  overflow-x: auto;
 }
 .ticket-editor__content .editor-codeblock code {
   background: none;
@@ -3973,13 +3979,37 @@ input, textarea, select { font-family: inherit; }
   border: 1px solid var(--gn-border);
   border-radius: 3px;
   padding: 0 0.25em;
-}
-.ticket-editor__content .editor-wikilink {
-  color: var(--gn-text-accent);
+  /* `ticket-ref.ts` renders a real `<a>` when it resolves an href — without
+     this, the UA's default link underline would run through a chip that
+     already carries its own border+fill affordance, which is redundant and
+     reads as a rendering glitch rather than a second cue. */
   text-decoration: none;
 }
-.ticket-editor__content .editor-wikilink:hover { text-decoration: none; }
-.ticket-editor__content .editor-wikilink--missing { color: var(--gn-text-muted); }
+/* The live wiki-link is the one chip with NO border or fill of its own — an
+   accent colour plus `text-decoration: none` would be colour as the ONLY
+   distinguishing cue from plain prose, which this product rules against
+   (and a plain WCAG 1.4.1 concern for links in text generally). The house
+   fix already exists for exactly this shape (`ui.css`'s
+   `.gn-board-card__parent-key`): underlined AT REST, and the owner's
+   "no underline on hover for chips" rule removes it going the other way. */
+.ticket-editor__content .editor-wikilink {
+  color: var(--gn-text-accent);
+  text-decoration: underline;
+  text-underline-offset: 2px;
+}
+/* `:not(--missing)`: the missing pill is a non-interactive `<span>` whose
+   wavy underline IS its meaning, not a live link's rest-state affordance —
+   removing it on hover would erase the one cue that the target is gone at
+   exactly the moment someone pauses to read it. */
+.ticket-editor__content .editor-wikilink:not(.editor-wikilink--missing):hover { text-decoration: none; }
+/* Re-asserts editor.css's wavy underline: both classes are present on a
+   missing link, so `.editor-wikilink`'s own solid underline above (same
+   specificity, earlier in this file) would otherwise win the property by
+   source order and flatten the "broken" cue to an ordinary link. */
+.ticket-editor__content .editor-wikilink--missing {
+  color: var(--gn-text-muted);
+  text-decoration: underline wavy;
+}
 .ticket-editor__content .editor-mention:focus-visible,
 .ticket-editor__content .editor-ticketref:focus-visible,
 .ticket-editor__content .editor-wikilink:focus-visible {
@@ -4041,45 +4071,30 @@ input, textarea, select { font-family: inherit; }
   background: var(--gn-fill-quaternary);
   font-weight: 600;
 }
+/* `--fill-tertiary`, not `--fill-quaternary` (the header row/column's own
+   token, just above): a selected header cell must read as SELECTED, not
+   merely as a header — the two states need visibly different weight, not
+   the same wash reused for two different meanings. `.selectedCell`'s
+   two-class specificity already wins the property over `th`'s one-class
+   rule regardless, but a shared token would still look identical. */
 .ticket-editor__content .selectedCell {
-  background: var(--gn-fill-quaternary);
+  background: var(--gn-fill-tertiary);
 }
 
-/* The table floating toolbar (TableFloatingToolbar.tsx). Sizing matches the
-   main toolbar's own 32/34px grouped-button precedent (editor.css:157-170),
-   not the 44px standalone floor — these are grouped controls, not a lone
-   target. */
+/* The table floating toolbar's COLOUR ONLY — its layout, sizing and the
+   Canvas/currentColor structural rule live in packages/editor/src/styles/
+   editor.css (T2: "put the component in packages/editor with its colours in
+   the web skin section" — editor.css stays colour-free by its own header
+   rule). This file's override never reaches the mobile WebView (its bundle
+   loads editor.css alone) — see that file's own comment on the same rule
+   for why the split is structured this way regardless. */
 .table-toolbar {
-  display: flex;
-  align-items: center;
-  gap: 0.125rem;
-  padding: 0.25rem;
   background: var(--gn-surface-raised);
   box-shadow: var(--gn-shadow-raised);
-  border-radius: var(--gn-radius-control);
-  z-index: 30;
-}
-.table-toolbar__group { display: flex; align-items: center; }
-.table-toolbar__sep {
-  width: 1px;
-  height: 1.25rem;
-  background: var(--gn-border);
-  margin: 0 0.25rem;
-}
-.table-toolbar__btn {
-  min-height: 32px;
-  min-width: 34px;
-  padding: 0 0.5rem;
   border: none;
-  border-radius: 4px;
-  background: none;
-  color: inherit;
-  font: inherit;
-  font-size: 0.8125rem;
-  cursor: pointer;
 }
+.table-toolbar__sep { background: var(--gn-border); opacity: 1; }
 .table-toolbar__btn:hover:not(:disabled) { background: var(--gn-fill-tertiary); }
-.table-toolbar__btn:disabled { opacity: 0.4; cursor: not-allowed; }
 .table-toolbar__btn:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;

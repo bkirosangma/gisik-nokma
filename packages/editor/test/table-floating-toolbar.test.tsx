@@ -189,15 +189,26 @@ describe('table floating toolbar', () => {
       },
     },
     {
+      // On TABLE_DOC's single row, a header ROW converts BOTH cells: a
+      // swapped mapping to `toggleHeaderColumn` would only convert the
+      // first ('a'), so a bare "some th exists" check would not catch it —
+      // the count does.
       label: 'Toggle header row',
       assert: (e) => {
-        expect(e.view.dom.querySelector('th')).not.toBeNull();
+        expect(e.view.dom.querySelectorAll('th')).toHaveLength(2);
+        expect(e.view.dom.querySelectorAll('td')).toHaveLength(0);
       },
     },
     {
+      // On TABLE_DOC's single row, a header COLUMN converts only the FIRST
+      // cell ('a') — a swapped mapping to `toggleHeaderRow` would convert
+      // both, so this must check the count AND which cell.
       label: 'Toggle header column',
       assert: (e) => {
-        expect(e.view.dom.querySelector('th')).not.toBeNull();
+        const th = Array.from(e.view.dom.querySelectorAll('th'));
+        expect(th).toHaveLength(1);
+        expect(th[0]!.textContent).toBe('a');
+        expect(e.view.dom.querySelectorAll('td')).toHaveLength(1);
       },
     },
   ];
@@ -232,6 +243,30 @@ describe('table floating toolbar', () => {
       return !found;
     });
     expect(found).toBe(false);
+    view.unmount();
+  });
+
+  it('Delete row/column are never disabled (a prosemirror-tables quirk, not this port) and a click on the last row/column is a harmless no-op', async () => {
+    // Investigated a React-staleness concern here: could `canRun` go stale
+    // after a command that leaves the active cell's <table> DOM node
+    // identity-equal? Traced into the installed prosemirror-tables@1.8.5
+    // source: `deleteRow`/`deleteColumn`'s "last row/column" guard lives
+    // INSIDE their `if (dispatch)` branch, so `.can()` (called with no
+    // dispatch) never sees it and always answers `true` once the caret is
+    // in a table — there is no disabled state to go stale, on TABLE_DOC's
+    // single row/two columns or anywhere else. Pinned as the button's real,
+    // library-inherited behaviour: never disabled, and a click at the
+    // structural floor is silently ignored rather than refused up front.
+    const { view, editor } = await mount(makeProps({ initialDoc: TABLE_DOC }));
+    editor.commands.setTextSelection(firstCellPos(editor));
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.table-toolbar')).not.toBeNull();
+    });
+    const findButton = (label: string) =>
+      Array.from(view.container.querySelectorAll('button')).find((b) => b.getAttribute('aria-label') === label)!;
+    expect(findButton('Delete row').disabled).toBe(false);
+    fireEvent.click(findButton('Delete row'));
+    expect(editor.view.dom.querySelectorAll('tr')).toHaveLength(1);
     view.unmount();
   });
 
