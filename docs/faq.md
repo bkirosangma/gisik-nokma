@@ -557,6 +557,12 @@ A note is a page of writing that belongs to a workspace or a project, not to a j
 that is not one piece of work — a log, a parts list, something you want to keep after the job it came
 from closes. Find it at **Notes** in the nav, left of Inbox.
 
+**What is the thin line at the top of a note?**
+A reading-progress bar: it fills from the left as you scroll down the note, so you can see how far through
+a long one you are. It measures the text of the note only (not the title or byline above it), starts over
+when you open another note, and is there whether or not you can edit the note. If your device is set to
+reduce motion it moves without the smoothing.
+
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
 workspace except guests, **This project** means everyone actually on that project, **Same as the

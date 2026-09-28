@@ -1610,7 +1610,12 @@ old versions, just not put one back).
 **A note with several headings gets a small floating button, bottom left, labelled "On this page".**
 Press it to open a table of contents over the note; press a heading in it to jump straight there. It
 appears at any window width once a note has enough headings, whereas it used to be a column that showed
-only on a wide screen.
+only on a wide screen. The heading you jump to lands just under the top bar, not behind it.
+
+**A thin line under the top bar shows how far down a note you have read.** It fills from the left as you
+scroll the note (the title and byline above the text do not count) and starts again at empty when you open
+another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops
+animating if your device is set to reduce motion.
 
 ### Finding a note
 

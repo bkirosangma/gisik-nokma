@@ -537,3 +537,12 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.400 — scrolling or a key dismisses the card, and a preview that resolves after the pointer left shows nothing.** (`packages/editor/test/wiki-link.test.ts`)
 - ✅ **9.401 — the link carries `aria-describedby` naming the card while it is up, and drops it after.** (`packages/editor/test/wiki-link.test.ts`)
 - ✅ **9.402 — deleting the link while its card is up removes the card.** (`packages/editor/test/wiki-link.test.ts`)
+- ✅ **9.403 — `findScroller` picks the nearest ancestor whose `overflow-y` scrolls (not the outermost, not `hidden`), and the window when none does.** (`packages/editor/test/reading-scroll.test.tsx`)
+- ✅ **9.404 — `readingProgress`: an element scroller reads `scrollTop` over its range; the window reads the surface's top over `height − viewport`, is 0 before the surface is reached or when it fits, and is clamped to 1.** (`packages/editor/test/reading-scroll.test.tsx`)
+- ✅ **9.405 — `ReadingProgress` on a window-scrolled page is a labelled progressbar (0–100) that follows the window scroll, scales the bar, and returns to 0 on a new note even when the new surface is not there yet.** (`packages/editor/test/reading-scroll.test.tsx`)
+- ✅ **9.406 — on a pane-scrolled page the bar follows the scrolling ancestor and ignores the window.** (`packages/editor/test/reading-scroll.test.tsx`)
+- ✅ **9.407 — a table-of-contents click scrolls the HEADING into view (smoothly, `auto` under reduced motion) and prevents the hash jump; it never calls `scrollTo` on the non-scrolling root.** (`packages/editor/test/reading-scroll.test.tsx`)
+- ✅ **9.408 — the scrollspy observer is rooted at the viewport when the window scrolls and at the pane when a pane does.** (`packages/editor/test/reading-scroll.test.tsx`)
+- ✅ **9.409 — the note page mounts a labelled progressbar for an editor and for a read-only viewer.** (`apps/web/test/note-document.test.tsx`)
+- ✅ **9.410 — the skin: bar top from `--app-nav-offset`, `--gn-border` track and `--gn-accent` fill, transition dropped under `prefers-reduced-motion`, headings `scroll-margin-top` clear of the nav, no literal colour in the section.** (`apps/web/test/note-document.test.tsx`)
+- 🧪 **9.411 — browser: on a long note the bar sits directly under the sticky nav, fills as the page scrolls, and a table-of-contents click lands the heading below the nav (light and dark).**

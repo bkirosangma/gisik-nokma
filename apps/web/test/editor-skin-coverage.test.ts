@@ -94,6 +94,11 @@ const EXCLUDED_EDITOR_FILES = new Set([
   // The link editor popover (KB editor parity) — a body-portalled panel; its rules
   // live in editor.css and the popover test (9.397) proves each class it draws has one.
   'components/LinkEditorPopover.tsx',
+  // The reading-progress bar (KB editor parity) — a page-level fixed bar, not
+  // editor content; its rules are split editor.css (structure) / globals.css
+  // (colour, placement, motion) and the note-document test (9.409/9.410)
+  // proves the skin half.
+  'reading/ReadingProgress.tsx',
   // Attachment/upload chrome — an unrelated feature area; some of it
   // (`.attachment-item--upload`/`__name`) is deliberately UNSTYLED per an
   // existing test (`apps/web/test/attachment-list-item.test.tsx`), and a

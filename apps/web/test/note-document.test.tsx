@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { searchTermSchema } from '@gisik-nokma/domain';
 import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -690,5 +692,46 @@ describe('13.1488 clicking below the text focuses the editor', () => {
     fireEvent.click(wrapper);
 
     await waitFor(() => expect(textbox).toHaveFocus());
+  });
+});
+
+/**
+ * 9.409 / 9.410 — KB parity: the reading-progress bar on the note page.
+ *
+ * gisik has no read/edit toggle, so the note page is the reading surface and
+ * the bar is there for an editor and a reader alike (the source mounts it in
+ * read mode only). 9.410 is the skin: the bar is under the sticky nav, painted
+ * from tokens, still under reduced motion, and a heading scrolled to clears the
+ * nav.
+ */
+describe('9.409 the note page carries a reading-progress bar', () => {
+  it('9.409 a labelled progressbar is mounted for an editor and for a read-only viewer', async () => {
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    renderDocument({ role: 'member' });
+    const bar = await screen.findByRole('progressbar', { name: 'Reading progress' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+    cleanup();
+
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(await screen.findByRole('progressbar', { name: 'Reading progress' })).toBeInTheDocument();
+  });
+
+  it('9.410 the skin: tokens only, under the nav, motion off under prefers-reduced-motion, headings clear the nav', () => {
+    const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (selector: string): string => {
+      const match = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css);
+      expect(match, `a rule for ${selector}`).not.toBeNull();
+      return match?.[1] ?? '';
+    };
+    expect(rule('.reading-progress')).toMatch(/top:\s*var\(--app-nav-offset/);
+    expect(rule('.reading-progress')).toMatch(/background:\s*var\(--gn-border\)/);
+    expect(rule('.reading-progress__bar')).toMatch(/background:\s*var\(--gn-accent\)/);
+    expect(rule('.reading-progress__bar')).toMatch(/transition:\s*transform/);
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.reading-progress__bar\s*\{\s*transition:\s*none/);
+    expect(rule('.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)')).toMatch(/scroll-margin-top:\s*calc\(var\(--app-nav-offset/);
+    // No literal colour in the section this piece added.
+    const section = css.slice(css.indexOf('.reading-progress {'));
+    expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
   });
 });

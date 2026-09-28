@@ -1549,6 +1549,18 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 - ✅ **Reading extras for long documents** — word count, reading time (200 wpm, floored at a
   minute for any non-empty text) and a table of contents that renders at three headings or more.
   `packages/editor/src/reading/reading-meta.ts`, `ReadingTOC.tsx`
+  - ✅ **Reading progress bar, and the reading surface's scroller is resolved, not assumed** (KB
+    `ReadingProgress`; audit of the ported `ReadingTOC`) — a 3px labelled `progressbar` under the sticky nav,
+    `transform: scaleX` from the left, driven by the note surface's position (the source's `scrollTop` would
+    read 0 forever here: the note page scrolls the WINDOW, `.gn-notes__editor` does not). Mounted for every
+    viewer (there is no read/edit toggle to gate it on) and never in the ticket sheet; resets per note;
+    transition off under `prefers-reduced-motion`; colours `--gn-accent` on `--gn-border`. The same
+    `findScroller` fixes two silent defects in the ported table of contents: a click did nothing (it called
+    `scrollTo` on the non-scrolling root after `preventDefault`) and the scrollspy was rooted at a page-tall
+    box. Headings now `scroll-margin-top` below the nav.
+    `packages/editor/src/reading/ReadingProgress.tsx`, `packages/editor/src/reading/scroller.ts`,
+    `packages/editor/src/reading/ReadingTOC.tsx`, `apps/web/app/globals.css` (KB editor parity section),
+    `apps/web/src/notes/note-document.tsx`
 - ✅ **Markdown in and out** — pasting plain text that looks like Markdown converts it (a clipboard carrying
   `text/html` is left to the default handler); copying formatted content puts Markdown in the PLAIN-TEXT
   clipboard flavour only; `exportMarkdown` renders a whole document through the editor's own schema.

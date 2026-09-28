@@ -1044,6 +1044,13 @@
    a colour, and colour alone is never the only indicator anyway. */
 .reading-toc__link[aria-current='true'] { font-weight: 600; }
 
+/* The reading-progress bar (ReadingProgress.tsx). Position, size and the
+   transform origin here; colour, the motion rule and where under the page's own
+   chrome it sits are the web skin's. `transform: scaleX` from the left edge, so
+   the bar never triggers layout. */
+.reading-progress { position: fixed; top: 0; left: 0; right: 0; height: 3px; pointer-events: none; }
+.reading-progress__bar { height: 100%; width: 100%; transform-origin: left center; transform: scaleX(0); }
+
 /* The table floating toolbar (TableFloatingToolbar.tsx). Structure here,
    colour in the web skin (globals.css) — same split `.wikilink-preview`
    above already uses: `Canvas`/`currentColor` are this file's stand-ins for

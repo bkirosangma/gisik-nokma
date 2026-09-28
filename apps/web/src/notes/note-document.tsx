@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   TicketEditorSlot,
   exportMarkdown,
+  ReadingProgress,
   extractReadingMeta,
   readingTimeMinutes,
   uploadAttachmentHttp,
@@ -551,6 +552,11 @@ export function NoteDocument({
           or the toolbar, never this element, so ProseMirror's own
           click-to-position-caret is untouched; what this catches is the
           padded empty space the `min-height` rule adds below short text. */}
+      {/* No read/edit toggle here, so the note page IS the reading surface
+          and every viewer gets the bar (the KB source mounts it in read mode
+          only). Bound to the same element as the table of contents; it works
+          out for itself that the WINDOW scrolls (`findScroller`). */}
+      <ReadingProgress scrollContainerRef={editorRoot} resetKey={note.noteId} />
       <div
         className="gn-notes__editor"
         ref={editorRoot}

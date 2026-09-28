@@ -51,6 +51,8 @@ export {
   type ReadingMeta,
 } from './reading/reading-meta.js';
 export { MIN_HEADINGS, ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
+export { ReadingProgress, type ReadingProgressProps } from './reading/ReadingProgress.js';
+export { findScroller, readingProgress, type Scroller } from './reading/scroller.js';
 export { UploadRefusedError, uploadAttachmentHttp, uploadNoteAttachmentHttp, type UploadResult } from './upload.js';
 export {
   attachmentPasteKey,
