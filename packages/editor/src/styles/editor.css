@@ -232,6 +232,9 @@
   background: var(--gn-fill-quaternary);
 }
 .ticket-editor__tool {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.375rem;
   min-height: 32px;
   min-width: 34px;
   padding: 0 10px;
@@ -244,6 +247,7 @@
   font-size: 0.8125rem;
   font-weight: 600;
   cursor: pointer;
+  transition: background 150ms ease, box-shadow 150ms ease;
 }
 /* The active mark. `ImageWrapMenu`'s own `--active` rule is the precedent, and
    the reason for a second cue rather than colour is the same: this file has no
@@ -251,6 +255,99 @@
 .ticket-editor__tool--active {
   outline: 1px solid currentColor;
   outline-offset: -1px;
+}
+/* Hover/active/pressed states (Unit 4 restyle, owner screenshot 2026-09-23:
+   "the editor toolbar needs better styling") — the strip had none of the
+   three before this. `--gn-fill-secondary` is one step UP from the resting
+   `--gn-fill-tertiary` in the fill hierarchy (`tokens.ts`'s own
+   fillPrimary→fillQuaternary order), so hovering reads as a lift rather than
+   a colour swap; `:active` reuses `--gn-shadow-sunken-compact`, the house
+   token already established for a COMPACT control's pressed feel
+   (`ui.css`'s `.gn-attention`/select-trigger family), in place of the
+   resting raised shadow, so the button visibly presses IN rather than just
+   changing colour. `:focus-visible` reuses the exact ring the searchable
+   select trigger already draws (`.gn-select__trigger--searchable:focus-
+   within`, `ui.css`) — one focus-ring treatment, not a second. */
+.ticket-editor__tool:hover {
+  background: var(--gn-fill-secondary);
+}
+.ticket-editor__tool:active {
+  box-shadow: var(--gn-shadow-sunken-compact);
+}
+.ticket-editor__tool:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.ticket-editor__tool:disabled {
+  cursor: not-allowed;
+  opacity: 0.6;
+}
+.ticket-editor__tool-label {
+  white-space: nowrap;
+}
+/* Groups (marks / blocks / insert), each `role="group"` in the markup — a
+   thin divider between clusters rather than a bigger gap alone, so the
+   strip reads as three related sets and not one undifferentiated row of
+   eleven buttons. */
+.ticket-editor__tool-group {
+  display: inline-flex;
+  align-items: center;
+  gap: 6px;
+}
+.ticket-editor__tool-divider {
+  width: 1px;
+  align-self: stretch;
+  min-height: 20px;
+  background: var(--gn-border);
+  margin: 0 2px;
+}
+/* The tooltip wrapper — `position: relative` is what anchors the floating
+   panel to ITS OWN button rather than the whole toolbar. */
+.ticket-editor__tool-wrap {
+  position: relative;
+  display: inline-flex;
+}
+/* The tooltip itself — `role="tooltip"` in the markup, shown on hover AND
+   keyboard focus (never `title=`: `packages/ui/src/ui.css` records the
+   product's ruling against it, unreachable by keyboard/touch). Anchored
+   ABOVE the button, the house raised surface/shadow (matching `.gn-popover`/
+   `.gn-select__panel`, `packages/ui/src/ui.css`) since this file already
+   carries `var(--gn-…)` references for this exact family (E4-8) — one more
+   is not a second exception. */
+.ticket-editor__tooltip {
+  position: absolute;
+  bottom: 100%;
+  left: 50%;
+  transform: translateX(-50%);
+  margin-bottom: 6px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  gap: 0.15rem;
+  padding: 0.35rem 0.55rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text);
+  font-size: 0.75rem;
+  font-weight: 400;
+  white-space: nowrap;
+  pointer-events: none;
+}
+.ticket-editor__tooltip-line {
+  display: flex;
+  align-items: baseline;
+  gap: 0.4rem;
+}
+.ticket-editor__tooltip-name {
+  font-weight: 600;
+}
+.ticket-editor__tooltip-shortcut {
+  color: var(--gn-text-muted);
+}
+.ticket-editor__tooltip-markdown {
+  color: var(--gn-text-muted);
+  font-size: 0.85em;
 }
 .ticket-editor__link-url {
   min-width: 10rem;
@@ -535,10 +632,25 @@
    takes no line of its own, so the caret sits where the text will. */
 .ticket-editor__content .is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--gn-text-muted);
+  /* Unit 6d — the same lighter tone every other placeholder in the product
+     moved to (`packages/ui/src/ui.css`'s `.gn-field__input::placeholder`
+     docblock has the measured contrast and the owner's ruling); this
+     element's own host carries `gn-field__input` too
+     (`TicketEditor.tsx`'s `<EditorContent>`), so the same
+     `--gn-fill-quaternary` background applies here. */
+  color: var(--gn-text-subtle);
   float: left;
   height: 0;
   pointer-events: none;
+}
+/* Unit 6c — the editor's own placeholder hides on focus too, the same rule
+   every other text field in the product now carries (`.gn-field__input:
+   focus::placeholder`, `ui.css`). `:focus-within` on the container, not
+   `:focus` on the pseudo-element's own (nonexistent) host: `.ProseMirror`
+   is what actually takes focus, one level below `.ticket-editor__content`,
+   the same selector `:620` above already uses for the focus RING. */
+.editor-slot .ticket-editor__content:focus-within .is-editor-empty:first-child::before {
+  color: transparent;
 }
 
 .editor-slot__footer {
@@ -559,6 +671,55 @@
   font-size: 0.75rem;
   line-height: 1rem;
   opacity: 0.7;
+}
+
+/* The Attach button (Unit 5) — the prototype's own raised/quiet coat
+   (`desktop.dc.html:1319`: `background:var(--cardBg);box-shadow:var(
+   --cardShadow);color:var(--accent)`), mapped onto the house tokens
+   `.gn-card` already uses for that exact pair (`--gn-surface-raised`/
+   `--gn-shadow-raised`), with `--gn-text-accent` for the tinted label —
+   NOT `flex: 1`, so it sits left of the hint rather than sharing its half
+   of the row. */
+.editor-slot__attach-wrap {
+  display: inline-flex;
+}
+.editor-slot__attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.8rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.editor-slot__attach:hover {
+  background: var(--gn-fill-secondary);
+}
+.editor-slot__attach:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* Visually hidden, not `display:none` — the SAME clip-path recipe this
+   file's disabled-reason span already uses, kept a real focusable/clickable
+   element so the visible button's `.click()` call reaches it reliably. */
+.editor-slot__attach-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
 }
 
 /* The note mode's save state (Plan 4 Task 8). It had NO RULE while all three of

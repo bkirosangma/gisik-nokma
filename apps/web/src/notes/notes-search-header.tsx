@@ -70,6 +70,7 @@ export function NotesSearchHeader({
       <input
         type="search"
         aria-label="Search notes"
+        placeholder="Search"
         data-testid="notes-search"
         className="gn-notes__search-input gn-field__input"
         value={value}

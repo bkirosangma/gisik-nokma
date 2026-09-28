@@ -35,6 +35,30 @@ import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 
 /**
+ * The Attachments tab's "Attach a file" button `accept` hint (Unit 5(b)) —
+ * the SAME eleven types `apps/server/src/attachments/sniff.ts`'s
+ * `ALLOWED_ATTACHMENT_MIME` accepts, transcribed rather than imported (this
+ * package cannot depend on `apps/server`, and `packages/editor`'s own copy —
+ * `TicketEditorSlot.tsx`'s `ATTACHMENT_ACCEPT` — is unreachable too: `app-
+ * core` must never depend on `@gisik-nokma/editor`, the same direction
+ * `editor-slot.tsx`'s docblock states for the reverse edge). A UX hint
+ * only — the server decides by magic bytes, never by this string.
+ */
+const ATTACHMENT_ACCEPT = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+].join(',');
+
+/**
  * How many ledger entries this sheet asks for, and the reason it names a number
  * at all instead of taking whatever arrives.
  *
@@ -581,6 +605,16 @@ export function TicketSheet({
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
+  // Unit 5(b), owner: "I thought we already made the attachment feature but
+  // i dont see where we can attach files in our build" — the Attachments
+  // tab's own "Attach a file" (prototype `addFile`, `desktop.dc.html:1363-
+  //1366`). `attachTabInputRef` is the hidden file input the button clicks;
+  // `attachTabRefusal` is a LOCAL failure sentence, not `attachRefusals`
+  // (that Toast is specifically for notes a COMMENT implied and does not fit
+  // a plain upload failure).
+  const attachTabInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachingTab, setAttachingTab] = useState(false);
+  const [attachTabRefusal, setAttachTabRefusal] = useState<string | null>(null);
   /**
    * Full screen (sheet prototype parity, 2026-09-20). Local state, like `tab`:
    * it is a way of LOOKING at this sheet rather than anything the server holds,
@@ -1474,6 +1508,29 @@ export function TicketSheet({
       );
     }
   };
+
+  /**
+   * Unit 5(b) — the Attachments tab's own upload, through the SAME two-step
+   * path the composer's Attach button and paste/drop all use:
+   * `uploadAttachment` then `emitAttachmentAdded`. No node to insert here
+   * (this tab holds no document) and no local list to update — `attachments`
+   * is the page's own live query, prop-fed, and reads the newly-added file
+   * the same way it already reads one a paste implied, once the ledger
+   * write above lands and the page's stream re-fetches.
+   */
+  async function handleAttachmentTabUpload(file: File): Promise<void> {
+    if (!uploadAttachment) return;
+    setAttachingTab(true);
+    setAttachTabRefusal(null);
+    try {
+      const uploaded = await uploadAttachment(file);
+      await emitAttachmentAdded(uploaded);
+    } catch (err) {
+      setAttachTabRefusal(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAttachingTab(false);
+    }
+  }
 
   /**
    * Mentions, resolved off the roster this sheet ALREADY reads for `nameOf`
@@ -3953,7 +4010,47 @@ export function TicketSheet({
       ) : tab === 'attachments' ? (
         <div className="gn-ticket-sheet__attachments">
           {attachmentsUnavailable === undefined ? (
-            <AttachmentList entries={attachments ?? []} />
+            <>
+              <AttachmentList entries={attachments ?? []} />
+              {/*
+                Unit 5(b) — the prototype's own footer control inside this
+                same "answered" arm (`desktop.dc.html:1363-1366`: the list
+                rows, the empty state, THEN this button, in that order) —
+                never drawn over a FAILED read, the same "not a dead button"
+                rule the composer's own Attach button follows: there is no
+                known list here to add a file to honestly.
+              */}
+              {uploadAttachment === undefined ? null : (
+                <>
+                  <button
+                    type="button"
+                    className="gn-ticket-sheet__attach-file"
+                    disabled={attachingTab}
+                    onClick={() => attachTabInputRef.current?.click()}
+                  >
+                    {attachingTab ? 'Attaching…' : 'Attach a file'}
+                  </button>
+                  <input
+                    ref={attachTabInputRef}
+                    type="file"
+                    className="gn-ticket-sheet__attach-file-input"
+                    accept={ATTACHMENT_ACCEPT}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleAttachmentTabUpload(file);
+                      event.target.value = '';
+                    }}
+                  />
+                </>
+              )}
+              {attachTabRefusal === null ? null : (
+                <p role="alert" className="gn-ticket-sheet__refusal" data-testid="sheet-attach-tab-refusal">
+                  {attachTabRefusal}
+                </p>
+              )}
+            </>
           ) : (
             /*
               The three-way distinction this sheet draws for the ledger tab,

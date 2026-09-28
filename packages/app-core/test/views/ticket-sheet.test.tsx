@@ -4957,6 +4957,74 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
 });
 
 /**
+ * 9.336–9.337 — Unit 5(b) (owner: "I thought we already made the attachment
+ * feature but i dont see where we can attach files in our build"): the
+ * Attachments tab's own "Attach a file" button. Case ids live in
+ * `test-cases/09-editor-attachments.md`, block `9.313`–`9.337`.
+ */
+describe('9.336-9.337 the Attachments tab draws its own Attach-a-file button', () => {
+  it('9.336 clicking Attach a file uploads through the SAME uploadAttachment path and writes attachment.added to the ledger', async () => {
+    const uploaded = {
+      attachmentId: '01J9GATA100000000000000001',
+      filename: 'evidence.pdf',
+      mime: 'application/pdf',
+      size: 4096,
+      url: '/v1/attachments/01J9GATA100000000000000001',
+      sha256: 'a'.repeat(64),
+    };
+    const uploadAttachment = vi.fn(async (_file: File) => uploaded);
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      attachments: [],
+      uploadAttachment,
+    });
+    await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    const button = document.querySelector('.gn-ticket-sheet__attach-file') as HTMLButtonElement;
+    expect(button, 'no Attach a file button rendered').not.toBeNull();
+    expect(button.textContent).toContain('Attach a file');
+    const input = document.querySelector('.gn-ticket-sheet__attach-file-input') as HTMLInputElement;
+    const file = new File([new Uint8Array(4)], 'evidence.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => {
+      expect(uploadAttachment).toHaveBeenCalledTimes(1);
+    });
+    expect(uploadAttachment.mock.lastCall?.[0]).toBe(file);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const event = source.ingested[0]![0]!;
+    expect(event.type).toBe('attachment.added');
+    expect(event.payload).toMatchObject({ kind: 'upload', attachmentId: uploaded.attachmentId });
+  });
+
+  it('9.337 with no uploader, the button is absent; with a FAILED attachments read, it is absent too — never a dead control over an unknown list', async () => {
+    // ARM ONE — no uploader wired at all.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [] });
+    await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    expect(document.querySelector('.gn-ticket-sheet__attach-file')).toBeNull();
+    cleanup();
+
+    // ARM TWO — an uploader IS wired, but the read failed: the button still
+    // must not draw, since there is no known list to add a file to honestly.
+    const uploadAttachment = vi.fn(async (_file: File) => ({
+      attachmentId: '01J9GATA200000000000000002',
+      filename: 'x.pdf',
+      mime: 'application/pdf',
+      size: 1,
+      url: '/v1/attachments/01J9GATA200000000000000002',
+      sha256: 'b'.repeat(64),
+    }));
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      attachmentsUnavailable: 'HTTP 500',
+      uploadAttachment,
+    });
+    await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    expect(screen.getByTestId('sheet-attachments-unavailable')).toBeInTheDocument();
+    expect(document.querySelector('.gn-ticket-sheet__attach-file')).toBeNull();
+  });
+});
+
+/**
  * 3.190 (E5-9) — A REFUSAL ANSWERS WHERE THE CONTROL IS.
  *
  * `Delete` sits in the sheet's footer, at the very END of a body that scrolls:

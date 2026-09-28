@@ -2,6 +2,7 @@ import { searchTermSchema } from '@gisik-nokma/domain';
 import { describe, expect, it, vi } from 'vitest';
 import {
   buildProjectPageQueryTickets,
+  buildWorkspaceQueryTickets,
   prioritizeProject,
   ticketRefCandidatesOf,
   ticketRefHrefIn,
@@ -162,5 +163,43 @@ describe('18.272 buildProjectPageQueryTickets', () => {
 
     await queryTickets('freezer');
     expect(search).toHaveBeenCalledWith('ws_1', 'freezer');
+  });
+});
+
+describe('18.311 buildWorkspaceQueryTickets', () => {
+  const workspace = {
+    id: 'ws_1',
+    projects: [
+      { id: 'p1', archived: false },
+      { id: 'p2', archived: false },
+    ],
+  };
+  const dataSource = (getTickets: (p: string) => Promise<{ rows: Array<{ ticketId: string; title: string; key: string | null }> }>) => ({
+    query: {
+      search: strictSearch([]),
+      getMyWorkspaces: async () => [workspace],
+      getTickets: getTickets as never,
+    },
+  });
+
+  it('18.311 one failing project does not blank the picker; only when EVERY project read fails does the rejection propagate', async () => {
+    const partial = dataSource(async (projectId) => {
+      if (projectId === 'p2') throw new Error('restricted');
+      return { rows: [{ ticketId: '01J9AAAA0000000000000000A1', title: 'Survives', key: 'CC-1' }] };
+    });
+    const survived = await buildWorkspaceQueryTickets(partial, 'ws_1')('');
+    expect(survived.map((c) => c.title)).toEqual(['Survives']);
+
+    const allDown = dataSource(async () => {
+      throw new Error('offline');
+    });
+    await expect(buildWorkspaceQueryTickets(allDown, 'ws_1')('')).rejects.toThrow('offline');
+  });
+
+  it('18.311 a whitespace-only query is the empty query (never reaches search); a workspace with no live projects lists nothing', async () => {
+    const ds = dataSource(async () => ({ rows: [] }));
+    expect(await buildWorkspaceQueryTickets(ds, 'ws_1')('   ')).toEqual([]);
+    expect(await buildWorkspaceQueryTickets(ds, 'ws_other')('')).toEqual([]);
+    expect(ds.query.search).not.toHaveBeenCalled();
   });
 });

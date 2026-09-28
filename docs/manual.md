@@ -424,9 +424,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   shipped in a shape that always fails silently (E5-44).
 - **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The job sheet's
-  **Attachments** tab lists the job's files, and the comment box takes one too. The **description** box is still the exception: a file
-  dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
-  puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
+  **Attachments** tab lists the job's files and has its own **Attach a file** button, and the comment
+  box takes one too — paste it, drop it, or press its own paperclip **Attach** button, left of the
+  posting note. The **description** box is still the exception: a file dropped into it is refused
+  rather than quietly lost, and it draws no Attach button either. A move carrying the "require evidence"
+  rule still puts its own file box on the Move dialog and stays blocked until the server has
+  stored the file (§7).
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and type into the title at the top
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
@@ -1574,7 +1577,11 @@ The author always reads their own note, whatever its scope — that is what **Pr
 ### Writing a note
 
 The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold,
-Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note.
+Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, **Insert note** and
+**Insert ticket**. Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and
+the markdown you can type instead. **Insert note** and **Insert ticket** each drop the `:note`/`:ticket`
+trigger at the cursor and open the same picker typing it would — the same two triggers work from the
+keyboard too, and `[[` still works for a note.
 
 **Notes save themselves.** A couple of seconds after you stop typing, your change is sent — not on
 every keystroke. Until it is accepted the footer says **Saving…**; once it is, **Saved**. If it cannot
@@ -1626,7 +1633,7 @@ this).
 ### Linking to a job or another note
 
 Typing `:ticket ` followed by a few words, in a comment or in a note, opens a picker over the jobs you
-can see; pick one and it inserts a chip showing the job's key and title, which opens that job.
+can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type.
 
 Typing `:note ` (or `[[`) the same way opens a picker over the notes you can read, and inserts a link to
 the one you pick.

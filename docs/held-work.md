@@ -44,20 +44,14 @@ Readings (commits) were taken at 2026-09-24 ~01:05 IST. Re-check each with `git 
 
 - **Owner ruling (2026-09-24 ~00:47):** *"and pause Editor-polish".* Units 1 and 3 landed in the notes release as #727: the `:ticket` fix, and the inline pickers placed, styled and kept above the sheet.
 - **Branch:** `task/editor-polish` at `a7462363a87d824a898a1126cd36a30bdf19f2ff`. That is the controller's forward-merge of `release/notes` onto the held unit tip `2a30141ad8c63d97acdb30ea90acb0d130d637a2`.
-- **Left:**
-  - **Unit 2:** style the "Attach note" button and its menu.
-  - **Unit 4:** the editor toolbar.
-    - Restyle it to the prototype.
-    - A hover tooltip on every tool, with its keyboard shortcut (platform-aware ⌘/Ctrl) and its markdown shortcut, plus `aria-keyshortcuts`.
-    - Replace `[[` with **Insert note** and **Insert ticket**.
-    - No `@` button.
-  - **Unit 5:** an **Attach** button in the comment composer (paperclip, as in the prototype `desktop.dc.html:1314-1330`) through the existing upload path, and "Add file" on the Attachments tab.
-  - **Unit 6a:** the notes search gets `placeholder="Search"`.
-  - **Unit 6b:** "Any author" / "Any scope" never wrap.
-  - **Unit 6c:** placeholders disappear on focus, everywhere, with a label sweep of the 23 `placeholder=` sites.
-  - **Unit 6d:** placeholders use `--gn-text-subtle`, with a 4.5:1 contrast pair against the field background. If that pair fails, stop and report instead of lowering the bar.
-- **Owed from Unit 3:** the live browser check 9.317 (the popup above `.gn-sheet__scrim`).
-- **Case blocks:** Units 1–5 `9.313`–`9.337`; Unit 6 is a new §18 row, `18.301`–`18.320`.
+- **DONE 2026-09-28, on the branch, not yet merged into `release/trash`:**
+  - **Unit 2:** the Attach-note button and its menu now draw the house treatment (cases `9.323`–`9.325`).
+  - **Unit 4:** the toolbar restyled — hover/active/focus states, a tooltip on every tool (name + platform-aware shortcut + markdown hint), `[[` replaced by **Insert note**/**Insert ticket**, no `@` (cases `9.326`–`9.332`).
+  - **Unit 5:** an Attach button in the comment composer footer and on the Attachments tab, both through the existing `uploadAttachment` path (cases `9.333`–`9.337`).
+  - **Unit 6a–c:** the notes search placeholder, the filter-wrap fix, and focus-hides-placeholder product-wide, with the 24-site label sweep (cases `18.301`–`18.305`).
+  - **Unit 6d:** placeholders now read `--gn-text-subtle`. Measured composited (the field background is translucent, so a raw-hex reading is meaningless) — `neo` clears 4.5:1 everywhere; `hig`/`minimal` do not (3.6–4.3:1 in three of six real contexts). **Owner ruling, 2026-09-28: accept 3:1 for `hig`/`minimal`** rather than hold every style to 4.5, given Unit 6c's own label sweep already guarantees a real name survives the placeholder vanishing. Cases `18.306`–`18.309`.
+- **Owed from Unit 3, still open:** the live browser check 9.317 (the popup above `.gn-sheet__scrim`) — not reached this pass.
+- **Case blocks:** Units 1–5 `9.313`–`9.337`, fully spent; Unit 6 is §18's new row, `18.301`–`18.320` (`18.301`–`18.309` minted, `18.310`–`18.320` unused).
 - **Brief:** `docs/lanes/held/BRIEF-editor-polish-2026-09-23.md`, including ADDENDUM 2 and ADDENDUM 3 at its end.
 
 ## 3. Editor skin — everything the editor draws, and tables

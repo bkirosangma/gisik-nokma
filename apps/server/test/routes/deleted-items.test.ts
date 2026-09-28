@@ -320,7 +320,7 @@ describe('19.063 the list is ordered by deletedAt descending', () => {
     await db.pool.query('UPDATE proj_tickets SET deleted_at = $2 WHERE ticket_id = $1', [t3, new Date(base + 2000).toISOString()]);
 
     const { items } = await deletedItems(owner);
-    const ordered = items.filter((i) => [t1, t2, t3].includes(i.id)).map((i) => i.id);
+    const ordered = items.filter((i) => ([t1, t2, t3] as string[]).includes(i.id)).map((i) => i.id);
     expect(ordered).toEqual([t3, t2, t1]);
   });
 });

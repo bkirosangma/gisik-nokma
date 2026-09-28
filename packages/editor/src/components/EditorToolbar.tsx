@@ -1,10 +1,11 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useId, useState } from 'react';
 import type { Editor } from '@tiptap/react';
 
 /**
- * The formatting strip above the composer — the prototype's `descTools`
- * (`design-system/interactive/desktop.dc.html:3670-3681`, drawn at `:1167`),
- * which is six controls and a hint line and has never had a counterpart here.
+ * The formatting strip above the composer — the prototype's `descTools`/
+ * `cmtTools` (`design-system/interactive/desktop.dc.html:3670-3695`, drawn
+ * at `:1301`), which is six controls and a hint line and has never had a
+ * counterpart here.
  *
  * ## Why this needed NO schema change, measured rather than assumed
  *
@@ -41,7 +42,8 @@ import type { Editor } from '@tiptap/react';
  * the reader has to guess about. `isActive` is re-read on every editor
  * TRANSACTION — the `ImageWrapMenu` pattern (`:15-22`), which is this package's
  * established way to follow the editor's state without Tiptap re-rendering the
- * tree. `aria-pressed` carries the same fact to a screen reader.
+ * tree. `aria-pressed` carries the same fact to a screen reader — except for
+ * the two insert actions (below), which toggle nothing and so report none.
  *
  * ## `Link` is the one control that needs input, and it gets it inline
  *
@@ -53,16 +55,244 @@ import type { Editor } from '@tiptap/react';
  * `ImageWrapMenu`'s alt input already uses. On a selection that is ALREADY a
  * link, the button removes the mark without asking, which is the one case where
  * there is no destination to supply.
+ *
+ * ## Restyle, tooltips and the two insert buttons (Unit 4, owner screenshot
+ * 2026-09-23: "the editor toolbar needs better styling ... add tool tips to
+ * the tools with their names on hover ... I want a button to insert the note
+ * and ticket there on the bar")
+ *
+ * Three additions on top of the six-plus-four strip above:
+ *
+ * 1. **Grouping.** The eleven controls cluster into three `role="group"`s —
+ *    marks (Bold/Italic/Code/Link), blocks (Bullet list/Quote/Task item/Code
+ *    block/Collapsible) and insert actions (Insert note/Insert ticket) — with
+ *    a thin divider between clusters. DOM order is unchanged from the flat
+ *    list (16.85's own order case reads `.ticket-editor__tool` regardless of
+ *    its wrapping `<div>`s), so no case that queries by that class needed to
+ *    change shape, only its final four names.
+ * 2. **Tooltips, not `title=`.** `packages/ui/src/ui.css` records the
+ *    product's ruling against `title=` (unreachable by keyboard and touch) —
+ *    so `ToolButton` below shows a `role="tooltip"` panel on hover AND on
+ *    focus, named by `aria-describedby`, and hides on blur/mouse-leave/
+ *    Escape. Its two lines are the tool's name + keyboard shortcut, then a
+ *    muted "or type …" line for a markdown trigger — both READ from
+ *    `SHORTCUTS`/`markdownFor`, never retyped per button, so a table edit
+ *    reaches every consumer.
+ * 3. **`[[` is REPLACED**, not kept alongside the two new buttons: "Insert
+ *    note" and "Insert ticket" each insert the bare trigger
+ *    (`:note `/`:ticket `) at the caret with `.focus()` in the same chain —
+ *    the SAME mechanism the old `[[` button used (`insertContent`), which is
+ *    what makes it "the same effect as typing it" rather than a second
+ *    implementation of either picker. No `@` control exists here and none is
+ *    added (owner: "I do not want that").
  */
-export const MARKDOWN_HINT = 'Markdown: **bold**, *italic*, `code`, > quote, - list, [text](url)';
+
+const MARKDOWN_ENTRIES: { key: string; markdown: string }[] = [
+  { key: 'bold', markdown: '**bold**' },
+  { key: 'italic', markdown: '*italic*' },
+  { key: 'code', markdown: '`code`' },
+  { key: 'quote', markdown: '> quote' },
+  { key: 'list', markdown: '- list' },
+  { key: 'link', markdown: '[text](url)' },
+];
+export const MARKDOWN_HINT = `Markdown: ${MARKDOWN_ENTRIES.map((entry) => entry.markdown).join(', ')}`;
+
+/**
+ * Per-tool markdown triggers beyond MARKDOWN_HINT's own six — kept OUT of
+ * `MARKDOWN_ENTRIES`/`MARKDOWN_HINT` deliberately, since that sentence's
+ * rendered text is 16.85's own pinned case and not this unit's to change.
+ * Each is read from the INSTALLED extension's `addInputRules()`, not
+ * invented (advisor rule, ADDENDUM 3): code block's
+ * `/^```([a-z]+)?[\s\n]$/` (`@tiptap/extension-code-block@3.31.3`, inherited
+ * unmodified by `CodeBlockWithCopy.extend`), task list's
+ * `/^\s*(\[([( |x])?\])\s$/` (`@tiptap/extension-list@3.30.5`), collapsible's
+ * `/^<\s$/` (`collapsible.ts`). Insert note/ticket name BOTH their triggers,
+ * per ADDENDUM 3's own examples.
+ */
+const EXTRA_MARKDOWN: Record<string, string> = {
+  codeBlock: '``` then space',
+  task: '[ ] ',
+  collapsible: '< ',
+  insertNote: ':note or [[',
+  insertTicket: ':ticket',
+};
+
+function markdownFor(key: string): string | null {
+  const shared = MARKDOWN_ENTRIES.find((entry) => entry.key === key);
+  if (shared) return shared.markdown;
+  return EXTRA_MARKDOWN[key] ?? null;
+}
+
+/**
+ * Real keyboard shortcuts, read from the INSTALLED extensions'
+ * `addKeyboardShortcuts()` under each installed `@tiptap/extension-` package's
+ * `dist` output, never remembered (advisor rule): bold `Mod-b`/italic `Mod-i`
+ * (extension-bold/italic@3.30.5), code `Mod-e` (extension-code@3.30.5),
+ * blockquote `Mod-Shift-b` (extension-blockquote@3.30.5), bullet list
+ * `Mod-Shift-8` and task list `Mod-Shift-9` (extension-list@3.30.5, both
+ * `BulletList` and `TaskList` live there since v3's list consolidation —
+ * the `@tiptap/extension-bullet-list`/`-task-list` packages this repo
+ * imports are thin re-export shims over it), code block `Mod-Alt-c`
+ * (extension-code-block@3.31.3). **`link` has NONE** — `extension-
+ * link@3.30.5`'s dist defines no `addKeyboardShortcuts` at all — and
+ * **`collapsible` has none either** — `Details` only binds `Backspace`/
+ * `Enter`, never a toggle. Both show their name alone rather than invent a
+ * binding neither extension registers.
+ */
+const SHORTCUTS: Record<string, string | null> = {
+  bold: 'Mod-b',
+  italic: 'Mod-i',
+  code: 'Mod-e',
+  link: null,
+  list: 'Mod-Shift-8',
+  quote: 'Mod-Shift-b',
+  task: 'Mod-Shift-9',
+  codeBlock: 'Mod-Alt-c',
+  collapsible: null,
+  insertNote: null,
+  insertTicket: null,
+};
+
+/** `Mod-Alt-c` → `⌘⌥C` (mac, no separators — matches the owner's own
+ * example) or `Ctrl+Alt+C` (every other platform, `+`-joined). */
+function formatShortcut(raw: string, isMac: boolean): string {
+  const parts = raw.split('-');
+  const key = (parts[parts.length - 1] ?? '').toUpperCase();
+  const symbols = parts.slice(0, -1).map((mod) => {
+    if (mod === 'Mod') return isMac ? '⌘' : 'Ctrl';
+    if (mod === 'Shift') return isMac ? '⇧' : 'Shift';
+    if (mod === 'Alt') return isMac ? '⌥' : 'Alt';
+    return mod;
+  });
+  return isMac ? [...symbols, key].join('') : [...symbols, key].join('+');
+}
+
+/** The ARIA-standard spelling for `aria-keyshortcuts` (always word names,
+ * always `+`-joined, regardless of platform — `Meta`/`Control`+`Shift`/
+ * `Alt`+KEY). */
+function ariaKeyshortcuts(raw: string, isMac: boolean): string {
+  const parts = raw.split('-');
+  const key = (parts[parts.length - 1] ?? '').toUpperCase();
+  const mods = parts.slice(0, -1).map((mod) => (mod === 'Mod' ? (isMac ? 'Meta' : 'Control') : mod));
+  return [...mods, key].join('+');
+}
+
+function detectMac(): boolean {
+  if (typeof navigator === 'undefined') return false;
+  const platform = navigator.platform ?? '';
+  const ua = navigator.userAgent ?? '';
+  return /Mac|iPhone|iPod|iPad/i.test(platform || ua);
+}
+
+const NOTE_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M6 3h8l4 4v14a1 1 0 0 1-1 1H6a1 1 0 0 1-1-1V4a1 1 0 0 1 1-1z" />
+    <path d="M14 3v4h4" />
+    <path d="M8 12h8M8 16h5" />
+  </svg>
+);
+
+const TICKET_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M3 8a2 2 0 0 1 2-2h14a2 2 0 0 1 2 2v2a2 2 0 0 0 0 4v2a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-2a2 2 0 0 0 0-4V8z" />
+    <path d="M13 5v2M13 10.5v3M13 17v2" />
+  </svg>
+);
+
+type ToolGroup = 'marks' | 'blocks' | 'insert';
+
+type ToolControl = {
+  key: string;
+  label: React.ReactNode;
+  name: string;
+  /** `null` for the two insert actions — they toggle nothing, so no
+   * `aria-pressed` is drawn for them (see the file docblock, point 1). */
+  active: boolean | null;
+  run: () => void;
+  group: ToolGroup;
+};
+
+const GROUP_LABEL: Record<ToolGroup, string> = {
+  marks: 'Text formatting',
+  blocks: 'Blocks',
+  insert: 'Insert',
+};
+
+/**
+ * One toolbar button plus its hover/focus tooltip. A component and not
+ * inline JSX because each instance owns its own show/hide state — `useId`
+ * gives `aria-describedby` a stable id without a caller-supplied key.
+ */
+function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMac: boolean; extraProps?: Record<string, unknown> }) {
+  const [hovered, setHovered] = useState(false);
+  const [focused, setFocused] = useState(false);
+  const tooltipId = useId();
+  const show = hovered || focused;
+
+  const rawShortcut = SHORTCUTS[control.key] ?? null;
+  const shortcutDisplay = rawShortcut === null ? null : formatShortcut(rawShortcut, isMac);
+  const shortcutAria = rawShortcut === null ? undefined : ariaKeyshortcuts(rawShortcut, isMac);
+  const markdown = markdownFor(control.key);
+
+  return (
+    <span
+      className="ticket-editor__tool-wrap"
+      onMouseEnter={() => setHovered(true)}
+      onMouseLeave={() => setHovered(false)}
+    >
+      <button
+        type="button"
+        className={control.active === true ? 'ticket-editor__tool ticket-editor__tool--active' : 'ticket-editor__tool'}
+        aria-label={control.name}
+        {...(control.active === null ? {} : { 'aria-pressed': control.active })}
+        {...(shortcutAria === undefined ? {} : { 'aria-keyshortcuts': shortcutAria })}
+        aria-describedby={show ? tooltipId : undefined}
+        onFocus={() => setFocused(true)}
+        onBlur={() => setFocused(false)}
+        onKeyDown={(event) => {
+          if (event.key === 'Escape' && show) {
+            event.stopPropagation();
+            setHovered(false);
+            setFocused(false);
+          }
+        }}
+        onClick={control.run}
+        {...extraProps}
+      >
+        {control.label}
+      </button>
+      {show ? (
+        <span role="tooltip" id={tooltipId} className="ticket-editor__tooltip">
+          <span className="ticket-editor__tooltip-line">
+            <span className="ticket-editor__tooltip-name">{control.name}</span>
+            {shortcutDisplay === null ? null : (
+              <span className="ticket-editor__tooltip-shortcut">{shortcutDisplay}</span>
+            )}
+          </span>
+          {markdown === null ? null : (
+            <span className="ticket-editor__tooltip-markdown">{`or type ${markdown}`}</span>
+          )}
+        </span>
+      ) : null}
+    </span>
+  );
+}
 
 export type EditorToolbarProps = {
   editor: Editor | null;
   /** The toolbar is chrome for a composer someone may type into; read-only has none. */
   editable: boolean;
+  /**
+   * Test-only override for the shortcut glyphs (⌘ vs Ctrl) and
+   * `aria-keyshortcuts` spelling (`Meta` vs `Control`) — real callers never
+   * pass it and get `detectMac()`'s own reading of `navigator`. Exists so
+   * both platform arms are reachable from jsdom, which has no real
+   * `navigator.platform` to vary (advisor rule, ADDENDUM 3).
+   */
+  platform?: 'mac' | 'other';
 };
 
-export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.JSX.Element | null {
+export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps): React.JSX.Element | null {
   /**
    * The URL field's own state. `null` = closed, which is the ordinary case and
    * what Escape returns to. It is deliberately NOT cleared on a successful
@@ -86,6 +316,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
 
   if (!editor || editor.isDestroyed || !editable) return null;
 
+  const isMac = platform === undefined ? detectMac() : platform === 'mac';
   const linkIsActive = editor.isActive('link');
 
   function applyLink(): void {
@@ -121,13 +352,14 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
    * called out at the button, which is the one control that asks for input. Its
    * `run` is the whole difference, and it is visible here rather than buried.
    */
-  const controls: { key: string; label: string; name: string; active: boolean; run: () => void }[] = [
+  const controls: ToolControl[] = [
     {
       key: 'bold',
       label: 'B',
       name: 'Bold',
       active: editor.isActive('bold'),
       run: () => editor.chain().focus().toggleBold().run(),
+      group: 'marks',
     },
     {
       key: 'italic',
@@ -135,6 +367,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       name: 'Italic',
       active: editor.isActive('italic'),
       run: () => editor.chain().focus().toggleItalic().run(),
+      group: 'marks',
     },
     {
       key: 'code',
@@ -142,6 +375,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       name: 'Code',
       active: editor.isActive('code'),
       run: () => editor.chain().focus().toggleCode().run(),
+      group: 'marks',
     },
     {
       key: 'link',
@@ -159,6 +393,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
         }
         setLinkOpen((was) => !was);
       },
+      group: 'marks',
     },
     {
       key: 'list',
@@ -166,6 +401,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       name: 'Bullet list',
       active: editor.isActive('bulletList'),
       run: () => editor.chain().focus().toggleBulletList().run(),
+      group: 'blocks',
     },
     {
       key: 'quote',
@@ -173,6 +409,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       name: 'Quote',
       active: editor.isActive('blockquote'),
       run: () => editor.chain().focus().toggleBlockquote().run(),
+      group: 'blocks',
     },
     // THE NOTES PORT'S FOUR (Plan 4 Tasks 4 and 5), after the prototype's six
     // rather than inserted among them: the prototype has no counterpart for
@@ -180,13 +417,14 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
     // end. The commands are `toggleTaskList` (extension-task-list),
     // `toggleCodeBlock` (extension-code-block), `setDetails` +
     // `updateAttributes` (extension-details — see the note at that control,
-    // the attrs are NOT free) and `insertContent('[[')` for the note picker.
+    // the attrs are NOT free).
     {
       key: 'task',
       label: '☐',
       name: 'Task item',
       active: editor.isActive('taskItem'),
       run: () => editor.chain().focus().toggleTaskList().run(),
+      group: 'blocks',
     },
     {
       key: 'codeBlock',
@@ -194,6 +432,7 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       name: 'Code block',
       active: editor.isActive('codeBlock'),
       run: () => editor.chain().focus().toggleCodeBlock().run(),
+      group: 'blocks',
     },
     {
       key: 'collapsible',
@@ -208,43 +447,60 @@ export function EditorToolbar({ editor, editable }: EditorToolbarProps): React.J
       // the reader who had just asked for it. Measured by the plan-close
       // review; 9.274 now asserts the attribute.
       run: () => editor.chain().focus().setDetails().updateAttributes('details', { open: true }).run(),
+      group: 'blocks',
     },
-    // The wiki-link control INSERTS THE TRIGGER rather than opening a picker of
-    // its own (Plan 4 Task 5). The picker is `@tiptap/suggestion`'s, driven by
-    // what is typed, so a button that opened a second popup would be a second
-    // implementation of it — and one that could not see the query the reader
-    // types next. Typing the two characters is exactly what the keyboard path
-    // does, so both routes end in the same plugin.
+    // Unit 4 (owner: "I want a button to insert the note and ticket there on
+    // the bar"), REPLACING the old `[[` control rather than sitting beside
+    // it. Both insert the BARE trigger and let the SAME suggestion plugin
+    // that answers a typed trigger take it from there — a second popup
+    // implementation here could not see the query the reader types next, the
+    // same reason the old `[[` button never opened one of its own either.
     {
-      key: 'wikiLink',
-      label: '[[',
-      name: 'Link a note',
-      active: editor.isActive('wikiLink'),
-      run: () => editor.chain().focus().insertContent('[[').run(),
+      key: 'insertNote',
+      label: (
+        <>
+          {NOTE_ICON}
+          <span className="ticket-editor__tool-label">Insert note</span>
+        </>
+      ),
+      name: 'Insert note',
+      active: null,
+      run: () => editor.chain().focus().insertContent(':note ').run(),
+      group: 'insert',
+    },
+    {
+      key: 'insertTicket',
+      label: (
+        <>
+          {TICKET_ICON}
+          <span className="ticket-editor__tool-label">Insert ticket</span>
+        </>
+      ),
+      name: 'Insert ticket',
+      active: null,
+      run: () => editor.chain().focus().insertContent(':ticket ').run(),
+      group: 'insert',
     },
   ];
 
+  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['marks', 'blocks', 'insert'] as ToolGroup[])
+    .map((key) => ({ key, controls: controls.filter((control) => control.group === key) }))
+    .filter((group) => group.controls.length > 0);
+
   return (
     <div className="ticket-editor__toolbar" role="toolbar" aria-label="Formatting">
-      {controls.map((control) => (
-        <button
-          key={control.key}
-          type="button"
-          className={
-            control.active
-              ? 'ticket-editor__tool ticket-editor__tool--active'
-              : 'ticket-editor__tool'
-          }
-          aria-label={control.name}
-          aria-pressed={control.active}
-          // Only `link` opens anything, so only it reports an expanded state —
-          // an `aria-expanded` on the five toggles would promise a disclosure
-          // that never arrives.
-          {...(control.key === 'link' ? { 'aria-expanded': linkOpen } : {})}
-          onClick={control.run}
-        >
-          {control.label}
-        </button>
+      {groups.map((group, index) => (
+        <div key={group.key} className="ticket-editor__tool-group" role="group" aria-label={GROUP_LABEL[group.key]}>
+          {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
+          {group.controls.map((control) => (
+            <ToolButton
+              key={control.key}
+              control={control}
+              isMac={isMac}
+              extraProps={control.key === 'link' ? { 'aria-expanded': linkOpen } : undefined}
+            />
+          ))}
+        </div>
       ))}
       {linkOpen ? (
         <input
