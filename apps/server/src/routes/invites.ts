@@ -1,9 +1,12 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
 import { newUlid, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
+import { alertWithoutWaiting, type ErrorAlerter } from '../alerts/error-alerter.js';
+import { isSyntheticPhoneEmail } from '../auth/synthetic-address.js';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import { appendAcceptance } from '../invites/acceptance.js';
+import { INVITER_FALLBACK, type InviteMailer } from '../invites/invite-mailer.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
 
@@ -41,7 +44,23 @@ export type InviteRouteDeps = {
   serverAppend: ServerAppend;
   /** Where the product's web client lives — the link's host. `WEB_ORIGIN`. */
   webOrigin: string;
+  /** Where an EMAIL invitation's letter goes (access plan W5). */
+  mailer: InviteMailer;
+  /** Told, without waiting, when that letter fails — the invitation still stands. */
+  alerter: ErrorAlerter;
 };
+
+/** The inviter as a person would name them: account name, else a REAL email, else `INVITER_FALLBACK`. */
+async function inviterLabel(db: Queryable, userId: string): Promise<string> {
+  const { rows } = await db.query<{ name: string | null; email: string | null }>(
+    'SELECT "name", "email" FROM "user" WHERE "id" = $1',
+    [userId],
+  );
+  const name = rows[0]?.name?.trim() ?? '';
+  if (name !== '') return name;
+  const email = rows[0]?.email ?? '';
+  return email !== '' && !isSyntheticPhoneEmail(email) ? email : INVITER_FALLBACK;
+}
 
 /**
  * How long an unaccepted invitation link opens anything.
@@ -368,11 +387,33 @@ export function registerInviteRoutes(
       // The one and only copy of the raw token leaves here. `expiresAt` rides
       // with it so the admin can be told when the link lapses rather than
       // discovering it from a person who could not get in.
-      return reply.code(201).send({
-        inviteId,
-        url: `${deps.webOrigin}/invite/${token}`,
-        expiresAt: expiresAt.toISOString(),
-      });
+      const url = `${deps.webOrigin}/invite/${token}`;
+      // THE LETTER (access plan W5) — email channel only, and only now, AFTER
+      // the credential exists (case 6.201): a crash before this line leaves an
+      // invitation the admin still holds the link to; a letter sent before the
+      // INSERT could carry a link that never opens. A failure is logged and
+      // alerted and answered as `emailSent: false` — never a 500, because the
+      // invitation itself committed and the one-time link below is still the
+      // admin's to hand over (case 6.200). The alert context names the
+      // invitation, never the url: the url IS the credential.
+      let emailSent = false;
+      if (channel === 'email') {
+        try {
+          await deps.mailer.send({
+            to: address,
+            inviterName: await inviterLabel(deps.pool, request.currentUserId),
+            workspaceName: (await workspaceNameFromLedger(deps.pool, workspaceId)) ?? 'a workspace',
+            role,
+            url,
+            expiresAt: expiresAt.toISOString(),
+          });
+          emailSent = true;
+        } catch (error) {
+          request.log.error({ err: error, inviteId }, 'invitation email failed');
+          alertWithoutWaiting(deps.alerter, `invitation email for invite ${inviteId}`, error);
+        }
+      }
+      return reply.code(201).send({ inviteId, url, expiresAt: expiresAt.toISOString(), emailSent });
     },
   );
 

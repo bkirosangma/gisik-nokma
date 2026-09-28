@@ -29,6 +29,7 @@ import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
+import { LogInviteMailer, type InviteMailer } from './invites/invite-mailer.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
@@ -130,6 +131,13 @@ export type AppDeps = {
    * them silently.
    */
   webOrigin: string;
+  /**
+   * Where invitation letters go (access plan W5). OPTIONAL, and absent means a
+   * SILENT `LogInviteMailer`: that is the ~sixty test files' default, which mint
+   * invitations and never asked for mail. `index.ts` always passes
+   * `selectInviteMailer(config)`, so a deployment decides by `SMTP_URL` alone.
+   */
+  inviteMailer?: InviteMailer;
   /**
    * The clock the ATTENTION strip computes against. Optional, and the only
    * dependency here that a test would ever want to freeze: the strip is the one
@@ -881,7 +889,14 @@ export function buildApp(
   // events are all refused at the client door by design.
   registerInviteRoutes(
     app,
-    { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
+    {
+      pool: deps.pool,
+      ingest: deps.ingest,
+      serverAppend: deps.serverAppend,
+      webOrigin: deps.webOrigin,
+      mailer: deps.inviteMailer ?? new LogInviteMailer(() => {}),
+      alerter,
+    },
     requireSession,
   );
   // The CALLER-scoped half of that surface (Task 17): the invitations addressed

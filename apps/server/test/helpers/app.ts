@@ -8,6 +8,8 @@ import { createObjectStoreFromEnv } from '../../src/attachments/store-config.js'
 import type { ObjectStore } from '../../src/attachments/object-store.js';
 import { createIngestService, type IngestService } from '../../src/ingest/ingest-service.js';
 import { buildProjectionRegistry } from '../../src/projections/index.js';
+import type { ErrorAlerter } from '../../src/alerts/error-alerter.js';
+import type { InviteMailer } from '../../src/invites/invite-mailer.js';
 import type { Queryable } from '../../src/db/queryable.js';
 import type { ProjectionRegistry } from '../../src/projections/registry.js';
 import type { TestDatabase } from './db.js';
@@ -121,6 +123,10 @@ export type BuildTestAppOverrides = {
    * the honest default and the one under which the HSTS hook must stay silent.
    */
   security?: SecurityOptions;
+  /** Where invitation letters go (`AppDeps.inviteMailer`); absent is a silent log mailer. */
+  inviteMailer?: InviteMailer;
+  /** The error alerter (`BuildAppOptions.alerter`); absent is the no-op one. */
+  alerter?: ErrorAlerter;
 };
 
 /**
@@ -175,6 +181,7 @@ export function buildTestApp(
       // is the only route into `ingestBatch` any handler has.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: TEST_WEB_ORIGIN,
+      inviteMailer: overrides.inviteMailer,
       // Undefaulted: `registerAttentionRoutes` owns the real-clock default, and
       // passing `undefined` here is what lets it.
       now: overrides.now,
@@ -185,8 +192,8 @@ export function buildTestApp(
       store: overrides.store ?? createObjectStoreFromEnv({}),
     },
     overrides.logStream === undefined
-      ? { security: overrides.security }
-      : { logLevel: 'info', logStream: overrides.logStream, security: overrides.security },
+      ? { security: overrides.security, alerter: overrides.alerter }
+      : { logLevel: 'info', logStream: overrides.logStream, security: overrides.security, alerter: overrides.alerter },
   );
   return { app, otp, magic, ingest };
 }

@@ -44,6 +44,7 @@ describe('loadConfig', () => {
       alertWebhookUrl: null,
       smtpUrl: null,
       magicLinkFrom: 'sign-in@gisik-nokma.local',
+      inviteFrom: 'sign-in@gisik-nokma.local',
       databaseCaCert: null,
       deploySha: 'dev',
     });
@@ -307,7 +308,7 @@ describe('loadConfig', () => {
     // `documented` and the loop above cannot cover them. Asserted against the
     // raw file instead, which is the only place the fact lives. Without this,
     // deleting either line from `.env.example` would be invisible here.
-    for (const key of ['ALERT_WEBHOOK_URL', 'DATABASE_CA_CERT']) {
+    for (const key of ['ALERT_WEBHOOK_URL', 'DATABASE_CA_CERT', 'INVITE_FROM']) {
       expect(raw, `.env.example should document ${key}`).toMatch(new RegExp(`^${key}=`, 'm'));
     }
 

@@ -3,6 +3,7 @@ import { alerterFromConfig } from './alerts/error-alerter.js';
 import { buildApp } from './app.js';
 import { createObjectStoreFromEnv } from './attachments/store-config.js';
 import { createAuth } from './auth/auth.js';
+import { selectInviteMailer } from './invites/invite-mailer.js';
 import { selectMagicLinkSender, selectOtpSender } from './auth/select-senders.js';
 import { loadConfig } from './config.js';
 import { createPool } from './db.js';
@@ -135,6 +136,7 @@ async function main(): Promise<void> {
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: config.webOrigin,
+      inviteMailer: selectInviteMailer(config),
       // The commit-feed listener `app.ts` registers when this is given. It
       // forwards to the worker created below; `EMBED_WORKER_ENABLED=false`
       // leaves the worker uncreated, and this closure then drops the nudge on
