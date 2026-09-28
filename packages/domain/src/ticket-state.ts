@@ -18,6 +18,7 @@ import {
   ticketWorkflowReboundPayload,
 } from './events/ticket-events.js';
 import { DEFAULT_PRIORITY, type TicketTypeDef } from './ticket-types.js';
+import { isRedactedTicketCreated } from './purge.js';
 // `ticket.transitioned`'s schema lives in workflow.ts, not with the rest of the
 // ticket vocabulary: Plan 2 shipped it there because the engine parses it, and
 // events/ticket-events.ts says so in its own header. Its destination field is
@@ -119,6 +120,17 @@ export function applyTicketEvent(
   env: EventEnvelope,
   deps: TicketStateDeps,
 ): TicketState {
+  // Trash series Plan 2 (spec §5.4, D7). A purged ticket's creation is kept
+  // REDACTED — `{ projectId, purged: true }` — so later keys do not shift. It
+  // describes no ticket, and this function's contract is to return one, so it
+  // refuses by NAME rather than letting `ticketCreatedPayload.parse` throw a
+  // ZodError that reads like a corrupt ledger. Callers that may meet one fold
+  // with `foldTicketEvent` below.
+  if (isRedactedTicketCreated(env)) {
+    throw new Error(
+      `applyTicketEvent: ticket.created for ticket ${env.entity.id} is a purged (redacted) row — fold with foldTicketEvent, which produces no ticket from it`,
+    );
+  }
   if (env.type === 'ticket.created') {
     const p = ticketCreatedPayload.parse(env.payload);
     const type = deps.getTicketType(p.typeId);
@@ -456,6 +468,25 @@ export function applyTicketEvent(
     default:
       throw new Error(`applyTicketEvent: not a ticket event: ${env.type}`);
   }
+}
+
+/**
+ * `applyTicketEvent` for a caller whose state may be absent and whose stream
+ * may hold a purged ticket's redacted creation (spec §5.4, D7): that row
+ * produces no ticket, so the input state comes back unchanged. Every other event
+ * goes to `applyTicketEvent` untouched. A separate function rather than a wider
+ * return type on `applyTicketEvent`, because three callers store its result as
+ * a definite `TicketState` (`apps/server/src/projections/tickets.ts`,
+ * `packages/rule-engine/src/memory-context.ts`,
+ * `packages/sync-client/src/precheck/local-context.ts`).
+ */
+export function foldTicketEvent(
+  state: TicketState | undefined,
+  env: EventEnvelope,
+  deps: TicketStateDeps,
+): TicketState | undefined {
+  if (isRedactedTicketCreated(env)) return state;
+  return applyTicketEvent(state, env, deps);
 }
 
 /**

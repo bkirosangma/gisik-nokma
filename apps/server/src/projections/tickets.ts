@@ -3,6 +3,7 @@ import {
   TICKET_EVENT_TYPES,
   applyTicketEvent,
   foldTicketToWorkflowVersion,
+  isRedactedTicketCreated,
   workflowDefinedPayloadSchema,
   type LedgerEvent,
   type TicketState,
@@ -557,6 +558,12 @@ export const ticketsProjection: Projection = {
       return;
     }
     if (!(TICKET_EVENT_TYPES as readonly string[]).includes(event.type)) {
+      return;
+    }
+    // Trash series Plan 2 (spec §5.4): a purged ticket's REDACTED creation
+    // produces no ticket. Skipped before `current` is read, like the two
+    // content-free types above — folding it would throw by design (D7).
+    if (isRedactedTicketCreated(event)) {
       return;
     }
 

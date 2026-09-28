@@ -144,6 +144,13 @@ backups bucket in BLR1, both alerting the webhook on failure. Manual run:
 
 The managed database's own daily backups are a second string, not the plan.
 
+After each successful scheduled backup the worker prunes the backups bucket: anything under `pg/` or
+`ledger/` older than `BACKUP_RETENTION_DAYS` (default 30) is deleted, except the newest object under each
+prefix, which is kept whatever its age. The bucket has no lifecycle rule of its own (measured
+2026-09-28); this prune is the only retention. A prune failure alerts `backup:prune-after-<job>` and never
+fails the backup. The manual `ops:backup-once` run does not prune. A permanently deleted item therefore
+leaves the last backup within the purge delay plus the retention window of being marked.
+
 ## Orphaned uploads (monthly, with the restore drill)
 
 An upload whose object reached the store but whose row and ledger event never landed leaves **bytes** no
@@ -166,12 +173,31 @@ ledger event as the only survival signal would flag essentially every live attac
 an orphan. An earlier draft of this section described exactly that one-signal rule — if you are here to
 make the code match the runbook, the runbook was wrong, not the code.
 
-**It does not delete `attachments` rows.** There is no `DELETE FROM attachments` anywhere in
-`apps/server/src`. Orphaned rows — a row whose object never arrived — therefore accumulate and are not
-swept by this tool. That is a known gap, not an oversight of this runbook.
+**It does not delete `attachments` rows.** The one `DELETE FROM attachments` in `apps/server/src` is the
+permanent purge's (`src/purge/erasure.ts`): it deletes an erased ticket's, note's or workspace's rows and
+queues their objects in `purge_pending_objects`, which the purge sweep empties. Orphaned rows — a row whose
+object never arrived — therefore still accumulate and are not swept by this tool. That is a known gap, not
+an oversight of this runbook.
 
 Run with `--dry-run` first and expect single digits; a large count means clients are failing between
 upload and ingest, which is an incident, not a cleanup.
+
+## Permanent-delete sweep (trash series)
+
+The backup worker runs an hourly `purge` job (`apps/server/src/purge/sweep.ts`): every workspace, project,
+ticket or note whose "delete permanently" mark has fallen due is erased — its ledger rows, projections,
+search rows and attachment objects — leaving only a content-free `purge.completed` tombstone and, for a
+ticket, its redacted key slot. A failure alerts the webhook as `purge:<kind>:<id>` and is retried on the
+next run; the item stays in Deleted items, overdue, until one succeeds. Object deletes that fail stay in
+`purge_pending_objects` (with `attempts` and `last_error`) and are retried every run.
+
+**Release note for the first deploy of this job.** It needs the worker to reach the attachment bucket:
+`deploy/do/app.yaml` now gives the `backup` worker `OBJECT_STORE=s3` and the attachment bucket. **A push
+does not apply spec changes** — apply the spec with `doctl apps update <app-id> --spec deploy/do/app.yaml`
+and confirm the worker's environment afterwards. The same change arms the 30-day orphan sweep against the
+real bucket for the first time (it has been listing an empty local folder): before its first run, 30 days
+after the worker boots, run `sweep:orphans` with `--dry-run` from the worker's console and read the count
+(see "Orphaned uploads" above).
 
 ## Restore drill (monthly, and after any schema change)
 

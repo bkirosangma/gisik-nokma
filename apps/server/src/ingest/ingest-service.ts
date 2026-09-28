@@ -26,6 +26,7 @@ import { checkContestCoherence } from '../sync/contest-coherence.js';
 import { refreshSnapshotsForWorkflowPublish } from '../sync/snapshot-refresh.js';
 import { bootstrapWorkspace } from '../workspaces/bootstrap-workspace.js';
 import { readEntityHead } from '../projections/entity-heads.js';
+import { checkPurged } from '../purge/check-purged.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
 
 export type IngestDeps = {
@@ -208,6 +209,24 @@ export function createIngestService(deps: IngestDeps): IngestService {
             rule: ENTITY_WORKSPACE_MISMATCH_RULE,
             reason: `This ${envelope.entity.kind} belongs to workspace ${head.workspaceId}; this event files it under workspace ${envelope.workspaceId}. An entity cannot move between workspaces.`,
           },
+          committed: null,
+        };
+      }
+
+      // Trash series Plan 2 (spec §5.7, server half; deviation D10). BOTH
+      // doors, like `checkContestCoherence` below. The internal door needs it:
+      // an offline claim refused on a ticket comes back as a server-appended
+      // `claim.contested` on that ticket through `serverAppend`
+      // (`sync/sync-service.ts`), and against a PURGED ticket that append would
+      // write the purged entity back into the ledger with the claim embedded.
+      // Before the permission gate: a purged workspace has no members left, and
+      // "you are not a member" would name the wrong fault. Also refuses
+      // `purge.completed` from anyone — the purge appends it directly.
+      const purgedRefusal = await checkPurged(client, envelope);
+      if (purgedRefusal !== null) {
+        await client.query('ROLLBACK');
+        return {
+          result: { status: 'refused', eventId: envelope.id, rule: purgedRefusal.rule, reason: purgedRefusal.reason },
           committed: null,
         };
       }

@@ -88,6 +88,8 @@ const EXEMPT: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown, 
   // away.
   ['purge.marked', () => ({}), 'marks a DELETED ticket for permanent deletion — the gate would make the feature unreachable'],
   ['purge.unmarked', () => ({}), 'its undo — it requires the ticket to still be marked, which requires it to still be deleted'],
+  // Trash series, Plan 2: the tombstone the purge appends to a deleted item.
+  ['purge.completed', () => ({ kind: 'ticket', markedBy: 'u', markedAt: '2026-09-13T10:00:00.000Z' }), 'the purge\'s own tombstone on an item that is deleted by definition'],
 ];
 
 describe('17.121 E6-2 — the live-ticket gate refuses every ordinary write against a soft-deleted ticket', () => {

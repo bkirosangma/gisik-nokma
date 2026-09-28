@@ -16,6 +16,7 @@ import {
 import {
   projectDeletedPayload,
   projectUndeletedPayload,
+  purgeCompletedPayload,
   purgeMarkedPayload,
   purgeUnmarkedPayload,
   workspaceArchivedPayload,
@@ -482,6 +483,12 @@ domainRegistry.register({
   version: 1,
   entityKind: ['workspace', 'project', 'ticket', 'note'],
   payloadSchema: purgeUnmarkedPayload,
+});
+domainRegistry.register({
+  type: 'purge.completed',
+  version: 1,
+  entityKind: ['workspace', 'project', 'ticket', 'note'],
+  payloadSchema: purgeCompletedPayload,
 });
 
 domainRegistry.register({
