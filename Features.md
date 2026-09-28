@@ -1590,6 +1590,11 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   PR body. Pieces, each its own commit:
   - ⚙️ **A table cannot be nested in a table** — `TableNoNest` refuses `insertTable` while the caret is
     inside a table (the same guard the reference carries); `packages/editor/src/extensions/table-no-nest.ts`
+  - ✅ **A comment shows the headings and horizontal rules its author wrote** — the composer's toolbar now
+    offers H1–H6 and a rule, so `comment-body.tsx` keeps a heading's level (a `<p>` with a
+    `gn-comment__heading--N` class, deliberately not a real `<h1>`–`<h6>` so a comment never enters the
+    ticket sheet's heading outline) and renders `horizontalRule` as an `<hr>` (it used to render as nothing);
+    `packages/app-core/src/views/comment-body.tsx`, `packages/ui/src/ui.css`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

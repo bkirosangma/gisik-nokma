@@ -505,3 +505,6 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.368 — `insertTable` succeeds when the caret is not inside a table.** (`packages/editor/test/table-no-nest.test.ts`, ported from the reference's DOC-4.3-27)
 - ✅ **9.369 — `insertTable` is refused with the caret inside a table, and the document keeps its ONE table** — `run()` returns `false` and the JSON is byte-identical after the refused call. (`packages/editor/test/table-no-nest.test.ts`, ported from DOC-4.3-26)
 - ✅ **9.370 — `insertTable` works again once the caret has left the table.** (`packages/editor/test/table-no-nest.test.ts`)
+- ✅ **9.371 — a comment renders a heading as a `<p>` that keeps its level (`gn-comment__heading--N`) and never as a real `<h1>`–`<h6>`.** (`packages/app-core/test/views/comment-body.test.tsx`)
+- ✅ **9.372 — a heading with a malformed level (0, 7, `'x'`, `null`, absent) still renders its text, with no modifier class.** (`packages/app-core/test/views/comment-body.test.tsx`)
+- ✅ **9.373 — a comment renders a horizontal rule as an `<hr>` (it used to render as nothing — an `<hr>` has no children for the fall-through arm to show).** (`packages/app-core/test/views/comment-body.test.tsx`)

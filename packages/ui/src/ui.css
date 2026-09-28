@@ -7302,6 +7302,15 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    means a newline, and that was true before this change and stays true after. */
 .gn-comment__body > * { margin: 0; }
 .gn-comment__body > * + * { margin-top: 0.4rem; }
+/* Headings and the horizontal rule (kb-editor-parity): the composer's toolbar
+   offers both, and `comment-body.tsx` renders a heading as a `<p>` carrying
+   its level (no heading in the ticket sheet's outline). Weight and a small
+   size step carry the hierarchy; a comment is not a page, so h1 stays modest. */
+.gn-comment__heading { font-weight: 700; }
+.gn-comment__heading--1 { font-size: 1.15em; }
+.gn-comment__heading--2 { font-size: 1.08em; }
+.gn-comment__heading--3 { font-size: 1.03em; }
+.gn-comment__rule { border: none; border-top: 1px solid var(--gn-border); margin: 0.6rem 0; }
 .gn-comment__list { padding-left: 1.3rem; }
 .gn-comment__list > li + li { margin-top: 0.15rem; }
 .gn-comment__quote {
