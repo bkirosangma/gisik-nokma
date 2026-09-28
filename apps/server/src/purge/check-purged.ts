@@ -1,4 +1,4 @@
-import { PURGE_SERVER_ONLY_REASON, PURGED_REASON, type EventEnvelope } from '@gisik-nokma/domain';
+import { PURGE_RULE, PURGE_SERVER_ONLY_REASON, PURGED_REASON, type EventEnvelope } from '@gisik-nokma/domain';
 import type { Refusal } from '@gisik-nokma/rule-engine';
 import type { Queryable } from '../db/queryable.js';
 
@@ -7,7 +7,9 @@ import type { Queryable } from '../db/queryable.js';
  * at BOTH ingest doors (D10) — see `ingest-service.ts`'s call site for why the
  * internal door needs it too.
  */
-export const PURGE_RULE = 'purge.erased';
+// Moved to the domain by trash Plan 3 (the device matches on it); re-exported
+// so every existing importer of this module keeps compiling unchanged.
+export { PURGE_RULE };
 
 function refuse(reason: string): Refusal {
   return { refused: true, rule: PURGE_RULE, reason };

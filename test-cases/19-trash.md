@@ -261,3 +261,10 @@ the number you added — an unchanged count has reported a clean sweep over case
 ## 19.29 Whole-branch review fixes
 
 - ✅ **19.160 — a purge that lands while the embed worker is mid-call is not undone: the worker writes no chunk for the erased note, and a chunk row whose note no longer exists is removed by the next pass;** control: the live note beside it is embedded. Mutation: drop the worker's `FOR SHARE` re-check (the racing INSERT survives), or restore the join-based cleanup (the orphan survives).
+
+## 19.30 The purged-id lookup
+
+- ✅ **19.161 — `POST /v1/purged-lookup` answers, of the ids asked, exactly those in `purged_entities` whose kind is a lifecycle kind, as `{ kind, id }` sorted by kind then id;** control: a live id asked beside them is absent, and a registry row of kind `workflow` for an asked id is absent. Mutation: join on the id alone (drop the `PURGEABLE_KINDS` cross join) — the `workflow` row appears.
+- ✅ **19.162 — the body is refused with 400 for 501 ids and for an id that is not a ULID;** control: exactly 500 ULIDs answer 200, and an empty list answers `{ purged: [] }`. Mutation: raise `maxItems` to 1000.
+- ✅ **19.163 — a signed-out caller gets 401;** control: the same body with a session answers 200. Mutation: drop `preHandler: requireSession`.
+- ✅ **19.164 — the device vocabulary is pinned: `PURGED_OUTBOX_NOTICE` verbatim, `PURGE_RULE` is `purge.erased` and the server's re-export is the same constant, `PURGED_LOOKUP_MAX_IDS` is 500, and `isPurgedRef` admits the four lifecycle kinds with a non-empty id;** control: a `workflow` ref, an empty id and a ref without an id are refused. Mutation: `isPurgedRef` accepts any string kind.

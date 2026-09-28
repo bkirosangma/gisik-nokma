@@ -35,6 +35,7 @@ import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerNoteRoutes } from './routes/notes.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
+import { registerPurgedLookupRoute } from './purge/lookup-route.js';
 import { registerDeletedItemsRoutes } from './routes/deleted-items.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import { registerSyncRoutes } from './sync/sync-routes.js';
@@ -874,6 +875,9 @@ export function buildApp(
   // restore or mark. Registered beside the workspace directory: same door,
   // same "me"-scoped shape, no workspace id in the path.
   registerDeletedItemsRoutes(app, { pool: deps.pool }, requireSession);
+  // The purged-id lookup (trash series Plan 3, D1): which of the ids a caller
+  // holds were permanently erased. Same "me"-scoped door as Deleted items.
+  registerPurgedLookupRoute(app, { pool: deps.pool }, requireSession);
   // The invitation surface (Plan 4 Task 14): issue, read a link, accept a link,
   // list what is outstanding. It takes BOTH doors — the gated `ingest` for
   // issuance, so the admin-only refusal fires exactly as it would on
