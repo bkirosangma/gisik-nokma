@@ -1356,6 +1356,8 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
   address input reddens this case ALONE (1 failed / 37), and un-wrapping the projects field back to the
   bare pair reddens it alone as well.
+  ⚠ **AMENDED 2026-09-29 (owner ruling A):** the invite form's second field, Project access, is gone. "Two
+  native fields" is now ONE, the address field; the test keeps the address half and drops the projects half.
   ⚠ **AMENDED BY RULING E5-11 (2026-09-21) — the projects half is no longer a NATIVE field.** It is the
   shared `Select` now, so it wears the pattern the way `Channel`/`Role` do (inside a `.gn-field` with a
   `.gn-field__label`, the component's own trigger carrying `gn-field__input`), and the case asserts the
@@ -1365,8 +1367,9 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   'Project access' })` returns 0 on this trigger while `/Project access/` returns 1, measured — which
   is also why this file's own `Role` queries have always been regexes.
 
-- ✅ **13.1181 — the invite form's project field offers project NAMES, not identifiers (ruling E5-11,
-  2026-09-21).** `apps/web/test/members-page.test.tsx`. It was a text box labelled *"Projects
+- 🚫 **13.1181 — the invite form's project field offers project NAMES, not identifiers (ruling E5-11,
+  2026-09-21).** 🚫 Retired 2026-09-29, owner ruling (A): the project select no longer exists; 3.991 pins its absence.
+  `apps/web/test/members-page.test.tsx`. It was a text box labelled *"Projects
   (comma-separated ids, optional)"*, so a person had to transcribe project ULIDs from somewhere else;
   `docs/manual.md` said so in as many words — *"In practice this box is not usable by a person"* — and
   the finding's judge measured a form whose own docblock already refused to "offer a choice the door

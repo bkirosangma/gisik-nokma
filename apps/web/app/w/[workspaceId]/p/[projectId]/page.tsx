@@ -77,6 +77,7 @@ import {
   toTicketDatesInput,
 } from '../../../../../src/ticket-dates-input.js';
 import { useAppServices, useSessionStatus } from '../../../../../src/providers.js';
+import { peopleProps } from '../../../../../src/people-props.js';
 import { ticketSheetPath } from '../../../../../src/ticket-location.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../../src/ticket-ref-callbacks.js';
 import { useProjectName } from '../../../../../src/use-project-name.js';
@@ -233,7 +234,7 @@ function ProjectBoard() {
   const params = useParams<{ workspaceId: string; projectId: string }>();
   const searchParams = useSearchParams();
   const { workspaceId, projectId } = params;
-  const { dataSource, cache, ticketLocation } = useAppServices();
+  const { dataSource, cache, ticketLocation, people } = useAppServices();
   /**
    * The `:ticket` picker's data source and the chip's link (Plan 7 Task 4,
    * spec §14, D26–D28) — passed into `TicketSheet`, which forwards both to
@@ -2222,6 +2223,7 @@ function ProjectBoard() {
     return (
       <>
         <CreateTicketFlow
+          {...peopleProps(people, workspaceId)}
           open={createOpen}
           onOpenChange={(next) => {
             setCreateOpen(next);
@@ -3591,6 +3593,7 @@ function ProjectBoard() {
         // review measured. Recorded so the next reader does not read the gate
         // above as covering the whole page.
         <TicketSheet
+          {...peopleProps(people, workspaceId)}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}

@@ -8,6 +8,7 @@ import {
   formatDateTime,
   makeSubmittedFactory,
   memberLabel,
+  type LookedUpPerson,
   type RosterMember,
 } from '@gisik-nokma/app-core';
 import { InviteAdminError, type MintedInvite, type PendingInvite } from '@gisik-nokma/app-core/online';
@@ -15,7 +16,14 @@ import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
-import { useWorkspaceProjects } from '../../../../src/use-workspace-projects.js';
+import {
+  CREATE_INVITE_LINK,
+  INVITE_EMAIL_FAILED,
+  SEND_INVITATION,
+  alreadyMemberLine,
+  hasAccountLine,
+  inviteEmailedLine,
+} from '../../../../src/invite-copy.js';
 
 /**
  * The minted link's copy. Pinned by Plan 6 Task 15b item 2 and exported so the
@@ -214,7 +222,7 @@ export default function MembersPage() {
    * presentational; showing a minted link it no longer owns is not its
    * business to lose.
    */
-  const [minted, setMinted] = useState<MintedInvite | null>(null);
+  const [minted, setMinted] = useState<(MintedInvite & { address: string; channel: string }) | null>(null);
 
   /** The roster read, and it is a callback rather than a bare effect because a
    *  committed role change re-runs it: the cell renders the role the SERVER
@@ -579,6 +587,17 @@ export default function MembersPage() {
           `MintForm` and take this card with it. */}
       {minted !== null ? (
         <Card className="gn-invite-mint__result">
+          {minted.channel === 'email' ? (
+            minted.emailSent ? (
+              <p role="status" className="gn-invite-mint__emailed">
+                {inviteEmailedLine(minted.address)}
+              </p>
+            ) : (
+              <p role="alert" className="gn-refusal gn-refusal--transport">
+                {INVITE_EMAIL_FAILED}
+              </p>
+            )
+          ) : null}
           <p className="gn-invite-mint__once">{COPY_IT_NOW}</p>
           <code className="gn-invite-mint__url">{minted.url}</code>
           {/*
@@ -607,8 +626,8 @@ export default function MembersPage() {
         <>
           <MintForm
             workspaceId={workspaceId}
-            onMinted={(result) => {
-              setMinted(result);
+            onMinted={(result, sent) => {
+              setMinted({ ...result, ...sent });
               loadPending();
             }}
           />
@@ -730,31 +749,14 @@ function memberSummary(members: readonly RosterMember[], workspaceName: string |
  * (`routes/invites.ts:285`): `address`, `channel`, `role` required,
  * `projectIds` optional, `additionalProperties: false`.
  *
- * Two refusals are honoured by the form rather than spent at the door:
+ * **`owner` is not in the role picker.** `inviteSentPayload` refuses it, and
+ * offering a choice the door will reject is a form that lies about what it can
+ * do. Everything else the door refuses reaches the screen in the door's own
+ * words, unparaphrased, out of the 422's `IngestResult`.
  *
- * - **`owner` is not in the role picker.** `inviteSentPayload` refuses it, and
- *   offering a choice the door will reject is a form that lies about what it
- *   can do.
- * - **The project field is hidden on `guest`.** The same schema refuses
- *   `projectIds` on a guest invitation — "a guest reaches work through
- *   `visibility.set` explicit lists, so a project association would promise
- *   something membership no longer means" — and the key is OMITTED, never sent
- *   as `[]`, because an empty array the admin never asked for is refused as if
- *   they had.
- *
- * ⚠ **AND THE SAME RULE NOW APPLIES TO THE PROJECT FIELD'S *SHAPE* (ruling
- * E5-11, 2026-09-21).** It was a text box labelled *"Projects (comma-separated
- * ids, optional)"*: a person had to transcribe project ULIDs from somewhere
- * else, and the manual said so in as many words — *"In practice this box is not
- * usable by a person."* The paragraph above already named the defect and had
- * been applied to two of the three choices the form offers; the third was the
- * one whose only honest input was an identifier no screen shows. It is now the
- * export's `<select>` of project NAMES (`desktop.dc.html:768-772`), fed from
- * `useWorkspaceProjects` — the same `GET /v1/me/workspaces` read the workspace
- * name beside it already makes.
- *
- * Everything else the door refuses reaches the screen in the door's own words,
- * unparaphrased, out of the 422's `IngestResult`.
+ * The project field was removed 2026-09-29 (owner ruling A: admins and members
+ * are on every project); the door still accepts `projectIds`, and this form
+ * never sends it.
  */
 function MintForm({
   workspaceId,
@@ -764,62 +766,34 @@ function MintForm({
   // RULING V2: hands the result UP rather than holding it — the caller owns
   // the credential's lifetime now, this component only owns the ceremony of
   // minting one.
-  onMinted: (result: MintedInvite) => void;
+  onMinted: (result: MintedInvite, sent: { address: string; channel: string }) => void;
 }) {
-  const { invitesAdmin } = useAppServices();
-  /**
-   * RULING E5-11 (2026-09-21) — THE PROJECTS READ, and it is the SAME read the
-   * nav and the workspace name already make. `useWorkspaceProjects` narrows
-   * `GET /v1/me/workspaces` one level further to the `projects` array nested in
-   * the workspace row, so nothing new is served and no second request is made.
-   *
-   * `null` means NOT KNOWN — pending, refused, or signed out — and it is NOT
-   * `[]`, which would be the claim "this workspace has no projects". The select
-   * below renders the one option that is true either way, so an unanswered read
-   * omits choices rather than inventing them; that is the same omission-not-id
-   * rule the hook's own docblock states.
-   */
-  const projects = useWorkspaceProjects(workspaceId);
+  const { invitesAdmin, people } = useAppServices();
   const [address, setAddress] = useState('');
   const [channel, setChannel] = useState('email');
   const [role, setRole] = useState('member');
   /**
-   * `'all'` — the export's own first option — or ONE project's id.
-   *
-   * ⚠ **THIS REPLACED A COMMA-SEPARATED TEXT BOX OF PROJECT ULIDS.** The field
-   * read *"Projects (comma-separated ids, optional)"* and asked a person to
-   * transcribe 26-character identifiers from somewhere else; the manual's own
-   * verdict was *"In practice this box is not usable by a person."* The export
-   * draws a `<select>` of project NAMES (`desktop.dc.html:768-772`), and this
-   * form's own docblock already sets the rule it was breaking — "offering a
-   * choice the door will reject is a form that lies about what it can do" — for
-   * `owner` and for the guest arm. A box whose only honest input is an
-   * identifier no screen shows is the same lie in a quieter voice.
-   *
-   * ONE project, not several, because that is what the export's control is: a
-   * single `<select>` whose options are "All projects in this workspace" and one
-   * `Only <name>` per project. The door still takes an ARRAY (`projectIds`), so
-   * the submission below wraps the single choice — the wire shape is unchanged.
+   * The account the typed address belongs to, if any (access plan W8, owner
+   * ruling 2026-09-29 "fold it in"). Looked up on BLUR, email channel only, and
+   * never listed — exact match or nothing. Sending uses the account's email, so
+   * the invitation reaches the address the account signs in with.
    */
-  const [projectScope, setProjectScope] = useState('all');
+  const [account, setAccount] = useState<LookedUpPerson | null>(null);
+  const lookUp = (): void => {
+    if (channel !== 'email' || !address.includes('@')) return;
+    void people.lookup(workspaceId, address).then(setAccount, () => setAccount(null));
+  };
   const [refusal, setRefusal] = useState<string | null>(null);
 
   const submit = (event: FormEvent): void => {
     event.preventDefault();
     setRefusal(null);
+    const target = account?.email ?? address;
     void invitesAdmin
-      .mintInvite(workspaceId, {
-        address,
-        channel,
-        role,
-        // The key is OMITTED for `all` and for a guest, never sent as `[]`:
-        // the schema refuses `projectIds` on a guest invitation, and an empty
-        // array the admin never asked for is refused as if they had.
-        ...(role === 'guest' || projectScope === 'all' ? {} : { projectIds: [projectScope] }),
-      })
+      .mintInvite(workspaceId, { address: target, channel, role })
       .then(
         (result) => {
-          onMinted(result);
+          onMinted(result, { address: target, channel });
         },
         (cause: unknown) => {
           setRefusal(
@@ -856,9 +830,18 @@ function MintForm({
           id="gn-invite-address"
           className="gn-field__input"
           value={address}
-          onChange={(event) => setAddress(event.target.value)}
+          onChange={(event) => {
+            setAddress(event.target.value);
+            setAccount(null);
+          }}
+          onBlur={lookUp}
         />
       </label>
+      {account !== null ? (
+        <p role="status" className="gn-invite-mint__account">
+          {account.inWorkspace ? alreadyMemberLine(account.name) : hasAccountLine(account.name)}
+        </p>
+      ) : null}
 
       {/* The two `Select` fields, ruled on 2026-09-18 (AMENDMENT 2): the LABEL
           half of the field pattern, and NOT the native-control half.
@@ -922,39 +905,8 @@ function MintForm({
         />
       </label>
 
-      {role === 'guest' ? null : (
-        <>
-          <label className="gn-field">
-            <span className="gn-field__label">Project access</span>
-            {/*
-              The export's own option set, in its own order
-              (`desktop.dc.html:768-772`): "All projects in this workspace"
-              FIRST, then one `Only <name>` per project, in SERVED order.
-
-              ARCHIVED PROJECTS ARE INCLUDED, deliberately. `useWorkspaceProjects`
-              returns the served rows and decides neither filtering nor order
-              (its own docblock); the door accepts an archived project's id, so
-              hiding it would withhold a choice that would have succeeded — the
-              mirror of the lie this change removes.
-            */}
-            <Select
-              options={[
-                { value: 'all', label: 'All projects in this workspace' },
-                ...(projects ?? []).map((project) => ({
-                  value: project.id,
-                  label: `Only ${project.name}`,
-                })),
-              ]}
-              value={projectScope}
-              onChange={setProjectScope}
-              aria-label="Project access"
-            />
-          </label>
-        </>
-      )}
-
       <Button variant="primary" type="submit">
-        Send invitation
+        {channel === 'phone' ? CREATE_INVITE_LINK : SEND_INVITATION}
       </Button>
 
       {/* RULING V2: the minted-URL card moved to the PAGE (`MembersPage`,

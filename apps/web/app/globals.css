@@ -4366,3 +4366,33 @@ input, textarea, select { font-family: inherit; }
 .gn-deleted-items__row > .gn-refusal { grid-column: 2; margin: 0; }
 
 /* ══ trash-4-ui: end ══ */
+
+/* ══ access-and-invites: begin ══
+   Access plan Tasks 7–8 (2026-09-29). The outsider finder inside the New ticket
+   dialog and the ticket sheet, and the invite form's two status lines. Tokens
+   only (no raw colours); every control 44px tall. */
+.gn-outsider-finder {
+  display: grid;
+  gap: 0.75rem;
+  margin-top: 0.5rem;
+}
+.gn-outsider-finder .gn-field__input,
+.gn-outsider-finder .gn-button {
+  min-height: 2.75rem;
+}
+.gn-outsider-finder__actions {
+  display: flex;
+  gap: 0.75rem;
+  flex-wrap: wrap;
+}
+.gn-outsider-finder__found {
+  display: grid;
+  gap: 0.5rem;
+  justify-items: start;
+}
+.gn-invite-mint__emailed,
+.gn-invite-mint__account {
+  margin: 0;
+  color: var(--gn-text-muted);
+}
+/* ══ access-and-invites: end ══ */

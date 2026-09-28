@@ -15,6 +15,7 @@ import { TicketEditorSlot, uploadAttachmentHttp } from '@gisik-nokma/editor';
 import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useSessionStatus } from '../../../../src/providers.js';
+import { peopleProps } from '../../../../src/people-props.js';
 import { useProjectName } from '../../../../src/use-project-name.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../src/ticket-ref-callbacks.js';
@@ -122,7 +123,7 @@ function MyWorkBoard() {
   const params = useParams<{ workspaceId: string }>();
   const searchParams = useSearchParams();
   const workspaceId = params.workspaceId;
-  const { dataSource, cache, ticketLocation } = useAppServices();
+  const { dataSource, cache, ticketLocation, people } = useAppServices();
   /**
    * `useSessionStatus`, not `useCurrentUser`, because this value reaches a
    * WRITE: `TicketSheet` builds submitted events from `currentUserId`, and
@@ -364,6 +365,7 @@ function MyWorkBoard() {
       */}
       {openTicketId !== null && openTicketProjectId !== null && !expired ? (
         <TicketSheet
+          {...peopleProps(people, workspaceId)}
           dataSource={dataSource}
           cache={cache}
           workspaceId={workspaceId}
