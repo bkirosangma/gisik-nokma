@@ -1703,8 +1703,8 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   reason unrelated to the rendered page. Composited, `textSubtle` clears 4.5:1 on `neo` in both themes
   on every surface (~5.03–5.05), but falls to 3.6–4.3:1 on `hig`/`minimal` (the default style) in three
   of six real contexts, including dark-mode fields inside any `.gn-dialog`/`.gn-sheet`
-  (`surfaceRaised`). Put to the owner with the measured numbers (2026-09-28): **accept 3:1 for
-  `hig`/`minimal`** rather than hold every style to 4.5 or leave the request unshipped, since 6c's own
+  (`surfaceRaised`). Put to the owner with the measured numbers (2026-09-28). **Owner ruling 2026-09-29: accept 3:1
+  for placeholder text** on `hig`/`minimal` rather than hold every style to 4.5 or leave the request unshipped, since 6c's own
   24-site label sweep already guarantees a real name survives the placeholder vanishing — a placeholder
   losing some of its contrast margin is not losing a field's only name. Cases `18.306`–`18.309`.
   `packages/ui/src/ui.css`, `apps/web/app/globals.css`, `packages/editor/src/styles/editor.css`,
