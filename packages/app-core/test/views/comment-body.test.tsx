@@ -393,4 +393,30 @@ describe('9.348 table in a comment', () => {
     expect(container.querySelector('th')?.textContent).toBe('Name');
     expect(container.querySelector('td')?.textContent).toBe('Ada');
   });
+
+  /**
+   * Review finding: a wide comment table (long unbreakable cell values) had
+   * no scroll container at all — `.gn-comment__table` alone would widen the
+   * comment thread and the ticket sheet around it, the exact "must scroll
+   * inside the document, never widen the page" failure the plan's Review
+   * Focus names, on a SECOND rendering surface the plan's own gallery
+   * (which only ever exercises the live editor) never touched.
+   */
+  it('9.356 wraps the table in a scrolling container, so a wide table cannot widen the thread', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            { type: 'tableRow', content: [{ type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a' }] }] }] },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    const wrap = container.querySelector('.gn-comment__table-wrap');
+    expect(wrap, 'no .gn-comment__table-wrap around the table').not.toBeNull();
+    expect(wrap!.querySelector('table.gn-comment__table')).not.toBeNull();
+  });
 });

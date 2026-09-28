@@ -216,7 +216,7 @@ const EXPLICIT_SELECTORS: readonly string[] = [
  * scopes some of these identically but a bare check here is simpler and this
  * repo has exactly one place tables render.
  */
-const TABLE_SELECTORS: readonly string[] = ['table', 'th', 'td', '.selectedCell', '.tableWrapper'];
+const TABLE_SELECTORS: readonly string[] = ['table', 'th', 'td', '.selectedCell', '.tableWrapper', '.gn-comment__table-wrap'];
 
 describe('9.341 editor skin — declared coverage', () => {
   const bare = stripComments(readFileSync(GLOBALS_CSS_PATH, 'utf8'));
@@ -272,6 +272,37 @@ describe('9.341 editor skin — declared coverage', () => {
   it.each(TABLE_SELECTORS)('globals.css declares a rule matching %s', (sel) => {
     const pattern = new RegExp(`(?:^|[\\s>])${sel.replace('.', '\\.')}(?![\\w-])`);
     expect(pattern.test(bare), `no rule for \`${sel}\` in apps/web/app/globals.css`).toBe(true);
+  });
+
+  it.each([
+    ['.ticket-editor__content .tableWrapper {', 'the live editor'],
+    ['.gn-comment__table-wrap {', 'a comment thread'],
+  ])('%s actually scrolls horizontally rather than merely being present (Review Focus #2, %s)', (selector) => {
+    // The plan's own Review Focus names these two properties specifically —
+    // a rule matching the selector could exist and declare neither, and the
+    // declared-coverage loop above would still pass (a review finding: it
+    // did, for the live-editor wrapper — the comment-thread one didn't even
+    // exist yet).
+    const start = bare.indexOf(selector);
+    expect(start, `no rule for \`${selector}\``).toBeGreaterThan(-1);
+    const body = bare.slice(start, bare.indexOf('}', start));
+    expect(body).toContain('overflow-x: auto');
+    expect(body).toContain('max-width: 100%');
+  });
+
+  it('9.355 .table-toolbar wraps rather than overflowing at phone width (Review Focus #2, the toolbar itself)', () => {
+    // 9 buttons + 3 separators at the house 32/34px-button sizing comes to
+    // roughly 450px+ — wider than a ~330-375px phone editor. An absolutely
+    // positioned child that overflows still adds to its ancestors'
+    // scrollable overflow, which is exactly the "never widen the page"
+    // failure Review Focus #2 forbids, just from the toolbar's OWN width
+    // rather than the table's (a review finding: unmeasured, open risk).
+    const editorCss = stripComments(readFileSync(EDITOR_CSS_PATH, 'utf8'));
+    const start = editorCss.indexOf('.table-toolbar {');
+    expect(start, 'no `.table-toolbar` rule in editor.css').toBeGreaterThan(-1);
+    const body = editorCss.slice(start, editorCss.indexOf('}', start));
+    expect(body).toContain('flex-wrap: wrap');
+    expect(body).toContain('max-width: 100%');
   });
 });
 

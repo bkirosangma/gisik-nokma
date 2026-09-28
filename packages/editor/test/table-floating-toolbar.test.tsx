@@ -285,6 +285,38 @@ describe('table floating toolbar', () => {
     view.unmount();
   });
 
+  it('9.357 Alt+F10 moves focus into the toolbar’s first button (review finding: nothing could reach it by keyboard at all)', async () => {
+    // Tiptap's own table keymap binds Tab to move cell-to-cell (or add a
+    // row at the last cell) and never returns false while inside a table,
+    // so ordinary Tab/Shift+Tab can never REACH this toolbar in the first
+    // place — a real keyboard trap, not merely a missing enhancement. Once
+    // focus IS inside the toolbar, its 9 buttons are plain sequential
+    // `<button>`s, so native Tab/Shift+Tab already moves between them; the
+    // gap this closes is only "how does focus get there at all", the
+    // WAI-ARIA convention for exactly that (Alt+F10, "move focus to the
+    // nearby toolbar").
+    const { view, editor } = await mount(makeProps({ initialDoc: TABLE_DOC }));
+    editor.commands.setTextSelection(firstCellPos(editor));
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.table-toolbar')).not.toBeNull();
+    });
+    fireEvent.keyDown(editor.view.dom, { key: 'F10', altKey: true });
+    const firstButton = view.container.querySelector('.table-toolbar button');
+    expect(document.activeElement).toBe(firstButton);
+    view.unmount();
+  });
+
+  it('Alt+F10 does nothing when the toolbar is not showing (caret outside any table)', async () => {
+    const { view, editor } = await mount(
+      makeProps({ initialDoc: { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'x' }] }] } }),
+    );
+    const before = document.activeElement;
+    fireEvent.keyDown(editor.view.dom, { key: 'F10', altKey: true });
+    expect(view.container.querySelector('.table-toolbar')).toBeNull();
+    expect(document.activeElement).toBe(before);
+    view.unmount();
+  });
+
   it('9.353 does not float above the content area (and so cannot cover the main toolbar) when the table is the very first node', async () => {
     // Reproduces a live-browser finding: a table with nothing above it inside
     // `.ticket-editor__content` sits right at the content area's own top edge
@@ -312,17 +344,62 @@ describe('table floating toolbar', () => {
     // is one of the events that effect's own listener responds to.
     window.dispatchEvent(new Event('resize'));
 
-    // The content area starts at 44 (relative to the anchor) — the toolbar
-    // must never render above that, which is where the main toolbar lives.
-    // Waited for directly (not read once): `updatePos` runs a first time on
-    // mount with jsdom's default zero rects before the mocks above are even
-    // in place, and that stale render also happens to clamp to a value
-    // (`0`) that a looser "isn't the unclamped -36" check would have let
-    // slip through as a false pass.
+    // The toolbar must render BELOW the table's own bottom edge (84 + a 4px
+    // gap = 88) when there's no room above it, not merely "not above 44" —
+    // a review finding: clamping to content's top (44) put the toolbar
+    // ON TOP of the table's own header row instead of the main toolbar,
+    // trading one occlusion for another. Waited for directly (not read
+    // once): `updatePos` runs a first time on mount with jsdom's default
+    // zero rects before the mocks above are even in place, and that stale
+    // render also happens to produce a value a looser check could mistake
+    // for the real one.
     await vi.waitFor(() => {
       const toolbar = view.container.querySelector('.table-toolbar') as HTMLElement | null;
       expect(toolbar).not.toBeNull();
-      expect(Number.parseFloat(toolbar!.style.top)).toBeGreaterThanOrEqual(44);
+      expect(Number.parseFloat(toolbar!.style.top)).toBe(88);
+    });
+    view.unmount();
+  });
+
+  it('9.358 clamps left to 0 when the table has scrolled left inside a horizontally-scrolling .tableWrapper', async () => {
+    // A wide table's `.tableWrapper` scrolling right moves the table's own
+    // `getBoundingClientRect().left` NEGATIVE (its content moves left of the
+    // wrapper's visible edge) — unclamped, `t.left - a.left` would carry
+    // that negative value straight into the toolbar's inline `left`,
+    // dragging it out of `.ticket-editor` entirely (a review finding).
+    //
+    // jsdom lays out every element at `left: 0` by default, so a test that
+    // only ever asserts a FINAL value of 0 cannot tell "correctly clamped"
+    // apart from "never recomputed, still holding jsdom's untouched
+    // default" (both read as 0) — the exact shape of a prior bug in the
+    // sibling 9.353 test, above. This one first drives `left` to a known
+    // NON-zero value (proving updatePos does read live mocks), then applies
+    // the scrolled mock and confirms the value actually MOVES to 0 from
+    // there, rather than starting there.
+    const { view, editor } = await mount(makeProps({ initialDoc: TABLE_DOC }));
+    const anchor = view.container.querySelector('.ticket-editor') as HTMLElement;
+    const content = view.container.querySelector('.ticket-editor__content') as HTMLElement;
+    const table = view.container.querySelector('table') as HTMLTableElement;
+    const rectFor = (top: number, left: number): DOMRect =>
+      ({ top, left, bottom: top + 40, right: left + 100, width: 100, height: 40, x: left, y: top, toJSON() {} }) as DOMRect;
+    const mockRect = (el: HTMLElement, top: number, left: number) =>
+      Object.defineProperty(el, 'getBoundingClientRect', { value: () => rectFor(top, left), configurable: true });
+
+    mockRect(anchor, 0, 0);
+    mockRect(content, 44, 0);
+    mockRect(table, 100, 50); // not scrolled: left tracks the table directly
+    window.dispatchEvent(new Event('resize'));
+    await vi.waitFor(() => {
+      const toolbar = view.container.querySelector('.table-toolbar') as HTMLElement | null;
+      expect(toolbar).not.toBeNull();
+      expect(Number.parseFloat(toolbar!.style.left)).toBe(50);
+    });
+
+    mockRect(table, 100, -250); // scrolled 250px right inside .tableWrapper
+    window.dispatchEvent(new Event('resize'));
+    await vi.waitFor(() => {
+      const toolbar = view.container.querySelector('.table-toolbar') as HTMLElement;
+      expect(Number.parseFloat(toolbar.style.left)).toBe(0);
     });
     view.unmount();
   });

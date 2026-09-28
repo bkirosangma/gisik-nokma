@@ -4052,6 +4052,11 @@ input, textarea, select { font-family: inherit; }
    comment. `.selectedCell` is prosemirror-tables' own decoration class for a
    multi-cell selection — not this file's to name, only to colour. */
 .ticket-editor__content .tableWrapper { overflow-x: auto; max-width: 100%; }
+/* Review finding: a wide comment table had no scroll container at all and
+   would widen the comment thread (and the ticket sheet around it) — the
+   same failure `.tableWrapper` exists to prevent, on the read-only
+   rendering surface `comment-body.tsx` owns. */
+.gn-comment__table-wrap { overflow-x: auto; max-width: 100%; }
 .ticket-editor__content table,
 .gn-comment__table {
   border-collapse: collapse;

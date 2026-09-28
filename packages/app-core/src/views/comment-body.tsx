@@ -294,7 +294,14 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
   // that fallback used to flatten a comment's table into unstructured nested
   // fragments with no `<table>` at all (9.348).
   if (node.type === 'table') {
-    return createElement('table', { className: 'gn-comment__table', key }, createElement('tbody', null, children));
+    // Wrapped in a scrolling container for the same reason the live editor's
+    // `.tableWrapper` exists: a wide, unbreakable table must scroll inside
+    // itself, never widen the comment thread (or the ticket sheet) around it.
+    return createElement(
+      'div',
+      { className: 'gn-comment__table-wrap', key },
+      createElement('table', { className: 'gn-comment__table' }, createElement('tbody', null, children)),
+    );
   }
   if (node.type === 'tableRow') {
     return createElement('tr', { key }, children);

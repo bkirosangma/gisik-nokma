@@ -736,6 +736,7 @@
 .table-toolbar {
   position: absolute;
   display: flex;
+  flex-wrap: wrap;
   align-items: center;
   gap: 2px;
   padding: 4px;
@@ -743,6 +744,13 @@
   border-radius: 6px;
   background: Canvas;
   z-index: 30;
+  /* Resolves against `.ticket-editor`, the containing block for this
+     absolutely-positioned element — 9 buttons + 3 separators run to
+     450px+, wider than a phone editor, and an overflowing absolute child
+     still adds to its ancestors' scrollable overflow. `flex-wrap` alone
+     wraps buttons onto a second row; this stops the row itself from ever
+     being asked to exceed the editor's own width in the first place. */
+  max-width: 100%;
 }
 .table-toolbar__group { display: flex; align-items: center; }
 .table-toolbar__sep {

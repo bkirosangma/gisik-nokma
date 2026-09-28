@@ -78,6 +78,29 @@ function findActiveCellDom(editor: Editor): HTMLElement | null {
 export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarProps): React.JSX.Element | null {
   const [table, setTable] = useState<HTMLTableElement | null>(null);
   const [pos, setPos] = useState<{ top: number; left: number } | null>(null);
+  const containerRef = useRef<HTMLDivElement | null>(null);
+
+  // Alt+F10 moves focus into the toolbar (the WAI-ARIA convention for
+  // "focus the nearby toolbar") — a review finding: Tiptap's own table
+  // keymap binds Tab to move cell-to-cell and never returns false while the
+  // caret is in a table, so ordinary Tab/Shift+Tab can never REACH this
+  // toolbar at all. Read via a ref rather than closed over `pos`/`table`:
+  // the listener is registered once per `editor` and must see the CURRENT
+  // render's DOM, not the values captured when it was attached.
+  useEffect(() => {
+    if (!editor) return;
+    const onKeyDown = (event: KeyboardEvent) => {
+      if (event.key !== 'F10' || !event.altKey) return;
+      const firstButton = containerRef.current?.querySelector('button');
+      if (!firstButton) return;
+      event.preventDefault();
+      firstButton.focus();
+    };
+    editor.view.dom.addEventListener('keydown', onKeyDown);
+    return () => {
+      editor.view.dom.removeEventListener('keydown', onKeyDown);
+    };
+  }, [editor]);
 
   // Cursor tracking: on every selection change/transaction, find the table
   // (if any) the caret currently sits inside.
@@ -123,7 +146,18 @@ export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarP
       const t = table.getBoundingClientRect();
       const desiredTop = t.top - a.top - 36;
       const minTop = content ? content.getBoundingClientRect().top - a.top : desiredTop;
-      setPos({ top: Math.max(desiredTop, minTop), left: t.left - a.left });
+      // No room above (clamped): sit BELOW the table instead of AT the
+      // clamp floor — the floor coincides with the table's own top edge in
+      // exactly the case that triggers it, so clamping there occludes the
+      // table's own header row instead of the main toolbar (a review
+      // finding: one occlusion traded for another, not fixed).
+      const top = desiredTop >= minTop ? desiredTop : t.bottom - a.top + 4;
+      // A wide table scrolled right inside `.tableWrapper` moves `t.left`
+      // negative (its content moves left of the wrapper's visible edge) —
+      // unclamped, that would drag the toolbar out of `.ticket-editor`
+      // entirely (a review finding).
+      const left = Math.max(0, t.left - a.left);
+      setPos({ top, left });
     };
     updatePos();
     // jsdom has no ResizeObserver by default; guard rather than crash under test.
@@ -167,6 +201,7 @@ export function TableFloatingToolbar({ editor, editable }: TableFloatingToolbarP
 
   return (
     <div
+      ref={containerRef}
       className="table-toolbar"
       role="toolbar"
       aria-label="Table"
