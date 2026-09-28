@@ -10,6 +10,7 @@ import type {
   NoteSummary,
   NoteVersion,
   Priority,
+  PurgedRef,
   StateCategory,
   TicketState,
   TicketTypeDef,
@@ -2923,3 +2924,15 @@ export function mapDeletedItems(raw: unknown): DeletedItem[] {
     };
   });
 }
+
+/** `POST /v1/purged-lookup`'s body (trash Plan 3). A row that is not a lifecycle ref is a `MappingError`, never skipped. */
+export function mapPurgedLookup(raw: unknown): PurgedRef[] {
+  const record = asRecord(raw, 'purged-lookup');
+  return asArray(record['purged'], 'purged-lookup.purged').map((entry, index) => {
+    const path = `purged-lookup.purged[${index}]`;
+    const item = asRecord(entry, path);
+    return { kind: asDeletedItemKind(item['kind'], `${path}.kind`), id: asString(item['id'], `${path}.id`) };
+  });
+}
+
+

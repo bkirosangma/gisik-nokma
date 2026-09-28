@@ -8656,6 +8656,19 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "A chip or link to something that was permanently deleted reads Deleted item"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — no key, no title, and nothing to open. The comment or note that holds it is not changed: only the chip is drawn differently, because the thing it pointed at no longer exists."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "Tagging a note in a job's own comment attaches that note to the job"
                   },
                   {

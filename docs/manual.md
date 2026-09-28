@@ -1700,6 +1700,10 @@ can see; pick one and it inserts a chip showing the job's key and title, which o
 Typing `:note ` (or `[[`) the same way opens a picker over the notes you can read, and inserts a link to
 the one you pick.
 
+**A chip or link to something that was permanently deleted reads Deleted item** — no key, no title, and
+nothing to open. The comment or note that holds it is not changed: only the chip is drawn differently,
+because the thing it pointed at no longer exists.
+
 **Tagging a note in a job's own comment attaches that note to the job** — the same as pressing Attach
 note yourself. Referencing a note inside the note's own comments does not attach anything anywhere.
 

@@ -32,6 +32,7 @@ export function createFakeDataSource(
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => [],
     getDeletedItems: async () => [],
+    purgedAmong: async () => [],
     getMembers: async () => [],
     getBoard: async () => ({ projectId: 'prj_unset', groups: [] }),
     getTickets: async () => ({ projectId: 'prj_unset', rows: [] }),

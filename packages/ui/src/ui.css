@@ -7376,6 +7376,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    (`.gn-comment__body a`), this rule only adds the one thing a span rendering
    still needs. */
 .gn-comment__ticketref { overflow-wrap: anywhere; }
+/* Trash Plan 3 (T11) — a chip whose target was permanently erased. Never a link;
+   italic as well as muted, so the ink is not the only difference, and the words
+   themselves ("Deleted item") carry the meaning. */
+.gn-comment__ref--purged { color: var(--gn-text-muted); font-style: italic; cursor: default; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {

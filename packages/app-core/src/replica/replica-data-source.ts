@@ -1188,6 +1188,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
     getDeletedItems: () => Promise.reject(new ReplicaGapError('getDeletedItems', DELETED_ITEMS_ABSENCES)),
+    purgedAmong: (ids) => replica.purgedAmong(ids),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
     getTicketAttachments: () =>
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),

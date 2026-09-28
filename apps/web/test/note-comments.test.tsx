@@ -394,3 +394,41 @@ describe('18.213-18.215 NoteComments', () => {
     expect(await queryNotes('compr')).toEqual([{ noteId: 'n2', title: 'Compressor log' }]);
   });
 });
+
+describe('19.191 note comments on the web', () => {
+  it('19.191 a chip to a purged note reads "Deleted item" with no link; the live ticket chip keeps its link', async () => {
+    const GONE = '01J9GNOTEGONE0000000000000';
+    const LIVE_TICKET = '01J9GTKLIVE000000000000000';
+    render(
+      <Providers
+        services={stubServices({
+          getNoteComments: async () => [
+            comment({
+              commentId: 'c1',
+              body: {
+                type: 'doc',
+                content: [
+                  {
+                    type: 'paragraph',
+                    content: [
+                      { type: 'wikiLink', attrs: { noteId: GONE, title: 'Cold room' } },
+                      { type: 'text', text: ' and ' },
+                      { type: 'ticketRef', attrs: { ticketId: LIVE_TICKET, projectId: 'p1', key: 'SHOP-9', title: 'Fix the freezer' } },
+                    ],
+                  },
+                ],
+              },
+            }),
+          ],
+          purgedAmong: async (ids) => (ids.includes(GONE) ? [{ kind: 'note', id: GONE }] : []),
+        })}
+      >
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+      </Providers>,
+    );
+    expect(await screen.findByText('Deleted item')).toBeInTheDocument();
+    expect(screen.queryByRole('link', { name: 'Cold room' })).toBeNull();
+    // CONTROL
+    expect(screen.getByRole('link', { name: 'SHOP-9 Fix the freezer' })).toBeInTheDocument();
+  });
+});

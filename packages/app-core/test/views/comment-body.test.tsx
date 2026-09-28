@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { PURGED_ITEM_LABEL } from '@gisik-nokma/domain';
 import { renderCommentBody, safeHref } from '../../src/views/comment-body.js';
 
 /**
@@ -468,5 +469,37 @@ describe('9.348 table in a comment', () => {
     const { container } = render(<>{renderCommentBody(body)}</>);
     expect(container.querySelector('hr.gn-comment__rule')).not.toBeNull();
     expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
+});
+
+describe('19.188 a chip to an erased item', () => {
+  it('19.188 renders PURGED_ITEM_LABEL with no link for a purged ticketRef and wikiLink; a live chip keeps its text and link', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'ticketRef', attrs: { ticketId: 'gone_ticket', projectId: 'p1', key: 'SHOP-7', title: 'Invoice' } },
+            { type: 'text', text: ' / ' },
+            { type: 'wikiLink', attrs: { noteId: 'gone_note', title: 'Cold room' } },
+            { type: 'text', text: ' / ' },
+            { type: 'ticketRef', attrs: { ticketId: 'live_ticket', projectId: 'p1', key: 'SHOP-9', title: 'Fix the freezer' } },
+          ],
+        },
+      ],
+    };
+    const isPurged = (_kind: 'ticket' | 'note', id: string) => id === 'gone_ticket' || id === 'gone_note';
+    const { container } = render(<>{renderCommentBody(body, () => '/w/x/p/p1?ticket=t', isPurged)}</>);
+    const purged = [...container.querySelectorAll('.gn-comment__ref--purged')];
+    expect(purged.map((el) => [el.tagName, el.textContent])).toEqual([
+      ['SPAN', PURGED_ITEM_LABEL],
+      ['SPAN', PURGED_ITEM_LABEL],
+    ]);
+    expect(container.textContent).not.toContain('Invoice');
+    expect(container.textContent).not.toContain('Cold room');
+    // CONTROL
+    const links = [...container.querySelectorAll('a')];
+    expect(links.map((a) => a.textContent)).toEqual(['SHOP-9 Fix the freezer']);
   });
 });

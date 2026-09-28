@@ -798,3 +798,43 @@ describe('TicketSheet — tagging a note in a ticket comment attaches it', () =>
     expect(src.ingested.flat().some((e) => e.type === 'note.detached')).toBe(false);
   });
 });
+
+describe('19.191 a surviving comment chips a purged note', () => {
+  it('19.191 the sheet draws "Deleted item" with no link, leaves the stored body alone, and keeps the live chip', async () => {
+    const GONE = '01J9GNOTEGONE0000000000000';
+    const surviving: TicketComment = {
+      commentId: '01COMMENTTHREE',
+      authorId: 'user_anselma',
+      body: {
+        type: 'doc',
+        content: [
+          {
+            type: 'paragraph',
+            content: [
+              { type: 'wikiLink', attrs: { noteId: GONE, title: 'Cold room' } },
+              { type: 'text', text: ' and ' },
+              { type: 'ticketRef', attrs: { ticketId: TICKET, projectId: 'p_other', key: 'SHOP-9', title: 'Fix the freezer' } },
+            ],
+          },
+        ],
+      },
+      recordedAt: '2026-09-23T09:00:00.000Z',
+      files: [],
+    };
+    const before = JSON.stringify(surviving.body);
+    renderSheet(
+      source({
+        getTicketComments: async () => [surviving],
+        purgedAmong: async (ids: readonly string[]) =>
+          ids.includes(GONE) ? [{ kind: 'note' as const, id: GONE }] : [],
+      }),
+      { resolveTicketHref: ({ ticketId }: { ticketId: string }) => `/t/${ticketId}` },
+    );
+    const section = await screen.findByTestId('sheet-comments');
+    expect(await within(section).findByText('Deleted item')).toBeInTheDocument();
+    expect(within(section).queryByText('Cold room')).toBeNull();
+    expect(JSON.stringify(surviving.body)).toBe(before);
+    // CONTROL
+    expect(within(section).getByRole('link', { name: 'SHOP-9 Fix the freezer' })).toHaveAttribute('href', `/t/${TICKET}`);
+  });
+});
