@@ -1162,3 +1162,63 @@ describe('18.198 the upload owner', () => {
     expect(ticketFields.noteId).toBeUndefined();
   });
 });
+
+/**
+ * 9.333–9.335 — Unit 5 (owner: "I thought we already made the attachment
+ * feature but i dont see where we can attach files in our build"): the
+ * composer's own Attach button. Case ids live in
+ * `test-cases/09-editor-attachments.md`, block `9.313`–`9.337`.
+ */
+describe('9.333-9.335 the Attach button', () => {
+  it('9.333 clicking Attach opens the file picker, and a chosen file reaches uploadAttachment through the SAME path a paste uses', async () => {
+    const uploadAttachment = vi.fn(async (_file: File) => UPLOADED);
+    const emitAttachmentAdded = vi.fn(async (_uploaded: EditorSlotUpload) => {});
+    const { view } = await mountSlot(makeProps({ uploadAttachment, emitAttachmentAdded }));
+    const button = view.container.querySelector('.editor-slot__attach') as HTMLButtonElement;
+    expect(button, 'no Attach button rendered').not.toBeNull();
+    expect(button.textContent).toContain('Attach');
+    const input = view.container.querySelector('.editor-slot__attach-input') as HTMLInputElement;
+    expect(input, 'no hidden file input rendered').not.toBeNull();
+    const file = new File([new Uint8Array(4)], 'evidence.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file] } });
+    await vi.waitFor(() => {
+      expect(uploadAttachment).toHaveBeenCalledTimes(1);
+      expect(emitAttachmentAdded).toHaveBeenCalledTimes(1);
+    });
+    // The EXACT file, not a copy or a re-read — one call, one path.
+    expect(uploadAttachment.mock.lastCall?.[0]).toBe(file);
+    expect(emitAttachmentAdded.mock.lastCall?.[0]).toEqual(UPLOADED);
+    view.unmount();
+  });
+
+  it('9.334 with no uploader wired, the button is ABSENT — not disabled, not present at all', async () => {
+    const props = makeProps();
+    delete props.uploadAttachment;
+    const { view } = await mountSlot(props);
+    expect(view.container.querySelector('.editor-slot__attach')).toBeNull();
+    expect(view.container.querySelector('.editor-slot__attach-input')).toBeNull();
+    view.unmount();
+  });
+
+  it('9.335 the accept list has no client/server disagreement: it names EXACTLY the mime types apps/server/src/attachments/sniff.ts accepts', async () => {
+    const serverPath = resolve(process.cwd(), '../../apps/server/src/attachments/sniff.ts');
+    expect(existsSync(serverPath), `not found: ${serverPath}`).toBe(true);
+    // Comments stripped FIRST — a naive quote-scan over the raw source
+    // matches the apostrophe in "domain's EMBEDDABLE_IMAGE_MIME" (this
+    // file's own comment) as a string delimiter, which is not a mutation
+    // this case should ever need to distinguish from the real list.
+    const stripped = readFileSync(serverPath, 'utf8')
+      .replace(/\/\*[\s\S]*?\*\//g, '')
+      .replace(/\/\/.*/g, '');
+    const match = stripped.match(/ALLOWED_ATTACHMENT_MIME:[^=]*=\s*new Set\(\[([\s\S]*?)\]\)/);
+    expect(match, 'ALLOWED_ATTACHMENT_MIME not found in sniff.ts').not.toBeNull();
+    const serverMimes = [...(match?.[1] ?? '').matchAll(/'([^']+)'/g)].map((m) => m[1]);
+    expect(serverMimes.length).toBeGreaterThan(0);
+
+    const { view } = await mountSlot(makeProps());
+    const input = view.container.querySelector('.editor-slot__attach-input') as HTMLInputElement;
+    const clientMimes = input.accept.split(',');
+    expect(new Set(clientMimes)).toEqual(new Set(serverMimes));
+    view.unmount();
+  });
+});

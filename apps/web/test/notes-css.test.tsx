@@ -250,6 +250,37 @@ describe('13.1490 .gn-notes__toc is the floating launcher’s fixed container', 
   });
 });
 
+/**
+ * 18.302 — Unit 6b (owner, 2026-09-23: "Any Author should not be 2 lines").
+ * `.gn-select__trigger`'s own `width: 100%` shrinks it below its label's
+ * natural width as a bare flex item of `.gn-notes__filters`, wrapping the
+ * text — the Select component is otherwise right (every other mount gives
+ * it a constrained container), so the fix is scoped to this row rather than
+ * to the shared component.
+ */
+describe('18.302 the notes filters keep each Select label on one line', () => {
+  it('18.302 the search input takes the remaining width; the filter group and each trigger refuse to shrink or wrap', () => {
+    const input = declarationsFor(CSS, '.gn-notes__search-input');
+    expect(input, '.gn-notes__search-input rule').not.toBeNull();
+    expect(input).toMatch(/flex:\s*1 1 auto;/);
+    expect(input).toMatch(/min-width:\s*0;/);
+
+    const filters = declarationsFor(CSS, '.gn-notes__filters');
+    expect(filters, '.gn-notes__filters rule').not.toBeNull();
+    expect(filters).toMatch(/flex:\s*none;/);
+
+    const trigger = declarationsFor(CSS, '.gn-notes__filters .gn-select__trigger');
+    expect(trigger, '.gn-notes__filters .gn-select__trigger rule').not.toBeNull();
+    expect(trigger).toMatch(/flex:\s*none;/);
+    expect(trigger).toMatch(/white-space:\s*nowrap;/);
+
+    // CONTROL: the Select component's OWN base rule is untouched — this is
+    // a fix at the notes row, not a change to every mount of `<Select>`.
+    const base = declarationsFor(CSS, '.gn-select__trigger');
+    expect(base, '.gn-select__trigger base rule (packages/ui, not this file)').toBeNull();
+  });
+});
+
 // ── Fixtures shared by 18.225 and 18.226 ────────────────────────────────────
 
 const WS_A = '01J9WSLOGISTICS000000000000';

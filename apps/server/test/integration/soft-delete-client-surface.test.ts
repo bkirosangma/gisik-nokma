@@ -493,7 +493,11 @@ type AbsenceDecision =
   // come back through search, in EITHER mode, and 18.148 is the case that
   // holds the queries to it — so this row is `carries: true` and the verdict
   // is the one that matters here.
-  | 'searchNotes';
+  | 'searchNotes'
+  // The trash series, Plan 1. `getDeletedItems` is the ONE read whose entire
+  // job is to name what was deleted — see its own row below for why its
+  // verdict is the exception to every other row's `'excluded'`.
+  | 'getDeletedItems';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -604,6 +608,20 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     // the chunk rows outlive the note until the worker catches up.)
     carries: false,
     why: 'a note hit shows the note’s own text and its tickets’ KEYS; the deleted ticket’s title reaches it as a match, not as content',
+  },
+  getDeletedItems: {
+    verdict: 'retained',
+    // `false`, and it is a claim about the BEFORE half specifically, not
+    // about whether ticket content ever reaches this surface — it does (see
+    // `why`). `carries` gates the positive control's pre-delete pass, and
+    // this read is EMPTY of the fixture's own tombstones until the AFTER
+    // block's `beforeAll` deletes them — a live, undeleted marker cannot
+    // appear in a list whose entire membership is "already deleted", so
+    // there is no "before" reading to carry the marker in the first place.
+    // `verdict: 'retained'` is still checked, unconditionally, in the AFTER
+    // pass below — the marker's title DOES surface there, once it is real.
+    carries: false,
+    why: 'the ONE surface whose entire job is naming what was deleted (`packages/domain/src/read-models.ts`’s `DeletedItem.label`, documented as "ticket `KEY title`, note title" for those two kinds) — a deleted ticket’s title is not a leak here, it is the answer a person needs to recognise what they are about to restore. Every other `excluded` row exists because a delete must not echo through a read that was never about the deleted thing; this read is about nothing else, which is why its verdict is this table’s one exception.',
   },
   getMyWork: { verdict: 'excluded', carries: true },
   getAttention: { verdict: 'excluded', carries: true },
@@ -732,6 +750,9 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     // The notes search reads, both modes. `MARKER` is this file's text term, so
     // the call visits the same door every other `carries: true` row walks.
     searchNotes: () => ds.searchNotes(workspaceId, MARKER, { mode: 'lexical' }),
+    // Takes no workspace id — `getDeletedItems` is scoped to the caller's own
+    // membership, not one workspace.
+    getDeletedItems: () => ds.getDeletedItems(),
   };
 }
 
@@ -799,8 +820,9 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   expect(absenceTripwire('getBoard')).toBe('getBoard');
   expect(absenceTripwire('getTicketHistory')).toBe('getTicketHistory');
   // 16 until the notes series (Plan 1 of 6) added its seven reads; 23 until
-  // Plan 3 of 6 added `searchNotes`.
-  expect(MEMBERS).toHaveLength(24);
+  // Plan 3 of 6 added `searchNotes`; 24 until the trash series (Plan 1) added
+  // `getDeletedItems`.
+  expect(MEMBERS).toHaveLength(25);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);

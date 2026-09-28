@@ -464,11 +464,13 @@ settled — the website has one now, and the two record the same thing.
 
 **Can I attach a photo or a file to a job?**
 Through a comment, and the file travels with the comment that carries it. Drop an image into the comment
-box and it is stored and put inside what you are writing; the comment then names it, and the chip under
-the comment is how you reach it. **A file that is not an image cannot be put inside a comment** — it is
-stored against the job instead and appears in the job's list of files, not in your comment. That split
-is the product's own rule rather than a limitation of the box: a comment's files are the ones its own
-text carries, so a comment can never be missing a file it was written with.
+box, paste it, or press the paperclip **Attach** button in the comment box's own footer, and it is
+stored and put inside what you are writing; the comment then names it, and the chip under the comment
+is how you reach it. **A file that is not an image cannot be put inside a comment** — it is stored
+against the job instead and appears in the job's list of files, not in your comment. That split is the
+product's own rule rather than a limitation of the box: a comment's files are the ones its own text
+carries, so a comment can never be missing a file it was written with. The **Attachments** tab has its
+own **Attach a file** button too, for a file that has no comment to travel with.
 
 **A file can also be attached to a Move:** a move carrying the "require evidence" rule puts a file box
 in its dialog and stays blocked until the server has stored the file.
@@ -484,9 +486,9 @@ Enough is known about the writing box to answer this properly:
 - It is proper formatting, not plain text — headings, bold, italic, bullet and numbered lists, quotes.
 - It **auto-formats as you type**: a dash becomes a bullet, "1." starts a numbered list, hashes become
   headings, asterisks become bold. About nineteen of these shortcuts.
-- When it auto-formats, a small chip appears. **Press Backspace, or click the chip, to undo the
-  formatting** and keep your literal characters. **Press Escape and the chip goes away and the
-  formatting stays.** Two opposite results, both of which dismiss the chip. Learn the difference.
+- If a shortcut fires when you did not want it, **press Backspace straight away** — the formatting
+  goes and the characters you typed (the hashes, dashes, backticks) come back as plain text. It works
+  only for the very next keypress; once you type anything else, the formatting stays.
 - **To mention somebody**, type @ and start their name. A list appears — arrows or click to pick,
   Enter to insert, Escape to close and leave what you typed as ordinary text. It will not offer anyone
   without a proper name, and it cannot be tricked into showing one person's name while pointing at

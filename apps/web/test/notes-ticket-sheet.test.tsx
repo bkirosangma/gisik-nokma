@@ -73,6 +73,7 @@ const WORKSPACE_REF: WorkspaceRef = {
   role: 'owner',
   memberCount: 1,
   nameRestrictedProjectCount: 0,
+  archived: false,
   projects: [project(PROJECT, PROJECT_NAME), project(OTHER_PROJECT, 'Other project')],
 };
 

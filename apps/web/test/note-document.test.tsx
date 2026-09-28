@@ -1,3 +1,4 @@
+import { searchTermSchema } from '@gisik-nokma/domain';
 import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
@@ -107,11 +108,17 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
 }
 
 function world(
-  opts: { note?: NoteDetail; role?: string; search?: DataSourceQuery['search'] } = {},
+  opts: {
+    note?: NoteDetail;
+    role?: string;
+    search?: DataSourceQuery['search'];
+    getTickets?: DataSourceQuery['getTickets'];
+  } = {},
 ) {
   const services = stubServices({
     getMyWorkspaces: async () => [{ ...WS_A_REF, role: opts.role ?? 'owner' }],
     ...(opts.search === undefined ? {} : { search: opts.search }),
+    ...(opts.getTickets === undefined ? {} : { getTickets: opts.getTickets }),
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
@@ -434,6 +441,38 @@ describe('18.11 The Notes page — the document', () => {
     expect(resolveTicketHref({ ticketId: TICKET, projectId: P_COLD })).toBe(
       `/w/${WS_A}/p/${P_COLD}?ticket=${TICKET}`,
     );
+  });
+
+  /**
+   * 18.310 — Unit 6e (owner ruling 2026-09-29): the note editor's bare
+   * `:ticket` — no project in this context — lists the workspace's tickets
+   * instead of reaching `search('')`, which the route refuses (400), drawn as
+   * "Search needs a connection". Same mount as 18.273; the comment box's half
+   * is in `note-comments.test.tsx`.
+   */
+  it('18.310 the note editor\'s empty :ticket query lists the workspace\'s tickets and never calls search', async () => {
+    stubSlot = true;
+    capturedSlotProps = [];
+    const search = vi.fn(async (_workspaceId: string, text: string) => {
+      searchTermSchema.parse(text);
+      return [];
+    });
+    const getTickets = vi.fn(async (projectId: string) => ({
+      projectId,
+      rows: [{ ticketId: TICKET, title: 'Renew the trade licence', key: 'CCSO-1183' }],
+    })) as unknown as DataSourceQuery['getTickets'];
+    render(
+      <Providers services={world({ search, getTickets })}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+    await waitFor(() => {
+      expect(slotProps().queryTickets).toBeDefined();
+    });
+    const queryTickets = slotProps().queryTickets as (q: string) => Promise<Array<{ key: string }>>;
+    const listed = await queryTickets('');
+    expect(listed.map((c) => c.key)).toContain('CCSO-1183');
+    expect(search).not.toHaveBeenCalled();
   });
 
   /**

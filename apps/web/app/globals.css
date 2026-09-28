@@ -5,6 +5,31 @@
 * { box-sizing: border-box; }
 html, body { margin: 0; padding: 0; }
 
+/* Unit 6c (owner, 2026-09-23: "placeholders in the text box should not be
+   visible once they are in focus") — the BARE half of the rule `.gn-field__
+   input::placeholder`/`:focus::placeholder` (`packages/ui/src/ui.css`)
+   already carries: six of this product's text fields draw an `<input>`/
+   `<textarea>` with a placeholder but NO `.gn-field__input` class (`.gn-
+   notes__filter`, `.gn-mcp-authorize__input`, `.gn-project__search`, `.gn-
+   saved-filters__name`, `.gn-help__search-input`, and the searchable
+   `Select` trigger's own input, `packages/ui/src/select/select.tsx`) — a
+   plain element selector reaches every one of them without naming any of
+   their classes, so a future bare field gets the same behaviour for free.
+   `.gn-field__input`'s own pair wins on specificity regardless of source
+   order (a class beats a bare type selector), so this never overrides it —
+   it only fills the gap those six left. */
+input::placeholder,
+textarea::placeholder {
+  /* Unit 6d — the same lighter tone `.gn-field__input::placeholder` moved
+     to (`packages/ui/src/ui.css`, that rule's own docblock has the
+     measured contrast and the owner's 3:1-for-hig/minimal ruling). */
+  color: var(--gn-text-subtle);
+}
+input:focus::placeholder,
+textarea:focus::placeholder {
+  color: transparent;
+}
+
 /* The skip link (exec1 P13) — the product's first focusable element, hidden
    until it is focused. It is pulled out of the flow with `position:absolute`
    and clipped to a 1px box rather than given `display:none`, which would take
@@ -3763,13 +3788,35 @@ input, textarea, select { font-family: inherit; }
   margin-left: auto;
 }
 
+/* Unit 6b (owner, 2026-09-23: "Any author should not be 2 lines") — the
+   search input takes the REMAINING width (`flex: 1 1 auto; min-width: 0`,
+   replacing the old fixed `min-width: 14rem`, which was itself squeezing the
+   filters at narrower widths), so a tight row shrinks the TEXT FIELD rather
+   than the option label beside it. */
 .gn-notes__search-input {
-  min-width: 14rem;
+  flex: 1 1 auto;
+  min-width: 0;
 }
 
 .gn-notes__filters {
   display: flex;
+  flex: none;
   gap: 0.5rem;
+}
+/* The Select component itself is right everywhere else it is used — its own
+   `width: 100%` is meant to fill a container that already constrains its
+   width (a form row, a field grid cell). `.gn-notes__filters` gives it no
+   such constraint, so as a bare flex item it shrinks below its label's
+   natural width and the label text wraps — `white-space` is inherited, so
+   setting it once on the trigger reaches the value span with no class of
+   its own to target. `flex: none` keeps the trigger from shrinking at all;
+   `.gn-notes__search`'s own `flex-wrap: wrap` (above) is what already lets
+   a whole filter — both selects together, never a label split mid-word —
+   move to its own line once the row runs out of room, so no separate
+   breakpoint rule is needed for that half. */
+.gn-notes__filters .gn-select__trigger {
+  flex: none;
+  white-space: nowrap;
 }
 
 /* The results wrapper — replaces the tree's groups while a query is active

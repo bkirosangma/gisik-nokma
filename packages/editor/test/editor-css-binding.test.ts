@@ -130,7 +130,11 @@ describe('13.1272 editor chrome css binding', () => {
     // in the ink `.gn-field__input::placeholder` uses.
     const ph = ruleBody(EDITOR_CSS, '.ticket-editor__content .is-editor-empty:first-child::before');
     expect(declared(ph, 'content')).toBe('attr(data-placeholder)');
-    expect(declared(ph, 'color')).toBe('var(--gn-text-muted)');
+    // Unit 6d (owner, 2026-09-23: "placeholders ... should be much lighter") —
+    // moved to `--gn-text-subtle`, the same lighter ink `.gn-field__input::
+    // placeholder` moved to; see that rule's own docblock (ui.css) for the
+    // measured, composited contrast and the owner's 3:1-for-hig/minimal ruling.
+    expect(declared(ph, 'color')).toBe('var(--gn-text-subtle)');
     expect(declared(ph, 'pointer-events')).toBe('none');
     expect(BARE).toMatch(/\.editor-slot \.ticket-editor__content:focus-within\s*\{[^}]*outline:\s*2px solid var\(--gn-focus-ring\)/);
   });

@@ -2484,7 +2484,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " tab lists the job's files, and the comment box takes one too. The "
+                      "text": " tab lists the job's files and has its own "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attach a file"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button, and the comment box takes one too — paste it, drop it, or press its own paperclip "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attach"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button, left of the posting note. The "
                     },
                     {
                       "kind": "bold",
@@ -2492,7 +2508,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " box is still the exception: a file dropped into it is refused rather than quietly lost. A move carrying the \"require evidence\" rule still puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7)."
+                      "text": " box is still the exception: a file dropped into it is refused rather than quietly lost, and it draws no Attach button either. A move carrying the \"require evidence\" rule still puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7)."
                     }
                   ],
                   [
@@ -7912,7 +7928,63 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note."
+                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " each drop the "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "/"
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " trigger at the cursor and open the same picker typing it would — the same two triggers work from the keyboard too, and "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "[["
+                  },
+                  {
+                    "kind": "text",
+                    "text": " still works for a note."
                   }
                 ]
               },
@@ -8157,7 +8229,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job."
+                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type."
                   }
                 ]
               },
@@ -10331,7 +10403,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Through a comment, and the file travels with the comment that carries it. Drop an image into the comment box and it is stored and put inside what you are writing; the comment then names it, and the chip under the comment is how you reach it. "
+                    "text": "Through a comment, and the file travels with the comment that carries it. Drop an image into the comment box, paste it, or press the paperclip "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attach"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button in the comment box's own footer, and it is stored and put inside what you are writing; the comment then names it, and the chip under the comment is how you reach it. "
                   },
                   {
                     "kind": "bold",
@@ -10339,7 +10419,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — it is stored against the job instead and appears in the job's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with."
+                    "text": " — it is stored against the job instead and appears in the job's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with. The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attachments"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " tab has its own "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attach a file"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button too, for a file that has no comment to travel with."
                   }
                 ]
               },
@@ -10411,23 +10507,15 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "When it auto-formats, a small chip appears. "
+                      "text": "If a shortcut fires when you did not want it, "
                     },
                     {
                       "kind": "bold",
-                      "text": "Press Backspace, or click the chip, to undo the formatting"
+                      "text": "press Backspace straight away"
                     },
                     {
                       "kind": "text",
-                      "text": " and keep your literal characters. "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "Press Escape and the chip goes away and the formatting stays."
-                    },
-                    {
-                      "kind": "text",
-                      "text": " Two opposite results, both of which dismiss the chip. Learn the difference."
+                      "text": " — the formatting goes and the characters you typed (the hashes, dashes, backticks) come back as plain text. It works only for the very next keypress; once you type anything else, the formatting stays."
                     }
                   ],
                   [

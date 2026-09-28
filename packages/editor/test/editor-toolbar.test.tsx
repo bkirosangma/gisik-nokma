@@ -1,8 +1,9 @@
 import { readFileSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
-import { render } from '@testing-library/react';
-import { describe, expect, it, vi } from 'vitest';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { fireEvent, render } from '@testing-library/react';
+import { userEvent } from '@testing-library/user-event';
 import type { Editor } from '@tiptap/core';
 import { TicketEditor, type TicketEditorProps } from '../src/components/TicketEditor.js';
 import { MARKDOWN_HINT } from '../src/components/EditorToolbar.js';
@@ -68,6 +69,20 @@ function tool(view: ReturnType<typeof render>, name: string): HTMLButtonElement 
   if (el === null) throw new Error(`no toolbar control named ${name}`);
   return el as HTMLButtonElement;
 }
+
+/** The visible tooltip for a control, found by its own `aria-describedby`. */
+function tooltipFor(view: ReturnType<typeof render>, button: HTMLButtonElement): Element | null {
+  const id = button.getAttribute('aria-describedby');
+  if (id === null) return null;
+  return view.container.querySelector(`#${id}`);
+}
+
+// The suggestion popups portal to `document.body`, outside the React tree
+// `view.unmount()` tears down — the same leak `wiki-link.test.ts`/
+// `ticket-ref.test.ts` guard against, for the same reason.
+afterEach(() => {
+  for (const el of document.querySelectorAll('.wikilink-popup, .ticketref-popup')) el.remove();
+});
 
 describe('the editor toolbar (16.85)', () => {
   /**
@@ -242,7 +257,10 @@ describe('the editor toolbar (16.85)', () => {
     expect(names.slice(0, 6)).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
     // …and the port's three are the ones that follow, in their own order, so a
     // future control cannot slip in between the six and these three unnoticed.
-    expect(names.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible', 'Link a note']);
+    // `Link a note` (`[[`) is GONE — Unit 4 (owner, 2026-09-23: "I want a
+    // button to insert the note and ticket there on the bar") replaced it
+    // with two insert actions rather than adding them beside it.
+    expect(names.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible', 'Insert note', 'Insert ticket']);
     expect(view.container.querySelector('.ticket-editor__hint')?.textContent).toBe(MARKDOWN_HINT);
     view.unmount();
   });
@@ -394,5 +412,154 @@ describe('9.274 the toolbar gains task, code block and collapsible', () => {
       expect(JSON.stringify(bold.editor.getJSON())).toContain('"type":"bold"');
     });
     bold.view.unmount();
+  });
+});
+
+/**
+ * 9.326–9.332 — Unit 4 restyle: tooltips (not `title=`), keyboard shortcuts,
+ * platform-aware rendering, and the two insert buttons that replaced `[[`.
+ * Case ids live in `test-cases/09-editor-attachments.md`, block
+ * `9.313`–`9.337`.
+ */
+describe('9.326-9.332 toolbar tooltips, shortcuts and the insert buttons', () => {
+  it('9.326 a tooltip names the tool on hover AND on keyboard focus, via role="tooltip" + aria-describedby, and hides again on blur', async () => {
+    const user = userEvent.setup();
+    const { view } = await mount(makeProps());
+    const bold = tool(view, 'Bold');
+    expect(bold.getAttribute('aria-describedby')).toBeNull();
+
+    // Hover shows it.
+    await user.hover(bold);
+    expect(bold.getAttribute('aria-describedby')).not.toBeNull();
+    let panel = tooltipFor(view, bold);
+    expect(panel?.getAttribute('role')).toBe('tooltip');
+    expect(panel?.textContent).toContain('Bold');
+    await user.unhover(bold);
+    expect(bold.getAttribute('aria-describedby')).toBeNull();
+
+    // Keyboard focus shows it too — the whole reason this is not `title=`
+    // (packages/ui/src/ui.css's ruling: unreachable by keyboard).
+    fireEvent.focus(bold);
+    expect(bold.getAttribute('aria-describedby')).not.toBeNull();
+    panel = tooltipFor(view, bold);
+    expect(panel?.textContent).toContain('Bold');
+    fireEvent.blur(bold);
+    expect(bold.getAttribute('aria-describedby')).toBeNull();
+    view.unmount();
+  });
+
+  it('9.327 Bold\'s tooltip carries its shortcut and the button exposes aria-keyshortcuts (aria-label stays the plain name)', async () => {
+    const { view } = await mount(makeProps({ toolbarPlatform: 'mac' }));
+    const bold = tool(view, 'Bold');
+    expect(bold.getAttribute('aria-label')).toBe('Bold');
+    expect(bold.getAttribute('aria-keyshortcuts')).toBe('Meta+B');
+    fireEvent.focus(bold);
+    expect(tooltipFor(view, bold)?.textContent).toContain('⌘B');
+    view.unmount();
+  });
+
+  it('9.328 the same shortcut renders ⌘-glyphs on mac and Ctrl+-words on every other platform, from one shared table', async () => {
+    const mac = await mount(makeProps({ toolbarPlatform: 'mac' }));
+    const codeBlockMac = tool(mac.view, 'Code block');
+    fireEvent.focus(codeBlockMac);
+    expect(tooltipFor(mac.view, codeBlockMac)?.textContent).toContain('⌘⌥C');
+    expect(codeBlockMac.getAttribute('aria-keyshortcuts')).toBe('Meta+Alt+C');
+    mac.view.unmount();
+
+    // CONTROL, same tool, the other platform arm: no ⌘ anywhere, Ctrl+ words instead.
+    const other = await mount(makeProps({ toolbarPlatform: 'other' }));
+    const codeBlockOther = tool(other.view, 'Code block');
+    fireEvent.focus(codeBlockOther);
+    const otherText = tooltipFor(other.view, codeBlockOther)?.textContent ?? '';
+    expect(otherText).toContain('Ctrl+Alt+C');
+    expect(otherText).not.toContain('⌘');
+    expect(codeBlockOther.getAttribute('aria-keyshortcuts')).toBe('Control+Alt+C');
+    other.view.unmount();
+  });
+
+  it('9.329 Link and Collapsible have no keyboard shortcut anywhere: no aria-keyshortcuts, no shortcut in the tooltip', async () => {
+    const { view } = await mount(makeProps());
+    for (const name of ['Link', 'Collapsible']) {
+      const button = tool(view, name);
+      expect(button.getAttribute('aria-keyshortcuts'), `${name} aria-keyshortcuts`).toBeNull();
+      fireEvent.focus(button);
+      const text = tooltipFor(view, button)?.textContent ?? '';
+      // The name is still there — only a shortcut glyph is absent — so this
+      // is not "no tooltip", it is "no invented binding" (advisor rule).
+      expect(text).toContain(name);
+      expect(text).not.toMatch(/⌘|Ctrl|Mod-/);
+      fireEvent.blur(button);
+    }
+    view.unmount();
+  });
+
+  it('9.330 a markdown trigger, where one exists, is a second muted tooltip line reading FROM the same table MARKDOWN_HINT is built from', async () => {
+    const { view } = await mount(makeProps());
+    const bold = tool(view, 'Bold');
+    fireEvent.focus(bold);
+    const boldText = tooltipFor(view, bold)?.textContent ?? '';
+    expect(boldText).toContain('or type **bold**');
+    // Proof of ONE source, not a second hand-typed literal: the exact markdown
+    // fragment shown here is a substring of the exported MARKDOWN_HINT sentence.
+    expect(MARKDOWN_HINT).toContain('**bold**');
+    fireEvent.blur(bold);
+
+    // A tool with a markdown trigger MARKDOWN_HINT itself never names (code
+    // block's ``` is not one of the sentence's six) still gets its own line,
+    // sourced from the installed extension's own input rule (verified against
+    // `@tiptap/extension-code-block@3.31.3`'s `backtickInputRegex`).
+    const codeBlock = tool(view, 'Code block');
+    fireEvent.focus(codeBlock);
+    expect(tooltipFor(view, codeBlock)?.textContent).toContain('or type ``` then space');
+    fireEvent.blur(codeBlock);
+
+    // CONTROL, same tooltip: the shortcut line and the markdown line never
+    // merge into one string with the wrong content — Code block's own
+    // shortcut is still there too, distinguishable from Bold's.
+    fireEvent.focus(codeBlock);
+    expect(tooltipFor(view, codeBlock)?.textContent).toContain('Code block');
+    expect(tooltipFor(view, codeBlock)?.textContent).not.toContain('**bold**');
+    view.unmount();
+  });
+
+  it('9.331 Insert note / Insert ticket each insert their trigger and open the SAME picker a typed trigger opens', async () => {
+    const queryNotes = vi.fn(async () => []);
+    const queryTickets = vi.fn(async () => []);
+    const { view, editor } = await mount(makeProps({ queryNotes, queryTickets }));
+    editor.commands.selectAll();
+    editor.commands.deleteSelection();
+
+    tool(view, 'Insert note').click();
+    expect(JSON.stringify(editor.getJSON())).toContain(':note ');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.wikilink-popup')).not.toBeNull();
+    });
+    // Focus stayed in the editor — the whole point of chaining `.focus()`
+    // into the same command the click runs, not a second implementation.
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(editor.view.dom);
+    });
+
+    editor.commands.clearContent();
+    tool(view, 'Insert ticket').click();
+    expect(JSON.stringify(editor.getJSON())).toContain(':ticket ');
+    await vi.waitFor(() => {
+      expect(document.querySelector('.ticketref-popup')).not.toBeNull();
+    });
+    await vi.waitFor(() => {
+      expect(document.activeElement).toBe(editor.view.dom);
+    });
+    view.unmount();
+  });
+
+  it('9.332 no @ / mention control anywhere in the strip, and the strip is exactly eleven controls (no stray extra)', async () => {
+    const { view } = await mount(makeProps());
+    const names = Array.from(view.container.querySelectorAll('.ticket-editor__tool')).map((el) =>
+      el.getAttribute('aria-label'),
+    );
+    expect(names).toHaveLength(11);
+    expect(names).not.toContain('@');
+    expect(names.some((name) => name?.toLowerCase().includes('mention'))).toBe(false);
+    view.unmount();
   });
 });

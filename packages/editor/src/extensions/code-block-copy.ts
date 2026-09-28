@@ -34,6 +34,31 @@ import { CodeBlock } from '@tiptap/extension-code-block';
  * the same bundle runs in both.
  */
 export const CodeBlockWithCopy = CodeBlock.extend({
+  /**
+   * ## BACKSPACE RIGHT AFTER THE ``` / ~~~ SHORTCUT RESTORES THE FENCE (A5a)
+   *
+   * The upstream code block binds its own `Backspace` — "caret at the start of
+   * an empty block: `clearNodes()`" — and it runs BEFORE core's keymap, the one
+   * that calls `undoInputRule`. So for a code block the shortcut's undo (the
+   * repair in `escape-suggestion.ts`, which every other block shortcut gets)
+   * never ran: Backspace right after typing ``` deleted the block and left an
+   * empty paragraph, the three backticks gone. Owner ruling 2026-09-29: the
+   * first Backspace after the shortcut gives the typed characters back.
+   *
+   * `undoInputRule` is the escape-suggestion override, which only succeeds
+   * while its record is live — i.e. IMMEDIATELY after the rule fired — and
+   * returns false otherwise. Falling through to the upstream handler then
+   * keeps its behaviour for a block that was not just created by typing
+   * (empty block made from the toolbar or a command still exits to a paragraph).
+   */
+  addKeyboardShortcuts() {
+    const parent = this.parent?.() ?? {};
+    return {
+      ...parent,
+      Backspace: (args) => this.editor.commands.undoInputRule() || (parent['Backspace']?.(args) ?? false),
+    };
+  },
+
   addNodeView() {
     return ({ node }) => {
       const dom = document.createElement('div');
