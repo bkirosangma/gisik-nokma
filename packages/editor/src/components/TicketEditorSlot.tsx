@@ -111,6 +111,7 @@ export type EditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  headingLink?: (id: string) => string | null;
   // Ticket-reference capabilities (Plan 7 Task 1), the twin of the block in
   // `packages/app-core/src/views/editor-slot.tsx`. Same two names and the
   // same inline shapes ON PURPOSE — see that file's docblock on the
@@ -448,6 +449,7 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         {...(props.onNavigateNote === undefined
           ? {}
           : { onNavigateNote: props.onNavigateNote })}
+        {...(props.headingLink === undefined ? {} : { headingLink: props.headingLink })}
         {...(props.queryTickets === undefined ? {} : { queryTickets: props.queryTickets })}
         {...(props.resolveTicketHref === undefined
           ? {}

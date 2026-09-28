@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import {
   TicketEditorSlot,
   exportMarkdown,
+  ReadingProgress,
   extractReadingMeta,
   readingTimeMinutes,
   uploadAttachmentHttp,
@@ -29,6 +30,7 @@ import {
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
 import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
+import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
@@ -370,6 +372,50 @@ export function NoteDocument({
     onHeadingsChange?.(meta.headings);
   }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
 
+  // A link to a heading (`/notes/<id>#slug`, copied from the heading's button or
+  // typed by hand) arrives at a page whose headings do not exist yet: the note
+  // loads, then the editor mounts, then the ids are stamped. So the browser's
+  // own jump-to-fragment finds nothing, and this waits for the target — once
+  // per note, so a reader who has scrolled away is not pulled back by a later
+  // re-render.
+  useEffect(() => {
+    if (note?.noteId === undefined) return;
+    const raw = window.location.hash.slice(1);
+    if (raw === '') return;
+    const root = editorRoot.current;
+    if (root === null) return;
+    let id = raw;
+    try {
+      id = decodeURIComponent(raw);
+    } catch {
+      // a malformed escape: use it as typed
+    }
+    const find = (): Element | null => root.querySelector(`#${CSS.escape(id)}`);
+    const reveal = (target: Element): void => target.scrollIntoView?.({ block: 'start' });
+    const now = find();
+    if (now !== null) {
+      reveal(now);
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new MutationObserver(() => {
+      const target = find();
+      if (target === null) return;
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+      reveal(target);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    // Give up after a while: a fragment naming no heading must not watch forever.
+    timer = setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+    };
+    // Once per note: `note` itself changes on every autosave and live update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.noteId, editorRoot]);
+
   /** The loaded list for `queryNotes` and `resolveNoteTitle`. */
   const [treeNotes, setTreeNotes] = useState<NoteSummary[]>([]);
   useEffect(() => {
@@ -601,6 +647,11 @@ export function NoteDocument({
           or the toolbar, never this element, so ProseMirror's own
           click-to-position-caret is untouched; what this catches is the
           padded empty space the `min-height` rule adds below short text. */}
+      {/* No read/edit toggle here, so the note page IS the reading surface
+          and every viewer gets the bar (the KB source mounts it in read mode
+          only). Bound to the same element as the table of contents; it works
+          out for itself that the WINDOW scrolls (`findScroller`). */}
+      <ReadingProgress scrollContainerRef={editorRoot} resetKey={note.noteId} />
       <div
         className="gn-notes__editor"
         ref={editorRoot}
@@ -620,6 +671,7 @@ export function NoteDocument({
           onDraftChange={setDraft}
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
           editorRef={editorInstanceRef}
+          onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
         />
       </div>
 
@@ -747,6 +799,7 @@ function NoteEditorPane({
   onDraftChange,
   onNavigateNote,
   editorRef,
+  onDraftDiscarded,
 }: {
   note: NoteDetail;
   treeNotes: NoteSummary[];
@@ -756,6 +809,8 @@ function NoteEditorPane({
   onDraftChange: (doc: unknown) => void;
   onNavigateNote: (id: string) => void;
   editorRef: TicketEditorSlotProps['editorRef'];
+  /** The banner's Discard: the parent remounts this pane, which then recovers nothing and mounts with the server's body. */
+  onDraftDiscarded: () => void;
 }) {
   const autosave = useNoteAutosave({
     dataSource,
@@ -778,47 +833,63 @@ function NoteEditorPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep only hides the banner; the draft stays live and saves as any edit.
+  const [bannerKept, setBannerKept] = useState(false);
+
   return (
-    <TicketEditorSlot
-      mode="note"
-      doc={autosave.initialDoc}
-      readOnly={!canEdit}
-      workspaceId={note.workspaceId}
-      ticketId=""
-      noteId={note.noteId}
-      submitSlot="none"
-      editorRef={editorRef}
-      onDraft={(doc) => {
-        onDraftChange(doc);
-        autosave.onDraft(doc);
-      }}
-      onSave={autosave.onSave}
-      saveState={autosave.saveState}
-      placeholder="Write the note…"
-      queryNotes={async (query: string) => {
-        const needle = query.trim().toLowerCase();
-        const hits: Array<{ noteId: string; title: string }> = [];
-        for (const candidate of [note, ...treeNotes]) {
-          if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
-          if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
-          hits.push({ noteId: candidate.noteId, title: candidate.title });
-          if (hits.length === 8) break;
-        }
-        return hits;
-      }}
-      resolveNoteTitle={(id: string) => {
-        if (id === note.noteId) return note.title;
-        return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
-      }}
-      previewNote={async (id: string) => {
-        const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
-        if (target === null) return null;
-        return docToPlainText(target.body).slice(0, 200);
-      }}
-      onNavigateNote={onNavigateNote}
-      queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
-      resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
-    />
+    <>
+      {autosave.restoredAt !== null && !bannerKept && canEdit ? (
+        <DraftRestoreBanner
+          savedAt={autosave.restoredAt}
+          onKeep={() => setBannerKept(true)}
+          onDiscard={() => {
+            autosave.discardDraft();
+            onDraftDiscarded();
+          }}
+        />
+      ) : null}
+      <TicketEditorSlot
+        mode="note"
+        doc={autosave.initialDoc}
+        readOnly={!canEdit}
+        workspaceId={note.workspaceId}
+        ticketId=""
+        noteId={note.noteId}
+        submitSlot="none"
+        editorRef={editorRef}
+        onDraft={(doc) => {
+          onDraftChange(doc);
+          autosave.onDraft(doc);
+        }}
+        onSave={autosave.onSave}
+        saveState={autosave.saveState}
+        placeholder="Write the note…"
+        queryNotes={async (query: string) => {
+          const needle = query.trim().toLowerCase();
+          const hits: Array<{ noteId: string; title: string }> = [];
+          for (const candidate of [note, ...treeNotes]) {
+            if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+            if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
+            hits.push({ noteId: candidate.noteId, title: candidate.title });
+            if (hits.length === 8) break;
+          }
+          return hits;
+        }}
+        resolveNoteTitle={(id: string) => {
+          if (id === note.noteId) return note.title;
+          return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
+        }}
+        previewNote={async (id: string) => {
+          const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
+          if (target === null) return null;
+          return docToPlainText(target.body).slice(0, 200);
+        }}
+        onNavigateNote={onNavigateNote}
+        headingLink={(id: string) => `${window.location.origin}/notes/${note.noteId}#${id}`}
+        queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
+        resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
+      />
+    </>
   );
 }
 

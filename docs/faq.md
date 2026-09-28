@@ -537,12 +537,45 @@ as an open question rather than a no.
 
 ---
 
+**How do I change a link I already wrote — its address, its words, or take it off?**
+Click into the link's text. A small panel appears next to it with the **URL** and the **Text**, an **Open
+link** shortcut for web, email and phone addresses, and **Unlink**. Change either field and press Enter
+(or click away) to keep the change; press Escape to put it back. Clearing the URL, or pressing Unlink,
+removes the link and leaves the words; clearing the Text deletes the link. From the keyboard, press
+Ctrl-K (Cmd-K on a Mac) with the cursor in a link to jump into the URL field. It only shows in the box you
+are typing in, and never in a box you can only read.
+
+**How do I put a table in a note or a comment?**
+Use **Insert table** in the formatting strip: an eight-by-eight grid opens, move over it (or use the arrow
+keys) until the label reads the size you want — "2 × 3 table" — then click, or press Enter. The first row
+is a header row. Escape closes the grid without inserting. The tool is greyed out while your cursor is
+already inside a table, because a table cannot go inside another one.
+
 ## Notes
 
 **What is a note, and how is it different from a job?**
 A note is a page of writing that belongs to a workspace or a project, not to a job. Use it for anything
 that is not one piece of work — a log, a parts list, something you want to keep after the job it came
 from closes. Find it at **Notes** in the nav, left of Inbox.
+
+**What is the thin line at the top of a note?**
+A reading-progress bar: it fills from the left as you scroll down the note, so you can see how far through
+a long one you are. It measures the text of the note only (not the title or byline above it), starts over
+when you open another note, and is there whether or not you can edit the note. If your device is set to
+reduce motion it moves without the smoothing.
+
+**How do I link to one heading in a note?**
+Hover the heading and press the small link icon at its end (Tab to it and press Enter with the keyboard; on a
+touch screen the icon is always visible). That copies a link ending in `#` and the heading's name, and
+opening it scrolls straight to the heading. It works on all six heading levels. Two headings with the same
+words get `-2`, `-3` and so on, in the order they appear — so a link can point at the wrong one if you
+rearrange headings that share a name. The person you send it to still needs access to the note.
+
+**Why does my note open with a bar saying "Restored unsaved changes"?**
+Last time you had it open, some of what you typed never reached the server (you lost the connection, or
+closed the tab first), so it was kept on your device and is showing now. **Keep** carries on with those
+words; **Discard** deletes them and shows the note as the server has it, which cannot be undone. The
+bar is only shown to people who can edit the note.
 
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the

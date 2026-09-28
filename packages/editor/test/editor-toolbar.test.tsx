@@ -8,6 +8,7 @@ import type { Editor } from '@tiptap/core';
 import { TicketEditor, type TicketEditorProps } from '../src/components/TicketEditor.js';
 import { MARKDOWN_HINT } from '../src/components/EditorToolbar.js';
 import type { DocJson } from '../src/doc.js';
+import { isElementNode, isTextNode } from './helpers/json-node.js';
 
 /**
  * 16.85 — the rich-text toolbar.
@@ -254,13 +255,17 @@ describe('the editor toolbar (16.85)', () => {
     // case exists to protect stays checkable. The alternative — rewriting the
     // literal to nine names — would leave the order of the prototype's six
     // pinned by nothing but their presence in a longer list.
-    expect(names.slice(0, 6)).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
-    // …and the port's three are the ones that follow, in their own order, so a
-    // future control cannot slip in between the six and these three unnoticed.
-    // `Link a note` (`[[`) is GONE — Unit 4 (owner, 2026-09-23: "I want a
-    // button to insert the note and ticket there on the bar") replaced it
-    // with two insert actions rather than adding them beside it.
-    expect(names.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible', 'Insert note', 'Insert ticket']);
+    // KB EDITOR PARITY (owner ruling 2026-09-24, cases 9.375-9.386) added seven
+    // controls the prototype has no counterpart for: Undo/Redo lead the strip,
+    // Strikethrough follows Italic, Numbered list follows Bullet list and the
+    // Horizontal rule follows Collapsible. They are filtered out so THIS case
+    // still pins the relative order of the eleven it was written for — the
+    // prototype's six then the port's five — rather than a longer literal that
+    // pins nothing but presence.
+    const added = new Set(['Undo', 'Redo', 'Strikethrough', 'Numbered list', 'Horizontal rule', 'Insert table']);
+    const original = names.filter((name) => !added.has(name ?? ''));
+    expect(original.slice(0, 6)).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
+    expect(original.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible', 'Insert note', 'Insert ticket']);
     expect(view.container.querySelector('.ticket-editor__hint')?.textContent).toBe(MARKDOWN_HINT);
     view.unmount();
   });
@@ -552,14 +557,286 @@ describe('9.326-9.332 toolbar tooltips, shortcuts and the insert buttons', () =>
     view.unmount();
   });
 
-  it('9.332 no @ / mention control anywhere in the strip, and the strip is exactly eleven controls (no stray extra)', async () => {
+  it('9.332 no @ / mention control anywhere in the strip, and the strip is exactly seventeen controls (the eleven plus KB parity six; no stray extra)', async () => {
     const { view } = await mount(makeProps());
     const names = Array.from(view.container.querySelectorAll('.ticket-editor__tool')).map((el) =>
       el.getAttribute('aria-label'),
     );
-    expect(names).toHaveLength(11);
+    expect(names).toHaveLength(17);
     expect(names).not.toContain('@');
     expect(names.some((name) => name?.toLowerCase().includes('mention'))).toBe(false);
+    view.unmount();
+  });
+
+  /** 9.375 — Undo/Redo lead the strip, report their state, and act. */
+  it('9.375 Undo and Redo are disabled with no history, enabled after an edit, and step through it', async () => {
+    const { view, editor } = await mount(makeProps());
+    expect(tool(view, 'Undo').disabled).toBe(true);
+    expect(tool(view, 'Redo').disabled).toBe(true);
+    const names = Array.from(view.container.querySelectorAll('.ticket-editor__tool')).map((el) =>
+      el.getAttribute('aria-label'),
+    );
+    expect(names.slice(0, 2)).toEqual(['Undo', 'Redo']);
+
+    editor.chain().focus().selectAll().toggleBold().run();
+    await vi.waitFor(() => {
+      expect(tool(view, 'Undo').disabled).toBe(false);
+    });
+    expect(JSON.stringify(editor.getJSON())).toContain('"bold"');
+    tool(view, 'Undo').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(editor.getJSON())).not.toContain('"bold"');
+      expect(tool(view, 'Redo').disabled).toBe(false);
+    });
+    tool(view, 'Redo').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(editor.getJSON())).toContain('"bold"');
+    });
+    view.unmount();
+  });
+
+  /** 9.376 — Strikethrough, Numbered list and Horizontal rule change the document. */
+  it('9.376 Strikethrough puts a strike mark, Numbered list an orderedList, Horizontal rule a horizontalRule', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.chain().focus().selectAll().run();
+    tool(view, 'Strikethrough').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(editor.getJSON())).toContain('"strike"');
+    });
+    expect(tool(view, 'Strikethrough').getAttribute('aria-pressed')).toBe('true');
+    tool(view, 'Numbered list').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(editor.getJSON())).toContain('"orderedList"');
+    });
+    editor.commands.clearContent();
+    tool(view, 'Horizontal rule').click();
+    await vi.waitFor(() => {
+      expect(JSON.stringify(editor.getJSON())).toContain('"horizontalRule"');
+    });
+    // a rule toggles nothing, so it reports no pressed state
+    expect(tool(view, 'Horizontal rule').hasAttribute('aria-pressed')).toBe(false);
+    view.unmount();
+  });
+
+  /** 9.377 — every heading level is reachable from the one select, and it reports the active one. */
+  it('9.377 the Heading level select sets H1-H6 and Paragraph, and reports the active level', async () => {
+    const { view, editor } = await mount(makeProps());
+    const select = view.container.querySelector('select[aria-label="Heading level"]') as HTMLSelectElement;
+    expect(Array.from(select.options).map((o) => o.textContent)).toEqual([
+      'Paragraph',
+      'Heading 1',
+      'Heading 2',
+      'Heading 3',
+      'Heading 4',
+      'Heading 5',
+      'Heading 6',
+    ]);
+    expect(select.value).toBe('paragraph');
+    for (const level of [1, 2, 3, 4, 5, 6]) {
+      fireEvent.change(select, { target: { value: String(level) } });
+      await vi.waitFor(() => {
+        expect(editor.getJSON().content?.[0]).toMatchObject({ type: 'heading', attrs: { level } });
+      });
+      await vi.waitFor(() => {
+        expect(select.value).toBe(String(level));
+      });
+    }
+    fireEvent.change(select, { target: { value: 'paragraph' } });
+    await vi.waitFor(() => {
+      expect(editor.getJSON().content?.[0]?.type).toBe('paragraph');
+    });
+    view.unmount();
+  });
+
+  /** 9.378 — selectFullLink: a mark toggle inside a link formats the WHOLE link. */
+  it('9.378 Bold pressed with the caret inside a link bolds the entire link text', async () => {
+    const linked: DocJson = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'text', text: 'see ' },
+            { type: 'text', text: 'the docs', marks: [{ type: 'link', attrs: { href: 'https://example.com' } }] },
+            { type: 'text', text: ' now' },
+          ],
+        },
+      ],
+    };
+    const editorRef: React.MutableRefObject<Editor | null> = { current: null };
+    const ready = vi.fn();
+    const view = render(
+      <TicketEditor {...makeProps()} editorRef={editorRef} onEditorReady={ready} initialDoc={linked} />,
+    );
+    await vi.waitFor(() => {
+      expect(editorRef.current).not.toBeNull();
+    });
+    const editor = editorRef.current as Editor;
+    // caret in the middle of "the docs" (doc positions: paragraph opens at 0, 'see ' is 1-5)
+    editor.chain().focus().setTextSelection(8).run();
+    tool(view, 'Bold').click();
+    await vi.waitFor(() => {
+      const nodes = editor.getJSON().content?.[0]?.content ?? [];
+      const bolded = nodes.filter(isTextNode).filter((n) => n.marks?.some((m) => m.type === 'bold')).map((n) => n.text);
+      expect(bolded).toEqual(['the docs']);
+    });
+    view.unmount();
+  });
+
+  /** 9.379 — the new tools name their real shortcut/markdown in the tooltip. */
+  it('9.379 the new tools carry their shortcut and markdown trigger', async () => {
+    const { view } = await mount(makeProps());
+    expect(tool(view, 'Undo').getAttribute('aria-keyshortcuts')).toBe('Control+Z');
+    expect(tool(view, 'Redo').getAttribute('aria-keyshortcuts')).toBe('Control+Shift+Z');
+    expect(tool(view, 'Strikethrough').getAttribute('aria-keyshortcuts')).toBe('Control+Shift+S');
+    expect(tool(view, 'Numbered list').getAttribute('aria-keyshortcuts')).toBe('Control+Shift+7');
+    expect(tool(view, 'Horizontal rule').hasAttribute('aria-keyshortcuts')).toBe(false);
+    fireEvent.mouseEnter(tool(view, 'Strikethrough').parentElement as Element);
+    expect(tooltipFor(view, tool(view, 'Strikethrough'))?.textContent).toContain('~~strike~~');
+    view.unmount();
+  });
+
+  /** 9.380 — the table picker: open, light the corner, choose, and a header-row table lands. */
+  it('9.380 Insert table opens the size grid; choosing 2 × 3 inserts a 2-row, 3-column table with a header row', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    const trigger = tool(view, 'Insert table');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    trigger.click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    expect(tool(view, 'Insert table').getAttribute('aria-expanded')).toBe('true');
+    const cells = view.container.querySelectorAll<HTMLButtonElement>('.ticket-editor__table-cell');
+    expect(cells).toHaveLength(64);
+    expect(view.container.querySelector('.ticket-editor__table-label')?.textContent).toBe('1 × 1 table');
+    fireEvent.mouseEnter(cells[10] as Element); // row 2, col 3
+    expect(view.container.querySelector('.ticket-editor__table-label')?.textContent).toBe('2 × 3 table');
+    expect(view.container.querySelectorAll('.ticket-editor__table-cell--lit')).toHaveLength(6);
+    (cells[10] as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(editor.getJSON().content?.[0]?.type).toBe('table');
+    });
+    const table = editor.getJSON().content?.[0];
+    if (!table || !isElementNode(table)) throw new Error('expected a table node');
+    expect(table.content).toHaveLength(2);
+    const row = table.content?.[0];
+    if (!row || !isElementNode(row)) throw new Error('expected a table row');
+    expect(row.content).toHaveLength(3);
+    expect(row.content?.[0]?.type).toBe('tableHeader');
+    expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    view.unmount();
+  });
+
+  /** 9.381 — keyboard: arrows move the corner, Enter commits, Escape closes and returns to the trigger. */
+  it('9.381 the size grid works from the keyboard: arrows, Enter to insert, Escape to close with focus back on the trigger', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    const grid = view.container.querySelector('.ticket-editor__table-picker') as HTMLElement;
+    const focused = () => document.activeElement?.getAttribute('aria-label');
+    await vi.waitFor(() => {
+      expect(focused()).toBe('1 × 1 table');
+    });
+    // one tab stop for the whole grid
+    expect(grid.querySelectorAll('button[tabindex="0"]')).toHaveLength(1);
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowRight' });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
+    await vi.waitFor(() => {
+      expect(focused()).toBe('2 × 2 table');
+    });
+    // clamped at the edge, never past 8
+    for (let n = 0; n < 10; n += 1) fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowRight' });
+    await vi.waitFor(() => {
+      expect(focused()).toBe('2 × 8 table');
+    });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    });
+    expect(document.activeElement).toBe(tool(view, 'Insert table'));
+    expect(editor.getJSON().content?.[0]?.type).not.toBe('table');
+
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
+    fireEvent.click(await vi.waitFor(() => {
+      const el = document.activeElement as HTMLButtonElement;
+      expect(el.getAttribute('aria-label')).toBe('2 × 1 table');
+      return el;
+    }));
+    await vi.waitFor(() => {
+      expect(editor.getJSON().content?.[0]?.content).toHaveLength(2);
+    });
+    view.unmount();
+  });
+
+  /** 9.382 — inside a table the tool is disabled and says why (TableNoNest would refuse anyway). */
+  it('9.382 Insert table is disabled, and named as such, while the caret is inside a table', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    editor.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run();
+    await vi.waitFor(() => {
+      expect(editor.isActive('table')).toBe(true);
+    });
+    // The strip repaints on the transaction, a tick after the editor state moved.
+    await vi.waitFor(() => {
+      const disabled = view.container.querySelector<HTMLButtonElement>(
+        '.ticket-editor__tool[aria-label="Insert table (not allowed inside a table)"]',
+      );
+      expect(disabled).not.toBeNull();
+      expect(disabled?.disabled).toBe(true);
+    });
+    view.unmount();
+  });
+
+  /** 9.383 — an outside press closes the grid and inserts nothing. */
+  it('9.383 pressing outside the size grid closes it without inserting', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    fireEvent.mouseDown(document.body);
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    });
+    expect(editor.getJSON().content?.[0]?.type).toBe('paragraph');
+    view.unmount();
+  });
+
+  /** 9.384 — every class the open size grid draws has a rule in editor.css (the skin test excludes this file). */
+  it('9.384 each class the open table size grid renders is declared in editor.css', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    fireEvent.mouseEnter(view.container.querySelector('.ticket-editor__table-cell') as Element);
+    const drawn = new Set<string>();
+    for (const el of view.container.querySelectorAll('.ticket-editor__table-picker, .ticket-editor__table-picker *')) {
+      for (const cls of Array.from(el.classList)) drawn.add(cls);
+    }
+    expect([...drawn].sort()).toEqual([
+      'ticket-editor__table-cell',
+      'ticket-editor__table-cell--lit',
+      'ticket-editor__table-grid',
+      'ticket-editor__table-label',
+      'ticket-editor__table-picker',
+    ]);
+    const here = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(resolve(here, '../src/styles/editor.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const cls of drawn) {
+      expect(css, `editor.css has no rule for .${cls}`).toMatch(new RegExp(`\\.${cls}(?![\\w-])[^{]*\\{`));
+    }
     view.unmount();
   });
 });

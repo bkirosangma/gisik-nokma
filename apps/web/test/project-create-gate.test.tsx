@@ -287,7 +287,12 @@ describe('3.142 a refused ticket list is never rendered as "this project has no 
     // states where the old expression did not: Title has no select, Type has one, and
     // Parent adds a second only when the picker renders.
     const dialog = screen.getByRole('dialog');
-    expect(within(dialog).queryAllByRole('combobox')).toHaveLength(1);
+    // The description editor's toolbar has its own native select (Heading level, kb-editor-parity
+    // 9.376), which is not one of the form's pickers — count outside the toolbar.
+    const formSelects = within(dialog)
+      .queryAllByRole('combobox')
+      .filter((select) => select.closest('[role="toolbar"]') === null);
+    expect(formSelects).toHaveLength(1);
     // The second half USED to read `within(dialog).queryByRole('option', { name: 'None (project
     // root)' })`, and that spelling had to go for the very reason the paragraphs above exist.
     // Both pickers are the shared searchable `Select` now, and its rows are portal-rendered onto

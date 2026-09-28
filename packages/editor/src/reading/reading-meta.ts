@@ -11,7 +11,12 @@
 export type ReadingMeta = {
   /** Words in the rendered text — what the reading-time estimate divides. */
   wordCount: number;
-  /** H1–H3 in document order, with the ids `extractReadingMeta` stamped. */
+  /**
+   * H1–H3 in document order, with the ids `extractReadingMeta` stamped. Only
+   * these three levels are LISTED (the rail's rule, and `MIN_HEADINGS` counts
+   * them); every level H1–H6 is STAMPED, so a copied heading link to an H4
+   * resolves.
+   */
   headings: Array<{ id: string; level: 1 | 2 | 3; text: string }>;
 };
 
@@ -49,6 +54,26 @@ export function headerSlug(text: string): string {
     .replace(/^-+|-+$/g, '');
 }
 
+/**
+ * The ids for a run of NON-EMPTY heading texts, in document order — THE one
+ * place ids are decided. The table of contents, the stamped `id` attributes and
+ * the copy-link fragment (`extensions/heading-anchors.ts`) all come from here,
+ * so a copied link is the fragment the table of contents already uses.
+ *
+ * Collisions are counted against the BASE slug (see `extractReadingMeta`), and a
+ * text that slugs to nothing becomes `heading-N` where N is its 1-based
+ * position in `texts`.
+ */
+export function assignHeadingIds(texts: readonly string[]): string[] {
+  const seen = new Map<string, number>();
+  return texts.map((text, index) => {
+    const base = headerSlug(text) || `heading-${index + 1}`;
+    const collisions = seen.get(base) ?? 0;
+    seen.set(base, collisions + 1);
+    return collisions === 0 ? base : `${base}-${collisions + 1}`;
+  });
+}
+
 /** Elements whose text ENDS a word — see `readText`. */
 const BLOCK_TAGS = new Set([
   'P', 'H1', 'H2', 'H3', 'H4', 'H5', 'H6', 'LI', 'BLOCKQUOTE', 'PRE',
@@ -78,7 +103,7 @@ function readText(node: Node): string {
 }
 
 /**
- * Word count and the H1–H3 list, read off the rendered node.
+ * Word count, the H1–H3 list and the H1–H6 ids, read off the rendered node.
  *
  * ## ONE DIVERGENCE FROM THE SOURCE, AND IT IS A FIX
  *
@@ -97,24 +122,27 @@ export function extractReadingMeta(root: HTMLElement): ReadingMeta {
   const text = readText(root);
   const wordCount = text.split(/\s+/).filter(Boolean).length;
 
+  // Every level is stamped (H1–H6); only H1–H3 are listed. The ids are computed
+  // over ALL non-empty headings in one pass, so the suffix an H2 gets counts an
+  // earlier H4 of the same text — one id per element, page-wide.
+  const nodes = Array.from(root.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')).filter(
+    (el) => (el.textContent?.trim() ?? '') !== '',
+  );
+  // A heading the anchor extension already gave an id (`data-heading-id`) keeps
+  // exactly that one: the extension slugs the DOCUMENT's text and this reads the
+  // rendered DOM's, and the two can differ on a mention chip or a hard break —
+  // the stamped id and the copied link must not.
+  const computed = assignHeadingIds(nodes.map((el) => el.textContent?.trim() ?? ''));
   const headings: ReadingMeta['headings'] = [];
-  const seen = new Map<string, number>();
-  for (const node of Array.from(root.querySelectorAll('h1, h2, h3'))) {
-    const el = node as HTMLElement;
-    const heading = el.textContent?.trim() ?? '';
-    if (heading === '') continue;
-    const tag = el.tagName.toLowerCase();
-    const level: 1 | 2 | 3 = tag === 'h1' ? 1 : tag === 'h2' ? 2 : 3;
-    const base = headerSlug(heading) || `heading-${headings.length + 1}`;
-    const collisions = seen.get(base) ?? 0;
-    const id = collisions === 0 ? base : `${base}-${collisions + 1}`;
-    seen.set(base, collisions + 1);
+  nodes.forEach((el, index) => {
+    const id = el.getAttribute('data-heading-id') || (computed[index] as string);
     // Stamped on the LIVE node, which is what lets the TOC scroll to it and
     // what makes the ids "stable" in the only sense that matters here: the
     // same document produces the same ids, and they are already on screen.
     if (el.id !== id) el.id = id;
-    headings.push({ id, level, text: heading });
-  }
+    const level = Number(el.tagName.slice(1));
+    if (level <= 3) headings.push({ id, level: level as 1 | 2 | 3, text: el.textContent?.trim() ?? '' });
+  });
 
   return { wordCount, headings };
 }

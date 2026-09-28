@@ -2,7 +2,6 @@ import type { Extensions } from '@tiptap/core';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Link } from '@tiptap/extension-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
-import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
@@ -14,6 +13,7 @@ import {
   DetailsSummary,
 } from '@tiptap/extension-details';
 import { VersionedDocument } from './versioned-document.js';
+import { TableNoNest } from '../extensions/table-no-nest.js';
 import { CodeBlockWithCopy } from '../extensions/code-block-copy.js';
 import { Collapsible } from '../extensions/collapsible.js';
 import { MarkdownClipboard } from '../extensions/markdown-clipboard.js';
@@ -22,6 +22,7 @@ import { Mention, type MentionCandidate } from '../extensions/mention.js';
 import { WikiLink, type NoteLinkCandidate } from '../extensions/wiki-link.js';
 import { TicketRef, type TicketRefCandidate } from '../extensions/ticket-ref.js';
 import { EscapeSuggestion } from '../extensions/escape-suggestion.js';
+import { HeadingAnchors } from '../extensions/heading-anchors.js';
 
 export type EditorSchemaOptions = {
   /**
@@ -61,6 +62,16 @@ export type EditorSchemaOptions = {
    */
   queryTickets?: (query: string) => Promise<TicketRefCandidate[]>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  /**
+   * Heading anchors (KB editor parity). When supplied, every non-empty heading
+   * gets a page-unique `id` and a "copy link to this heading" button whose
+   * clipboard text is `headingLink(id)` (`null` → nothing is copied). ABSENT →
+   * no ids and no button: a heading id is a page-wide claim, and only a host
+   * with a URL to point at (the note page) should make it. The extension is
+   * not registered at all without it, so every other surface's extension list
+   * — and its input-rule census — is unchanged.
+   */
+  headingLink?: (id: string) => string | null;
 };
 
 /**
@@ -236,7 +247,7 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // assumed): without it the library never emits the `.tableWrapper` div,
     // so the web skin's wide-table horizontal-scroll rule would target
     // nothing.
-    Table.configure({ resizable: false, renderWrapper: true }),
+    TableNoNest.configure({ resizable: false, renderWrapper: true }),
     TableRow,
     TableHeader,
     TableCell,
@@ -314,6 +325,9 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       queryTickets: options.queryTickets ?? (async () => []),
       resolveTicketHref: options.resolveTicketHref ?? (() => null),
     }),
+    ...(options.headingLink === undefined
+      ? []
+      : [HeadingAnchors.configure({ headingLink: options.headingLink })]),
     // HEADING LEVELS ARE NOT VALIDATED HERE. Heading resolves to
     // `levels: [1,2,3,4,5,6]`, which governs which levels the toolbar and
     // input rules OFFER — it is not a constraint on stored documents, and it

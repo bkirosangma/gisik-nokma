@@ -1,4 +1,5 @@
 import { CodeBlock } from '@tiptap/extension-code-block';
+import { copyText } from './copy-text.js';
 
 /**
  * The code block, with a Copy button in its corner (spec §8.2).
@@ -90,17 +91,10 @@ export const CodeBlockWithCopy = CodeBlock.extend({
             button.textContent = 'Copy';
           }, 1500);
         };
-        if (navigator.clipboard?.writeText !== undefined) {
-          navigator.clipboard.writeText(text).then(done, () => undefined);
-          return;
-        }
-        const area = document.createElement('textarea');
-        area.value = text;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand('copy');
-        area.remove();
-        done();
+        // `copyText` is ALSO the answer to a REJECTED write, not only to a missing
+        // API (see it) — swallowing the rejection left a button that said nothing
+        // and copied nothing.
+        copyText(text, done);
       });
       dom.append(pre, button);
       return {

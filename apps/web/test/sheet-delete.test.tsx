@@ -235,6 +235,17 @@ async function pressDelete(): Promise<void> {
   await userEvent.click(screen.getByRole('button', { name: 'Delete ticket' }));
 }
 
+/**
+ * The TOAST's Undo. The sheet's own editor toolbar carries an Undo button too
+ * (kb-editor-parity, 9.375), so the accessible name alone is no longer unique:
+ * the toast's is the one that is not inside the editor's toolbar.
+ */
+function toastUndo(): HTMLElement {
+  const hits = screen.getAllByRole('button', { name: 'Undo' }).filter((button) => button.closest('[role="toolbar"]') === null);
+  expect(hits).toHaveLength(1);
+  return hits[0]!;
+}
+
 describe('the sheet footer’s Delete — the narration and the Undo, at the call site', () => {
   it('16.84 pressing Delete posts ticket.deleted and names the ticket in the toast', async () => {
     await openTheSheet();
@@ -262,7 +273,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     // …and it is UNDOABLE, which is the other half of "history-retaining". This
     // is the TOAST's own Undo — the durable strip's carries a different
     // accessible name precisely so this query stays unambiguous.
-    expect(screen.getByRole('button', { name: 'Undo' })).toBeInTheDocument();
+    expect(toastUndo()).toBeInTheDocument();
   });
 
   it('16.84 the toast names the ticket KEY when the read carries one — the prototype’s own sentence', async () => {
@@ -295,7 +306,7 @@ describe('the sheet footer’s Delete — the narration and the Undo, at the cal
     await pressDelete();
     await waitFor(() => expect(ingested).toHaveLength(1));
 
-    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await userEvent.click(toastUndo());
 
     // A SECOND event, and the inverse of the first — not an optimistic un-hide.
     // The id is the assertion that binds: an Undo that restored some other

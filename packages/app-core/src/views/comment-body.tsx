@@ -30,7 +30,7 @@ import { createElement, Fragment, type ReactNode } from 'react';
  *
  * Marks: `bold` → `<strong>`, `italic` → `<em>`, `strike` → `<s>`, `code` →
  * `<code>`, `link` → `<a href>` (sanitised — see below). Blocks: `paragraph` →
- * `<p>`, `heading` → `<p>`, `bulletList`/`orderedList`/`listItem` → the real
+ * `<p>`, `heading` → `<p class="gn-comment__heading gn-comment__heading--N">`, `horizontalRule` → `<hr>`, `bulletList`/`orderedList`/`listItem` → the real
  * list elements, so the browser supplies the markers the plain-text renderer
  * dropped, `blockquote` → `<blockquote>`, `codeBlock` → `<pre><code>`,
  * `hardBreak` → `<br>`, `mention` → the same `@label` the plain renderer
@@ -312,7 +312,20 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
   if (node.type === 'tableCell') {
     return createElement('td', { key }, children);
   }
-  if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'doc') {
+  // The toolbar offers H1-H6 and a horizontal rule (kb-editor-parity), so both
+  // must SURVIVE the trip to the thread. A heading stays a `<p>` on purpose: a
+  // real `<h1>`-`<h6>` inside a comment would enter the ticket sheet's own
+  // heading outline for assistive tech, and a comment is not a page section.
+  // The level rides on a modifier class so the eye still gets the hierarchy.
+  if (node.type === 'heading') {
+    const level = Number((node.attrs as { level?: unknown } | undefined)?.level);
+    const modifier = Number.isInteger(level) && level >= 1 && level <= 6 ? ` gn-comment__heading--${level}` : '';
+    return createElement('p', { className: `gn-comment__heading${modifier}`, key }, children);
+  }
+  if (node.type === 'horizontalRule' || node.type === 'horizontal_rule') {
+    return createElement('hr', { className: 'gn-comment__rule', key });
+  }
+  if (node.type === 'paragraph' || node.type === 'doc') {
     const element = node.type === 'doc' ? Fragment : 'p';
     return createElement(element, node.type === 'doc' ? { key } : { key }, children);
   }

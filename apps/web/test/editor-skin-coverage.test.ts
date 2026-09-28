@@ -87,6 +87,18 @@ const EXCLUDED_EDITOR_FILES = new Set([
   'extensions/wiki-link-popup.ts',
   // The main toolbar — task/editor-polish's scope, already skinned.
   'components/EditorToolbar.tsx',
+  // The table size grid opened from the toolbar's "Insert table" tool — toolbar
+  // chrome (KB editor parity); its rules live in editor.css and the toolbar
+  // test (9.384) proves each class it draws has one.
+  'components/TablePicker.tsx',
+  // The link editor popover (KB editor parity) — a body-portalled panel; its rules
+  // live in editor.css and the popover test (9.397) proves each class it draws has one.
+  'components/LinkEditorPopover.tsx',
+  // The reading-progress bar (KB editor parity) — a page-level fixed bar, not
+  // editor content; its rules are split editor.css (structure) / globals.css
+  // (colour, placement, motion) and the note-document test (9.409/9.410)
+  // proves the skin half.
+  'reading/ReadingProgress.tsx',
   // Attachment/upload chrome — an unrelated feature area; some of it
   // (`.attachment-item--upload`/`__name`) is deliberately UNSTYLED per an
   // existing test (`apps/web/test/attachment-list-item.test.tsx`), and a
@@ -426,7 +438,12 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     // missing one ('gone') the same way the production app's resolver would —
     // without it every wiki-link renders as "live" (wiki-link.ts's own
     // documented default when no resolver is configured at all).
-    extensions: buildEditorExtensions({ resolveNoteTitle: (id) => (id === 'gone' ? null : 'Note') }),
+    // `headingLink` switches the heading anchors on (KB editor parity), which is
+    // what makes `.editor-heading-link` render at all.
+    extensions: buildEditorExtensions({
+      resolveNoteTitle: (id) => (id === 'gone' ? null : 'Note'),
+      headingLink: (id) => `#${id}`,
+    }),
     content: GALLERY_DOC,
   });
   const root = editor.view.dom;
@@ -434,8 +451,12 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     (cls) => !HOVER_ONLY_CLASSES.has(cls) && !COMPONENT_RENDERED_CLASSES.has(cls),
   );
 
+  // The heading-link live region is appended to `document.body` (outside the
+  // contenteditable, which is the point), so it is looked up there.
+  const BODY_RENDERED_CLASSES = new Set(['editor-heading-link__status']);
   it.each(declaredClasses)('.%s matches at least one rendered element', (cls) => {
-    expect(root.querySelector(`.${cls}`), `no element in the gallery matches .${cls}`).not.toBeNull();
+    const scope = BODY_RENDERED_CLASSES.has(cls) ? document : root;
+    expect(scope.querySelector(`.${cls}`), `no element in the gallery matches .${cls}`).not.toBeNull();
   });
 
   it('table/th/td render in the gallery', () => {

@@ -4152,6 +4152,97 @@ input, textarea, select { font-family: inherit; }
   outline-offset: 2px;
 }
 
+/* ═══════════════════════════════════════════════════════════════════════════
+   KB editor parity (task/kb-editor-parity) — the note page's reading surface.
+   ONE delimited section, tokens only, so it does not interleave with the
+   other lanes' rules above it.
+   ═══════════════════════════════════════════════════════════════════════════ */
+
+/* The reading-progress bar (`packages/editor` `ReadingProgress`). Structure
+   (fixed, 3px, scaleX from the left) is in editor.css; here: where it sits and
+   what colour it is. `top: var(--app-nav-offset)` puts it under the sticky bar
+   (`.gn-nav`, `z-index: 20`) — the same offset `.gn-legal__section` uses for
+   its scroll-margin — and `z-index: 10` keeps it under the nav if the two ever
+   disagree by a row, and far under every popover/sheet tier (30/40/50/60).
+   Track = `--gn-border`, fill = `--gn-accent`. No token existed for a
+   "progress" role, so the bar takes the accent rather than a new value. */
+.reading-progress {
+  top: var(--app-nav-offset, 0px);
+  z-index: 10;
+  background: var(--gn-border);
+}
+.reading-progress__bar {
+  background: var(--gn-accent);
+  transition: transform 150ms linear;
+}
+@media (prefers-reduced-motion: reduce) {
+  .reading-progress__bar { transition: none; }
+}
+
+/* A heading scrolled to (a table-of-contents click, a `#heading` link) must
+   land BELOW the sticky nav, not under it: `scroll-margin-top` is honoured by
+   `scrollIntoView` and by hash navigation alike. `--app-nav-offset` plus one
+   rem of air, the same 1rem the table of contents' own `offsetTop - 16` used. */
+.gn-notes__editor :is(h1, h2, h3, h4, h5, h6) {
+  scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
+}
+
+/* The heading copy-link button (`packages/editor` `heading-anchors.ts`): its
+   presence, size and reveal are in editor.css; this is only colour. Muted at
+   rest so it does not compete with the heading, the accent text token on
+   hover/copied, and the shared focus ring (the same 2px/2px the table toolbar
+   uses). */
+.editor-heading-link { color: var(--gn-text-muted); }
+.editor-heading-link:hover,
+.editor-heading-link[data-copied] { color: var(--gn-text-accent); }
+.editor-heading-link:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The draft-restore banner (`apps/web/src/notes/draft-restore-banner.tsx`, KB
+   `DraftRestoreBanner`). Same shape as `.gn-notes__deleted-banner` above, but
+   an accent stripe instead of the danger one: recovering words is good news,
+   not a warning. The KB source paints it Tailwind blue-50/200/600/900; the
+   mapping is fill-secondary surface, `--gn-accent` stripe, `--gn-text`. No
+   token existed for an "info" role, so accent stands in for it. */
+.gn-notes__draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-secondary);
+  box-shadow: inset 4px 0 0 var(--gn-accent);
+  color: var(--gn-text);
+}
+.gn-notes__draft-banner p {
+  margin: 0;
+  flex: 1 1 auto;
+}
+
+/* H4–H6 in the editor skin (KB `prose.css`, adapted). The skin above styles
+   H1–H3 only, so a deeper heading fell back to the browser's defaults: an H6
+   at 0.67em, smaller than body text and unstyled. The editor and the reading
+   TOC already cover all six levels (9.413), so the skin now does too. Sizes
+   step down from H3's 1.0625rem to body text (KB: 1 / 0.9 / 0.85rem, which
+   ends BELOW body size; here H6 stops at 0.875rem so a heading is never
+   smaller than the 0.875rem code/UI text around it). All three stay bold-ish
+   (600) so they read as headings by weight once size stops doing it. H6 takes
+   `--gn-text-muted` (the KB's `--mute`); H4/H5 keep the body colour. No new
+   token was needed. */
+.ticket-editor__content h4 { margin: 0.75rem 0 0.375rem; font-size: 1rem; line-height: 1.5rem; font-weight: 600; }
+.ticket-editor__content h5 { margin: 0.625rem 0 0.25rem; font-size: 0.9375rem; line-height: 1.375rem; font-weight: 600; }
+.ticket-editor__content h6 {
+  margin: 0.625rem 0 0.25rem;
+  font-size: 0.875rem;
+  line-height: 1.25rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+}
+
 
 /* ══ trash-4-ui: begin ═══════════════════════════════════════════════════
    Trash series Plan 4 — the delete dialog, the workspace card's menu and
