@@ -2,7 +2,6 @@ import type { Extensions } from '@tiptap/core';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Link } from '@tiptap/extension-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
-import { Table } from '@tiptap/extension-table';
 import { TableRow } from '@tiptap/extension-table-row';
 import { TableHeader } from '@tiptap/extension-table-header';
 import { TableCell } from '@tiptap/extension-table-cell';
@@ -14,6 +13,7 @@ import {
   DetailsSummary,
 } from '@tiptap/extension-details';
 import { VersionedDocument } from './versioned-document.js';
+import { TableNoNest } from '../extensions/table-no-nest.js';
 import { CodeBlockWithCopy } from '../extensions/code-block-copy.js';
 import { Collapsible } from '../extensions/collapsible.js';
 import { MarkdownClipboard } from '../extensions/markdown-clipboard.js';
@@ -236,7 +236,7 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     // assumed): without it the library never emits the `.tableWrapper` div,
     // so the web skin's wide-table horizontal-scroll rule would target
     // nothing.
-    Table.configure({ resizable: false, renderWrapper: true }),
+    TableNoNest.configure({ resizable: false, renderWrapper: true }),
     TableRow,
     TableHeader,
     TableCell,

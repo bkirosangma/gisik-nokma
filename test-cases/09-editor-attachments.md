@@ -501,3 +501,7 @@ reference) of the components, extensions, hooks/utils and styles this product do
 ruling). Already landed since the brief was written: editor-skin #738 (content/chip/table skin,
 TableFloatingToolbar), editor-polish #739 (toolbar restyle, tooltips, Insert note/ticket, Attach button,
 placeholders) — this lane builds on them, verifies drift, does not redo their units. Cases file: this one.
+
+- ✅ **9.368 — `insertTable` succeeds when the caret is not inside a table.** (`packages/editor/test/table-no-nest.test.ts`, ported from the reference's DOC-4.3-27)
+- ✅ **9.369 — `insertTable` is refused with the caret inside a table, and the document keeps its ONE table** — `run()` returns `false` and the JSON is byte-identical after the refused call. (`packages/editor/test/table-no-nest.test.ts`, ported from DOC-4.3-26)
+- ✅ **9.370 — `insertTable` works again once the caret has left the table.** (`packages/editor/test/table-no-nest.test.ts`)

@@ -1584,6 +1584,12 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   layout/border) — everything coloured through `globals.css` does not, since the webview loads only
   `editor.css`. `apps/web/app/globals.css`, `packages/editor/src/styles/editor.css`,
   `packages/editor/src/components/TableFloatingToolbar.tsx`, `packages/app-core/src/views/comment-body.tsx`
+- ✅ **KB editor parity — the owner's knowledge-base editor refinements, ported without the live markdown
+  reveal** (task/kb-editor-parity, owner ruling 2026-09-24) — a file-by-file port from
+  `/Users/kiro/my_projects/knowledge-base` (`features/document/`); every reference file's verdict is in the
+  PR body. Pieces, each its own commit:
+  - ⚙️ **A table cannot be nested in a table** — `TableNoNest` refuses `insertTable` while the caret is
+    inside a table (the same guard the reference carries); `packages/editor/src/extensions/table-no-nest.ts`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
