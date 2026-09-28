@@ -36,6 +36,11 @@ import {
   type ListFilterSpec,
   type ListRow,
   type TicketDatesInput,
+  classifyBatch,
+  restoreSeeds,
+  restoreUnreachableLine,
+  ticketDeletedToast,
+  ticketDurableUndoLine,
   writeFailureCopy,
   writeFailureRefusalClass,
 } from '@gisik-nokma/app-core';
@@ -513,10 +518,14 @@ function ProjectBoard() {
    * rendered from `undoFor` and from nothing else**, so a toast with nothing to
    * take back cannot be drawn by mistake — the same rule the inbox's `undoable`
    * states for its own bulk action.
+   *
+   * `permanent` (trash Plan 4, D11): the Undo this notice offers must unmark
+   * before it restores.
    */
   const [deleteNotice, setDeleteNotice] = useState<{
     message: string;
     undoFor: string | null;
+    permanent: boolean;
   } | null>(null);
   /**
    * RULING E2-30 (2026-09-21) — THE DURABLE HALF OF THE WAY BACK FROM A DELETE.
@@ -558,7 +567,7 @@ function ProjectBoard() {
    * to serve rows every read path currently excludes by that one predicate, and
    * that is a visibility door rather than a client affordance.
    */
-  const [durableUndo, setDurableUndo] = useState<{ ticketId: string; title: string } | null>(null);
+  const [durableUndo, setDurableUndo] = useState<{ ticketId: string; title: string; permanent: boolean } | null>(null);
   const applyRankOverride = useCallback((ticketId: string, rank: string | null) => {
     setRankOverrides((current) => {
       const next = new Map(current);
@@ -1031,21 +1040,26 @@ function ProjectBoard() {
    * Ruling 27's split, applied to the second half as well: a refusal and a
    * transport failure are different facts, and `undoFor: null` is what keeps a
    * second click off a toast whose first one did not take.
+   *
+   * ## After a PERMANENT delete (trash Plan 4, D10/D11)
+   *
+   * It sends `purge.unmarked` then `ticket.restored` in ONE batch. If only the
+   * unmark lands, the ticket is deleted and no longer marked: the strip's
+   * `permanent` goes false so its next Undo sends the restore alone (case 19.234).
    */
   const restoreDeletedTicket = useCallback(
-    async (ticketId: string): Promise<void> => {
+    async (ticketId: string, permanent: boolean): Promise<void> => {
       setDeleteNotice(null);
       const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
+      const seeds = restoreSeeds({ kind: 'ticket', workspaceId, entityId: ticketId }, permanent);
       try {
-        const results = await dataSource.ingest([
-          make({ workspaceId, entity: { kind: 'ticket', id: ticketId }, type: 'ticket.restored', payload: {} }),
-        ]);
-        const result = results[0];
-        if (result === undefined) {
-          setDeleteNotice({ message: 'The server did not answer the restore.', undoFor: null });
+        const results = await dataSource.ingest(seeds.map(make));
+        const outcome = classifyBatch(results, seeds.length);
+        if (outcome.status === 'unanswered') {
+          setDeleteNotice({ message: 'The server did not answer the restore.', undoFor: null, permanent: false });
           return;
         }
-        if (result.status === 'committed') {
+        if (outcome.status === 'committed') {
           // Ruling E2-30 — the durable strip goes ONLY on a committed restore.
           // A failed one keeps it, because the route back is still there and
           // the person may want to try again; clearing it here would take the
@@ -1055,18 +1069,24 @@ function ProjectBoard() {
           board.reload();
           return;
         }
-        const reason = result.status === 'refused' ? result.reason : result.message;
-        setDeleteNotice({ message: `The ticket could not be restored — ${reason}`, undoFor: null });
+        if (outcome.status === 'partly') {
+          setDurableUndo((current) =>
+            current !== null && current.ticketId === ticketId ? { ...current, permanent: false } : current,
+          );
+        }
+        setDeleteNotice({
+          message: `The ticket could not be restored — ${outcome.reason}`,
+          undoFor: null,
+          permanent: false,
+        });
       } catch (cause) {
         // E5-25: a 401 here is a session that ended, not an unreachable server.
         // `writeFailureCopy` is the ONE place that is decided, for all nine
         // write sites; the redirect is the shell's data-source guard.
         setDeleteNotice({
-          message: writeFailureCopy(
-            cause,
-            (message) => `We could not reach the server to restore it — ${message}`,
-          ),
+          message: writeFailureCopy(cause, restoreUnreachableLine),
           undoFor: null,
+          permanent: false,
         });
       }
     },
@@ -2702,7 +2722,7 @@ function ProjectBoard() {
             {durableUndo !== null ? (
               <div className="gn-project__deleted" role="status" data-testid="deleted-undo">
                 <span className="gn-project__deleted-text">
-                  {`${durableUndo.title} is deleted. Undo here until you delete another ticket or reload the page.`}
+                  {ticketDurableUndoLine(durableUndo.title, durableUndo.permanent)}
                 </span>
                 <button
                   type="button"
@@ -2720,7 +2740,7 @@ function ProjectBoard() {
                     control rather than silently repeated here.
                   */
                   aria-label={`Undo the deletion of ${durableUndo.title}`}
-                  onClick={() => void restoreDeletedTicket(durableUndo.ticketId)}
+                  onClick={() => void restoreDeletedTicket(durableUndo.ticketId, durableUndo.permanent)}
                 >
                   Undo
                 </button>
@@ -3707,7 +3727,7 @@ function ProjectBoard() {
             was wrong, not the interpolation. See
             `TicketSheetProps.onDeleted`.
           */
-          onDeleted={(ticketId, name) => {
+          onDeleted={(ticketId, name, { permanent }) => {
             setDeleteNotice({
               /*
                 ⚠ THE SENTENCE NAMES THE DURABLE ROUTE (ruling E2-30, 2026-09-21).
@@ -3720,14 +3740,15 @@ function ProjectBoard() {
                 The route named is real from the same moment — the strip below
                 is rendered with this toast, not after it.
               */
-              message: `${name} deleted · you can also undo this on the page`,
+              message: ticketDeletedToast(name, permanent),
               undoFor: ticketId,
+              permanent,
             });
             // One slot: a second delete replaces the first ticket's strip, the
             // same one-slot rule the toast above keeps. Said plainly on the
             // strip's own sentence, so nobody is told a ticket is still
             // reachable when it has been superseded.
-            setDurableUndo({ ticketId, title: name });
+            setDurableUndo({ ticketId, title: name, permanent });
             /*
               ⚠ BOTH READS ARE RE-ASKED HERE, and the deletion's correction must
               not depend on the stream. **Found by independent review
@@ -3789,7 +3810,7 @@ function ProjectBoard() {
         message={deleteNotice?.message ?? ''}
         undo={
           deleteNotice?.undoFor != null
-            ? { onUndo: () => void restoreDeletedTicket(deleteNotice.undoFor as string) }
+            ? { onUndo: () => void restoreDeletedTicket(deleteNotice.undoFor as string, deleteNotice.permanent) }
             : null
         }
         onDismiss={() => setDeleteNotice(null)}

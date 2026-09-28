@@ -8,7 +8,7 @@ import {
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Chip, Dialog, SegmentedControl, Select, Sheet, Toast } from '@gisik-nokma/ui';
+import { Button, Chip, SegmentedControl, Select, Sheet, Toast } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
@@ -21,6 +21,7 @@ import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js
 import { attachmentsImpliedBy, noteReferencesIn } from '../flows/attachments-implied-by.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import { CommentsThread, type TicketComment } from './comments-thread.js';
+import { DeleteDialog } from './delete-dialog.js';
 import {
   PlainTextEditorSlot,
   type EditorSlotComponent,
@@ -350,8 +351,16 @@ export type TicketSheetProps = {
    * that same expression: the key when the workspace has a prefix, the title
    * when it does not. The toast therefore says what the prototype says wherever
    * a key exists, and still names the ticket where one does not.
+   *
+   * ## `{ permanent }` (trash Plan 4, D11)
+   *
+   * True when the delete dialog's **Delete permanently** switch was on AND the
+   * mark committed. The host's Undo then sends `purge.unmarked` before
+   * `ticket.restored`, in one batch — the server refuses a restore while the
+   * ticket is marked (`UNMARK_FIRST_REASON`). Additive: a host that takes two
+   * arguments is unaffected.
    */
-  onDeleted?: (ticketId: string, name: string) => void;
+  onDeleted?: (ticketId: string, name: string, outcome: { permanent: boolean }) => void;
   /**
    * The two names the breadcrumb above the title shows — the workspace's and
    * the project's — supplied by the host, which already holds both.
@@ -645,27 +654,6 @@ export function TicketSheet({
    */
   const [transportError, setTransportError] = useState<string | null>(null);
   /**
-   * THE FOOTER'S OWN PAIR, and the same two facts as `serverRefusal` /
-   * `transportError` one screen down (E5-9, 2026-09-21).
-   *
-   * WHY PLACEMENT IS PART OF THE ANSWER HERE. `Delete` is the last thing in the
-   * sheet's body, and that body scrolls: the lane that filed this measured
-   * `.gn-ticket-sheet__body` at `clientHeight 756` against `scrollHeight 4036`,
-   * with the footer's top 3,942.8 px below the tab bar. The shared slots sit at
-   * the HEAD of that body, so a person who scrolled to the foot, pressed Delete
-   * and was refused was answered about five viewports above their own eyes —
-   * the sentence was on screen in the DOM and nowhere near the screen they were
-   * looking at. `TransitionDialog` already owns its own refusal slots for
-   * exactly this reason; Delete had none.
-   *
-   * These are separate STATE, not a flag on the shared pair, because the two
-   * sentences must never coexist: every submission clears BOTH pairs (see
-   * `submitTicketEvent`'s `clearBoth`), so one click's outcome is one sentence
-   * in one place.
-   */
-  const [footerRefusal, setFooterRefusal] = useState<{ rule: string; reason: string } | null>(null);
-  const [footerTransport, setFooterTransport] = useState<string | null>(null);
-  /**
    * A THIRD slot, and the third distinct fact: something the editor itself
    * could not do, where the server was never asked.
    *
@@ -795,7 +783,7 @@ export function TicketSheet({
    *
    * ## What this does NOT do, and why each omission is deliberate
    *
-   * **The control is NOT hidden** — the docblock beside `deleteTicket` is right
+   * **The control is NOT hidden** — the docblock beside `onDeleteCommitted` is right
    * that a hidden control cannot explain itself, and the finding says so in as
    * many words. This asks; it does not conceal.
    *
@@ -816,6 +804,12 @@ export function TicketSheet({
    * the ruled 15 seconds (the host owns it) and the page strip this batch added.
    * Saying "its history is retained" alone would be the same misleading half
    * E2-30 corrected in the toast's own sentence.
+   *
+   * ## Amended by trash Plan 4 (spec §6.1, D6)
+   *
+   * The confirmation is now `DeleteDialog`, the one every delete door opens. Its
+   * note replaces the sentence above about "two routes back": Deleted items on
+   * the Account page is the durable route that now exists, and the note names it.
    */
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   /**
@@ -1652,39 +1646,21 @@ export function TicketSheet({
    * names this one first; the reasoning above is why it is the one taken.
    */
   const submitTicketEvent = async (
-    type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
+    type: 'ticket.closed' | 'ticket.reopened',
     onCommitted: () => void,
-    /**
-     * WHERE this event's answer is shown (E5-9). `'sheet'` is the shared slot at
-     * the head of the body; `'footer'` is the one beside Delete.
-     *
-     * The state machine is SHARED on purpose — the refusal/transport split, the
-     * `submitting` latch and the three-outcome branch are one decision, and a
-     * delete that grew a private copy is how the two drift. What is NOT shared
-     * is the PLACEMENT, because the two controls are not equally far from the
-     * shared slot: `Delete` sits at the end of a body that legitimately scrolls
-     * thousands of pixels, and the lane that filed this measured the footer's
-     * top 3,942.8 px below the tab bar — so an answer rendered at the head is an
-     * answer the person who pressed the button cannot see. `Close`/`Reopen` sit
-     * in that same footer, but their refusals are rendered by `TransitionDialog`
-     * (which owns its own slot) or by the shared one while the person is still
-     * at the head of the body.
-     */
-    sink: 'sheet' | 'footer',
   ): Promise<void> => {
-    // ONE pair of writers per sink, chosen once. Every branch below states its
-    // outcome through these rather than through the setters directly, so a
-    // future outcome cannot land in the wrong place by omission.
-    const putRefusal = sink === 'footer' ? setFooterRefusal : setServerRefusal;
-    const putTransport = sink === 'footer' ? setFooterTransport : setTransportError;
-    // Both sinks are cleared by every submission, whichever one this is: two
-    // sentences about one click's outcome — one stale, one current — is the
-    // defect the shared slot's own comment below already refuses.
+    // The head-slot writers. Until trash Plan 4 a Delete answered through a
+    // FOOTER pair chosen by a `sink` parameter (E5-9); Delete now answers inside
+    // `DeleteDialog` (D7), so Close/Reopen are the only callers and one pair of
+    // writers is left.
+    const putRefusal = setServerRefusal;
+    const putTransport = setTransportError;
+    // Both slots are cleared by every submission: two sentences about one
+    // click's outcome — one stale, one current — is the defect the shared slot's
+    // own comment below already refuses.
     const clearBoth = (): void => {
       setServerRefusal(null);
       setTransportError(null);
-      setFooterRefusal(null);
-      setFooterTransport(null);
     };
     setSubmitting(true);
     try {
@@ -1712,11 +1688,9 @@ export function TicketSheet({
       if (result.status === 'committed') {
         clearBoth();
         // What a COMMITTED event does next is the caller's — Close/Reopen
-        // re-read (the ticket's own state moved), Delete closes and narrates
-        // (the ticket is gone from every view). Everything before this line is
+        // re-read (the ticket's own state moved). Everything before this line is
         // shared on purpose: the refusal and transport-error slots, the
-        // `submitting` latch, and the three-outcome split are one decision, and
-        // a delete that grew its own private copy of them is how the two drift.
+        // `submitting` latch, and the three-outcome split are one decision.
         onCommitted();
         return;
       }
@@ -2021,12 +1995,6 @@ export function TicketSheet({
         read.reload();
         history.reload();
       },
-      // The shared slot. Their own refusals are the one case that reaches it
-      // from the foot of the sheet: Close/Reopen are rendered only while
-      // `TransitionDialog` is closed, and its copy is not on screen then — see
-      // the slot's own comment, which is what makes that placement deliberate
-      // rather than an oversight.
-      'sheet',
     );
 
   /**
@@ -2053,22 +2021,16 @@ export function TicketSheet({
    * button that silently is not there. **A hidden control cannot explain
    * itself.**
    *
-   * ## ⚠ AND ITS REFUSAL ANSWERS IN THE FOOTER, NOT AT THE HEAD OF THE BODY
+   * ## ITS REFUSAL ANSWERS INSIDE THE DIALOG (trash Plan 4, D7, case 19.231)
    *
-   * The ruling above is about WHETHER Delete is offered; it never weighed
-   * WHERE its answer lands, and the answer landed five screens away (E5-9;
-   * the measurement is on `footerRefusal`). The sink is `'footer'` for that
-   * reason: the sentence renders beside the button the person just pressed.
+   * Spec §7: the dialog that asked shows the answer and stays open, which is
+   * where the person is when they press.
    */
-  const deleteTicket = (): Promise<void> =>
-    submitTicketEvent(
-      'ticket.deleted',
-      () => {
-        onClose();
-        onDeleted?.(ticketId, ticketRead.key ?? ticketRead.title);
-      },
-      'footer',
-    );
+  const onDeleteCommitted = ({ permanent }: { permanent: boolean }): void => {
+    setConfirmingDelete(false);
+    onClose();
+    onDeleted?.(ticketId, ticketRead.key ?? ticketRead.title, { permanent });
+  };
 
   const state = ticketRead.ticket;
   /**
@@ -4117,39 +4079,12 @@ export function TicketSheet({
           sheet is already open on. So the footer draws on every mount, and
           `onDeleted` (the host's half) is optional and NOT load-bearing: the
           close happens here, and a host that narrates nothing still gets a closed
-          sheet. See `deleteTicket`'s docblock.
+          sheet. See `onDeleteCommitted`'s docblock.
 
           The strip's fill and its full-bleed inset remain the recorded departure
           `ui.css` carries beside `.gn-ticket-sheet__footer` — the reason is a
           `Sheet` API change, measured there rather than asserted here. */}
       <footer className="gn-ticket-sheet__footer">
-        {/*
-          DELETE'S OWN ANSWER, HERE RATHER THAN AT THE HEAD OF THE BODY.
-
-          The shared slots above sit at the top of the one scrolling body; this
-          one is where the person is when they press the button. The lane that
-          filed E5-9 measured the footer's top **3,942.8 px** below the tab bar
-          (`scrollHeight 4036` against `clientHeight 756`), so an answer rendered
-          in the shared slot arrived about five viewports above the eyes that
-          asked for it. Same two facts, same sentences, own placement — the
-          reasoning, and why this is a separate PAIR of states rather than a flag
-          on the shared one, is on `footerRefusal`'s declaration.
-
-          It renders INSIDE the footer element so the answer is structurally
-          attached to the control, which is the property the case asserts: a
-          jsdom sheet lays nothing out, so the pixel claim is the lane's and the
-          containment claim is this test's.
-        */}
-        {footerRefusal !== null ? (
-          <p role="alert" className="gn-refusal gn-refusal--server">
-            {`Refused by the server — ${footerRefusal.rule}: ${footerRefusal.reason}`}
-          </p>
-        ) : null}
-        {footerTransport !== null ? (
-          <p role="alert" className="gn-refusal gn-refusal--transport">
-            {footerTransport}
-          </p>
-        ) : null}
         <button
           type="button"
           className="gn-ticket-sheet__delete"
@@ -4161,45 +4096,26 @@ export function TicketSheet({
       </footer>
 
       {/*
-        RULING E2-35 — the confirmation, in `BulkCloseDialog`'s shape: a `Dialog`
-        with a title, the consequence, and Cancel beside a primary confirm.
-        Rendered HERE, beside `TransitionDialog`'s own mount, so the sheet owns
-        both of its modal decisions from one place.
-
-        ⚠ THE CONFIRM IS NAMED **Delete ticket**, not "Delete". The footer's
-        control is called "Delete", and a second button with the same accessible
-        name on one screen is ambiguous to a screen-reader user and
-        unaddressable by role and name — the same collision this batch's E2-30
-        hit on the deleted-ticket strip's Undo.
-
-        ⚠ AND THE CONFIRM CARRIES NO `disabled`. It unmounts on its own click
-        (`setConfirmingDelete(false)` runs before the submit), so a disabled
-        state there is a term nobody can ever observe — which is exactly the
-        defect E2-31 removed one function up. The guard for the submit in flight
-        is the FOOTER's own `disabled={submitting}`, which is set before the
-        first await and blocks a second press from opening this dialog again.
+        RULING E2-35, NOW THE SHARED CONFIRMATION (trash Plan 4, spec §6.1). The
+        sheet's own `Dialog` became `DeleteDialog` — the component every delete
+        door opens — so its title is `Delete ticket “<title>”?`, its note names
+        Deleted items (the durable way back), its refusal answers inside it
+        (§7), and its **Delete permanently** switch marks the ticket too. The
+        confirm's accessible name is still `Delete ticket` (D8), so the footer's
+        `Delete` stays the only button of that name. It unmounts on commit via
+        `onDeleteCommitted`, and on Cancel/Escape via `setConfirmingDelete`.
       */}
-      <Dialog
+      <DeleteDialog
         open={confirmingDelete}
-        title="Delete this ticket?"
-        onClose={() => setConfirmingDelete(false)}
-      >
-        <p>
-          {`${ticketRead.title} will stop appearing in the Board, the List, the Calendar and the Timeline. Nothing is erased — its history is kept — and you can put it back for 15 seconds from the message that follows, or from the message on the page until you delete another ticket.`}
-        </p>
-        <div>
-          <Button onClick={() => setConfirmingDelete(false)}>Cancel</Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setConfirmingDelete(false);
-              void deleteTicket();
-            }}
-          >
-            Delete ticket
-          </Button>
-        </div>
-      </Dialog>
+        kind="ticket"
+        name={ticketRead.title}
+        workspaceId={workspaceId}
+        entityId={ticketId}
+        dataSource={dataSource}
+        make={make}
+        onCancel={() => setConfirmingDelete(false)}
+        onDeleted={onDeleteCommitted}
+      />
 
       {workflow.data != null ? (
         <TransitionDialog

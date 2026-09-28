@@ -240,12 +240,13 @@ Yes. Open the job and type into the title at the top of the sheet. **Enter** or 
 **Escape** abandons the change.
 
 **Can I delete a job I created by mistake?**
-Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer. The job stops
-appearing in every view — boards, lists, search, My Work — and its history is kept, because other events
-cite it. A **"… deleted · its history is retained"** message follows with an **Undo** for about fifteen
-seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the
-job. If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
-alternative.
+Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer, then confirm.
+The job stops appearing in every view — boards, lists, search, My Work — and its history is kept,
+because other events cite it. An **Undo** follows for about fifteen seconds, and after that the job is
+still under **Deleted items** on your Account page, where **Restore** brings it back. Turning on
+**Delete permanently** in the confirmation also marks it to be erased for good after the waiting period
+the confirmation states; **Unmark** in Deleted items takes that back until then. If you would rather
+not lose it at all, a "won't do" or "cancelled" stage in your workflow remains the alternative.
 
 **Can I move a job to a different project?**
 No. Parents have to be in the same project, and no way to move a job across projects was found.

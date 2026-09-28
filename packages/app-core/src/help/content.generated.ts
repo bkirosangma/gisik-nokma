@@ -2552,7 +2552,31 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and "
+                      "text": " in the sheet's footer. A confirmation opens first: it names the job, has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete permanently"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " switch (off unless you turn it on), and says where deleted things go. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " is where the cursor starts, so pressing Enter by reflex deletes nothing. Press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and the job stops appearing in every view — boards, lists, search, My Work — while "
                     },
                     {
                       "kind": "bold",
@@ -2568,15 +2592,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", and the button is not hidden from anybody: press it without the right and the server refuses, saying so. A "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "\"… deleted · its history is retained\""
-                    },
-                    {
-                      "kind": "text",
-                      "text": " message follows with an "
+                      "text": ", and the button is not hidden from anybody: press it without the right and the confirmation shows the server's refusal and stays open. A message follows with an "
                     },
                     {
                       "kind": "bold",
@@ -2584,7 +2600,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " for about fifteen seconds, and that Undo is the product's only route back — once it goes, no control anywhere restores the job."
+                      "text": " for about fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After that the job is still listed under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Deleted items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on your Account page, where "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " brings it back."
                     }
                   ]
                 ]
@@ -2594,15 +2626,48 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "One exception, added 2026-09-23: a job deleted from My Work has no Undo."
+                    "text": "Delete permanently"
                   },
                   {
                     "kind": "text",
-                    "text": " The message and the fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place without them, so the deletion there is silent and final. The job still stops appearing in every view and its history is still kept. "
+                    "text": " does all of that and also marks the job to be erased for good after the waiting period the confirmation states. Until then the "
                   },
                   {
                     "kind": "bold",
-                    "text": "If you want the way back, delete the job from its project page."
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items) takes the mark off; once the period is over it cannot be undone."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A job deleted from My Work has no Undo there."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The message and the Undo belong to the job's own project page, and My Work opens the sheet in place without them. The job still stops appearing in every view, its history is still kept, and it is still in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page."
                   }
                 ]
               },
@@ -9547,15 +9612,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. A "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "\"… deleted · its history is retained\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " message follows with an "
+                    "text": " in the sheet's footer, then confirm. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. An "
                   },
                   {
                     "kind": "bold",
@@ -9563,7 +9620,39 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " for about fifteen seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the job. If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
+                    "text": " follows for about fifteen seconds, and after that the job is still under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, where "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " brings it back. Turning on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete permanently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the confirmation also marks it to be erased for good after the waiting period the confirmation states; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items takes that back until then. If you would rather not lose it at all, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
                   }
                 ]
               }

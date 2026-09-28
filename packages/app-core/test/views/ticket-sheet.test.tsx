@@ -10,6 +10,7 @@ import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import type { ListRow, TicketHistoryEvent, TicketRead, TicketVisibility } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
+import { DELETE_NOTE, unansweredLine } from '../../src/trash/copy.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import {
   PARENT,
@@ -3799,7 +3800,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     // product has no ticket KEY" while `ticketRead()`'s own fixture had carried
     // `CCSO-1183` all along; the fallback arm is the test below.
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183');
+    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183', { permanent: false });
   });
 
   it('16.84 the SAME handover carries the title when the read composed no key', async () => {
@@ -3819,7 +3820,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     await user.click(await screen.findByRole('button', { name: 'Delete ticket' }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
 
-    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return');
+    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return', { permanent: false });
   });
 
   it('16.84 closes even when the host passes NO onDeleted — the close is not the host\'s to forget', async () => {
@@ -3892,9 +3893,13 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     await settled();
 
     await pressDelete(user);
-    await waitFor(() =>
-      expect(screen.getByText(/The server did not answer this change\./)).toBeInTheDocument(),
-    );
+    // Trash Plan 4 (D7): the answer lands INSIDE the delete dialog, in the
+    // transport class — silence is still never a refusal.
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent(unansweredLine(0, 1));
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
     expect(onDeleted).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -5038,8 +5043,8 @@ describe('9.336-9.337 the Attachments tab draws its own Attach-a-file button', (
  * that ruling is about WHETHER Delete is offered, not about where its answer
  * lands, so this case does not disturb it.
  */
-describe('E5-9 a refused Delete answers beside the button that was pressed', () => {
-  it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
+describe('E5-9 / 19.231 a refused Delete answers inside the dialog that asked', () => {
+  it('PLANTED DEFECT: ONE sentence, inside the dialog, not in the footer or the head of the body', async () => {
     const user = userEvent.setup();
     const read = ticketRead();
     const source = createFakeDataSource(
@@ -5060,19 +5065,18 @@ describe('E5-9 a refused Delete answers beside the button that was pressed', () 
     renderSheet(read, source);
     await settled();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
-    // E2-35 (B13) put a confirm in front of the delete; the refusal this case
-    // is about is the SERVER's, so press through the confirm to reach it.
-    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
-    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete ticket' }));
 
-    const refusal = await screen.findByText(/Refused by the server/);
-    // One sentence, never two: the footer answer REPLACES the shared slot's,
-    // rather than being a second copy of the same fact on one screen.
-    expect(screen.getAllByText(/Refused by the server/)).toHaveLength(1);
-    // …and it is in the surface the person is looking at. `.closest('footer')`
-    // is the structural claim; the pixel claim is the lane's measurement above,
-    // which a jsdom sheet cannot make (it lays nothing out).
-    expect(refusal.closest('footer')).not.toBeNull();
+    // Spec §7: the refusal is shown INSIDE the dialog, which stays open. One
+    // sentence, never two — nothing lands in the footer or the head slot.
+    const refusal = await within(dialog).findByRole('alert');
+    expect(refusal).toHaveTextContent('Only an admin may delete this ticket.');
+    expect(screen.getAllByText('Only an admin may delete this ticket.')).toHaveLength(1);
+    const footer = document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+    expect(within(footer).queryByRole('alert')).toBeNull();
+    // CONTROL — the door is still there to press again once the dialog closes.
+    expect(within(footer).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
 });
 
@@ -5360,13 +5364,12 @@ describe('13.1183 Delete asks first', () => {
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
     // It names the ticket and the consequence, INCLUDING the two ways back —
     // "its history is retained" alone would be the misleading half E2-30
     // corrected in the toast's own sentence.
     expect(within(dialog).getByText(new RegExp(ticketRead().title))).toBeInTheDocument();
-    expect(dialog.textContent).toContain('the Board, the List, the Calendar and the Timeline');
-    expect(dialog.textContent).toContain('15 seconds');
+    expect(within(dialog).getByText(DELETE_NOTE)).toBeInTheDocument();
     // THE ASK IS NOT THE ACT.
     expect(source.ingested).toHaveLength(0);
 
@@ -5383,10 +5386,10 @@ describe('13.1183 Delete asks first', () => {
     await settled();
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
-    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete this ticket?' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' })).toBeNull());
     expect(source.ingested).toHaveLength(0);
     // The sheet is still here — a Cancel that closed it would be a delete by
     // another name.
@@ -5399,7 +5402,7 @@ describe('13.1183 Delete asks first', () => {
     await settled();
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
-    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
     await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
@@ -5408,5 +5411,100 @@ describe('13.1183 Delete asks first', () => {
     expect(batch[0]!.type).toBe('ticket.deleted');
     expect(batch[0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
     expect(batch[0]!.payload).toEqual({});
+  });
+});
+
+/**
+ * Trash series Plan 4, Task 5. Cases 19.228–19.232 (`test-cases/19-trash.md`
+ * §19.23): the sheet's delete goes through the shared `DeleteDialog`.
+ */
+describe('19.228–19.232 the ticket sheet asks through DeleteDialog', () => {
+  const TITLE = 'Delete ticket “File the GST return”?';
+  function footer(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+  }
+
+  it('19.228 Delete opens the shared alertdialog and posts nothing; CONTROL: one Delete, one Delete ticket', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    expect(within(dialog).getByRole('checkbox', { name: 'Delete permanently' })).not.toBeChecked();
+    expect(source.ingested).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Delete ticket' })).toHaveLength(1);
+  });
+
+  it('19.229 confirming posts one ticket.deleted, closes, and hands over { permanent: false }', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDeleted = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onClose, onDeleted });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete ticket' }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183', { permanent: false }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(source.ingested.map((batch) => batch.map((event) => event.type))).toEqual([['ticket.deleted']]);
+  });
+
+  it('19.230 with the switch on, ONE batch [ticket.deleted, purge.marked] and { permanent: true }', async () => {
+    const user = userEvent.setup();
+    const onDeleted = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onDeleted });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Delete permanently' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183', { permanent: true }));
+    expect(source.ingested).toHaveLength(1);
+    expect(source.ingested[0]!.map((event) => event.type)).toEqual(['ticket.deleted', 'purge.marked']);
+    expect(source.ingested[0]!.every((event) => event.entity.kind === 'ticket' && event.entity.id === TICKET)).toBe(true);
+  });
+
+  it('19.231 a refusal answers inside the dialog and the sheet stays; CONTROL: the footer Delete remains', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'permission.role',
+          reason: 'Only a project admin can delete this ticket.',
+        })),
+    );
+    renderSheet(read, source, { onClose });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete ticket' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Only a project admin can delete this ticket.');
+    expect(screen.getAllByText('Only a project admin can delete this ticket.')).toHaveLength(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(within(footer()).queryByRole('alert')).toBeNull();
+    expect(within(footer()).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('19.232 Escape closes the delete dialog, not the sheet; CONTROL: nothing posted', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onClose });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('alertdialog', { name: TITLE });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('alertdialog', { name: TITLE })).toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(source.ingested).toHaveLength(0);
   });
 });

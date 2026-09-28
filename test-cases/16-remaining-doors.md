@@ -611,7 +611,7 @@ plus a partial index → a filter at every view-serving SELECT.
   no filter axis, no search arm — and the ONE producer of `ticket.restored` in the whole client was the
   Undo inside a toast that caps itself at the ruled 15 s. It now reads `${title} deleted · you can also
   undo this on the page`, naming the durable route the ruling added. The three assertions that pinned
-  the old spelling were amended in the same change set, quoting what they used to assert.
+  the old spelling were amended in the same change set, quoting what they used to assert. Amended 2026-09-29 by 19.229/19.233 (trash Plan 4): `onDeleted` carries `{ permanent }`, and after a permanent delete the Undo posts `purge.unmarked` then `ticket.restored` in one batch.
 
 - **13.1180** ✅ **The DURABLE way back from a delete (ruling E2-30, 2026-09-21).** A delete now also puts
   a strip on the page — one slot, the last ticket deleted from this page — naming the ticket and offering
@@ -653,7 +653,7 @@ plus a partial index → a filter at every view-serving SELECT.
   docblock (`packages/rule-engine/src/checks/deletion.ts`) says authority "is not a pure function of the
   envelope — this engine's context carries no membership at all", so a local gate would answer every
   question about this delete except the one that makes it consequential. The id is from **B13's allocated
-  §13 block (13.1177–13.1186)**. — (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+  §13 block (13.1177–13.1186)**. — (`packages/app-core/test/views/ticket-sheet.test.tsx`) Amended 2026-09-29 by 19.228 (trash Plan 4): the confirmation is now the shared `DeleteDialog` — titled `Delete ticket “<title>”?`, an `alertdialog`, carrying spec §6.1's note instead of the 15-second sentence — and its confirm is still named `Delete ticket`.
 
 ### The sheet's three missing surfaces — the toolbar, the editable title, the breadcrumb
 

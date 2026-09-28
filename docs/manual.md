@@ -435,17 +435,23 @@ This is the honest list. Each one is an absence, not a hidden button.
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
 - **You can delete a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and press **Delete** in the sheet's
-  footer. The job stops appearing in every view — boards, lists, search, My Work — and **its history is
-  kept**, because other events cite it. **Only a project admin may delete**, and the button is not hidden
-  from anybody: press it without the right and the server refuses, saying so. A **"… deleted · its
-  history is retained"** message follows with an **Undo** for about fifteen seconds, and that Undo is the
-  product's only route back — once it goes, no control anywhere restores the job.
+  footer. A confirmation opens first: it names the job, has a **Delete permanently** switch (off unless
+  you turn it on), and says where deleted things go. **Cancel** is where the cursor starts, so pressing
+  Enter by reflex deletes nothing. Press **Delete** and the job stops appearing in every view — boards,
+  lists, search, My Work — while **its history is kept**, because other events cite it. **Only a project
+  admin may delete**, and the button is not hidden from anybody: press it without the right and the
+  confirmation shows the server's refusal and stays open. A message follows with an **Undo** for about
+  fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After
+  that the job is still listed under **Deleted items** on your Account page, where **Restore** brings it
+  back.
 
-  **One exception, added 2026-09-23: a job deleted from My Work has no Undo.** The message and the
-  fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place
-  without them, so the deletion there is silent and final. The job still stops appearing in every
-  view and its history is still kept. **If you want the way back, delete the job from its project
-  page.**
+  **Delete permanently** does all of that and also marks the job to be erased for good after the
+  waiting period the confirmation states. Until then the **Undo** (or **Unmark** in Deleted items) takes
+  the mark off; once the period is over it cannot be undone.
+
+  **A job deleted from My Work has no Undo there.** The message and the Undo belong to the job's own
+  project page, and My Work opens the sheet in place without them. The job still stops appearing in
+  every view, its history is still kept, and it is still in **Deleted items** on your Account page.
 
   If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
   alternative.
