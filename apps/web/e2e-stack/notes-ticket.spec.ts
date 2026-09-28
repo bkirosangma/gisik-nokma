@@ -16,6 +16,14 @@ import { openSeededBoard } from './helpers/board.js';
  * Every spec opens on a board or the Notes page and asserts a POSITIVE
  * CONTROL first (`visibility.spec.ts`'s own rule): a bare absence assertion
  * later in the flow would also pass on a blank page or a stalled read.
+ *
+ * 18.330 (task/notes-badge-sheet, owner request 2026-09-24) is the SAME
+ * shape, reversed: instead of opening a note from the ticket's Notes
+ * section, it opens the ticket's sheet from the NOTE's own byline badge,
+ * added to this file rather than a new one because it needs 18.254's own
+ * "attach note → land on the note page" recipe to get a note with a real
+ * ticket badge on screen. Also UNEXECUTED AT WRITE TIME, for the same
+ * reason as the four above.
  */
 
 /** The seeded board's first ticket, opened at its canonical sheet path. */
@@ -53,6 +61,43 @@ test('18.254 attach note → New note navigates to the note page, and the badge 
   await page.goBack();
   await expect(page.getByTestId('ticket-notes')).toBeVisible({ timeout: 20_000 });
   await expect(page.getByRole('link', { name: 'Compressor log' })).toBeVisible({ timeout: 10_000 });
+});
+
+test('18.330 clicking a note’s ticket badge opens the sheet in place; the URL path stays /notes/<id>', async ({
+  page,
+}) => {
+  await signIn(page, OWNER_EMAIL);
+  const { ticketId } = await openFirstSeededTicket(page);
+
+  // The same recipe 18.254 uses to reach a note with a real ticket badge on
+  // it — this spec's own subject only exists once that badge does.
+  await page.getByTestId('attach-note').click();
+  await page.getByRole('textbox', { name: 'Find a note' }).fill('Ticket-sheet-in-place note');
+  await page.getByRole('option', { name: 'New note: Ticket-sheet-in-place note' }).click();
+  await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
+  const notePath = new URL(page.url()).pathname;
+
+  // POSITIVE CONTROL: the note itself is actually on screen before the
+  // badge under test is touched.
+  await expect(page.getByTestId('note-title')).toHaveText('Ticket-sheet-in-place note');
+  const badge = page.getByRole('link').filter({ hasText: /.+/ }).first();
+  await expect(badge).toBeVisible({ timeout: 10_000 });
+
+  await badge.click();
+
+  // The path is UNCHANGED — this is the whole point: the old behaviour
+  // navigated to `/w/:ws/p/:project?ticket=…`, leaving /notes entirely.
+  await expect(page).toHaveURL(new RegExp(`${notePath}\\?ticket=${ticketId}$`), { timeout: 10_000 });
+  const sheet = page.getByRole('dialog');
+  await expect(sheet).toBeVisible({ timeout: 10_000 });
+  await expect(sheet.getByLabel('Ticket title')).toBeVisible({ timeout: 10_000 });
+  // The note underneath is still mounted, not replaced.
+  await expect(page.getByTestId('note-title')).toHaveText('Ticket-sheet-in-place note');
+
+  // Close returns to the bare note path, sheet gone.
+  await sheet.getByRole('button', { name: 'Close sheet' }).click();
+  await expect(page).toHaveURL(new RegExp(`${notePath}$`), { timeout: 10_000 });
+  await expect(sheet).toBeHidden({ timeout: 10_000 });
 });
 
 test('18.255 × on a note badge detaches it; Undo brings it back', async ({ page }) => {
