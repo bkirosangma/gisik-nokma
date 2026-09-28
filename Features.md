@@ -1649,9 +1649,28 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   supplies neither, so the two composers never borrow each other's advice. Because `TicketEditor` renders the
   hint below the field, it gained `hintSlot?: 'below' | 'none'` (default `'below'`, which leaves every other
   mount identical) so the slot can draw the hint in its own footer without printing it twice.
+
+  **A file can now be ATTACHED, not only pasted or dropped (Unit 5, owner: "I thought we already made
+  the attachment feature but i dont see where we can attach files in our build").** Paste/drop were
+  the only path before this — no button drew anywhere in the web build, though the upload route and
+  `uploadAttachment` prop had existed since Task 12. The footer now draws a paperclip "Attach" button,
+  left of the hint (the prototype's own `attachToComment`, `desktop.dc.html:1314-1330`), gated on
+  `uploadAttachment !== undefined` alone — absent, not disabled, wherever no uploader is wired (the
+  new-ticket description slot). It opens a native file picker and hands the chosen file to the SAME
+  `handleFile` a paste/drop already runs — exported from `attachment-paste.ts` for exactly this, and
+  reached through `TicketEditor`'s new `attachFileRef`, so there is one upload-then-route decision, not
+  two. The `accept` hint names the same eleven mime types `apps/server/src/attachments/sniff.ts`'s
+  `ALLOWED_ATTACHMENT_MIME` accepts — a UX hint only, since the route decides by magic bytes and
+  consults neither it nor the browser's own filter. The ticket sheet's own Attachments tab draws a
+  matching "Attach a file" (the prototype's `addFile`, `:1363-1366`), also gated on `uploadAttachment`
+  and additionally absent over a FAILED attachments read (never a control over an unknown list),
+  uploading through the same two-step `uploadAttachment` → `emitAttachmentAdded` path the sheet's other
+  attachment producers already use. Cases `9.333`–`9.337`.
   `apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx`, `apps/web/app/layout.tsx`,
   `packages/editor/src/components/TicketEditorSlot.tsx`, `packages/editor/src/components/TicketEditor.tsx`,
-  `packages/app-core/src/views/editor-slot.tsx`
+  `packages/editor/src/extensions/attachment-paste.ts`, `packages/editor/src/styles/editor.css`,
+  `packages/app-core/src/views/editor-slot.tsx`, `packages/app-core/src/views/ticket-sheet.tsx`,
+  `packages/ui/src/ui.css`
 - ⚙️ **`ObjectStore`, and where attachment bytes actually live** — a three-verb interface
   (`put`/`getStream`/`delete`) behind which `LocalDiskStore` (dev/test) and `S3ObjectStore`
   (S3-compatible, path-style addressing default `true` so MinIO and R2 work unconfigured) are

@@ -2646,6 +2646,46 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__attachments-error { color: var(--gn-danger); margin: 0; }
 .gn-ticket-sheet__history-empty { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__history-partial { color: var(--gn-text-muted); font-size: 0.8rem; margin: 0 0 0.6rem; }
+/* The Attachments tab's own "Attach a file" (Unit 5(b), owner: "I thought
+   we already made the attachment feature but i dont see where we can
+   attach files in our build") — the prototype's `ctlBg`/`ctlShadow`/
+   `accent` "control button" pairing (`desktop.dc.html:1363-1366`), the same
+   `--gn-fill-tertiary`/`--gn-shadow-raised`/`--gn-text-accent` mapping this
+   file already documents for that exact prototype trio elsewhere. */
+.gn-ticket-sheet__attach-file {
+  align-self: flex-start;
+  margin-top: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0 1.125rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: 0.6; }
+.gn-ticket-sheet__attach-file:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* Visually hidden, not `display:none` — the same clip-path recipe
+   `TicketEditorSlot.tsx`'s disabled-reason span and the Attach button's own
+   hidden input (`editor.css`'s `.editor-slot__attach-input`) already use,
+   so `.click()` still reaches a real, focusable element reliably. */
+.gn-ticket-sheet__attach-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ══ The ticket sheet's `Visibility` section — "Who can see this" (spec §6) ══
 

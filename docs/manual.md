@@ -424,9 +424,12 @@ This is the honest list. Each one is an absence, not a hidden button.
   shipped in a shape that always fails silently (E5-44).
 - **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The job sheet's
-  **Attachments** tab lists the job's files, and the comment box takes one too. The **description** box is still the exception: a file
-  dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
-  puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
+  **Attachments** tab lists the job's files and has its own **Attach a file** button, and the comment
+  box takes one too — paste it, drop it, or press its own paperclip **Attach** button, left of the
+  posting note. The **description** box is still the exception: a file dropped into it is refused
+  rather than quietly lost, and it draws no Attach button either. A move carrying the "require evidence"
+  rule still puts its own file box on the Move dialog and stays blocked until the server has
+  stored the file (§7).
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and type into the title at the top
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.

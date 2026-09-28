@@ -39,7 +39,15 @@ function extractFiles(dataTransfer: { items: ArrayLike<{ kind: string; getAsFile
  * declared type, so a renamed `.exe` cannot talk its way past this branch
  * any more than it can past layer 1 or layer 3.
  */
-async function handleFile(file: File, view: EditorView, options: AttachmentPasteOptions): Promise<void> {
+/**
+ * Exported (Unit 5, owner: "I thought we already made the attachment
+ * feature but i dont see where we can attach files in our build") so the
+ * composer's Attach button — a click, not a paste/drop — can run the exact
+ * same upload-then-route decision paste already does, through `TicketEditor`'s
+ * `attachFileRef` escape hatch. "No second upload path" means this function,
+ * not a parallel one that happens to call the same `uploadAttachment`.
+ */
+export async function handleFile(file: File, view: EditorView, options: AttachmentPasteOptions): Promise<void> {
   // The optimistic placeholder is UI chrome (a chip), never a doc node: a
   // node could ride a submit mid-upload and land an unfinished claim.
   const uploadId = `${Date.now()}-${file.name}`;

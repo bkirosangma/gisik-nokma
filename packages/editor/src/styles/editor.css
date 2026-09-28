@@ -658,6 +658,55 @@
   opacity: 0.7;
 }
 
+/* The Attach button (Unit 5) — the prototype's own raised/quiet coat
+   (`desktop.dc.html:1319`: `background:var(--cardBg);box-shadow:var(
+   --cardShadow);color:var(--accent)`), mapped onto the house tokens
+   `.gn-card` already uses for that exact pair (`--gn-surface-raised`/
+   `--gn-shadow-raised`), with `--gn-text-accent` for the tinted label —
+   NOT `flex: 1`, so it sits left of the hint rather than sharing its half
+   of the row. */
+.editor-slot__attach-wrap {
+  display: inline-flex;
+}
+.editor-slot__attach {
+  display: inline-flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.5rem;
+  padding: 0 0.8rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-weight: 600;
+  font-size: 0.8125rem;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.editor-slot__attach:hover {
+  background: var(--gn-fill-secondary);
+}
+.editor-slot__attach:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* Visually hidden, not `display:none` — the SAME clip-path recipe this
+   file's disabled-reason span already uses, kept a real focusable/clickable
+   element so the visible button's `.click()` call reaches it reliably. */
+.editor-slot__attach-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
+
 /* The note mode's save state (Plan 4 Task 8). It had NO RULE while all three of
    its siblings did — the family was `footer`/`hint`/`submit` declared and
    `footer`/`hint`/`submit`/`save-state` emitted, which the plan-close audit

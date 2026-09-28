@@ -3,7 +3,7 @@ import { EditorContent, useEditor } from '@tiptap/react';
 import type { Editor } from '@tiptap/core';
 import { Extension } from '@tiptap/core';
 import { buildEditorExtensions } from '../schema/extensions.js';
-import { createAttachmentPasteExtension } from '../extensions/attachment-paste.js';
+import { createAttachmentPasteExtension, handleFile, type AttachmentPasteOptions } from '../extensions/attachment-paste.js';
 import type { MentionCandidate } from '../extensions/mention.js';
 import type { NoteLinkCandidate } from '../extensions/wiki-link.js';
 import type { TicketRefCandidate } from '../extensions/ticket-ref.js';
@@ -88,6 +88,16 @@ export type TicketEditorProps = {
    * callers never set it. See that prop's docblock.
    */
   toolbarPlatform?: 'mac' | 'other';
+  /**
+   * The Attach button's escape hatch (Unit 5) — set to a function that runs
+   * `handleFile` (the SAME one `attachmentPaste`'s `handlePaste`/`handleDrop`
+   * call) against this editor's live view, so a click routes through the
+   * identical upload-then-insert-or-list decision a paste does. A ref rather
+   * than a prop callback: the function closes over the editor instance and
+   * `TicketEditorSlot` needs it BEFORE the file is chosen, to wire an
+   * `<input type="file">` it owns.
+   */
+  attachFileRef?: React.MutableRefObject<((file: File) => void) | null>;
 };
 
 export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
@@ -99,6 +109,27 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
   useEffect(() => {
     propsRef.current = props;
   });
+
+  // Extracted from the paste extension's own option literal so the Attach
+  // button (below) can hand the SAME object to `handleFile` — one set of
+  // closures, not two independently-written copies that could drift.
+  const attachmentOptions: AttachmentPasteOptions = useMemo(
+    () => ({
+      uploadAttachment: (file) => propsRef.current.uploadAttachment(file),
+      onAttachmentAdded: (result) => propsRef.current.onAttachmentAdded(result),
+      onFileAttached: (result) => propsRef.current.onFileAttached?.(result),
+      onUploadError: (err) => propsRef.current.onUploadError?.(err),
+      onUploadStart: (id, filename) => setChips((prev) => new Map(prev).set(id, filename)),
+      onUploadEnd: (id) =>
+        setChips((prev) => {
+          const next = new Map(prev);
+          next.delete(id);
+          return next;
+        }),
+      captureFiles: (files) => propsRef.current.captureFiles?.(files) ?? false,
+    }),
+    [],
+  );
 
   const extensions = useMemo(
     () => [
@@ -151,20 +182,7 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         queryTickets: (query) => propsRef.current.queryTickets?.(query) ?? Promise.resolve([]),
         resolveTicketHref: (ref) => propsRef.current.resolveTicketHref?.(ref) ?? null,
       }),
-      createAttachmentPasteExtension({
-        uploadAttachment: (file) => propsRef.current.uploadAttachment(file),
-        onAttachmentAdded: (result) => propsRef.current.onAttachmentAdded(result),
-        onFileAttached: (result) => propsRef.current.onFileAttached?.(result),
-        onUploadError: (err) => propsRef.current.onUploadError?.(err),
-        onUploadStart: (id, filename) => setChips((prev) => new Map(prev).set(id, filename)),
-        onUploadEnd: (id) =>
-          setChips((prev) => {
-            const next = new Map(prev);
-            next.delete(id);
-            return next;
-          }),
-        captureFiles: (files) => propsRef.current.captureFiles?.(files) ?? false,
-      }),
+      createAttachmentPasteExtension(attachmentOptions),
       Extension.create({
         name: 'submitShortcut',
         addKeyboardShortcuts() {
@@ -255,6 +273,18 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
       if (props.editorRef) props.editorRef.current = null;
     };
   }, [editor, props.editorRef]);
+
+  useEffect(() => {
+    if (!props.attachFileRef) return;
+    props.attachFileRef.current = editor
+      ? (file: File) => {
+          void handleFile(file, editor.view, attachmentOptions);
+        }
+      : null;
+    return () => {
+      if (props.attachFileRef) props.attachFileRef.current = null;
+    };
+  }, [editor, props.attachFileRef, attachmentOptions]);
 
   return (
     <div className="ticket-editor">
