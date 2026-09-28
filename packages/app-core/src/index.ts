@@ -377,3 +377,20 @@ export {
   type PasskeysSectionProps,
 } from './account/passkeys-section.js';
 export * from './help/index.js';
+
+// Trash series Plan 4 — the pure half of the trash UI: every string it shows,
+// which events each act sends and in which order, what a batch answer means,
+// and the IST day. The dialog and the Deleted items section (Tasks 4 and 9)
+// are exported beside these by their own tasks.
+export * from './trash/copy.js';
+export {
+  archiveWorkspaceSeeds,
+  deleteSeeds,
+  markSeeds,
+  restoreSeeds,
+  targetOf,
+  unmarkSeeds,
+  type LifecycleTarget,
+} from './trash/seeds.js';
+export { classifyBatch, type BatchOutcome } from './trash/batch.js';
+export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
