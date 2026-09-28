@@ -1282,7 +1282,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "With no connection the section says it needs one, rather than showing an empty list."
+                    "text": "If the list cannot be read, the section says so, rather than showing an empty list."
                   }
                 ]
               }
@@ -8123,7 +8123,39 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, "
+                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Redo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Heading level"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link, Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
                   },
                   {
                     "kind": "bold",
@@ -8139,7 +8171,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. "
+                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. Undo and Redo grey out when there is nothing to step back or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link. "
                   },
                   {
                     "kind": "bold",
@@ -8188,6 +8220,64 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you want, the label reads, for example, \"2 × 3 table\", then click (or press Enter) to insert it with a header row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is inside a table, because a table cannot be placed inside another."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Editing a link."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Click into any link's text and a small panel opens beside it with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "URL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Text"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shortcut (web, email and phone addresses only) and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unlink"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Enter or clicking away keeps a change, Escape puts it back. An empty URL, or Unlink, takes the link off and keeps the words; an empty Text deletes the link. Ctrl-K (Cmd-K on a Mac) with the cursor in a link jumps straight into the URL field. The panel appears only for the box you are typing in."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "Notes save themselves."
                   },
                   {
@@ -8217,6 +8307,43 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " until it goes through. Leaving the note, switching away, or closing the tab all flush a change in progress rather than dropping it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Reopening a note after an unsaved session shows a banner."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " If a note opens with words that never reached the server, a bar above the text reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restored unsaved changes from 5m ago."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to carry on with them (they save as usual), or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to throw them away and load the note as the server has it. Discard cannot be undone. Only people who can edit the note see the bar."
                   }
                 ]
               },
@@ -8258,7 +8385,49 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen."
+                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen. The heading you jump to lands just under the top bar, not behind it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Every heading in a note can be linked to."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Hover a heading (on a phone or tablet the small link icon is always there, faintly) and press the link icon at the end of it — or Tab to it and press Enter — to copy a link to that exact heading. Paste it anywhere; whoever opens it lands on that heading, provided they can read the note. The icon appears on all six heading levels, and if two headings read the same the second gets a "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-2"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the end of its link, the third "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-3"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Only the note page has this; the comment box and the job sheet do not."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A thin line under the top bar shows how far down a note you have read."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It fills from the left as you scroll the note (the title and byline above the text do not count) and starts again at empty when you open another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops animating if your device is set to reduce motion."
                   }
                 ]
               }
@@ -10972,6 +11141,76 @@ export const HELP_CONTENT: HelpContent = [
                 ]
               }
             ]
+          },
+          {
+            "id": "how-do-i-change-a-link-i-already-wrote-its-address-its-words",
+            "title": "How do I change a link I already wrote — its address, its words, or take it off?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Click into the link's text. A small panel appears next to it with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "URL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Text"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shortcut for web, email and phone addresses, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unlink"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Change either field and press Enter (or click away) to keep the change; press Escape to put it back. Clearing the URL, or pressing Unlink, removes the link and leaves the words; clearing the Text deletes the link. From the keyboard, press Ctrl-K (Cmd-K on a Mac) with the cursor in a link to jump into the URL field. It only shows in the box you are typing in, and never in a box you can only read."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-put-a-table-in-a-note-or-a-comment",
+            "title": "How do I put a table in a note or a comment?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Use "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the formatting strip: an eight-by-eight grid opens, move over it (or use the arrow keys) until the label reads the size you want — \"2 × 3 table\" — then click, or press Enter. The first row is a header row. Escape closes the grid without inserting. The tool is greyed out while your cursor is already inside a table, because a table cannot go inside another one."
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -10998,6 +11237,91 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " in the nav, left of Inbox."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-is-the-thin-line-at-the-top-of-a-note",
+            "title": "What is the thin line at the top of a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A reading-progress bar: it fills from the left as you scroll down the note, so you can see how far through a long one you are. It measures the text of the note only (not the title or byline above it), starts over when you open another note, and is there whether or not you can edit the note. If your device is set to reduce motion it moves without the smoothing."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-link-to-one-heading-in-a-note",
+            "title": "How do I link to one heading in a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Hover the heading and press the small link icon at its end (Tab to it and press Enter with the keyboard; on a touch screen the icon is always visible). That copies a link ending in "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "#"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the heading's name, and opening it scrolls straight to the heading. It works on all six heading levels. Two headings with the same words get "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-2"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-3"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and so on, in the order they appear — so a link can point at the wrong one if you rearrange headings that share a name. The person you send it to still needs access to the note."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-does-my-note-open-with-a-bar-saying-restored-unsaved-cha",
+            "title": "Why does my note open with a bar saying \"Restored unsaved changes\"?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Last time you had it open, some of what you typed never reached the server (you lost the connection, or closed the tab first), so it was kept on your device and is showing now. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " carries on with those words; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " deletes them and shows the note as the server has it, which cannot be undone. The bar is only shown to people who can edit the note."
                   }
                 ]
               }
@@ -11236,7 +11560,15 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in either brings it back exactly as it was."
+                    "text": " in either brings it back exactly as it was; a note marked for permanent deletion has to be unmarked first, with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items."
                   }
                 ]
               }

@@ -183,4 +183,25 @@ describe('19.251–19.256 Account → Deleted items', () => {
     await act(async () => answer());
     expect(await within(rowOf('tkt1')).findByRole('alert')).toHaveTextContent(reason);
   });
+
+  it('19.256 a press while the re-read after a committed act is still in flight posts nothing', async () => {
+    let releaseRead: () => void = () => undefined;
+    let reads = 0;
+    const source = createFakeDataSource({
+      getDeletedItems: async () => {
+        reads += 1;
+        if (reads > 1) await new Promise<void>((resolve) => { releaseRead = resolve; });
+        return [TICKET_ROW];
+      },
+    });
+    render(<DeletedItemsSection dataSource={source} currentUserId={ME} now={() => NOW} />);
+    const mark = await screen.findByRole('button', { name: markItemName(TICKET_ROW.label) });
+    fireEvent.click(mark);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    await waitFor(() => expect(reads).toBe(2));
+    // The ingest has answered; the row is still drawn from the old read.
+    fireEvent.click(screen.getByRole('button', { name: markItemName(TICKET_ROW.label) }));
+    expect(source.ingested).toHaveLength(1);
+    await act(async () => releaseRead());
+  });
 });

@@ -227,7 +227,7 @@ they come back with it, and are not listed separately.
 - Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing
   is already under way.
 
-With no connection the section says it needs one, rather than showing an empty list.
+If the list cannot be read, the section says so, rather than showing an empty list.
 
 ---
 

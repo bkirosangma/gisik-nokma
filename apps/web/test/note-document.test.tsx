@@ -876,7 +876,10 @@ describe('9.422 the draft-restore banner', () => {
     renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
     await waitFor(() => expect(slotProps().readOnly).toBe(true));
     expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+});
 
+/**
  * Trash series Plan 4, Task 6. Cases 19.236–19.239 (`test-cases/19-trash.md`
  * §19.24). The note page's Delete door (D2) and the banner's Restore (the
  * silent `write` it used could not show `UNMARK_FIRST_REASON`).
@@ -909,12 +912,13 @@ describe('19.236–19.239 the note page deletes, and restores what it deleted', 
       });
       return answer;
     };
-    render(
+    const tree = (noteId: string) => (
       <Providers services={services}>
-        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
-      </Providers>,
+        <NoteDocument noteId={noteId} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
+      </Providers>
     );
-    return { batches };
+    const view = render(tree(NOTE));
+    return { batches, services, show: (noteId: string) => view.rerender(tree(noteId)) };
   }
   const types = (batch: SubmittedEvent[] | undefined) => (batch ?? []).map((event) => event.type);
   const TITLE = 'Delete note “Compressor log”?';
@@ -996,5 +1000,23 @@ describe('19.236–19.239 the note page deletes, and restores what it deleted', 
     const okBanner = await screen.findByTestId('note-deleted-banner');
     await userEvent.click(within(okBanner).getByRole('button', { name: 'Restore' }));
     await waitFor(() => expect(screen.queryByTestId('note-deleted-banner')).toBeNull());
+  });
+
+  it('19.238 opening another note starts clean — a permanent delete here is not remembered for the next note', async () => {
+    const OTHER = '01J9NOTEOTHER0000000000000';
+    const first = mountLive();
+    const getNote = first.services.dataSource.query.getNote;
+    first.services.dataSource.query.getNote = async (ws: string, id: string) =>
+      id === OTHER ? noteDetail({ noteId: OTHER, deleted: true }) : getNote(ws, id);
+    await deleteFromByline(true);
+    await screen.findByTestId('note-deleted-banner');
+    expect(types(first.batches[0])).toEqual(['note.deleted', 'purge.marked']);
+
+    first.show(OTHER);
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(first.batches).toHaveLength(2));
+    // The other note was never marked here: no unmark in front of the restore.
+    expect(types(first.batches[1])).toEqual(['note.restored']);
   });
 });

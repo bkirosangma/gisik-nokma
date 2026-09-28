@@ -1,6 +1,6 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   TicketEditorSlot,
@@ -94,7 +94,7 @@ type Placement = { ticketId: string; projectId: string | null; notice: string | 
  * draws the same frozen sentence My Work draws, for the same reason: a 404
  * that could mean "gone" or "not yours" must not guess which.
  */
-export function NoteDocument({
+function NoteDocumentBody({
   noteId,
   workspaces,
   editorRootRef,
@@ -780,6 +780,17 @@ export function NoteDocument({
       ) : null}
     </div>
   );
+}
+
+/**
+ * `NoteDocumentBody` keyed by the note. Its Delete dialog, its
+ * "deleted here on purpose" memory and a refused Restore's sentence belong to
+ * ONE note; a route change to another note (browser Back included) must not
+ * carry them over — the dialog would delete the new note, and a Restore would
+ * send an unmark the new note was never given.
+ */
+export function NoteDocument(props: ComponentProps<typeof NoteDocumentBody>) {
+  return <NoteDocumentBody key={props.noteId} {...props} />;
 }
 
 /**

@@ -81,8 +81,8 @@ export function DeletedItemsSection({
   // is refused before React re-renders `disabled`.
   const busyRef = useRef<string | null>(null);
 
-  const reload = useCallback(() => {
-    dataSource.query.getDeletedItems().then(
+  const reload = useCallback((): Promise<void> => {
+    return dataSource.query.getDeletedItems().then(
       (items) => setLoad({ at: 'ready', items }),
       (cause: unknown) => {
         if (cause instanceof Error && cause.name === 'ReplicaGapError') setLoad({ at: 'offline' });
@@ -91,7 +91,9 @@ export function DeletedItemsSection({
     );
   }, [dataSource]);
 
-  useEffect(() => reload(), [reload]);
+  useEffect(() => {
+    void reload();
+  }, [reload]);
 
   const act = async (item: DeletedItem, seeds: EnvelopeSeed[]): Promise<void> => {
     if (busyRef.current !== null) return;
@@ -108,8 +110,9 @@ export function DeletedItemsSection({
         setNotice({ id: item.id, text: outcome.reason, className: 'gn-refusal gn-refusal--server' });
       }
       // Re-read on every answer: a committed act moved the row, and a refused
-      // or half-committed one may have changed the world under it.
-      reload();
+      // or half-committed one may have changed the world under it. Awaited, so
+      // the latch outlasts the window where the old row is still drawn.
+      await reload();
     } catch (cause) {
       const text = writeFailureCopy(cause, changeUnreachableLine);
       setNotice({ id: item.id, text, className: writeFailureRefusalClass(text) });

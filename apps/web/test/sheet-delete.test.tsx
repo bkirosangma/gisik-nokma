@@ -484,7 +484,7 @@ describe('19.233–19.234 the Undo after a PERMANENT delete unmarks first', () =
     // CONTROL — not the soft sentence.
     expect(screen.queryByText(ticketDeletedToast(TITLE, false))).toBeNull();
 
-    await userEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    await userEvent.click(toastUndo());
     await waitFor(() => expect(ingested).toHaveLength(2));
     expect(types(ingested[1])).toEqual(['purge.unmarked', 'ticket.restored']);
     expect(ingested[1]!.every((event) => event.entity.kind === 'ticket' && event.entity.id === TICKET)).toBe(true);

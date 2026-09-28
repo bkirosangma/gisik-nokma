@@ -621,7 +621,7 @@ the product owner is still deciding.
 **Can I delete a note?**
 Yes — open it and press **Delete…** beside **History** (its author, a workspace admin or the owner).
 It goes to the **Deleted** group on the Notes page and to **Deleted items** on your Account page, and
-**Restore** in either brings it back exactly as it was.
+**Restore** in either brings it back exactly as it was; a note marked for permanent deletion has to be unmarked first, with **Unmark** in Deleted items.
 
 **What happens if someone stops sharing a note with me while I have it open?**
 You are taken back to the Notes list with a message: "That note is no longer shared with you".
