@@ -2,6 +2,7 @@ import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
 import { describe, expect, it } from 'vitest';
 import { parse as parseYaml } from 'yaml';
+import { requireExplicitObjectStore } from '../../src/purge/sweep.js';
 
 /**
  * Trash series Plan 2, deviation D5 — the purge deletes attachment objects
@@ -32,5 +33,15 @@ describe('19.150 the backup worker reaches the real attachment store', () => {
     // CONTROL — the same bucket as the server's attachments, and not the backup bucket.
     expect(server['OBJECT_STORE_S3_BUCKET']).toBe(worker['OBJECT_STORE_S3_BUCKET']);
     expect(worker['BACKUP_S3_BUCKET']).not.toBe(worker['OBJECT_STORE_S3_BUCKET']);
+  });
+});
+
+describe('19.150 the purge job fails closed on the local-disk fallback', () => {
+  it('refuses to run when OBJECT_STORE is unset or empty, and accepts an explicit store', () => {
+    expect(() => requireExplicitObjectStore({})).toThrow(/OBJECT_STORE/);
+    expect(() => requireExplicitObjectStore({ OBJECT_STORE: '' })).toThrow(/OBJECT_STORE/);
+    // CONTROL — an explicit choice, either kind, passes.
+    expect(() => requireExplicitObjectStore({ OBJECT_STORE: 's3' })).not.toThrow();
+    expect(() => requireExplicitObjectStore({ OBJECT_STORE: 'local' })).not.toThrow();
   });
 });

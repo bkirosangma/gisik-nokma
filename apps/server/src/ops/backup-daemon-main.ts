@@ -10,7 +10,7 @@ import { ConfigError } from '../config.js';
 import { createPool } from '../db.js';
 import { createIngestService } from '../ingest/ingest-service.js';
 import { runNotificationSweep } from '../notifications/sweep.js';
-import { runPurgeSweep } from '../purge/sweep.js';
+import { requireExplicitObjectStore, runPurgeSweep } from '../purge/sweep.js';
 import { buildProjectionRegistry } from '../projections/index.js';
 import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
@@ -290,6 +290,7 @@ async function main(): Promise<void> {
       run: async (): Promise<void> => {
         // `store` is the attachment store built above — which is why the worker
         // needs OBJECT_STORE=s3 in production (deploy/do/app.yaml, D5).
+        requireExplicitObjectStore(process.env);
         const report = await runPurgeSweep({ pool, projections, store, alerter });
         console.log(JSON.stringify({ msg: 'purge sweep complete', ...report }));
       },

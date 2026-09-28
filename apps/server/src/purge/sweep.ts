@@ -68,6 +68,24 @@ export async function dueCandidates(pool: Pool, now: Date): Promise<PurgeTarget[
     .map((row) => ({ kind: row.kind, id: row.id }));
 }
 
+/**
+ * Fail closed (whole-branch review). `createObjectStoreFromEnv` falls back to a
+ * LocalDiskStore when `OBJECT_STORE` is unset, and `LocalDiskStore.delete`
+ * never throws for a missing file — so on a worker whose spec was not applied,
+ * every purge would "delete" its attachment keys from an empty local folder,
+ * drain the queue, and leave the real objects in the bucket with no record.
+ * The scheduled job therefore refuses to run until the store is chosen
+ * explicitly; the failure alerts through the scheduler's `onFailure`.
+ */
+export function requireExplicitObjectStore(env: NodeJS.ProcessEnv): void {
+  const { OBJECT_STORE } = env;
+  if (OBJECT_STORE === undefined || OBJECT_STORE.trim() === '') {
+    throw new Error(
+      'purge sweep refused: OBJECT_STORE is not set, so attachment deletes would go to a local folder. Apply deploy/do/app.yaml (docs/runbook.md, "Permanent-delete sweep").',
+    );
+  }
+}
+
 export async function runPurgeSweep(deps: PurgeSweepDeps): Promise<PurgeSweepReport> {
   const log = deps.log ?? ((message: string, error?: unknown) => console.error(message, error));
   const now = deps.now === undefined ? new Date() : deps.now();

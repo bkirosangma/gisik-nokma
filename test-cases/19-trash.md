@@ -164,7 +164,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.147 — an object left queued by a failed delete is retried by every sweep: a still-failing store leaves it queued with `attempts` incremented, a working one deletes it and empties the queue;** control: before any sweep the key is queued with `attempts = 1`. Mutation: in `deletePendingObjects`, delete the queue row before calling `store.delete`.
 - ✅ **19.148 — a marked item is not a candidate one millisecond before `purgeDueAt(mark)` and is one at exactly that instant;** control: the second run purges it. Mutation: filter with `<` instead of `<=`.
 - ✅ **19.149 — the daemon refuses `PURGE_SWEEP_INTERVAL_MS=0` before arming any job, naming the variable;** control: with `3600000` it arms and announces itself. Mutation: remove the `requirePositiveIntervalMs` call from the `purge` job's `delayMs`.
-- ✅ **19.150 — the deploy spec's `backup` worker declares `OBJECT_STORE=s3` and `OBJECT_STORE_S3_BUCKET=gisik-nokma-attachments`;** control: that is the bucket the `server` service writes attachments to, and it differs from `BACKUP_S3_BUCKET`. Mutation: delete the worker's `OBJECT_STORE` entry.
+- ✅ **19.150 — the deploy spec's `backup` worker declares `OBJECT_STORE=s3` and `OBJECT_STORE_S3_BUCKET=gisik-nokma-attachments`;** control: that is the bucket the `server` service writes attachments to, and it differs from `BACKUP_S3_BUCKET`. Mutation: delete the worker's `OBJECT_STORE` entry. Whole-branch review addition: the scheduled `purge` job also refuses to run unless `OBJECT_STORE` is set explicitly (`requireExplicitObjectStore`, fail closed on the local-disk fallback); control: `s3` and `local` pass. Mutation: neutralise the check.
 - ✅ **19.151 — an item already in `purged_entities` is never a candidate, even if its lifecycle row still says it is due;** control: a second due item in the same sweep is a candidate and is purged. Mutation: drop the `NOT EXISTS (… purged_entities …)` filter from the candidate query.
 
 ## 19.18 Backup retention
@@ -176,3 +176,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.157 — `BACKUP_RETENTION_DAYS` defaults to 30 when unset or empty, accepts `45`, and throws naming the variable for `abc`, `0`, `-3` and `1.5`;** control: the default. Mutation: parse with `Number.parseInt` (accepts `1.5` as 1).
 - ✅ **19.158 — `runThenPrune` prunes only after the job succeeds; a prune that throws or reports errors alerts `backup:prune-after-<job>` and resolves;** control: a failing job rejects and the prune is never called. Mutation: rethrow the prune's error.
 - ✅ **19.159 — the daemon refuses `BACKUP_RETENTION_DAYS=abc` before arming any job, naming the variable;** control: with `30` it arms and announces itself. Mutation: move the `backupRetentionDaysFromEnv` call inside the prune closure (read lazily).
+
+## 19.19 Whole-branch review fixes
+
+- ✅ **19.160 — a purge that lands while the embed worker is mid-call is not undone: the worker writes no chunk for the erased note, and a chunk row whose note no longer exists is removed by the next pass;** control: the live note beside it is embedded. Mutation: drop the worker's `FOR SHARE` re-check (the racing INSERT survives), or restore the join-based cleanup (the orphan survives).
