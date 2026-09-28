@@ -1549,6 +1549,9 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 - ✅ **Reading extras for long documents** — word count, reading time (200 wpm, floored at a
   minute for any non-empty text) and a table of contents that renders at three headings or more.
   `packages/editor/src/reading/reading-meta.ts`, `ReadingTOC.tsx`
+  - ✅ **H4–H6 are skinned** (KB `prose.css`, adapted) — the editor skin used to style H1–H3 only, so a deeper
+    heading fell back to browser defaults (an H6 smaller than body text). Now a descending ladder down to
+    `0.875rem`, H6 in `--gn-text-muted` (`apps/web/app/globals.css`, cases 9.431–9.432).
   - ✅ **Reading progress bar, and the reading surface's scroller is resolved, not assumed** (KB
     `ReadingProgress`; audit of the ported `ReadingTOC`) — a 3px labelled `progressbar` under the sticky nav,
     `transform: scaleX` from the left, driven by the note surface's position (the source's `scrollTop` would

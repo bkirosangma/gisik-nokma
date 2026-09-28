@@ -565,3 +565,5 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.428 — `relativeTime` says "just now" under 5 s, then seconds, minutes, hours and days at each boundary, and never reads negative for a clock ahead of this one.** (`apps/web/test/draft-restore-banner.test.tsx`)
 - ✅ **9.429 — the banner's rule in `globals.css` uses `--gn-accent` and no hex, `rgb()` or `hsl()` literal.** (`apps/web/test/draft-restore-banner.test.tsx`)
 - 🧪 **9.430 — browser: type in a note, kill the network, reload — the note opens with the banner in both themes, the accent stripe and both buttons legible, Keep and Discard reachable by Tab and their focus ring visible.**
+- ✅ **9.431 — the editor skin styles all six heading levels: sizes never grow going down and step through more than three values, none is below `0.875rem`, H6 is `--gn-text-muted`, and H4–H6 use no colour literal.** (`apps/web/test/draft-restore-banner.test.tsx`)
+- 🧪 **9.432 — browser, light AND dark: a note holding one heading of each level H1–H6 reads as a descending ladder, H4–H6 distinguishable from body text by weight, and a heading that wraps onto two lines keeps its line height.**

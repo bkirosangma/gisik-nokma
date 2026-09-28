@@ -27,3 +27,30 @@ describe('9.428 the draft-restore banner helpers', () => {
     expect(rule).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i);
   });
 });
+
+describe('9.431 H4–H6 in the editor skin', () => {
+  const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8');
+  const rule = (selector: string): string => {
+    const start = css.indexOf(`${selector} {`);
+    expect(start, `no rule for ${selector}`).toBeGreaterThan(-1);
+    return css.slice(start, css.indexOf('}', start));
+  };
+  const size = (selector: string): number => {
+    const match = /font-size:\s*([0-9.]+)rem/.exec(rule(selector));
+    expect(match, `${selector} has no rem font-size`).not.toBeNull();
+    return Number(match![1]);
+  };
+
+  it('9.431 every heading level has a rule, sizes never grow going down, none is below 0.875rem, and only tokens colour them', () => {
+    const sizes = ['h1', 'h2', 'h3', 'h4', 'h5', 'h6'].map((tag) => size(`.ticket-editor__content ${tag}`));
+    for (let i = 1; i < sizes.length; i += 1) expect(sizes[i]!).toBeLessThanOrEqual(sizes[i - 1]!);
+    expect(Math.min(...sizes)).toBeGreaterThanOrEqual(0.875);
+    // CONTROL: the ladder is strictly decreasing somewhere, so a flat copy-paste would not pass as "never grows".
+    expect(new Set(sizes).size).toBeGreaterThan(3);
+    const h6 = rule('.ticket-editor__content h6');
+    expect(h6).toContain('var(--gn-text-muted)');
+    for (const tag of ['h4', 'h5', 'h6']) {
+      expect(rule(`.ticket-editor__content ${tag}`)).not.toMatch(/#[0-9a-f]{3,8}\b|rgb\(|hsl\(/i);
+    }
+  });
+});
