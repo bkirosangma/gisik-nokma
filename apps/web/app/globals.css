@@ -4151,3 +4151,29 @@ input, textarea, select { font-family: inherit; }
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
+
+
+/* ══ trash-4-ui: begin ═══════════════════════════════════════════════════
+   Trash series Plan 4 — the delete dialog, the workspace card's menu and
+   Archived group, and Account → Deleted items. EVERY rule this plan adds lives
+   between this line and the matching end marker, so a merge with another lane's
+   globals.css edit is a pure append and `apps/web/test/trash-css.test.ts`
+   (case 19.258) can check the block as one unit. Tokens only — no colour
+   literal (`packages/ui/test/token-discipline.test.ts`). */
+
+/* The confirm's column: 16px rhythm between the name field, the switch, the
+   note and the action row (ui-ux-pro-max: group related, separate distinct).
+   `max-width` keeps the note at a readable measure inside the shared panel. */
+.gn-delete-dialog { display: flex; flex-direction: column; gap: 1rem; max-width: 32rem; }
+.gn-delete-dialog__name { display: flex; flex-direction: column; gap: 0.375rem; }
+.gn-delete-dialog__switch { align-self: flex-start; }
+/* The note is always visible and is the dialog's accessible description; muted,
+   never subtle (`--gn-text-muted` is the contrast-gated secondary ink). */
+.gn-delete-dialog__note { margin: 0; color: var(--gn-text-muted); font-size: 0.875rem; line-height: 1.5; }
+.gn-delete-dialog > .gn-refusal { margin: 0; }
+/* Cancel first, the destructive confirm last and rightmost; 12px apart and 44px
+   tall so neither is a near-miss for the other on touch. */
+.gn-delete-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
+.gn-delete-dialog__actions .gn-button { min-height: 2.75rem; padding-inline: 1rem; }
+
+/* ══ trash-4-ui: end ══ */

@@ -394,3 +394,5 @@ export {
 } from './trash/seeds.js';
 export { classifyBatch, type BatchOutcome } from './trash/batch.js';
 export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
+
+export { DeleteDialog, type DeleteDialogProps } from './views/delete-dialog.js';
