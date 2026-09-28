@@ -4176,4 +4176,8 @@ input, textarea, select { font-family: inherit; }
 .gn-delete-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
 .gn-delete-dialog__actions .gn-button { min-height: 2.75rem; padding-inline: 1rem; }
 
+/* The card pages' "where it went" line after a delete (spec §6.3's route back
+   named at the moment it matters). Plain text ink, never a tint. */
+.gn-trash-notice { margin: 0.75rem 0 0; color: var(--gn-text); }
+
 /* ══ trash-4-ui: end ══ */

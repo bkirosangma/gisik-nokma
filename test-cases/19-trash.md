@@ -137,3 +137,9 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.237 — **Delete…** opens `Delete note “<title>”?`; confirming with the switch on posts ONE batch `[note.deleted, purge.marked]` for this note, and the page then shows the deleted banner;** control: switch off posts `[note.deleted]` alone. Mutation: send the batch against `kind: 'ticket'`.
 - ✅ **19.238 — after a permanent delete made on this page, the banner's **Restore** posts ONE batch `[purge.unmarked, note.restored]`;** control: after a soft delete it posts `[note.restored]` alone. Mutation: always restore with `note.restored` alone.
 - ✅ **19.239 — a refused banner Restore shows the server's reason in the banner (`role="alert"`), and the banner stays;** control: a committed Restore removes the banner. Mutation: return on refusal without setting the message (the old silent `write`).
+
+## 19.25 Project delete on the workspace home
+
+- ✅ **19.241 — an admin's project card shows **Delete…** (accessible name `Delete <project>`) beside **Archive**;** control: a member's card shows neither. Mutation: render Delete… for every role.
+- ✅ **19.242 — **Delete…** opens `Delete project “<name>”?`; confirming posts ONE batch `[project.deleted]` (with the switch on, `[project.deleted, purge.marked]`) against the project, the page re-reads, and a status line names the project and Deleted items;** control: Cancel posts nothing and leaves the card. Mutation: send `project.archived`.
+- ✅ **19.243 — an ARCHIVED project card (behind the archived toggle) also offers **Delete…**;** control: its Archive control reads **Restore**, unchanged. Mutation: render Delete… only on live cards.
