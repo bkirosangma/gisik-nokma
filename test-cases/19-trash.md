@@ -85,3 +85,9 @@ the number you added — an unchanged count has reported a clean sweep over case
 
 - ✅ **19.070 — the online twin maps every `DeletedItem` field and refuses a row missing `purgeDueAt`;** control: a full row round-trips. Mutation: default a missing `purgeDueAt` to null.
 - ✅ **19.071 — the replica twin rejects with `ReplicaGapError`;** control: `getMyWorkspaces` on the same replica resolves. Mutation: resolve `[]` (an empty list would tell a person they have nothing deleted, when nobody was asked).
+
+## 19.9 Purge — every table has a rule
+
+- ✅ **19.081 — every base table carrying an entity column (`workspace_id`, `project_id`, `ticket_id`, `note_id`, `entity_id`, `parent_id`, `home_project_id`, `parent_ticket_id`) has an entry in `PURGE_TABLE_RULES`;** control: the same check run against the rules minus `proj_search` names exactly `proj_search`. Mutation: delete the `proj_search` entry — the case reddens naming it.
+- ✅ **19.082 — every rule names a table that exists, and every `by` column exists on its table;** control: a rule for a fictitious `proj_gone`, and a `by` of `proj_tickets.ticket_idx`, are each named. Mutation: add `proj_gone: { rule: 'erase', by: ['workspace_id'], why: '…' }`.
+- ✅ **19.083 — every base table except `pgmigrations` has a rule, and no entity-bearing table is labelled `not-entity-bearing`;** control: relabelling `proj_tickets` `not-entity-bearing` is named. Mutation: relabel `attachments` `not-entity-bearing`.
