@@ -1694,6 +1694,17 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   blank name never offered. Announces its result count politely to a screen reader and hands the
   editor's ARIA role back on exit; nothing in the popup is tabbable.
   `packages/editor/src/extensions/mention-popup.ts`, `packages/editor/src/styles/editor.css`
+- ✅ **Clicking a mention in an editable editor reopens the picker to replace it** (owner, 2026-09-29) —
+  a plain click, or Enter/Space on a node-selected chip, opens the SAME popup anchored under the chip
+  with the full list (`queryUsers('')`) and the current person highlighted; choosing someone else
+  replaces the node in ONE transaction (one undo restores the old mention), choosing the same person
+  is a no-op, Escape or a click elsewhere leaves it unchanged. Read-only renderings never open it.
+  Every host gets it through the one `Mention` extension (ticket description and comments, note body
+  and comments, the mobile webview). Notifications are unchanged code: the server fans `mention` out
+  from the doc a save carries (`extractMentionedUserIds`, ticket comments and descriptions only), so
+  the NEW person is notified on the next save, the REMOVED person is simply no longer in the doc,
+  and a notification already sent is not retracted.
+  `packages/editor/src/extensions/mention-replace.ts`
 - ⚙️ **Embeddable-image vocabulary** — `EMBEDDABLE_IMAGE_MIME`, `isEmbeddableImageMime(mime)`,
   `collectImageAttachmentIds(doc)`: one definition of which attachments a document may embed, and a
   walker that survives whatever a hostile document hands it. `packages/domain/src/doc-embeds.ts`
