@@ -521,7 +521,8 @@ describe('13.390 the card is a door to /w/<id>', () => {
       workspace({
         id: 'ws1',
         name: 'Convenience Corner',
-        role: 'owner',
+        // Admin, not owner: an owner's card also has the overflow trigger (19.245, trash Plan 4); every other role's card has zero buttons.
+        role: 'admin',
         memberCount: 3,
         projects: [
           project({ id: 'p1', name: 'Shop operations', ticketCount: 2, blockedCount: 0 }),

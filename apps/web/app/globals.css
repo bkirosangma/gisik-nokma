@@ -4180,4 +4180,63 @@ input, textarea, select { font-family: inherit; }
    named at the moment it matters). Plain text ink, never a tint. */
 .gn-trash-notice { margin: 0.75rem 0 0; color: var(--gn-text); }
 
+/* The workspace card's overflow menu (spec §6.2) — AccountMenu's recipe placed
+   on a card. The anchor is the card itself (`--menu`), and the head gives way so
+   a long name never runs under the trigger. */
+.gn-workspace-card--menu { position: relative; }
+.gn-workspace-card--menu .gn-workspace-card__head { padding-right: 2.75rem; }
+.gn-card-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; }
+/* 44px, round, ink-muted until hovered — a quiet control on an informational card. */
+.gn-card-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-card-menu__trigger:hover:not(:disabled) { background: var(--gn-fill-tertiary); color: var(--gn-text); }
+.gn-card-menu__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-card-menu__trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.gn-card-menu__list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.375rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+}
+/* Items in plain text ink, deliberately NOT `--gn-danger` for Delete…: danger text
+   on a raised surface measured 4.29:1 (`sessions-section.tsx`'s own record),
+   under the 4.5 body text owes. The destructive colour lives on the dialog's
+   solid confirm, where it passes. */
+.gn-card-menu__item {
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-card-menu__item:hover,
+.gn-card-menu__item:focus-visible { background: var(--gn-fill-tertiary); outline: none; }
+.gn-card-menu__item:focus-visible { box-shadow: inset 0 0 0 2px var(--gn-focus-ring); }
+/* Archived workspaces: the project card's own dimming (`.gn-project-card--archived`,
+   0.72) so "retired" looks the same wherever it appears. */
+.gn-workspace-card--archived .gn-workspace-card__door { opacity: 0.72; }
+.gn-workspaces__archived { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; margin-top: 1.5rem; }
+.gn-workspaces__archived-heading { margin: 0; font-size: 1rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-workspace-list--archived { width: 100%; }
+
 /* ══ trash-4-ui: end ══ */

@@ -1083,6 +1083,64 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": ". There is nothing per-project to click there; the project list is one click further in, on the workspace's own page."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "If you own a workspace, its card has a menu"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "⋯"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button in its corner): "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Archive"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " moves the workspace into an "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Archived"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " group below the others — collapsed until you open it — without taking anyone's access away, and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " there brings it back. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete…"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks you to type the workspace's name first, because it removes the workspace from every member at once; it then sits under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Deleted items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on your Account page until you restore it. Nobody but the owner sees the menu."
+                    }
                   ]
                 ]
               },

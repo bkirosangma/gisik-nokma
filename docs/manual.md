@@ -193,6 +193,11 @@ count and — once it has any projects — a line naming them.
   heading and is in fact the door.
 - The projects on the card are a **line of text, not links**. There is nothing per-project to click
   there; the project list is one click further in, on the workspace's own page.
+- **If you own a workspace, its card has a menu** (the **⋯** button in its corner): **Archive** moves
+  the workspace into an **Archived** group below the others — collapsed until you open it — without
+  taking anyone's access away, and **Restore** there brings it back. **Delete…** asks you to type the
+  workspace's name first, because it removes the workspace from every member at once; it then sits
+  under **Deleted items** on your Account page until you restore it. Nobody but the owner sees the menu.
 
 If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
 — or create your own."* Both of those are real options.
