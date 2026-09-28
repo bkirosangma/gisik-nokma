@@ -1,8 +1,8 @@
 import { evaluateEvent } from '@gisik-nokma/rule-engine';
-import type { EventEnvelope, LedgerEvent, SubmittedEvent, TicketState } from '@gisik-nokma/domain';
+import { PURGE_RULE, type EventEnvelope, type LedgerEvent, type SubmittedEvent, type TicketState } from '@gisik-nokma/domain';
 import type { SqlRow, SyncStorage } from '../storage/storage.js';
 import type { Replica } from '../replica/replica.js';
-import { deleteNotice, listNotices, type SyncNotice } from './notices.js';
+import { deleteNotice, dropOutboxRowsAsNotices, listNotices, type SyncNotice } from './notices.js';
 import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } from '../precheck/local-context.js';
 
 /**
@@ -136,6 +136,8 @@ export type OutboxItem = {
   envelope: SubmittedEvent;
   attempts: number;
   status: 'queued' | 'failed';
+  /** The server's words when a claim was refused or invalid (`rule: reason`), or the last transport error. */
+  lastError: string | null;
 };
 
 /**
@@ -198,6 +200,8 @@ export type Outbox = {
   recordFailure(eventIds: string[], error: string, now?: () => Date): Promise<void>;
   queuedCount(workspaceId: string): Promise<number>;
   failedItems(workspaceId: string): Promise<OutboxItem[]>;
+  /** The person has read a refused claim's reason and lets it go. Only a FAILED row is deleted. */
+  dismissFailed(eventId: string): Promise<void>;
   /** Claims removed because their item was permanently erased (trash Plan 3), oldest first. */
   notices(workspaceId: string): Promise<SyncNotice[]>;
   /** The person has read it. */
@@ -216,6 +220,7 @@ function rowToItem(row: SqlRow): OutboxItem {
     envelope: JSON.parse(row.envelope as string) as SubmittedEvent,
     attempts: Number(row.attempts),
     status: row.status as 'queued' | 'failed',
+    lastError: (row.last_error as string | null) ?? null,
   };
 }
 
@@ -453,6 +458,22 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
         return;
       }
 
+      // Trash Plan 3 (D6): refused because the item was permanently erased. It
+      // can never commit, and keeping it as a failed row would keep a copy of
+      // content that no longer exists; spec §5.7 wants it gone WITH a visible
+      // notice. `dropOutboxRowsAsNotices` records the notice and deletes the row
+      // in one transaction.
+      if (result.status === 'refused' && result.rule === PURGE_RULE) {
+        await storage.transaction(async (tx) => {
+          await dropOutboxRowsAsNotices(
+            tx,
+            await tx.all('SELECT * FROM outbox WHERE event_id = ?', [eventId]),
+            new Date().toISOString(),
+          );
+        });
+        return;
+      }
+
       // `refused` or `invalid`: TERMINAL. The row stays, visibly failed, and
       // stops being offered to the flush — never silently dropped, because the
       // person who made the claim is owed the fact that it was refused and the
@@ -491,6 +512,10 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
         [workspaceId],
       );
       return rows.map(rowToItem);
+    },
+
+    async dismissFailed(eventId) {
+      await storage.run("DELETE FROM outbox WHERE event_id = ? AND status = 'failed'", [eventId]);
     },
 
     notices: (workspaceId) => listNotices(storage, workspaceId),

@@ -1,7 +1,7 @@
 import { useEffect, useState } from 'react';
-import { FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
+import { Button, FlatList, Text, TextInput, TouchableOpacity, View } from 'react-native';
 import { useNavigation } from '@react-navigation/native';
-import { syncStatusLabel, type ReplicaDataSource, type TicketSummary } from '@gisik-nokma/app-core';
+import { SYNC_NOTICE_DISMISS, syncStatusLabel, type ReplicaDataSource, type SyncNoticeView, type TicketSummary } from '@gisik-nokma/app-core';
 import { loadBoard } from './board-read.js';
 import { boardRowAccessibilityLabel } from './board-row-a11y.js';
 
@@ -13,6 +13,8 @@ export function BoardScreen(props: {
   status: string;
   queued: number;
   failed: number;
+  notices: readonly SyncNoticeView[];
+  onDismissNotice(id: string): void;
   initError?: string | null;
 }) {
   const navigation = useNavigation<Nav>();
@@ -50,6 +52,22 @@ export function BoardScreen(props: {
       */}
       <Text accessibilityRole="text">{syncStatusLabel(props.status, props.queued)}</Text>
       {props.failed > 0 ? <Text accessibilityRole="text">{props.failed} needs attention</Text> : null}
+      {/* Trash Plan 3 — the same notices desktop draws with `SyncNotices`, in
+          native views (RN cannot mount its <section>). RN's own `Button`, the
+          one `ticket-screen.tsx` uses, so the pressable census (13.1188) is
+          unchanged. */}
+      <View accessibilityLiveRegion="polite">
+        {props.notices.map((notice) => (
+          <View key={notice.id}>
+            <Text accessibilityRole="text">{notice.text}</Text>
+            <Button
+              title={SYNC_NOTICE_DISMISS}
+              accessibilityLabel={`${SYNC_NOTICE_DISMISS}: ${notice.text}`}
+              onPress={() => props.onDismissNotice(notice.id)}
+            />
+          </View>
+        ))}
+      </View>
       {props.initError != null ? <Text accessibilityRole="alert">{props.initError}</Text> : null}
       <TextInput placeholder="Search" value={query} onChangeText={setQuery} />
       {offlineCopy && query !== '' ? <Text>searching offline copy</Text> : null}

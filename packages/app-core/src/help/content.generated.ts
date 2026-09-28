@@ -7283,6 +7283,35 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A change to something that was permanently deleted while you were offline cannot be saved."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " When the app reconnects it takes that change out of its queue and puts a note in its place — \"A change to an item that was permanently deleted could not be saved, and was removed.\" — with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Dismiss"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button. Any other change the server refused is listed the same way, with the server's reason, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Dismiss"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " lets it go."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "When everything is fine and nothing is queued, it shows no alarming badge at all. If the connection errors, the message appears "
                   },

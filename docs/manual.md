@@ -1408,6 +1408,11 @@ Both apps show a strip with plain-English states:
 - **"Offline — 3 claims waiting to send"**
 - a separate "needs attention" count for changes that were permanently refused
 
+**A change to something that was permanently deleted while you were offline cannot be saved.** When the
+app reconnects it takes that change out of its queue and puts a note in its place — "A change to an item
+that was permanently deleted could not be saved, and was removed." — with a **Dismiss** button. Any other
+change the server refused is listed the same way, with the server's reason, and **Dismiss** lets it go.
+
 When everything is fine and nothing is queued, it shows no alarming badge at all. If the connection
 errors, the message appears *beside* the status rather than replacing it, in the server's own words,
 ending with **"still retrying"** — it is specifically forbidden from ever saying it will not

@@ -14,10 +14,12 @@ import {
   BACKLOG_STATE_ID,
   IST_DAY_REGEX,
   PRIORITIES,
+  PURGED_OUTBOX_NOTICE,
   isCreatableState,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
+import { failedClaimNotice, type SyncNoticeView } from '../sync/sync-notices.js';
 import {
   isSyncInstruction,
   workflowVersionsOf,
@@ -277,6 +279,10 @@ export type ReplicaOnlyQuery = {
     text: string,
   ): Promise<{ offlineCopy: true; hits: Array<{ ticketId: string; title: string }> }>;
   syncStatus(workspaceId: string): Promise<{ status: SyncStatus; queued: number; failed: number }>;
+  /** Purge notices (oldest first), then failed claims with the server's words — trash Plan 3. */
+  syncNotices(workspaceId: string): Promise<SyncNoticeView[]>;
+  /** `purged:<eventId>` dismisses a notice; `failed:<eventId>` deletes a failed claim; anything else is ignored. */
+  dismissSyncNotice(id: string): Promise<void>;
 };
 
 /**
@@ -1768,6 +1774,21 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         queued: await outbox.queuedCount(workspaceId),
         failed: (await outbox.failedItems(workspaceId)).length,
       };
+    },
+
+    async syncNotices(workspaceId) {
+      const purged = (await outbox.notices(workspaceId)).map(
+        (notice): SyncNoticeView => ({ id: `purged:${notice.noticeId}`, text: PURGED_OUTBOX_NOTICE }),
+      );
+      const failed = (await outbox.failedItems(workspaceId)).map(
+        (item): SyncNoticeView => ({ id: `failed:${item.eventId}`, text: failedClaimNotice(item.lastError) }),
+      );
+      return [...purged, ...failed];
+    },
+
+    async dismissSyncNotice(id) {
+      if (id.startsWith('purged:')) await outbox.dismissNotice(id.slice('purged:'.length));
+      else if (id.startsWith('failed:')) await outbox.dismissFailed(id.slice('failed:'.length));
     },
   };
 

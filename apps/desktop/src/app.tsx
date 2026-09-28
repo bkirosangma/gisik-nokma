@@ -8,8 +8,10 @@ import {
 } from '@gisik-nokma/sync-client';
 import {
   HelpBrowser,
+  SyncNotices,
   createReplicaDataSource,
   type ReplicaDataSource,
+  type SyncNoticeView,
   type TicketSummary,
 } from '@gisik-nokma/app-core';
 import { createTauriSqlStorage } from './storage/tauri-sql-storage.js';
@@ -44,6 +46,7 @@ export function App() {
   const [status, setStatus] = useState<SyncStatus>('offline');
   const [queued, setQueued] = useState(0);
   const [failed, setFailed] = useState(0);
+  const [notices, setNotices] = useState<SyncNoticeView[]>([]);
   /**
    * The help view is state on the shell rather than a route, because this app
    * has no router — and it is deliberately readable in BOTH branches below,
@@ -90,6 +93,7 @@ export function App() {
           setQueued(s.queued);
           setFailed(s.failed);
         });
+        void dataSource.query.syncNotices(workspaceId).then(setNotices);
       };
       const offChange = dataSource.subscribe(workspaceId, 0, refreshCounts);
       // Online/offline transitions: the OS's word starts/stops the engine;
@@ -144,6 +148,16 @@ export function App() {
         <span>queued: {queued}</span>
         <span>failed: {failed}</span>
       </div>
+      <SyncNotices
+        notices={notices}
+        onDismiss={(id) => {
+          if (ds === null) return;
+          void ds.query
+            .dismissSyncNotice(id)
+            .then(() => ds.query.syncNotices(workspaceId))
+            .then(setNotices);
+        }}
+      />
       {helpToggle}
       {/* Plan 6's Board/List/ticket views mount here with ds as their DataSource.
           Until they land, the shell renders the sync status strip and a minimal
