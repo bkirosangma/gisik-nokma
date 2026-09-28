@@ -1215,6 +1215,78 @@ export const HELP_CONTENT: HelpContent = [
                 ]
               }
             ]
+          },
+          {
+            "id": "deleted-items-and-getting-things-back",
+            "title": "Deleted items, and getting things back",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Everything deleted that you may bring back is listed under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page: the workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived, and who deleted it and when. A deleted workspace or project also says how many things are inside it — they come back with it, and are not listed separately."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " brings it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Mark for permanent deletion"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " starts the waiting period, and the row then shows the day it will be erased for good. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Unmark"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " stops that. A marked item has to be unmarked before it can be restored."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing is already under way."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "With no connection the section says it needs one, rather than showing an empty list."
+                  }
+                ]
+              }
+            ]
           }
         ]
       },

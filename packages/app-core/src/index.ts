@@ -396,3 +396,4 @@ export { classifyBatch, type BatchOutcome } from './trash/batch.js';
 export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
 
 export { DeleteDialog, type DeleteDialogProps } from './views/delete-dialog.js';
+export { DeletedItemsSection, type DeletedItemsSectionProps } from './account/deleted-items-section.js';

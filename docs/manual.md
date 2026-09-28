@@ -213,6 +213,22 @@ You can rename a workspace and the new name appears in everybody's list.
 > limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the
 > rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on.
 
+### Deleted items, and getting things back
+
+Everything deleted that you may bring back is listed under **Deleted items** on your Account page: the
+workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your
+own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived,
+and who deleted it and when. A deleted workspace or project also says how many things are inside it —
+they come back with it, and are not listed separately.
+
+- **Restore** brings it back.
+- **Mark for permanent deletion** starts the waiting period, and the row then shows the day it will be
+  erased for good. **Unmark** stops that. A marked item has to be unmarked before it can be restored.
+- Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing
+  is already under way.
+
+With no connection the section says it needs one, rather than showing an empty list.
+
 ---
 
 ## §4 — Getting your people in

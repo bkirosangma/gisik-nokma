@@ -4239,4 +4239,39 @@ input, textarea, select { font-family: inherit; }
 .gn-workspaces__archived-heading { margin: 0; font-size: 1rem; font-weight: 600; color: var(--gn-text-muted); }
 .gn-workspace-list--archived { width: 100%; }
 
+/* Account → Deleted items (spec §6.3). The card is `.gn-account__section`;
+   its rows follow the account rows' transparent, gap-separated shape
+   (`.gn-account__session-row`'s own comment) as a two-column grid — the kind
+   glyph, then the text and the actions under it — so a long label wraps rather
+   than pushing a 44px button off a 320px screen. */
+.gn-deleted-items { align-items: stretch; }
+.gn-account ul.gn-deleted-items__list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.gn-deleted-items__row {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.5rem;
+  align-items: start;
+  color: var(--gn-text);
+}
+.gn-deleted-items__icon { color: var(--gn-text-muted); margin-top: 0.125rem; }
+.gn-deleted-items__text { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.gn-deleted-items__label { font-weight: 600; overflow-wrap: anywhere; }
+.gn-deleted-items__meta { color: var(--gn-text-muted); font-size: 0.8125rem; }
+/* The date is the fact a marked row exists to state — text ink and weight,
+   not a colour, so it reads in both themes and to anyone who cannot see hue. */
+.gn-deleted-items__due { color: var(--gn-text); font-size: 0.8125rem; font-weight: 600; }
+.gn-deleted-items__reason { color: var(--gn-text-muted); font-size: 0.8125rem; }
+.gn-deleted-items__actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.gn-deleted-items__actions .gn-button { min-height: 2.75rem; }
+.gn-deleted-items__row > .gn-refusal { grid-column: 2; margin: 0; }
+
 /* ══ trash-4-ui: end ══ */
