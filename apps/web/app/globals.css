@@ -4011,3 +4011,36 @@ input, textarea, select { font-family: inherit; }
   border-radius: var(--gn-radius-control);
   box-shadow: var(--gn-shadow-raised);
 }
+
+/* ── Tables ──
+   `.tableWrapper` is @tiptap/extension-table's own div, emitted only because
+   `Table.configure({ renderWrapper: true })` (schema/extensions.ts) turns on
+   an option this repo's installed 3.30.5 defaults OFF — without it there is
+   nothing for the horizontal-scroll rule to target. `.gn-comment__table` is
+   the read-only comment-body renderer's own table (comment-body.tsx), styled
+   identically so a table looks the same whether it is live or a rendered
+   comment. `.selectedCell` is prosemirror-tables' own decoration class for a
+   multi-cell selection — not this file's to name, only to colour. */
+.ticket-editor__content .tableWrapper { overflow-x: auto; max-width: 100%; }
+.ticket-editor__content table,
+.gn-comment__table {
+  border-collapse: collapse;
+  width: 100%;
+  margin: 0.5rem 0;
+}
+.ticket-editor__content th,
+.ticket-editor__content td,
+.gn-comment__table th,
+.gn-comment__table td {
+  border: 1px solid var(--gn-border);
+  padding: 0.375rem 0.625rem;
+  text-align: left;
+}
+.ticket-editor__content th,
+.gn-comment__table th {
+  background: var(--gn-fill-quaternary);
+  font-weight: 600;
+}
+.ticket-editor__content .selectedCell {
+  background: var(--gn-fill-quaternary);
+}

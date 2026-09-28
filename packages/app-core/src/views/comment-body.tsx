@@ -289,6 +289,22 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
       ? createElement('span', { className: 'gn-comment__ticketref', key }, text)
       : createElement('a', { className: 'gn-comment__ticketref', href, key }, text);
   }
+  // A table (spec's schema v2, shared with the note document). Real
+  // table/tr/th/td, not the "unknown type renders its children" fallback —
+  // that fallback used to flatten a comment's table into unstructured nested
+  // fragments with no `<table>` at all (9.348).
+  if (node.type === 'table') {
+    return createElement('table', { className: 'gn-comment__table', key }, createElement('tbody', null, children));
+  }
+  if (node.type === 'tableRow') {
+    return createElement('tr', { key }, children);
+  }
+  if (node.type === 'tableHeader') {
+    return createElement('th', { key }, children);
+  }
+  if (node.type === 'tableCell') {
+    return createElement('td', { key }, children);
+  }
   if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'doc') {
     const element = node.type === 'doc' ? Fragment : 'p';
     return createElement(element, node.type === 'doc' ? { key } : { key }, children);

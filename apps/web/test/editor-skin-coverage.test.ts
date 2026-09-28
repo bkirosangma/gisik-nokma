@@ -141,10 +141,7 @@ function extractDeclaredEditorClasses(): string[] {
 /**
  * Bare elements and third-party-injected classes the editor's own source
  * never spells as a string literal — `extractDeclaredEditorClasses` cannot
- * see these, so they are asserted explicitly, same treatment the plan this
- * test implements already gives `table`/`th`/`td`/`.selectedCell`.
- * `.tableWrapper` joins this list in Task 4 once `renderWrapper: true` makes
- * the library actually emit it.
+ * see these, so they are asserted explicitly.
  */
 const EXPLICIT_SELECTORS: readonly string[] = [
   'h1',
@@ -159,6 +156,20 @@ const EXPLICIT_SELECTORS: readonly string[] = [
   'pre',
   'a',
 ];
+
+/**
+ * Table selectors: `table`/`th`/`td` are bare elements, `.tableWrapper` is
+ * `@tiptap/extension-table`'s own wrapper div (emitted only because
+ * `renderWrapper: true` was added to `Table.configure(...)` — the option
+ * defaults to `false` in this repo's installed 3.30.5, measured directly
+ * against the dist, not assumed from a different project's install), and
+ * `.selectedCell` is prosemirror-tables' own decoration class for a
+ * multi-cell selection. Not scoped to `.ticket-editor__content` in the
+ * pattern below (unlike `EXPLICIT_SELECTORS`) because the plan's own CSS
+ * scopes some of these identically but a bare check here is simpler and this
+ * repo has exactly one place tables render.
+ */
+const TABLE_SELECTORS: readonly string[] = ['table', 'th', 'td', '.selectedCell', '.tableWrapper'];
 
 describe('9.341 editor skin — declared coverage', () => {
   const bare = stripComments(readFileSync(GLOBALS_CSS_PATH, 'utf8'));
@@ -183,6 +194,11 @@ describe('9.341 editor skin — declared coverage', () => {
   it.each(EXPLICIT_SELECTORS)('globals.css declares a rule for bare element %s (scoped)', (sel) => {
     const pattern = new RegExp(`\\.ticket-editor__content[^{]*\\b${sel}\\b[^{]*\\{`);
     expect(pattern.test(bare), `no .ticket-editor__content-scoped rule for <${sel}> in globals.css`).toBe(true);
+  });
+
+  it.each(TABLE_SELECTORS)('globals.css declares a rule matching %s', (sel) => {
+    const pattern = new RegExp(`(?:^|[\\s>])${sel.replace('.', '\\.')}(?![\\w-])`);
+    expect(pattern.test(bare), `no rule for \`${sel}\` in apps/web/app/globals.css`).toBe(true);
   });
 });
 
@@ -310,10 +326,52 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     expect(root.querySelector('td')).not.toBeNull();
   });
 
+  it('.tableWrapper renders around the table (renderWrapper: true)', () => {
+    expect(root.querySelector('.tableWrapper')).not.toBeNull();
+    expect(root.querySelector('.tableWrapper table')).not.toBeNull();
+  });
+
   it('a link renders as a real <a> with href', () => {
     const link = root.querySelector('a');
     expect(link).not.toBeNull();
     expect(link?.getAttribute('href')).toBe('https://example.com');
+  });
+});
+
+describe('9.352 a multi-cell selection paints prosemirror-tables’ own .selectedCell', () => {
+  it('appears on both cells once a CellSelection spans them', async () => {
+    const { CellSelection } = await import('@tiptap/pm/tables');
+    const editor = new Editor({
+      element: document.createElement('div'),
+      extensions: buildEditorExtensions(),
+      content: {
+        type: 'doc',
+        content: [
+          {
+            type: 'table',
+            content: [
+              {
+                type: 'tableRow',
+                content: [
+                  { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a' }] }] },
+                  { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'b' }] }] },
+                ],
+              },
+            ],
+          },
+        ],
+      },
+    });
+    const cells: number[] = [];
+    editor.state.doc.descendants((node, pos) => {
+      if (node.type.name === 'tableCell') cells.push(pos);
+    });
+    expect(cells.length).toBe(2);
+    const selection = CellSelection.create(editor.state.doc, cells[0]!, cells[1]!);
+    editor.view.dispatch(editor.state.tr.setSelection(selection));
+    const selected = editor.view.dom.querySelectorAll('.selectedCell');
+    expect(selected.length).toBe(2);
+    editor.destroy();
   });
 });
 
