@@ -1,6 +1,6 @@
 import {
   applyNoteEvent,
-  applyTicketEvent,
+  foldTicketEvent,
   claimContestedPayloadSchema,
   claimContestedResolvedPayloadSchema,
   CONTEST_EVENT_TYPES,
@@ -944,7 +944,7 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
     );
     for (const row of eventRows) {
       const env = rowToEnvelope(row);
-      if (FOLDING_TICKET_TYPES.includes(env.type)) state = applyTicketEvent(state, env, localDeps);
+      if (FOLDING_TICKET_TYPES.includes(env.type)) state = foldTicketEvent(state, env, localDeps);
     }
     if (state === undefined) return;
     await upsertTicket(tx, state);

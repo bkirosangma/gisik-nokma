@@ -283,3 +283,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.171 — erasing the workspace empties every workspace-scoped local table, the definitions, the cursor and BOTH pending-pull keys, and records the workspace;** control: the device identity (`me`) is kept. Mutation: forget `pending-note-pulls:<ws>` (the key `revokeScope` also leaves behind).
 - ✅ **19.172 — every local table has an entry in `LOCAL_TABLE_RULES`, and every entry names a real table;** control: the rules minus `contests` leave exactly `contests` uncovered. Mutation: delete the `contests` entry.
 - ✅ **19.173 — `purgedAmong` answers only recorded ids, and an erase strips the Deleted-items cache of the erased ticket and, for a workspace, of every item in it;** control: an unrecorded id is absent and an item of another workspace stays cached. Mutation: skip the cache strip.
+
+## 19.33 Client folds
+
+- ✅ **19.174 — the replica applies a redacted `ticket.created` (`{ projectId, purged: true }`) without throwing and folds no ticket from it;** control: an ordinary creation beside it folds. Mutation: fold with `applyTicketEvent` again — its named throw rejects the apply.
+- ✅ **19.175 — `buildPendingOverlay` over a queued redacted creation produces no state and does not mark the ticket unfoldable;** control: an ordinary queued creation folds into `states`. Mutation: fold with `applyTicketEvent` — the ticket lands in `unfoldable`.
