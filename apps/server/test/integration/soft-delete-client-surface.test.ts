@@ -493,7 +493,11 @@ type AbsenceDecision =
   // come back through search, in EITHER mode, and 18.148 is the case that
   // holds the queries to it — so this row is `carries: true` and the verdict
   // is the one that matters here.
-  | 'searchNotes';
+  | 'searchNotes'
+  // The trash series, Plan 1. `getDeletedItems` is the ONE read whose entire
+  // job is to name what was deleted — see its own row below for why its
+  // verdict is the exception to every other row's `'excluded'`.
+  | 'getDeletedItems';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -604,6 +608,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     // the chunk rows outlive the note until the worker catches up.)
     carries: false,
     why: 'a note hit shows the note’s own text and its tickets’ KEYS; the deleted ticket’s title reaches it as a match, not as content',
+  },
+  getDeletedItems: {
+    verdict: 'retained',
+    carries: true,
+    why: 'the ONE surface whose entire job is naming what was deleted (`packages/domain/src/read-models.ts`’s `DeletedItem.label`, documented as "ticket `KEY title`, note title" for those two kinds) — a deleted ticket’s title is not a leak here, it is the answer a person needs to recognise what they are about to restore. Every other row in this table exists because a delete must not echo through a read that was never about the deleted thing; this read is about nothing else.',
   },
   getMyWork: { verdict: 'excluded', carries: true },
   getAttention: { verdict: 'excluded', carries: true },
@@ -732,6 +741,9 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     // The notes search reads, both modes. `MARKER` is this file's text term, so
     // the call visits the same door every other `carries: true` row walks.
     searchNotes: () => ds.searchNotes(workspaceId, MARKER, { mode: 'lexical' }),
+    // Takes no workspace id — `getDeletedItems` is scoped to the caller's own
+    // membership, not one workspace.
+    getDeletedItems: () => ds.getDeletedItems(),
   };
 }
 

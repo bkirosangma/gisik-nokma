@@ -586,7 +586,7 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
   it('19.071 getDeletedItems rejects with ReplicaGapError; control: getTicketTypes on the same replica resolves', async () => {
     const { ds } = await fixture();
     await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(ReplicaGapError);
-    const err = await ds.query.getDeletedItems().catch((e: unknown) => e as ReplicaGapError);
+    const err = (await ds.query.getDeletedItems().catch((e: unknown) => e)) as ReplicaGapError;
     expect(err.absences.map((a) => a.field)).toEqual(['DeletedItem[] — the whole read']);
 
     // CONTROL, same fixture: a method this replica actually answers.
