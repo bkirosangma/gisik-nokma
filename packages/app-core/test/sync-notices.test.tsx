@@ -57,5 +57,13 @@ describe('19.185 SyncNotices', () => {
     render(<SyncNotices notices={[]} onDismiss={onDismiss} />);
     expect(screen.queryByRole('button')).toBeNull();
     expect(screen.getByRole('region', { name: 'Sync notices' })).toBeEmptyDOMElement();
+
+    // The empty region must be visually nothing yet STAY in the accessibility
+    // tree so the first notice is announced (M-6): `display: none` and
+    // `visibility: hidden` both remove it, so the `:empty` rule may carry neither.
+    const emptyRule = /\.gn-sync-notices:empty\s*\{([^}]*)\}/.exec(css)?.[1] ?? '';
+    expect(emptyRule).toMatch(/height:\s*0\b/);
+    expect(emptyRule).toMatch(/padding:\s*0\b/);
+    expect(emptyRule).not.toMatch(/display\s*:\s*none|visibility\s*:\s*hidden/);
   });
 });

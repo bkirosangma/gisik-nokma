@@ -16,7 +16,7 @@ export function failedClaimNotice(lastError: string | null): string {
 }
 
 /**
- * The live region stays MOUNTED when empty (`.gn-sync-notices:empty` hides it):
+ * The live region stays MOUNTED when empty (`.gn-sync-notices:empty` makes it zero-height, never `display: none`):
  * a region inserted together with its first notice is not reliably announced.
  * Each button's name starts with its visible word (WCAG 2.5.3) and ends with
  * the sentence it dismisses, so a list of them is not five identical "Dismiss".
