@@ -3853,3 +3853,161 @@ input, textarea, select { font-family: inherit; }
   margin: 0;
   flex: 1 1 auto;
 }
+
+/* ── Editor skin — everything packages/editor draws ─────────────────────────
+   packages/editor/src/styles/editor.css is structure-only (its own header
+   rule); this is where that content gets its colour, from --gn-* tokens only.
+   Scoped under .ticket-editor__content, the one wrapper class present in the
+   note document, the comment composer, and the note's read-only view alike
+   (TicketEditor.tsx:269) — never a bare element selector, or `table`/`code`/
+   `blockquote` here would restyle every table and code element in the
+   product. Excludes the suggestion popups and the main toolbar
+   (task/editor-polish's own scope, already skinned in editor.css). */
+
+.ticket-editor__content h1 { margin: 1rem 0 0.5rem; font-size: 1.5rem; line-height: 2rem; font-weight: 700; }
+.ticket-editor__content h2 { margin: 0.875rem 0 0.5rem; font-size: 1.25rem; line-height: 1.75rem; font-weight: 600; }
+.ticket-editor__content h3 { margin: 0.75rem 0 0.375rem; font-size: 1.0625rem; line-height: 1.5rem; font-weight: 600; }
+.ticket-editor__content p { margin: 0.5rem 0; }
+.ticket-editor__content a { color: var(--gn-text-accent); }
+.ticket-editor__content blockquote {
+  margin: 0.5rem 0;
+  padding-left: 0.75rem;
+  border-left: 3px solid var(--gn-border-strong);
+  color: var(--gn-text-muted);
+}
+.ticket-editor__content ul,
+.ticket-editor__content ol {
+  margin: 0.5rem 0;
+  padding-left: 1.5rem;
+}
+.ticket-editor__content hr {
+  margin: 1rem 0;
+  border: none;
+  border-top: 1px solid var(--gn-border);
+}
+.ticket-editor__content code {
+  background: var(--gn-fill-quaternary);
+  border-radius: 4px;
+  padding: 0.1em 0.35em;
+  font-family: var(--gn-font-mono);
+  font-size: 0.875em;
+}
+/* Task list. The `<li>` carries `data-checked`, NEVER `data-type="taskItem"`
+   — measured directly against this repo's installed Tiptap 3.30.5 render
+   (Task 0's gallery-DOM probe), contradicting an older comment elsewhere in
+   this codebase that describes markdown SERIALIZATION shape, not the live
+   DOM. */
+.ticket-editor__content ul[data-type='taskList'] {
+  list-style: none;
+  padding-left: 0;
+}
+.ticket-editor__content ul[data-type='taskList'] > li {
+  display: flex;
+  align-items: flex-start;
+  gap: 0.5rem;
+}
+
+/* The fenced code block. `.editor-codeblock`'s own `position: relative` is
+   editor.css's; this is its surface. `pre code` resets the inline-code rule
+   above so the block does not draw a fill inside a fill. */
+.ticket-editor__content .editor-codeblock {
+  background: var(--gn-fill-quaternary);
+  border-radius: var(--gn-radius-control);
+  padding: 0.75rem 1rem;
+  margin: 0.5rem 0;
+  overflow-x: auto;
+}
+.ticket-editor__content .editor-codeblock pre {
+  margin: 0;
+  font-family: var(--gn-font-mono);
+  font-size: 0.875rem;
+  line-height: 1.5;
+}
+.ticket-editor__content .editor-codeblock code {
+  background: none;
+  padding: 0;
+  font-size: inherit;
+}
+/* Quiet, opacity-shown: `display`/`visibility` would drop the button from
+   the tab order, and a keyboard user tabbing into the block must still find
+   it — hence :focus-visible and the hover:none arm for touch, not only
+   :hover/:focus-within on the block. */
+.ticket-editor__content .editor-codeblock__copy {
+  opacity: 0;
+  background: var(--gn-fill-tertiary);
+  border-radius: 4px;
+  padding: 0.25rem 0.5rem;
+  font-size: 0.75rem;
+  color: var(--gn-text);
+  transition: opacity 150ms;
+}
+.ticket-editor__content .editor-codeblock:hover .editor-codeblock__copy,
+.ticket-editor__content .editor-codeblock:focus-within .editor-codeblock__copy,
+.ticket-editor__content .editor-codeblock__copy:focus-visible {
+  opacity: 1;
+}
+@media (hover: none) {
+  .ticket-editor__content .editor-codeblock__copy { opacity: 1; }
+}
+.ticket-editor__content .editor-codeblock__copy:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The collapsible block, promoted from editor.css's bare currentColor
+   border to the house surface treatment. */
+.ticket-editor__content .editor-details {
+  background: var(--gn-fill-quaternary);
+  border: none;
+}
+
+/* Chips: distinguished from plain text and from each other WITHOUT colour
+   alone (house rule), and never underlined on hover (the note-badge rule,
+   extended to every chip). */
+.ticket-editor__content .editor-mention {
+  background: var(--gn-fill-tertiary);
+  border-radius: 3px;
+  padding: 0 0.25em;
+}
+.ticket-editor__content .editor-ticketref {
+  border: 1px solid var(--gn-border);
+  border-radius: 3px;
+  padding: 0 0.25em;
+}
+.ticket-editor__content .editor-wikilink {
+  color: var(--gn-text-accent);
+  text-decoration: none;
+}
+.ticket-editor__content .editor-wikilink:hover { text-decoration: none; }
+.ticket-editor__content .editor-wikilink--missing { color: var(--gn-text-muted); }
+.ticket-editor__content .editor-mention:focus-visible,
+.ticket-editor__content .editor-ticketref:focus-visible,
+.ticket-editor__content .editor-wikilink:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+
+/* The wiki-link hover preview: the house popover surface, replacing
+   editor.css's system `Canvas` colour keyword and `currentColor` border
+   (packages/editor cannot reach these tokens; this file can). Unscoped, to
+   match editor.css's own unscoped `.wikilink-preview` rule — the card is
+   appended to `document.body`, outside `.ticket-editor__content`. */
+.wikilink-preview {
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  border: none;
+}
+
+/* Images: the frame the three wrap modes (editor.css) never got. One rule —
+   ticket-image.ts always renders BOTH `editor-image` and the wrap-mode
+   modifier on the same element (`editor-image editor-image--${wrap}`), so
+   this single frame already reaches every mode; the modifier selectors are
+   named here too only so the skin-coverage check (driven from the classes
+   the source actually emits) has something to point at for each one. */
+.ticket-editor__content .editor-image,
+.ticket-editor__content .editor-image--block,
+.ticket-editor__content .editor-image--inline-left,
+.ticket-editor__content .editor-image--inline-right {
+  border-radius: var(--gn-radius-control);
+  box-shadow: var(--gn-shadow-raised);
+}
