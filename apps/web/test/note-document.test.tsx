@@ -5,8 +5,9 @@ import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { DELETE_TRIGGER_LABEL } from '@gisik-nokma/app-core';
 import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
-import type { NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
+import type { IngestResult, NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { noteDraftKey } from '../src/notes/use-note-autosave.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -875,5 +876,147 @@ describe('9.422 the draft-restore banner', () => {
     renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
     await waitFor(() => expect(slotProps().readOnly).toBe(true));
     expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+});
+
+/**
+ * Trash series Plan 4, Task 6. Cases 19.236–19.239 (`test-cases/19-trash.md`
+ * §19.24). The note page's Delete door (D2) and the banner's Restore (the
+ * silent `write` it used could not show `UNMARK_FIRST_REASON`).
+ */
+describe('19.236–19.239 the note page deletes, and restores what it deleted', () => {
+  function mountLive(opts: {
+    role?: string;
+    note?: NoteDetail;
+    answer?: (events: SubmittedEvent[], call: number) => IngestResult[];
+  } = {}) {
+    let current = opts.note ?? noteDetail();
+    const batches: SubmittedEvent[][] = [];
+    const services = world({ role: opts.role });
+    services.dataSource.query.getNote = async (_ws: string, id: string) => (id === NOTE ? current : null);
+    services.dataSource.ingest = async (events) => {
+      batches.push(events);
+      const answer =
+        opts.answer?.(events, batches.length) ??
+        events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: batches.length,
+          serverTime: '2026-09-29T10:00:00.000Z',
+        }));
+      // The server's projection, as far as this page can see it.
+      events.forEach((event, index) => {
+        if (answer[index]?.status !== 'committed') return;
+        if (event.type === 'note.deleted') current = { ...current, deleted: true };
+        if (event.type === 'note.restored') current = { ...current, deleted: false };
+      });
+      return answer;
+    };
+    const tree = (noteId: string) => (
+      <Providers services={services}>
+        <NoteDocument noteId={noteId} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
+      </Providers>
+    );
+    const view = render(tree(NOTE));
+    return { batches, services, show: (noteId: string) => view.rerender(tree(noteId)) };
+  }
+  const types = (batch: SubmittedEvent[] | undefined) => (batch ?? []).map((event) => event.type);
+  const TITLE = 'Delete note “Compressor log”?';
+
+  async function deleteFromByline(permanent: boolean): Promise<void> {
+    await userEvent.click(await screen.findByRole('button', { name: DELETE_TRIGGER_LABEL }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    if (permanent) {
+      await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Delete permanently' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
+    } else {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete note' }));
+    }
+  }
+
+  it('19.236 the editor sees Delete…; CONTROL: a non-author member and a deleted note do not', async () => {
+    mountLive();
+    expect(await screen.findByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeInTheDocument();
+    cleanup();
+
+    mockSessionUser = { id: 'u_ana', name: 'Anselma Marak', email: 'ana@example.com' };
+    mountLive({ role: 'member' });
+    await screen.findByTestId('note-editor');
+    expect(screen.queryByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeNull();
+    cleanup();
+
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    mountLive({ note: noteDetail({ deleted: true }) });
+    await screen.findByTestId('note-deleted-banner');
+    expect(screen.queryByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeNull();
+  });
+
+  it('19.237 permanent posts [note.deleted, purge.marked] and the banner appears; CONTROL: soft posts [note.deleted]', async () => {
+    const hard = mountLive();
+    await deleteFromByline(true);
+    await waitFor(() => expect(hard.batches).toHaveLength(1));
+    expect(types(hard.batches[0])).toEqual(['note.deleted', 'purge.marked']);
+    expect(hard.batches[0]!.every((event) => event.entity.kind === 'note' && event.entity.id === NOTE)).toBe(true);
+    expect(await screen.findByTestId('note-deleted-banner')).toBeInTheDocument();
+    cleanup();
+
+    const soft = mountLive();
+    await deleteFromByline(false);
+    await waitFor(() => expect(soft.batches).toHaveLength(1));
+    expect(types(soft.batches[0])).toEqual(['note.deleted']);
+  });
+
+  it('19.238 after a permanent delete here, Restore posts [purge.unmarked, note.restored]; CONTROL: after a soft one, [note.restored]', async () => {
+    const hard = mountLive();
+    await deleteFromByline(true);
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(hard.batches).toHaveLength(2));
+    expect(types(hard.batches[1])).toEqual(['purge.unmarked', 'note.restored']);
+    cleanup();
+
+    const soft = mountLive();
+    await deleteFromByline(false);
+    const softBanner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(softBanner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(soft.batches).toHaveLength(2));
+    expect(types(soft.batches[1])).toEqual(['note.restored']);
+  });
+
+  it('19.239 a refused Restore says why in the banner; CONTROL: a committed one removes the banner', async () => {
+    const reason = 'Unmark this note for permanent deletion before restoring it.';
+    mountLive({
+      note: noteDetail({ deleted: true }),
+      answer: (events) =>
+        events.map((event) => ({ status: 'refused' as const, eventId: event.id, rule: 'lifecycle.state', reason })),
+    });
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    expect(await within(banner).findByRole('alert')).toHaveTextContent(reason);
+    expect(screen.getByTestId('note-deleted-banner')).toBeInTheDocument();
+    cleanup();
+
+    mountLive({ note: noteDetail({ deleted: true }) });
+    const okBanner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(okBanner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(screen.queryByTestId('note-deleted-banner')).toBeNull());
+  });
+
+  it('19.238 opening another note starts clean — a permanent delete here is not remembered for the next note', async () => {
+    const OTHER = '01J9NOTEOTHER0000000000000';
+    const first = mountLive();
+    const getNote = first.services.dataSource.query.getNote;
+    first.services.dataSource.query.getNote = async (ws: string, id: string) =>
+      id === OTHER ? noteDetail({ noteId: OTHER, deleted: true }) : getNote(ws, id);
+    await deleteFromByline(true);
+    await screen.findByTestId('note-deleted-banner');
+    expect(types(first.batches[0])).toEqual(['note.deleted', 'purge.marked']);
+
+    first.show(OTHER);
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(first.batches).toHaveLength(2));
+    // The other note was never marked here: no unmark in front of the restore.
+    expect(types(first.batches[1])).toEqual(['note.restored']);
   });
 });

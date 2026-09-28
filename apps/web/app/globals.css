@@ -4242,3 +4242,127 @@ input, textarea, select { font-family: inherit; }
   font-weight: 600;
   color: var(--gn-text-muted);
 }
+
+
+/* ══ trash-4-ui: begin ═══════════════════════════════════════════════════
+   Trash series Plan 4 — the delete dialog, the workspace card's menu and
+   Archived group, and Account → Deleted items. EVERY rule this plan adds lives
+   between this line and the matching end marker, so a merge with another lane's
+   globals.css edit is a pure append and `apps/web/test/trash-css.test.ts`
+   (case 19.258) can check the block as one unit. Tokens only — no colour
+   literal (`packages/ui/test/token-discipline.test.ts`). */
+
+/* The confirm's column: 16px rhythm between the name field, the switch, the
+   note and the action row (ui-ux-pro-max: group related, separate distinct).
+   `max-width` keeps the note at a readable measure inside the shared panel. */
+.gn-delete-dialog { display: flex; flex-direction: column; gap: 1rem; max-width: 32rem; }
+.gn-delete-dialog__name { display: flex; flex-direction: column; gap: 0.375rem; }
+.gn-delete-dialog__switch { align-self: flex-start; }
+/* The note is always visible and is the dialog's accessible description; muted,
+   never subtle (`--gn-text-muted` is the contrast-gated secondary ink). */
+.gn-delete-dialog__note { margin: 0; color: var(--gn-text-muted); font-size: 0.875rem; line-height: 1.5; }
+.gn-delete-dialog > .gn-refusal { margin: 0; }
+/* Cancel first, the destructive confirm last and rightmost; 12px apart and 44px
+   tall so neither is a near-miss for the other on touch. */
+.gn-delete-dialog__actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
+.gn-delete-dialog__actions .gn-button { min-height: 2.75rem; padding-inline: 1rem; }
+
+/* The card pages' "where it went" line after a delete (spec §6.3's route back
+   named at the moment it matters). Plain text ink, never a tint. */
+.gn-trash-notice { margin: 0.75rem 0 0; color: var(--gn-text); }
+
+/* The workspace card's overflow menu (spec §6.2) — AccountMenu's recipe placed
+   on a card. The anchor is the card itself (`--menu`), and the head gives way so
+   a long name never runs under the trigger. */
+.gn-workspace-card--menu { position: relative; }
+.gn-workspace-card--menu .gn-workspace-card__head { padding-right: 2.75rem; }
+.gn-card-menu { position: absolute; top: 0.5rem; right: 0.5rem; z-index: 2; }
+/* 44px, round, ink-muted until hovered — a quiet control on an informational card. */
+.gn-card-menu__trigger {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-muted);
+  cursor: pointer;
+}
+.gn-card-menu__trigger:hover:not(:disabled) { background: var(--gn-fill-tertiary); color: var(--gn-text); }
+.gn-card-menu__trigger:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
+.gn-card-menu__trigger:disabled { opacity: 0.55; cursor: not-allowed; }
+.gn-card-menu__list {
+  position: absolute;
+  top: calc(100% + 0.25rem);
+  right: 0;
+  min-width: 12rem;
+  display: flex;
+  flex-direction: column;
+  padding: 0.375rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+}
+/* Items in plain text ink, deliberately NOT `--gn-danger` for Delete…: danger text
+   on a raised surface measured 4.29:1 (`sessions-section.tsx`'s own record),
+   under the 4.5 body text owes. The destructive colour lives on the dialog's
+   solid confirm, where it passes. */
+.gn-card-menu__item {
+  min-height: 2.75rem;
+  padding: 0 0.75rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: transparent;
+  color: var(--gn-text);
+  font: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-card-menu__item:hover,
+.gn-card-menu__item:focus-visible { background: var(--gn-fill-tertiary); outline: none; }
+.gn-card-menu__item:focus-visible { box-shadow: inset 0 0 0 2px var(--gn-focus-ring); }
+/* Archived workspaces: the project card's own dimming (`.gn-project-card--archived`,
+   0.72) so "retired" looks the same wherever it appears. */
+.gn-workspace-card--archived .gn-workspace-card__door { opacity: 0.72; }
+.gn-workspaces__archived { display: flex; flex-direction: column; align-items: flex-start; gap: 0.75rem; margin-top: 1.5rem; }
+.gn-workspaces__archived-heading { margin: 0; font-size: 1rem; font-weight: 600; color: var(--gn-text-muted); }
+.gn-workspace-list--archived { width: 100%; }
+
+/* Account → Deleted items (spec §6.3). The card is `.gn-account__section`;
+   its rows follow the account rows' transparent, gap-separated shape
+   (`.gn-account__session-row`'s own comment) as a two-column grid — the kind
+   glyph, then the text and the actions under it — so a long label wraps rather
+   than pushing a 44px button off a 320px screen. */
+.gn-deleted-items { align-items: stretch; }
+.gn-account ul.gn-deleted-items__list {
+  width: 100%;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+  display: flex;
+  flex-direction: column;
+  gap: 1rem;
+}
+.gn-deleted-items__row {
+  display: grid;
+  grid-template-columns: 1.25rem minmax(0, 1fr);
+  column-gap: 0.75rem;
+  row-gap: 0.5rem;
+  align-items: start;
+  color: var(--gn-text);
+}
+.gn-deleted-items__icon { color: var(--gn-text-muted); margin-top: 0.125rem; }
+.gn-deleted-items__text { display: flex; flex-direction: column; gap: 0.125rem; min-width: 0; }
+.gn-deleted-items__label { font-weight: 600; overflow-wrap: anywhere; }
+.gn-deleted-items__meta { color: var(--gn-text-muted); font-size: 0.8125rem; }
+/* The date is the fact a marked row exists to state — text ink and weight,
+   not a colour, so it reads in both themes and to anyone who cannot see hue. */
+.gn-deleted-items__due { color: var(--gn-text); font-size: 0.8125rem; font-weight: 600; }
+.gn-deleted-items__reason { color: var(--gn-text-muted); font-size: 0.8125rem; }
+.gn-deleted-items__actions { grid-column: 2; display: flex; flex-wrap: wrap; gap: 0.5rem; }
+.gn-deleted-items__actions .gn-button { min-height: 2.75rem; }
+.gn-deleted-items__row > .gn-refusal { grid-column: 2; margin: 0; }
+
+/* ══ trash-4-ui: end ══ */

@@ -1,7 +1,8 @@
-import { render, screen, waitFor } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import type { DeletedItem } from '@gisik-nokma/domain';
 
 vi.mock('next/navigation', () => ({
   usePathname: () => '/account',
@@ -106,7 +107,7 @@ function mount() {
   render(
     <Providers
       services={stubServices(
-        { getMyWorkspaces: async () => [] },
+        { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
         // A benign default, matching `listUserPasskeys`'s own precedent above:
         // without it, every pre-E5-13 case in this file would drive the
         // notification-preferences read against the unstubbed rejection and
@@ -242,7 +243,7 @@ describe('AccountPage — Notifications', () => {
     render(
       <Providers
         services={stubServices(
-          { getMyWorkspaces: async () => [] },
+          { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
           { notificationPreferences: { load: async () => ({ mutedKinds: ['mention'] }) } },
         )}
       >
@@ -263,7 +264,7 @@ describe('AccountPage — Notifications', () => {
     render(
       <Providers
         services={stubServices(
-          { getMyWorkspaces: async () => [] },
+          { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
           { notificationPreferences: { load: async () => ({ mutedKinds: [] }), save } },
         )}
       >
@@ -293,7 +294,7 @@ describe('AccountPage — Notifications', () => {
     render(
       <Providers
         services={stubServices(
-          { getMyWorkspaces: async () => [] },
+          { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
           {
             notificationPreferences: {
               load,
@@ -333,7 +334,7 @@ describe('AccountPage — Notifications', () => {
     render(
       <Providers
         services={stubServices(
-          { getMyWorkspaces: async () => [] },
+          { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
           {
             notificationPreferences: {
               load: async () => {
@@ -370,7 +371,7 @@ describe('AccountPage — Notifications', () => {
     render(
       <Providers
         services={stubServices(
-          { getMyWorkspaces: async () => [] },
+          { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
           {
             notificationPreferences: {
               load: async () => ({ mutedKinds: [] }),
@@ -404,7 +405,7 @@ describe('AccountPage — Notifications', () => {
     render(
       <Providers
         services={stubServices(
-          { getMyWorkspaces: async () => [] },
+          { getDeletedItems: async () => [], getMyWorkspaces: async () => [] },
           {
             notificationPreferences: {
               load: async () => {
@@ -438,7 +439,7 @@ describe('AccountPage — Your workspaces', () => {
   it('lists each workspace with its real role and project count', async () => {
     render(
       <Providers services={stubServices({
-        getMyWorkspaces: async () => [
+        getDeletedItems: async () => [], getMyWorkspaces: async () => [
           workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin', projects: [{ id: 'p1', name: 'Delivery', prefix: 'DL', archived: false, ticketCount: 3, blockedCount: 0 }] }),
           workspace({ id: 'w2', name: 'Field Support', role: 'member', projects: [] }),
         ],
@@ -457,7 +458,7 @@ describe('AccountPage — Your workspaces', () => {
   it('E5-12 counts LIVE projects and names the archived half, the unit /workspaces already uses', async () => {
     render(
       <Providers services={stubServices({
-        getMyWorkspaces: async () => [
+        getDeletedItems: async () => [], getMyWorkspaces: async () => [
           // One live, one archived. This row counted the WHOLE array, so it read
           // "2 projects" while `/workspaces`' card read "1 project · 1 archived"
           // for the same workspace — one word, two measurements, neither screen
@@ -493,7 +494,7 @@ describe('AccountPage — Your workspaces', () => {
   it('each workspace row is a real link to that workspace, named once', async () => {
     render(
       <Providers services={stubServices({
-        getMyWorkspaces: async () => [workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin' })],
+        getDeletedItems: async () => [], getMyWorkspaces: async () => [workspace({ id: 'w1', name: 'Meghalaya Rollout', role: 'admin' })],
       }, {})}>
         <AccountPage />
       </Providers>,
@@ -741,5 +742,43 @@ describe('AccountPage — Passkeys', () => {
       'Your passkeys could not be loaded.',
     );
     expect(screen.queryByText('You have no passkeys yet.')).not.toBeInTheDocument();
+  });
+});
+
+/** Trash series Plan 4, Task 9. Case 19.257 (`test-cases/19-trash.md` §19.27). */
+describe('19.257 /account mounts Deleted items for a signed-in person', () => {
+  const ROW: DeletedItem = {
+    kind: 'project', id: 'prj2', workspaceId: 'ws1', workspaceName: 'Convenience Corner',
+    projectId: 'prj2', projectName: 'Signage', label: 'Signage', deletedBy: 'u1', deletedByName: 'Anjali Kharkongor',
+    deletedAt: '2026-09-29T10:00:00.000Z', purgeMarkedAt: null, purgeDueAt: null, containedCount: 0,
+  };
+
+  function mountWithDeleted(getDeletedItems: () => Promise<DeletedItem[]>) {
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [], getDeletedItems },
+          { notificationPreferences: { load: async () => ({ mutedKinds: [] }) } },
+        )}
+      >
+        <AccountPage />
+      </Providers>,
+    );
+  }
+
+  it('19.257 the section and its rows; CONTROL: signed out, no section and no read', async () => {
+    const read = vi.fn(async () => [ROW]);
+    mountWithDeleted(read);
+    expect(await screen.findByRole('heading', { name: 'Deleted items' })).toBeInTheDocument();
+    expect(await screen.findByText('Signage')).toBeInTheDocument();
+    expect(screen.getByText('Deleted by you · 29 Sep')).toBeInTheDocument();
+    cleanup();
+
+    sessionAnswer.current = null;
+    const unread = vi.fn(async () => [ROW]);
+    mountWithDeleted(unread);
+    await screen.findByRole('heading', { name: 'Your account' });
+    expect(screen.queryByRole('heading', { name: 'Deleted items' })).toBeNull();
+    expect(unread).not.toHaveBeenCalled();
   });
 });

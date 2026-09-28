@@ -177,6 +177,87 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.158 — `runThenPrune` prunes only after the job succeeds; a prune that throws or reports errors alerts `backup:prune-after-<job>` and resolves;** control: a failing job rejects and the prune is never called. Mutation: rethrow the prune's error.
 - ✅ **19.159 — the daemon refuses `BACKUP_RETENTION_DAYS=abc` before arming any job, naming the variable;** control: with `30` it arms and announces itself. Mutation: move the `backupRetentionDaysFromEnv` call inside the prune closure (read lazily).
 
-## 19.19 Whole-branch review fixes
+## 19.19 UI primitives
+
+- ✅ **19.201 — `Dialog` with `initialFocusRef` puts focus on that element when it opens;** control: the same dialog without the prop focuses its own panel (ruling P8's default). Mutation: ignore `initialFocusRef` in the focus effect.
+- ✅ **19.202 — `Dialog role="alertdialog"` renders `role="alertdialog"` named by its title;** control: no `role` prop renders `role="dialog"`. Mutation: hard-code `role="dialog"`.
+- ✅ **19.203 — `Dialog describedBy` sets `aria-describedby`, so the panel's accessible description is that element's text;** control: without it the panel has no `aria-describedby` attribute. Mutation: drop the attribute.
+- ✅ **19.204 — `Button` forwards `ref` to its `<button>`;** control: the ref's element is the one the role query finds, with the variant class on it. Mutation: destructure `ref` out of the props and drop it.
+
+## 19.20 Deleted items — who deleted it
+
+- ✅ **19.206 — each row carries `deletedByName`: the deleter's name for a project the owner deleted and for one an admin deleted, and `null` once the admin's name is blank;** control: the two rows carry two different names (a join on the caller would give both the owner's). Mutation: join `"user"` on the CALLER's id instead of `deleted_by`.
+- ✅ **19.207 — the online mapper maps `deletedByName` and refuses a row without the key;** control: `null` round-trips as `null`. Mutation: default a missing `deletedByName` to `null`.
+
+## 19.21 The trash model
+
+- ✅ **19.209 — the spec's fixed strings are the exported constants, verbatim: the note, `Delete permanently`, the title shape `Delete <kind> “<name>”?`, `Nothing deleted.`, `Deleted items needs a connection.`, `Permanently deleted on <day>`;** control: the note's day count is `String(PURGE_DELAY_DAYS)`, and the soft ticket toast is still the 2026-09-20 sentence. Mutation: reword the note ("…purged after…").
+- ✅ **19.210 — with `PURGE_DELAY_DAYS` mocked to 14, the note and the permanent-delete notice say 14 days and contain no 15;** control: the note is otherwise the spec's sentence. Mutation: spell `15` in `DELETE_NOTE`'s template.
+- ✅ **19.211 — `deleteSeeds` sends `<kind>.deleted` alone, or `<kind>.deleted` THEN `purge.marked`, each `{}` against the item's own entity and workspace;** control: all four kinds map to their own delete type. Mutation: put `purge.marked` first.
+- ✅ **19.212 — `restoreSeeds` sends `workspace.undeleted`, `project.undeleted`, `ticket.restored`, `note.restored`, and with `unmarkFirst` sends `purge.unmarked` BEFORE it;** control: no restore ever sends `project.restored` or `workspace.restored` (those are un-archive). Mutation: map `project` to `project.restored`.
+- ✅ **19.213 — `markSeeds`/`unmarkSeeds` file `purge.marked`/`purge.unmarked` against the item's own kind; `targetOf` of a deleted WORKSPACE targets the workspace in its own stream;** control: a note row targets `{ kind: 'note' }` in its workspace. Mutation: file every mark against `kind: 'ticket'`.
+- ✅ **19.214 — `classifyBatch`: all committed → `committed`; none committed → `refused` with the FIRST non-committed reason (an `invalid` answer's message counts); some committed → `partly` with the per-event `committed` flags; fewer answers than claims → `unanswered`;** control: an empty batch is `committed`. Mutation: return `refused` whenever the first answer is not committed.
+- ✅ **19.215 — `istDayLabel` prints the IST day as "8 Oct" and turns at IST midnight (18:30Z); a malformed instant is printed verbatim; `isPurgeOverdue` is true AT the due instant;** control: one millisecond before it, false; `null` is never overdue. Mutation: compare with `<` instead of `<=`.
+- ✅ **19.216 — `archiveWorkspaceSeeds` sends `workspace.archived` for a live workspace and `workspace.restored` for an archived one, `{}` against the workspace;** control: never a `project.*` type. Mutation: send `project.archived`.
+
+## 19.22 The delete dialog
+
+- ✅ **19.218 — the dialog is an `alertdialog` titled `Delete ticket “File the GST return”?`, its **Delete permanently** switch starts OFF, and the note is shown;** control: turning the switch on keeps the note on screen. Mutation: start the switch on.
+- ✅ **19.219 — the confirm reads **Delete** (accessible name `Delete ticket`, `gn-button--danger`) and, with the switch on, **Delete permanently** (accessible name the same);** control: there is exactly one confirm at a time. Mutation: never flip the label.
+- ✅ **19.220 — switch off sends ONE batch `[ticket.deleted]` and calls `onDeleted({ permanent: false })`; switch on sends ONE batch `[ticket.deleted, purge.marked]`, both `{}` against the ticket, and calls `onDeleted({ permanent: true })`;** control: every event in the batch names this ticket in this workspace. Mutation: send the mark in a second `ingest` call.
+- ✅ **19.221 — on open, focus is on **Cancel**; Escape calls `onCancel` and sends nothing;** control: Cancel's own press also calls `onCancel` and sends nothing. Mutation: drop `initialFocusRef`.
+- ✅ **19.222 — a refusal shows the server's reason inline (`role="alert"`) and the dialog stays open still holding the typed workspace name and the switch position; `onDeleted` is not called;** control: pressing again sends a second batch (a retry is possible). Mutation: reset the switch and the typed name on a refusal.
+- ✅ **19.223 — two presses of the confirm while the first ingest is pending send ONE batch, and the confirm is disabled meanwhile;** control: after the answer arrives, `onDeleted` is called once. Mutation: remove BOTH guards (the `inFlight` ref and `submitting` in `disabled`) — each covers the other in jsdom, so the mutation names the pair.
+- ✅ **19.224 — a half-committed batch (`ticket.deleted` committed, `purge.marked` refused) shows "This ticket was deleted, but not marked for permanent deletion — <reason> …", offers only **Close** (focused), never resends, and Close calls `onDeleted({ permanent: false })`;** control: nothing was sent a second time. Mutation: classify the answer as a plain refusal (the dialog then offers **Delete permanently** again, which would resend the delete).
+- ✅ **19.225 — deleting a WORKSPACE asks for its name: the confirm is disabled until the exact name is typed;** control: a ticket shows no text field and its confirm is enabled at once. Mutation: skip the name gate.
+- ✅ **19.226 — a rejected ingest shows the transport sentence in `gn-refusal--transport` and the dialog stays open;** control: an answer shorter than the batch shows `unansweredLine(0, 1)`. Mutation: route the rejection through the server-refusal class.
+
+## 19.23 The ticket sheet
+
+- ✅ **19.228 — the sheet's **Delete** opens the shared `alertdialog` `Delete ticket “<title>”?` with its **Delete permanently** switch, and posts nothing;** control: exactly one button is named `Delete` (the footer's) and one `Delete ticket` (the confirm). Mutation: mount the old E2-35 `Dialog` instead.
+- ✅ **19.229 — confirming posts ONE `ticket.deleted` for this ticket, closes the sheet, and calls `onDeleted(ticketId, key ?? title, { permanent: false })`;** control: the batch holds no `purge.marked`. Mutation: drop the third argument.
+- ✅ **19.230 — with the switch on, confirming posts ONE batch `[ticket.deleted, purge.marked]` and calls `onDeleted(…, { permanent: true })`;** control: both events name this ticket. Mutation: pass `{ permanent: false }` always.
+- ✅ **19.231 — a refused delete answers INSIDE the dialog, once, and the sheet stays open (its `onClose` is not called); the footer holds no refusal;** control: the footer's `Delete` is still there. Mutation: render the refusal in the sheet's head slot as well.
+- ✅ **19.232 — Escape inside the delete dialog closes the dialog and NOT the sheet under it;** control: nothing was posted. Mutation: drop `event.preventDefault()` from `Dialog`'s Escape handler (the E5-20 mechanism).
+- ✅ **19.233 — on the project page a PERMANENT delete's toast reads "<name> marked for permanent deletion · …" and its **Undo** posts ONE batch `[purge.unmarked, ticket.restored]` for that ticket;** control: the soft sentence is not on screen (16.84 is the soft Undo's own case). Mutation: always restore with `ticket.restored` alone.
+- ✅ **19.234 — the page strip's Undo after a permanent delete sends the pair; if only the unmark lands, the refusal is shown and the strip's next Undo sends `ticket.restored` alone;** control: the strip's sentence turns to the soft one once the mark is gone. Mutation: keep `permanent: true` on the strip after a `partly` answer.
+
+## 19.24 The note page
+
+- ✅ **19.236 — a note's editor (its author, here the owner) sees **Delete…** in the byline;** control: a plain member who is not the author sees none, and neither does anyone on a note that is already deleted. Mutation: pass `onDelete` regardless of `canEditNow`.
+- ✅ **19.237 — **Delete…** opens `Delete note “<title>”?`; confirming with the switch on posts ONE batch `[note.deleted, purge.marked]` for this note, and the page then shows the deleted banner;** control: switch off posts `[note.deleted]` alone. Mutation: send the batch against `kind: 'ticket'`.
+- ✅ **19.238 — after a permanent delete made on this page, the banner's **Restore** posts ONE batch `[purge.unmarked, note.restored]`;** control: after a soft delete it posts `[note.restored]` alone. Mutation: always restore with `note.restored` alone.
+- ✅ **19.239 — a refused banner Restore shows the server's reason in the banner (`role="alert"`), and the banner stays;** control: a committed Restore removes the banner. Mutation: return on refusal without setting the message (the old silent `write`).
+
+## 19.25 Project delete on the workspace home
+
+- ✅ **19.241 — an admin's project card shows **Delete…** (accessible name `Delete <project>`) beside **Archive**;** control: a member's card shows neither. Mutation: render Delete… for every role.
+- ✅ **19.242 — **Delete…** opens `Delete project “<name>”?`; confirming posts ONE batch `[project.deleted]` (with the switch on, `[project.deleted, purge.marked]`) against the project, the page re-reads, and a status line names the project and Deleted items;** control: Cancel posts nothing and leaves the card. Mutation: send `project.archived`.
+- ✅ **19.243 — an ARCHIVED project card (behind the archived toggle) also offers **Delete…**;** control: its Archive control reads **Restore**, unchanged. Mutation: render Delete… only on live cards.
+
+## 19.26 Workspace cards
+
+- ✅ **19.245 — an OWNER's workspace card holds exactly one link (the door) and one button (`More actions for <name>`), and the button is not inside the link;** control: an admin's card holds zero buttons (13.390's rule, for everyone but the owner). Mutation: render the menu for `mayAdminister`.
+- ✅ **19.246 — the trigger opens a `menu` named `Workspace actions` with **Archive** and **Delete…**, focus on the first item; ArrowDown moves to **Delete…**; Escape closes it and returns focus to the trigger;** control: `aria-expanded` reads false then true then false. Mutation: drop the Escape branch.
+- ✅ **19.247 — **Archive** posts ONE `workspace.archived` `{}` against the workspace in its own stream, and after the re-read the card has left the live list for the collapsed Archived group;** control: the other, live workspace's card is still in the live list. Mutation: send `project.archived`.
+- ✅ **19.248 — the Archived group is collapsed behind `1 archived · show` (named `Show archived workspaces`, `aria-expanded="false"`); opening it shows the card dimmed with an `Archived` chip, and its menu's **Restore** posts `workspace.restored`;** control: **Hide archived** collapses it again. Mutation: render archived cards in the live list.
+- ✅ **19.249 — **Delete…** opens `Delete workspace “<name>”?`, which needs the name typed; confirming posts ONE `[workspace.deleted]`, the re-read drops the card, and the status line names the workspace and Deleted items;** control: before typing, the confirm is disabled and nothing is posted. Mutation: open the dialog with `kind: 'project'`.
+
+## 19.27 Account — Deleted items
+
+- ✅ **19.251 — each row shows its kind (icon and text), its label, where it lived, "Deleted by you / <name> / someone · <IST day>", and "and N items inside" (singular at 1), in the order served;** control: a ticket row with `containedCount: 0` has no "inside" line. Mutation: print `deletedBy` (the id) instead of the name.
+- ✅ **19.252 — an empty read shows "Nothing deleted."; a `ReplicaGapError` shows "Deleted items needs a connection."; any other failure shows the failure line;** control: neither failure ever shows "Nothing deleted.". Mutation: catch every failure as `[]`.
+- ✅ **19.253 — an unmarked row's **Restore** posts ONE `project.undeleted` for a project row (never `project.restored`), and **Mark for permanent deletion** posts ONE `purge.marked` against the row's own kind; each re-reads;** control: an unmarked row offers no Unmark. Mutation: restore a project with `project.restored`.
+- ✅ **19.254 — a marked row shows "Permanently deleted on 13 Oct", offers **Unmark** (posting `purge.unmarked`), and its **Restore** is disabled with "Unmark it to restore it.";** control: a marked row offers no Mark. Mutation: leave Restore enabled on a marked row.
+- ✅ **19.255 — at its due instant a marked row still shows its date, offers NO Unmark, and says "Its permanent deletion is under way.";** control: one millisecond earlier, Unmark is offered. Mutation: `isPurgeOverdue` with `<`.
+- ✅ **19.256 — two presses on a row action while one is pending post ONE batch; a refusal is shown inside that row;** control: the row's buttons are disabled while pending. Mutation: remove the row latch AND `disabled={busy}` (each covers the other in jsdom).
+- ✅ **19.257 — `/account` shows the Deleted items section for a signed-in person, with the rows `getDeletedItems` served;** control: signed out, no section (and no read). Mutation: render it regardless of the session.
+- ✅ **19.258 — every trash class the dialog and the section render, and every class the card pages add, has a rule inside the one `trash-4-ui` block of `globals.css`, and none of those classes is styled outside it;** control: the block exists exactly once. Mutation: delete the `.gn-deleted-items__due` rule.
+
+## 19.28 Browser
+
+- 🧪 **19.260 — on the dev stack (built from `release/trash` after this plan merges), a project admin deletes a ticket PERMANENTLY from its sheet, finds it marked in Account → Deleted items, unmarks it, restores it, and finds it back on the board with the same key;** control: pressing Escape in the delete dialog closes the dialog and leaves the sheet open, and the first focus in the dialog is Cancel. Steps: (1) sign in as the workspace owner; open a project's Board; open a live ticket (note its key, e.g. `CCSO-12`); (2) press **Delete** in the sheet's footer — the `Delete ticket “<title>”?` dialog opens with focus on **Cancel**; press Escape — the dialog closes and the sheet is still open; (3) press **Delete** again, turn on **Delete permanently**, press **Delete permanently** — the sheet closes, the toast reads "<key> marked for permanent deletion · you can also undo this on the page", the card is gone from the Board; (4) open the avatar menu → **Account** → **Deleted items**: the ticket's row shows "Ticket · <workspace> › <project>", "Deleted by you · <today, IST>", "Permanently deleted on <today + PURGE_DELAY_DAYS, IST>", an **Unmark** button, a disabled **Restore** and "Unmark it to restore it."; (5) press **Unmark** — the date line goes and **Restore** and **Mark for permanent deletion** are offered; (6) press **Restore** — the row goes (or the list reads "Nothing deleted." if it was the only one); (7) back on the project's Board the card is back with the SAME key. Evidence: one screenshot per step 2–7 into the PR thread, and the runner's name and the stack's commit. Mutation (for the runner, optional): none — a browser case is witnessed, not mutated.
+
+## 19.29 Whole-branch review fixes
 
 - ✅ **19.160 — a purge that lands while the embed worker is mid-call is not undone: the worker writes no chunk for the erased note, and a chunk row whose note no longer exists is removed by the next pass;** control: the live note beside it is embedded. Mutation: drop the worker's `FOR SHARE` re-check (the racing INSERT survives), or restore the join-based cleanup (the orphan survives).

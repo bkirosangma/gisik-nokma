@@ -193,6 +193,11 @@ count and — once it has any projects — a line naming them.
   heading and is in fact the door.
 - The projects on the card are a **line of text, not links**. There is nothing per-project to click
   there; the project list is one click further in, on the workspace's own page.
+- **If you own a workspace, its card has a menu** (the **⋯** button in its corner): **Archive** moves
+  the workspace into an **Archived** group below the others — collapsed until you open it — without
+  taking anyone's access away, and **Restore** there brings it back. **Delete…** asks you to type the
+  workspace's name first, because it removes the workspace from every member at once; it then sits
+  under **Deleted items** on your Account page until you restore it. Nobody but the owner sees the menu.
 
 If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
 — or create your own."* Both of those are real options.
@@ -207,6 +212,22 @@ You can rename a workspace and the new name appears in everybody's list.
 > **Worth knowing:** at the moment *anyone* inside a workspace can rename it — including the most
 > limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the
 > rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on.
+
+### Deleted items, and getting things back
+
+Everything deleted that you may bring back is listed under **Deleted items** on your Account page: the
+workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your
+own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived,
+and who deleted it and when. A deleted workspace or project also says how many things are inside it —
+they come back with it, and are not listed separately.
+
+- **Restore** brings it back.
+- **Mark for permanent deletion** starts the waiting period, and the row then shows the day it will be
+  erased for good. **Unmark** stops that. A marked item has to be unmarked before it can be restored.
+- Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing
+  is already under way.
+
+If the list cannot be read, the section says so, rather than showing an empty list.
 
 ---
 
@@ -435,17 +456,23 @@ This is the honest list. Each one is an absence, not a hidden button.
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
 - **You can delete a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and press **Delete** in the sheet's
-  footer. The job stops appearing in every view — boards, lists, search, My Work — and **its history is
-  kept**, because other events cite it. **Only a project admin may delete**, and the button is not hidden
-  from anybody: press it without the right and the server refuses, saying so. A **"… deleted · its
-  history is retained"** message follows with an **Undo** for about fifteen seconds, and that Undo is the
-  product's only route back — once it goes, no control anywhere restores the job.
+  footer. A confirmation opens first: it names the job, has a **Delete permanently** switch (off unless
+  you turn it on), and says where deleted things go. **Cancel** is where the cursor starts, so pressing
+  Enter by reflex deletes nothing. Press **Delete** and the job stops appearing in every view — boards,
+  lists, search, My Work — while **its history is kept**, because other events cite it. **Only a project
+  admin may delete**, and the button is not hidden from anybody: press it without the right and the
+  confirmation shows the server's refusal and stays open. A message follows with an **Undo** for about
+  fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After
+  that the job is still listed under **Deleted items** on your Account page, where **Restore** brings it
+  back.
 
-  **One exception, added 2026-09-23: a job deleted from My Work has no Undo.** The message and the
-  fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place
-  without them, so the deletion there is silent and final. The job still stops appearing in every
-  view and its history is still kept. **If you want the way back, delete the job from its project
-  page.**
+  **Delete permanently** does all of that and also marks the job to be erased for good after the
+  waiting period the confirmation states. Until then the **Undo** (or **Unmark** in Deleted items) takes
+  the mark off; once the period is over it cannot be undone.
+
+  **A job deleted from My Work has no Undo there.** The message and the Undo belong to the job's own
+  project page, and My Work opens the sheet in place without them. The job still stops appearing in
+  every view, its history is still kept, and it is still in **Deleted items** on your Account page.
 
   If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
   alternative.
@@ -1677,9 +1704,12 @@ A deleted note goes into a **Deleted** group on the Notes page, with a **Restore
 see your own there, and an owner or admin sees everyone's. Restoring it brings it back exactly as it
 was; while deleted, the note is read-only for everyone, its own author included.
 
-**As of this writing there is no Delete button on a note's own page** — nothing in the product yet puts
-a note there for you. The Restore machinery is ready and working; only the control that starts it is
-still missing.
+**Deleting a note:** open it and press **Delete…** beside **History** — only the note's author, a
+workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its
+**Delete permanently** switch. A deleted note shows a banner on its own page; **Restore** there brings
+it back, and if the server refuses (for example because the note is marked for permanent deletion
+elsewhere) the banner says why. Every deleted note is also listed under **Deleted items** on your
+Account page.
 
 If a note you have open stops being shared with you — someone narrowed its scope, or detached the last
 job it inherited from — you are taken back to the Notes list with a message: **That note is no longer

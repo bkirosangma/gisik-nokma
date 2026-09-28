@@ -2,6 +2,7 @@
 
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import {
+  DeletedItemsSection,
   NotificationsSection,
   PasskeysSection,
   SessionsSection,
@@ -316,6 +317,12 @@ export default function AccountPage() {
           />
         ) : null}
         {workspaces !== null ? <WorkspacesSection workspaces={workspaces} /> : null}
+        {/* Trash series Plan 4 (spec §6.3): after "Your workspaces" because
+            what it lists is the workspaces' contents, and before the three
+            credential cards. Signed-in only: the read is the caller's own
+            (`GET /v1/me/deleted-items`), and a signed-out read would buy a
+            401 for nothing. */}
+        {user !== null ? <DeletedItemsSection dataSource={dataSource} currentUserId={user.id} /> : null}
         {sessions !== null ? (
           <SessionsSection
             sessions={sessions}

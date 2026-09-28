@@ -889,6 +889,13 @@ export type DeletedItem = {
   /** Workspace/project name, ticket `KEY title`, note title. */
   label: string;
   deletedBy: string;
+  /**
+   * The deleter's display name (trash Plan 4, D1) — `"user"."name"` trimmed, or
+   * `null` when it is blank or the account is gone. The Deleted items screen
+   * says "you" for the viewer's own deletions and "someone" for `null`; the id
+   * above stays the identity, this is only what a person reads.
+   */
+  deletedByName: string | null;
   deletedAt: string;
   purgeMarkedAt: string | null;
   /** `purgeDueAt(purgeMarkedAt)`, computed by the server; `null` when unmarked. */

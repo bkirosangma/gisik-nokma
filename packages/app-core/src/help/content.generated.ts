@@ -1083,6 +1083,64 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": ". There is nothing per-project to click there; the project list is one click further in, on the workspace's own page."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "If you own a workspace, its card has a menu"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "⋯"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button in its corner): "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Archive"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " moves the workspace into an "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Archived"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " group below the others — collapsed until you open it — without taking anyone's access away, and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " there brings it back. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete…"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks you to type the workspace's name first, because it removes the workspace from every member at once; it then sits under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Deleted items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on your Account page until you restore it. Nobody but the owner sees the menu."
+                    }
                   ]
                 ]
               },
@@ -1153,6 +1211,78 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " inside a workspace can rename it — including the most limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "deleted-items-and-getting-things-back",
+            "title": "Deleted items, and getting things back",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Everything deleted that you may bring back is listed under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page: the workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived, and who deleted it and when. A deleted workspace or project also says how many things are inside it — they come back with it, and are not listed separately."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " brings it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Mark for permanent deletion"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " starts the waiting period, and the row then shows the day it will be erased for good. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Unmark"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " stops that. A marked item has to be unmarked before it can be restored."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing is already under way."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the list cannot be read, the section says so, rather than showing an empty list."
                   }
                 ]
               }
@@ -2552,7 +2682,31 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and "
+                      "text": " in the sheet's footer. A confirmation opens first: it names the job, has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete permanently"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " switch (off unless you turn it on), and says where deleted things go. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " is where the cursor starts, so pressing Enter by reflex deletes nothing. Press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and the job stops appearing in every view — boards, lists, search, My Work — while "
                     },
                     {
                       "kind": "bold",
@@ -2568,15 +2722,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", and the button is not hidden from anybody: press it without the right and the server refuses, saying so. A "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "\"… deleted · its history is retained\""
-                    },
-                    {
-                      "kind": "text",
-                      "text": " message follows with an "
+                      "text": ", and the button is not hidden from anybody: press it without the right and the confirmation shows the server's refusal and stays open. A message follows with an "
                     },
                     {
                       "kind": "bold",
@@ -2584,7 +2730,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " for about fifteen seconds, and that Undo is the product's only route back — once it goes, no control anywhere restores the job."
+                      "text": " for about fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After that the job is still listed under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Deleted items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on your Account page, where "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " brings it back."
                     }
                   ]
                 ]
@@ -2594,15 +2756,48 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "One exception, added 2026-09-23: a job deleted from My Work has no Undo."
+                    "text": "Delete permanently"
                   },
                   {
                     "kind": "text",
-                    "text": " The message and the fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place without them, so the deletion there is silent and final. The job still stops appearing in every view and its history is still kept. "
+                    "text": " does all of that and also marks the job to be erased for good after the waiting period the confirmation states. Until then the "
                   },
                   {
                     "kind": "bold",
-                    "text": "If you want the way back, delete the job from its project page."
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items) takes the mark off; once the period is over it cannot be undone."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A job deleted from My Work has no Undo there."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The message and the Undo belong to the job's own project page, and My Work opens the sheet in place without them. The job still stops appearing in every view, its history is still kept, and it is still in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page."
                   }
                 ]
               },
@@ -7928,7 +8123,39 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, "
+                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Redo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Heading level"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link, Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
                   },
                   {
                     "kind": "bold",
@@ -7944,7 +8171,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. "
+                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. Undo and Redo grey out when there is nothing to step back or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link. "
                   },
                   {
                     "kind": "bold",
@@ -7993,6 +8220,64 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you want, the label reads, for example, \"2 × 3 table\", then click (or press Enter) to insert it with a header row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is inside a table, because a table cannot be placed inside another."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Editing a link."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Click into any link's text and a small panel opens beside it with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "URL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Text"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shortcut (web, email and phone addresses only) and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unlink"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Enter or clicking away keeps a change, Escape puts it back. An empty URL, or Unlink, takes the link off and keeps the words; an empty Text deletes the link. Ctrl-K (Cmd-K on a Mac) with the cursor in a link jumps straight into the URL field. The panel appears only for the box you are typing in."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "Notes save themselves."
                   },
                   {
@@ -8022,6 +8307,43 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " until it goes through. Leaving the note, switching away, or closing the tab all flush a change in progress rather than dropping it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Reopening a note after an unsaved session shows a banner."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " If a note opens with words that never reached the server, a bar above the text reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restored unsaved changes from 5m ago."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to carry on with them (they save as usual), or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to throw them away and load the note as the server has it. Discard cannot be undone. Only people who can edit the note see the bar."
                   }
                 ]
               },
@@ -8063,7 +8385,49 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen."
+                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen. The heading you jump to lands just under the top bar, not behind it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Every heading in a note can be linked to."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Hover a heading (on a phone or tablet the small link icon is always there, faintly) and press the link icon at the end of it — or Tab to it and press Enter — to copy a link to that exact heading. Paste it anywhere; whoever opens it lands on that heading, provided they can read the note. The icon appears on all six heading levels, and if two headings read the same the second gets a "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-2"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the end of its link, the third "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-3"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Only the note page has this; the comment box and the job sheet do not."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A thin line under the top bar shows how far down a note you have read."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It fills from the left as you scroll the note (the title and byline above the text do not count) and starts again at empty when you open another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops animating if your device is set to reduce motion."
                   }
                 ]
               }
@@ -8307,11 +8671,51 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "As of this writing there is no Delete button on a note's own page"
+                    "text": "Deleting a note:"
                   },
                   {
                     "kind": "text",
-                    "text": " — nothing in the product yet puts a note there for you. The Restore machinery is ready and working; only the control that starts it is still missing."
+                    "text": " open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — only the note's author, a workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete permanently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switch. A deleted note shows a banner on its own page; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " there brings it back, and if the server refuses (for example because the note is marked for permanent deletion elsewhere) the banner says why. Every deleted note is also listed under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page."
                   }
                 ]
               },
@@ -9547,15 +9951,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. A "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "\"… deleted · its history is retained\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " message follows with an "
+                    "text": " in the sheet's footer, then confirm. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. An "
                   },
                   {
                     "kind": "bold",
@@ -9563,7 +9959,39 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " for about fifteen seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the job. If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
+                    "text": " follows for about fifteen seconds, and after that the job is still under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, where "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " brings it back. Turning on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete permanently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the confirmation also marks it to be erased for good after the waiting period the confirmation states; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items takes that back until then. If you would rather not lose it at all, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
                   }
                 ]
               }
@@ -10713,6 +11141,76 @@ export const HELP_CONTENT: HelpContent = [
                 ]
               }
             ]
+          },
+          {
+            "id": "how-do-i-change-a-link-i-already-wrote-its-address-its-words",
+            "title": "How do I change a link I already wrote — its address, its words, or take it off?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Click into the link's text. A small panel appears next to it with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "URL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Text"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shortcut for web, email and phone addresses, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unlink"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Change either field and press Enter (or click away) to keep the change; press Escape to put it back. Clearing the URL, or pressing Unlink, removes the link and leaves the words; clearing the Text deletes the link. From the keyboard, press Ctrl-K (Cmd-K on a Mac) with the cursor in a link to jump into the URL field. It only shows in the box you are typing in, and never in a box you can only read."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-put-a-table-in-a-note-or-a-comment",
+            "title": "How do I put a table in a note or a comment?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Use "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the formatting strip: an eight-by-eight grid opens, move over it (or use the arrow keys) until the label reads the size you want — \"2 × 3 table\" — then click, or press Enter. The first row is a header row. Escape closes the grid without inserting. The tool is greyed out while your cursor is already inside a table, because a table cannot go inside another one."
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -10739,6 +11237,91 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " in the nav, left of Inbox."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-is-the-thin-line-at-the-top-of-a-note",
+            "title": "What is the thin line at the top of a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A reading-progress bar: it fills from the left as you scroll down the note, so you can see how far through a long one you are. It measures the text of the note only (not the title or byline above it), starts over when you open another note, and is there whether or not you can edit the note. If your device is set to reduce motion it moves without the smoothing."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-link-to-one-heading-in-a-note",
+            "title": "How do I link to one heading in a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Hover the heading and press the small link icon at its end (Tab to it and press Enter with the keyboard; on a touch screen the icon is always visible). That copies a link ending in "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "#"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the heading's name, and opening it scrolls straight to the heading. It works on all six heading levels. Two headings with the same words get "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-2"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-3"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and so on, in the order they appear — so a link can point at the wrong one if you rearrange headings that share a name. The person you send it to still needs access to the note."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-does-my-note-open-with-a-bar-saying-restored-unsaved-cha",
+            "title": "Why does my note open with a bar saying \"Restored unsaved changes\"?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Last time you had it open, some of what you typed never reached the server (you lost the connection, or closed the tab first), so it was kept on your device and is showing now. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " carries on with those words; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " deletes them and shows the note as the server has it, which cannot be undone. The bar is only shown to people who can edit the note."
                   }
                 ]
               }
@@ -10937,7 +11520,55 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up in the Deleted group, Restore works and brings it back exactly as it was."
+                    "text": "Yes — open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (its author, a workspace admin or the owner). It goes to the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " group on the Notes page and to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in either brings it back exactly as it was; a note marked for permanent deletion has to be unmarked first, with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items."
                   }
                 ]
               }

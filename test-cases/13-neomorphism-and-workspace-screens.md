@@ -937,6 +937,10 @@ result. No server change — `WorkspaceRef`/`ProjectRef` are unchanged, every nu
   length 0), rather than proving absence indirectly by showing other controls still reachable at their own
   top-level role. Nothing removed is unreachable: `/w/<id>`, one click through this same door, already
   carries all three (Task 19, Round 19b). —
+  **Amended 2026-09-29 by 19.245 (trash Plan 4):** the workspace's OWNER now also gets one button, the overflow
+  menu's trigger, as a sibling of the door and never inside it (spec §6.2, a deliberate change to Round 19c);
+  every other role's card still has zero buttons, which is what this case's zero-buttons arm now asserts with an
+  admin fixture. —
   (`workspaces-cards.test.tsx`)
 - **13.391** ✅ The nav is CONTEXTUAL, transcribing the prototype's `navItems` FILTER rather than its
   picture: without a workspace in the route, only the `always` items render plus a scope note; with one,

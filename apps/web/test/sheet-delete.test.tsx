@@ -2,9 +2,9 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import { act } from 'react';
 import { userEvent } from '@testing-library/user-event';
 import { afterEach, describe, expect, it, vi } from 'vitest';
-import type { SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, SubmittedEvent, TicketState, WorkflowDef } from '@gisik-nokma/domain';
 import type { TicketRead } from '@gisik-nokma/app-core';
-import { createClientStateCache } from '@gisik-nokma/app-core';
+import { createClientStateCache, ticketDeletedToast, ticketDurableUndoLine } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
 
@@ -127,7 +127,16 @@ let ingested: SubmittedEvent[][] = [];
  */
 let listCalls = 0;
 
-async function openTheSheet(readKey: string | null = null): Promise<void> {
+type Answer = (events: SubmittedEvent[], call: number) => IngestResult[];
+const COMMIT_ALL: Answer = (events) =>
+  events.map((event) => ({
+    status: 'committed' as const,
+    eventId: event.id,
+    seq: 1,
+    serverTime: '2026-09-20T08:00:00.000Z',
+  }));
+
+async function openTheSheet(readKey: string | null = null, answer: Answer = COMMIT_ALL): Promise<void> {
   const services = stubServices({
     getTickets: async () => {
       listCalls += 1;
@@ -177,12 +186,7 @@ async function openTheSheet(readKey: string | null = null): Promise<void> {
     ...services.dataSource,
     ingest: async (events) => {
       ingested.push(events);
-      return events.map((event) => ({
-        status: 'committed' as const,
-        eventId: event.id,
-        seq: 1,
-        serverTime: '2026-09-20T08:00:00.000Z',
-      }));
+      return answer(events, ingested.length);
     },
   };
   // The transition dialog's precheck reads the cache, and `stubServices`
@@ -458,5 +462,56 @@ describe('13.1180 the durable way back from a delete (ruling E2-30)', () => {
 
     await waitFor(() => expect(ingested).toHaveLength(2));
     await waitFor(() => expect(strip()).toBeNull());
+  });
+});
+
+/** Trash series Plan 4, Task 5. Cases 19.233–19.234 (`test-cases/19-trash.md` §19.23). */
+describe('19.233–19.234 the Undo after a PERMANENT delete unmarks first', () => {
+  const types = (batch: SubmittedEvent[] | undefined) => (batch ?? []).map((event) => event.type);
+
+  async function deletePermanently(): Promise<void> {
+    await userEvent.click(screen.getByRole('button', { name: 'Delete' }));
+    await userEvent.click(await screen.findByRole('checkbox', { name: 'Delete permanently' }));
+    await userEvent.click(screen.getByRole('button', { name: 'Delete permanently' }));
+    await waitFor(() => expect(ingested).toHaveLength(1));
+    expect(types(ingested[0])).toEqual(['ticket.deleted', 'purge.marked']);
+  }
+
+  it('19.233 the toast says it is marked, and its Undo posts ONE batch [purge.unmarked, ticket.restored]', async () => {
+    await openTheSheet();
+    await deletePermanently();
+    await screen.findByText(ticketDeletedToast(TITLE, true));
+    // CONTROL — not the soft sentence.
+    expect(screen.queryByText(ticketDeletedToast(TITLE, false))).toBeNull();
+
+    await userEvent.click(toastUndo());
+    await waitFor(() => expect(ingested).toHaveLength(2));
+    expect(types(ingested[1])).toEqual(['purge.unmarked', 'ticket.restored']);
+    expect(ingested[1]!.every((event) => event.entity.kind === 'ticket' && event.entity.id === TICKET)).toBe(true);
+  });
+
+  it('19.234 the strip sends the pair; after a half answer its next Undo sends the restore alone', async () => {
+    const reason = 'This project is deleted. Restore it from Deleted items on your Account page first.';
+    await openTheSheet(null, (events, call) =>
+      call === 2
+        ? [
+            COMMIT_ALL([events[0]!], call)[0]!,
+            { status: 'refused', eventId: events[1]!.id, rule: 'lifecycle.state', reason },
+          ]
+        : COMMIT_ALL(events, call),
+    );
+    await deletePermanently();
+    expect(await screen.findByText(ticketDurableUndoLine(TITLE, true))).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('deleted-undo-button'));
+    await waitFor(() => expect(ingested).toHaveLength(2));
+    expect(types(ingested[1])).toEqual(['purge.unmarked', 'ticket.restored']);
+    await screen.findByText(`The ticket could not be restored — ${reason}`);
+    // CONTROL — the mark is gone, so the strip now says so and sends the restore alone.
+    expect(await screen.findByText(ticketDurableUndoLine(TITLE, false))).toBeInTheDocument();
+
+    await userEvent.click(screen.getByTestId('deleted-undo-button'));
+    await waitFor(() => expect(ingested).toHaveLength(3));
+    expect(types(ingested[2])).toEqual(['ticket.restored']);
   });
 });

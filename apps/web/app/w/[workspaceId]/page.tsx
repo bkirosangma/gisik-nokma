@@ -5,7 +5,14 @@ import { useParams } from 'next/navigation';
 import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { newUlid, type IngestResult } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
-import { makeSubmittedFactory, type EnvelopeSeed } from '@gisik-nokma/app-core';
+import {
+  DELETE_TRIGGER_LABEL,
+  DeleteDialog,
+  deleteItemName,
+  deletedNotice,
+  makeSubmittedFactory,
+  type EnvelopeSeed,
+} from '@gisik-nokma/app-core';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
 import { AppNav } from '../../../src/app-nav.js';
 import { ShellRefusal } from '../../../src/shell-refusal.js';
@@ -200,6 +207,10 @@ export default function WorkspaceHomePage() {
   const [refusal, setRefusal] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
   const [showArchived, setShowArchived] = useState(false);
+  /** The project the delete dialog is open on (trash Plan 4, spec §6.2). */
+  const [deleting, setDeleting] = useState<ProjectRef | null>(null);
+  /** "Deleted project “X”…" after a committed delete — where it went and how back. */
+  const [notice, setNotice] = useState<string | null>(null);
 
   const reload = useCallback(() => {
     dataSource.query.getMyWorkspaces().then(
@@ -328,8 +339,36 @@ export default function WorkspaceHomePage() {
           showArchived={showArchived}
           onToggleArchived={() => setShowArchived((open) => !open)}
           onSubmit={submit}
+          onDelete={(project) => {
+            setNotice(null);
+            setDeleting(project);
+          }}
         />
       )}
+      {notice !== null ? (
+        <p role="status" className="gn-trash-notice" data-testid="trash-notice">
+          {notice}
+        </p>
+      ) : null}
+      {deleting !== null && user !== null ? (
+        <DeleteDialog
+          open
+          kind="project"
+          name={deleting.name}
+          workspaceId={workspaceId}
+          entityId={deleting.id}
+          dataSource={dataSource}
+          make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })}
+          onCancel={() => setDeleting(null)}
+          onDeleted={({ permanent }) => {
+            setNotice(deletedNotice('project', deleting.name, permanent));
+            setDeleting(null);
+            // Observed by re-reading, never by editing this page's copy — the
+            // rule `submit`'s own comment states.
+            reload();
+          }}
+        />
+      ) : null}
       {refusal !== null ? (
         <p role="alert" className="gn-refusal gn-refusal--server">
           {refusal}
@@ -390,6 +429,7 @@ function ProjectCard({
   isAdmin,
   busy,
   onArchive,
+  onDelete,
 }: {
   workspaceId: string;
   project: ProjectRef;
@@ -397,6 +437,7 @@ function ProjectCard({
   isAdmin: boolean;
   busy: boolean;
   onArchive: (project: ProjectRef) => void;
+  onDelete: (project: ProjectRef) => void;
 }) {
   return (
     <li data-testid={`project-row-${project.id}`}>
@@ -461,6 +502,18 @@ function ProjectCard({
               onClick={() => onArchive(project)}
             >
               {project.archived ? 'Restore' : 'Archive'}
+            </Button>
+            {/* Spec §6.2: Delete… BESIDE Archive, for the same people (D4) —
+                the ellipsis because it asks before it acts. The accessible name
+                carries the project, the rule the Archive button's own comment
+                states, and contains the visible word (WCAG 2.5.3). */}
+            <Button
+              type="button"
+              disabled={busy}
+              aria-label={deleteItemName(project.name)}
+              onClick={() => onDelete(project)}
+            >
+              {DELETE_TRIGGER_LABEL}
             </Button>
           </div>
         ) : null}
@@ -680,12 +733,14 @@ function WorkspaceHome({
   showArchived,
   onToggleArchived,
   onSubmit,
+  onDelete,
 }: {
   workspace: WorkspaceRef;
   busy: boolean;
   showArchived: boolean;
   onToggleArchived: () => void;
   onSubmit: (build: (actorId: string) => EnvelopeSeed[], whenDone: () => void) => void;
+  onDelete: (project: ProjectRef) => void;
 }) {
   const viewer = viewerOf(workspace.role);
   const isAdmin = mayAdminister(workspace.role);
@@ -980,6 +1035,7 @@ function WorkspaceHome({
               isAdmin={isAdmin}
               busy={busy}
               onArchive={archive}
+              onDelete={onDelete}
             />
           ))}
         </ul>

@@ -6,7 +6,23 @@ import { useCallback, useEffect, useState, type FormEvent } from 'react';
 import { IST_TIME_ZONE } from '@gisik-nokma/domain';
 import { Avatar, Button, Card, Chip } from '@gisik-nokma/ui';
 import { FoundingError, InvitationActionError, type PendingInvitation } from '@gisik-nokma/app-core/online';
-import type { WorkspaceRef } from '@gisik-nokma/app-core';
+import {
+  ARCHIVED_CHIP_LABEL,
+  ARCHIVED_GROUP_HEADING,
+  DeleteDialog,
+  NOT_SIGNED_IN_LINE,
+  archiveWorkspaceSeeds,
+  archivedDoorName,
+  archivedToggleName,
+  archivedToggleText,
+  changeUnreachableLine,
+  classifyBatch,
+  deletedNotice,
+  makeSubmittedFactory,
+  unansweredLine,
+  writeFailureCopy,
+  type WorkspaceRef,
+} from '@gisik-nokma/app-core';
 import { AppNav } from '../../src/app-nav.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { useAppServices, useCurrentUser } from '../../src/providers.js';
@@ -19,6 +35,7 @@ import {
   type CardViewer,
 } from '../../src/workspace-viewer.js';
 import { displayLabelOf } from '../../src/display-label.js';
+import { WorkspaceCardMenu } from '../../src/workspace-card-menu.js';
 
 export default function WorkspacesPage() {
   const { dataSource } = useAppServices();
@@ -26,11 +43,54 @@ export default function WorkspacesPage() {
   const [workspaces, setWorkspaces] = useState<WorkspaceRef[] | null>(null);
   const [failure, setFailure] = useState<string | null>(null);
 
-  useEffect(() => {
+  const [showArchived, setShowArchived] = useState(false);
+  const [busy, setBusy] = useState(false);
+  const [refusal, setRefusal] = useState<string | null>(null);
+  const [notice, setNotice] = useState<string | null>(null);
+  const [deleting, setDeleting] = useState<WorkspaceRef | null>(null);
+
+  const reload = useCallback(() => {
     dataSource.query.getMyWorkspaces().then(setWorkspaces, (cause: unknown) => {
       setFailure(cause instanceof Error ? cause.message : String(cause));
     });
   }, [dataSource]);
+
+  useEffect(() => reload(), [reload]);
+
+  /**
+   * Archive / Restore of a workspace (spec T8, §6.2) — one event, read back by
+   * RE-READING, never by moving the card here (the workspace home's own rule).
+   */
+  const toggleArchive = useCallback(
+    (workspace: WorkspaceRef): void => {
+      setRefusal(null);
+      setNotice(null);
+      if (user === null) {
+        setRefusal(NOT_SIGNED_IN_LINE);
+        return;
+      }
+      const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+      const seeds = archiveWorkspaceSeeds(workspace.id, workspace.archived);
+      setBusy(true);
+      void dataSource.ingest(seeds.map(make)).then(
+        (results) => {
+          setBusy(false);
+          const outcome = classifyBatch(results, seeds.length);
+          if (outcome.status === 'unanswered') setRefusal(unansweredLine(outcome.answered, seeds.length));
+          else if (outcome.status !== 'committed') setRefusal(outcome.reason);
+          reload();
+        },
+        (cause: unknown) => {
+          setBusy(false);
+          setRefusal(writeFailureCopy(cause, changeUnreachableLine));
+        },
+      );
+    },
+    [dataSource, reload, user],
+  );
+
+  const live = workspaces?.filter((workspace) => !workspace.archived) ?? [];
+  const archived = workspaces?.filter((workspace) => workspace.archived) ?? [];
 
   // A 401 is not a refusal to answer, it is “we do not know who you are” — and the
   // one place that has an answer is the sign-in page. The rule USED TO LIVE HERE,
@@ -96,12 +156,88 @@ export default function WorkspacesPage() {
           // for somebody else, which was the last hole in the founding path.
           <p>No workspaces yet. Ask an admin for an invite link — or create your own.</p>
         ) : (
-          <ul className="gn-workspace-list">
-            {workspaces.map((workspace) => (
-              <WorkspaceCard key={workspace.id} workspace={workspace} />
-            ))}
-          </ul>
+          <>
+            {live.length > 0 ? (
+              <ul className="gn-workspace-list">
+                {live.map((workspace) => (
+                  <WorkspaceCard
+                    key={workspace.id}
+                    workspace={workspace}
+                    busy={busy}
+                    onArchiveToggle={toggleArchive}
+                    onDelete={(target) => {
+                      setNotice(null);
+                      setDeleting(target);
+                    }}
+                  />
+                ))}
+              </ul>
+            ) : null}
+            {/* Spec §6.2: archived workspaces in a COLLAPSED group below the
+                live ones, disclosed the way the workspace home discloses its
+                archived projects (`app/w/[workspaceId]/page.tsx`):
+                rendered only when there is something behind it, the visible
+                count, and an accessible name that says WHAT is archived. */}
+            {archived.length > 0 ? (
+              <section className="gn-workspaces__archived" aria-labelledby="gn-workspaces-archived-heading">
+                <h2 className="gn-workspaces__archived-heading" id="gn-workspaces-archived-heading">
+                  {ARCHIVED_GROUP_HEADING}
+                </h2>
+                <Button
+                  type="button"
+                  aria-expanded={showArchived}
+                  aria-label={archivedToggleName(showArchived)}
+                  onClick={() => setShowArchived((open) => !open)}
+                >
+                  {archivedToggleText(archived.length, showArchived)}
+                </Button>
+                {showArchived ? (
+                  <ul className="gn-workspace-list gn-workspace-list--archived">
+                    {archived.map((workspace) => (
+                      <WorkspaceCard
+                        key={workspace.id}
+                        workspace={workspace}
+                        busy={busy}
+                        onArchiveToggle={toggleArchive}
+                        onDelete={(target) => {
+                          setNotice(null);
+                          setDeleting(target);
+                        }}
+                      />
+                    ))}
+                  </ul>
+                ) : null}
+              </section>
+            ) : null}
+          </>
         )}
+        {refusal !== null ? (
+          <p role="alert" className="gn-refusal gn-refusal--server">
+            {refusal}
+          </p>
+        ) : null}
+        {notice !== null ? (
+          <p role="status" className="gn-trash-notice" data-testid="trash-notice">
+            {notice}
+          </p>
+        ) : null}
+        {deleting !== null && user !== null ? (
+          <DeleteDialog
+            open
+            kind="workspace"
+            name={deleting.name}
+            workspaceId={deleting.id}
+            entityId={deleting.id}
+            dataSource={dataSource}
+            make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })}
+            onCancel={() => setDeleting(null)}
+            onDeleted={({ permanent }) => {
+              setNotice(deletedNotice('workspace', deleting.name, permanent));
+              setDeleting(null);
+              reload();
+            }}
+          />
+        ) : null}
 
         {/*
           OUTSIDE the list's three branches, and deliberately so. ⚠ CORRECTED
@@ -272,7 +408,17 @@ function ChipRow({
  * ticket counts are (`viewer.countsWithheld`), so a guest sees no archived
  * count either, consistent with getting no numbers at all.
  */
-function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
+function WorkspaceCard({
+  workspace,
+  busy,
+  onArchiveToggle,
+  onDelete,
+}: {
+  workspace: WorkspaceRef;
+  busy: boolean;
+  onArchiveToggle: (workspace: WorkspaceRef) => void;
+  onDelete: (workspace: WorkspaceRef) => void;
+}) {
   const viewer = viewerOf(workspace.role);
   const live = workspace.projects.filter((project) => !project.archived);
   const archived = workspace.projects.filter((project) => project.archived);
@@ -283,6 +429,16 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
   // Same reason as `meta` above: `projects` is read in both the render
   // condition and the body below.
   const projects = projectLine(live.map((p) => p.name), viewer.countsWithheld);
+  // D4 — the menu is the OWNER's (spec §4: archive, restore and delete of a
+  // workspace are owner-only), so nobody else is shown a door the server refuses.
+  const isOwner = workspace.role === 'owner';
+  const cardClass = [
+    'gn-workspace-card',
+    isOwner ? 'gn-workspace-card--menu' : null,
+    workspace.archived ? 'gn-workspace-card--archived' : null,
+  ]
+    .filter(Boolean)
+    .join(' ');
 
   return (
     <li data-testid={`workspace-card-${workspace.id}`}>
@@ -293,10 +449,10 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
           the one `neo-card-radius.test.ts` (case 13.355) asserts does not
           exist, because page-scoped overrides of the shared card class are what
           inverted a radius bump into a shrink once the radius became a token. */}
-      <Card className="gn-workspace-card">
+      <Card className={cardClass}>
         <Link
           href={`/w/${workspace.id}`}
-          aria-label={workspace.name}
+          aria-label={workspace.archived ? archivedDoorName(workspace.name) : workspace.name}
           className="gn-workspace-card__door"
         >
           <div className="gn-workspace-card__head">
@@ -306,6 +462,7 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
             <Avatar name={workspace.name} tint={workspace.id} size="workspace" />
             <div className="gn-workspace-card__titles">
               <h2>{workspace.name}</h2>
+              {workspace.archived ? <Chip tone="neutral">{ARCHIVED_CHIP_LABEL}</Chip> : null}
               {/* The prototype's meta line. It carries the PROJECT count only:
                   the members chip below already says the member count, and the
                   prototype's "5 members · 2 projects" would say it twice on one
@@ -352,6 +509,15 @@ function WorkspaceCard({ workspace }: { workspace: WorkspaceRef }) {
             <p className="gn-workspace-card__restricted">{restricted}</p>
           ) : null}
         </Link>
+        {isOwner ? (
+          <WorkspaceCardMenu
+            name={workspace.name}
+            archived={workspace.archived}
+            disabled={busy}
+            onArchiveToggle={() => onArchiveToggle(workspace)}
+            onDelete={() => onDelete(workspace)}
+          />
+        ) : null}
       </Card>
     </li>
   );
