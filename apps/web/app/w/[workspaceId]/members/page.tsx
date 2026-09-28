@@ -1,6 +1,6 @@
 'use client';
 
-import { useCallback, useEffect, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
 import { Button, Card, Select } from '@gisik-nokma/ui';
 import { INVITE_CHANNELS, membershipId } from '@gisik-nokma/domain';
@@ -779,9 +779,22 @@ function MintForm({
    * the invitation reaches the address the account signs in with.
    */
   const [account, setAccount] = useState<LookedUpPerson | null>(null);
+  // The address the newest lookup was asked about. A slow answer for an address
+  // the admin has since edited must not name (and redirect the invitation to) an
+  // account the box no longer holds.
+  const askedAddress = useRef<string | null>(null);
   const lookUp = (): void => {
     if (channel !== 'email' || !address.includes('@')) return;
-    void people.lookup(workspaceId, address).then(setAccount, () => setAccount(null));
+    const asked = address;
+    askedAddress.current = asked;
+    void people.lookup(workspaceId, asked).then(
+      (found) => {
+        if (askedAddress.current === asked) setAccount(found);
+      },
+      () => {
+        if (askedAddress.current === asked) setAccount(null);
+      },
+    );
   };
   const [refusal, setRefusal] = useState<string | null>(null);
 
@@ -832,6 +845,7 @@ function MintForm({
           value={address}
           onChange={(event) => {
             setAddress(event.target.value);
+            askedAddress.current = null;
             setAccount(null);
           }}
           onBlur={lookUp}

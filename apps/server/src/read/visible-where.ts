@@ -128,7 +128,7 @@ export function ticketAudienceWhere(eff: EffectiveRole, userId: string, params: 
  * (deviation D6; this file's own note on `LIVE_TICKET_WHERE`, reason 2).
  */
 export function assigneeArmWhere(userId: string, params: SqlParams): string {
-  return `EXISTS (SELECT 1 FROM proj_tickets asg WHERE asg.ticket_id = v.ticket_id AND asg.assignee_id = ${params.add(userId)})`;
+  return `EXISTS (SELECT 1 FROM proj_tickets asg WHERE asg.ticket_id = v.ticket_id AND asg.assignee_id = ${params.add(userId)} AND NOT EXISTS (SELECT 1 FROM proj_projects adp WHERE adp.project_id = v.project_id AND adp.deleted_at IS NOT NULL))`;
 }
 
 /**

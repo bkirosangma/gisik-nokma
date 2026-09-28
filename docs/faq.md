@@ -125,7 +125,7 @@ your email before you do anything else.**
 Nothing: the box was removed on 29 September 2026. Admins and members see every project in the workspace.
 
 **Is an admin the same as "sees everything"?**
-**Close to it.** Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them. Only the owner sees those.
+**Close to it.** Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those.
 
 **Can I assign a job to somebody who is not in the workspace?**
 Yes. In the **Assignee** picker choose **Assign someone outside this workspace…**, type their exact email and press **Find**. If an account has that email you can press **Assign**, and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email.

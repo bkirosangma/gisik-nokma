@@ -196,7 +196,10 @@ export function assigneeSees(eff: EffectiveRole, userId: string, assigneeId: str
 
 async function currentAssignee(db: Queryable, ticketId: string): Promise<string | null> {
   const { rows } = await db.query<{ assignee_id: string | null }>(
-    'SELECT assignee_id FROM proj_tickets WHERE ticket_id = $1',
+    // A DELETED project's tickets are out of reach for an assignee too (final
+    // review, 2026-09-29) — the same exclusion rule A applies to a roster.
+    `SELECT t.assignee_id FROM proj_tickets t WHERE t.ticket_id = $1
+       AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL)`,
     [ticketId],
   );
   return rows[0]?.assignee_id ?? null;

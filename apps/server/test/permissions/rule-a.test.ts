@@ -231,4 +231,22 @@ describe('6.217 rule A does not reach a deleted project (coordinator amendment, 
     expect(await canSee(db.pool, w.admin, goneTicket)).toBe(false);
     expect(await canSee(db.pool, insider, goneTicket)).toBe(true);
   });
+
+  /**
+   * Final review (2026-09-29), Important: the assignee arm (W3) ORs the head
+   * row's assignee into `canSee` WITHOUT asking whether the project is deleted,
+   * so a person NOT on a deleted project who was assigned one of its tickets
+   * kept reach to it through every canSee-only door. The arm now excludes a
+   * deleted project exactly as rule A does.
+   */
+  it('6.217 an ASSIGNEE of a ticket in a deleted project cannot see it either; CONTROL: they could before the delete', async () => {
+    const w = await world();
+    const gone = newUlid();
+    const goneTicket = newUlid();
+    await seedProject(db.pool, w.ws, gone);
+    await seedTicket(db.pool, { workspaceId: w.ws, projectId: gone, ticketId: goneTicket, assigneeId: w.guest });
+    expect(await canSee(db.pool, w.guest, goneTicket)).toBe(true);
+    await deleteProject(w.ws, gone, w.owner);
+    expect(await canSee(db.pool, w.guest, goneTicket)).toBe(false);
+  });
 });

@@ -2,7 +2,7 @@ import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testi
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { IngestResult, SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
-import { ASSIGN_OUTSIDER_OPTION, OUTSIDER_ASSIGN, OUTSIDER_EMAIL_LABEL } from '../../src/people/copy.js';
+import { ASSIGNEE_OUTSIDE_ROSTER, ASSIGN_OUTSIDER_OPTION, OUTSIDER_ASSIGN, OUTSIDER_EMAIL_LABEL } from '../../src/people/copy.js';
 import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { formatDate } from '../../src/provenance.js';
@@ -1931,6 +1931,28 @@ describe('3.989–3.990 the sheet’s outsider arm (access plan Task 7)', () => 
     await pickVia(ANSELMA);
     await waitFor(() => expect(source.ingested).toHaveLength(1));
     expect(assignOutsider).not.toHaveBeenCalled();
+  });
+
+  it('3.989 a member can still clear an assignee the roster hides, once the outsider arm is on; CONTROL: without it the row is read-only', async () => {
+    // Final review (2026-09-29): pulling an outsider in made the assignment
+    // unmanageable by the member who made it (guests are hidden from the roster).
+    const ghost = ticketRead({ ticket: ticketStateSeed({ assigneeId: 'user_hidden_guest' }) });
+    const withArm = renderSheet(ghost, sheetSource(ghost), { lookupPerson: async () => OUT, assignOutsider: vi.fn() });
+    await settled();
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: ASSIGNEE_OUTSIDE_ROSTER })).toBeInTheDocument();
+    await userEvent.click(within(listbox).getByRole('option', { name: 'Unassigned' }));
+    await waitFor(() => expect(withArm.ingested).toHaveLength(1));
+    expect(withArm.ingested[0]![0]).toMatchObject({ type: 'ticket.assigned', payload: { assigneeId: null } });
+  });
+
+  it('3.989 CONTROL: without the outsider arm the same ticket stays read-only', async () => {
+    const ghost = ticketRead({ ticket: ticketStateSeed({ assigneeId: 'user_hidden_guest' }) });
+    renderSheet(ghost, sheetSource(ghost));
+    await settled();
+    expect(within(screen.getByTestId('field-assignee')).queryByRole('button')).toBeNull();
   });
 
   it('3.990 the outsider door’s refusal is shown verbatim; CONTROL: none on commit', async () => {

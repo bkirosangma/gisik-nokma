@@ -533,7 +533,11 @@ export async function* visibleEventsFor(
             // an `inherit` note attached to a ticket the reader may see is
             // readable BY DEFINITION of `canReadNote`'s `inherit` arm, which
             // asks the same `canSeeResolved` of the same ticket. So on this path
-            // the filter cannot change an answer. It is kept because
+            // the filter cannot change an answer **for a reader admitted by the
+            // audience** — but since the assignee arm (W3) `canSee` ALSO admits an
+            // ASSIGNEE the note's inherited scope does not, and for that reader
+            // the filter is what keeps the note out (final review 2026-09-29):
+            // do not remove it. It is kept because
             // `noteGrantNoticeFor` is also the note branch's filter (Task 1),
             // where it is load-bearing — a note event reaches that call for a
             // note whose readability nothing else has asked about — and because

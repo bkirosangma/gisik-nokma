@@ -9481,7 +9481,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them. Only the owner sees those."
+                    "text": " Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those."
                   }
                 ]
               }

@@ -1554,6 +1554,43 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
     expect(bodies[0]!.address).toBe('anselma@example.test');
   });
 
+  it('3.995 a slow lookup for an address since edited is dropped, and the invite goes to the typed address', async () => {
+    // Final review (2026-09-29): the late answer used to name account A and send
+    // the one-time link to A's email although the box held B.
+    const bodies: Array<{ address: string }> = [];
+    let release: (person: { userId: string; name: string; email: string; inWorkspace: boolean; role: null }) => void = () => undefined;
+    mount(
+      {
+        listPending: async () => [],
+        mintInvite: async (_ws, request) => {
+          bodies.push(request);
+          return MINT_OK(true);
+        },
+      },
+      undefined,
+      undefined,
+      {},
+      {
+        lookup: () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      },
+    );
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText('Address');
+    await user.type(field, 'a@x.test');
+    await user.tab();
+    await user.clear(field);
+    await user.type(field, 'b@x.test');
+    release({ userId: 'u_a', name: 'Anselma Marak', email: 'a@x.test', inWorkspace: false, role: null });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText(hasAccountLine('Anselma Marak'))).toBeNull();
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]!.address).toBe('b@x.test');
+  });
+
   it('3.996 an existing member is named as one; CONTROL: Send stays enabled', async () => {
     mount({ listPending: async () => [], mintInvite: async () => MINT_OK(true) }, undefined, undefined, {}, {
       lookup: async () => ({ userId: 'u_b', name: 'Balti Sangma', email: 'balti@example.test', inWorkspace: true, role: 'member' }),

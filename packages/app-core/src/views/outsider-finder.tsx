@@ -46,6 +46,10 @@ export function OutsiderFinder({
   const [email, setEmail] = useState('');
   const [state, setState] = useState<FinderState>({ kind: 'idle' });
   const assignRef = useRef<HTMLButtonElement | null>(null);
+  // Which lookup is current. An answer that arrives after the address changed (or
+  // after a newer Find) belongs to a question nobody is asking any more — showing
+  // it would put Assign on someone the person did not just look up.
+  const askedRef = useRef(0);
 
   useEffect(() => {
     if (state.kind === 'found') assignRef.current?.focus();
@@ -54,11 +58,14 @@ export function OutsiderFinder({
   const find = async (): Promise<void> => {
     const wanted = email.trim();
     if (wanted === '') return;
+    const asked = ++askedRef.current;
     setState({ kind: 'looking' });
     try {
       const person = await lookup(wanted);
+      if (asked !== askedRef.current) return;
       setState(person === null ? { kind: 'none' } : { kind: 'found', person });
     } catch (cause) {
+      if (asked !== askedRef.current) return;
       setState({ kind: 'failed', why: cause instanceof Error ? cause.message : String(cause) });
     }
   };
@@ -73,6 +80,7 @@ export function OutsiderFinder({
           className="gn-field__input"
           value={email}
           onChange={(event) => {
+            askedRef.current += 1;
             setEmail(event.target.value);
             setState({ kind: 'idle' });
           }}

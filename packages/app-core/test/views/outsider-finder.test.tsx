@@ -46,6 +46,32 @@ describe('3.984–3.986 OutsiderFinder', () => {
     expect(onPick).toHaveBeenCalledWith(OUT);
   });
 
+  it('3.984 a slow answer for an address that was since edited is dropped; CONTROL: the answer to the current address shows', async () => {
+    // Final review (2026-09-29): the late answer used to put Assign on the person
+    // found for the OLD address.
+    const user = userEvent.setup();
+    let release: (person: typeof OUT) => void = () => undefined;
+    const lookup = vi.fn(
+      () =>
+        new Promise<typeof OUT>((resolve) => {
+          release = resolve;
+        }),
+    );
+    render(<OutsiderFinder lookup={lookup} onPick={() => undefined} onCancel={() => undefined} />);
+    const field = screen.getByLabelText(OUTSIDER_EMAIL_LABEL);
+    await user.type(field, 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: OUTSIDER_FIND }));
+    await user.type(field, 'x');
+    release(OUT);
+    await waitFor(() => expect(lookup).toHaveBeenCalledTimes(1));
+    expect(screen.queryByText(foundLine(OUT))).toBeNull();
+    expect(screen.queryByRole('button', { name: OUTSIDER_ASSIGN })).toBeNull();
+    // CONTROL: asking again for the current address shows its answer.
+    await user.click(screen.getByRole('button', { name: OUTSIDER_FIND }));
+    release(OUT);
+    expect(await screen.findByText(foundLine(OUT))).toBeInTheDocument();
+  });
+
   it('3.984 Enter in the field runs Find', async () => {
     const user = userEvent.setup();
     const lookup = vi.fn(async () => OUT);

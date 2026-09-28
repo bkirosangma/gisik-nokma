@@ -1,6 +1,8 @@
 import type { LookedUpPerson } from './types.js';
 
 /** Every string the outsider arm shows (access plan Task 7). Pinned literally once, by `outsider-finder.test.tsx`. */
+/** The assignee row's label for someone this viewer's roster does not list (a guest, to a non-admin). */
+export const ASSIGNEE_OUTSIDE_ROSTER = 'Someone outside the roster you can see';
 export const ASSIGN_OUTSIDER_OPTION = 'Assign someone outside this workspace…';
 export const OUTSIDER_EMAIL_LABEL = 'Their email';
 export const OUTSIDER_FIND = 'Find';
