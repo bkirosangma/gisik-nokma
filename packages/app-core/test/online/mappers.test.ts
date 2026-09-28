@@ -7,6 +7,7 @@ import type {
   AttentionResponse,
   BoardResponse,
   BoardTicketCard,
+  DeletedItemsRead,
   MemberListResponse,
   ListCard,
   ListResponse,
@@ -24,6 +25,7 @@ import {
   mapActors,
   mapAttention,
   mapBoardView,
+  mapDeletedItems,
   mapHistory,
   mapIngestResults,
   mapListPage,
@@ -2709,7 +2711,7 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
   function body(role: string): { workspaces: unknown[] } {
     return {
       workspaces: [
-        { workspaceId: 'ws1', name: 'Convenience Corner', prefix: 'CC', role, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: 'ws1', name: 'Convenience Corner', prefix: 'CC', role, archived: false, nameRestrictedProjectCount: 0, projects: [] },
       ],
     };
   }
@@ -2723,6 +2725,9 @@ describe('13.357 mapWorkspaceRefs reads role, the server field the client used t
       // this line is also what fails if the mapper ever starts defaulting it.
       prefix: 'CC',
       role: 'admin',
+      // Trash series, Plan 1 Task 5 (spec T8). Served for every caller told
+      // about this workspace at all.
+      archived: false,
       // Task 16. This body carries no `memberCount`, and an absent count is
       // WITHHELD — `null`, never 0. `toEqual` is exact, so this line is also
       // what would fail if the mapper ever started defaulting the absence.
@@ -2768,6 +2773,7 @@ describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
           name: 'Meghalaya Rollout',
           prefix: 'MR',
           role: 'member',
+          archived: false,
           nameRestrictedProjectCount: 0,
           projects,
         },
@@ -2824,6 +2830,60 @@ describe('13.982-13.983 mapWorkspaceRefs reads the project description', () => {
 });
 
 /**
+ * 19.070-19.071 — `GET /v1/me/deleted-items` → `DeletedItem[]` (trash series,
+ * Plan 1 Task 8). Only the online twin's mapper is exercised here; the
+ * replica twin's `ReplicaGapError` is 19.071, in `replica-data-source.test.ts`.
+ */
+describe('19.070 mapDeletedItems maps every field and refuses a row missing purgeDueAt', () => {
+  function fullRow(): DeletedItemsRead {
+    return {
+      items: [
+        {
+          kind: 'ticket',
+          id: 'tkt1',
+          workspaceId: 'ws1',
+          workspaceName: 'Convenience Corner',
+          projectId: 'prj1',
+          projectName: 'Shop operations',
+          label: 'CCSO-3 Renew the lease',
+          deletedBy: 'usr1',
+          deletedAt: '2026-09-28T10:00:00.000Z',
+          purgeMarkedAt: '2026-09-28T11:00:00.000Z',
+          purgeDueAt: '2026-10-13T11:00:00.000Z',
+          containedCount: 0,
+        },
+      ],
+    };
+  }
+
+  it('a full row round-trips', () => {
+    expect(mapDeletedItems(fullRow())).toEqual(fullRow().items);
+  });
+
+  it('null is a real value for projectId/projectName/purgeMarkedAt/purgeDueAt, not a MappingError', () => {
+    const body = fullRow();
+    const [item] = body.items;
+    item!.projectId = null;
+    item!.projectName = null;
+    item!.purgeMarkedAt = null;
+    item!.purgeDueAt = null;
+    expect(mapDeletedItems(body)).toEqual(body.items);
+  });
+
+  it('refuses a row missing purgeDueAt rather than defaulting it to null', () => {
+    const body = fullRow() as { items: Record<string, unknown>[] };
+    delete body.items[0]!['purgeDueAt'];
+    expect(() => mapDeletedItems(body)).toThrow(MappingError);
+    // The path, so the failure says WHICH row forgot it — the same discipline
+    // `mapWorkspaceRefs`'s description case (13.983) holds itself to.
+    expect(() => mapDeletedItems(body)).toThrow(/items\[0\]\.purgeDueAt/);
+
+    // CONTROL: the identical row WITH the key parses.
+    expect(() => mapDeletedItems(fullRow())).not.toThrow();
+  });
+});
+
+/**
  * 13.372 — Task 16's counts across the mapper, where ABSENT and `0` must stay
  * two different claims.
  *
@@ -2854,6 +2914,7 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
           name: 'Convenience Corner',
           prefix: 'CC',
           role: 'guest',
+          archived: false,
           // A GUEST body, and it carries this count — which is the owner's
           // ruling in one line. `...workspace` spreads AFTER, so a case that
           // wants the key absent or malformed can still override it.
@@ -2921,6 +2982,40 @@ describe('13.372 mapWorkspaceRefs distinguishes a WITHHELD count from a counted 
   });
 });
 
+/**
+ * 19.044 — trash series, Plan 1 Task 5 (spec T8). `mapWorkspaceRefs` maps the
+ * new workspace-level `archived` field and refuses a row that omits it, the
+ * same discipline `prefix` gets two blocks up — a construction site that
+ * forgot the field must fail loudly, never read as unarchived by default.
+ */
+describe('19.044 mapWorkspaceRefs maps archived and refuses a row without it', () => {
+  function workspaceRow(extra: Record<string, unknown>): Record<string, unknown> {
+    return {
+      workspaceId: 'ws1',
+      name: 'Convenience Corner',
+      prefix: 'CC',
+      role: 'owner',
+      archived: false,
+      nameRestrictedProjectCount: 0,
+      projects: [],
+      ...extra,
+    };
+  }
+
+  it('round-trips true and false', () => {
+    expect(mapWorkspaceRefs({ workspaces: [workspaceRow({ archived: true })] })[0]!.archived).toBe(true);
+    expect(mapWorkspaceRefs({ workspaces: [workspaceRow({ archived: false })] })[0]!.archived).toBe(false);
+  });
+
+  it('refuses a row that omits archived, naming its path', () => {
+    const orphan = workspaceRow({});
+    delete orphan['archived'];
+    expect(() => mapWorkspaceRefs({ workspaces: [orphan] })).toThrow(MappingError);
+    expect(() => mapWorkspaceRefs({ workspaces: [orphan] })).toThrow(/workspaces\[0\]\.archived/);
+    // control: the same row WITH the key present maps.
+    expect(() => mapWorkspaceRefs({ workspaces: [workspaceRow({})] })).not.toThrow();
+  });
+});
 
 /**
  * Second wave, Task 6 — `mapWorkspaceSettings`, the mapper the plan named and

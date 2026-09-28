@@ -175,10 +175,19 @@ export function registerWorkspaceRoutes(
    * including them would list the same workspace once per project.
    */
   app.get('/v1/me/workspaces', { preHandler: requireSession }, async (request) => {
-    const { rows } = await deps.pool.query<{ workspace_id: string; role: string }>(
-      `SELECT workspace_id, role FROM proj_memberships
-        WHERE user_id = $1 AND scope_kind = 'workspace'
-        ORDER BY workspace_id`,
+    // Trash series, Plan 1 Task 5 (spec §4 T10). A DIRECT `proj_memberships`
+    // read — `resolveEffectiveRole`'s deleted-workspace default cannot reach
+    // this query, since it never calls the resolver for the workspace list
+    // itself (only per-row, after this query has already decided which
+    // workspaces exist). `LEFT JOIN proj_workspaces`: absence means live,
+    // unarchived (Task 2), so `pw.deleted_at IS NULL` keeps a never-touched
+    // workspace and `coalesce(pw.archived, false)` serves it unarchived.
+    const { rows } = await deps.pool.query<{ workspace_id: string; role: string; archived: boolean }>(
+      `SELECT m.workspace_id, m.role, coalesce(pw.archived, false) AS archived
+         FROM proj_memberships m
+         LEFT JOIN proj_workspaces pw ON pw.workspace_id = m.workspace_id
+        WHERE m.user_id = $1 AND m.scope_kind = 'workspace' AND pw.deleted_at IS NULL
+        ORDER BY m.workspace_id`,
       [request.currentUserId],
     );
     const workspaces: Array<Record<string, unknown>> = [];
@@ -217,6 +226,10 @@ export function registerWorkspaceRoutes(
         // `CC` in `CCSO-1183`. See `workspaces/workspace-name.ts`.
         prefix: identity.prefix,
         role: row.role,
+        // REQUIRED, never omitted (Task 5): T8 says an archived workspace is
+        // still served in FULL — archive removes nobody's access — so this is
+        // metadata every viewer sees, not a withholding like the counts below.
+        archived: row.archived,
         // WITHHELD IS AN ABSENT KEY, NEVER A ZERO (Task 16). A guest resolves
         // `null` here and the key is not written at all, so the card renders
         // "Restricted" rather than a number nobody counted. `?? 0` anywhere on

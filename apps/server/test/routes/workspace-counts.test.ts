@@ -525,6 +525,9 @@ describe('13.371 the shape the directory already served is unchanged', () => {
       // a new field on this route must be impossible to add by accident.
       prefix: 'UC',
       role: 'member',
+      // Trash series, Plan 1 Task 5 (spec T8): served for every caller told
+      // about this workspace at all, never a withholding.
+      archived: false,
       memberCount: 2,
       // Task 18. Zero here for the reason 13.382 measures at length: this
       // member is on the only project seeded, so there is nothing they hold the

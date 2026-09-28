@@ -43,3 +43,5 @@ export * from './events/workspace-settings.js';
 export * from './read-models.js';
 export * from './notifications.js';
 export * from './notification-preferences.js';
+export * from './events/lifecycle-events.js';
+export * from './lifecycle.js';

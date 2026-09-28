@@ -231,7 +231,7 @@ describe('AccountPage — Profile', () => {
 
 function workspace(over: Partial<WorkspaceRef> = {}): WorkspaceRef {
   return {
-    id: 'w1', name: 'Meghalaya Rollout', prefix: 'MR', role: 'admin',
+    id: 'w1', name: 'Meghalaya Rollout', prefix: 'MR', role: 'admin', archived: false,
     memberCount: 4, nameRestrictedProjectCount: 0, projects: [],
     ...over,
   };

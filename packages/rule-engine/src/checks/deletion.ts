@@ -86,6 +86,12 @@ const LIVE_GATE_EXEMPT: ReadonlySet<string> = new Set([
   'ticket.created',
   'claim.contested',
   'claim.contested_resolved',
+  // Trash series, Plan 1 (spec §4): `purge.marked` REFUSES a ticket that is
+  // NOT deleted ("Delete it first" — Task 4's checkLifecycle), so marking one
+  // for permanent deletion is exactly the act this gate would otherwise turn
+  // away. `purge.unmarked` is its undo and must reach the same deleted ticket.
+  'purge.marked',
+  'purge.unmarked',
 ]);
 
 /**

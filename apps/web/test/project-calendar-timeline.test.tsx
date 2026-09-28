@@ -820,6 +820,7 @@ describe('the nav item follows the route it is on', () => {
               name: 'Convenience Corner',
               prefix: 'CC',
               role: 'owner',
+              archived: false,
               memberCount: 1,
               nameRestrictedProjectCount: 0,
               projects: [

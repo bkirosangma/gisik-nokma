@@ -74,6 +74,7 @@ function workspaceAs(role: string, over: Partial<WorkspaceRef> = {}): WorkspaceR
     name: 'Convenience Corner',
     prefix: 'CC',
     role,
+    archived: false,
     memberCount: 5,
     nameRestrictedProjectCount: 2,
     projects: [
