@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import { ASSIGN_OUTSIDER_OPTION, OUTSIDER_ASSIGN, OUTSIDER_EMAIL_LABEL } from '../../src/people/copy.js';
 import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { formatDate } from '../../src/provenance.js';
@@ -1892,6 +1893,55 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
     expect(
       within(screen.getByTestId('field-assignee')).getByText('set by Kiro on 19 Aug 2026'),
     ).toBeInTheDocument();
+  });
+});
+
+describe('3.989–3.990 the sheet’s outsider arm (access plan Task 7)', () => {
+  const OUT = { userId: 'user_out', name: 'Era Momin', email: 'era@example.test', inWorkspace: false, role: null } as const;
+  const ANSELMA = { userId: 'user_anselma', name: 'Anselma Marak', email: 'anselma@example.test', inWorkspace: true, role: 'member' } as const;
+
+  async function pickVia(finderAnswer: typeof OUT | typeof ANSELMA): Promise<void> {
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    await userEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: ASSIGN_OUTSIDER_OPTION }));
+    await userEvent.type(screen.getByLabelText(OUTSIDER_EMAIL_LABEL), `${finderAnswer.email}{Enter}`);
+    await userEvent.click(await screen.findByRole('button', { name: OUTSIDER_ASSIGN }));
+  }
+
+  it('3.989 an outsider pick sends ticket.assigned through assignOutsider; CONTROL: a member found goes through ingest', async () => {
+    const assignOutsider = vi.fn(async (_u: string, e: SubmittedEvent): Promise<IngestResult> => ({
+      status: 'committed',
+      eventId: e.id,
+      seq: 2,
+      serverTime: '2026-09-29T10:00:00.000Z',
+    }));
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { lookupPerson: async () => OUT, assignOutsider });
+    await settled();
+    await pickVia(OUT);
+    await waitFor(() => expect(assignOutsider).toHaveBeenCalledTimes(1));
+    expect(assignOutsider.mock.calls[0]![0]).toBe('user_out');
+    expect(assignOutsider.mock.calls[0]![1]).toMatchObject({ type: 'ticket.assigned', payload: { assigneeId: 'user_out' } });
+    expect(source.ingested).toHaveLength(0);
+  });
+
+  it('3.989 CONTROL: someone already in the workspace goes through the ordinary door', async () => {
+    const assignOutsider = vi.fn();
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { lookupPerson: async () => ANSELMA, assignOutsider });
+    await settled();
+    await pickVia(ANSELMA);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(assignOutsider).not.toHaveBeenCalled();
+  });
+
+  it('3.990 the outsider door’s refusal is shown verbatim; CONTROL: none on commit', async () => {
+    const reason = 'That person has no account.';
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      lookupPerson: async () => OUT,
+      assignOutsider: async (_u, e) => ({ status: 'refused', eventId: e.id, rule: 'people.outsider', reason }),
+    });
+    await settled();
+    await pickVia(OUT);
+    expect(await screen.findByText(reason, { exact: false })).toBeInTheDocument();
   });
 });
 

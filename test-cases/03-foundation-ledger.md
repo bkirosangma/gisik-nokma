@@ -346,4 +346,16 @@ section follow the controller's rule, so the next free id after B16 is one past 
   selector above the track reddens this case alone, `expected '.gn-mutation-probe' to be ''`. —
   `packages/ui/test/components.test.tsx`
 
+## People: the outsider arm and the invitation result (access plan, 2026-09-29)
+
+- ✅ **3.982 — `PeopleGateway.lookup` POSTs `{email}` to `…/people-lookup` and maps `{user}` to a `LookedUpPerson` or `null`; a 404 throws `PeopleLookupError` carrying the status;** control: `{ user: null }` maps to `null`, not an error. Mutation: map a 404 to `null`.
+- ✅ **3.983 — `PeopleGateway.assignOutsider` POSTs `{userId, event}` and returns the `IngestResult` for a 200 AND for a 422 (a refusal is an answer, not an error);** control: a 400 throws with the server's message. Mutation: throw on 422.
+- ✅ **3.984 — `OutsiderFinder`: typing an address and pressing Find (or Enter) shows `<name> (<email>)` with **Assign**, focus moves to Assign, and pressing it hands the person to `onPick`;** control: the lookup was called with the trimmed address. Mutation: call `onPick` without the person.
+- ✅ **3.985 — `OutsiderFinder`: no match says `No user with that email.` as a status, and offers no Assign;** control: a failed lookup says so as an alert with the reason. Mutation: render the not-found line as an empty status.
+- ✅ **3.986 — `OutsiderFinder`: a match who is already in the workspace is labelled `<name> is already in this workspace.` and is still pickable;** control: an outsider's line says they join as a guest. Mutation: drop the `inWorkspace` branch.
+- ✅ **3.987 — the New ticket dialog offers `Assign someone outside this workspace…` only when `lookupPerson` is given, and a found outsider leaves in the draft as `assigneeId` with `assigneeIsOutsider: true`;** control: without the prop the options are unchanged, and a member pick carries no `assigneeIsOutsider` key. Mutation: always set `assigneeIsOutsider`.
+- ✅ **3.988 — `CreateTicketFlow` sends an outsider draft's `ticket.created` through `assignOutsider(userId, event)` and NOT `dataSource.ingest`;** control: a member draft goes through `dataSource.ingest` and never calls `assignOutsider`. Mutation: ignore `assigneeIsOutsider`.
+- ✅ **3.989 — the ticket sheet offers the outsider arm when given `lookupPerson`, and picking a found outsider sends `ticket.assigned` through `assignOutsider`, not `dataSource.ingest`;** control: a found person who is ALREADY in the workspace goes through `dataSource.ingest`. Mutation: route every pick through `assignOutsider`.
+- ✅ **3.990 — the sheet shows `assignOutsider`'s refusal verbatim, as it shows an ingest refusal;** control: a committed answer shows no refusal. Mutation: drop the refused branch of the outsider submit.
+
 **Block `3.982`–`3.999` is ALLOCATED to the access-and-invites plan (`docs/superpowers/plans/2026-09-29-workspace-access-and-invites.md`, 2026-09-29).** Measured across all remote branches: §3's tip is `3.974`; `3.975`–`3.981` are the priority plan's reservation.

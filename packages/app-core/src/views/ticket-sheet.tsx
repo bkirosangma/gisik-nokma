@@ -21,6 +21,10 @@ import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js
 import { attachmentsImpliedBy, noteReferencesIn } from '../flows/attachments-implied-by.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import { CommentsThread, type TicketComment } from './comments-thread.js';
+import { ASSIGN_OUTSIDER_OPTION } from '../people/copy.js';
+import { outsiderIngest } from '../people/outsider-ingest.js';
+import type { AssignOutsider, LookupPerson } from '../people/types.js';
+import { OutsiderFinder } from './outsider-finder.js';
 import { DeleteDialog } from './delete-dialog.js';
 import {
   PlainTextEditorSlot,
@@ -451,6 +455,10 @@ export type TicketSheetProps = {
    * assumed.
    */
   onNavigate?: (href: string) => void;
+  /** See `NewTicketDialogProps.lookupPerson`: present → the Assignee picker offers the outsider arm. */
+  lookupPerson?: LookupPerson;
+  /** See `CreateTicketFlowProps.assignOutsider`: an outsider pick's `ticket.assigned` goes through it. */
+  assignOutsider?: AssignOutsider;
 };
 
 /**
@@ -612,6 +620,8 @@ export function TicketSheet({
   workspaceHref,
   projectHref,
   onNavigate,
+  lookupPerson,
+  assignOutsider,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
@@ -632,6 +642,8 @@ export function TicketSheet({
    */
   const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  // The outsider arm of the Assignee row (access plan W6) — state lives up here, not in the row's IIFE.
+  const [findingOutsider, setFindingOutsider] = useState(false);
   /**
    * How many moves have COMMITTED. Bumped beside `setMoveOpen(false)` on the
    * success path and used as `TransitionDialog`'s `key`, so a committed move is a
@@ -1273,14 +1285,20 @@ export function TicketSheet({
    * a control that hid itself would leave a refusal unreachable and therefore
    * unrendered.
    */
-  const submitAssignee = async (assigneeId: string | null): Promise<void> => {
+  const submitAssignee = async (assigneeId: string | null, viaOutsider = false): Promise<void> => {
     const event = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
       type: 'ticket.assigned',
       payload: { assigneeId },
     });
-    const results = await dataSource.ingest([event]);
+    // The outsider door (access plan W6) for someone found by email who is not
+    // in the workspace; the ordinary door for everyone else. Same answer shape,
+    // same refusal rendering below (case 3.990).
+    const results =
+      viaOutsider && assignOutsider !== undefined && assigneeId !== null
+        ? await outsiderIngest(assignOutsider, assigneeId)([event])
+        : await dataSource.ingest([event]);
     const failed = results.find((result) => result.status !== 'committed');
     if (failed === undefined) {
       setServerRefusal(null);
@@ -2685,6 +2703,7 @@ export function TicketSheet({
    * assignee is among the options, and the row falls back to saying what it is.
    */
   const UNASSIGNED = '__unassigned__';
+  const OUTSIDER_OPTION = '__outsider__';
   const assigneeRow = ((): { control: ReactNode; claim: string } => {
     const claim =
       ticketRead.assignedProvenance === null
@@ -2723,6 +2742,7 @@ export function TicketSheet({
     }
     return {
       control: (
+        <>
         <Select
           aria-label="Assignee"
           options={[
@@ -2744,12 +2764,28 @@ export function TicketSheet({
               value: member.id,
               label: memberLabel(member),
             })),
+            ...(lookupPerson === undefined ? [] : [{ value: OUTSIDER_OPTION, label: ASSIGN_OUTSIDER_OPTION }]),
           ]}
           value={state.assigneeId ?? UNASSIGNED}
           onChange={(next) => {
+            if (next === OUTSIDER_OPTION) {
+              setFindingOutsider(true);
+              return;
+            }
             void submitAssignee(next === UNASSIGNED ? null : next);
           }}
         />
+        {findingOutsider && lookupPerson !== undefined ? (
+          <OutsiderFinder
+            lookup={lookupPerson}
+            onCancel={() => setFindingOutsider(false)}
+            onPick={(person) => {
+              setFindingOutsider(false);
+              void submitAssignee(person.userId, !person.inWorkspace);
+            }}
+          />
+        ) : null}
+        </>
       ),
       claim,
     };

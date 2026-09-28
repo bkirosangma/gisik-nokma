@@ -135,6 +135,21 @@ export {
   type NewTicketDraft,
 } from './views/new-ticket-dialog.js';
 export { CreateTicketFlow, type CreateTicketFlowProps } from './views/create-ticket-flow.js';
+export { OutsiderFinder } from './views/outsider-finder.js';
+export type { AssignOutsider, LookedUpPerson, LookupPerson } from './people/types.js';
+export { outsiderIngest } from './people/outsider-ingest.js';
+export {
+  ASSIGN_OUTSIDER_OPTION,
+  OUTSIDER_ASSIGN,
+  OUTSIDER_CANCEL,
+  OUTSIDER_EMAIL_LABEL,
+  OUTSIDER_FIND,
+  OUTSIDER_JOINS_AS_GUEST,
+  OUTSIDER_NOT_FOUND,
+  alreadyInWorkspaceLine,
+  foundLine,
+  lookupFailedLine,
+} from './people/copy.js';
 export {
   LOCKOUT_WARNING_COPY,
   OWNER_ALWAYS_SEES_COPY,
