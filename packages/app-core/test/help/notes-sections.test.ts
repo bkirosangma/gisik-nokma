@@ -49,9 +49,16 @@ describe('15.36 the generated corpus carries the notes release sections', () => 
     const faq = document('faq');
     const notes = faq.sections.find((section) => section.title === 'Notes');
     expect(notes).toBeDefined();
-    // 8–12 real questions, per the owner's brief — not a placeholder count.
+    // 8–14 real questions, per the planner's brief (BRIEF-help-notes-2026-09-23.md:22, sized 8–12
+    // before kb-editor-parity) — not a placeholder count. Widened to 14 (planner ruling, 2026-09-29):
+    // the three questions kb-editor-parity (#744) added for its note-only ports (ReadingProgress,
+    // HeadingCopyLink, DraftRestoreBanner) stay in Notes rather than being miscategorised as general
+    // editor questions — none of the three is wired anywhere but note-document.tsx (HeadingAnchors is
+    // gated on the `headingLink` option, passed only there; DraftRestoreBanner is imported only there),
+    // so moving them to "Writing, comments and files" would describe a control readers of THAT section
+    // cannot find.
     expect(notes?.entries.length).toBeGreaterThanOrEqual(8);
-    expect(notes?.entries.length).toBeLessThanOrEqual(12);
+    expect(notes?.entries.length).toBeLessThanOrEqual(14);
     // Every entry is a real question, not an empty heading.
     for (const entry of notes?.entries ?? []) {
       expect(entry.title.trim().length).toBeGreaterThan(0);
