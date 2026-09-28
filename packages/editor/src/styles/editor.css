@@ -376,6 +376,64 @@
   color: var(--gn-text-muted);
   font-size: 0.85em;
 }
+/* The table size grid (KB editor parity, `TablePicker.tsx`) — a raised panel
+   under the "Insert table" tool, 8×8 square buttons, the lit rectangle running
+   from the corner to the pointer/keyboard cell. The panel and the cells reuse
+   the tooltip's raised surface and the hover fill, so it is one family, not a
+   second set of tokens. Cells grow on a coarse pointer (a finger is not 20px). */
+.ticket-editor__table-picker {
+  position: absolute;
+  top: 100%;
+  left: 0;
+  margin-top: 6px;
+  z-index: 2;
+  padding: 0.5rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text);
+}
+.ticket-editor__table-grid {
+  display: grid;
+  grid-template-columns: repeat(8, 1fr);
+  gap: 2px;
+}
+.ticket-editor__table-cell {
+  width: 20px;
+  height: 20px;
+  padding: 0;
+  border: 1px solid var(--gn-border);
+  border-radius: 2px;
+  background: none;
+  cursor: pointer;
+  transition: background 150ms ease;
+}
+.ticket-editor__table-cell--lit {
+  background: var(--gn-fill-secondary);
+  border-color: currentColor;
+}
+.ticket-editor__table-cell:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.ticket-editor__table-label {
+  margin-top: 0.375rem;
+  text-align: center;
+  font-size: 0.75rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+}
+@media (pointer: coarse) {
+  .ticket-editor__table-cell {
+    width: 32px;
+    height: 32px;
+  }
+}
+@media (prefers-reduced-motion: reduce) {
+  .ticket-editor__table-cell {
+    transition: none;
+  }
+}
 .ticket-editor__link-url {
   min-width: 10rem;
   min-height: 32px;

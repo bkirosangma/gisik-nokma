@@ -1,6 +1,7 @@
 import { useEffect, useId, useState } from 'react';
 import { getMarkRange } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
+import { TablePicker } from './TablePicker.js';
 
 /**
  * The formatting strip above the composer — the prototype's `descTools`/
@@ -171,6 +172,7 @@ const SHORTCUTS: Record<string, string | null> = {
   strike: 'Mod-Shift-s',
   orderedList: 'Mod-Shift-7',
   rule: null,
+  table: null,
   bold: 'Mod-b',
   italic: 'Mod-i',
   code: 'Mod-e',
@@ -230,6 +232,13 @@ const TICKET_ICON = (
   </svg>
 );
 
+const TABLE_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <rect x="3" y="4" width="18" height="16" rx="1.5" />
+    <path d="M3 10h18M3 15h18M9 4v16M15 4v16" />
+  </svg>
+);
+
 const UNDO_ICON = (
   <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
     <path d="M9 14 4 9l5-5" />
@@ -257,6 +266,10 @@ type ToolControl = {
   group: ToolGroup;
   /** A control that cannot act right now (Undo with nothing to undo). */
   disabled?: boolean;
+  /** A popover drawn inside the tool's own wrapper (the table size grid). */
+  panel?: React.ReactNode;
+  /** `aria-expanded` for a control that opens a panel. */
+  expanded?: boolean;
 };
 
 const GROUP_LABEL: Record<ToolGroup, string> = {
@@ -306,10 +319,12 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
           }
         }}
         onClick={control.run}
+        {...(control.expanded === undefined ? {} : { 'aria-expanded': control.expanded, 'aria-haspopup': 'true' as const })}
         {...extraProps}
       >
         {control.label}
       </button>
+      {control.panel}
       {show ? (
         <span role="tooltip" id={tooltipId} className="ticket-editor__tooltip">
           <span className="ticket-editor__tooltip-line">
@@ -379,6 +394,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
    */
   const [linkOpen, setLinkOpen] = useState(false);
   const [href, setHref] = useState('');
+  const [tableOpen, setTableOpen] = useState(false);
   // The transaction subscription that re-reads `isActive`. Same shape and same
   // reason as `ImageWrapMenu`'s repaint: `useEditor` does not re-render this
   // tree on every transaction, and a toggle button that never updates its own
@@ -397,6 +413,10 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
 
   const isMac = platform === undefined ? detectMac() : platform === 'mac';
   const linkIsActive = editor.isActive('link');
+  // The reference disables the picker inside a table (`TableNoNest` refuses the
+  // command regardless; this tells the reader BEFORE they press it).
+  const inTable = editor.isActive('table');
+  const tablePanelOpen = tableOpen && !inTable;
 
   function applyLink(): void {
     const trimmed = href.trim();
@@ -589,6 +609,25 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
       active: null,
       run: () => editor.chain().focus().setHorizontalRule().run(),
       group: 'blocks',
+    },
+    {
+      key: 'table',
+      label: TABLE_ICON,
+      name: inTable ? 'Insert table (not allowed inside a table)' : 'Insert table',
+      active: null,
+      disabled: inTable,
+      expanded: tablePanelOpen,
+      run: () => setTableOpen((was) => !was),
+      panel: tablePanelOpen ? (
+        <TablePicker
+          onSelect={(rows, cols) => {
+            setTableOpen(false);
+            editor.chain().focus().insertTable({ rows, cols, withHeaderRow: true }).run();
+          }}
+          onClose={() => setTableOpen(false)}
+        />
+      ) : null,
+      group: 'insert',
     },
     // Unit 4 (owner: "I want a button to insert the note and ticket there on
     // the bar"), REPLACING the old `[[` control rather than sitting beside

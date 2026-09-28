@@ -254,14 +254,14 @@ describe('the editor toolbar (16.85)', () => {
     // case exists to protect stays checkable. The alternative — rewriting the
     // literal to nine names — would leave the order of the prototype's six
     // pinned by nothing but their presence in a longer list.
-    // KB EDITOR PARITY (owner ruling 2026-09-24, cases 9.375-9.381) added six
+    // KB EDITOR PARITY (owner ruling 2026-09-24, cases 9.375-9.386) added seven
     // controls the prototype has no counterpart for: Undo/Redo lead the strip,
     // Strikethrough follows Italic, Numbered list follows Bullet list and the
     // Horizontal rule follows Collapsible. They are filtered out so THIS case
     // still pins the relative order of the eleven it was written for — the
     // prototype's six then the port's five — rather than a longer literal that
     // pins nothing but presence.
-    const added = new Set(['Undo', 'Redo', 'Strikethrough', 'Numbered list', 'Horizontal rule']);
+    const added = new Set(['Undo', 'Redo', 'Strikethrough', 'Numbered list', 'Horizontal rule', 'Insert table']);
     const original = names.filter((name) => !added.has(name ?? ''));
     expect(original.slice(0, 6)).toEqual(['Bold', 'Italic', 'Code', 'Link', 'Bullet list', 'Quote']);
     expect(original.slice(6)).toEqual(['Task item', 'Code block', 'Collapsible', 'Insert note', 'Insert ticket']);
@@ -556,12 +556,12 @@ describe('9.326-9.332 toolbar tooltips, shortcuts and the insert buttons', () =>
     view.unmount();
   });
 
-  it('9.332 no @ / mention control anywhere in the strip, and the strip is exactly sixteen controls (the eleven plus KB parity five; no stray extra)', async () => {
+  it('9.332 no @ / mention control anywhere in the strip, and the strip is exactly seventeen controls (the eleven plus KB parity six; no stray extra)', async () => {
     const { view } = await mount(makeProps());
     const names = Array.from(view.container.querySelectorAll('.ticket-editor__tool')).map((el) =>
       el.getAttribute('aria-label'),
     );
-    expect(names).toHaveLength(16);
+    expect(names).toHaveLength(17);
     expect(names).not.toContain('@');
     expect(names.some((name) => name?.toLowerCase().includes('mention'))).toBe(false);
     view.unmount();
@@ -692,6 +692,147 @@ describe('9.326-9.332 toolbar tooltips, shortcuts and the insert buttons', () =>
     expect(tool(view, 'Horizontal rule').hasAttribute('aria-keyshortcuts')).toBe(false);
     fireEvent.mouseEnter(tool(view, 'Strikethrough').parentElement as Element);
     expect(tooltipFor(view, tool(view, 'Strikethrough'))?.textContent).toContain('~~strike~~');
+    view.unmount();
+  });
+
+  /** 9.380 — the table picker: open, light the corner, choose, and a header-row table lands. */
+  it('9.380 Insert table opens the size grid; choosing 2 × 3 inserts a 2-row, 3-column table with a header row', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    const trigger = tool(view, 'Insert table');
+    expect(trigger.getAttribute('aria-expanded')).toBe('false');
+    expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    trigger.click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    expect(tool(view, 'Insert table').getAttribute('aria-expanded')).toBe('true');
+    const cells = view.container.querySelectorAll<HTMLButtonElement>('.ticket-editor__table-cell');
+    expect(cells).toHaveLength(64);
+    expect(view.container.querySelector('.ticket-editor__table-label')?.textContent).toBe('1 × 1 table');
+    fireEvent.mouseEnter(cells[10] as Element); // row 2, col 3
+    expect(view.container.querySelector('.ticket-editor__table-label')?.textContent).toBe('2 × 3 table');
+    expect(view.container.querySelectorAll('.ticket-editor__table-cell--lit')).toHaveLength(6);
+    (cells[10] as HTMLButtonElement).click();
+    await vi.waitFor(() => {
+      expect(editor.getJSON().content?.[0]?.type).toBe('table');
+    });
+    const table = editor.getJSON().content?.[0];
+    expect(table?.content).toHaveLength(2);
+    expect(table?.content?.[0]?.content).toHaveLength(3);
+    expect(table?.content?.[0]?.content?.[0]?.type).toBe('tableHeader');
+    expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    view.unmount();
+  });
+
+  /** 9.381 — keyboard: arrows move the corner, Enter commits, Escape closes and returns to the trigger. */
+  it('9.381 the size grid works from the keyboard: arrows, Enter to insert, Escape to close with focus back on the trigger', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    const grid = view.container.querySelector('.ticket-editor__table-picker') as HTMLElement;
+    const focused = () => document.activeElement?.getAttribute('aria-label');
+    await vi.waitFor(() => {
+      expect(focused()).toBe('1 × 1 table');
+    });
+    // one tab stop for the whole grid
+    expect(grid.querySelectorAll('button[tabindex="0"]')).toHaveLength(1);
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowRight' });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
+    await vi.waitFor(() => {
+      expect(focused()).toBe('2 × 2 table');
+    });
+    // clamped at the edge, never past 8
+    for (let n = 0; n < 10; n += 1) fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowRight' });
+    await vi.waitFor(() => {
+      expect(focused()).toBe('2 × 8 table');
+    });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'Escape' });
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    });
+    expect(document.activeElement).toBe(tool(view, 'Insert table'));
+    expect(editor.getJSON().content?.[0]?.type).not.toBe('table');
+
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    fireEvent.keyDown(document.activeElement as Element, { key: 'ArrowDown' });
+    fireEvent.click(await vi.waitFor(() => {
+      const el = document.activeElement as HTMLButtonElement;
+      expect(el.getAttribute('aria-label')).toBe('2 × 1 table');
+      return el;
+    }));
+    await vi.waitFor(() => {
+      expect(editor.getJSON().content?.[0]?.content).toHaveLength(2);
+    });
+    view.unmount();
+  });
+
+  /** 9.382 — inside a table the tool is disabled and says why (TableNoNest would refuse anyway). */
+  it('9.382 Insert table is disabled, and named as such, while the caret is inside a table', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    editor.chain().focus().insertTable({ rows: 2, cols: 2, withHeaderRow: true }).run();
+    await vi.waitFor(() => {
+      expect(editor.isActive('table')).toBe(true);
+    });
+    // The strip repaints on the transaction, a tick after the editor state moved.
+    await vi.waitFor(() => {
+      const disabled = view.container.querySelector<HTMLButtonElement>(
+        '.ticket-editor__tool[aria-label="Insert table (not allowed inside a table)"]',
+      );
+      expect(disabled).not.toBeNull();
+      expect(disabled?.disabled).toBe(true);
+    });
+    view.unmount();
+  });
+
+  /** 9.383 — an outside press closes the grid and inserts nothing. */
+  it('9.383 pressing outside the size grid closes it without inserting', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    fireEvent.mouseDown(document.body);
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
+    });
+    expect(editor.getJSON().content?.[0]?.type).toBe('paragraph');
+    view.unmount();
+  });
+
+  /** 9.384 — every class the open size grid draws has a rule in editor.css (the skin test excludes this file). */
+  it('9.384 each class the open table size grid renders is declared in editor.css', async () => {
+    const { view, editor } = await mount(makeProps());
+    editor.commands.clearContent();
+    tool(view, 'Insert table').click();
+    await vi.waitFor(() => {
+      expect(view.container.querySelector('.ticket-editor__table-picker')).not.toBeNull();
+    });
+    fireEvent.mouseEnter(view.container.querySelector('.ticket-editor__table-cell') as Element);
+    const drawn = new Set<string>();
+    for (const el of view.container.querySelectorAll('.ticket-editor__table-picker, .ticket-editor__table-picker *')) {
+      for (const cls of Array.from(el.classList)) drawn.add(cls);
+    }
+    expect([...drawn].sort()).toEqual([
+      'ticket-editor__table-cell',
+      'ticket-editor__table-cell--lit',
+      'ticket-editor__table-grid',
+      'ticket-editor__table-label',
+      'ticket-editor__table-picker',
+    ]);
+    const here = dirname(fileURLToPath(import.meta.url));
+    const css = readFileSync(resolve(here, '../src/styles/editor.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    for (const cls of drawn) {
+      expect(css, `editor.css has no rule for .${cls}`).toMatch(new RegExp(`\\.${cls}(?![\\w-])[^{]*\\{`));
+    }
     view.unmount();
   });
 });

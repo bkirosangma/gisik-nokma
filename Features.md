@@ -1605,6 +1605,11 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
     Shortcuts and markdown triggers are read from the installed extensions, as for the rest of the strip;
     `packages/editor/src/components/EditorToolbar.tsx`, `packages/editor/src/styles/editor.css`
     (the mobile editor bundle is regenerated: `apps/mobile/src/editor/editor-html.generated.ts`)
+  - ✅ **Insert table — an 8×8 size grid on the toolbar** (KB `TablePicker`) — hover or arrow to light the
+    size, the label reads "R × C table", click/Enter inserts it with a header row, Escape closes with focus back
+    on the tool; disabled (and named so) while the caret is inside a table. Real buttons with a roving tabindex,
+    so it works from the keyboard and on touch (the source is a mouse-only grid of divs);
+    `packages/editor/src/components/TablePicker.tsx`, `packages/editor/src/components/EditorToolbar.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

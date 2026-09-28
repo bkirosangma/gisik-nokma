@@ -87,6 +87,10 @@ const EXCLUDED_EDITOR_FILES = new Set([
   'extensions/wiki-link-popup.ts',
   // The main toolbar — task/editor-polish's scope, already skinned.
   'components/EditorToolbar.tsx',
+  // The table size grid opened from the toolbar's "Insert table" tool — toolbar
+  // chrome (KB editor parity); its rules live in editor.css and the toolbar
+  // test (9.384) proves each class it draws has one.
+  'components/TablePicker.tsx',
   // Attachment/upload chrome — an unrelated feature area; some of it
   // (`.attachment-item--upload`/`__name`) is deliberately UNSTYLED per an
   // existing test (`apps/web/test/attachment-list-item.test.tsx`), and a

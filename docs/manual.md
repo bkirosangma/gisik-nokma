@@ -1578,9 +1578,14 @@ The author always reads their own note, whatever its scope — that is what **Pr
 
 The editor is the same one the rest of the product uses, with headings and a formatting toolbar: **Undo** and
 **Redo**, a **Heading level** menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link,
-Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert note** and
+Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**, **Insert note** and
 **Insert ticket**. Undo and Redo grey out when there is nothing to step back or forward to. Pressing Bold,
-Italic or Strikethrough with the cursor inside a link formats the whole link. Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and
+Italic or Strikethrough with the cursor inside a link formats the whole link.
+
+**Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size
+you want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
+row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is
+inside a table, because a table cannot be placed inside another. Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and
 the markdown you can type instead. **Insert note** and **Insert ticket** each drop the `:note`/`:ticket`
 trigger at the cursor and open the same picker typing it would — the same two triggers work from the
 keyboard too, and `[[` still works for a note.

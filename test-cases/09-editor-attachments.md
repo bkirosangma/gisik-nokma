@@ -514,3 +514,8 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.377 — the Heading level select offers Paragraph and Heading 1–6, sets each level, reports the active one and returns to Paragraph.** (`packages/editor/test/editor-toolbar.test.tsx`)
 - ✅ **9.378 — Bold pressed with the caret inside a link bolds the entire link text (`selectFullLink`), and only that.** (`packages/editor/test/editor-toolbar.test.tsx`)
 - ✅ **9.379 — the new tools carry their real `aria-keyshortcuts` and a tooltip naming the markdown trigger; the rule has no shortcut.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.380 — Insert table opens the 8×8 size grid; choosing 2 × 3 inserts a 2-row, 3-column table whose first row is header cells, and closes the grid.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.381 — the size grid works from the keyboard: one tab stop, arrows move the corner (clamped to 8), Enter/click inserts, Escape closes with focus back on the trigger.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.382 — Insert table is disabled, and named "(not allowed inside a table)", while the caret is inside a table.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.383 — pressing outside the size grid closes it and inserts nothing.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.384 — every class the open table size grid renders (picker, grid, cell, lit cell, label) has a rule in `editor.css`.** (`packages/editor/test/editor-toolbar.test.tsx`)
