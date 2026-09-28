@@ -1,5 +1,6 @@
 import { mergeAttributes, Node } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
+import { PURGED_ITEM_LABEL, type PurgedPredicate } from '@gisik-nokma/domain';
 import Suggestion from '@tiptap/suggestion';
 import { placePopover } from '../components/popover-position.js';
 import { createWikiLinkPopup } from './wiki-link-popup.js';
@@ -22,6 +23,8 @@ export type WikiLinkOptions = {
   previewNote?: (noteId: string) => Promise<string | null>;
   /** Following the link is the HOST's navigation, not the editor's. */
   onNavigateNote?: (noteId: string) => void;
+  /** Trash series Plan 3 (T11): the linked note was permanently erased — asked before `resolveNoteTitle`. */
+  isPurged?: PurgedPredicate;
 };
 
 export const wikiLinkSuggestionKey = new PluginKey('wikiLinkSuggestion');
@@ -92,6 +95,9 @@ export const WikiLink = Node.create<WikiLinkOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
+    if (this.options.isPurged?.('note', String(node.attrs['noteId'])) === true) {
+      return ['span', mergeAttributes(HTMLAttributes, { class: 'editor-wikilink editor-wikilink--purged' }), PURGED_ITEM_LABEL];
+    }
     return [
       'a',
       mergeAttributes(HTMLAttributes, {
@@ -103,6 +109,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
   },
 
   renderText({ node }) {
+    if (this.options.isPurged?.('note', String(node.attrs['noteId'])) === true) return PURGED_ITEM_LABEL;
     // The plain-text projection (`docToPlainText`) is the reader this serves,
     // and it must agree with the node's own `wikiLink` branch there: the TITLE,
     // never the id.
@@ -115,6 +122,14 @@ export const WikiLink = Node.create<WikiLinkOptions>({
     return ({ node }) => {
       const stored: string = String(node.attrs['title']);
       const noteId: string = String(node.attrs['noteId']);
+      if (this.options.isPurged?.('note', noteId) === true) {
+        const dom = document.createElement('span');
+        dom.className = 'editor-wikilink editor-wikilink--purged';
+        dom.setAttribute('data-note-id', noteId);
+        dom.setAttribute('data-note-title', stored);
+        dom.textContent = PURGED_ITEM_LABEL;
+        return { dom };
+      }
       const resolver = this.options.resolveNoteTitle;
       const resolved = resolver === undefined ? stored : resolver(noteId);
       const missing = resolved === null;

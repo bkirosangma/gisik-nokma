@@ -1,7 +1,13 @@
 'use client';
 
 import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
-import { CommentsThread, makeSubmittedFactory, useLiveQuery, type TicketComment } from '@gisik-nokma/app-core';
+import {
+  CommentsThread,
+  makeSubmittedFactory,
+  useLiveQuery,
+  usePurgedPredicate,
+  type TicketComment,
+} from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
 import { buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 
@@ -61,6 +67,10 @@ export function NoteComments({
     const rows = await dataSource.query.getNoteComments(workspaceId, noteId);
     return rows.map((row): TicketComment => ({ ...row, files: [] }));
   });
+  const purged = usePurgedPredicate(
+    dataSource.query,
+    (comments.data ?? []).map((row) => row.body),
+  );
 
   const submitComment = async (submission: EditorSubmission): Promise<boolean> => {
     if (user === null) return false;
@@ -85,6 +95,7 @@ export function NoteComments({
       commentsUnavailable={comments.error ?? undefined}
       nameOf={nameOf}
       ticketHref={ticketRefHrefIn(workspaceId)}
+      isPurged={purged.isPurged}
       composer={
         canComment ? (
           <TicketEditorSlot

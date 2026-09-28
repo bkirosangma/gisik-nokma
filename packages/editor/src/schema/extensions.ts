@@ -1,4 +1,5 @@
 import type { Extensions } from '@tiptap/core';
+import type { PurgedPredicate } from '@gisik-nokma/domain';
 import { StarterKit } from '@tiptap/starter-kit';
 import { Link } from '@tiptap/extension-link';
 import { Placeholder } from '@tiptap/extension-placeholder';
@@ -62,6 +63,8 @@ export type EditorSchemaOptions = {
    */
   queryTickets?: (query: string) => Promise<TicketRefCandidate[]>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  /** Trash series Plan 3 (T11): which chips point at permanently erased items. Absent → none. */
+  isPurged?: PurgedPredicate;
   /**
    * Heading anchors (KB editor parity). When supplied, every non-empty heading
    * gets a page-unique `id` and a "copy link to this heading" button whose
@@ -314,6 +317,7 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       ...(options.onNavigateNote === undefined
         ? {}
         : { onNavigateNote: options.onNavigateNote }),
+      ...(options.isPurged === undefined ? {} : { isPurged: options.isPurged }),
     }),
     // The ticket-ref node (Plan 7 Task 1). Both options are spelled with `??`
     // like `queryNotes`'s: the fallback is a VALUE, not a default being
@@ -324,6 +328,7 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     TicketRef.configure({
       queryTickets: options.queryTickets ?? (async () => []),
       resolveTicketHref: options.resolveTicketHref ?? (() => null),
+      isPurged: options.isPurged ?? (() => false),
     }),
     ...(options.headingLink === undefined
       ? []

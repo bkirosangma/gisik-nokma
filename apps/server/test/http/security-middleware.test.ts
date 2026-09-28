@@ -368,6 +368,13 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       // causing a state change with an ambient credential; this route causes
       // none, the same reasoning that excludes `GET /v1/sync/bootstrap`.
       '/v1/sync/reconcile',
+      // The same shape, and the same reasoning carries over: `purged-lookup.ts`
+      // (grepped) has no INSERT/UPDATE/DELETE/append — it answers which of the
+      // presented ids were permanently erased, kinds and ids the caller sent,
+      // and changes nothing. The POST is only there to carry up to
+      // `PURGED_LOOKUP_MAX_IDS` ids in a body. Cookie-authenticated
+      // (`requireSession`), but there is no state change to forge.
+      '/v1/purged-lookup',
       // No `preHandler: requireSession` — no cookie session is ever read, so
       // there is no ambient credential to forge (`routes/mcp-device.ts`).
       '/v1/mcp/device/code',

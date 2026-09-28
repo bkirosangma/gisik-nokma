@@ -1,7 +1,7 @@
 import { useCallback, useEffect, useMemo, useRef } from 'react';
 import { WebView, type WebViewMessageEvent } from 'react-native-webview';
 import type { EditorToHostMessage, HostToEditorMessage } from '@gisik-nokma/editor/webview-bridge';
-import { parseRawEditorMessage, serializeHostMessage } from './editor-bridge.js';
+import { loadDocMessage, parseRawEditorMessage, serializeHostMessage } from './editor-bridge.js';
 import {
   EDITOR_LOAD_FAILURE_MESSAGE,
   EDITOR_PARSE_FAILURE_MESSAGE,
@@ -32,6 +32,8 @@ export type EditorWebViewProps = {
    */
   initialDoc: LoadDocMessage['doc'];
   editable?: boolean;
+  /** Trash Plan 3: ids of permanently erased items; chips to them in `initialDoc` draw "Deleted item". */
+  purgedIds?: readonly string[];
   /** The bundled webview page — `packages/editor`'s `build:webview` output, baked in by `scripts/generate-editor-html.mjs`. */
   html: string;
   onChange(doc: ChangeMessage['doc']): void;
@@ -66,7 +68,7 @@ export type EditorWebViewProps = {
  */
 export function EditorWebView(props: EditorWebViewProps) {
   const ref = useRef<WebView>(null);
-  const { initialDoc, editable = true, html, onChange, onSubmit, onRequestUpload, onMentionQuery, onEditorError } = props;
+  const { initialDoc, editable = true, purgedIds, html, onChange, onSubmit, onRequestUpload, onMentionQuery, onEditorError } = props;
   const source = useMemo(() => ({ html }), [html]);
   const readyReceivedRef = useRef(false);
 
@@ -99,7 +101,7 @@ export function EditorWebView(props: EditorWebViewProps) {
       switch (message.kind) {
         case 'ready':
           readyReceivedRef.current = true;
-          send({ bridge: 1, kind: 'loadDoc', doc: initialDoc, editable });
+          send(loadDocMessage(initialDoc, editable, purgedIds));
           break;
         case 'change':
           onChange(message.doc);
@@ -143,7 +145,7 @@ export function EditorWebView(props: EditorWebViewProps) {
         }
       }
     },
-    [editable, initialDoc, onChange, onEditorError, onMentionQuery, onRequestUpload, onSubmit, send],
+    [editable, initialDoc, onChange, onEditorError, onMentionQuery, onRequestUpload, onSubmit, purgedIds, send],
   );
 
   return (

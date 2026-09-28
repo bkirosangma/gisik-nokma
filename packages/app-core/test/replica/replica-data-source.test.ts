@@ -149,6 +149,8 @@ const idleTransport: SyncTransport = {
   bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
   bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
   reconcile: () => Promise.reject(new Error('offline')),
+  purgedLookup: () => Promise.reject(new Error('offline')),
+  deletedItems: () => Promise.reject(new Error('offline')),
 };
 
 type Fixture = {
@@ -582,12 +584,14 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
    * added to) — it always throws `ReplicaGapError`, so it cannot serve as
    * "answers" evidence. `getTicketTypes` is used instead: 12.185 already
    * establishes it as a method this same fixture answers rather than refuses.
+   *
+   * Amended by trash Plan 3 (19.197): this fixture's transport answers `deletedItems` with a failure and nothing is cached, which is now the only way this read refuses.
    */
-  it('19.071 getDeletedItems rejects with ReplicaGapError; control: getTicketTypes on the same replica resolves', async () => {
+  it('19.071 getDeletedItems rejects with ReplicaGapError while nothing is cached; control: getTicketTypes on the same replica resolves', async () => {
     const { ds } = await fixture();
     await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(ReplicaGapError);
     const err = (await ds.query.getDeletedItems().catch((e: unknown) => e)) as ReplicaGapError;
-    expect(err.absences.map((a) => a.field)).toEqual(['DeletedItem[] — the whole read']);
+    expect(err.absences.map((a) => a.field)).toEqual(['DeletedItem[] — until one online read is cached on this device']);
 
     // CONTROL, same fixture: a method this replica actually answers.
     await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
@@ -664,6 +668,8 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         bootstrapTicket: () => Promise.reject(new Error('closure 5b(d): no per-ticket pull in this fixture')),
         bootstrapNote: () => Promise.reject(new Error('Plan 2: no note pull in this fixture')),
         reconcile: (ws: string) => Promise.resolve({ workspaceId: ws, restricted: [], restrictedNotes: [] }),
+        purgedLookup: () => Promise.resolve([]),
+        deletedItems: () => Promise.resolve({ items: [] }),
       },
     });
     const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });

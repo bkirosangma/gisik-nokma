@@ -567,6 +567,7 @@ describe('9.398 the hover card is placed from the link and can be reached', () =
 const WIKILINK_BEM = [
   'editor-wikilink',
   'editor-wikilink--missing',
+  'editor-wikilink--purged',
   'wikilink-popup',
   'wikilink-popup__item',
   'wikilink-popup__item--selected',
@@ -607,6 +608,13 @@ describe('9.282 the BEM classes the wiki-link surface names', () => {
     );
     collect(missing.view.dom);
     missing.destroy();
+    // Trash Plan 3: the erased target (`editor-wikilink--purged`).
+    const purged = createTestEditor(
+      { isPurged: () => true },
+      { type: 'doc', content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] }] },
+    );
+    collect(purged.view.dom);
+    purged.destroy();
 
     // The popup, opened through the real suggestion path — every class it puts
     // in the DOM, not the three a hand might name.

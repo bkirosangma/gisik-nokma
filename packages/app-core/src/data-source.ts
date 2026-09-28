@@ -2,6 +2,7 @@ import type {
   DeletedItem,
   IngestResult,
   LedgerEvent,
+  PurgedRef,
   ServerStreamFrame,
   SubmittedEvent,
   TicketTypeDef,
@@ -245,10 +246,19 @@ export type DataSourceQuery = {
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:
-   * `GET /v1/me/deleted-items`. Replica: throws `ReplicaGapError` — Plan 3
-   * fills it, and the UI renders the gap as "Deleted items needs a connection".
+   * `GET /v1/me/deleted-items`. Replica (trash Plan 3): the online answer when
+   * the server can be reached, cached; otherwise it REJECTS — with
+   * `DeletedItemsFromCache` (the saved list and when it was read) or, before
+   * anything was cached, `ReplicaGapError`. Never a silent `[]`.
    */
   getDeletedItems(): Promise<DeletedItem[]>;
+  /**
+   * Of `ids`, those a permanent purge erased (trash series Plan 3, D7) — the
+   * data behind every "Deleted item" chip. Online: `POST /v1/purged-lookup`,
+   * chunked at `PURGED_LOOKUP_MAX_IDS`. Replica: the local `purged_ids`
+   * registry, offline. Content-free either way: kinds and ids.
+   */
+  purgedAmong(ids: readonly string[]): Promise<PurgedRef[]>;
   /**
    * The workspace roster. `RosterMember[]` and not `Actor[]`: the route sends a
    * `role` per person (`routes/builder-reads.ts:247`) and the members screen

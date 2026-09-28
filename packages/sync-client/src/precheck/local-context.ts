@@ -1,6 +1,6 @@
 import {
   TICKET_EVENT_TYPES,
-  applyTicketEvent,
+  foldTicketEvent,
   membershipId,
   type EventEnvelope,
   type PublishedWorkflowDef,
@@ -148,7 +148,10 @@ export async function buildPendingOverlay(deps: LocalContextDeps): Promise<Pendi
     // both clocks, so the provenance stays readable as "this device said so".
     const env: EventEnvelope = { ...submitted, serverTime: submitted.clientTime, seq };
     try {
-      states.set(ticketId, applyTicketEvent(states.get(ticketId), env, localDeps));
+      const next = foldTicketEvent(states.get(ticketId), env, localDeps);
+      // A purged ticket's redacted creation folds to nothing (trash Plan 2 D7):
+      // no state, and — unlike a throw — not "unfoldable" either.
+      if (next !== undefined) states.set(ticketId, next);
     } catch {
       unfoldable.add(ticketId);
     }

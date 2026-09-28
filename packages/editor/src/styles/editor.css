@@ -1045,6 +1045,11 @@
    block above: this file names no colour. `.ticketref-popup` and its parts
    are the shared suggestion-popup rules near the top of this file. */
 .editor-ticketref { overflow-wrap: anywhere; }
+/* Trash Plan 3 (T11) — a chip whose target was permanently erased. No colour
+   (this file's rule); italic and no underline tell it apart, and the words
+   ("Deleted item") carry the meaning. `cursor: default`: nothing to open. */
+.editor-ticketref--purged,
+.editor-wikilink--purged { font-style: italic; text-decoration: none; cursor: default; }
 
 /* The reading rail (spec §8.2, Plan 4 Task 7). Structure only, like everything
    above — and NO width rule: the source gated on a 1100px viewport inside the

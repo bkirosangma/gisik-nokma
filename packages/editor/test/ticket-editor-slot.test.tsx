@@ -123,6 +123,7 @@ type AppCoreEditorSlotProps = {
   // either half gains a prop the other does not have.
   queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  isPurged?: (kind: 'ticket' | 'note', id: string) => boolean;
   uploadAttachment?: (file: File) => Promise<AppCoreEditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: AppCoreEditorSlotUpload) => Promise<void>;
   // V7 — mirrored from app-core's seam, and the TYPE is part of the parity the

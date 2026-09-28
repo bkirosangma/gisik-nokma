@@ -22,6 +22,7 @@ import {
   restoreUnreachableLine,
   unansweredLine,
   useLiveQuery,
+  usePurgedPredicate,
   writeFailureCopy,
   type DataSource,
   type RosterMember,
@@ -848,6 +849,11 @@ function NoteEditorPane({
   // Keep only hides the banner; the draft stays live and saves as any edit.
   const [bannerKept, setBannerKept] = useState(false);
 
+  // Trash Plan 3 (D7): chips in the stored body that point at erased items. The
+  // editor mounts on `ready` — a node view is built once, and the autosave must
+  // never see a remount mid-edit, so the wait happens before the first draw.
+  const purged = usePurgedPredicate(dataSource.query, [autosave.initialDoc]);
+
   return (
     <>
       {autosave.restoredAt !== null && !bannerKept && canEdit ? (
@@ -860,6 +866,7 @@ function NoteEditorPane({
           }}
         />
       ) : null}
+      {purged.ready ? (
       <TicketEditorSlot
         mode="note"
         doc={autosave.initialDoc}
@@ -900,7 +907,9 @@ function NoteEditorPane({
         headingLink={(id: string) => `${window.location.origin}/notes/${note.noteId}#${id}`}
         queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
         resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
+        isPurged={purged.isPurged}
       />
+      ) : null}
     </>
   );
 }

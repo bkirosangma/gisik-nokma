@@ -84,7 +84,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 ## 19.8 Client contract
 
 - ✅ **19.070 — the online twin maps every `DeletedItem` field and refuses a row missing `purgeDueAt`;** control: a full row round-trips. Mutation: default a missing `purgeDueAt` to null.
-- ✅ **19.071 — the replica twin rejects with `ReplicaGapError`;** control: `getMyWorkspaces` on the same replica resolves. Mutation: resolve `[]` (an empty list would tell a person they have nothing deleted, when nobody was asked).
+- ✅ **19.071 — the replica twin rejects with `ReplicaGapError`;** control: `getMyWorkspaces` on the same replica resolves. Mutation: resolve `[]` (an empty list would tell a person they have nothing deleted, when nobody was asked). Amended 2026-09-29 by 19.197 (trash Plan 3): the rejection now happens only while nothing is cached — the absence is `DELETED_ITEMS_NOT_CACHED` ("DeletedItem[] — until one online read is cached on this device"); with a cache the replica rejects with `DeletedItemsFromCache` instead (19.196).
 
 ## 19.9 Purge — every table has a rule
 
@@ -261,3 +261,77 @@ the number you added — an unchanged count has reported a clean sweep over case
 ## 19.29 Whole-branch review fixes
 
 - ✅ **19.160 — a purge that lands while the embed worker is mid-call is not undone: the worker writes no chunk for the erased note, and a chunk row whose note no longer exists is removed by the next pass;** control: the live note beside it is embedded. Mutation: drop the worker's `FOR SHARE` re-check (the racing INSERT survives), or restore the join-based cleanup (the orphan survives).
+
+## 19.30 The purged-id lookup
+
+- ✅ **19.161 — `POST /v1/purged-lookup` answers, of the ids asked, exactly those in `purged_entities` whose kind is a lifecycle kind, as `{ kind, id }` sorted by kind then id;** control: a live id asked beside them is absent, and a registry row of kind `workflow` for an asked id is absent. Mutation: join on the id alone (drop the `PURGEABLE_KINDS` cross join) — the `workflow` row appears.
+- ✅ **19.162 — the body is refused with 400 for 501 ids and for an id that is not a ULID;** control: exactly 500 ULIDs answer 200, and an empty list answers `{ purged: [] }`. Mutation: raise `maxItems` to 1000.
+- ✅ **19.163 — a signed-out caller gets 401;** control: the same body with a session answers 200. Mutation: drop `preHandler: requireSession`.
+- ✅ **19.164 — the device vocabulary is pinned: `PURGED_OUTBOX_NOTICE` verbatim, `PURGE_RULE` is `purge.erased` and the server's re-export is the same constant, `PURGED_LOOKUP_MAX_IDS` is 500, and `isPurgedRef` admits the four lifecycle kinds with a non-empty id;** control: a `workflow` ref, an empty id and a ref without an id are refused. Mutation: `isPurgedRef` accepts any string kind.
+
+## 19.31 The door, through sync
+
+- ✅ **19.165 — through `POST /v1/sync`'s service, a `ticket.created` whose parent was purged is answered `refused` with `PURGED_REASON` and rule `purge.erased`, and no row of any kind is written for the new ticket (no `claim.contested`);** control: a legal top-level creation in the same project commits. Mutation: delete the `claim.contested` arm of `payloadIds` — the answer becomes `contested`.
+- ✅ **19.166 — through sync, a `ticket.created` in a purged project and a `ticket.reparented` of a live ticket under a purged one are both refused with `PURGED_REASON`, and the live ticket's stream is unchanged;** control: a creation in the kept project commits. Mutation: read only the original event's ENTITY, not its payload — both answers become `contested`.
+
+## 19.32 The replica erases
+
+- ✅ **19.167 — `eraseEntities([{ticket T}])` removes T's events, row, snapshot and provenance, T's local child, and EVERY contest on T — the device's own stub included;** control: the sibling S keeps its row, its snapshot and its own stub. Mutation: delete contests with `purgeEntity`'s rule (`claimant_id <> me`) — the own stub survives.
+- ✅ **19.168 — an erased ticket's queued claim leaves the outbox as a `sync_notices` row naming only its event id, target and type (never the payload), and is neither silently deleted nor left failed;** control: another ticket's queued claim stays queued. Mutation: delete the outbox rows without recording a notice.
+- ✅ **19.169 — erasing a note removes its events, its row and its comments, and its queued claim becomes a notice;** control: a second note and its comment are untouched. Mutation: skip `note_comments`.
+- ✅ **19.170 — erasing a project recomputes the local subtree: every ticket whose state names the project (children included) and every note homed in it;** control: the other project's ticket and note stay. Mutation: expand by `parent_id` only, skipping the project scan.
+- ✅ **19.171 — erasing the workspace empties every workspace-scoped local table, the definitions, the cursor and BOTH pending-pull keys, and records the workspace;** control: the device identity (`me`) is kept. Mutation: forget `pending-note-pulls:<ws>` (the key `revokeScope` also leaves behind).
+- ✅ **19.172 — every local table has an entry in `LOCAL_TABLE_RULES`, and every entry names a real table;** control: the rules minus `contests` leave exactly `contests` uncovered. Mutation: delete the `contests` entry.
+- ✅ **19.173 — `purgedAmong` answers only recorded ids, and an erase strips the Deleted-items cache of the erased ticket and, for a workspace, of every item in it;** control: an unrecorded id is absent and an item of another workspace stays cached. Mutation: skip the cache strip. Amended 2026-09-30 (final review I-2, I-3): the cached Deleted-items ids (item, project, workspace) are lookup candidates, an erased project strips its cached tickets, and offline `searchLocal` stops matching an erased title inside a surviving comment.
+
+## 19.33 Client folds
+
+- ✅ **19.174 — the replica applies a redacted `ticket.created` (`{ projectId, purged: true }`) without throwing and folds no ticket from it;** control: an ordinary creation beside it folds. Mutation: fold with `applyTicketEvent` again — its named throw rejects the apply.
+- ✅ **19.175 — `buildPendingOverlay` over a queued redacted creation produces no state and does not mark the ticket unfoldable;** control: an ordinary queued creation folds into `states`. Mutation: fold with `applyTicketEvent` — the ticket lands in `unfoldable`.
+
+## 19.34 When a device learns
+
+- ✅ **19.176 — at `caught-up`, after the reconcile pass, the engine sends the ids it holds to the lookup and erases what comes back;** control: a held ticket the lookup does not name stays. Mutation: remove the `learnPurges` call from `onCaughtUp`.
+- ✅ **19.177 — the lookup asks about more than the held rows: an id reconcile just evicted (whose own contest stub `purgeEntity` kept) and a chip id inside a held comment;** control: the untouched held ticket is still held. Mutation: build the candidates from `listTickets` alone — the chip id is never asked and never recorded.
+- ✅ **19.178 — a device holding 1,102 ids asks in chunks of at most 500; one chunk failing is recorded in `lastPurgeLookupError` and the next chunk's answer is still erased;** control: an id answered only by the failing chunk is not erased. Mutation: stop at the first failing chunk.
+- ✅ **19.179 — a `not-a-member` stream error whose lookup names the workspace erases the workspace and ENDS the stream: status `offline`, no resubscribe;** control: the recorded workspace answers `purgedAmong`. Mutation: erase without setting `streamEnded` — the engine reconnects.
+- ✅ **19.180 — a `not-a-member` whose lookup names nothing erases nothing (a revoke is `revokeScope`'s), and a bootstrap 403 asks the lookup and rethrows `WorkspaceAccessLost`;** control: the same 403 when the lookup names the workspace resolves `start()` with the workspace recorded and no subscribe. Mutation: erase the workspace on any `not-a-member` without asking. Amended 2026-09-30 (final review I-4): a relaunch after the purge — the workspace already recorded, the lookup asking nothing — still resolves `start()` without a subscribe.
+- ✅ **19.181 — a `purge.completed` envelope for a project is never stored and makes the device erase that project's local subtree;** control: the other project's ticket stays. Mutation: drop the replica's `purge.completed` branch — the tombstone lands in `events`.
+- ✅ **19.182 — the HTTP transport POSTs `{ ids }` to `/v1/purged-lookup` with the bearer token and keeps only well-formed lifecycle refs, GETs `/v1/me/deleted-items`, and answers a bootstrap 403 with `WorkspaceAccessLost` (message `bootstrap failed: 403`);** control: a bootstrap 500 is a plain `Error`, and a lookup 502 throws `purged-lookup failed: 502`. Mutation: throw a plain `Error` on 403.
+
+## 19.35 The outbox notice
+
+- ✅ **19.183 — a claim the server refuses with rule `purge.erased` leaves the outbox as a notice and is NOT a failed row;** control: a claim refused by any other rule stays a failed row carrying its `rule: reason` as `lastError`. Mutation: delete the `PURGE_RULE` arm — the purge refusal becomes a permanent failed row.
+- ✅ **19.184 — `failedItems` carries `lastError`, `dismissFailed` deletes a failed row, and `dismissNotice` deletes a notice;** control: `dismissFailed` on a QUEUED row's id leaves it queued. Mutation: `dismissFailed` without the `status = 'failed'` guard.
+- ✅ **19.185 — `SyncNotices` draws each notice's sentence with a Dismiss button named `Dismiss: <sentence>`, calls `onDismiss` with its id, draws an empty live region for none, and every `gn-sync-notices*` class it renders has a rule in `ui.css` and vice versa;** control: no button for zero notices, and the empty region's `:empty` rule is zero-height/no-padding without `display: none` or `visibility: hidden` (the region stays in the accessibility tree so the first notice is announced). Mutation: drop the `aria-label` — the button's name loses the sentence; put `display: none` back on `.gn-sync-notices:empty` — the empty-rule check fails.
+- ✅ **19.186 — the replica data source's `syncNotices` lists purge notices as `PURGED_OUTBOX_NOTICE` and failed claims as `failedClaimNotice(lastError)`, and `dismissSyncNotice` routes `purged:`/`failed:` ids to the right delete;** control: an unknown id changes nothing. Mutation: route `failed:` ids to `dismissNotice`.
+- ✅ **19.187 — end to end against the real server: device A edits T offline, T is deleted, marked and purged, A reconnects — the edit comes back refused, leaves A's outbox as a notice (no failed row), A's lookup erases T, and A lists `PURGED_OUTBOX_NOTICE`;** control: A's offline edit to the surviving S commits. Mutation: delete the `PURGE_RULE` arm in `applyResult`.
+
+## 19.36 Deleted item chips
+
+- ✅ **19.188 — `renderCommentBody` draws a `ticketRef` and a `wikiLink` whose target the predicate names as `PURGED_ITEM_LABEL`, in a span with `gn-comment__ref--purged`, with no link even when the href resolver answers one;** control: a live chip beside them keeps `KEY title` and its link. Mutation: resolve the href before asking the predicate.
+- ✅ **19.189 — the online twin of `purgedAmong` POSTs the unique ULIDs (a non-ULID is never sent) to `/v1/purged-lookup` in chunks of at most 500 and maps each row, refusing one that is not a lifecycle ref; the replica twin answers from `purged_ids`;** control: an empty list sends no request, and an unrecorded id is absent on the replica. Mutation: send every id in one request.
+- ✅ **19.190 — `usePurgedPredicate` is not `ready` before its documents are `loaded`, asks once per id per session (a second mount of the same document asks nothing), is `ready` in the same render for a document without chips, and settles `ready` with nothing purged when the lookup fails — which it retries on the next mount;** control: the predicate names the purged id and not the live one. Mutation: drop the session cache.
+- ✅ **19.191 — a SURVIVING comment's chip to a purged note reads "Deleted item" with no link, both in the ticket sheet's thread and in the web's note comments, and the stored comment body is unchanged;** control: the live ticket chip in the same comment keeps `SHOP-9 Fix the freezer` and its link. Mutation: do not pass `isPurged` from the sheet to `CommentsThread`.
+
+## 19.37 Deleted item chips in the editor
+
+- ✅ **19.192 — the editor's `ticketRef` whose target is purged renders `span.editor-ticketref.editor-ticketref--purged` reading `PURGED_ITEM_LABEL` with no href (node view, `renderHTML` and `renderText` alike), and the node's attrs in `getJSON()` still hold the stored key and title;** control: a live chip beside it is `a.editor-ticketref` reading `SHOP-9 Fix the freezer`. Mutation: resolve the href before asking the predicate in the node view.
+- ✅ **19.193 — a purged `wikiLink` renders `PURGED_ITEM_LABEL` in `span.editor-wikilink--purged` even when `resolveNoteTitle` answers a title, and a click does not navigate;** control: a live link resolves its title and navigates. Mutation: ask `resolveNoteTitle` first.
+- ✅ **19.194 — the webview bridge's `loadDoc` carries `purgedIds` (non-strings dropped), and they are applied BEFORE `setContent`, so a loaded chip to a purged id renders `PURGED_ITEM_LABEL`; the phone builds the message with them;** control: a `loadDoc` without the field parses without the key and renders the stored text. Mutation: call `onPurgedIds` after `setContent`.
+- ✅ **19.195 — the ticket sheet mounts its description editor only once the description's chips have an answer, then hands it `isPurged`;** control: a description with no chips mounts on the first render. Mutation: mount the description slot without waiting for `ready`.
+
+## 19.38 Deleted items offline
+
+- ✅ **19.196 — the replica returns and caches an online `getDeletedItems`; offline it rejects with `DeletedItemsFromCache` holding the cached items and when they were read, and an erase strips an erased item from that cache;** control: back online the answer is a plain list again. Mutation: resolve the cached items instead of rejecting with them.
+- ✅ **19.197 — a device that has never cached the list rejects with `ReplicaGapError` naming `DELETED_ITEMS_NOT_CACHED` (the entry `REPLICA_GAPS` lists), and a malformed online body is a `MappingError` that the cache does not mask;** control: a transport failure with a cache is `DeletedItemsFromCache`. Mutation: map inside the transport `try`, so a mapping failure falls back to the cache. A 401, 403, 500 and 503 answer (driven through the real `createHttpTransport`, an `HttpStatusError`) still throw with a saved copy present, while a `fetch` that rejects serves the copy. Mutation: widen the catch to everything so a status answer falls back to the cache.
+
+## 19.39 The cached Deleted items view
+
+- ✅ **19.198 — a `DeletedItemsFromCache` answer draws the saved rows under `deletedItemsAsOf(<IST instant>)`, with no button in the list and no "Unmark it to restore it.";** control: a `ReplicaGapError` still reads "Deleted items needs a connection." and never "Nothing deleted.". Mutation: render the row actions for a cached answer.
+- ✅ **19.199 — `deletedItemsAsOf` is pinned verbatim, and an EMPTY saved list reads "Nothing deleted." together with the as-of line, never the offline line;** control: an empty live list reads "Nothing deleted." with no as-of line. Mutation: treat an empty cached list as offline.
+
+## 19.40 A purge redraws what it changed
+
+- ✅ **19.200 — the engine's `onNoticesChanged` fires after a flushed claim is refused (a notice or a failed row) and after a purge lookup erases something, and the replica data source forwards it to a subscriber as a `refresh` frame;** control: a lookup naming nothing, and a flush with nothing queued, fire nothing. Mutation: drop the `notifyNoticesChanged()` after `eraseEntities`.
+

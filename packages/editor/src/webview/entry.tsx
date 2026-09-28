@@ -20,11 +20,18 @@ function post(message: EditorToHostMessage): void {
 function WebviewEditorApp(): React.JSX.Element {
   const editorRef = useRef<Editor | null>(null);
   const bridgeRef = useRef<EditorBridge | null>(null);
+  const purgedRef = useRef<ReadonlySet<string>>(new Set());
 
   const handleReady = (): void => {
     const editor = editorRef.current;
     if (!editor || bridgeRef.current) return;
-    const bridge = createEditorBridge({ editor, post });
+    const bridge = createEditorBridge({
+      editor,
+      post,
+      onPurgedIds: (ids) => {
+        purgedRef.current = new Set(ids);
+      },
+    });
     bridgeRef.current = bridge;
 
     const onMessage = (event: MessageEvent): void => {
@@ -52,6 +59,7 @@ function WebviewEditorApp(): React.JSX.Element {
 
   return (
     <TicketEditor
+      isPurged={(_kind, id) => purgedRef.current.has(id)}
       queryUsers={(query) => bridgeRef.current?.resolveMentions(query) ?? Promise.resolve([])}
       // The note picker's data source, over the same round trip: the note list
       // lives on the host, and the WebView has no access to it.
