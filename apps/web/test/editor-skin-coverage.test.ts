@@ -91,6 +91,9 @@ const EXCLUDED_EDITOR_FILES = new Set([
   // chrome (KB editor parity); its rules live in editor.css and the toolbar
   // test (9.384) proves each class it draws has one.
   'components/TablePicker.tsx',
+  // The link editor popover (KB editor parity) — a body-portalled panel; its rules
+  // live in editor.css and the popover test (9.397) proves each class it draws has one.
+  'components/LinkEditorPopover.tsx',
   // Attachment/upload chrome — an unrelated feature area; some of it
   // (`.attachment-item--upload`/`__name`) is deliberately UNSTYLED per an
   // existing test (`apps/web/test/attachment-list-item.test.tsx`), and a

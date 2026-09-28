@@ -536,6 +536,20 @@ as an open question rather than a no.
 
 ---
 
+**How do I change a link I already wrote — its address, its words, or take it off?**
+Click into the link's text. A small panel appears next to it with the **URL** and the **Text**, an **Open
+link** shortcut for web, email and phone addresses, and **Unlink**. Change either field and press Enter
+(or click away) to keep the change; press Escape to put it back. Clearing the URL, or pressing Unlink,
+removes the link and leaves the words; clearing the Text deletes the link. From the keyboard, press
+Ctrl-K (Cmd-K on a Mac) with the cursor in a link to jump into the URL field. It only shows in the box you
+are typing in, and never in a box you can only read.
+
+**How do I put a table in a note or a comment?**
+Use **Insert table** in the formatting strip: an eight-by-eight grid opens, move over it (or use the arrow
+keys) until the label reads the size you want — "2 × 3 table" — then click, or press Enter. The first row
+is a header row. Escape closes the grid without inserting. The tool is greyed out while your cursor is
+already inside a table, because a table cannot go inside another one.
+
 ## Notes
 
 **What is a note, and how is it different from a job?**

@@ -1610,6 +1610,14 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
     on the tool; disabled (and named so) while the caret is inside a table. Real buttons with a roving tabindex,
     so it works from the keyboard and on touch (the source is a mouse-only grid of divs);
     `packages/editor/src/components/TablePicker.tsx`, `packages/editor/src/components/EditorToolbar.tsx`
+  - ✅ **A link is edited in place — URL, text, open, unlink** (KB `LinkEditorPopover`, link-mark branch
+    only; the wiki-link branch has nothing to bind to because a `wikiLink` is a note id) — click into a link and
+    a panel opens beside it: Enter/blur commits, Escape reverts, an empty URL unlinks, an empty text deletes,
+    **Open link** only for http(s)/mailto/tel. Additions over the source: it shows only for the focused editor
+    (the ticket sheet mounts two), Ctrl/Cmd-K moves focus into it, a text edit keeps the link's bold/italic,
+    and a blur commit never pulls focus back into the editor. Placement (below, flipped above, clamped) is the
+    shared pure `placePopover`; `packages/editor/src/components/LinkEditorPopover.tsx`,
+    `packages/editor/src/components/popover-position.ts`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

@@ -1578,17 +1578,23 @@ The author always reads their own note, whatever its scope — that is what **Pr
 
 The editor is the same one the rest of the product uses, with headings and a formatting toolbar: **Undo** and
 **Redo**, a **Heading level** menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link,
-Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**, **Insert note** and
-**Insert ticket**. Undo and Redo grey out when there is nothing to step back or forward to. Pressing Bold,
-Italic or Strikethrough with the cursor inside a link formats the whole link.
+Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**,
+**Insert note** and **Insert ticket**. Hover or tab to any tool to see its name, its keyboard shortcut where
+it has one, and the markdown you can type instead. Undo and Redo grey out when there is nothing to step back
+or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link.
+**Insert note** and **Insert ticket** each drop the `:note`/`:ticket` trigger at the cursor and open the same
+picker typing it would — the same two triggers work from the keyboard too, and `[[` still works for a note.
 
-**Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size
-you want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
+**Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you
+want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
 row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is
-inside a table, because a table cannot be placed inside another. Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and
-the markdown you can type instead. **Insert note** and **Insert ticket** each drop the `:note`/`:ticket`
-trigger at the cursor and open the same picker typing it would — the same two triggers work from the
-keyboard too, and `[[` still works for a note.
+inside a table, because a table cannot be placed inside another.
+
+**Editing a link.** Click into any link's text and a small panel opens beside it with the **URL** and the
+**Text**, an **Open link** shortcut (web, email and phone addresses only) and **Unlink**. Enter or clicking
+away keeps a change, Escape puts it back. An empty URL, or Unlink, takes the link off and keeps the words;
+an empty Text deletes the link. Ctrl-K (Cmd-K on a Mac) with the cursor in a link jumps straight into the
+URL field. The panel appears only for the box you are typing in.
 
 **Notes save themselves.** A couple of seconds after you stop typing, your change is sent — not on
 every keystroke. Until it is accepted the footer says **Saving…**; once it is, **Saved**. If it cannot

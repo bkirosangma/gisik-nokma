@@ -434,6 +434,79 @@
     transition: none;
   }
 }
+/* The link editor popover (KB editor parity, `LinkEditorPopover.tsx`) — a
+   `position: fixed` panel appended to <body>, so it is a stacking-context
+   sibling of `.gn-sheet__scrim` (z-index 40) exactly like the suggestion
+   popups above, and takes the same 50. Same raised surface as the tooltip and
+   the size grid: one family. */
+.link-editor {
+  z-index: 50;
+  box-sizing: border-box;
+  width: min(22rem, calc(100vw - 16px));
+  padding: 0.5rem;
+  display: flex;
+  flex-direction: column;
+  gap: 0.375rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-surface-raised);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text);
+  font-size: 0.8125rem;
+}
+.link-editor:focus {
+  outline: none;
+}
+.link-editor__row {
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+}
+.link-editor__label {
+  flex: 0 0 2.25rem;
+  font-size: 0.75rem;
+  color: var(--gn-text-muted);
+}
+.link-editor__input {
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 32px;
+  padding: 0 8px;
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+}
+.link-editor__input:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
+.link-editor__actions {
+  display: flex;
+  justify-content: flex-end;
+  gap: 0.25rem;
+}
+.link-editor__action {
+  display: inline-flex;
+  align-items: center;
+  min-height: 32px;
+  padding: 0 10px;
+  border: none;
+  border-radius: 6px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.75rem;
+  text-decoration: none;
+  cursor: pointer;
+}
+.link-editor__action:hover {
+  background: var(--gn-fill-secondary);
+}
+.link-editor__action:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
 .ticket-editor__link-url {
   min-width: 10rem;
   min-height: 32px;

@@ -63,6 +63,8 @@ export {
   MARKDOWN_HINT,
   type EditorToolbarProps,
 } from './components/EditorToolbar.js';
+export { LinkEditorPopover, type LinkEditorPopoverProps } from './components/LinkEditorPopover.js';
+export { placePopover, type PlaceInput } from './components/popover-position.js';
 export { TablePicker, TABLE_PICKER_SIZE, type TablePickerProps } from './components/TablePicker.js';
 export {
   TableFloatingToolbar,
