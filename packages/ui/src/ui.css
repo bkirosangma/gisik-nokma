@@ -7367,6 +7367,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* The marker goes, because the checkbox replaces it. */
 .gn-comment__list--tasks { list-style: none; padding-left: 0; }
 .gn-comment__task { display: flex; gap: 0.45rem; align-items: flex-start; }
+/* A taskItem's child is a PARAGRAPH, so the row is `<input><span><p>…</p></span>`,
+   one level deeper than `.gn-comment__body > *` above reaches — left alone the
+   `<p>` kept the user-agent's 1em margins (17px each side): the row grew to 56px
+   for one line and the checkbox sat 16px above its text. Same two declarations
+   as the body's own blocks, one level down. */
+.gn-comment__task > span > * { margin: 0; }
+.gn-comment__task > span > * + * { margin-top: 0.4rem; }
 /* Nudged down onto the first line of text rather than the top of the item box. */
 .gn-comment__task > input[type='checkbox'] { margin: 0.15rem 0 0; flex: none; }
 .gn-comment__details { margin: 0; }

@@ -4045,10 +4045,17 @@ input, textarea, select { font-family: inherit; }
   outline-offset: 2px;
 }
 .gn-comment__task > input[type='checkbox']:disabled { cursor: default; }
-/* The comment body's task item is a bare `input + span` row (no label, no
-   paragraph margin), so its box is centred on the first line by a fixed nudge:
-   (23.2px line - 16px box) / 2 at the body's 1.45 line-height. */
-.gn-comment__task > input[type='checkbox'] { margin: 0.225rem 0 0; }
+/* The comment body's task item is `input + span > p` (a taskItem's child is a
+   paragraph; `ui.css` zeroes its margins). It draws like the composer's row —
+   measured 2026-09-29 on a posted comment against the composer beneath it: the
+   row is 1.5rem tall at least (the composer's label floor), rows abut (no
+   `li + li` gap), and the 16px box is nudged onto the FIRST line by
+   (line-height - box) / 2 = (1.375rem - 1rem) / 2, the body's line-height in
+   `ui.css` — 9.365 recomputes it from there, so changing one without the other
+   fails a test instead of the eye. */
+.gn-comment__task { min-height: 1.5rem; }
+.gn-comment__task + .gn-comment__task { margin-top: 0; }
+.gn-comment__task > input[type='checkbox'] { margin: 0.1875rem 0 0; }
 /* `neo` fields are borderless and sunken (`[data-style="neo"] .gn-field__input`);
    the unchecked box takes the same coat, the checked one stays a flat accent. */
 [data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked),
