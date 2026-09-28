@@ -28,13 +28,14 @@ const MANUAL_NOTES_SUBSECTIONS = [
   'Writing a note',
   'Finding a note',
   "A job's own notes",
+  'Mentioning somebody in a note',
   'Linking to a job or another note',
   'Deleting a note, and getting it back',
   'What notes cannot do yet',
 ];
 
 describe('15.36 the generated corpus carries the notes release sections', () => {
-  it('15.36 the manual has a "§15 — Notes" section, last in document order, with its nine subsections', () => {
+  it('15.36 the manual has a "§15 — Notes" section, last in document order, with its ten subsections', () => {
     const manual = document('manual');
     const notes = manual.sections.find((section) => section.id === '15-notes');
     expect(notes).toBeDefined();
@@ -49,16 +50,18 @@ describe('15.36 the generated corpus carries the notes release sections', () => 
     const faq = document('faq');
     const notes = faq.sections.find((section) => section.title === 'Notes');
     expect(notes).toBeDefined();
-    // 8–14 real questions, per the planner's brief (BRIEF-help-notes-2026-09-23.md:22, sized 8–12
+    // 8–15 real questions, per the planner's brief (BRIEF-help-notes-2026-09-23.md:22, sized 8–12
     // before kb-editor-parity) — not a placeholder count. Widened to 14 (planner ruling, 2026-09-29):
     // the three questions kb-editor-parity (#744) added for its note-only ports (ReadingProgress,
     // HeadingCopyLink, DraftRestoreBanner) stay in Notes rather than being miscategorised as general
     // editor questions — none of the three is wired anywhere but note-document.tsx (HeadingAnchors is
     // gated on the `headingLink` option, passed only there; DraftRestoreBanner is imported only there),
     // so moving them to "Writing, comments and files" would describe a control readers of THAT section
-    // cannot find.
+    // cannot find. Widened to 15 (note mentions, 2026-09-29): "If I mention someone in a note, do they
+    // get told?" answers the who-is-told and told-once rules, which belong with the note, not with the
+    // ticket comment box.
     expect(notes?.entries.length).toBeGreaterThanOrEqual(8);
-    expect(notes?.entries.length).toBeLessThanOrEqual(14);
+    expect(notes?.entries.length).toBeLessThanOrEqual(15);
     // Every entry is a real question, not an empty heading.
     for (const entry of notes?.entries ?? []) {
       expect(entry.title.trim().length).toBeGreaterThan(0);
