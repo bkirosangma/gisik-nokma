@@ -14,7 +14,8 @@ import { canSee } from '../visibility/can-see.js';
 import { deliverToAll, type NotificationTransport } from './transport.js';
 
 /**
- * Turns committed events into messages addressed to people.
+ * Turns committed events into messages addressed to people. `ticket.created` with a
+ * birth `assigneeId` is an assignment too (W4).
  *
  * THE RULING THIS MODULE EXISTS TO HONOUR: the mention gate is SILENT
  * server-side. A mention must never become a probe for who can see a ticket.
@@ -239,7 +240,13 @@ export function createNotificationFanout(deps: FanoutDeps): NotificationFanout {
   return {
     async onCommitted(env: EventEnvelope): Promise<void> {
       try {
-        if (env.type === 'ticket.assigned') {
+        if (env.type === 'ticket.assigned' || env.type === 'ticket.created') {
+          // `ticket.created` carries the New ticket dialog's birth assignee
+          // (W4, owner ruling 2026-09-29). Same handler, same guards (unassigned,
+          // self), same `canSee` gate — which the assignee arm (W3) now answers
+          // true for them — and the same `assignment:${env.id}` key, so a
+          // redelivery is one row. A payload with no `assigneeId` fails the
+          // handler's parse and addresses nobody: born unassigned.
           await handleAssigned(env);
         } else if (env.type === 'comment.added') {
           const parsed = commentPayloadSchema.safeParse(env.payload);

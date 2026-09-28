@@ -336,6 +336,14 @@ matching `notifications.test.ts`'s own argument against a hand-written `HttpClie
 - **11.219** ✅ RULING E2-24(a)'s compounding-failure case — a refused save whose REVERT read also fails falls back to the disabled `prefsError` state (11.215's own treatment) rather than leaving the optimistic, wrong flip standing with no trace at all, which is what the revert `.load()`'s missing rejection handler used to do — (`apps/web/test/account-page.test.tsx`)
 - **11.220** ✅ RULING E2-24(b) — a revoke refusal on `/account` renders verbatim in a `role="alert"` (the same one-prop shape `PasskeysSection`'s add/remove `error` already carries) and the session list is NOT re-read, since the revoke never actually succeeded — before this ruling the result was read and discarded entirely, so the session simply failed to leave the list with nothing on screen to say why — (`packages/app-core/test/account/sessions-section.test.tsx`, `apps/web/test/account-page.test.tsx`)
 
+## Notify on create (access plan, W4)
+
+The New ticket dialog puts the assignee on `ticket.created`; the fan-out now reads it as an assignment (owner ruling 2026-09-29).
+
+- ✅ **11.225 — a `ticket.created` carrying `assigneeId` (not the actor) delivers ONE `assignment` notification to that person, with the ticket's title and the creator as `assignedBy`, keyed `assignment:<event id>`;** control: a `ticket.created` with no `assigneeId` delivers nothing. Mutation: delete the `ticket.created` branch from `onCommitted`.
+- ✅ **11.226 — the creator assigning themselves at birth, and `assigneeId: null`, deliver nothing;** control: the same event with another person does. Mutation: route `ticket.created` around `handleAssigned`'s self/null guard (call `deliverToAll` directly).
+- ✅ **11.227 — the same committed `ticket.created` delivered twice yields ONE row;** control: a different `ticket.created` for the same person is a second row. Mutation: key the dedupe on `newUlid()` instead of `env.id`.
+
 ## Permanently unused id ranges
 
 Three disjoint ranges/ids will never be filled, for three different reasons. Neither is a gap
