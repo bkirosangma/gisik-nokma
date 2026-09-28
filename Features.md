@@ -1595,6 +1595,9 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
     `gn-comment__heading--N` class, deliberately not a real `<h1>`–`<h6>` so a comment never enters the
     ticket sheet's heading outline) and renders `horizontalRule` as an `<hr>` (it used to render as nothing);
     `packages/app-core/src/views/comment-body.tsx`, `packages/ui/src/ui.css`
+  - ⚙️ **The code block's Copy button still copies when the clipboard write is rejected** — a denied or
+    sandboxed `navigator.clipboard.writeText` now falls back to the textarea route the reference's
+    `codeBlockCopy.tsx` takes (it used to swallow the rejection); `packages/editor/src/extensions/code-block-copy.ts`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

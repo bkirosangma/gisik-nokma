@@ -508,3 +508,4 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.371 — a comment renders a heading as a `<p>` that keeps its level (`gn-comment__heading--N`) and never as a real `<h1>`–`<h6>`.** (`packages/app-core/test/views/comment-body.test.tsx`)
 - ✅ **9.372 — a heading with a malformed level (0, 7, `'x'`, `null`, absent) still renders its text, with no modifier class.** (`packages/app-core/test/views/comment-body.test.tsx`)
 - ✅ **9.373 — a comment renders a horizontal rule as an `<hr>` (it used to render as nothing — an `<hr>` has no children for the fall-through arm to show).** (`packages/app-core/test/views/comment-body.test.tsx`)
+- ✅ **9.374 — the code block's Copy button falls back to the `execCommand` route when the clipboard write is rejected (permission denied), and still flips to "Copied".** (`packages/editor/test/code-block-copy.test.ts`)

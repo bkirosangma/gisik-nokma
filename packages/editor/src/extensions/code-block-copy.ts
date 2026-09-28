@@ -90,17 +90,28 @@ export const CodeBlockWithCopy = CodeBlock.extend({
             button.textContent = 'Copy';
           }, 1500);
         };
+        // The textarea route is ALSO the answer to a REJECTED write (a denied
+        // permission or a sandboxed frame), not only to a missing API — the
+        // reference's `codeBlockCopy.tsx` falls back from its catch, and
+        // swallowing the rejection left a button that said nothing and copied
+        // nothing.
+        const fallback = (): void => {
+          const area = document.createElement('textarea');
+          area.value = text;
+          document.body.appendChild(area);
+          area.select();
+          try {
+            document.execCommand('copy');
+          } finally {
+            area.remove();
+          }
+          done();
+        };
         if (navigator.clipboard?.writeText !== undefined) {
-          navigator.clipboard.writeText(text).then(done, () => undefined);
+          navigator.clipboard.writeText(text).then(done, fallback);
           return;
         }
-        const area = document.createElement('textarea');
-        area.value = text;
-        document.body.appendChild(area);
-        area.select();
-        document.execCommand('copy');
-        area.remove();
-        done();
+        fallback();
       });
       dom.append(pre, button);
       return {
