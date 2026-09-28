@@ -1,3 +1,4 @@
+import { searchTermSchema } from '@gisik-nokma/domain';
 import { act, cleanup, render, screen, waitFor } from '@testing-library/react';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import type { IngestResult, NoteComment, SubmittedEvent } from '@gisik-nokma/domain';
@@ -296,6 +297,69 @@ describe('18.213-18.215 NoteComments', () => {
     expect(search).toHaveBeenCalledWith(WS, 'licence');
     expect(hits).toEqual([{ ticketId: 't1', projectId: 'p1', key: 'CCSO-1183', title: 'Renew the trade licence' }]);
     expect(resolveTicketHref({ ticketId: 't1', projectId: 'p1' })).toBe(`/w/${WS}/p/p1?ticket=t1`);
+  });
+
+  /**
+   * 18.310 — Unit 6e (owner ruling 2026-09-29): a bare `:ticket` in a note's
+   * comment box — a context with NO project — must list the workspace's
+   * recent visible tickets, not reach `search('')` (the route's
+   * `searchTermSchema.min(1)` always 400s, which the picker draws as
+   * "Search needs a connection"). REPRODUCED first: with the old inline
+   * `queryTickets`, this `queryTickets('')` rejected.
+   */
+  it('18.310 an empty :ticket query lists the workspace\'s visible tickets across its projects, newest first, and never calls search; a typed query still does', async () => {
+    const search = vi.fn(async (_workspaceId: string, text: string) => {
+      searchTermSchema.parse(text);
+      return [
+        { ticketId: 't9', projectId: 'p2', title: 'Typed hit', snippet: '', matchedIn: 'title' as const, key: 'CCSO-9' },
+      ];
+    });
+    const getTickets = vi.fn(async (projectId: string) => ({
+      projectId,
+      rows:
+        projectId === 'p1'
+          ? [
+              { ticketId: '01J9AAAA0000000000000000A1', title: 'Older one', key: 'CCSO-1' },
+              { ticketId: '01J9CCCC0000000000000000C3', title: 'Newest one', key: 'CCSO-3' },
+            ]
+          : [{ ticketId: '01J9BBBB0000000000000000B2', title: 'Middle one', key: 'CCSO-2' }],
+    }));
+    const services = stubServices({
+      getNoteComments: async () => [],
+      getMyWorkspaces: async () => [
+        {
+          id: WS,
+          projects: [
+            { id: 'p1', name: 'One', archived: false },
+            { id: 'p2', name: 'Two', archived: false },
+            { id: 'p3', name: 'Gone', archived: true },
+          ],
+        },
+      ] as never,
+      getTickets: getTickets as never,
+      search,
+    });
+
+    render(
+      <Providers services={services}>
+        <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+      </Providers>,
+    );
+    await waitFor(() => expect(capturedSlotProps.length).toBeGreaterThan(0));
+    const queryTickets = slotProps().queryTickets as (
+      q: string,
+    ) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
+
+    const listed = await queryTickets('');
+    expect(listed.map((c) => c.key)).toEqual(['CCSO-3', 'CCSO-2', 'CCSO-1']);
+    expect(listed[0]).toEqual({ ticketId: '01J9CCCC0000000000000000C3', projectId: 'p1', key: 'CCSO-3', title: 'Newest one' });
+    expect(search).not.toHaveBeenCalled();
+    expect(getTickets).not.toHaveBeenCalledWith('p3', expect.anything(), expect.anything());
+
+    // control, same `it`: a typed query still goes to `search`.
+    const typed = await queryTickets('typed');
+    expect(search).toHaveBeenCalledWith(WS, 'typed');
+    expect(typed.map((c) => c.key)).toEqual(['CCSO-9']);
   });
 
   /**

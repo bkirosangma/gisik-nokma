@@ -8229,7 +8229,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job."
+                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type."
                   }
                 ]
               },

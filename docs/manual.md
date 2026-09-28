@@ -1633,7 +1633,7 @@ this).
 ### Linking to a job or another note
 
 Typing `:ticket ` followed by a few words, in a comment or in a note, opens a picker over the jobs you
-can see; pick one and it inserts a chip showing the job's key and title, which opens that job.
+can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type.
 
 Typing `:note ` (or `[[`) the same way opens a picker over the notes you can read, and inserts a link to
 the one you pick.
