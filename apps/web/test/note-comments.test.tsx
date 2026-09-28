@@ -395,6 +395,42 @@ describe('18.213-18.215 NoteComments', () => {
   });
 });
 
+describe('18.416 a mention notification opens the comment it names', () => {
+  it('18.416 with #comment-<id> in the URL the named comment is scrolled into view once its thread loads; with no hash nothing scrolls (control)', async () => {
+    const scroll = vi.fn();
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = scroll;
+    const services = () =>
+      stubServices({
+        getNoteComments: async () => [comment({ commentId: 'c1' }), comment({ commentId: 'c2', authorId: 'u_ana' })],
+      });
+    try {
+      // CONTROL first, same it(): no hash, the thread renders, nothing is scrolled.
+      window.location.hash = '';
+      render(
+        <Providers services={services()}>
+          <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        </Providers>,
+      );
+      expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
+      expect(scroll).not.toHaveBeenCalled();
+      cleanup();
+
+      window.location.hash = '#comment-c2';
+      render(
+        <Providers services={services()}>
+          <NoteComments workspaceId={WS} noteId={NOTE} nameOf={nameOf} canComment />
+        </Providers>,
+      );
+      await waitFor(() => expect(scroll).toHaveBeenCalledTimes(1));
+      expect((scroll.mock.contexts[0] as HTMLElement).id).toBe('comment-c2');
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.location.hash = '';
+    }
+  });
+});
+
 describe('19.191 note comments on the web', () => {
   it('19.191 a chip to a purged note reads "Deleted item" with no link; the live ticket chip keeps its link', async () => {
     const GONE = '01J9GNOTEGONE0000000000000';

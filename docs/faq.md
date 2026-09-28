@@ -577,6 +577,13 @@ closed the tab first), so it was kept on your device and is showing now. **Keep*
 words; **Discard** deletes them and shows the note as the server has it, which cannot be undone. The
 bar is only shown to people who can edit the note.
 
+**If I mention someone in a note, do they get told?**
+Yes — type `@` and pick them, in the note or in one of its comments. They get a *mentioned you* message in their Inbox
+that opens the note, or the comment. It is sent once: saving the note again with the same
+mention in it does not tell them again, and mentioning yourself sends nothing. Only people who can read the note
+are told — a note shared with nobody else, or with a list that leaves them out, tells them nothing, and you are
+not shown that. Muting Mentions under Account → Notifications hides these too.
+
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
 workspace except guests, **This project** means everyone actually on that project, **Same as the

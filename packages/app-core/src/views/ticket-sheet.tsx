@@ -15,6 +15,7 @@ import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
 import { memberLabel } from '../member-label.js';
+import { mentionCandidatesOf } from '../mention-candidates.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
@@ -1568,26 +1569,11 @@ export function TicketSheet({
    * **Named owner: whoever next widens `EditorSlotProps.queryUsers`** — an
    * absent-roster signal has to exist before this can tell the truth.
    */
-  const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> => {
-    const people = members.data ?? [];
-    const needle = query.trim().toLowerCase();
-    // RULING E5-4: `member.name` verbatim is blank for the magic-link
-    // population (`name: ''`) — the same defect E4-18 closed on the
-    // Assignee picker, here on the @mention list. Resolved BEFORE matching,
-    // not after: a nameless member is otherwise never reachable by typing
-    // (their raw name never matches anything) and, once resolved, is found
-    // the same way any other person is — by what this list actually shows
-    // for them.
-    //
-    // Resolved through `memberLabel` (2026-09-22), not `actorLabel`: a row in
-    // this list IS a roster member, so the address step applies, and "what this
-    // list shows for them" is now name → email → id rather than name → id.
-    // `actorLabel` would be wrong here for its FIRST step as well — the system
-    // override is for claims, not for a person you can @mention.
-    return people
-      .map((member) => ({ userId: member.id, name: memberLabel(member) }))
-      .filter((person) => needle === '' || person.name.toLowerCase().includes(needle));
-  };
+  const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> =>
+    // The list itself is `mentionCandidatesOf` — shared with the note editors
+    // (`apps/web/src/notes`), which is where RULING E5-4's label-before-match
+    // note now lives.
+    mentionCandidatesOf(members.data ?? [], query);
 
   /**
    * Close / Reopen — the same `make`/`ingest`/result idiom `submitTransition`

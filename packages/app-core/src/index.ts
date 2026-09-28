@@ -11,6 +11,7 @@ export * from './view-types.js';
 export { makeSubmittedFactory, type EnvelopeSeed, type MakeSubmitted } from './submit.js';
 export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from './provenance.js';
 export { memberLabel } from './member-label.js';
+export { mentionCandidatesOf, type MentionPerson } from './mention-candidates.js';
 export { createClientStateCache, type ClientStateCache } from './cache.js';
 export { withCacheFeed } from './cache-feed.js';
 export {
@@ -270,7 +271,9 @@ export type { InboxFilter, NotificationsGateway, NotificationsPage } from './inb
 export {
   notificationBody,
   notificationHeadline,
+  notificationTarget,
   notificationTicketId,
+  type NotificationTarget,
 } from './inbox/format.js';
 export { NotificationIcon, type NotificationIconProps } from './inbox/icons.js';
 export { UnreadBadge, type UnreadBadgeProps } from './inbox/unread-badge.js';

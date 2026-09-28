@@ -18,6 +18,7 @@ import {
   TicketSheet,
   classifyBatch,
   makeSubmittedFactory,
+  mentionCandidatesOf,
   restoreSeeds,
   restoreUnreachableLine,
   unansweredLine,
@@ -672,6 +673,7 @@ function NoteDocumentBody({
           onDraftChange={setDraft}
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
           editorRef={editorInstanceRef}
+          members={members}
           onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
         />
       </div>
@@ -682,6 +684,7 @@ function NoteDocumentBody({
         nameOf={nameOf}
         canComment
         notes={treeNotes}
+        members={members}
       />
 
       <HistoryPanel
@@ -811,6 +814,7 @@ function NoteEditorPane({
   onDraftChange,
   onNavigateNote,
   editorRef,
+  members,
   onDraftDiscarded,
 }: {
   note: NoteDetail;
@@ -821,6 +825,14 @@ function NoteEditorPane({
   onDraftChange: (doc: unknown) => void;
   onNavigateNote: (id: string) => void;
   editorRef: TicketEditorSlotProps['editorRef'];
+  /**
+   * The workspace roster `NoteDocument` already loads for the byline — the
+   * `@` picker's people (`mentionCandidatesOf`, the SAME source the ticket
+   * sheet's editors use). Read through a closure at query time, and
+   * `TicketEditor` threads `queryUsers` through a props ref, so a roster that
+   * arrives after the editor mounted is still what the picker searches.
+   */
+  members: RosterMember[];
   /** The banner's Discard: the parent remounts this pane, which then recovers nothing and mounts with the server's body. */
   onDraftDiscarded: () => void;
 }) {
@@ -882,6 +894,7 @@ function NoteEditorPane({
         onSave={autosave.onSave}
         saveState={autosave.saveState}
         placeholder="Write the note…"
+        queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
         queryNotes={async (query: string) => {
           const needle = query.trim().toLowerCase();
           const hits: Array<{ noteId: string; title: string }> = [];

@@ -1,9 +1,10 @@
-import { istDayOf } from '@gisik-nokma/domain';
+import { isNoteMentionPayload, istDayOf } from '@gisik-nokma/domain';
 import type {
   AssignmentNotificationPayload,
   ContestedClaimNotificationPayload,
   DateApproachingNotificationPayload,
   MentionNotificationPayload,
+  NoteMentionNotificationPayload,
   Notification,
   StaleTicketNotificationPayload,
 } from '@gisik-nokma/domain';
@@ -77,7 +78,9 @@ export function notificationHeadline(notification: Notification, userName: UserN
       return `${userName(payload.assignedBy)} assigned this to you`;
     }
     case 'mention': {
-      const payload = notification.payload as MentionNotificationPayload;
+      // The ticket and the note shape carry the same `mentionedBy`, and a
+      // mention reads the same wherever it sat — the row's label says WHERE.
+      const payload = notification.payload as MentionNotificationPayload | NoteMentionNotificationPayload;
       return `${userName(payload.mentionedBy)} mentioned you`;
     }
     case 'contested-claim': {
@@ -129,7 +132,7 @@ export function notificationBody(notification: Notification): string {
     case 'assignment':
       return (notification.payload as AssignmentNotificationPayload).ticketTitle;
     case 'mention':
-      return (notification.payload as MentionNotificationPayload).excerpt;
+      return (notification.payload as MentionNotificationPayload | NoteMentionNotificationPayload).excerpt;
     case 'contested-claim':
       return (notification.payload as ContestedClaimNotificationPayload).reason;
     case 'date-approaching':
@@ -159,7 +162,34 @@ export function notificationBody(notification: Notification): string {
  */
 export function notificationTicketLabel(notification: Notification): string | null {
   if (notification.kind !== 'mention') return null;
-  return (notification.payload as MentionNotificationPayload).ticketTitle;
+  const payload = notification.payload as MentionNotificationPayload | NoteMentionNotificationPayload;
+  // A note mention names its NOTE where a ticket mention names its ticket.
+  return isNoteMentionPayload(payload) ? payload.noteTitle : payload.ticketTitle;
+}
+
+/**
+ * Where a row opens — a ticket, or (for a mention that sat in a note) the note,
+ * and for a mention in a note's COMMENT the comment too: its id is the event id
+ * (`NoteMentionNotificationPayload`'s docblock). `notificationTicketId` below
+ * stays the ticket-only reader it always was; a row that is about a note has no
+ * ticket id to give, so the inbox asks THIS first.
+ */
+export type NotificationTarget =
+  | { kind: 'ticket'; ticketId: string }
+  | { kind: 'note'; noteId: string; commentId: string | null };
+
+export function notificationTarget(notification: Notification): NotificationTarget {
+  if (notification.kind === 'mention') {
+    const payload = notification.payload as MentionNotificationPayload | NoteMentionNotificationPayload;
+    if (isNoteMentionPayload(payload)) {
+      return {
+        kind: 'note',
+        noteId: payload.noteId,
+        commentId: payload.source === 'note-comment' ? payload.eventId : null,
+      };
+    }
+  }
+  return { kind: 'ticket', ticketId: notificationTicketId(notification) };
 }
 
 /**

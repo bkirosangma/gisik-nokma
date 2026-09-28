@@ -149,7 +149,7 @@ function CommentItem({
   // notifications; it is a display of last resort and never was this one.
   const text = renderCommentBody(comment.body, ticketHref ?? (() => null), isPurged ?? (() => false));
   return (
-    <li className="gn-comment" data-testid={`comment-${comment.commentId}`}>
+    <li className="gn-comment" id={`comment-${comment.commentId}`} data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
         {initialsOf(name)}
       </span>

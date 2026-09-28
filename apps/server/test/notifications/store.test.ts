@@ -298,6 +298,30 @@ describe('unreadNotificationCount / listNotifications — muted kinds', () => {
     expect(muted.notifications).toHaveLength(0);
   });
 
+  // 18.411 — a NOTE mention is the `mention` kind, so muting mentions hides it too.
+  it('18.411 a note mention is hidden by the mention mute, in the list and in the unread count', async () => {
+    await insertNotification(
+      db.pool,
+      mentionSample({
+        payload: {
+          noteId: 'n1',
+          noteTitle: 'Weekly notes',
+          mentionedBy: 'user_anselma',
+          eventId: nextId(),
+          source: 'note',
+          excerpt: 'cc @user_kiro',
+          clientTime: '2026-09-29T05:00:00.000Z',
+          serverTime: '2026-09-29T05:00:01.000Z',
+        },
+      }),
+    );
+    // Positive control, same it(): unmuted, the row is listed and counted.
+    expect((await listNotifications(db.pool, 'user_kiro', { mutedKinds: [] })).notifications).toHaveLength(1);
+    expect(await unreadNotificationCount(db.pool, 'user_kiro', [])).toBe(1);
+    expect((await listNotifications(db.pool, 'user_kiro', { mutedKinds: ['mention'] })).notifications).toHaveLength(0);
+    expect(await unreadNotificationCount(db.pool, 'user_kiro', ['mention'])).toBe(0);
+  });
+
   it('listNotifications excludes a muted kind while leaving an unmuted kind\'s row visible', async () => {
     await insertNotification(db.pool, mentionSample());
     await insertNotification(db.pool, assignmentSample());
