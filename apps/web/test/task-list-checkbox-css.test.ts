@@ -224,6 +224,7 @@ describe('9.365 a posted comment’s task item sits like the composer’s: box o
  * `<p>` had the same margins and, with no padding/border to stop them, collapsed THROUGH the quote.
  * Fixture = the renderer's own output for a bullet list holding a two-paragraph item, a nested list
  * and a quote, plus a numbered list and a task list (which must NOT be touched by the list-item rule).
+ * Item gap: 0.25rem, the owner's choice (2026-09-29) — tighter than the composer's 0.5rem paragraph margin.
  */
 const para = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
 const li = (...blocks: unknown[]) => ({ type: 'listItem', content: blocks });
@@ -247,7 +248,7 @@ const declaredMargins = (el: Element, sheets?: string[]) => matchingBodies(el, s
 const NON_ZERO_MARGIN = /margin(?:-top|-bottom)?:\s*(?!0\s*;)\S[^;]*;/;
 const COMPOSER_PARAGRAPH_MARGIN_REM = Number(/margin:\s*([\d.]+)rem 0;/.exec(bodyFor('.ticket-editor__content p'))?.[1]);
 
-describe('9.367 a posted comment’s bullet/numbered list has no stacked paragraph margins; items sit like the composer’s', () => {
+describe('9.367 a posted comment’s bullet/numbered list has no stacked paragraph margins; items sit 0.25rem apart', () => {
   const rendered = () => renderBody(LIST_DOC).container;
 
   it('9.367 the renderer’s item is li > p, and NO rule leaves that paragraph — or a quote’s — a margin', () => {
@@ -291,13 +292,15 @@ describe('9.367 a posted comment’s bullet/numbered list has no stacked paragra
     expect(declaredMargins(quote)).toMatch(/margin-top:\s*0\.4rem;/);
   });
 
-  it('9.367 items are the composer’s paragraph margin apart — 0.5rem, read from globals.css — not 0.15rem, not 1em', () => {
+  it('9.367 items are 0.25rem apart — the owner’s choice, tighter than the composer’s paragraph margin (globals.css) — not 0.15rem, not 1em', () => {
     expect(COMPOSER_PARAGRAPH_MARGIN_REM, 'the composer paragraph margin parsed from globals.css').toBeGreaterThan(0);
     const c = rendered();
     for (const selector of ['ul.gn-comment__list:not(.gn-comment__list--tasks) > li + li', 'ol.gn-comment__list > li + li']) {
       const sibling = c.querySelector(selector)!;
       const gap = matchingBodies(sibling).filter((body) => /margin-top/.test(body)).pop() ?? '';
-      expect(Number(/margin-top:\s*([\d.]+)rem;/.exec(gap)?.[1]), selector).toBeCloseTo(COMPOSER_PARAGRAPH_MARGIN_REM, 4);
+      const rem = Number(/margin-top:\s*([\d.]+)rem;/.exec(gap)?.[1]);
+      expect(rem, selector).toBeCloseTo(0.25, 4);
+      expect(rem, `${selector} is deliberately tighter than the composer's ${COMPOSER_PARAGRAPH_MARGIN_REM}rem`).toBeLessThan(COMPOSER_PARAGRAPH_MARGIN_REM);
     }
   });
 

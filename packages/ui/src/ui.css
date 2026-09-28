@@ -7351,11 +7351,12 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    block in one item (a nested list, a quote, another paragraph) keeps the
    body's 0.4rem. The task list is excluded — its `li` is `input + span`, and
    `.gn-comment__task > span > *` below is its own version of this. Items are
-   0.5rem apart, the composer's `.ticket-editor__content p { margin: 0.5rem 0 }`
-   (globals.css) — what was written is what is posted. */
+   0.25rem apart — the owner's choice (2026-09-29), deliberately TIGHTER than
+   the composer's `.ticket-editor__content p { margin: 0.5rem 0 }` (globals.css),
+   so a posted list is denser than the one that was typed. */
 .gn-comment__list:not(.gn-comment__list--tasks) > li > * { margin: 0; }
 .gn-comment__list:not(.gn-comment__list--tasks) > li > * + * { margin-top: 0.4rem; }
-.gn-comment__list > li + li { margin-top: 0.5rem; }
+.gn-comment__list > li + li { margin-top: 0.25rem; }
 .gn-comment__quote {
   margin: 0;
   padding-left: 0.6rem;
