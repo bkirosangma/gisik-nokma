@@ -24,6 +24,7 @@ import {
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
 import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
+import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
@@ -620,6 +621,7 @@ export function NoteDocument({
           onDraftChange={setDraft}
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
           editorRef={editorInstanceRef}
+          onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
         />
       </div>
 
@@ -724,6 +726,7 @@ function NoteEditorPane({
   onDraftChange,
   onNavigateNote,
   editorRef,
+  onDraftDiscarded,
 }: {
   note: NoteDetail;
   treeNotes: NoteSummary[];
@@ -733,6 +736,8 @@ function NoteEditorPane({
   onDraftChange: (doc: unknown) => void;
   onNavigateNote: (id: string) => void;
   editorRef: TicketEditorSlotProps['editorRef'];
+  /** The banner's Discard: the parent remounts this pane, which then recovers nothing and mounts with the server's body. */
+  onDraftDiscarded: () => void;
 }) {
   const autosave = useNoteAutosave({
     dataSource,
@@ -755,48 +760,63 @@ function NoteEditorPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep only hides the banner; the draft stays live and saves as any edit.
+  const [bannerKept, setBannerKept] = useState(false);
+
   return (
-    <TicketEditorSlot
-      mode="note"
-      doc={autosave.initialDoc}
-      readOnly={!canEdit}
-      workspaceId={note.workspaceId}
-      ticketId=""
-      noteId={note.noteId}
-      submitSlot="none"
-      editorRef={editorRef}
-      onDraft={(doc) => {
-        onDraftChange(doc);
-        autosave.onDraft(doc);
-      }}
-      onSave={autosave.onSave}
-      saveState={autosave.saveState}
-      placeholder="Write the note…"
-      queryNotes={async (query: string) => {
-        const needle = query.trim().toLowerCase();
-        const hits: Array<{ noteId: string; title: string }> = [];
-        for (const candidate of [note, ...treeNotes]) {
-          if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
-          if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
-          hits.push({ noteId: candidate.noteId, title: candidate.title });
-          if (hits.length === 8) break;
-        }
-        return hits;
-      }}
-      resolveNoteTitle={(id: string) => {
-        if (id === note.noteId) return note.title;
-        return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
-      }}
-      previewNote={async (id: string) => {
-        const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
-        if (target === null) return null;
-        return docToPlainText(target.body).slice(0, 200);
-      }}
-      onNavigateNote={onNavigateNote}
-      headingLink={(id: string) => `${window.location.origin}/notes/${note.noteId}#${id}`}
-      queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
-      resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
-    />
+    <>
+      {autosave.restoredAt !== null && !bannerKept && canEdit ? (
+        <DraftRestoreBanner
+          savedAt={autosave.restoredAt}
+          onKeep={() => setBannerKept(true)}
+          onDiscard={() => {
+            autosave.discardDraft();
+            onDraftDiscarded();
+          }}
+        />
+      ) : null}
+      <TicketEditorSlot
+        mode="note"
+        doc={autosave.initialDoc}
+        readOnly={!canEdit}
+        workspaceId={note.workspaceId}
+        ticketId=""
+        noteId={note.noteId}
+        submitSlot="none"
+        editorRef={editorRef}
+        onDraft={(doc) => {
+          onDraftChange(doc);
+          autosave.onDraft(doc);
+        }}
+        onSave={autosave.onSave}
+        saveState={autosave.saveState}
+        placeholder="Write the note…"
+        queryNotes={async (query: string) => {
+          const needle = query.trim().toLowerCase();
+          const hits: Array<{ noteId: string; title: string }> = [];
+          for (const candidate of [note, ...treeNotes]) {
+            if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+            if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
+            hits.push({ noteId: candidate.noteId, title: candidate.title });
+            if (hits.length === 8) break;
+          }
+          return hits;
+        }}
+        resolveNoteTitle={(id: string) => {
+          if (id === note.noteId) return note.title;
+          return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
+        }}
+        previewNote={async (id: string) => {
+          const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
+          if (target === null) return null;
+          return docToPlainText(target.body).slice(0, 200);
+        }}
+        onNavigateNote={onNavigateNote}
+        headingLink={(id: string) => `${window.location.origin}/notes/${note.noteId}#${id}`}
+        queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
+        resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
+      />
+    </>
   );
 }
 

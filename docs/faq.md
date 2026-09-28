@@ -570,6 +570,12 @@ opening it scrolls straight to the heading. It works on all six heading levels. 
 words get `-2`, `-3` and so on, in the order they appear — so a link can point at the wrong one if you
 rearrange headings that share a name. The person you send it to still needs access to the note.
 
+**Why does my note open with a bar saying "Restored unsaved changes"?**
+Last time you had it open, some of what you typed never reached the server (you lost the connection, or
+closed the tab first), so it was kept on your device and is showing now. **Keep** carries on with those
+words; **Discard** deletes them and shows the note as the server has it, which cannot be undone. The
+bar is only shown to people who can edit the note.
+
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
 workspace except guests, **This project** means everyone actually on that project, **Same as the

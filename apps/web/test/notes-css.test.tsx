@@ -576,6 +576,30 @@ describe('18.226 every class the Notes page renders is a class globals.css style
     snap(deletedRender.container); // deleted-banner
     deletedRender.unmount();
 
+    // A note that opens over a recovered draft (its own author): the draft banner.
+    window.localStorage.setItem(
+      'gn.note-draft.u_kiro.' + OPEN_NOTE,
+      JSON.stringify({ doc: body([paragraph('kept on this device')]), at: Date.now() }),
+    );
+    const draftRender = render(
+      <Providers
+        services={stubServices({
+          getMyWorkspaces: async () => [WS_A_REF],
+          getMembers: async () => MEMBERS,
+          getNote: async (_ws, id) =>
+            id === OPEN_NOTE ? noteDetail({ noteId: OPEN_NOTE, updatedAt: '2020-01-01T00:00:00.000Z' }) : null,
+          getNotes: async () => [],
+          getDeletedNotes: async () => [],
+        })}
+      >
+        <NotesPage noteId={OPEN_NOTE} />
+      </Providers>,
+    );
+    await screen.findByTestId('draft-restore-banner');
+    snap(draftRender.container); // draft-banner
+    draftRender.unmount();
+    window.localStorage.clear();
+
     // No workspace at all: the empty tree, and the Create button it still
     // draws (spec §9.7) opened on an empty roster — dialog-empty.
     const emptyServices = stubServices({ getMyWorkspaces: async () => [], getMembers: async () => [] });

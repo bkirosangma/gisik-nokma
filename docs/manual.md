@@ -1602,6 +1602,11 @@ reach the server your change is not lost: it is kept on this device and the foot
 (kept on this device)** until it goes through. Leaving the note, switching away, or closing the tab all
 flush a change in progress rather than dropping it.
 
+**Reopening a note after an unsaved session shows a banner.** If a note opens with words that never
+reached the server, a bar above the text reads **Restored unsaved changes from 5m ago.** Press **Keep**
+to carry on with them (they save as usual), or **Discard** to throw them away and load the note as the
+server has it. Discard cannot be undone. Only people who can edit the note see the bar.
+
 **History** keeps every version you have saved, newest first, each one named by who saved it and when.
 Open one and it opens read-only with a banner reading **Viewing version from …**; press **Restore** to
 bring the note back to that text (only if you can edit the note — a reader can open History and read

@@ -798,3 +798,82 @@ describe('9.418 heading anchors on the note page', () => {
     }
   });
 });
+
+describe('9.422 the draft-restore banner', () => {
+  const DRAFT_TEXT = 'a draft nobody has seen yet';
+  function seedDraft(): void {
+    window.localStorage.setItem(
+      noteDraftKey('u_kiro', NOTE),
+      JSON.stringify({ doc: body(DRAFT_TEXT), at: Date.now() - 5 * 60_000 }),
+    );
+  }
+  const editorText = (container: HTMLElement): string => container.querySelector('.ProseMirror')?.textContent ?? '';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('9.422 a recovered draft opens with a banner naming its age; a note with no draft has none', async () => {
+    seedDraft();
+    const { container } = renderDocument();
+    const banner = await screen.findByTestId('draft-restore-banner');
+    expect(banner).toHaveTextContent('Restored unsaved changes from 5m ago.');
+    expect(editorText(container)).toContain(DRAFT_TEXT);
+    // CONTROL, same it: with no draft stored the same page draws no banner.
+    cleanup();
+    window.localStorage.clear();
+    renderDocument();
+    await waitFor(() => expect(screen.getByTestId('note-editor')).toBeInTheDocument());
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+
+  it('9.423 Keep hides the banner and leaves the recovered words and their stored draft in place', async () => {
+    seedDraft();
+    const { container } = renderDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+    expect(editorText(container)).toContain(DRAFT_TEXT);
+    expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).not.toBeNull();
+  });
+
+  it('9.424 Discard reloads the server body, deletes the draft key and writes nothing to the server', async () => {
+    seedDraft();
+    const services = world();
+    const ingested: SubmittedEvent[] = [];
+    services.dataSource.ingest = async (events: SubmittedEvent[]) => {
+      ingested.push(...events);
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-29T09:00:00.000Z',
+      }));
+    };
+    const { container } = render(
+      <Providers services={services}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(editorText(container)).toContain('Compressor stopped in the cold room'));
+    expect(editorText(container)).not.toContain(DRAFT_TEXT);
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+    expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).toBeNull();
+    // Give an unmount flush and the coalescing timer their turn: neither may write the discarded words.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(ingested.filter((event) => event.type === 'note.body_set')).toHaveLength(0);
+    expect(screen.getByTestId('editor-save-state')).toHaveTextContent('Saved');
+  });
+
+  it('9.425 a reader who cannot edit is not offered the banner', async () => {
+    seedDraft();
+    // CONTROL, same it: the author's own page over the same draft shows the banner.
+    renderDocument();
+    await screen.findByTestId('draft-restore-banner');
+    cleanup();
+    // Authored by somebody else, so the member role is the only thing making them a reader (18.204's recipe).
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+});

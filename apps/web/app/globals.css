@@ -4199,3 +4199,26 @@ input, textarea, select { font-family: inherit; }
   outline: 2px solid var(--gn-focus-ring);
   outline-offset: 2px;
 }
+
+/* The draft-restore banner (`apps/web/src/notes/draft-restore-banner.tsx`, KB
+   `DraftRestoreBanner`). Same shape as `.gn-notes__deleted-banner` above, but
+   an accent stripe instead of the danger one: recovering words is good news,
+   not a warning. The KB source paints it Tailwind blue-50/200/600/900; the
+   mapping is fill-secondary surface, `--gn-accent` stripe, `--gn-text`. No
+   token existed for an "info" role, so accent stands in for it. */
+.gn-notes__draft-banner {
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 0.75rem;
+  margin: 0 0 0.75rem;
+  padding: 0.625rem 0.75rem;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-secondary);
+  box-shadow: inset 4px 0 0 var(--gn-accent);
+  color: var(--gn-text);
+}
+.gn-notes__draft-banner p {
+  margin: 0;
+  flex: 1 1 auto;
+}
