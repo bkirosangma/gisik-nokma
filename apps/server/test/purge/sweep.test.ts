@@ -93,7 +93,7 @@ describe('19.146 one failure neither stops the sweep nor is forgotten', () => {
         ev(base, 'ticket', T2, 'purge.marked', {}),
       ]);
       const now = await dueAt(db.pool, 'ticket', T2);
-      const failing = new Set([T1]);
+      const failing = new Set<string>([T1]);
       const purge: typeof purgeItem = async (pool, target, deps) => {
         if (failing.has(target.id)) throw new Error(`injected failure for ${target.id}`);
         return purgeItem(pool, target, deps);

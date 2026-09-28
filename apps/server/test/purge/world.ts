@@ -320,7 +320,7 @@ export type ProjectWorld = Base & {
 export async function buildProjectWorld(pool: Pool): Promise<ProjectWorld> {
   const base = await seedWorkspace(pool);
   const marker = newMarker();
-  const [P2, Q, A, A1, B, B2, NP, NW, Q1] = Array.from({ length: 9 }, () => newUlid()) as [
+  const [P2, Q, A, A1, B, B2, NP, NW, Q1] = Array.from({ length: 9 }, () => newUlid()) as unknown as [
     string, string, string, string, string, string, string, string, string,
   ];
   await applyCommitted(pool, [
@@ -374,7 +374,7 @@ export async function buildWorkspacePair(pool: Pool): Promise<WorkspacePair> {
   const W1 = await seedWorkspace(pool, U);
   const W2 = await seedWorkspace(pool, U);
   const marker = newMarker();
-  const [P1, T1, N1, INV, att1, PW2, TW2] = Array.from({ length: 7 }, () => newUlid()) as [
+  const [P1, T1, N1, INV, att1, PW2, TW2] = Array.from({ length: 7 }, () => newUlid()) as unknown as [
     string, string, string, string, string, string, string,
   ];
   await applyCommitted(pool, [
