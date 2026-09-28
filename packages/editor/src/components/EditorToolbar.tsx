@@ -1,4 +1,5 @@
 import { useEffect, useId, useState } from 'react';
+import { getMarkRange } from '@tiptap/core';
 import type { Editor } from '@tiptap/react';
 
 /**
@@ -85,6 +86,25 @@ import type { Editor } from '@tiptap/react';
  *    what makes it "the same effect as typing it" rather than a second
  *    implementation of either picker. No `@` control exists here and none is
  *    added (owner: "I do not want that").
+ *
+ * ## KB editor parity (owner ruling 2026-09-24) — six more controls
+ *
+ * Ported from the knowledge-base app's `MarkdownToolbar.tsx`, NORMAL Tiptap
+ * branch only (its `toggleRawSyntax`/`forceExitRawBlock` arms belong to the
+ * live-reveal mode this product does not have):
+ *
+ * - **History** (Undo/Redo) leads the strip in its own group. Disabled when the
+ *   history has nothing to give (`can().undo()`), which is state a button must
+ *   report, not hide.
+ * - **Strike** joins the marks, **Numbered list** and **Horizontal rule** the
+ *   blocks.
+ * - **Heading** is ONE `<select>` (Paragraph, Heading 1–6) rather than the
+ *   reference's six side-by-side buttons: six more icons would push this dense
+ *   composer strip onto a second row, and a native select is keyboard, touch
+ *   and screen-reader accessible with no menu code of its own. Every level stays
+ *   one choice away.
+ * - **`selectFullLink`** — a mark toggle pressed inside a link formats the WHOLE
+ *   link, not just the caret/partial selection (`MarkdownEditor.tsx:755`).
  */
 
 const MARKDOWN_ENTRIES: { key: string; markdown: string }[] = [
@@ -110,6 +130,9 @@ export const MARKDOWN_HINT = `Markdown: ${MARKDOWN_ENTRIES.map((entry) => entry.
  * per ADDENDUM 3's own examples.
  */
 const EXTRA_MARKDOWN: Record<string, string> = {
+  strike: '~~strike~~',
+  orderedList: '1. then space',
+  rule: '---',
   codeBlock: '``` then space',
   task: '[ ] ',
   collapsible: '< ',
@@ -133,13 +156,21 @@ function markdownFor(key: string): string | null {
  * `BulletList` and `TaskList` live there since v3's list consolidation —
  * the `@tiptap/extension-bullet-list`/`-task-list` packages this repo
  * imports are thin re-export shims over it), code block `Mod-Alt-c`
- * (extension-code-block@3.31.3). **`link` has NONE** — `extension-
+ * (extension-code-block@3.31.3), plus (KB parity) undo `Mod-z`/redo `Shift-Mod-z`
+ * (extensions@3.30.5 undo-redo), strike `Mod-Shift-s` (extension-strike@3.30.5) and
+ * ordered list `Mod-Shift-7` (extension-list@3.30.5); the horizontal rule binds
+ * none. **`link` has NONE** — `extension-
  * link@3.30.5`'s dist defines no `addKeyboardShortcuts` at all — and
  * **`collapsible` has none either** — `Details` only binds `Backspace`/
  * `Enter`, never a toggle. Both show their name alone rather than invent a
  * binding neither extension registers.
  */
 const SHORTCUTS: Record<string, string | null> = {
+  undo: 'Mod-z',
+  redo: 'Mod-Shift-z',
+  strike: 'Mod-Shift-s',
+  orderedList: 'Mod-Shift-7',
+  rule: null,
   bold: 'Mod-b',
   italic: 'Mod-i',
   code: 'Mod-e',
@@ -199,7 +230,21 @@ const TICKET_ICON = (
   </svg>
 );
 
-type ToolGroup = 'marks' | 'blocks' | 'insert';
+const UNDO_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="M9 14 4 9l5-5" />
+    <path d="M4 9h10.5a5.5 5.5 0 0 1 0 11H11" />
+  </svg>
+);
+
+const REDO_ICON = (
+  <svg width="16" height="16" viewBox="0 0 24 24" fill="none" stroke="currentColor" strokeWidth={2} strokeLinecap="round" strokeLinejoin="round" aria-hidden="true">
+    <path d="m15 14 5-5-5-5" />
+    <path d="M20 9H9.5a5.5 5.5 0 0 0 0 11H13" />
+  </svg>
+);
+
+type ToolGroup = 'history' | 'marks' | 'blocks' | 'insert';
 
 type ToolControl = {
   key: string;
@@ -210,9 +255,12 @@ type ToolControl = {
   active: boolean | null;
   run: () => void;
   group: ToolGroup;
+  /** A control that cannot act right now (Undo with nothing to undo). */
+  disabled?: boolean;
 };
 
 const GROUP_LABEL: Record<ToolGroup, string> = {
+  history: 'History',
   marks: 'Text formatting',
   blocks: 'Blocks',
   insert: 'Insert',
@@ -244,6 +292,7 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
         type="button"
         className={control.active === true ? 'ticket-editor__tool ticket-editor__tool--active' : 'ticket-editor__tool'}
         aria-label={control.name}
+        disabled={control.disabled === true}
         {...(control.active === null ? {} : { 'aria-pressed': control.active })}
         {...(shortcutAria === undefined ? {} : { 'aria-keyshortcuts': shortcutAria })}
         aria-describedby={show ? tooltipId : undefined}
@@ -275,6 +324,36 @@ function ToolButton({ control, isMac, extraProps }: { control: ToolControl; isMa
         </span>
       ) : null}
     </span>
+  );
+}
+
+const HEADING_LEVELS = [1, 2, 3, 4, 5, 6] as const;
+
+/**
+ * Paragraph / Heading 1–6 as one native select. `value` is the ACTIVE level
+ * (or `paragraph`), re-read on every transaction with the rest of the strip.
+ * A change applies the level with `.focus()` in the same chain, so the caret
+ * returns to the text — a select otherwise keeps focus after it is used.
+ */
+function HeadingSelect({ editor }: { editor: Editor }): React.JSX.Element {
+  const active = HEADING_LEVELS.find((level) => editor.isActive('heading', { level }));
+  return (
+    <select
+      className="ticket-editor__heading-select"
+      aria-label="Heading level"
+      value={active === undefined ? 'paragraph' : String(active)}
+      onChange={(event) => {
+        const value = event.target.value;
+        const chain = editor.chain().focus();
+        if (value === 'paragraph') chain.setParagraph().run();
+        else chain.setHeading({ level: Number(value) as (typeof HEADING_LEVELS)[number] }).run();
+      }}
+    >
+      <option value="paragraph">Paragraph</option>
+      {HEADING_LEVELS.map((level) => (
+        <option key={level} value={String(level)}>{`Heading ${level}`}</option>
+      ))}
+    </select>
   );
 }
 
@@ -336,6 +415,26 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
   }
 
   /**
+   * Formatting pressed inside a link formats the WHOLE link — ported from the
+   * reference's `selectFullLink` (`MarkdownEditor.tsx:755`), minus its rawBlock
+   * arm. Returns nothing; it only widens the selection, so the toggle that
+   * follows sees the full anchor rather than the caret.
+   */
+  function selectFullLink(): void {
+    if (!editor!.isActive('link')) return;
+    const linkType = editor!.schema.marks['link'];
+    if (linkType === undefined) return;
+    const range = getMarkRange(editor!.state.selection.$from, linkType);
+    if (range === undefined) return;
+    editor!.chain().setTextSelection({ from: range.from, to: range.to }).run();
+  }
+
+  const markToggle = (run: () => boolean) => () => {
+    selectFullLink();
+    run();
+  };
+
+  /**
    * THE CONTROLS IN THE PROTOTYPE'S ORDER — `B i code link list quote` — and the
    * first cut of this file had it WRONG.
    *
@@ -354,11 +453,29 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
    */
   const controls: ToolControl[] = [
     {
+      key: 'undo',
+      label: UNDO_ICON,
+      name: 'Undo',
+      active: null,
+      disabled: !editor.can().undo(),
+      run: () => editor.chain().focus().undo().run(),
+      group: 'history',
+    },
+    {
+      key: 'redo',
+      label: REDO_ICON,
+      name: 'Redo',
+      active: null,
+      disabled: !editor.can().redo(),
+      run: () => editor.chain().focus().redo().run(),
+      group: 'history',
+    },
+    {
       key: 'bold',
       label: 'B',
       name: 'Bold',
       active: editor.isActive('bold'),
-      run: () => editor.chain().focus().toggleBold().run(),
+      run: markToggle(() => editor.chain().focus().toggleBold().run()),
       group: 'marks',
     },
     {
@@ -366,7 +483,15 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
       label: 'i',
       name: 'Italic',
       active: editor.isActive('italic'),
-      run: () => editor.chain().focus().toggleItalic().run(),
+      run: markToggle(() => editor.chain().focus().toggleItalic().run()),
+      group: 'marks',
+    },
+    {
+      key: 'strike',
+      label: <s>S</s>,
+      name: 'Strikethrough',
+      active: editor.isActive('strike'),
+      run: markToggle(() => editor.chain().focus().toggleStrike().run()),
       group: 'marks',
     },
     {
@@ -401,6 +526,14 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
       name: 'Bullet list',
       active: editor.isActive('bulletList'),
       run: () => editor.chain().focus().toggleBulletList().run(),
+      group: 'blocks',
+    },
+    {
+      key: 'orderedList',
+      label: '1.',
+      name: 'Numbered list',
+      active: editor.isActive('orderedList'),
+      run: () => editor.chain().focus().toggleOrderedList().run(),
       group: 'blocks',
     },
     {
@@ -449,6 +582,14 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
       run: () => editor.chain().focus().setDetails().updateAttributes('details', { open: true }).run(),
       group: 'blocks',
     },
+    {
+      key: 'rule',
+      label: '—',
+      name: 'Horizontal rule',
+      active: null,
+      run: () => editor.chain().focus().setHorizontalRule().run(),
+      group: 'blocks',
+    },
     // Unit 4 (owner: "I want a button to insert the note and ticket there on
     // the bar"), REPLACING the old `[[` control rather than sitting beside
     // it. Both insert the BARE trigger and let the SAME suggestion plugin
@@ -483,7 +624,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
     },
   ];
 
-  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['marks', 'blocks', 'insert'] as ToolGroup[])
+  const groups: { key: ToolGroup; controls: ToolControl[] }[] = (['history', 'marks', 'blocks', 'insert'] as ToolGroup[])
     .map((key) => ({ key, controls: controls.filter((control) => control.group === key) }))
     .filter((group) => group.controls.length > 0);
 
@@ -492,6 +633,7 @@ export function EditorToolbar({ editor, editable, platform }: EditorToolbarProps
       {groups.map((group, index) => (
         <div key={group.key} className="ticket-editor__tool-group" role="group" aria-label={GROUP_LABEL[group.key]}>
           {index > 0 ? <span className="ticket-editor__tool-divider" aria-hidden="true" /> : null}
+          {group.key === 'blocks' ? <HeadingSelect editor={editor} /> : null}
           {group.controls.map((control) => (
             <ToolButton
               key={control.key}

@@ -509,3 +509,8 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.372 — a heading with a malformed level (0, 7, `'x'`, `null`, absent) still renders its text, with no modifier class.** (`packages/app-core/test/views/comment-body.test.tsx`)
 - ✅ **9.373 — a comment renders a horizontal rule as an `<hr>` (it used to render as nothing — an `<hr>` has no children for the fall-through arm to show).** (`packages/app-core/test/views/comment-body.test.tsx`)
 - ✅ **9.374 — the code block's Copy button falls back to the `execCommand` route when the clipboard write is rejected (permission denied), and still flips to "Copied".** (`packages/editor/test/code-block-copy.test.ts`)
+- ✅ **9.375 — Undo and Redo lead the strip, are disabled with no history, enable after an edit and step through it.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.376 — Strikethrough puts a strike mark (and reports pressed), Numbered list makes an orderedList, Horizontal rule inserts a rule and reports no pressed state.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.377 — the Heading level select offers Paragraph and Heading 1–6, sets each level, reports the active one and returns to Paragraph.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.378 — Bold pressed with the caret inside a link bolds the entire link text (`selectFullLink`), and only that.** (`packages/editor/test/editor-toolbar.test.tsx`)
+- ✅ **9.379 — the new tools carry their real `aria-keyshortcuts` and a tooltip naming the markdown trigger; the rule has no shortcut.** (`packages/editor/test/editor-toolbar.test.tsx`)

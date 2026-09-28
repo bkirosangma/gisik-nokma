@@ -282,6 +282,33 @@
   cursor: not-allowed;
   opacity: 0.6;
 }
+.ticket-editor__tool:disabled:hover {
+  background: var(--gn-fill-tertiary);
+}
+/* The heading-level select (KB editor parity): drawn as a sibling of the
+   buttons — same height, radius, fill and shadow — so the strip stays one
+   family. A native <select>, so the platform supplies keyboard, touch and
+   screen-reader behaviour. */
+.ticket-editor__heading-select {
+  min-height: 32px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 6px;
+  background: var(--gn-fill-tertiary);
+  box-shadow: var(--gn-shadow-raised);
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  font-weight: 600;
+  cursor: pointer;
+}
+.ticket-editor__heading-select:hover {
+  background: var(--gn-fill-secondary);
+}
+.ticket-editor__heading-select:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+}
 .ticket-editor__tool-label {
   white-space: nowrap;
 }

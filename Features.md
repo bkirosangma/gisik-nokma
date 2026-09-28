@@ -1598,6 +1598,13 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   - ⚙️ **The code block's Copy button still copies when the clipboard write is rejected** — a denied or
     sandboxed `navigator.clipboard.writeText` now falls back to the textarea route the reference's
     `codeBlockCopy.tsx` takes (it used to swallow the rejection); `packages/editor/src/extensions/code-block-copy.ts`
+  - ✅ **The formatting strip gains Undo/Redo, a Heading level menu, Strikethrough, Numbered list and
+    Horizontal rule** (KB `MarkdownToolbar`, normal branch only) — Undo/Redo lead in their own group and grey
+    out with no history; Heading is one native select (Paragraph, Heading 1–6) so the strip stays on one row;
+    a mark toggle pressed inside a link first widens the selection to the whole link (`selectFullLink`).
+    Shortcuts and markdown triggers are read from the installed extensions, as for the rest of the strip;
+    `packages/editor/src/components/EditorToolbar.tsx`, `packages/editor/src/styles/editor.css`
+    (the mobile editor bundle is regenerated: `apps/mobile/src/editor/editor-html.generated.ts`)
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
