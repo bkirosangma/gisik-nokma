@@ -3786,6 +3786,10 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   gap: 0.5rem;
   margin-left: auto;
+  /* Lets this flex item of `.gn-notes__header` shrink to a 390px viewport;
+     without it its min-content is the two triggers' full width and the filter
+     group (clamped to `max-width: 100%` below) is clamped to THAT, not the page. */
+  min-width: 0;
 }
 
 /* Unit 6b (owner, 2026-09-23: "Any author should not be 2 lines") — the
@@ -3801,22 +3805,39 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__filters {
   display: flex;
   flex: none;
+  /* Never wider than the row it sits in (390px): the triggers below shrink by
+     ellipsis inside this clamp instead of the group overflowing the viewport. */
+  max-width: 100%;
   gap: 0.5rem;
 }
 /* The Select component itself is right everywhere else it is used — its own
    `width: 100%` is meant to fill a container that already constrains its
    width (a form row, a field grid cell). `.gn-notes__filters` gives it no
-   such constraint, so as a bare flex item it shrinks below its label's
-   natural width and the label text wraps — `white-space` is inherited, so
-   setting it once on the trigger reaches the value span with no class of
-   its own to target. `flex: none` keeps the trigger from shrinking at all;
-   `.gn-notes__search`'s own `flex-wrap: wrap` (above) is what already lets
-   a whole filter — both selects together, never a label split mid-word —
-   move to its own line once the row runs out of room, so no separate
-   breakpoint rule is needed for that half. */
+   such constraint, and that is the whole bug (owner, 2026-09-29, screenshot:
+   "Any author" ~550px wide, "Any scope" past the right edge): the group is an
+   unsized `flex: none` box, so its width IS the sum of its triggers' content
+   widths, and a trigger's `width: 100%` then resolves against that sum —
+   every trigger came out as wide as BOTH together and the second overflowed.
+   Unit 6b's `flex: none` (below) made it visible by freezing the group's width
+   to its max-content. `width: auto` sizes each trigger to its own label; the
+   cap keeps a long author name from rebuilding the wide select, and the label
+   is ellipsised rather than wrapped (`white-space` is inherited, so setting
+   `nowrap` once on the trigger reaches the value span with no class of its own
+   to target). The trigger only shrinks once the group is already clamped to
+   its own line; before that `.gn-notes__search`'s `flex-wrap: wrap` moves a
+   whole filter — never a label split mid-word — to its own line, so no
+   separate breakpoint rule is needed for that half. */
 .gn-notes__filters .gn-select__trigger {
-  flex: none;
+  flex: 0 1 auto;
+  width: auto;
+  min-width: 0;
+  max-width: 16rem;
   white-space: nowrap;
+}
+.gn-notes__filters .gn-select__trigger > :not(.gn-select__chevron) {
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* The results wrapper — replaces the tree's groups while a query is active

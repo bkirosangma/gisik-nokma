@@ -259,7 +259,7 @@ describe('13.1490 .gn-notes__toc is the floating launcher’s fixed container', 
  * to the shared component.
  */
 describe('18.302 the notes filters keep each Select label on one line', () => {
-  it('18.302 the search input takes the remaining width; the filter group and each trigger refuse to shrink or wrap', () => {
+  it('18.302 the search input takes the remaining width; the filter group refuses to shrink and each trigger refuses to wrap', () => {
     const input = declarationsFor(CSS, '.gn-notes__search-input');
     expect(input, '.gn-notes__search-input rule').not.toBeNull();
     expect(input).toMatch(/flex:\s*1 1 auto;/);
@@ -271,13 +271,57 @@ describe('18.302 the notes filters keep each Select label on one line', () => {
 
     const trigger = declarationsFor(CSS, '.gn-notes__filters .gn-select__trigger');
     expect(trigger, '.gn-notes__filters .gn-select__trigger rule').not.toBeNull();
-    expect(trigger).toMatch(/flex:\s*none;/);
+    // 18.312 relaxed the trigger's `flex: none` to `0 1 auto`: it may now shrink,
+    // but only by ellipsis after the row has wrapped (see 18.312) — never a wrap.
+    expect(trigger).toMatch(/flex:\s*0 1 auto;/);
     expect(trigger).toMatch(/white-space:\s*nowrap;/);
 
     // CONTROL: the Select component's OWN base rule is untouched — this is
     // a fix at the notes row, not a change to every mount of `<Select>`.
     const base = declarationsFor(CSS, '.gn-select__trigger');
     expect(base, '.gn-select__trigger base rule (packages/ui, not this file)').toBeNull();
+  });
+});
+
+/**
+ * 18.312 — owner report 2026-09-29 (screenshot): "Any author" rendered ~550px wide
+ * and "Any scope" ran past the right edge. `.gn-select__trigger` declares
+ * `width: 100%` (packages/ui — right for a form row), and inside the unsized,
+ * `flex: none` `.gn-notes__filters` that percentage resolves against the group's
+ * own max-content width, so EACH trigger came out as wide as BOTH together and
+ * the second overflowed. The fix is scoped to this row: `width: auto`, capped,
+ * the label ellipsised, the group clamped to its container.
+ */
+describe('18.312 the notes filter triggers size to their content, not to the filter group', () => {
+  it('18.312 the row states width: auto with a cap and an ellipsised label; the shared base keeps width: 100%', () => {
+    const trigger = declarationsFor(CSS, '.gn-notes__filters .gn-select__trigger');
+    expect(trigger, '.gn-notes__filters .gn-select__trigger rule').not.toBeNull();
+    // The rule that fixes it: content width, not a percentage of the group.
+    expect(trigger).toMatch(/(?:^|[\s;])width:\s*auto;/);
+    // A sane cap so a long author name cannot rebuild the 550px select.
+    expect(trigger).toMatch(/max-width:\s*16rem;/);
+    // 6b's never-wrap survives; the trigger may only shrink AFTER the row has
+    // wrapped, and it does so by ellipsis (below), never by a second line.
+    expect(trigger).toMatch(/white-space:\s*nowrap;/);
+    expect(trigger).toMatch(/min-width:\s*0;/);
+
+    const label = declarationsFor(CSS, '.gn-notes__filters .gn-select__trigger > :not(.gn-select__chevron)');
+    expect(label, 'the value-label rule inside the row').not.toBeNull();
+    expect(label).toMatch(/overflow:\s*hidden;/);
+    expect(label).toMatch(/text-overflow:\s*ellipsis;/);
+    expect(label).toMatch(/min-width:\s*0;/);
+
+    // The group itself never exceeds the row it sits in (390px viewport), and
+    // the row can itself shrink to the page (measured: without `min-width: 0` on
+    // `.gn-notes__search` its min-content pins the group at 520px on a 390 page).
+    expect(declarationsFor(CSS, '.gn-notes__search')).toMatch(/min-width:\s*0;/);
+    const filters = declarationsFor(CSS, '.gn-notes__filters');
+    expect(filters).toMatch(/max-width:\s*100%;/);
+
+    // CONTROL: `Select`'s own base rule keeps `width: 100%` — every other mount
+    // gives the trigger a constrained container and relies on it.
+    const UI = readFileSync(join(REPO_ROOT, 'packages/ui/src/ui.css'), 'utf8');
+    expect(declarationsFor(UI, '.gn-select__trigger')).toMatch(/width:\s*100%;/);
   });
 });
 
