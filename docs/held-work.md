@@ -40,7 +40,7 @@ Readings (commits) were taken at 2026-09-24 ~01:05 IST. Re-check each with `git 
 
 ## 2. Editor polish — the units not in the notes release
 
-- **RESUMED 2026-09-28 ~21:5x IST** (owner: *"resume the held works"*). New integration branch **`release/2026-09-28`** (cut from `main` `dd6d7ed7`); the task branch merges `origin/release/2026-09-28` first and PRs `--base release/2026-09-28`.
+- **RESUMED 2026-09-28 ~21:5x IST** (owner: *"resume the held works"*). Integration branch **`release/trash`** (owner, 2026-09-28: one release branch for all resumed work — a separate `release/2026-09-28` was cut and deleted the same evening); the task branch merges `origin/release/trash` first and PRs `--base release/trash`. The editor fixes therefore ship when `release/trash` ships.
 
 - **Owner ruling (2026-09-24 ~00:47):** *"and pause Editor-polish".* Units 1 and 3 landed in the notes release as #727: the `:ticket` fix, and the inline pickers placed, styled and kept above the sheet.
 - **Branch:** `task/editor-polish` at `a7462363a87d824a898a1126cd36a30bdf19f2ff`. That is the controller's forward-merge of `release/notes` onto the held unit tip `2a30141ad8c63d97acdb30ea90acb0d130d637a2`.
@@ -62,7 +62,7 @@ Readings (commits) were taken at 2026-09-24 ~01:05 IST. Re-check each with `git 
 
 ## 3. Editor skin — everything the editor draws, and tables
 
-- **RESUMED 2026-09-28 ~21:5x IST** (owner: *"resume the held works"*). New integration branch **`release/2026-09-28`** (cut from `main` `dd6d7ed7`); the task branch merges `origin/release/2026-09-28` first and PRs `--base release/2026-09-28`.
+- **RESUMED 2026-09-28 ~21:5x IST** (owner: *"resume the held works"*). Integration branch **`release/trash`** (owner, 2026-09-28: one release branch for all resumed work — a separate `release/2026-09-28` was cut and deleted the same evening); the task branch merges `origin/release/trash` first and PRs `--base release/trash`. The editor fixes therefore ship when `release/trash` ships.
 
 - **Owner ruling (2026-09-24 ~00:45):** *"pause Editor-skin".* Unit R (the "Keep … as text" chip removed, Backspace-undo kept) is going into the notes release on the owner's word, ~01:02.
 - **Branch:** `task/editor-skin` at `d7eb16ec6a491076b8a451978480cb164201be65`. That is Unit R on top of the lane's plan doc `docs/superpowers/plans/2026-09-24-editor-skin.md` (`dec19452`).
@@ -81,7 +81,7 @@ Readings (commits) were taken at 2026-09-24 ~01:05 IST. Re-check each with `git 
 
 ## 4. Knowledge-base editor parity — never started
 
-- **RESUMED 2026-09-28 ~21:5x IST, sequenced:** it starts only after items 2 AND 3 have landed on `release/2026-09-28` (same files). Base `release/2026-09-28`.
+- **RESUMED 2026-09-28 ~21:5x IST, sequenced:** it starts only after items 2 AND 3 have landed on `release/trash` (same files). Base `release/trash`.
 
 - **Owner ruling (2026-09-24 ~00:2x):** *"lets pause it for now."* The owner's instruction that created it: *"i took a lot of time to refine the editor in knowledgebase. make sure to study them and implement them here. without the live reveal of the markdown syntax."*
 - **Branch:** none. It was never cut.
