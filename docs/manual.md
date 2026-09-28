@@ -1576,18 +1576,36 @@ The author always reads their own note, whatever its scope — that is what **Pr
 
 ### Writing a note
 
-The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold,
-Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, **Insert note** and
-**Insert ticket**. Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and
-the markdown you can type instead. **Insert note** and **Insert ticket** each drop the `:note`/`:ticket`
-trigger at the cursor and open the same picker typing it would — the same two triggers work from the
-keyboard too, and `[[` still works for a note.
+The editor is the same one the rest of the product uses, with headings and a formatting toolbar: **Undo** and
+**Redo**, a **Heading level** menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link,
+Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**,
+**Insert note** and **Insert ticket**. Hover or tab to any tool to see its name, its keyboard shortcut where
+it has one, and the markdown you can type instead. Undo and Redo grey out when there is nothing to step back
+or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link.
+**Insert note** and **Insert ticket** each drop the `:note`/`:ticket` trigger at the cursor and open the same
+picker typing it would — the same two triggers work from the keyboard too, and `[[` still works for a note.
+
+**Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you
+want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
+row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is
+inside a table, because a table cannot be placed inside another.
+
+**Editing a link.** Click into any link's text and a small panel opens beside it with the **URL** and the
+**Text**, an **Open link** shortcut (web, email and phone addresses only) and **Unlink**. Enter or clicking
+away keeps a change, Escape puts it back. An empty URL, or Unlink, takes the link off and keeps the words;
+an empty Text deletes the link. Ctrl-K (Cmd-K on a Mac) with the cursor in a link jumps straight into the
+URL field. The panel appears only for the box you are typing in.
 
 **Notes save themselves.** A couple of seconds after you stop typing, your change is sent — not on
 every keystroke. Until it is accepted the footer says **Saving…**; once it is, **Saved**. If it cannot
 reach the server your change is not lost: it is kept on this device and the footer says **Not saved
 (kept on this device)** until it goes through. Leaving the note, switching away, or closing the tab all
 flush a change in progress rather than dropping it.
+
+**Reopening a note after an unsaved session shows a banner.** If a note opens with words that never
+reached the server, a bar above the text reads **Restored unsaved changes from 5m ago.** Press **Keep**
+to carry on with them (they save as usual), or **Discard** to throw them away and load the note as the
+server has it. Discard cannot be undone. Only people who can edit the note see the bar.
 
 **History** keeps every version you have saved, newest first, each one named by who saved it and when.
 Open one and it opens read-only with a banner reading **Viewing version from …**; press **Restore** to
@@ -1597,7 +1615,19 @@ old versions, just not put one back).
 **A note with several headings gets a small floating button, bottom left, labelled "On this page".**
 Press it to open a table of contents over the note; press a heading in it to jump straight there. It
 appears at any window width once a note has enough headings, whereas it used to be a column that showed
-only on a wide screen.
+only on a wide screen. The heading you jump to lands just under the top bar, not behind it.
+
+**Every heading in a note can be linked to.** Hover a heading (on a phone or tablet the small link icon is
+always there, faintly) and press the link icon at the end of it — or Tab to it and press Enter — to copy a
+link to that exact heading. Paste it anywhere; whoever opens it lands on that heading, provided they can read
+the note. The icon appears on all six heading levels, and if two headings read the same the second gets a
+`-2` on the end of its link, the third `-3`. Only the note page has this; the comment box and the job sheet
+do not.
+
+**A thin line under the top bar shows how far down a note you have read.** It fills from the left as you
+scroll the note (the title and byline above the text do not count) and starts again at empty when you open
+another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops
+animating if your device is set to reduce motion.
 
 ### Finding a note
 

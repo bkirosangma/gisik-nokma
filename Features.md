@@ -1549,6 +1549,21 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
 - ✅ **Reading extras for long documents** — word count, reading time (200 wpm, floored at a
   minute for any non-empty text) and a table of contents that renders at three headings or more.
   `packages/editor/src/reading/reading-meta.ts`, `ReadingTOC.tsx`
+  - ✅ **H4–H6 are skinned** (KB `prose.css`, adapted) — the editor skin used to style H1–H3 only, so a deeper
+    heading fell back to browser defaults (an H6 smaller than body text). Now a descending ladder down to
+    `0.875rem`, H6 in `--gn-text-muted` (`apps/web/app/globals.css`, cases 9.431–9.432).
+  - ✅ **Reading progress bar, and the reading surface's scroller is resolved, not assumed** (KB
+    `ReadingProgress`; audit of the ported `ReadingTOC`) — a 3px labelled `progressbar` under the sticky nav,
+    `transform: scaleX` from the left, driven by the note surface's position (the source's `scrollTop` would
+    read 0 forever here: the note page scrolls the WINDOW, `.gn-notes__editor` does not). Mounted for every
+    viewer (there is no read/edit toggle to gate it on) and never in the ticket sheet; resets per note;
+    transition off under `prefers-reduced-motion`; colours `--gn-accent` on `--gn-border`. The same
+    `findScroller` fixes two silent defects in the ported table of contents: a click did nothing (it called
+    `scrollTo` on the non-scrolling root after `preventDefault`) and the scrollspy was rooted at a page-tall
+    box. Headings now `scroll-margin-top` below the nav.
+    `packages/editor/src/reading/ReadingProgress.tsx`, `packages/editor/src/reading/scroller.ts`,
+    `packages/editor/src/reading/ReadingTOC.tsx`, `apps/web/app/globals.css` (KB editor parity section),
+    `apps/web/src/notes/note-document.tsx`
 - ✅ **Markdown in and out** — pasting plain text that looks like Markdown converts it (a clipboard carrying
   `text/html` is left to the default handler); copying formatted content puts Markdown in the PLAIN-TEXT
   clipboard flavour only; `exportMarkdown` renders a whole document through the editor's own schema.
@@ -1584,6 +1599,60 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   layout/border) — everything coloured through `globals.css` does not, since the webview loads only
   `editor.css`. `apps/web/app/globals.css`, `packages/editor/src/styles/editor.css`,
   `packages/editor/src/components/TableFloatingToolbar.tsx`, `packages/app-core/src/views/comment-body.tsx`
+- ✅ **KB editor parity — the owner's knowledge-base editor refinements, ported without the live markdown
+  reveal** (task/kb-editor-parity, owner ruling 2026-09-24) — a file-by-file port from
+  `/Users/kiro/my_projects/knowledge-base` (`features/document/`); every reference file's verdict is in the
+  PR body. Pieces, each its own commit:
+  - ⚙️ **A table cannot be nested in a table** — `TableNoNest` refuses `insertTable` while the caret is
+    inside a table (the same guard the reference carries); `packages/editor/src/extensions/table-no-nest.ts`
+  - ✅ **A comment shows the headings and horizontal rules its author wrote** — the composer's toolbar now
+    offers H1–H6 and a rule, so `comment-body.tsx` keeps a heading's level (a `<p>` with a
+    `gn-comment__heading--N` class, deliberately not a real `<h1>`–`<h6>` so a comment never enters the
+    ticket sheet's heading outline) and renders `horizontalRule` as an `<hr>` (it used to render as nothing);
+    `packages/app-core/src/views/comment-body.tsx`, `packages/ui/src/ui.css`
+  - ⚙️ **The code block's Copy button still copies when the clipboard write is rejected** — a denied or
+    sandboxed `navigator.clipboard.writeText` now falls back to the textarea route the reference's
+    `codeBlockCopy.tsx` takes (it used to swallow the rejection); `packages/editor/src/extensions/code-block-copy.ts`
+  - ✅ **The formatting strip gains Undo/Redo, a Heading level menu, Strikethrough, Numbered list and
+    Horizontal rule** (KB `MarkdownToolbar`, normal branch only) — Undo/Redo lead in their own group and grey
+    out with no history; Heading is one native select (Paragraph, Heading 1–6) so the strip stays on one row;
+    a mark toggle pressed inside a link first widens the selection to the whole link (`selectFullLink`).
+    Shortcuts and markdown triggers are read from the installed extensions, as for the rest of the strip;
+    `packages/editor/src/components/EditorToolbar.tsx`, `packages/editor/src/styles/editor.css`
+    (the mobile editor bundle is regenerated: `apps/mobile/src/editor/editor-html.generated.ts`)
+  - ✅ **Insert table — an 8×8 size grid on the toolbar** (KB `TablePicker`) — hover or arrow to light the
+    size, the label reads "R × C table", click/Enter inserts it with a header row, Escape closes with focus back
+    on the tool; disabled (and named so) while the caret is inside a table. Real buttons with a roving tabindex,
+    so it works from the keyboard and on touch (the source is a mouse-only grid of divs);
+    `packages/editor/src/components/TablePicker.tsx`, `packages/editor/src/components/EditorToolbar.tsx`
+  - ✅ **A link is edited in place — URL, text, open, unlink** (KB `LinkEditorPopover`, link-mark branch
+    only; the wiki-link branch has nothing to bind to because a `wikiLink` is a note id) — click into a link and
+    a panel opens beside it: Enter/blur commits, Escape reverts, an empty URL unlinks, an empty text deletes,
+    **Open link** only for http(s)/mailto/tel. Additions over the source: it shows only for the focused editor
+    (the ticket sheet mounts two), Ctrl/Cmd-K moves focus into it, a text edit keeps the link's bold/italic,
+    and a blur commit never pulls focus back into the editor. Placement (below, flipped above, clamped) is the
+    shared pure `placePopover`; `packages/editor/src/components/LinkEditorPopover.tsx`,
+    `packages/editor/src/components/popover-position.ts`
+  - ✅ **The note-link hover card is placed from the link, can be reached, and goes away cleanly** (KB
+    `WikiLinkHoverCard`, taking the better of the two) — `position: fixed` from the link's rect via the shared
+    `placePopover` (below, flipped above, clamped to the viewport); a 60 ms grace lets the pointer cross onto
+    the card (it stays while hovered); scrolling, a key, deleting the link, or a fetch that resolves after the
+    pointer left all dismiss it; the link carries `aria-describedby` while it is up. Kept from the spec: the
+    400 ms rest (the source uses 200 ms) and the plain 200-character preview (the source's heading and backlink
+    footer need data `previewNote` does not return); `packages/editor/src/extensions/wiki-link.ts`,
+    `packages/editor/src/styles/editor.css`
+  - ✅ **Every heading can be linked to: page-unique ids, a copy-link button, and arrival at `#slug`** (KB
+    `HeadingCopyLink` + its slugged heading node view, rebuilt as decorations so the schema and the heading DOM
+    stay stock) — on the note page only (opt-in `headingLink`; the ticket sheet, the comment box and the mobile
+    WebView get no ids and no button). H1–H6 all get an `id`/`data-heading-id` from ONE function
+    (`assignHeadingIds`, shared with `extractReadingMeta`, so the copied fragment is the table of contents' own id;
+    the rail still LISTS H1–H3 only). A widget button at the end of the heading copies
+    `<origin>/notes/<noteId>#<id>` (the source copies a `[[file#id]]` wiki-link, which a note id cannot be), is
+    revealed on hover / focus / touch, is icon-only so the heading's text and the word count are untouched, uses
+    the same clipboard fallback as the code block's Copy, and announces "Link copied" through a live region. A
+    link opened at load waits for the editor to draw the heading, then scrolls once per note.
+    `packages/editor/src/extensions/heading-anchors.ts`, `copy-text.ts`, `reading/reading-meta.ts`,
+    `apps/web/src/notes/note-document.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
@@ -3319,7 +3388,7 @@ where the ledger's provenance vocabulary is defined, rather than being restated 
 - ✅ **The notes tree**: notes under their workspace or project, newest first, ticket keys beside attached notes, a Deleted group with Restore, and a title filter that narrows every section (`apps/web/src/notes/workspace-notes-section.tsx`, `apps/web/src/notes/note-row.tsx`).
 - ✅ **Create a note anywhere you belong**, choosing its home and scope; change scope later from the byline chip (spec §9.3; D3). The people picker is one component shared with the ticket visibility editor (`apps/web/src/notes/create-note-dialog.tsx`, `apps/web/src/notes/scope-editor.tsx`, `packages/app-core/src/views/people-picker.tsx`).
 - ✅ **A note's page**: breadcrumb, editable title, byline with author, scope and attached tickets, reading time, Copy as Markdown, the shared editor with wiki-links (spec §9.2, §8.5). A reader gets a static title, a static scope chip, a read-only editor with no toolbar, and no detach × on its badges — an editor (author, admin-reader or owner) gets all four (`apps/web/src/notes/note-document.tsx`, `note-title.tsx`, `note-byline.tsx`, `packages/ui/src/components/note-badge.tsx`).
-- ✅ **Notes save themselves** — one `note.body_set` per 2 s typing pause (not per keystroke), a draft kept on the device (`localStorage`, keyed by user and note) until the server accepts it, and a Saved / Saving… / Not saved (kept on this device) indicator in the editor's own footer (spec §9.4, D14). The draft also flushes on blur, on `beforeunload`, and on leaving the note; reopening a note with a newer local draft than its last server save loads the draft, not the stale server copy (`apps/web/src/notes/use-note-autosave.ts`).
+- ✅ **Notes save themselves** — one `note.body_set` per 2 s typing pause (not per keystroke), a draft kept on the device (`localStorage`, keyed by user and note) until the server accepts it, and a Saved / Saving… / Not saved (kept on this device) indicator in the editor's own footer (spec §9.4, D14). The draft also flushes on blur, on `beforeunload`, and on leaving the note; reopening a note with a newer local draft than its last server save loads the draft, not the stale server copy (`apps/web/src/notes/use-note-autosave.ts`). **Reopening with a recovered draft shows a "Restored unsaved changes from Nm ago" banner (KB `DraftRestoreBanner`, adapted):** Keep hides it and the draft saves as any edit; Discard cancels the pending write, deletes the key and remounts the editor over the server's body (`useNoteAutosave().restoredAt` / `discardDraft`, `apps/web/src/notes/draft-restore-banner.tsx`, `.gn-notes__draft-banner`). Editors only.
 - ✅ **History**: every saved version of a note, newest first, each named by who recorded it and when; opening one shows it read-only with a "Viewing version from…" banner, and Restore returns the note to that body (spec §9.5, D15). Open to any viewer — Restore is what `canEdit` gates, not the panel itself (`apps/web/src/notes/history-panel.tsx`).
 - ✅ **Comments on notes**, the same thread tickets have (D19) — `CommentsThread` (`packages/app-core`), mounted under the editor, reused rather than duplicated; a note's `comment.added` files against `{ kind: 'note', id }` and the thread reloads on commit. Open to every reader, not gated by `canEdit`: notes have no author-only comment restriction (`apps/web/src/notes/note-comments.tsx`).
 - ✅ **Search on the Notes page** — spelling results as you type, meaning results appended, author and scope filters (D21–D24). Typing swaps a workspace section's groups for its own `useNotesSearch` results (title, `**match**` snippets as `<mark>`, scope, ticket keys); clearing restores the tree. The Author and Scope selects narrow every section's request at once (`apps/web/src/notes/notes-search-header.tsx`, `workspace-notes-section.tsx`). **The search field carries `placeholder="Search"` (Unit 6a, owner: "the input element needs a place holder"), and neither filter's label wraps onto a second line any more (Unit 6b, owner: "Any Author should not be 2 lines")** — `.gn-notes__search-input` now takes the row's remaining width (`flex: 1 1 auto; min-width: 0`) while `.gn-notes__filters` and each Select trigger inside it refuse to shrink, a fix scoped to this row rather than to `Select`'s own shared base rule, which stays right everywhere else it is used with a properly constrained container. Cases `18.301`–`18.303`.

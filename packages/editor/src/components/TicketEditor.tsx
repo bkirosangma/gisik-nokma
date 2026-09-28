@@ -13,6 +13,7 @@ import { ImageWrapMenu } from './ImageWrapMenu.js';
 import { UploadChips } from './UploadChips.js';
 import { EditorToolbar, MARKDOWN_HINT } from './EditorToolbar.js';
 import { TableFloatingToolbar } from './TableFloatingToolbar.js';
+import { LinkEditorPopover } from './LinkEditorPopover.js';
 
 export type TicketEditorProps = {
   initialDoc?: DocJson | null;
@@ -30,6 +31,8 @@ export type TicketEditorProps = {
   resolveNoteTitle?(noteId: string): string | null;
   previewNote?(noteId: string): Promise<string | null>;
   onNavigateNote?(noteId: string): void;
+  /** Heading anchors + copy-link (KB editor parity); see `EditorSchemaOptions.headingLink`. */
+  headingLink?(id: string): string | null;
   /**
    * Ticket-reference capabilities (Plan 7 Task 1), the same two schema options
    * reach `buildEditorExtensions` with. Both optional, the same additive
@@ -175,6 +178,11 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         ...(props.onNavigateNote === undefined
           ? {}
           : { onNavigateNote: (noteId: string) => propsRef.current.onNavigateNote?.(noteId) }),
+        // Through `propsRef` for the same reason: the link is read at CLICK time,
+        // so a host whose URL changes (a note renamed) is followed.
+        ...(props.headingLink === undefined
+          ? {}
+          : { headingLink: (id: string) => propsRef.current.headingLink?.(id) ?? null }),
         // The ticket-ref two, threaded through `propsRef` for the same reason
         // as `queryNotes` above: Tiptap snapshots extension options at
         // construction. `resolveTicketHref` has no "no resolver supplied"
@@ -304,6 +312,9 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
           The slot scopes only the geometry (`editor.css`). */}
       <EditorContent editor={editor} className="ticket-editor__content gn-field__input" />
       <TableFloatingToolbar editor={editor} editable={editable} />
+      {/* The link under the caret, editable in place (KB editor parity). Portalled
+          to <body>; shows only while THIS editor (or its own panel) has focus. */}
+      <LinkEditorPopover editor={editor} />
       {/* The prototype's hint line, BELOW the field (`:1173`) and outside the
           strip, so the two keep the prototype's geometry rather than being one
           block. Gated with the strip and for the same reason: it explains what

@@ -88,4 +88,35 @@ describe('9.273 code block copy button', () => {
       if (original !== undefined) Object.defineProperty(globalThis.navigator, 'clipboard', original);
     }
   });
+
+  /** Ported from the reference's catch branch: a REJECTED write still copies. */
+  it('9.374 falls back to execCommand when the clipboard write is rejected', async () => {
+    const writeText = vi.fn().mockRejectedValue(new Error('denied'));
+    Object.defineProperty(globalThis.navigator, 'clipboard', { value: { writeText }, configurable: true });
+    let copiedAtCallTime: string | null = null;
+    const execCommand = vi.fn(() => {
+      copiedAtCallTime = document.querySelector('textarea')?.value ?? null;
+      return true;
+    });
+    const originalExec = document.execCommand;
+    document.execCommand = execCommand as unknown as typeof document.execCommand;
+    try {
+      const editor = createTestEditor(undefined, {
+        type: 'doc',
+        content: [{ type: 'codeBlock', content: [{ type: 'text', text: 'npm run gst' }] }],
+      });
+      const button = editor.view.dom.querySelector<HTMLButtonElement>('button.editor-codeblock__copy');
+      button?.dispatchEvent(new MouseEvent('click', { bubbles: true }));
+      await vi.waitFor(() => {
+        expect(button?.textContent).toBe('Copied');
+      });
+      expect(writeText).toHaveBeenCalledWith('npm run gst');
+      expect(execCommand).toHaveBeenCalledWith('copy');
+      expect(copiedAtCallTime).toBe('npm run gst');
+      expect(document.querySelectorAll('textarea')).toHaveLength(0);
+      editor.destroy();
+    } finally {
+      document.execCommand = originalExec;
+    }
+  });
 });

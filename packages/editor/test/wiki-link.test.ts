@@ -384,8 +384,10 @@ describe('9.300 the note-link hover card', () => {
       expect(card?.textContent).toHaveLength(200);
       expect(card?.textContent).toBe(long.slice(0, 200));
 
-      // …and leaving removes it.
+      // …and leaving removes it — after the 60 ms grace (KB parity, 9.399), which
+      // is what lets the pointer reach the card.
       link!.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(61);
       expect(document.querySelector('.wikilink-preview')).toBeNull();
       editor.destroy();
 
@@ -410,6 +412,137 @@ describe('9.300 the note-link hover card', () => {
       await Promise.resolve();
       expect(document.querySelector('.wikilink-preview')).toBeNull();
       missing.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+});
+
+/**
+ * 9.398–9.401 — the hover card's KB-parity behaviour (`attachHoverPreview`):
+ * placed from the link's rect, hoverable through a 60 ms grace, dismissed by
+ * scroll/key/a stale fetch, and tied to the link by `aria-describedby`.
+ */
+describe('9.398 the hover card is placed from the link and can be reached', () => {
+  const DOC = {
+    type: 'doc',
+    content: [{ type: 'paragraph', content: [{ type: 'wikiLink', attrs: { noteId: 'n1', title: 'Cold room' } }] }],
+  } as const;
+
+  async function open(previewNote: () => Promise<string | null> = async () => 'Compressor notes') {
+    const editor = createTestEditor({ previewNote, resolveNoteTitle: () => 'Cold room' }, DOC as never);
+    const link = editor.view.dom.querySelector('a.editor-wikilink') as HTMLElement;
+    return { editor, link };
+  }
+
+  async function hover(link: HTMLElement): Promise<HTMLElement> {
+    link.dispatchEvent(new MouseEvent('mouseenter'));
+    await vi.advanceTimersByTimeAsync(401);
+    await vi.waitFor(() => {
+      expect(document.querySelector('.wikilink-preview')).not.toBeNull();
+    });
+    return document.querySelector('.wikilink-preview') as HTMLElement;
+  }
+
+  it('9.398 is position: fixed at the link rect (below it), and flips above near the viewport bottom', async () => {
+    vi.useFakeTimers();
+    try {
+      const { editor, link } = await open();
+      link.getBoundingClientRect = () => ({ top: 100, bottom: 120, left: 50, right: 90, width: 40, height: 20, x: 50, y: 100, toJSON: () => ({}) });
+      const card = await hover(link);
+      expect(card.style.left).toBe('50px');
+      expect(card.style.top).toBe('128px'); // bottom 120 + gap 8
+      link.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(61);
+
+      link.getBoundingClientRect = () => ({ top: 780, bottom: 790, left: 50, right: 90, width: 40, height: 10, x: 50, y: 780, toJSON: () => ({}) });
+      const low = await hover(link);
+      expect(low.style.top).toBe('772px'); // above: top 780 - height 0 - gap 8
+      editor.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('9.399 survives the pointer crossing to the card, and goes 60 ms after leaving either', async () => {
+    vi.useFakeTimers();
+    try {
+      const { editor, link } = await open();
+      const card = await hover(link);
+      link.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(30);
+      expect(document.querySelector('.wikilink-preview')).not.toBeNull(); // inside the grace
+      card.dispatchEvent(new MouseEvent('mouseenter')); // reached the card
+      await vi.advanceTimersByTimeAsync(500);
+      expect(document.querySelector('.wikilink-preview')).not.toBeNull(); // stays while hovered
+      card.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(59);
+      expect(document.querySelector('.wikilink-preview')).not.toBeNull();
+      await vi.advanceTimersByTimeAsync(2);
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      editor.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('9.400 scrolling or a key dismisses it, and a fetch that resolves after the pointer left shows nothing', async () => {
+    vi.useFakeTimers();
+    try {
+      const { editor, link } = await open();
+      await hover(link);
+      window.dispatchEvent(new Event('scroll'));
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      await hover(link);
+      window.dispatchEvent(new KeyboardEvent('keydown', { key: 'a' }));
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+
+      // a slow fetch: the pointer leaves while it is in flight
+      let resolve: (text: string) => void = () => undefined;
+      const slow = createTestEditor(
+        { previewNote: () => new Promise<string | null>((r) => (resolve = r)), resolveNoteTitle: () => 'Cold room' },
+        DOC as never,
+      );
+      const slowLink = slow.view.dom.querySelector('a.editor-wikilink') as HTMLElement;
+      slowLink.dispatchEvent(new MouseEvent('mouseenter'));
+      await vi.advanceTimersByTimeAsync(401);
+      slowLink.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(100);
+      resolve('too late');
+      await vi.advanceTimersByTimeAsync(50);
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      slow.destroy();
+      editor.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('9.402 deleting the link while its card is up removes the card', async () => {
+    vi.useFakeTimers();
+    try {
+      const { editor, link } = await open();
+      await hover(link);
+      editor.commands.clearContent();
+      expect(document.querySelector('.wikilink-preview')).toBeNull();
+      editor.destroy();
+    } finally {
+      vi.useRealTimers();
+    }
+  });
+
+  it('9.401 the link names its card with aria-describedby while it is up, and drops it after', async () => {
+    vi.useFakeTimers();
+    try {
+      const { editor, link } = await open();
+      expect(link.hasAttribute('aria-describedby')).toBe(false);
+      const card = await hover(link);
+      expect(card.getAttribute('role')).toBe('tooltip');
+      expect(link.getAttribute('aria-describedby')).toBe(card.id);
+      link.dispatchEvent(new MouseEvent('mouseleave'));
+      await vi.advanceTimersByTimeAsync(61);
+      expect(link.hasAttribute('aria-describedby')).toBe(false);
+      editor.destroy();
     } finally {
       vi.useRealTimers();
     }

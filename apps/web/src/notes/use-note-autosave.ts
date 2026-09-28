@@ -20,6 +20,14 @@ export type UseNoteAutosaveResult = {
   onSave: (doc: unknown) => void;
   saveState: NoteSaveState;
   initialDoc: unknown;
+  /** Epoch ms of the draft `initialDoc` was recovered from — `null` when the editor mounted with the server's body. */
+  restoredAt: number | null;
+  /**
+   * Drop the recovered draft: cancels the pending write, deletes the key and
+   * reports saved. The CALLER then remounts the editor, which recovers from
+   * the (now empty) key and mounts with the server's body.
+   */
+  discardDraft: () => void;
 };
 
 /** `gn.note-draft.<userId>.<noteId>` (spec §9.4) — keyed by user, so a shared device never offers one person's unsaved words as another's. */
@@ -35,6 +43,8 @@ type Recovery = {
   pendingDoc: unknown;
   /** A stale draft was found and must be deleted — a write, so it happens in an effect, not here. */
   staleDraftFound: boolean;
+  /** `at` of the recovered draft, for the restore banner — `null` when none was recovered. */
+  restoredAt: number | null;
 };
 
 /**
@@ -43,7 +53,7 @@ type Recovery = {
  * ACCESSOR, not on the value.
  */
 function recoverDraft(draftKey: string, note: NoteDetail | null): Recovery {
-  if (note === null) return { doc: null, saveState: 'saved', pendingDoc: null, staleDraftFound: false };
+  if (note === null) return { doc: null, saveState: 'saved', pendingDoc: null, staleDraftFound: false, restoredAt: null };
 
   let stored: { doc: unknown; at: number } | null = null;
   try {
@@ -54,9 +64,9 @@ function recoverDraft(draftKey: string, note: NoteDetail | null): Recovery {
   }
 
   if (stored !== null && stored.at > Date.parse(note.updatedAt)) {
-    return { doc: stored.doc, saveState: 'unsaved', pendingDoc: stored.doc, staleDraftFound: false };
+    return { doc: stored.doc, saveState: 'unsaved', pendingDoc: stored.doc, staleDraftFound: false, restoredAt: stored.at };
   }
-  return { doc: note.body, saveState: 'saved', pendingDoc: null, staleDraftFound: stored !== null };
+  return { doc: note.body, saveState: 'saved', pendingDoc: null, staleDraftFound: stored !== null, restoredAt: null };
 }
 
 /**
@@ -225,5 +235,21 @@ export function useNoteAutosave({
     };
   }, [flush]);
 
-  return { onDraft, onSave, saveState, initialDoc: initial.doc };
+  const discardDraft = useCallback(() => {
+    if (timerRef.current !== null) {
+      clearTimeout(timerRef.current);
+      timerRef.current = null;
+    }
+    // Nothing pending, so the unmount flush that follows the caller's remount
+    // cannot write the discarded words to the server.
+    pendingDocRef.current = null;
+    try {
+      window.localStorage.removeItem(draftKey);
+    } catch {
+      // Blocked site data: nothing was stored, so nothing to remove.
+    }
+    setSaveState('saved');
+  }, [draftKey]);
+
+  return { onDraft, onSave, saveState, initialDoc: initial.doc, restoredAt: initial.restoredAt, discardDraft };
 }

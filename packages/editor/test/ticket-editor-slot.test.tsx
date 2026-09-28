@@ -115,6 +115,8 @@ type AppCoreEditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  // 9.412 — the heading-anchor link builder, transcribed like the fields above.
+  headingLink?: (id: string) => string | null;
   // 9.309 — the ticket-ref two (Plan 7 Task 1), transcribed with the same name
   // and inline shape so the case above, which compares this type's field
   // names against `packages/app-core/src/views/editor-slot.tsx`'s, fails if

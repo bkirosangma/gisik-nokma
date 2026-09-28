@@ -1,5 +1,6 @@
 import { useEffect, useState } from 'react';
 import type { ReadingMeta } from './reading-meta.js';
+import { findScroller } from './scroller.js';
 
 /**
  * The sticky table of contents for a long document (spec §8.2), ported from
@@ -20,9 +21,17 @@ import type { ReadingMeta } from './reading-meta.js';
  * The source renders `<button>` and scrolls the container by hand. An `<a
  * href="#id">` is the same affordance with the semantics the platform already
  * has: it is a link, it is focusable, it appears in the document's link list,
- * and it copies as a URL. The click handler still scrolls the CONTAINER (the
- * document's own scroller is not the one that moves) and still honours
+ * and it copies as a URL. The click handler still honours
  * `prefers-reduced-motion`, so nothing the source did is lost.
+ *
+ * ## WHICH ELEMENT SCROLLS (KB-parity audit, 2026-09-29)
+ *
+ * The source scrolls `root.scrollTo(...)` and roots its observer at `root`.
+ * On the note page `root` is `.gn-notes__editor`, which does not scroll — the
+ * window does — so the click was a silent no-op (after `preventDefault`) and
+ * the highlight was computed against a page-tall box. Both now ask
+ * `findScroller` (`scroller.ts`) / use `scrollIntoView`, which work for a
+ * scrolling pane and for the window alike.
  */
 
 /**
@@ -49,6 +58,10 @@ export function ReadingTOC({ headings, scrollContainerRef }: ReadingTOCProps): R
     if (headings.length < MIN_HEADINGS) return;
     const root = scrollContainerRef.current;
     if (root === null) return;
+    // The IntersectionObserver root is the scroller ONLY when one element
+    // scrolls; the window scrolls on the note page, and an observer rooted at
+    // a non-scrolling, page-tall element would call every heading visible.
+    const scroller = findScroller(root);
     const targets = headings
       .map((h) => root.querySelector(`#${CSS.escape(h.id)}`))
       .filter((el): el is Element => el !== null);
@@ -68,7 +81,7 @@ export function ReadingTOC({ headings, scrollContainerRef }: ReadingTOCProps): R
       // The top margin pulls the trigger zone down so the highlight moves as a
       // heading APPROACHES the top of the reading area, not only once it has
       // passed it.
-      { root, rootMargin: '-10% 0px -70% 0px', threshold: 0 },
+      { root: scroller.kind === 'element' ? scroller.element : null, rootMargin: '-10% 0px -70% 0px', threshold: 0 },
     );
     for (const target of targets) observer.observe(target);
     return () => observer.disconnect();
@@ -95,8 +108,14 @@ export function ReadingTOC({ headings, scrollContainerRef }: ReadingTOCProps): R
                 const reduced =
                   typeof window !== 'undefined' &&
                   window.matchMedia?.('(prefers-reduced-motion: reduce)').matches === true;
-                const top = (target as HTMLElement).offsetTop - 16;
-                root.scrollTo({ top, behavior: reduced ? 'auto' : 'smooth' });
+                // `scrollIntoView` moves whichever ancestor scrolls (the window
+                // on the note page, where `root.scrollTo` was a silent no-op);
+                // the breathing room above the heading is the SKIN's
+                // `scroll-margin-top`, not a number in here.
+                (target as HTMLElement).scrollIntoView?.({
+                  block: 'start',
+                  behavior: reduced ? 'auto' : 'smooth',
+                });
                 setActiveId(heading.id);
               }}
             >

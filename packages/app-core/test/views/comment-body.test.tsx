@@ -419,4 +419,54 @@ describe('9.348 table in a comment', () => {
     expect(wrap, 'no .gn-comment__table-wrap around the table').not.toBeNull();
     expect(wrap!.querySelector('table.gn-comment__table')).not.toBeNull();
   });
+
+  /**
+   * kb-editor-parity: the toolbar now offers H1-H6 and a horizontal rule, so a
+   * comment that carries either must show it. Before this, `heading` was the
+   * same arm as `paragraph` (level dropped) and `horizontalRule` fell to the
+   * "unknown type renders its children" arm — an `<hr>` has no children, so it
+   * rendered as NOTHING.
+   */
+  it('9.371 renders a heading as a paragraph that keeps its level, without entering the heading outline', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Plan' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'body' }] },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    const heading = container.querySelector('.gn-comment__heading');
+    expect(heading?.tagName).toBe('P');
+    expect(heading?.className).toContain('gn-comment__heading--2');
+    expect(heading?.textContent).toBe('Plan');
+    expect(container.querySelector('h1, h2, h3, h4, h5, h6')).toBeNull();
+    // CONTROL: the plain paragraph beside it carries no heading class.
+    expect(container.querySelectorAll('.gn-comment__heading')).toHaveLength(1);
+  });
+
+  it('9.372 a heading with a malformed level still renders its text, with no modifier class', () => {
+    for (const level of [0, 7, 'x', null, undefined]) {
+      const body = { type: 'doc', content: [{ type: 'heading', attrs: { level }, content: [{ type: 'text', text: 'T' }] }] };
+      const { container, unmount } = render(<>{renderCommentBody(body)}</>);
+      const heading = container.querySelector('.gn-comment__heading');
+      expect(heading?.textContent, `level ${String(level)}`).toBe('T');
+      expect(heading?.className, `level ${String(level)}`).toBe('gn-comment__heading');
+      unmount();
+    }
+  });
+
+  it('9.373 renders a horizontal rule as an <hr>, not as nothing', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'above' }] },
+        { type: 'horizontalRule' },
+        { type: 'paragraph', content: [{ type: 'text', text: 'below' }] },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    expect(container.querySelector('hr.gn-comment__rule')).not.toBeNull();
+    expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
 });

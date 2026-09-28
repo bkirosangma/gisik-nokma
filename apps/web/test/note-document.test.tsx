@@ -1,3 +1,5 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
 import { searchTermSchema } from '@gisik-nokma/domain';
 import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
@@ -690,5 +692,188 @@ describe('13.1488 clicking below the text focuses the editor', () => {
     fireEvent.click(wrapper);
 
     await waitFor(() => expect(textbox).toHaveFocus());
+  });
+});
+
+/**
+ * 9.409 / 9.410 — KB parity: the reading-progress bar on the note page.
+ *
+ * gisik has no read/edit toggle, so the note page is the reading surface and
+ * the bar is there for an editor and a reader alike (the source mounts it in
+ * read mode only). 9.410 is the skin: the bar is under the sticky nav, painted
+ * from tokens, still under reduced motion, and a heading scrolled to clears the
+ * nav.
+ */
+describe('9.409 the note page carries a reading-progress bar', () => {
+  it('9.409 a labelled progressbar is mounted for an editor and for a read-only viewer', async () => {
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    renderDocument({ role: 'member' });
+    const bar = await screen.findByRole('progressbar', { name: 'Reading progress' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+    cleanup();
+
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(await screen.findByRole('progressbar', { name: 'Reading progress' })).toBeInTheDocument();
+  });
+
+  it('9.410 the skin: tokens only, under the nav, motion off under prefers-reduced-motion, headings clear the nav', () => {
+    const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (selector: string): string => {
+      const match = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css);
+      expect(match, `a rule for ${selector}`).not.toBeNull();
+      return match?.[1] ?? '';
+    };
+    expect(rule('.reading-progress')).toMatch(/top:\s*var\(--app-nav-offset/);
+    expect(rule('.reading-progress')).toMatch(/background:\s*var\(--gn-border\)/);
+    expect(rule('.reading-progress__bar')).toMatch(/background:\s*var\(--gn-accent\)/);
+    expect(rule('.reading-progress__bar')).toMatch(/transition:\s*transform/);
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.reading-progress__bar\s*\{\s*transition:\s*none/);
+    expect(rule('.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)')).toMatch(/scroll-margin-top:\s*calc\(var\(--app-nav-offset/);
+    // No literal colour in the section this piece added.
+    const section = css.slice(css.indexOf('.reading-progress {'));
+    expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
+  });
+});
+
+/**
+ * 9.418–9.420 — KB parity: heading anchors on the note page. The extension and
+ * the button are proved in `packages/editor/test/heading-anchors.test.ts`; what
+ * belongs here is what only the page knows — the URL it hands the button, and
+ * the arrival at `/notes/<id>#slug`, which has to wait for the headings.
+ */
+const HEADED_BODY = {
+  type: 'doc',
+  content: [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Overview' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'body' }] },
+    { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Deep detail' }] },
+  ],
+};
+
+describe('9.418 heading anchors on the note page', () => {
+  it('9.418 the note editor gets a copy-link button per heading, carrying this note\'s absolute URL', async () => {
+    const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+    await waitFor(() => expect(container.querySelectorAll('.ProseMirror h2 .editor-heading-link, .ProseMirror h4 .editor-heading-link')).toHaveLength(2));
+    const headingLink = slotProps().headingLink as (id: string) => string | null;
+    expect(headingLink('deep-detail')).toBe(`${window.location.origin}/notes/${NOTE}#deep-detail`);
+    expect(container.querySelector('.ProseMirror h4')?.getAttribute('id')).toBe('deep-detail');
+    // The comment composer is not a page: it gets no anchors.
+    const composer = [...capturedSlotProps].reverse().find((props) => props['mode'] === 'comment');
+    expect(composer?.['headingLink']).toBeUndefined();
+  });
+
+  it('9.419 arriving at #slug scrolls that heading into view once the editor has drawn it', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    window.history.replaceState(null, '', `/notes/${NOTE}#deep-detail`);
+    try {
+      const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+      await waitFor(() => expect(scrolled.length).toBeGreaterThan(0));
+      expect(scrolled[0]).toBe(container.querySelector('.ProseMirror h4'));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.history.replaceState(null, '', '/');
+    }
+  });
+
+  it('9.420 a fragment naming no heading scrolls nothing and does not throw', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    window.history.replaceState(null, '', `/notes/${NOTE}#no-such-heading`);
+    try {
+      const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+      await waitFor(() => expect(container.querySelector('.ProseMirror h2')).not.toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(scrolled).toHaveLength(0);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.history.replaceState(null, '', '/');
+    }
+  });
+});
+
+describe('9.422 the draft-restore banner', () => {
+  const DRAFT_TEXT = 'a draft nobody has seen yet';
+  function seedDraft(): void {
+    window.localStorage.setItem(
+      noteDraftKey('u_kiro', NOTE),
+      JSON.stringify({ doc: body(DRAFT_TEXT), at: Date.now() - 5 * 60_000 }),
+    );
+  }
+  const editorText = (container: HTMLElement): string => container.querySelector('.ProseMirror')?.textContent ?? '';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('9.422 a recovered draft opens with a banner naming its age; a note with no draft has none', async () => {
+    seedDraft();
+    const { container } = renderDocument();
+    const banner = await screen.findByTestId('draft-restore-banner');
+    expect(banner).toHaveTextContent('Restored unsaved changes from 5m ago.');
+    expect(editorText(container)).toContain(DRAFT_TEXT);
+    // CONTROL, same it: with no draft stored the same page draws no banner.
+    cleanup();
+    window.localStorage.clear();
+    renderDocument();
+    await waitFor(() => expect(screen.getByTestId('note-editor')).toBeInTheDocument());
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+
+  it('9.423 Keep hides the banner and leaves the recovered words and their stored draft in place', async () => {
+    seedDraft();
+    const { container } = renderDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+    expect(editorText(container)).toContain(DRAFT_TEXT);
+    expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).not.toBeNull();
+  });
+
+  it('9.424 Discard reloads the server body, deletes the draft key and writes nothing to the server', async () => {
+    seedDraft();
+    const services = world();
+    const ingested: SubmittedEvent[] = [];
+    services.dataSource.ingest = async (events: SubmittedEvent[]) => {
+      ingested.push(...events);
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-29T09:00:00.000Z',
+      }));
+    };
+    const { container } = render(
+      <Providers services={services}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(editorText(container)).toContain('Compressor stopped in the cold room'));
+    expect(editorText(container)).not.toContain(DRAFT_TEXT);
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+    expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).toBeNull();
+    // Give an unmount flush and the coalescing timer their turn: neither may write the discarded words.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(ingested.filter((event) => event.type === 'note.body_set')).toHaveLength(0);
+    expect(screen.getByTestId('editor-save-state')).toHaveTextContent('Saved');
+  });
+
+  it('9.425 a reader who cannot edit is not offered the banner', async () => {
+    seedDraft();
+    // CONTROL, same it: the author's own page over the same draft shows the banner.
+    renderDocument();
+    await screen.findByTestId('draft-restore-banner');
+    cleanup();
+    // Authored by somebody else, so the member role is the only thing making them a reader (18.204's recipe).
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
   });
 });
