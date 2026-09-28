@@ -244,6 +244,21 @@ describe('AttachNotePicker', () => {
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
   });
 
+  /**
+   * 9.325 — Unit 2 styling (owner screenshot, 2026-09-23: "the add note menu
+   * needs better styling"): each row's title and meta render as separate,
+   * separately-classed spans (so CSS can mute the meta), while the row's
+   * ACCESSIBLE NAME stays byte-identical to what 18.247-18.251 already
+   * assert — `${title} · ${homeProjectId}` — because those cases (and the
+   * live suite) keep finding rows by that exact name.
+   */
+  it('9.325 an existing-note row splits into a title span and a muted meta span, with the accessible name unchanged', async () => {
+    renderPicker({ getNotes: async () => [note({ noteId: 'note_1', title: 'Compressor log' })] });
+    const option = await screen.findByRole('option', { name: `Compressor log · ${PROJECT}` });
+    expect(option.querySelector('.gn-attach-note-picker__option-title')).toHaveTextContent('Compressor log');
+    expect(option.querySelector('.gn-attach-note-picker__option-meta')).toHaveTextContent(PROJECT);
+  });
+
   it('18.252 a refused create shows the reason inline and keeps the picker open', async () => {
     const user = userEvent.setup();
     const ingestScript: IngestScript = (events) =>

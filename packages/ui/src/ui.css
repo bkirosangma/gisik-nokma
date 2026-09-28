@@ -2452,9 +2452,44 @@ a.gn-ticket-sheet__crumb--link {
 .gn-ticket-sheet__subtask-add .gn-ticket-sheet__subtask-input { flex: 1; min-width: 12.5rem; }
 /* The ticket's Notes section (notes series, Plan 6 of 7, spec §10.1) — the
    caption is `.gn-ticket-sheet__caption`, already shared with Subtasks and
-   Comments, so only the badge row and the Attach button need their own rule. */
+   Comments, so only the badge row and the Attach button need their own rule.
+   The trigger itself now carries `gn-button gn-button--ghost` too
+   (`ticket-notes-section.tsx`, Unit 2 styling fix, owner screenshot
+   2026-09-23: "add note button does not have a style") — this rule stays as
+   layout ONLY (`margin-top`), no property conflict with `.gn-button--ghost`'s
+   own visual coat. */
 .gn-ticket-sheet__note-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0.5rem 0; }
 .gn-ticket-sheet__attach { margin-top: 0.5rem; }
+/* The AttachNotePicker menu — `.gn-popover` (below) already supplies the
+   floating shell (surface/shadow/radius), so this block is internal layout
+   and the house menu-item treatment only. Selected state by BACKGROUND, not
+   outline, the same `--gn-fill-tertiary` tier `.gn-select__option[data-
+   focused]` and the suggestion popups' own `--selected` rules use — reused
+   rather than a bespoke value. `[aria-selected="true"]`, not a class: the
+   component already writes this ARIA state for the roving-tabindex listbox,
+   so the selector needs no new prop to read it. */
+.gn-attach-note-picker { display: flex; flex-direction: column; gap: 0.5rem; min-width: 16rem; }
+.gn-attach-note-picker__search { width: 100%; }
+.gn-attach-note-picker__status { color: var(--gn-text-muted); font-size: 0.85em; margin: 0; }
+.gn-attach-note-picker__refusal { color: var(--gn-danger); margin: 0; }
+.gn-attach-note-picker__list { display: flex; flex-direction: column; gap: 0.15rem; max-height: 16rem; overflow-y: auto; }
+.gn-attach-note-picker__option {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--gn-radius-control);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-attach-note-picker__option[aria-selected="true"] { background: var(--gn-fill-tertiary); }
+.gn-attach-note-picker__option:disabled { color: var(--gn-text-muted); cursor: not-allowed; }
+.gn-attach-note-picker__option-title { flex: 1; }
+.gn-attach-note-picker__option-meta { color: var(--gn-text-muted); font-size: 0.85em; }
 button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }
