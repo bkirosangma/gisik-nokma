@@ -41,6 +41,7 @@ export type TicketEditorProps = {
    */
   queryTickets?(query: string): Promise<TicketRefCandidate[]>;
   resolveTicketHref?(ref: { ticketId: string; projectId: string }): string | null;
+  isPurged?(kind: 'ticket' | 'note', id: string): boolean;
   uploadAttachment(file: File): Promise<UploadResult>;
   /** Emit attachment.added — runs after upload, before any node insertion. */
   onAttachmentAdded(result: UploadResult): Promise<void> | void;
@@ -190,6 +191,11 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
         // travels unconditionally like `queryNotes` does.
         queryTickets: (query) => propsRef.current.queryTickets?.(query) ?? Promise.resolve([]),
         resolveTicketHref: (ref) => propsRef.current.resolveTicketHref?.(ref) ?? null,
+        // Trash Plan 3. Read at node-view construction; a host whose answer
+        // arrives later remounts the editor (it defers the mount, `usePurgedPredicate`'s `ready`).
+        ...(props.isPurged === undefined
+          ? {}
+          : { isPurged: (kind: 'ticket' | 'note', id: string) => propsRef.current.isPurged?.(kind, id) ?? false }),
       }),
       createAttachmentPasteExtension(attachmentOptions),
       Extension.create({

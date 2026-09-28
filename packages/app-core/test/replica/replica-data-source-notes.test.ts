@@ -136,6 +136,12 @@ function fakeTransport(script: Script, notePayload: LedgerEvent[]): SyncTranspor
     async reconcile(workspaceId) {
       return { workspaceId, restricted: [], restrictedNotes: [] };
     },
+    async purgedLookup() {
+      return [];
+    },
+    async deletedItems() {
+      return { items: [] };
+    },
     async bootstrapTicket(_ws, ticketId) {
       throw new Error(`unexpected ticket pull ${ticketId}`);
     },

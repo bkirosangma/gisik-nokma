@@ -1,4 +1,6 @@
+import type { DocTextOptions } from './doc-text.js';
 import type { EventEnvelope } from './envelope.js';
+import { PURGEABLE_KINDS, type LifecycleKind } from './lifecycle.js';
 
 /**
  * The purge's shared vocabulary (trash series Plan 2; spec §5.3, §5.4, §5.6,
@@ -38,4 +40,44 @@ export function isRedactedTicketCreated(env: Pick<EventEnvelope, 'type' | 'paylo
   const payload = env.payload;
   if (payload === null || typeof payload !== 'object') return false;
   return (payload as { purged?: unknown }).purged === true;
+}
+
+/**
+ * The rule id every purge refusal carries. Declared by trash Plan 2 in
+ * `apps/server/src/purge/check-purged.ts`; moved here by Plan 3 because the
+ * DEVICE must recognise it (the outbox turns such a refusal into a notice) and
+ * `packages/sync-client` may not import `apps/server`. The server re-exports
+ * this constant; nothing else spells the string.
+ */
+export const PURGE_RULE = 'purge.erased';
+
+/** The most ids one `POST /v1/purged-lookup` accepts. Every caller chunks at this size. */
+export const PURGED_LOOKUP_MAX_IDS = 500;
+
+/** One erased item as the lookup names it: its kind and id, and nothing else. */
+export type PurgedRef = { kind: LifecycleKind; id: string };
+
+/** The one predicate every chip renderer asks (the `DocTextOptions` shape Plan 2 gave search). */
+export type PurgedPredicate = NonNullable<DocTextOptions['isPurged']>;
+
+/**
+ * What a device shows for an offline change it removed from its outbox because
+ * the item it was about was permanently deleted (spec §5.7: "dropped from its
+ * outbox with a visible notice — never silently").
+ */
+export const PURGED_OUTBOX_NOTICE =
+  'A change to an item that was permanently deleted could not be saved, and was removed.';
+
+const PURGEABLE: readonly string[] = PURGEABLE_KINDS;
+
+/** A wire entry of the lookup's answer, read defensively: a lifecycle kind and a non-empty id. */
+export function isPurgedRef(value: unknown): value is PurgedRef {
+  if (value === null || typeof value !== 'object') return false;
+  const candidate = value as { kind?: unknown; id?: unknown };
+  return (
+    typeof candidate.kind === 'string' &&
+    PURGEABLE.includes(candidate.kind) &&
+    typeof candidate.id === 'string' &&
+    candidate.id !== ''
+  );
 }

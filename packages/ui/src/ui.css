@@ -4976,6 +4976,37 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    warning rather than a failure: `--gn-danger` would claim a finality the
    engine does not implement. */
 .gn-sync-status-bar__error { color: var(--gn-warning); }
+/* Trash Plan 3 — changes the device removed or could not save (spec §5.7: "a
+   visible notice — never silently"). The left rule is the warning ink the
+   strip's own server-reason line uses; the sentence carries the meaning, so
+   colour is never the only signal. The live region stays mounted and empty
+   when there is nothing to say. */
+/* Empty = visually nothing, NOT out of the accessibility tree: `display: none`
+   removes a live region from that tree, and a region that is inserted afresh
+   with its first notice is not reliably announced (the region must already
+   exist when the text arrives). Zero height, no padding, clipped — still there. */
+.gn-sync-notices:empty { height: 0; padding: 0; margin: 0; overflow: hidden; }
+.gn-sync-notices { background: var(--gn-surface); padding: 0.3rem 0.75rem; }
+.gn-sync-notices__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.gn-sync-notices__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-left: 3px solid var(--gn-warning);
+  padding-left: 0.6rem;
+}
+.gn-sync-notices__text { flex: 1; color: var(--gn-text); font-size: 0.85rem; }
+.gn-sync-notices__dismiss {
+  min-height: 2.75rem;
+  padding: 0 0.9rem;
+  background: transparent;
+  color: var(--gn-text);
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.gn-sync-notices__dismiss:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* ── The in-app manual and FAQ ────────────────────────────────────────────────
    Rendered by `packages/app-core/src/help/help-browser.tsx`, which both
@@ -7349,6 +7380,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    (`.gn-comment__body a`), this rule only adds the one thing a span rendering
    still needs. */
 .gn-comment__ticketref { overflow-wrap: anywhere; }
+/* Trash Plan 3 (T11) — a chip whose target was permanently erased. Never a link;
+   italic as well as muted, so the ink is not the only difference, and the words
+   themselves ("Deleted item") carry the meaning. */
+.gn-comment__ref--purged { color: var(--gn-text-muted); font-style: italic; cursor: default; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {

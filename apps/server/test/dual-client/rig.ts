@@ -50,6 +50,8 @@ import { listVisibleTickets } from '../../src/visibility/visible-tickets.js';
 import { readEntityEvents, rowToEnvelope, type EventRow } from '../../src/ledger/event-store.js';
 import { readLatestSnapshot } from '../../src/ledger/snapshot-store.js';
 import { listNotes } from '../../src/read/notes.js';
+import { purgedRefsAmong } from '../../src/purge/purged-lookup.js';
+import { readDeletedItems } from '../../src/read/deleted-items.js';
 // ALIASED: this file declares its OWN `LedgerRow` (a narrower, harness-facing
 // row shape at `:141`), and the two collided when the bootstrap's `notes` section
 // needed the route's column list. The alias keeps both names honest.
@@ -499,6 +501,11 @@ export async function createHarness(): Promise<Harness> {
         }
         return { events: await readEntityEvents(pool, 'note', noteId) };
       },
+      // Trash Plan 3: the ROUTE's own function, the discipline the ticket and
+      // note pulls state above — a restated rule would let a harness prove
+      // replicas against a server that does not exist.
+      purgedLookup: (ids) => purgedRefsAmong(pool, ids),
+      deletedItems: async () => ({ items: await readDeletedItems(pool, userId) }),
       // Only `engine.start()` opens a stream, and the harness never calls it:
       // sync-down is `syncDown()` below, on the same primitive the socket
       // wraps. A no-op handle here would let a scenario `start()` the engine

@@ -7283,6 +7283,35 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A change to something that was permanently deleted while you were offline cannot be saved."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " When the app reconnects it takes that change out of its queue and puts a note in its place — \"A change to an item that was permanently deleted could not be saved, and was removed.\" — with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Dismiss"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button. Any other change the server refused is listed the same way, with the server's reason, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Dismiss"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " lets it go."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "When everything is fine and nothing is queued, it shows no alarming badge at all. If the connection errors, the message appears "
                   },
@@ -8619,6 +8648,19 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": ") the same way opens a picker over the notes you can read, and inserts a link to the one you pick."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A chip or link to something that was permanently deleted reads Deleted item"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — no key, no title, and nothing to open. The comment or note that holds it is not changed: only the chip is drawn differently, because the thing it pointed at no longer exists."
                   }
                 ]
               },

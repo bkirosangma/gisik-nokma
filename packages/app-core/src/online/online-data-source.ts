@@ -1,3 +1,4 @@
+import { PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type PurgedRef } from '@gisik-nokma/domain';
 import type { DataSource, DataSourceQuery } from '../data-source.js';
 import type { FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
 import { SessionExpiredError } from '../session-expired.js';
@@ -6,6 +7,7 @@ import {
   boardWorkspaceId,
   mapActors,
   mapAttention,
+  mapPurgedLookup,
   mapWorkspaceSettings,
   mapBoardView,
   mapDeletedItems,
@@ -151,6 +153,18 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
     getMyWorkspaces: async () => mapWorkspaceRefs(await http.get('/v1/me/workspaces')),
 
     getDeletedItems: async () => mapDeletedItems(await http.get('/v1/me/deleted-items')),
+
+    purgedAmong: async (ids) => {
+      // ULIDs only, for the reason `learnPurges` gives: one malformed chip id
+      // would 400 its whole chunk, and every chip in the document would fail open.
+      const unique = [...new Set(ids)].filter((id) => ULID_REGEX.test(id));
+      const found: PurgedRef[] = [];
+      for (let i = 0; i < unique.length; i += PURGED_LOOKUP_MAX_IDS) {
+        const chunk = unique.slice(i, i + PURGED_LOOKUP_MAX_IDS);
+        found.push(...mapPurgedLookup(await http.post('/v1/purged-lookup', { ids: chunk })));
+      }
+      return found;
+    },
 
     /**
      * `[]` on a 404, and the asymmetry with `contested: []` is deliberate rather

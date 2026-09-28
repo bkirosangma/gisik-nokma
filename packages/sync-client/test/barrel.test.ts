@@ -118,6 +118,7 @@ describe('root barrel cleanliness', () => {
       //   grep -rn "from 'node:" --include='*.ts' packages/rule-engine/src
       // → three hits, all in `src/fixtures/harness.ts`, none reachable from its
       // `src/index.ts`.
+      'outbox/notices.ts',
       'outbox/outbox.ts',
       'precheck/local-context.ts',
       // Plan 10 Task 9's replica. It reaches `@gisik-nokma/domain` and nothing

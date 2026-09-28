@@ -1,7 +1,8 @@
 import { useCallback, useEffect, useId, useRef, useState, type ReactElement } from 'react';
-import type { DeletedItem, LifecycleKind } from '@gisik-nokma/domain';
+import { formatIstInstant, type DeletedItem, type LifecycleKind } from '@gisik-nokma/domain';
 import { Button } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
+import { cachedDeletedItemsOf } from '../deleted-items-from-cache.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { makeSubmittedFactory, type EnvelopeSeed } from '../submit.js';
 import { classifyBatch } from '../trash/batch.js';
@@ -21,6 +22,7 @@ import {
   changeUnreachableLine,
   containedLine,
   deletedByLine,
+  deletedItemsAsOf,
   deletedItemsFailed,
   markItemName,
   permanentlyDeletedOn,
@@ -41,6 +43,7 @@ export type DeletedItemsSectionProps = {
 type Load =
   | { at: 'loading' }
   | { at: 'ready'; items: DeletedItem[] }
+  | { at: 'cached'; items: DeletedItem[]; fetchedAt: string }
   | { at: 'offline' }
   | { at: 'failed'; message: string };
 
@@ -57,9 +60,13 @@ type RowNotice = { id: string; text: string; className: string };
  * "Nothing deleted." is a claim about the account. The replica cannot answer
  * this read until Plan 3 (`ReplicaGapError`) and a server can fail; neither may
  * be painted as that claim — the reasoning Plan 1 gave for the replica's
- * rejection (`replica-data-source.ts`'s `DELETED_ITEMS_ABSENCES`). The offline
+ * rejection (`replica-data-source.ts`'s `DELETED_ITEMS_NOT_CACHED`). The offline
  * case is recognised by the error's NAME (`ReplicaGapError`, set in its
  * constructor), so this view does not import the replica module.
+ *
+ * Trash Plan 3 adds a fourth: the SAVED copy (`DeletedItemsFromCache`), drawn
+ * read-only under its instant. `DELETED_ITEMS_OFFLINE` now means only that
+ * nothing was ever saved.
  *
  * ## A marked row cannot be restored — the server says so, and so does the row (D14)
  *
@@ -85,7 +92,10 @@ export function DeletedItemsSection({
     return dataSource.query.getDeletedItems().then(
       (items) => setLoad({ at: 'ready', items }),
       (cause: unknown) => {
-        if (cause instanceof Error && cause.name === 'ReplicaGapError') setLoad({ at: 'offline' });
+        // Trash Plan 3 (D9): the saved copy is a list, just not a current one.
+        const cached = cachedDeletedItemsOf(cause);
+        if (cached !== null) setLoad({ at: 'cached', items: cached.items, fetchedAt: cached.fetchedAt });
+        else if (cause instanceof Error && cause.name === 'ReplicaGapError') setLoad({ at: 'offline' });
         else setLoad({ at: 'failed', message: cause instanceof Error ? cause.message : String(cause) });
       },
     );
@@ -123,6 +133,9 @@ export function DeletedItemsSection({
   };
 
   const at = now();
+  // A live list and a saved copy draw the same rows; only the live one can be acted on.
+  const rows = load.at === 'ready' || load.at === 'cached' ? load.items : null;
+  const readOnly = load.at === 'cached';
 
   return (
     <section className="gn-account__section gn-deleted-items" aria-labelledby={headingId}>
@@ -131,17 +144,18 @@ export function DeletedItemsSection({
       </h2>
       {load.at === 'loading' ? <p className="gn-account__note">{DELETED_ITEMS_LOADING}</p> : null}
       {load.at === 'offline' ? <p className="gn-account__note">{DELETED_ITEMS_OFFLINE}</p> : null}
+      {load.at === 'cached' ? <p className="gn-account__note">{deletedItemsAsOf(formatIstInstant(load.fetchedAt))}</p> : null}
       {load.at === 'failed' ? (
         <p role="alert" className="gn-refusal gn-refusal--transport">
           {deletedItemsFailed(load.message)}
         </p>
       ) : null}
-      {load.at === 'ready' && load.items.length === 0 ? (
+      {rows !== null && rows.length === 0 ? (
         <p className="gn-account__note">{DELETED_ITEMS_EMPTY}</p>
       ) : null}
-      {load.at === 'ready' && load.items.length > 0 ? (
+      {rows !== null && rows.length > 0 ? (
         <ul className="gn-deleted-items__list">
-          {load.items.map((item) => {
+          {rows.map((item) => {
             const label = item.label !== '' ? item.label : KIND_LABEL[item.kind];
             const marked = item.purgeDueAt !== null;
             const overdue = isPurgeOverdue(item.purgeDueAt, at);
@@ -164,38 +178,40 @@ export function DeletedItemsSection({
                   {item.purgeDueAt !== null ? (
                     <span className="gn-deleted-items__due">{permanentlyDeletedOn(istDayLabel(item.purgeDueAt))}</span>
                   ) : null}
-                  {marked ? (
+                  {marked && !readOnly ? (
                     <span className="gn-deleted-items__reason">{overdue ? PURGE_UNDER_WAY : UNMARK_BEFORE_RESTORE}</span>
                   ) : null}
                 </span>
-                <span className="gn-deleted-items__actions">
-                  <Button
-                    aria-label={restoreItemName(label)}
-                    disabled={busy || marked}
-                    onClick={() => void act(item, restoreSeeds(target, false))}
-                  >
-                    {RESTORE_LABEL}
-                  </Button>
-                  {!marked ? (
+                {readOnly ? null : (
+                  <span className="gn-deleted-items__actions">
                     <Button
-                      variant="danger"
-                      aria-label={markItemName(label)}
-                      disabled={busy}
-                      onClick={() => void act(item, markSeeds(target))}
+                      aria-label={restoreItemName(label)}
+                      disabled={busy || marked}
+                      onClick={() => void act(item, restoreSeeds(target, false))}
                     >
-                      {MARK_LABEL}
+                      {RESTORE_LABEL}
                     </Button>
-                  ) : null}
-                  {marked && !overdue ? (
-                    <Button
-                      aria-label={unmarkItemName(label)}
-                      disabled={busy}
-                      onClick={() => void act(item, unmarkSeeds(target))}
-                    >
-                      {UNMARK_LABEL}
-                    </Button>
-                  ) : null}
-                </span>
+                    {!marked ? (
+                      <Button
+                        variant="danger"
+                        aria-label={markItemName(label)}
+                        disabled={busy}
+                        onClick={() => void act(item, markSeeds(target))}
+                      >
+                        {MARK_LABEL}
+                      </Button>
+                    ) : null}
+                    {marked && !overdue ? (
+                      <Button
+                        aria-label={unmarkItemName(label)}
+                        disabled={busy}
+                        onClick={() => void act(item, unmarkSeeds(target))}
+                      >
+                        {UNMARK_LABEL}
+                      </Button>
+                    ) : null}
+                  </span>
+                )}
                 {notice !== null && notice.id === item.id ? (
                   <p role="alert" className={notice.className}>
                     {notice.text}

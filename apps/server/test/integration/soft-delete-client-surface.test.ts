@@ -497,7 +497,8 @@ type AbsenceDecision =
   // The trash series, Plan 1. `getDeletedItems` is the ONE read whose entire
   // job is to name what was deleted — see its own row below for why its
   // verdict is the exception to every other row's `'excluded'`.
-  | 'getDeletedItems';
+  | 'getDeletedItems'
+  | 'purgedAmong';
 
 /**
  * The compile-time tripwire. Widening `keyof DataSourceQuery` past
@@ -622,6 +623,11 @@ const DECIDED: Record<AbsenceDecision, Decision> = {
     // pass below — the marker's title DOES surface there, once it is real.
     carries: false,
     why: 'the ONE surface whose entire job is naming what was deleted (`packages/domain/src/read-models.ts`’s `DeletedItem.label`, documented as "ticket `KEY title`, note title" for those two kinds) — a deleted ticket’s title is not a leak here, it is the answer a person needs to recognise what they are about to restore. Every other `excluded` row exists because a delete must not echo through a read that was never about the deleted thing; this read is about nothing else, which is why its verdict is this table’s one exception.',
+  },
+  purgedAmong: {
+    verdict: 'excluded',
+    carries: false,
+    why: 'trash Plan 3: answers kinds and ids from purged_entities and nothing else — no title, key or body can travel through it, and a soft delete is not a purge',
   },
   getMyWork: { verdict: 'excluded', carries: true },
   getAttention: { verdict: 'excluded', carries: true },
@@ -753,6 +759,7 @@ function callers(ds: DataSourceQuery): Record<AbsenceDecision, () => Promise<unk
     // Takes no workspace id — `getDeletedItems` is scoped to the caller's own
     // membership, not one workspace.
     getDeletedItems: () => ds.getDeletedItems(),
+    purgedAmong: () => ds.purgedAmong([childId]),
   };
 }
 
@@ -821,8 +828,8 @@ it('TYPE TRIPWIRE: every member of DataSourceQuery is enumerated, or tsc refuses
   expect(absenceTripwire('getTicketHistory')).toBe('getTicketHistory');
   // 16 until the notes series (Plan 1 of 6) added its seven reads; 23 until
   // Plan 3 of 6 added `searchNotes`; 24 until the trash series (Plan 1) added
-  // `getDeletedItems`.
-  expect(MEMBERS).toHaveLength(25);
+  // `getDeletedItems`; 25 until trash Plan 3 added `purgedAmong`.
+  expect(MEMBERS).toHaveLength(26);
   // A control on the control: a table where nothing carries would make the
   // positive pass below vacuous and the negative pass unfalsifiable.
   expect(CARRIERS.length).toBeGreaterThanOrEqual(7);
