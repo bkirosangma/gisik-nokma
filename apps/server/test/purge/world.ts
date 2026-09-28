@@ -259,3 +259,154 @@ export async function buildTicketWorld(pool: Pool): Promise<TicketWorld> {
   ]);
   return { ...base, P, T, C, S1, S2, keyT, keyS1, marker };
 }
+
+/** A chunk row as the embed worker writes one (`apps/server/src/search/embed-worker.ts:152-170`); the vector is irrelevant here. */
+export async function insertChunk(pool: Pool, base: Pick<Base, 'WS'>, noteId: string, chunkText: string): Promise<void> {
+  await pool.query(
+    `INSERT INTO search_note_chunks (note_id, chunk_index, workspace_id, heading_path, chunk_text, model, source_seq, embedding)
+     VALUES ($1, 0, $2, '', $3, 'test-model@1', 1, $4)`,
+    [noteId, base.WS, chunkText, `[${new Array(512).fill(0).join(',')}]`],
+  );
+}
+
+export type NoteWorld = Base & { P: string; X: string; N: string; keyN: string; marker: string };
+
+/** A private workspace-level note N, attached to ticket X, deleted and then marked. */
+export async function buildNoteWorld(pool: Pool): Promise<NoteWorld> {
+  const base = await seedWorkspace(pool);
+  const marker = newMarker();
+  const P = newUlid();
+  const X = newUlid();
+  const N = newUlid();
+  const attN = newUlid();
+  const keyN = `w/${base.WS}/a/${attN}`;
+  await applyCommitted(pool, [
+    projectCreated(base, P, 'Notes', 'NT'),
+    ticketCreated(base, X, P, 'A ticket the note hangs on'),
+    noteCreated(base, N, {
+      title: `Minutes ${marker}`,
+      homeProjectId: '',
+      scope: { mode: 'private' },
+      body: doc(text(`we agreed ${marker}`)),
+    }),
+    ev(base, 'note', N, 'comment.added', { body: doc(text(`noted ${marker}`)) }),
+    ev(base, 'note', N, 'note.attached', { ticketId: X }),
+  ]);
+  await insertAttachment(pool, base, attN, { noteId: N }, `${marker}.pdf`, keyN);
+  await insertChunk(pool, base, N, `we agreed ${marker}`);
+  await applyCommitted(pool, [ev(base, 'note', N, 'note.deleted', {}), ev(base, 'note', N, 'purge.marked', {})]);
+  return { ...base, P, X, N, keyN, marker };
+}
+
+export type ProjectWorld = Base & {
+  P2: string;
+  Q: string;
+  A: string;
+  A1: string;
+  B: string;
+  B2: string;
+  NP: string;
+  NW: string;
+  Q1: string;
+  marker: string;
+};
+
+/**
+ * Project P2 (to be purged) beside project Q (kept). P2 holds A and its child
+ * A1, B (deleted), B2 (deleted AND marked — purged individually by the test
+ * before the project, D11), a project note NP and a project membership. The
+ * owner's preferences are keyed by both projects. NW is a workspace-level note.
+ */
+export async function buildProjectWorld(pool: Pool): Promise<ProjectWorld> {
+  const base = await seedWorkspace(pool);
+  const marker = newMarker();
+  const [P2, Q, A, A1, B, B2, NP, NW, Q1] = Array.from({ length: 9 }, () => newUlid()) as [
+    string, string, string, string, string, string, string, string, string,
+  ];
+  await applyCommitted(pool, [
+    projectCreated(base, P2, 'Doomed', 'DM'),
+    projectCreated(base, Q, 'Kept', 'KP'),
+    ticketCreated(base, A, P2, `Doomed ${marker}`),
+    ticketCreated(base, A1, P2, 'Its child', A),
+    ticketCreated(base, B, P2, 'Deleted on its own'),
+    ev(base, 'ticket', B, 'ticket.deleted', {}),
+    ticketCreated(base, B2, P2, 'Purged on its own'),
+    ev(base, 'ticket', B2, 'ticket.deleted', {}),
+    ev(base, 'ticket', B2, 'purge.marked', {}),
+    ticketCreated(base, Q1, Q, 'Kept ticket'),
+    noteCreated(base, NP, { title: `Plan ${marker}`, homeProjectId: P2, scope: { mode: 'project' } }),
+    noteCreated(base, NW, { title: 'Workspace note', homeProjectId: '', scope: { mode: 'workspace' } }),
+    ev(base, 'project', P2, 'project.member_added', { userId: base.OWNER, projectAdmin: true }),
+  ]);
+  await pool.query(
+    `INSERT INTO user_preferences (user_id, workspace_id, doc, updated_at) VALUES ($1, $2, $3, now())`,
+    [
+      base.OWNER,
+      base.WS,
+      JSON.stringify({
+        savedFilters: [],
+        listColumns: { [P2]: ['title'], [Q]: ['title'] },
+        grouping: { [P2]: 'status', [Q]: 'epic' },
+      }),
+    ],
+  );
+  await applyCommitted(pool, [
+    ev(base, 'project', P2, 'project.deleted', {}),
+    ev(base, 'project', P2, 'purge.marked', {}),
+  ]);
+  return { ...base, P2, Q, A, A1, B, B2, NP, NW, Q1, marker };
+}
+
+export type WorkspacePair = {
+  U: string;
+  W1: Base;
+  W2: Base;
+  P1: string;
+  T1: string;
+  N1: string;
+  INV: string;
+  marker: string;
+};
+
+/** User U owns W1 (to be purged) and W2 (kept); both hold preferences and notifications for U. */
+export async function buildWorkspacePair(pool: Pool): Promise<WorkspacePair> {
+  const U = newUlid();
+  const W1 = await seedWorkspace(pool, U);
+  const W2 = await seedWorkspace(pool, U);
+  const marker = newMarker();
+  const [P1, T1, N1, INV, att1, PW2, TW2] = Array.from({ length: 7 }, () => newUlid()) as [
+    string, string, string, string, string, string, string,
+  ];
+  await applyCommitted(pool, [
+    projectCreated(W1, P1, 'Gone', 'GN'),
+    ticketCreated(W1, T1, P1, `Doomed ${marker}`),
+    noteCreated(W1, N1, { title: `Minutes ${marker}`, homeProjectId: '', scope: { mode: 'workspace' } }),
+    ev(W1, 'invite', INV, 'invite.sent', {
+      inviteId: INV,
+      address: 'guest@example.com',
+      channel: 'email',
+      role: 'member',
+      projectIds: [P1],
+    }),
+    projectCreated(W2, PW2, 'Stays', 'ST'),
+    ticketCreated(W2, TW2, PW2, 'Survivor'),
+  ]);
+  await pool.query(
+    `INSERT INTO invite_tokens (invite_id, token_hash, created_at, expires_at) VALUES ($1, $2, now(), now() + interval '7 days')`,
+    [INV, `hash-${newUlid()}`],
+  );
+  await insertAttachment(pool, W1, att1, { ticketId: T1 }, `${marker}.pdf`, `w/${W1.WS}/a/${att1}`);
+  await insertNotification(pool, W1, U, T1, `Doomed ${marker}`);
+  await insertNotification(pool, W2, U, TW2, 'Survivor');
+  for (const ws of [W1.WS, W2.WS]) {
+    await pool.query(
+      `INSERT INTO user_preferences (user_id, workspace_id, doc, updated_at) VALUES ($1, $2, $3, now())`,
+      [U, ws, JSON.stringify({ savedFilters: [], listColumns: {}, grouping: {} })],
+    );
+  }
+  await applyCommitted(pool, [
+    ev(W1, 'workspace', W1.WS, 'workspace.deleted', {}),
+    ev(W1, 'workspace', W1.WS, 'purge.marked', {}),
+  ]);
+  return { U, W1, W2, P1, T1, N1, INV, marker };
+}

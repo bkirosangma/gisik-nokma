@@ -2,6 +2,7 @@ import type { PoolClient } from 'pg';
 import type { LifecycleKind } from '@gisik-nokma/domain';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import type { ProjectionRegistry } from '../projections/registry.js';
+import { workspaceScopedTables } from './table-rules.js';
 
 /**
  * The non-ledger half of a purge (trash series Plan 2, D1). `purge_ledger`
@@ -60,7 +61,8 @@ export async function objectKeysOf(db: PoolClient, set: ErasureSet): Promise<str
  */
 export async function eraseRows(db: PoolClient, set: ErasureSet): Promise<void> {
   if (set.target.kind === 'workspace') {
-    throw new Error('eraseRows: a workspace purge is wired in trash Plan 2 Task 6');
+    await eraseWorkspace(db, set.workspaceId);
+    return;
   }
   const [kinds, ids] = kindsAndIds(set);
   await db.query(
@@ -91,6 +93,34 @@ export async function eraseRows(db: PoolClient, set: ErasureSet): Promise<void> 
   ];
   for (const [sql, params] of statements) {
     await db.query(sql, params);
+  }
+  // A project's keys in each member's preferences (`listColumns`, `grouping`
+  // are keyed by project id — `packages/domain/src/preferences.ts:111-117`).
+  // `savedFilters` cannot name a project or a ticket, so it is left alone.
+  for (const projectId of P) {
+    await db.query(
+      `UPDATE user_preferences
+          SET doc = doc #- ARRAY['listColumns', $2::text] #- ARRAY['grouping', $2::text]
+        WHERE workspace_id = $1 AND (doc->'listColumns' ? $2 OR doc->'grouping' ? $2)`,
+      [set.workspaceId, projectId],
+    );
+  }
+}
+
+/**
+ * A workspace purge: every row of every workspace-scoped table (derived from
+ * `PURGE_TABLE_RULES`, so a new table with a rule is covered without an edit),
+ * and the tokens of its invites — deleted FIRST, because `proj_invites` is how
+ * they are found. Rows of any other workspace are never touched, even for a
+ * user who belongs to both (Review Focus 3).
+ */
+async function eraseWorkspace(db: PoolClient, workspaceId: string): Promise<void> {
+  await db.query(
+    'DELETE FROM invite_tokens WHERE invite_id IN (SELECT invite_id FROM proj_invites WHERE workspace_id = $1)',
+    [workspaceId],
+  );
+  for (const table of workspaceScopedTables()) {
+    await db.query(`DELETE FROM ${table} WHERE workspace_id = $1`, [workspaceId]);
   }
 }
 
