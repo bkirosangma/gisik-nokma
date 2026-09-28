@@ -39,7 +39,7 @@ describe('18.304 every placeholder family hides on focus', () => {
     const restingRule = ruleFor(GLOBALS_CSS, /^input::placeholder,\s*$/);
     expect(restingRule, 'bare resting placeholder rule').toBeDefined();
     expect(restingRule).toContain('textarea::placeholder');
-    expect(restingRule).toContain('color: var(--gn-text-muted)');
+    expect(restingRule).toContain('color: var(--gn-text-subtle)');
 
     const focusRule = ruleFor(GLOBALS_CSS, /^input:focus::placeholder,\s*$/);
     expect(focusRule, 'bare focus placeholder rule').toBeDefined();
@@ -54,10 +54,38 @@ describe('18.304 every placeholder family hides on focus', () => {
     );
     expect(rule, 'editor focus-hide placeholder rule').toBeDefined();
     expect(rule).toContain('color: transparent');
-    // CONTROL: the resting (unfocused) rule is still the muted tone, not transparent.
+    // CONTROL: the resting (unfocused) rule is still the subtle tone, not transparent.
     const resting = ruleFor(EDITOR_CSS, /^\.ticket-editor__content \.is-editor-empty:first-child::before\s*\{/);
     expect(resting).toBeDefined();
-    expect(resting).toContain('var(--gn-text-muted)');
+    expect(resting).toContain('var(--gn-text-subtle)');
     expect(resting).not.toContain('transparent');
+  });
+});
+
+/**
+ * Case 18.308 — Unit 6d (owner, 2026-09-23: "placeholders have the same
+ * colour as the input text. they should be much lighter"). Confirms the
+ * SOURCE reads the lighter role — `18.306`/`18.307`
+ * (`packages/ui/test/field-placeholder-contrast.test.ts`) prove that role
+ * actually clears its floor once composited; this proves the shipped rules
+ * really name it and not `--gn-text-muted` (dark theme's `--gn-text-muted`
+ * is #ebebf5, next to typed text's #f2e9e1 — the reported defect).
+ */
+describe('18.308 every placeholder rule reads --gn-text-subtle, not --gn-text-muted', () => {
+  it('18.308 all three resting placeholder rules, and the Select trigger, name --gn-text-subtle', () => {
+    const fieldInput = ruleFor(UI_CSS, /^\.gn-field__input::placeholder\s*\{/);
+    expect(fieldInput).toBeDefined();
+    expect(fieldInput).toContain('var(--gn-text-subtle)');
+    expect(fieldInput).not.toContain('var(--gn-text-muted)');
+
+    const bare = ruleFor(GLOBALS_CSS, /^input::placeholder,\s*$/);
+    expect(bare).toBeDefined();
+    expect(bare).toContain('var(--gn-text-subtle)');
+    expect(bare).not.toContain('var(--gn-text-muted)');
+
+    const editor = ruleFor(EDITOR_CSS, /^\.ticket-editor__content \.is-editor-empty:first-child::before\s*\{/);
+    expect(editor).toBeDefined();
+    expect(editor).toContain('var(--gn-text-subtle)');
+    expect(editor).not.toContain('var(--gn-text-muted)');
   });
 });

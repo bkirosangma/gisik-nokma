@@ -20,7 +20,10 @@ html, body { margin: 0; padding: 0; }
    it only fills the gap those six left. */
 input::placeholder,
 textarea::placeholder {
-  color: var(--gn-text-muted);
+  /* Unit 6d — the same lighter tone `.gn-field__input::placeholder` moved
+     to (`packages/ui/src/ui.css`, that rule's own docblock has the
+     measured contrast and the owner's 3:1-for-hig/minimal ruling). */
+  color: var(--gn-text-subtle);
 }
 input:focus::placeholder,
 textarea:focus::placeholder {

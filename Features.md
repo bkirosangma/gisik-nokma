@@ -1690,6 +1690,25 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   name (`label={isComment ? 'Comment' : 'Description'}` when no `labelledBy` is given), so a placeholder
   disappearing on focus never leaves a field with no name at all. Cases `18.304`–`18.305`.
   `packages/ui/src/ui.css`, `apps/web/app/globals.css`, `packages/editor/src/styles/editor.css`
+- ⚙️ **Every placeholder is visibly lighter than typed text** (Unit 6d, owner, 2026-09-23: "Today
+  placeholders have the same colour as the input text. they should be much lighter"). All three
+  placeholder rules above now read `--gn-text-subtle` (the third-tier ink role, one step below
+  `--gn-text-muted`) instead of `--gn-text-muted`, which in dark theme (`#ebebf5`) read almost
+  identically to typed text (`#f2e9e1`) — the reported defect. **Measured before shipping, not
+  assumed:** the field background this is checked against, `--gn-fill-quaternary`, is translucent in
+  every style (5–10% alpha), so a meaningful contrast reading has to COMPOSITE it over the surface a
+  field actually sits on first — `packages/ui/test/field-placeholder-contrast.test.ts` does this
+  deliberately outside the shared `CONTRAST_PAIRS` array, whose own `relativeLuminance` ignores alpha
+  and would score the fill's raw (much darker) hex as if opaque, failing every combination for a
+  reason unrelated to the rendered page. Composited, `textSubtle` clears 4.5:1 on `neo` in both themes
+  on every surface (~5.03–5.05), but falls to 3.6–4.3:1 on `hig`/`minimal` (the default style) in three
+  of six real contexts, including dark-mode fields inside any `.gn-dialog`/`.gn-sheet`
+  (`surfaceRaised`). Put to the owner with the measured numbers (2026-09-28): **accept 3:1 for
+  `hig`/`minimal`** rather than hold every style to 4.5 or leave the request unshipped, since 6c's own
+  24-site label sweep already guarantees a real name survives the placeholder vanishing — a placeholder
+  losing some of its contrast margin is not losing a field's only name. Cases `18.306`–`18.309`.
+  `packages/ui/src/ui.css`, `apps/web/app/globals.css`, `packages/editor/src/styles/editor.css`,
+  `packages/ui/test/field-placeholder-contrast.test.ts`
 - ⚙️ **`ObjectStore`, and where attachment bytes actually live** — a three-verb interface
   (`put`/`getStream`/`delete`) behind which `LocalDiskStore` (dev/test) and `S3ObjectStore`
   (S3-compatible, path-style addressing default `true` so MinIO and R2 work unconfigured) are

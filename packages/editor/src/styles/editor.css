@@ -632,7 +632,13 @@
    takes no line of its own, so the caret sits where the text will. */
 .ticket-editor__content .is-editor-empty:first-child::before {
   content: attr(data-placeholder);
-  color: var(--gn-text-muted);
+  /* Unit 6d — the same lighter tone every other placeholder in the product
+     moved to (`packages/ui/src/ui.css`'s `.gn-field__input::placeholder`
+     docblock has the measured contrast and the owner's ruling); this
+     element's own host carries `gn-field__input` too
+     (`TicketEditor.tsx`'s `<EditorContent>`), so the same
+     `--gn-fill-quaternary` background applies here. */
+  color: var(--gn-text-subtle);
   float: left;
   height: 0;
   pointer-events: none;
