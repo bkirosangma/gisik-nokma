@@ -532,3 +532,8 @@ placeholders) — this lane builds on them, verifies drift, does not redo their 
 - ✅ **9.395 — leaving the panel for another field commits the edit without asking the editor for focus.** (`packages/editor/test/link-editor-popover.test.tsx`)
 - ✅ **9.396 — `placePopover` sits below the anchor, flips above when it would clip, and is pinned inside the viewport on both axes.** (`packages/editor/test/link-editor-popover.test.tsx`)
 - ✅ **9.397 — every class the open link panel renders has a rule in `editor.css`.** (`packages/editor/test/link-editor-popover.test.tsx`)
+- ✅ **9.398 — the hover card is `position: fixed` at the link's rect, below it, and flips above when it would clip the viewport bottom.** (`packages/editor/test/wiki-link.test.ts`)
+- ✅ **9.399 — the card survives a 60 ms grace after the pointer leaves the link, stays while the card is hovered, and goes 60 ms after leaving it.** (`packages/editor/test/wiki-link.test.ts`)
+- ✅ **9.400 — scrolling or a key dismisses the card, and a preview that resolves after the pointer left shows nothing.** (`packages/editor/test/wiki-link.test.ts`)
+- ✅ **9.401 — the link carries `aria-describedby` naming the card while it is up, and drops it after.** (`packages/editor/test/wiki-link.test.ts`)
+- ✅ **9.402 — deleting the link while its card is up removes the card.** (`packages/editor/test/wiki-link.test.ts`)

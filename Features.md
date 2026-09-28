@@ -1618,6 +1618,14 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
     and a blur commit never pulls focus back into the editor. Placement (below, flipped above, clamped) is the
     shared pure `placePopover`; `packages/editor/src/components/LinkEditorPopover.tsx`,
     `packages/editor/src/components/popover-position.ts`
+  - ✅ **The note-link hover card is placed from the link, can be reached, and goes away cleanly** (KB
+    `WikiLinkHoverCard`, taking the better of the two) — `position: fixed` from the link's rect via the shared
+    `placePopover` (below, flipped above, clamped to the viewport); a 60 ms grace lets the pointer cross onto
+    the card (it stays while hovered); scrolling, a key, deleting the link, or a fetch that resolves after the
+    pointer left all dismiss it; the link carries `aria-describedby` while it is up. Kept from the spec: the
+    400 ms rest (the source uses 200 ms) and the plain 200-character preview (the source's heading and backlink
+    footer need data `previewNote` does not return); `packages/editor/src/extensions/wiki-link.ts`,
+    `packages/editor/src/styles/editor.css`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

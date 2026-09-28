@@ -1009,8 +1009,12 @@
    above (`.mention-popup, .wikilink-popup, .ticketref-popup { … }`, near the
    top of this file) — not repeated here. */
 .wikilink-preview {
-  position: absolute;
-  max-width: 24rem;
+  /* `fixed`, placed from the link's own rect by `wiki-link.ts` (`top`/`left`
+     inline). It used to be `absolute` with NO offsets and so landed wherever
+     the body's flow ended, not beside the link. */
+  position: fixed;
+  max-width: min(24rem, calc(100vw - 16px));
+  overflow-wrap: anywhere;
   border: 1px solid currentColor;
   border-radius: 6px;
   padding: 6px 8px;
