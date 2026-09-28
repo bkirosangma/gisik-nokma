@@ -10,6 +10,7 @@ import { ConfigError } from '../config.js';
 import { createPool } from '../db.js';
 import { createIngestService } from '../ingest/ingest-service.js';
 import { runNotificationSweep } from '../notifications/sweep.js';
+import { runPurgeSweep } from '../purge/sweep.js';
 import { buildProjectionRegistry } from '../projections/index.js';
 import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
@@ -170,15 +171,24 @@ async function main(): Promise<void> {
       : rawAutoCloseInterval,
   );
 
+  // The permanent-delete sweep (trash series Plan 2, spec §5.1): the same
+  // read-once, validate-on-every-call shape and empty-means-unset handling as
+  // the two sweeps above, default one hour.
+  const rawPurgeInterval = process.env.PURGE_SWEEP_INTERVAL_MS;
+  const purgeSweepIntervalMs = Number(
+    rawPurgeInterval === undefined || rawPurgeInterval.trim() === '' ? '3600000' : rawPurgeInterval,
+  );
+
   // The auto-close sweep closes tickets, so it needs a door to close them
   // THROUGH — the same composition `seed/cli-seed-dev-workspace.ts` uses, built
   // here rather than there because this is the process that runs it on a timer.
   // The engine and the projection registry are the real ones: a sweep wired to a
   // permissive stub would report a clean run and write nothing.
+  const projections = buildProjectionRegistry();
   const ingest = createIngestService({
     pool,
     evaluate: evaluateEvent,
-    projections: buildProjectionRegistry(),
+    projections,
   });
 
   const scheduledJobs: ScheduledJob[] = [
@@ -265,6 +275,16 @@ async function main(): Promise<void> {
       },
       delayMs: () =>
         requirePositiveIntervalMs(autoCloseSweepIntervalMs, 'AUTO_CLOSE_SWEEP_INTERVAL_MS'),
+    },
+    {
+      name: 'purge',
+      run: async (): Promise<void> => {
+        // `store` is the attachment store built above — which is why the worker
+        // needs OBJECT_STORE=s3 in production (deploy/do/app.yaml, D5).
+        const report = await runPurgeSweep({ pool, projections, store, alerter });
+        console.log(JSON.stringify({ msg: 'purge sweep complete', ...report }));
+      },
+      delayMs: () => requirePositiveIntervalMs(purgeSweepIntervalMs, 'PURGE_SWEEP_INTERVAL_MS'),
     },
   ];
 

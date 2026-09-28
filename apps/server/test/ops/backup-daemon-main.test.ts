@@ -60,7 +60,7 @@ const runDaemon = (extra: Record<string, string>): Promise<Run> =>
     });
   });
 
-describe('backup-daemon-main — one scheduler for all five jobs', () => {
+describe('backup-daemon-main — one scheduler for all six jobs', () => {
   let db: TestDatabase;
   beforeAll(async () => {
     db = await createTestDatabase();
@@ -82,6 +82,23 @@ describe('backup-daemon-main — one scheduler for all five jobs', () => {
     });
     expect(run.stdout).toContain(SCHEDULED);
   }, 60_000);
+
+  it('19.149 refuses PURGE_SWEEP_INTERVAL_MS=0 before arming any job, naming the variable', async () => {
+    const refused = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      PURGE_SWEEP_INTERVAL_MS: '0',
+    });
+    expect(refused.stdout).not.toContain(SCHEDULED);
+    expect(refused.stderr).toContain('PURGE_SWEEP_INTERVAL_MS');
+    // CONTROL — the same command with a valid interval arms and announces itself.
+    const armed = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      PURGE_SWEEP_INTERVAL_MS: '3600000',
+    });
+    expect(armed.stdout).toContain(SCHEDULED);
+  }, 90_000);
 
   /**
    * 13.203 — `sweep-notifications` and `sweep-orphans` are registered on the SAME

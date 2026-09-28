@@ -310,6 +310,20 @@ workers:
         type: SECRET
       - key: OBJECT_STORE_S3_SECRET_ACCESS_KEY
         type: SECRET
+      # Trash series Plan 2 (2026-09-28, deviation D5): the permanent-delete
+      # sweep deletes ATTACHMENT objects from this worker, so it needs the
+      # attachment store -- without these two, createObjectStoreFromEnv defaults
+      # to a LocalDiskStore (apps/server/src/attachments/store-config.ts) and
+      # every purge's object delete would "succeed" against an empty local
+      # folder. Measured 2026-09-28: the live worker had neither, so the 30-day
+      # orphan sweep on this same worker has been listing that empty folder too.
+      # THIS ALSO ARMS THE ORPHAN SWEEP AGAINST THE REAL BUCKET FOR THE FIRST
+      # TIME -- run it with --dry-run first (docs/runbook.md, "Permanent-delete
+      # sweep"). Same bucket as the server component's OBJECT_STORE_S3_BUCKET.
+      - key: OBJECT_STORE
+        value: s3
+      - key: OBJECT_STORE_S3_BUCKET
+        value: gisik-nokma-attachments
       - key: BACKUP_S3_BUCKET
         value: gisik-nokma-backups
       # The *_UTC schedule names stay UTC on purpose and are NOT affected by

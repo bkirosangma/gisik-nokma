@@ -175,6 +175,23 @@ an oversight of this runbook.
 Run with `--dry-run` first and expect single digits; a large count means clients are failing between
 upload and ingest, which is an incident, not a cleanup.
 
+## Permanent-delete sweep (trash series)
+
+The backup worker runs an hourly `purge` job (`apps/server/src/purge/sweep.ts`): every workspace, project,
+ticket or note whose "delete permanently" mark has fallen due is erased — its ledger rows, projections,
+search rows and attachment objects — leaving only a content-free `purge.completed` tombstone and, for a
+ticket, its redacted key slot. A failure alerts the webhook as `purge:<kind>:<id>` and is retried on the
+next run; the item stays in Deleted items, overdue, until one succeeds. Object deletes that fail stay in
+`purge_pending_objects` (with `attempts` and `last_error`) and are retried every run.
+
+**Release note for the first deploy of this job.** It needs the worker to reach the attachment bucket:
+`deploy/do/app.yaml` now gives the `backup` worker `OBJECT_STORE=s3` and the attachment bucket. **A push
+does not apply spec changes** — apply the spec with `doctl apps update <app-id> --spec deploy/do/app.yaml`
+and confirm the worker's environment afterwards. The same change arms the 30-day orphan sweep against the
+real bucket for the first time (it has been listing an empty local folder): before its first run, 30 days
+after the worker boots, run `sweep:orphans` with `--dry-run` from the worker's console and read the count
+(see "Orphaned uploads" above).
+
 ## Restore drill (monthly, and after any schema change)
 
 0. Export the object-store credentials the fetch needs — `OBJECT_STORE_S3_*` and the backups bucket
