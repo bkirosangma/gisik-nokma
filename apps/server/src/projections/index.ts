@@ -1,5 +1,6 @@
 import { projContested } from './contested.js';
 import { entityHeadsProjection } from './entity-heads.js';
+import { lifecycleProjection } from './lifecycle.js';
 import { projInvites } from './proj-invites.js';
 import { notesProjection } from './notes.js';
 import { noteSearchProjection } from './note-search.js';
@@ -120,6 +121,13 @@ export function buildProjectionRegistry(): ProjectionRegistry {
   // be justified AS an adjacency — and Plan 3's search projection is the first
   // candidate, since `proj_note_search` will read notes.
   registry.register(notesProjection);
+  // The lifecycle fold (trash series, Plan 1). Directly after `notesProjection`:
+  // every row a mark can name (workspace, project, ticket, note) already
+  // exists by this position, since `proj_projects`, `proj_tickets` and
+  // `proj_notes` are all populated by projections registered above this one.
+  // `proj_workspaces` itself has no such dependency — its rows are created BY
+  // this projection, not consumed from an earlier one.
+  registry.register(lifecycleProjection);
   // The notes SEARCH projection (Plan 3 of 6, spec §7.3), and the first
   // registrant for which the note above this one became load-bearing rather
   // than merely named by the spec: `notesProjection`'s own comment said "Plan 3's search

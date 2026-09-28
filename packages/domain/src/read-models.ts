@@ -870,3 +870,30 @@ export type NoteSummary = {
 export type NoteDetail = NoteSummary & { body: unknown; schemaVersion: number };
 export type NoteVersion = { eventId: string; authorId: string; recordedAt: string; seq: number };
 export type NoteComment = { commentId: string; authorId: string; body: unknown; recordedAt: string };
+
+/**
+ * `GET /v1/me/deleted-items` (trash series, Plan 1 Task 7, spec §6.3's read).
+ *
+ * One item per deleted workspace, project, ticket or note this caller may
+ * currently restore or mark — by CURRENT authority (T3), never by who deleted
+ * it. An item inside a deleted container is NOT listed on its own; the
+ * container's own row carries `containedCount` instead (spec §6.3).
+ */
+export type DeletedItem = {
+  kind: 'workspace' | 'project' | 'ticket' | 'note';
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  projectId: string | null;
+  projectName: string | null;
+  /** Workspace/project name, ticket `KEY title`, note title. */
+  label: string;
+  deletedBy: string;
+  deletedAt: string;
+  purgeMarkedAt: string | null;
+  /** `purgeDueAt(purgeMarkedAt)`, computed by the server; `null` when unmarked. */
+  purgeDueAt: string | null;
+  /** Live items inside a deleted workspace/project (projects + tickets + notes); 0 for tickets and notes. */
+  containedCount: number;
+};
+export type DeletedItemsRead = { items: DeletedItem[] };

@@ -116,6 +116,12 @@ describe('projection registration order (coordination §8)', () => {
       // projection is the first candidate to make this position load-bearing,
       // since `proj_note_search` will read notes.
       'proj_notes',
+      // Trash series, Plan 1. INSERTED directly below `proj_notes`: every row a
+      // mark can name (workspace, project, ticket, note) already exists by this
+      // position, since `proj_projects`, `proj_tickets` and `proj_notes` are all
+      // populated by projections registered above it. `proj_workspaces` has no
+      // such dependency — its own rows are created BY this projection.
+      'proj_lifecycle',
       // Plan 3 of 6 (the notes series' search plan). INSERTED directly below
       // `proj_notes`, and this is the entry that turns the note above it from a
       // forecast into a fact: `proj_note_search`'s `apply` reads `proj_notes`,
@@ -183,6 +189,12 @@ describe('projection registration order (coordination §8)', () => {
       // them here is what keeps `verify-projections` from replaying a note's
       // links into whichever live table the search_path happens to resolve.
       ['proj_notes', ['proj_notes', 'proj_note_attachments']],
+      // ONE table — the only one this projection RESETS. It also writes
+      // lifecycle columns onto `proj_projects`, `proj_tickets` and `proj_notes`,
+      // but does not own those tables: they are each already declared by their
+      // owning projection above, so the verifier's shadow copy of them exists
+      // and gets diffed regardless (test-cases/19-trash.md 19.015).
+      ['proj_lifecycle', ['proj_workspaces']],
       // TWO tables, and BOTH must be declared or the verifier truncates the
       // LIVE one. `proj_note_lexemes` is not a projection of its own: it is
       // derived from the same notes in the same `apply`, and a projection whose

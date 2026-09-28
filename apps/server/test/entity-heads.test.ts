@@ -127,6 +127,12 @@ describe('proj_entity_heads', () => {
       // the spec's order rather than discharging a dependency. See
       // projection-order.test.ts, the pin of record.
       'proj_notes',
+      // The trash series, Plan 1. INSERTED directly below `proj_notes`, for the
+      // reason projection-order.test.ts (the pin of record) gives: every row a
+      // mark can name already exists by this position. This copy of the pin did
+      // its job again — the registrant found the other one first and was told
+      // about this one by a red suite.
+      'proj_lifecycle',
       // The notes series, Plan 3 of 6 (search). INSERTED directly below
       // `proj_notes`, and this entry is the first to make the note above it
       // load-bearing rather than spec-followed: `proj_note_search.apply` reads

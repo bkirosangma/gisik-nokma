@@ -64,6 +64,7 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
     name: 'Convenience Corner',
     prefix: 'CC',
     role: 'owner',
+    archived: false,
     memberCount: 3,
     nameRestrictedProjectCount: 0,
     projects: [],

@@ -196,8 +196,20 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
  * that does not follow it. The qualification is what makes a
  * mis-aliased join a compile-time-invisible but immediate Postgres error rather
  * than a predicate that silently reads some other table's column.
+ *
+ * ## The container clause (Plan 1 Task 6, spec §4 T10)
+ *
+ * A ticket whose own `deleted_at` is null is still gone from every view once
+ * its PROJECT is deleted (the project's contents go with it). The
+ * `NOT EXISTS` reads `proj_projects` fresh on every call rather than a denormalized
+ * flag on `proj_tickets` — the same reason `checkLifecycle`'s per-container
+ * gates read `proj_workspaces`/`proj_projects` directly instead of writing a
+ * ticket-level "ancestor deleted" column: one row is the only place the
+ * container's own state can change, and a copy on every descendant would need
+ * its own fold on every `project.deleted`/`project.undeleted`.
  */
-export const LIVE_TICKET_WHERE = 't.deleted_at IS NULL';
+export const LIVE_TICKET_WHERE =
+  't.deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL)';
 
 /**
  * The `'explicit'` COLUMN of the table above, on its own: this ticket's resolved

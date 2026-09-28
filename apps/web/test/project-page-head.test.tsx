@@ -119,6 +119,7 @@ const world = (archived: boolean) =>
         name: 'Garo Hills Logistics',
         prefix: 'GH',
         role: 'owner',
+        archived: false,
         memberCount: 3,
         nameRestrictedProjectCount: 0,
         projects: [

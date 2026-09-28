@@ -2,7 +2,7 @@
 
 Project management software ("the keeper of memory" — Garo: *gisik* mind/memory, *nokma* the custodian who holds things in trust). Based on the convenience-corner project tracker, snapshotted verbatim under `reference/` at upstream commit `24e2240`.
 
-**Status: pre-brainstorm.** No product decisions exist. The first working session runs `superpowers:brainstorming` from `docs/brainstorm-kickoff.md` — do not scaffold apps, pick stacks, or write product code before that design session concludes and its spec is approved.
+**Status: live in production** (DigitalOcean App Platform, go-live 2026-09-22). What ships is catalogued in `Features.md`, its scenarios in `test-cases/`, designs and plans in `docs/superpowers/specs/` and `docs/superpowers/plans/`, and owner-paused work in `docs/held-work.md`. New features still start with `superpowers:brainstorming` and an owner-approved spec.
 
 ## Rules
 
@@ -26,8 +26,8 @@ Project management software ("the keeper of memory" — Garo: *gisik* mind/memor
   calling the step done. **Never `pkill -f vitest` and never kill `pgrep -f vitest`'s output**: when
   Claude sessions run with this file in their prompt, their own command lines contain the word "vitest",
   so `pgrep -f vitest` names every such session plus every peer's live workers (measured 2026-09-06: five
-  sessions and a live 10-worker pool, zero orphans). Read the list
-  calling the step done. **A `PreToolUse` hook on this machine now refuses the piped form**
+  sessions and a live 10-worker pool, zero orphans). Read the list before killing anything.
+  **A `PreToolUse` hook on this machine now refuses the piped form**
   (`~/.claude/scripts/no-piped-test-runs.py`, registered in `~/.claude/settings.json`); it is machine-local,
   so a fresh machine needs it installed again — the rule above is the part that travels.
 - **Features.md and `test-cases/` stay in sync with reality** per the workspace conventions (`/Users/kiro/my_projects/CLAUDE.md`) — same change set, never a follow-up.

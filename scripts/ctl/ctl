@@ -19,6 +19,7 @@ usage: scripts/ctl/ctl <verb> [--repo <worktree>] [--dry-run] [args]
   reconcile                       ledger vs report headings by membership + plan coverage
   lanes [--watch]                 one line per gisik: window
   restart <window> <worktree> <brief> [--override FILE]
+  close <window>                  close an idle lane whose worktree is clean and pushed
   dispatch <window> <file>        two pastes + proof of delivery
   rebuild                         pull --ff-only the primary checkout's own branch (main or release/*),
                                   rebuild the stack from it, verify

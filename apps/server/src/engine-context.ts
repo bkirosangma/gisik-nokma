@@ -134,7 +134,10 @@ async function readMembershipState(
     return null;
   }
 
-  const eff = await resolveEffectiveRole(client, userId, workspaceId);
+  // Trash series, Plan 1 Task 5: the engine judges TRUTH and must not filter
+  // a deleted workspace's membership state out from under itself (the last-
+  // owner guard and the rest of the rule engine still need the real answer).
+  const eff = await resolveEffectiveRole(client, userId, workspaceId, { includeDeleted: true });
   if (eff.workspaceRole === null) {
     return null;
   }

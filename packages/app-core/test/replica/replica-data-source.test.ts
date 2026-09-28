@@ -484,10 +484,15 @@ describe('12.182-12.184 the replica-only surface, and what it confesses', () => 
 });
 
 describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
-  it('12.185 TEN methods refuse, enumerated by id rather than counted', async () => {
+  it('12.185 ELEVEN methods refuse, enumerated by id rather than counted', async () => {
     const { ds } = await fixture();
     const refusals: Array<[string, () => Promise<unknown>]> = [
       ['getMyWorkspaces', () => ds.query.getMyWorkspaces()],
+      // Added by the trash series (Plan 1 Task 8), directly under
+      // `getMyWorkspaces` — the same position `REPLICA_GAPS` gained the key at,
+      // for the same order-sensitive reason every other entry here is placed
+      // where it is.
+      ['getDeletedItems', () => ds.query.getDeletedItems()],
       ['getMembers', () => ds.query.getMembers(WS)],
       // Added 2026-09-20 with the attachments read. The entry's POSITION here
       // matters: the assertion below is `toEqual(Object.keys(REPLICA_GAPS))`,
@@ -545,12 +550,15 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
         ]);
         // And every owner is something the CLIENT would have to change. The
         // notes series (Plan 1 of 6) added a SECOND such owner and named it
-        // honestly rather than writing "Plan 10" over Plan 2's work: the
+        // honestly rather than writing "Plan 10" over Plan 2's work; the trash
+        // series (Plan 1 Task 8) added a THIRD, for the same reason. The
         // property this line holds is that the owner is a NAMED plan the client
-        // must change, which was a one-plan set until the notes replica landed.
-        // Widening it to the two plans that will actually do the work keeps the
-        // property; hard-coding `Plan 10` would have made the sentence false.
-        expect(absence.owner, `${name}: ${absence.field}`).toMatch(/^(Plan 10|Plan 2 of the notes series) — /);
+        // must change — widening the set to the plans that will actually do the
+        // work keeps the property; hard-coding any one of them would have made
+        // the sentence false for the others.
+        expect(absence.owner, `${name}: ${absence.field}`).toMatch(
+          /^(Plan 10|Plan 2 of the notes series|Trash series Plan 3) — /,
+        );
       }
       names.push(name);
     }
@@ -560,6 +568,29 @@ describe('12.185-12.186 the refusals, and the frames subscribe carries', () => {
     // evidence beside the list of what answers.
     await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
     await expect(ds.query.getTicketHistory(newUlid())).resolves.toEqual([]);
+  });
+
+  /**
+   * 19.071 — the trash series' own witness that `getDeletedItems` is among the
+   * refusals, matching 18.038's relationship to 12.185: that case is the
+   * ENUMERATION (it already walks `getDeletedItems` as one of the ELEVEN), this
+   * is the plan that minted the read naming its own case id against it.
+   *
+   * **The brief's own suggested control — "`getMyWorkspaces` resolves" — does
+   * NOT hold**: `getMyWorkspaces` is itself a permanent entry in `REPLICA_GAPS`
+   * (confirmed above, in the SAME `refusals` list this case's method was just
+   * added to) — it always throws `ReplicaGapError`, so it cannot serve as
+   * "answers" evidence. `getTicketTypes` is used instead: 12.185 already
+   * establishes it as a method this same fixture answers rather than refuses.
+   */
+  it('19.071 getDeletedItems rejects with ReplicaGapError; control: getTicketTypes on the same replica resolves', async () => {
+    const { ds } = await fixture();
+    await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(ReplicaGapError);
+    const err = await ds.query.getDeletedItems().catch((e: unknown) => e as ReplicaGapError);
+    expect(err.absences.map((a) => a.field)).toEqual(['DeletedItem[] — the whole read']);
+
+    // CONTROL, same fixture: a method this replica actually answers.
+    await expect(ds.query.getTicketTypes(WS)).resolves.toHaveLength(2);
   });
 
   /**
