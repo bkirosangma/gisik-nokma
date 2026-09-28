@@ -16,6 +16,7 @@ import {
   contestOn,
   count,
   docWith,
+  ticketRefChip,
   freshReplica,
   noteCreated,
   queue,
@@ -220,5 +221,38 @@ describe('19.173 the registry and the Deleted-items cache', () => {
     // CONTROL: the other workspace's item is still cached
     expect((afterWorkspace?.body as { items: Array<{ id: string }> }).items.map((item) => item.id)).toEqual([otherItem]);
     expect(await replica.purgedAmong([stranger])).toEqual([]);
+  });
+});
+
+describe('19.173 review fixes', () => {
+  it('19.173 (review fix I-2) a cached item is a lookup candidate, and an erased project strips its cached items', async () => {
+    const { replica } = await freshReplica();
+    const [X, PX, otherWs, Y, PY] = [newUlid(), newUlid(), newUlid(), newUlid(), newUlid()];
+    await replica.cacheDeletedItems(
+      {
+        items: [
+          { kind: 'ticket', id: X, workspaceId: otherWs, projectId: PX, label: 'Salary review' },
+          { kind: 'project', id: PX, workspaceId: otherWs, projectId: PX, label: 'People' },
+          { kind: 'ticket', id: Y, workspaceId: otherWs, projectId: PY, label: 'Kept' },
+        ],
+      },
+      '2026-09-29T10:00:00.000Z',
+    );
+    expect(await replica.purgeLookupCandidates(WS)).toEqual(expect.arrayContaining([X, PX, Y, PY]));
+
+    await replica.eraseEntities([{ kind: 'project', id: PX }]);
+    const left = (await replica.readDeletedItemsCache())?.body as { items: Array<{ id: string }> };
+    // CONTROL: an item of another project is still cached
+    expect(left.items.map((item) => item.id)).toEqual([Y]);
+  });
+
+  it('19.173 (review fix I-3) offline search stops matching an erased title inside a surviving comment', async () => {
+    const { replica } = await freshReplica();
+    const [T, S] = [newUlid(), newUlid()];
+    await apply(replica, [ticketCreated(T), ticketCreated(S), commentOnTicket(S, docWith(ticketRefChip(T)))]);
+    // CONTROL: before the erase the chip's baked title matches
+    expect((await replica.searchLocal(WS, 'The title its author saw')).map((hit) => hit.ticketId)).toEqual([S]);
+    await replica.eraseEntities([{ kind: 'ticket', id: T }]);
+    expect(await replica.searchLocal(WS, 'The title its author saw')).toEqual([]);
   });
 });

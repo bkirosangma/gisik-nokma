@@ -1225,8 +1225,14 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
       const body = JSON.parse(row['payload'] as string) as { items?: unknown };
       if (!Array.isArray(body.items)) continue;
       const kept = body.items.filter((item: unknown) => {
-        const entry = (typeof item === 'object' && item !== null ? item : {}) as { id?: unknown; workspaceId?: unknown };
+        const entry = (typeof item === 'object' && item !== null ? item : {}) as {
+          id?: unknown;
+          workspaceId?: unknown;
+          projectId?: unknown;
+        };
         if (typeof entry.id === 'string' && ids.has(entry.id)) return false;
+        // An erased project takes its cached tickets (review fix I-2).
+        if (typeof entry.projectId === 'string' && ids.has(entry.projectId)) return false;
         return !(typeof entry.workspaceId === 'string' && workspaces.has(entry.workspaceId));
       });
       await tx.run('UPDATE deleted_items_cache SET payload = ? WHERE cache_key = ?', [
@@ -1758,6 +1764,21 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         const refs = collectDocReferences(body);
         for (const id of [...refs.ticketIds, ...refs.noteIds]) ids.add(id);
       }
+      // The Deleted-items cache is content this device holds about items it may
+      // hold nothing else of (another workspace, a project): its ids must be
+      // asked about too, or a purge of a cached item never reaches its label
+      // (review fix I-2). `body` is untrusted JSON; only string ids are taken.
+      for (const row of await storage.all('SELECT payload FROM deleted_items_cache', [])) {
+        const cached = JSON.parse(row['payload'] as string) as { items?: unknown };
+        if (!Array.isArray(cached.items)) continue;
+        for (const item of cached.items) {
+          const entry = (typeof item === 'object' && item !== null ? item : {}) as Record<string, unknown>;
+          for (const key of ['id', 'projectId', 'workspaceId']) {
+            const value = entry[key];
+            if (typeof value === 'string' && value !== '') ids.add(value);
+          }
+        }
+      }
       const known = new Set(
         (await storage.all('SELECT entity_id FROM purged_ids', [])).map((row) => row['entity_id'] as string),
       );
@@ -1918,13 +1939,21 @@ async function refoldTicket(tx: SyncStorage, ticketId: string, localDeps: Ticket
         const title = titleOf(JSON.parse(row.state as string) as TicketState);
         if (title.toLowerCase().includes(text.toLowerCase())) hits.set(row.ticket_id as string, title);
       }
+      // Spec §5.6/§5.7: an erased item's title stops matching inside surviving
+      // comments, the same rule the server's search applies (review fix I-3).
+      const purged = new Set(
+        (await storage.all('SELECT entity_kind, entity_id FROM purged_ids', [])).map(
+          (row) => `${row['entity_kind'] as string}:${row['entity_id'] as string}`,
+        ),
+      );
+      const isPurged = (kind: 'ticket' | 'note', id: string): boolean => purged.has(`${kind}:${id}`);
       const comments = await storage.all(
         "SELECT entity_id, payload FROM events WHERE workspace_id = ? AND type = 'comment.added' AND LOWER(payload) LIKE ?",
         [workspaceId, needle],
       );
       for (const row of comments) {
         const body = (JSON.parse(row.payload as string) as { body: unknown }).body;
-        if (!docToPlainText(body).toLowerCase().includes(text.toLowerCase())) continue;
+        if (!docToPlainText(body, { isPurged }).toLowerCase().includes(text.toLowerCase())) continue;
         if (hits.has(row.entity_id as string)) continue;
         const owning = await storage.all('SELECT state FROM tickets WHERE ticket_id = ?', [row.entity_id as string]);
         if (owning.length === 0) continue; // a comment on a ticket we no longer hold

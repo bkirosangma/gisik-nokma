@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from 'vitest';
-import { newUlid, type PurgedRef } from '@gisik-nokma/domain';
+import { newUlid, PURGE_RULE, PURGED_REASON, type PurgedRef } from '@gisik-nokma/domain';
 import { createBetterSqliteStorage } from '../src/storage/better-sqlite3.js';
 import type { SyncStorage } from '../src/storage/storage.js';
 import { createReplica, type BootstrapResponse, type Replica } from '../src/replica/replica.js';
@@ -26,7 +26,9 @@ import {
   count,
   docWith,
   envelope,
+  claim,
   freshReplica,
+  queue,
   ticketCreated,
   ticketRefChip,
 } from './purge-world.js';
@@ -44,14 +46,13 @@ function transportFor(
     lookup?: (ids: string[]) => Promise<PurgedRef[]>;
     bootstrap?: () => Promise<BootstrapResponse>;
     reconcile?: SyncTransport['reconcile'];
+    sync?: SyncTransport['sync'];
   } = {},
 ): { transport: SyncTransport; calls: Calls } {
   const calls: Calls = { lookups: [], subscribes: 0, handlers: null };
   const transport: SyncTransport = {
     bootstrap: opts.bootstrap ?? (async () => bootstrap()),
-    async sync() {
-      return [];
-    },
+    sync: opts.sync ?? (async () => []),
     openStream(_ws, _afterSeq, handlers) {
       calls.subscribes += 1;
       calls.handlers = handlers;
@@ -226,6 +227,18 @@ describe('19.180 a revoke is not a purge', () => {
     await expect(engineOver(goneStorage, goneReplica, gone.transport).start(WS)).resolves.toBeUndefined();
     expect(await goneReplica.purgedAmong([WS])).toEqual([{ kind: 'workspace', id: WS }]);
     expect(gone.calls.subscribes).toBe(0);
+
+    // REVIEW FIX (I-4): the NEXT launch. The workspace is already recorded, so
+    // the lookup has nothing left to ask — and the 403 must still resolve
+    // rather than surface on every launch.
+    const again = transportFor({
+      bootstrap: async () => {
+        throw new WorkspaceAccessLost(WS, 'bootstrap failed: 403');
+      },
+      lookup: async () => [],
+    });
+    await expect(engineOver(goneStorage, goneReplica, again.transport).start(WS)).resolves.toBeUndefined();
+    expect(again.calls.subscribes).toBe(0);
   });
 });
 
@@ -291,5 +304,41 @@ describe('19.182 the HTTP transport', () => {
     expect(broken).not.toBeInstanceOf(WorkspaceAccessLost);
     expect((broken as Error).message).toBe('bootstrap failed: 500');
     await expect(over(fetchAnswering(502, {}).fetchImpl).purgedLookup([T])).rejects.toThrow('purged-lookup failed: 502');
+  });
+});
+
+describe('19.200 a shell is told when a purge changes what it draws', () => {
+  it('19.200 onNoticesChanged fires after a purge refusal lands and after an erase; not when nothing changed', async () => {
+    const { storage, replica } = await freshReplica();
+    const T = newUlid();
+    await apply(replica, [ticketCreated(T)]);
+    const offline = claim({ kind: 'ticket', id: T }, 'ticket.field_set', { fieldId: 'title', value: 'offline' });
+    await queue(storage, offline);
+    const { transport } = transportFor({
+      sync: async (batch) =>
+        batch.map((item) => ({ status: 'refused' as const, eventId: item.id, rule: PURGE_RULE, reason: PURGED_REASON })),
+      lookup: async (ids) => ids.filter((id) => id === T).map(ticketRef),
+    });
+    const engine = engineOver(storage, replica, transport);
+    const told = vi.fn();
+    engine.onNoticesChanged(told);
+
+    // CONTROL: nothing queued and nothing named — no signal
+    await engine.learnPurges(WS, []).catch(() => undefined);
+    const afterErase = told.mock.calls.length;
+    expect(afterErase).toBe(1); // the lookup named T
+    const quiet = transportFor({ lookup: async () => [] });
+    const quietEngine = engineOver(storage, replica, quiet.transport);
+    const quietTold = vi.fn();
+    quietEngine.onNoticesChanged(quietTold);
+    await quietEngine.learnPurges(WS, []);
+    await quietEngine.flush();
+    expect(quietTold).not.toHaveBeenCalled();
+
+    // the refusal
+    const queued = claim({ kind: 'ticket', id: newUlid() }, 'ticket.field_set', { fieldId: 'title', value: 'x' });
+    await queue(storage, queued);
+    await engine.flush();
+    expect(told.mock.calls.length).toBeGreaterThan(afterErase);
   });
 });

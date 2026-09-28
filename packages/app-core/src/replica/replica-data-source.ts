@@ -20,7 +20,7 @@ import {
   type Priority,
 } from '@gisik-nokma/domain';
 import { DeletedItemsFromCache } from '../deleted-items-from-cache.js';
-import { mapDeletedItems } from '../online/mappers.js';
+import { mapDeletedItems } from '../wire-readers.js';
 import { failedClaimNotice, type SyncNoticeView } from '../sync/sync-notices.js';
 import {
   isSyncInstruction,
@@ -1945,6 +1945,13 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const offPull = engine.onPullApplied(() => {
         cb({ type: 'refresh', workspaceId });
       });
+      // Trash Plan 3 (review fix I-1): a refused claim turning into a notice, and
+      // an erase a purge lookup caused, both land AFTER the `live` status and
+      // announce nothing else — so a quiet workspace would keep drawing the old
+      // board and no notice until an unrelated frame arrived.
+      const offNotices = engine.onNoticesChanged(() => {
+        cb({ type: 'refresh', workspaceId });
+      });
       const offStatus = engine.onStatus((status) => {
         // `live` is set immediately after the cursor is written, so the value
         // read back IS the seq the server's caught-up frame named. Not
@@ -1960,6 +1967,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       return () => {
         offItem();
         offPull();
+        offNotices();
         offStatus();
       };
     },

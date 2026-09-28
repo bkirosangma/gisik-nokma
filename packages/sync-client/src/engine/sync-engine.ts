@@ -301,6 +301,15 @@ export type SyncEngine = {
    */
   onPullApplied(cb: (info: { kind: 'ticket' | 'note'; id: string }) => void): () => void;
   /**
+   * Fires after something this device HOLDS or OWES the person a sentence about
+   * changed without any frame announcing it (trash Plan 3, review fix I-1): a
+   * flushed claim the server refused (a purge notice, or a failed row) and an
+   * erase a purge lookup caused. Both happen AFTER the `live` status a shell
+   * reads notices on, so without this a quiet workspace shows neither until
+   * some unrelated frame arrives. Content-free: it says "re-read", nothing more.
+   */
+  onNoticesChanged(cb: () => void): () => void;
+  /**
    * Ask the server which of the tickets this replica holds are no longer this
    * user's, and delete those — closure 5's NARROW half, case 6.104's residual.
    *
@@ -519,6 +528,7 @@ export function createSyncEngine(deps: {
   const statusListeners = new Set<(s: SyncStatus) => void>();
   const itemListeners = new Set<(item: SyncItem) => void>();
   const pullAppliedListeners = new Set<(info: { kind: 'ticket' | 'note'; id: string }) => void>();
+  const noticesChangedListeners = new Set<() => void>();
 
   function setStatus(next: SyncStatus): void {
     if (next === currentStatus) return;
@@ -687,6 +697,16 @@ export function createSyncEngine(deps: {
    * listener that only heard about notes would be a second, narrower rule
    * waiting to be discovered.
    */
+  function notifyNoticesChanged(): void {
+    for (const cb of noticesChangedListeners) {
+      try {
+        cb();
+      } catch {
+        // a shell's callback; see notifyPullApplied
+      }
+    }
+  }
+
   function notifyPullApplied(info: { kind: 'ticket' | 'note'; id: string }): void {
     for (const cb of pullAppliedListeners) {
       // A listener is a shell's callback and its throw is its own business:
@@ -761,6 +781,7 @@ export function createSyncEngine(deps: {
     }
     if (found.length === 0) return { erased: [] };
     const { erased } = await replica.eraseEntities(found);
+    notifyNoticesChanged();
     if (found.some((ref) => ref.kind === 'workspace' && ref.id === ws)) {
       // The whole-workspace `scope-revoked` precedent (`applyOne`): nothing is
       // left to stream, and a reconnect would only earn `not-a-member` again.
@@ -1095,6 +1116,12 @@ export function createSyncEngine(deps: {
           // failure it always was.
           if (err instanceof WorkspaceAccessLost) {
             await learnPurges(ws);
+            // A relaunch after the purge: the workspace is already recorded, so
+            // the lookup had nothing to ask — the recorded answer is the answer
+            // (review fix I-4).
+            if (!streamEnded && (await replica.purgedAmong([ws])).some((ref) => ref.kind === 'workspace')) {
+              streamEnded = true;
+            }
             if (streamEnded) return;
           }
           throw err;
@@ -1218,6 +1245,8 @@ export function createSyncEngine(deps: {
             for (let i = 0; i < batch.length; i += 1) {
               try {
                 await outbox.applyResult(batch[i]!.eventId, results[i]!);
+                // A refusal moved a row into a notice or a failed row.
+                if (results[i]!.status === 'refused' || results[i]!.status === 'invalid') notifyNoticesChanged();
               } catch (err) {
                 await outbox.recordFailure(ids.slice(i), messageOf(err));
                 stall(err, null);
@@ -1262,6 +1291,13 @@ export function createSyncEngine(deps: {
       itemListeners.add(cb);
       return () => {
         itemListeners.delete(cb);
+      };
+    },
+
+    onNoticesChanged(cb) {
+      noticesChangedListeners.add(cb);
+      return () => {
+        noticesChangedListeners.delete(cb);
       };
     },
 

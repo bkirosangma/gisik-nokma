@@ -30,3 +30,29 @@ describe('19.189 purgedAmong — the replica twin', () => {
     expect(await ds.query.purgedAmong([live])).toEqual([]);
   });
 });
+
+describe('19.200 the replica data source forwards a purge-caused change as a refresh', () => {
+  it('19.200 an erase after caught-up reaches a subscriber as a refresh frame; a lookup naming nothing does not', async () => {
+    const storage = createBetterSqliteStorage();
+    const replica = await createReplica({ storage });
+    const outbox = createOutbox({ storage, replica });
+    const [gone, kept] = [newUlid(), newUlid()];
+    let answer: Array<{ kind: 'note'; id: string }> = [];
+    const engine = createSyncEngine({
+      replica,
+      outbox,
+      transport: { ...offline, purgedLookup: async () => answer },
+    });
+    const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
+    const frames: string[] = [];
+    const off = ds.subscribe(WS, 0, (frame) => frames.push(frame.type));
+
+    await engine.learnPurges(WS, [kept]);
+    expect(frames).toEqual([]); // CONTROL: nothing named, nothing to redraw
+
+    answer = [{ kind: 'note', id: gone }];
+    await engine.learnPurges(WS, [gone]);
+    expect(frames).toEqual(['refresh']);
+    off();
+  });
+});
