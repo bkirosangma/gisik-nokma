@@ -637,6 +637,15 @@
   height: 0;
   pointer-events: none;
 }
+/* Unit 6c — the editor's own placeholder hides on focus too, the same rule
+   every other text field in the product now carries (`.gn-field__input:
+   focus::placeholder`, `ui.css`). `:focus-within` on the container, not
+   `:focus` on the pseudo-element's own (nonexistent) host: `.ProseMirror`
+   is what actually takes focus, one level below `.ticket-editor__content`,
+   the same selector `:620` above already uses for the focus RING. */
+.editor-slot .ticket-editor__content:focus-within .is-editor-empty:first-child::before {
+  color: transparent;
+}
 
 .editor-slot__footer {
   display: flex;
