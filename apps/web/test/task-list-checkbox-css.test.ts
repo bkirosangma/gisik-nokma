@@ -139,9 +139,9 @@ function bodyIn(css: string, selector: string): string {
 }
 
 /** Declarations of every rule in ui.css + globals.css whose selector list matches `el`, in source order. */
-function matchingBodies(el: Element): string[] {
+function matchingBodies(el: Element, sheets: string[] = [UI_CSS, CSS]): string[] {
   const out: string[] = [];
-  for (const css of [UI_CSS, CSS]) {
+  for (const css of sheets) {
     for (const rule of rulesOf(css)) {
       const hit = rule.selectors.some((sel) => {
         try {
@@ -212,5 +212,104 @@ describe('9.365 a posted comment’s task item sits like the composer’s: box o
     expect(BODY_LINE_HEIGHT_REM, 'the body line-height parsed from ui.css').toBeGreaterThan(1);
     const nudge = Number(/margin:\s*([\d.]+)rem 0 0;/.exec(bodyFor(COMMENT_BOX))?.[1]);
     expect(nudge).toBeCloseTo((BODY_LINE_HEIGHT_REM - 1) / 2, 4);
+  });
+});
+
+/**
+ * 9.367 — owner report 2026-09-29 (measured on a POSTED comment beside the composer): every `<p>`
+ * inside `ul/ol.gn-comment__list > li` kept the user-agent's 1em margins, so consecutive bullets sat
+ * 17px apart (pitch 39px for one 22px line, against the composer's 30px), and the `li` carried a
+ * 2.4px margin-top on top. Same root cause as 9.365: `renderCommentBody` emits `li > p` (a listItem's
+ * child is a paragraph) and `.gn-comment__body > *` reaches one level only. A blockquote's inner
+ * `<p>` had the same margins and, with no padding/border to stop them, collapsed THROUGH the quote.
+ * Fixture = the renderer's own output for a bullet list holding a two-paragraph item, a nested list
+ * and a quote, plus a numbered list and a task list (which must NOT be touched by the list-item rule).
+ */
+const para = (text: string) => ({ type: 'paragraph', content: [{ type: 'text', text }] });
+const li = (...blocks: unknown[]) => ({ type: 'listItem', content: blocks });
+const LIST_DOC = {
+  type: 'doc',
+  content: [
+    {
+      type: 'bulletList',
+      content: [
+        li(para('parent'), { type: 'bulletList', content: [li(para('child a')), li(para('child b'))] }),
+        li(para('first'), para('second')),
+        li(para('with quote'), { type: 'blockquote', content: [para('quoted')] }),
+        li(para('last')),
+      ],
+    },
+    { type: 'orderedList', content: [li(para('one')), li(para('two'))] },
+    { type: 'taskList', content: [item(false, 'task')] },
+  ],
+};
+const declaredMargins = (el: Element, sheets?: string[]) => matchingBodies(el, sheets).join('\n');
+const NON_ZERO_MARGIN = /margin(?:-top|-bottom)?:\s*(?!0\s*;)\S[^;]*;/;
+const COMPOSER_PARAGRAPH_MARGIN_REM = Number(/margin:\s*([\d.]+)rem 0;/.exec(bodyFor('.ticket-editor__content p'))?.[1]);
+
+describe('9.367 a posted comment’s bullet/numbered list has no stacked paragraph margins; items sit like the composer’s', () => {
+  const rendered = () => renderBody(LIST_DOC).container;
+
+  it('9.367 the renderer’s item is li > p, and NO rule leaves that paragraph — or a quote’s — a margin', () => {
+    const c = rendered();
+    const paras = [...c.querySelectorAll<HTMLElement>('ul.gn-comment__list:not(.gn-comment__list--tasks) li > p:first-child, ol.gn-comment__list > li > p:first-child')];
+    expect(paras.length, 'first paragraphs of bullet and numbered items found').toBeGreaterThanOrEqual(8);
+    for (const p of paras) {
+      const declared = declaredMargins(p);
+      expect(declared, p.textContent ?? '').toMatch(/(^|[;\s])margin:\s*0;/);
+      expect(declared, p.textContent ?? '').not.toMatch(NON_ZERO_MARGIN);
+    }
+    const quoted = c.querySelector('blockquote > p')!;
+    expect(declaredMargins(quoted)).toMatch(/margin:\s*0;/);
+    expect(declaredMargins(quoted)).not.toMatch(NON_ZERO_MARGIN);
+  });
+
+  it('9.367 CONTROL — the same check goes RED with the list-item reset deleted (the matcher can see the difference)', () => {
+    const c = rendered();
+    const p = c.querySelector('ul.gn-comment__list > li > p')!;
+    const without = (css: string, rule: string) => {
+      expect(css, `the rule "${rule}" exists to be deleted`).toContain(rule);
+      return css.replace(rule, '');
+    };
+    const noListReset = without(UI_CSS, '.gn-comment__list:not(.gn-comment__list--tasks) > li > * { margin: 0; }');
+    // Mutation 1: delete the paragraph reset → no rule zeroes the paragraph (UA 1em stays).
+    expect(declaredMargins(p, [noListReset, CSS])).not.toMatch(/margin:\s*0;/);
+    const noQuoteReset = without(UI_CSS, '.gn-comment__quote > * { margin: 0; }');
+    // Mutation 2: delete the quote reset → the quote's paragraph keeps its margins.
+    expect(declaredMargins(c.querySelector('blockquote > p')!, [noQuoteReset, CSS])).not.toMatch(/margin:\s*0;/);
+  });
+
+  it('9.367 a second block in one item keeps the body’s 0.4rem; a nested list is set off by the same', () => {
+    const c = rendered();
+    const items = [...c.querySelectorAll('ul.gn-comment__list > li')];
+    const second = items.find((el) => el.textContent === 'firstsecond')!.querySelectorAll('p')[1]!;
+    expect(declaredMargins(second)).toMatch(/margin-top:\s*0\.4rem;/);
+    const nested = c.querySelector('li > ul.gn-comment__list')!;
+    expect(declaredMargins(nested)).toMatch(/margin-top:\s*0\.4rem;/);
+    expect(declaredMargins(nested)).not.toMatch(/margin-top:\s*0\.15rem;/);
+    const quote = c.querySelector('li > blockquote')!;
+    expect(declaredMargins(quote)).toMatch(/margin-top:\s*0\.4rem;/);
+  });
+
+  it('9.367 items are the composer’s paragraph margin apart — 0.5rem, read from globals.css — not 0.15rem, not 1em', () => {
+    expect(COMPOSER_PARAGRAPH_MARGIN_REM, 'the composer paragraph margin parsed from globals.css').toBeGreaterThan(0);
+    const c = rendered();
+    for (const selector of ['ul.gn-comment__list:not(.gn-comment__list--tasks) > li + li', 'ol.gn-comment__list > li + li']) {
+      const sibling = c.querySelector(selector)!;
+      const gap = matchingBodies(sibling).filter((body) => /margin-top/.test(body)).pop() ?? '';
+      expect(Number(/margin-top:\s*([\d.]+)rem;/.exec(gap)?.[1]), selector).toBeCloseTo(COMPOSER_PARAGRAPH_MARGIN_REM, 4);
+    }
+  });
+
+  it('9.367 the task list is NOT reached by the list-item rule: its span takes no top margin, its rows still abut', () => {
+    const c = rendered();
+    const row = c.querySelector('li.gn-comment__task')!;
+    const span = row.querySelector(':scope > span')!;
+    expect(declaredMargins(span)).not.toMatch(/margin-top:\s*0\.4rem;/);
+    expect(declaredMargins(span)).not.toMatch(/margin:\s*0;/);
+    // Mutation 3: drop the `:not(--tasks)` guard → the row's span is reached and gets 0.4rem.
+    const unguarded = UI_CSS.replaceAll(':not(.gn-comment__list--tasks)', '');
+    expect(unguarded).not.toBe(UI_CSS);
+    expect(declaredMargins(span, [unguarded, CSS])).toMatch(/margin-top:\s*0\.4rem;/);
   });
 });

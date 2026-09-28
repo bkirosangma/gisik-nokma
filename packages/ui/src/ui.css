@@ -7343,13 +7343,30 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-comment__heading--3 { font-size: 1.03em; }
 .gn-comment__rule { border: none; border-top: 1px solid var(--gn-border); margin: 0.6rem 0; }
 .gn-comment__list { padding-left: 1.3rem; }
-.gn-comment__list > li + li { margin-top: 0.15rem; }
+/* A listItem's child is a PARAGRAPH (`<li><p>…</p></li>`), one level deeper than
+   `.gn-comment__body > *` above reaches — left alone every `<p>` kept the
+   user-agent's 1em margins (17px each side), so items sat 17px apart (measured
+   2026-09-29: pitch 39px against 22px of text, vs the composer's 30px). The
+   same two declarations as the body's own blocks, one level down; a second
+   block in one item (a nested list, a quote, another paragraph) keeps the
+   body's 0.4rem. The task list is excluded — its `li` is `input + span`, and
+   `.gn-comment__task > span > *` below is its own version of this. Items are
+   0.5rem apart, the composer's `.ticket-editor__content p { margin: 0.5rem 0 }`
+   (globals.css) — what was written is what is posted. */
+.gn-comment__list:not(.gn-comment__list--tasks) > li > * { margin: 0; }
+.gn-comment__list:not(.gn-comment__list--tasks) > li > * + * { margin-top: 0.4rem; }
+.gn-comment__list > li + li { margin-top: 0.5rem; }
 .gn-comment__quote {
   margin: 0;
   padding-left: 0.6rem;
   border-left: 2px solid var(--gn-border);
   color: var(--gn-text-muted);
 }
+/* A quote's child is a PARAGRAPH too: its 1em margins collapsed THROUGH the
+   quote (no padding-top or border-top to stop them), so the block above it
+   sat 17px away whatever `> * + *` said — the same defect, one level down. */
+.gn-comment__quote > * { margin: 0; }
+.gn-comment__quote > * + * { margin-top: 0.4rem; }
 .gn-comment__code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: var(--gn-surface-sunken);
