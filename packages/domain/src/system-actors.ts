@@ -40,6 +40,17 @@ import { ULID_REGEX } from './ids.js';
 export const SYSTEM_ACTOR_AUTO_CLOSE = '00000000000000000000SYS0AC';
 
 /**
+ * The permanent-deletion sweep (trash series Plan 2, spec §5.3). The tombstone
+ * `purge.completed` is filed under this id for the reason `SYSTEM_ACTOR_AUTO_CLOSE`
+ * gives above: the erasure is nobody's act at the moment it runs — the person who
+ * MARKED the item is recorded in the payload's `markedBy`, and naming them as the
+ * actor of an erasure that runs after the purge delay would put an act in their
+ * mouth. Case 19.088
+ * pins the match against `ULID_REGEX`.
+ */
+export const SYSTEM_ACTOR_PURGE = '00000000000000000000SYS0PG';
+
+/**
  * The reserved actors, id → display name. A `ReadonlyMap` rather than an
  * object literal so a lookup of an arbitrary actor id cannot reach
  * `Object.prototype` — an id of `'constructor'` is not in the key space
@@ -47,12 +58,14 @@ export const SYSTEM_ACTOR_AUTO_CLOSE = '00000000000000000000SYS0AC';
  * arrived over the wire, and `'toString' in {}` is the shape of bug that
  * costs an afternoon.
  *
- * `SYSTEM_ACTOR_AUTO_CLOSE` is the only entry today. Task 8's sweep is its one
- * consumer; the name is the string the sheet's closed badge renders, and
- * `Auto-close` is the spelling spec §8.2 fixes.
+ * Two entries: `SYSTEM_ACTOR_AUTO_CLOSE` (Task 8's sweep is its one consumer; the
+ * name is the string the sheet's closed badge renders, and `Auto-close` is the
+ * spelling spec §8.2 fixes) and `SYSTEM_ACTOR_PURGE` (the permanent-deletion
+ * sweep's tombstone, trash series Plan 2).
  */
 export const SYSTEM_ACTOR_NAMES: ReadonlyMap<string, string> = new Map([
   [SYSTEM_ACTOR_AUTO_CLOSE, 'Auto-close'],
+  [SYSTEM_ACTOR_PURGE, 'Permanent deletion'],
 ]);
 
 /** Whether `id` is one of this product's reserved system actors. */

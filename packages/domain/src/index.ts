@@ -45,3 +45,4 @@ export * from './notifications.js';
 export * from './notification-preferences.js';
 export * from './events/lifecycle-events.js';
 export * from './lifecycle.js';
+export * from './purge.js';
