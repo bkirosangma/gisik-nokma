@@ -2,7 +2,7 @@ import { useState } from 'react';
 import { act, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { NoteSummary } from '@gisik-nokma/domain';
+import type { NoteSummary, PurgedPredicate, PurgedRef } from '@gisik-nokma/domain';
 import { createFakeDataSource, type IngestScript } from '../helpers/fake-data-source.js';
 import { TICKET, WF_ERRAND, WS, claim, ticketStateSeed } from '../helpers/seed.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
@@ -836,5 +836,57 @@ describe('19.191 a surviving comment chips a purged note', () => {
     expect(JSON.stringify(surviving.body)).toBe(before);
     // CONTROL
     expect(within(section).getByRole('link', { name: 'SHOP-9 Fix the freezer' })).toHaveAttribute('href', `/t/${TICKET}`);
+  });
+});
+
+describe('19.195 the description editor waits for its chips', () => {
+  it('19.195 mounts the description slot only after the lookup answers, with isPurged; a chipless description mounts at once', async () => {
+    const GONE = '01J9GTKGONE000000000000000';
+    const at = '2026-09-20T10:00:00.000Z';
+    const withDescription = (value: unknown): TicketRead => ({
+      ...read(),
+      ticket: ticketStateSeed({ fields: { description: { value, actorId: 'user_kiro', clientTime: at, serverTime: at } } }),
+    });
+    const chipDoc = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [{ type: 'ticketRef', attrs: { ticketId: GONE, projectId: 'p1', key: 'SHOP-7', title: 'Invoice' } }],
+        },
+      ],
+    };
+    let release: (refs: PurgedRef[]) => void = () => undefined;
+    const answer = new Promise<PurgedRef[]>((resolve) => {
+      release = resolve;
+    });
+    const captured: Array<Record<string, unknown>> = [];
+    const StubSlot: EditorSlotComponent = (props) => {
+      captured.push(props as unknown as Record<string, unknown>);
+      return <div data-testid={`stub-${props.mode}-editor`} />;
+    };
+    renderSheet(source({ getTicket: async () => withDescription(chipDoc), purgedAmong: () => answer }), {
+      editorSlot: StubSlot,
+    });
+    await screen.findByTestId('stub-comment-editor');
+    expect(captured.some((props) => props['mode'] === 'description')).toBe(false);
+
+    await act(async () => {
+      release([{ kind: 'ticket', id: GONE }]);
+    });
+    await screen.findByTestId('stub-description-editor');
+    const description = captured.filter((props) => props['mode'] === 'description').at(-1);
+    expect((description?.['isPurged'] as PurgedPredicate)('ticket', GONE)).toBe(true);
+  });
+
+  it('19.195 (control) a description with no chips mounts with the first render', async () => {
+    const captured: Array<Record<string, unknown>> = [];
+    const StubSlot: EditorSlotComponent = (props) => {
+      captured.push(props as unknown as Record<string, unknown>);
+      return <div data-testid={`stub-${props.mode}-editor`} />;
+    };
+    renderSheet(source(), { editorSlot: StubSlot });
+    await screen.findByTestId('stub-description-editor');
+    expect(captured.find((props) => props['mode'] === 'description')?.['isPurged']).toBeDefined();
   });
 });

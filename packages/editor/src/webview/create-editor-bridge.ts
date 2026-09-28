@@ -8,6 +8,8 @@ import { parseHostMessage, type EditorToHostMessage } from './bridge.js';
 export type EditorBridgeDeps = {
   editor: Editor;
   post(message: EditorToHostMessage): void;
+  /** Trash Plan 3: the ids a loaded document's erased chips point at, handed over BEFORE its content is set. */
+  onPurgedIds?(ids: readonly string[]): void;
 };
 
 export type EditorBridge = {
@@ -52,6 +54,7 @@ export function createEditorBridge(deps: EditorBridgeDeps): EditorBridge {
       if (!message || disposed) return;
       switch (message.kind) {
         case 'loadDoc':
+          deps.onPurgedIds?.(message.purgedIds ?? []);
           editor.commands.setContent(message.doc ?? emptyDoc(), { emitUpdate: false });
           // `setEditable`'s second parameter defaults to `true` and, read in
           // @tiptap/core@3.30.5 (dist:6292-6297), emits an `update` event

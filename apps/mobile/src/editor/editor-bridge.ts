@@ -118,3 +118,10 @@ export function parseRawEditorMessage(raw: string): EditorToHostMessage | null {
     return null;
   }
 }
+
+type LoadDocMessage = Extract<HostToEditorMessage, { kind: 'loadDoc' }>;
+
+/** The document the webview opens with, and (trash Plan 3) which of its chips point at erased items. */
+export function loadDocMessage(doc: LoadDocMessage['doc'], editable: boolean, purgedIds?: readonly string[]): LoadDocMessage {
+  return { bridge: 1, kind: 'loadDoc', doc, editable, ...(purgedIds === undefined ? {} : { purgedIds: [...purgedIds] }) };
+}

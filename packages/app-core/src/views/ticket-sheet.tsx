@@ -3258,6 +3258,7 @@ export function TicketSheet({
                 passed unconditionally because the read-only fallback ignores
                 every capability prop on purpose.
               */}
+              {purgedDescription.ready ? (
               <EditorSlot
                 mode="description"
                 // The composer is NAMED BY the `<dt>` above rather than given
@@ -3275,8 +3276,10 @@ export function TicketSheet({
                 queryNotes={queryNotes}
                 {...(queryTickets === undefined ? {} : { queryTickets })}
                 {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                isPurged={purgedDescription.isPurged}
                 onError={reportEditorError}
               />
+              ) : null}
               <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
           </section>
           <dl className="gn-ticket-sheet__fields">
@@ -3946,6 +3949,7 @@ export function TicketSheet({
                   queryNotes={queryNotes}
                   {...(queryTickets === undefined ? {} : { queryTickets })}
                   {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                  isPurged={purgedComments.isPurged}
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}
