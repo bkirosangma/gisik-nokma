@@ -287,7 +287,13 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
     const href = resolved === null ? null : safeHref(resolved);
     return href === null
       ? createElement('span', { className: 'gn-comment__ticketref', key }, text)
-      : createElement('a', { className: 'gn-comment__ticketref', href, key }, text);
+      : createElement(
+          'a',
+          // `data-ticket-id` lets a host that opens the ticket in place (the Notes page's
+          // `ticketChipClickHandler`) find the chip without parsing its href.
+          { className: 'gn-comment__ticketref', href, key, 'data-ticket-id': ticketId },
+          text,
+        );
   }
   // A table (spec's schema v2, shared with the note document). Real
   // table/tr/th/td, not the "unknown type renders its children" fallback —

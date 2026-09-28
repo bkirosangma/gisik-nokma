@@ -34,6 +34,7 @@ import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
+import { ticketChipClickHandler } from './ticket-chip-click.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
 
@@ -578,7 +579,7 @@ function NoteDocumentBody({
     workspace?.projects.find((project) => project.id === note.homeProjectId)?.name ?? null;
 
   return (
-    <div className="gn-note-document" data-testid="note-document">
+    <div className="gn-note-document" data-testid="note-document" onClick={ticketChipClickHandler(openTicket)}>
       {/* An absent level renders NO `<li>` at all, not an empty one — the
           stylesheet's own separator rule (`.gn-breadcrumb__item +
           .gn-breadcrumb__item::before`) draws `/` only BETWEEN two
