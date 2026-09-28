@@ -1350,7 +1350,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — a dropdown offering email, sms and whatsapp. - "
+                      "text": " — "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "email"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Phone (SMS)"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". - "
                     },
                     {
                       "kind": "bold",
@@ -1358,17 +1374,24 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — admin, member or guest. (See below.) - "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "Projects"
-                    },
-                    {
-                      "kind": "text",
-                      "text": " — this box appears for admin and member, and is hidden for guest."
+                      "text": " — admin, member or guest. (See below.)"
                     }
-                  ],
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the email address you typed belongs to somebody who already has an account, the form says so when you leave the box, and the invitation goes to the address that account signs in with."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": true,
+                "items": [
                   [
                     {
                       "kind": "text",
@@ -1380,7 +1403,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": "."
+                      "text": " (for Phone (SMS) the button reads "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create invite link"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "). For email, the product sends the invitation to that address, and the next screen says it was emailed. If the email could not be sent, the screen says so, and you send the link yourself."
                     }
                   ],
                   [
@@ -1404,15 +1435,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Copy that link before you do anything else.  It means exactly what it says. That link appears once, on that screen, at that moment. It is not in the pending list. It is nowhere else. Nobody — including you — can look it up again. If you close the tab you have to withdraw the invitation and start over.  Paste it into an email to the person "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "first"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ", then carry on."
+                    "text": "Copy that link before you do anything else.  The link is still shown once. For an emailed invitation you do not need it, but copy it anyway if the email did not go. It appears on that screen, at that moment; it is not in the pending list and nobody — including you — can look it up again. If you close the tab you have to withdraw the invitation and start over."
                   }
                 ]
               }
@@ -1426,25 +1449,20 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "email"
+                  },
+                  {
                     "kind": "text",
-                    "text": "The dropdown offers email, sms and whatsapp, but "
+                    "text": " sends the invitation for you. "
                   },
                   {
                     "kind": "bold",
-                    "text": "the product does not appear to send the invitation by any of them."
+                    "text": "Phone (SMS)"
                   },
                   {
                     "kind": "text",
-                    "text": " It makes a link, shows it to you once, and you send it however you like."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "So treat \"Channel\" as a note to yourself about how you intend to reach the person, and plan on sending the link by hand."
+                    "text": " does not send anything yet: it makes the link, and you send it by message yourself."
                   }
                 ]
               }
@@ -1458,95 +1476,12 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
-                    "kind": "text",
-                    "text": "It is a dropdown, and it offers "
-                  },
-                  {
                     "kind": "bold",
-                    "text": "All projects in this workspace"
+                    "text": "Removed on 29 September 2026."
                   },
                   {
                     "kind": "text",
-                    "text": " plus one *"
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "Only "
-                  },
-                  {
-                    "kind": "text",
-                    "text": "<project name>*** entry for each project you can see. Pick a name; the product works out the identifier behind it."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "bold",
-                    "text": "⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so."
-                  },
-                  {
-                    "kind": "text",
-                    "text": " Until 2026-09-21 the box was labelled "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "\"Projects (comma-separated ids, optional)\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " and wanted long strings of letters and numbers that you would have to go and find from somewhere — the manual's own verdict was "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "\"In practice this box is not usable by a person.\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " It is kept here, rather than deleted, so a reader who remembers it as an unusable box finds the correction where they last saw it."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "Leave it on "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "All projects in this workspace"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " unless the invitation really is for one project only."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "It is correctly hidden when you pick "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "guest"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ", and if you try to invite a guest "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " name projects it refuses and tells you to share individual jobs with them instead."
+                    "text": " Admins and members now see every project in their workspace, so there is nothing to choose. A guest still sees only the jobs shared with them or assigned to them."
                   }
                 ]
               }
@@ -1596,12 +1531,8 @@ export const HELP_CONTENT: HelpContent = [
                     ],
                     [
                       {
-                        "kind": "bold",
-                        "text": "A \"can change things\" role, not a \"can see things\" role."
-                      },
-                      {
                         "kind": "text",
-                        "text": " This surprises everybody. An admin can invite people and set up stages and job types — but only sees the projects they have personally been put on, same as anyone else."
+                        "text": "Can invite people and set up stages and job types, and sees every project in the workspace."
                       }
                     ]
                   ],
@@ -1615,7 +1546,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Ordinary staff. Does the work. Cannot invite people, cannot change how the stages work."
+                        "text": "Ordinary staff. Sees every project in the workspace and does the work. Cannot invite people, cannot change how the stages work."
                       }
                     ]
                   ],
@@ -1629,39 +1560,10 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "An outsider — a client, your accountant. Sees only the specific jobs somebody has explicitly shared with them. Nothing else. Cannot see the people list. Cannot create jobs."
+                        "text": "An outsider — a client, your accountant. Sees only the jobs somebody has shared with them or assigned to them, and nothing else. Cannot see the people list. Cannot create jobs."
                       }
                     ]
                   ]
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "bold",
-                    "text": "The practical consequence of the admin rule:"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " if you want somebody to be able to invite people "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " see the work, you have to make them an admin "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " get them onto the projects. One does not come with the other."
-                  }
                 ]
               },
               {
@@ -2457,6 +2359,61 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " pill."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "assigning-somebody-who-is-not-in-the-workspace",
+            "title": "Assigning somebody who is not in the workspace",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "In the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assignee"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker, choose "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assign someone outside this workspace…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", type their email and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Find"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If an account has exactly that email, it is shown. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assign"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and they join the workspace as a guest who sees only that job. Nothing is listed or suggested: you have to know their email. If nobody has that email, the picker says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "No user with that email."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Anyone who can assign a job can do this."
                   }
                 ]
               }
@@ -9450,8 +9407,28 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "By email, yes."
+                  },
+                  {
                     "kind": "text",
-                    "text": "It does not appear to. The Channel dropdown offers email, sms and whatsapp, and nothing was found that sends by any of them. What happens is that the product makes a link, shows it to you once, and you send it however you like."
+                    "text": " Pick "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "email"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the product sends it, and the screen tells you whether it went. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Phone (SMS)"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is not sent for you: copy the link and send it yourself."
                   }
                 ]
               }
@@ -9484,33 +9461,8 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
-                    "kind": "bold",
-                    "text": "All projects in this workspace"
-                  },
-                  {
                     "kind": "text",
-                    "text": ", unless the invitation is genuinely for one project only — in which case pick the project by NAME from the same dropdown. It is a list of names; you never type an identifier."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "bold",
-                    "text": "⚠ It used to ask you to type identifiers, and this answer said to leave it empty."
-                  },
-                  {
-                    "kind": "text",
-                    "text": " Until 2026-09-21 the box was labelled "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "\"Projects (comma-separated ids, optional)\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " and wanted long strings of letters and numbers you would have to go and find. The old answer is kept here so a reader who remembers it finds the correction where they last saw it."
+                    "text": "Nothing: the box was removed on 29 September 2026. Admins and members see every project in the workspace."
                   }
                 ]
               }
@@ -9524,32 +9476,59 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "Close to it."
+                  },
+                  {
                     "kind": "text",
-                    "text": "No, and this surprises everybody. "
+                    "text": " Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them. Only the owner sees those."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-assign-a-job-to-somebody-who-is-not-in-the-workspace",
+            "title": "Can I assign a job to somebody who is not in the workspace?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes. In the "
                   },
                   {
                     "kind": "bold",
-                    "text": "Admin is a \"can change things\" role, not a \"can see things\" role."
+                    "text": "Assignee"
                   },
                   {
                     "kind": "text",
-                    "text": " An admin can invite people and set up stages and job types, but only sees the projects they have personally been put on. If you want somebody to manage the workspace "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " see the work, you have to do both — one does not come with the other. Only the "
+                    "text": " picker choose "
                   },
                   {
                     "kind": "bold",
-                    "text": "owner"
+                    "text": "Assign someone outside this workspace…"
                   },
                   {
                     "kind": "text",
-                    "text": " automatically sees everything."
+                    "text": ", type their exact email and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Find"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If an account has that email you can press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assign"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email."
                   }
                 ]
               }
@@ -12587,7 +12566,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Only the specific jobs somebody explicitly shared with them. Not the project, not the workspace's other work. They see the workspace's name and an empty project list — intended, not broken. They can see a child of something shared with them if that child inherits. They cannot open the people list and cannot create jobs."
+                    "text": "Only the jobs somebody explicitly shared with them, and any job assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create jobs."
                   }
                 ]
               }
