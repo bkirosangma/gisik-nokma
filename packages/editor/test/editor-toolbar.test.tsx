@@ -8,6 +8,7 @@ import type { Editor } from '@tiptap/core';
 import { TicketEditor, type TicketEditorProps } from '../src/components/TicketEditor.js';
 import { MARKDOWN_HINT } from '../src/components/EditorToolbar.js';
 import type { DocJson } from '../src/doc.js';
+import { isElementNode, isTextNode } from './helpers/json-node.js';
 
 /**
  * 16.85 — the rich-text toolbar.
@@ -676,7 +677,7 @@ describe('9.326-9.332 toolbar tooltips, shortcuts and the insert buttons', () =>
     tool(view, 'Bold').click();
     await vi.waitFor(() => {
       const nodes = editor.getJSON().content?.[0]?.content ?? [];
-      const bolded = nodes.filter((n) => n.marks?.some((m) => m.type === 'bold')).map((n) => n.text);
+      const bolded = nodes.filter(isTextNode).filter((n) => n.marks?.some((m) => m.type === 'bold')).map((n) => n.text);
       expect(bolded).toEqual(['the docs']);
     });
     view.unmount();
@@ -718,9 +719,12 @@ describe('9.326-9.332 toolbar tooltips, shortcuts and the insert buttons', () =>
       expect(editor.getJSON().content?.[0]?.type).toBe('table');
     });
     const table = editor.getJSON().content?.[0];
-    expect(table?.content).toHaveLength(2);
-    expect(table?.content?.[0]?.content).toHaveLength(3);
-    expect(table?.content?.[0]?.content?.[0]?.type).toBe('tableHeader');
+    if (!table || !isElementNode(table)) throw new Error('expected a table node');
+    expect(table.content).toHaveLength(2);
+    const row = table.content?.[0];
+    if (!row || !isElementNode(row)) throw new Error('expected a table row');
+    expect(row.content).toHaveLength(3);
+    expect(row.content?.[0]?.type).toBe('tableHeader');
     expect(view.container.querySelector('.ticket-editor__table-picker')).toBeNull();
     view.unmount();
   });

@@ -7,6 +7,7 @@ import type { Editor } from '@tiptap/core';
 import { TicketEditor, type TicketEditorProps } from '../src/components/TicketEditor.js';
 import { placePopover } from '../src/components/popover-position.js';
 import type { DocJson } from '../src/doc.js';
+import { isTextNode } from './helpers/json-node.js';
 
 /**
  * The link editor popover — ported from the knowledge-base app's
@@ -58,7 +59,7 @@ const url = (): HTMLInputElement => panel()?.querySelector('input[type="url"]') 
 const text = (): HTMLInputElement => panel()?.querySelector('input[type="text"]') as HTMLInputElement;
 const linkOf = (editor: Editor): { text: string; href: string | undefined; marks: string[] }[] =>
   (editor.getJSON().content?.[0]?.content ?? []).map((n) => ({
-    text: n.text ?? '',
+    text: isTextNode(n) ? n.text : '',
     href: n.marks?.find((m) => m.type === 'link')?.attrs?.['href'] as string | undefined,
     marks: (n.marks ?? []).map((m) => m.type),
   }));
