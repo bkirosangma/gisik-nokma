@@ -1612,6 +1612,13 @@ Press it to open a table of contents over the note; press a heading in it to jum
 appears at any window width once a note has enough headings, whereas it used to be a column that showed
 only on a wide screen. The heading you jump to lands just under the top bar, not behind it.
 
+**Every heading in a note can be linked to.** Hover a heading (on a phone or tablet the small link icon is
+always there, faintly) and press the link icon at the end of it — or Tab to it and press Enter — to copy a
+link to that exact heading. Paste it anywhere; whoever opens it lands on that heading, provided they can read
+the note. The icon appears on all six heading levels, and if two headings read the same the second gets a
+`-2` on the end of its link, the third `-3`. Only the note page has this; the comment box and the job sheet
+do not.
+
 **A thin line under the top bar shows how far down a note you have read.** It fills from the left as you
 scroll the note (the title and byline above the text do not count) and starts again at empty when you open
 another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops

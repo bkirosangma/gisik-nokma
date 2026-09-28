@@ -172,6 +172,7 @@ export type EditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  headingLink?: (id: string) => string | null;
   // Ticket-reference capabilities (Plan 7 Task 1), the twin of the block in
   // `packages/editor/src/components/TicketEditorSlot.tsx`. Same reasoning as
   // the wiki-link four above: field names, not deep types, are what the

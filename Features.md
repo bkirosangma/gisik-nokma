@@ -1638,6 +1638,18 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
     400 ms rest (the source uses 200 ms) and the plain 200-character preview (the source's heading and backlink
     footer need data `previewNote` does not return); `packages/editor/src/extensions/wiki-link.ts`,
     `packages/editor/src/styles/editor.css`
+  - ✅ **Every heading can be linked to: page-unique ids, a copy-link button, and arrival at `#slug`** (KB
+    `HeadingCopyLink` + its slugged heading node view, rebuilt as decorations so the schema and the heading DOM
+    stay stock) — on the note page only (opt-in `headingLink`; the ticket sheet, the comment box and the mobile
+    WebView get no ids and no button). H1–H6 all get an `id`/`data-heading-id` from ONE function
+    (`assignHeadingIds`, shared with `extractReadingMeta`, so the copied fragment is the table of contents' own id;
+    the rail still LISTS H1–H3 only). A widget button at the end of the heading copies
+    `<origin>/notes/<noteId>#<id>` (the source copies a `[[file#id]]` wiki-link, which a note id cannot be), is
+    revealed on hover / focus / touch, is icon-only so the heading's text and the word count are untouched, uses
+    the same clipboard fallback as the code block's Copy, and announces "Link copied" through a live region. A
+    link opened at load waits for the editor to draw the heading, then scrolls once per note.
+    `packages/editor/src/extensions/heading-anchors.ts`, `copy-text.ts`, `reading/reading-meta.ts`,
+    `apps/web/src/notes/note-document.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule

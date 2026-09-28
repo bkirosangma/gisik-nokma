@@ -4186,3 +4186,16 @@ input, textarea, select { font-family: inherit; }
 .gn-notes__editor :is(h1, h2, h3, h4, h5, h6) {
   scroll-margin-top: calc(var(--app-nav-offset, 0px) + 1rem);
 }
+
+/* The heading copy-link button (`packages/editor` `heading-anchors.ts`): its
+   presence, size and reveal are in editor.css; this is only colour. Muted at
+   rest so it does not compete with the heading, the accent text token on
+   hover/copied, and the shared focus ring (the same 2px/2px the table toolbar
+   uses). */
+.editor-heading-link { color: var(--gn-text-muted); }
+.editor-heading-link:hover,
+.editor-heading-link[data-copied] { color: var(--gn-text-accent); }
+.editor-heading-link:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}

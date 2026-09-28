@@ -735,3 +735,66 @@ describe('9.409 the note page carries a reading-progress bar', () => {
     expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
   });
 });
+
+/**
+ * 9.418–9.420 — KB parity: heading anchors on the note page. The extension and
+ * the button are proved in `packages/editor/test/heading-anchors.test.ts`; what
+ * belongs here is what only the page knows — the URL it hands the button, and
+ * the arrival at `/notes/<id>#slug`, which has to wait for the headings.
+ */
+const HEADED_BODY = {
+  type: 'doc',
+  content: [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Overview' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'body' }] },
+    { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Deep detail' }] },
+  ],
+};
+
+describe('9.418 heading anchors on the note page', () => {
+  it('9.418 the note editor gets a copy-link button per heading, carrying this note\'s absolute URL', async () => {
+    const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+    await waitFor(() => expect(container.querySelectorAll('.ProseMirror h2 .editor-heading-link, .ProseMirror h4 .editor-heading-link')).toHaveLength(2));
+    const headingLink = slotProps().headingLink as (id: string) => string | null;
+    expect(headingLink('deep-detail')).toBe(`${window.location.origin}/notes/${NOTE}#deep-detail`);
+    expect(container.querySelector('.ProseMirror h4')?.getAttribute('id')).toBe('deep-detail');
+    // The comment composer is not a page: it gets no anchors.
+    const composer = [...capturedSlotProps].reverse().find((props) => props['mode'] === 'comment');
+    expect(composer?.['headingLink']).toBeUndefined();
+  });
+
+  it('9.419 arriving at #slug scrolls that heading into view once the editor has drawn it', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    window.history.replaceState(null, '', `/notes/${NOTE}#deep-detail`);
+    try {
+      const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+      await waitFor(() => expect(scrolled.length).toBeGreaterThan(0));
+      expect(scrolled[0]).toBe(container.querySelector('.ProseMirror h4'));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.history.replaceState(null, '', '/');
+    }
+  });
+
+  it('9.420 a fragment naming no heading scrolls nothing and does not throw', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    window.history.replaceState(null, '', `/notes/${NOTE}#no-such-heading`);
+    try {
+      const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+      await waitFor(() => expect(container.querySelector('.ProseMirror h2')).not.toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(scrolled).toHaveLength(0);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.history.replaceState(null, '', '/');
+    }
+  });
+});

@@ -438,7 +438,12 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     // missing one ('gone') the same way the production app's resolver would —
     // without it every wiki-link renders as "live" (wiki-link.ts's own
     // documented default when no resolver is configured at all).
-    extensions: buildEditorExtensions({ resolveNoteTitle: (id) => (id === 'gone' ? null : 'Note') }),
+    // `headingLink` switches the heading anchors on (KB editor parity), which is
+    // what makes `.editor-heading-link` render at all.
+    extensions: buildEditorExtensions({
+      resolveNoteTitle: (id) => (id === 'gone' ? null : 'Note'),
+      headingLink: (id) => `#${id}`,
+    }),
     content: GALLERY_DOC,
   });
   const root = editor.view.dom;
@@ -446,8 +451,12 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     (cls) => !HOVER_ONLY_CLASSES.has(cls) && !COMPONENT_RENDERED_CLASSES.has(cls),
   );
 
+  // The heading-link live region is appended to `document.body` (outside the
+  // contenteditable, which is the point), so it is looked up there.
+  const BODY_RENDERED_CLASSES = new Set(['editor-heading-link__status']);
   it.each(declaredClasses)('.%s matches at least one rendered element', (cls) => {
-    expect(root.querySelector(`.${cls}`), `no element in the gallery matches .${cls}`).not.toBeNull();
+    const scope = BODY_RENDERED_CLASSES.has(cls) ? document : root;
+    expect(scope.querySelector(`.${cls}`), `no element in the gallery matches .${cls}`).not.toBeNull();
   });
 
   it('table/th/td render in the gallery', () => {

@@ -563,6 +563,13 @@ a long one you are. It measures the text of the note only (not the title or byli
 when you open another note, and is there whether or not you can edit the note. If your device is set to
 reduce motion it moves without the smoothing.
 
+**How do I link to one heading in a note?**
+Hover the heading and press the small link icon at its end (Tab to it and press Enter with the keyboard; on a
+touch screen the icon is always visible). That copies a link ending in `#` and the heading's name, and
+opening it scrolls straight to the heading. It works on all six heading levels. Two headings with the same
+words get `-2`, `-3` and so on, in the order they appear — so a link can point at the wrong one if you
+rearrange headings that share a name. The person you send it to still needs access to the note.
+
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
 workspace except guests, **This project** means everyone actually on that project, **Same as the

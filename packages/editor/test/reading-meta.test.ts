@@ -32,10 +32,10 @@ describe('9.288 extractReadingMeta', () => {
     // heading without re-querying or re-parsing.
     expect(el.querySelector('h1')?.id).toBe('gst-filing');
     expect(el.querySelector('h2')?.id).toBe('the-cold-room');
-    // …and an h4 is not listed AND is not stamped: `ReadingMeta.headings` is
-    // typed 1 | 2 | 3, so numbering a deeper heading would be a claim the type
-    // cannot carry.
-    expect(el.querySelector('h4')?.id).toBe('');
+    // …and an h4 is not LISTED (`ReadingMeta.headings` is typed 1 | 2 | 3, and
+    // the rail's `MIN_HEADINGS` counts those) but IS stamped, since KB parity: a
+    // copied link to an H4 has to resolve (9.414).
+    expect(el.querySelector('h4')?.id).toBe('not-listed');
   });
 
   it('9.288 two headings with the same text get -2 suffixes; an empty one falls back', () => {

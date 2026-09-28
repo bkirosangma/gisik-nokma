@@ -48,9 +48,11 @@ export {
   extractReadingMeta,
   headerSlug,
   readingTimeMinutes,
+  assignHeadingIds,
   type ReadingMeta,
 } from './reading/reading-meta.js';
 export { MIN_HEADINGS, ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
+export { HeadingAnchors, headingAnchorsKey, type HeadingAnchorsOptions } from './extensions/heading-anchors.js';
 export { ReadingProgress, type ReadingProgressProps } from './reading/ReadingProgress.js';
 export { findScroller, readingProgress, type Scroller } from './reading/scroller.js';
 export { UploadRefusedError, uploadAttachmentHttp, uploadNoteAttachmentHttp, type UploadResult } from './upload.js';

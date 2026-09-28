@@ -365,6 +365,50 @@ export function NoteDocument({
     onHeadingsChange?.(meta.headings);
   }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
 
+  // A link to a heading (`/notes/<id>#slug`, copied from the heading's button or
+  // typed by hand) arrives at a page whose headings do not exist yet: the note
+  // loads, then the editor mounts, then the ids are stamped. So the browser's
+  // own jump-to-fragment finds nothing, and this waits for the target — once
+  // per note, so a reader who has scrolled away is not pulled back by a later
+  // re-render.
+  useEffect(() => {
+    if (note?.noteId === undefined) return;
+    const raw = window.location.hash.slice(1);
+    if (raw === '') return;
+    const root = editorRoot.current;
+    if (root === null) return;
+    let id = raw;
+    try {
+      id = decodeURIComponent(raw);
+    } catch {
+      // a malformed escape: use it as typed
+    }
+    const find = (): Element | null => root.querySelector(`#${CSS.escape(id)}`);
+    const reveal = (target: Element): void => target.scrollIntoView?.({ block: 'start' });
+    const now = find();
+    if (now !== null) {
+      reveal(now);
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new MutationObserver(() => {
+      const target = find();
+      if (target === null) return;
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+      reveal(target);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    // Give up after a while: a fragment naming no heading must not watch forever.
+    timer = setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+    };
+    // Once per note: `note` itself changes on every autosave and live update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.noteId, editorRoot]);
+
   /** The loaded list for `queryNotes` and `resolveNoteTitle`. */
   const [treeNotes, setTreeNotes] = useState<NoteSummary[]>([]);
   useEffect(() => {
@@ -749,6 +793,7 @@ function NoteEditorPane({
         return docToPlainText(target.body).slice(0, 200);
       }}
       onNavigateNote={onNavigateNote}
+      headingLink={(id: string) => `${window.location.origin}/notes/${note.noteId}#${id}`}
       queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
       resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
     />
