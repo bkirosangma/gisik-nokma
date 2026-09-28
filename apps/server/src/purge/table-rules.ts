@@ -155,6 +155,15 @@ export const PURGE_TABLE_RULES: Readonly<Record<string, PurgeTableRule>> = {
     why: 'Erased for the set; a surviving note’s chunks are deleted and the embed worker re-chunks it (Task 7).',
   },
   proj_workspaces: { rule: 'erase', by: ['workspace_id'], why: 'The workspace’s lifecycle row.' },
+  purged_entities: {
+    rule: 'purge-registry',
+    by: ['workspace_id', 'entity_id'],
+    why: 'The purge’s own registry of erased ids (D2): content-free, read by the door and by projections, never erased.',
+  },
+  purge_pending_objects: {
+    rule: 'purge-registry',
+    why: 'Object keys awaiting deletion after a purge; a row leaves when its delete succeeds (Task 5).',
+  },
 };
 
 /**
