@@ -8128,6 +8128,15 @@ export const HELP_CONTENT: HelpContent = [
                     "text": "Each attached note is a badge with an × on it (if you can edit the job) that detaches it — the note itself is not deleted, only unlinked from this job. Detaching shows a toast you can undo."
                   }
                 ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "It works the other way too: an attached job appears as a badge in the note's own byline. Click it and the job's own panel opens right there, over the note — you are not taken to the job's page. Deleting the job from that panel does not remove the badge; a deleted job stays attached (see the Notes FAQ entry on this)."
+                  }
+                ]
               }
             ]
           },

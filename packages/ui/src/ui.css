@@ -1199,9 +1199,17 @@ a.gn-ticket-sheet__crumb--link {
    disclosure on the densest surface in the product, not this card's own
    open control. `max-width: 100%` plus the title span's own
    `text-overflow` is what keeps a long epic name from pushing the card
-   wider than its column. */
+   wider than its column.
+   `display: flex` — CORRECTED 2026-09-23 (owner bug report, case
+   13.1467/13.1468): this was `inline-flex`, and `.gn-board-card` itself
+   sets only padding (no `display: flex` of its own), so the chip shared a
+   line with the next sibling — `.gn-board-card__title`, a `<button>`,
+   inline-level by default — whenever both fit. `width: fit-content` keeps
+   the now-block-level chip's own hit area (and its focus ring) sized to
+   its content instead of stretching to the card's full width. */
 .gn-board-card__epic {
-  display: inline-flex;
+  display: flex;
+  width: fit-content;
   align-items: center;
   gap: 0.25rem;
   max-width: 100%;
@@ -7293,8 +7301,33 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   text-decoration: none;
 }
 
+/* NO underline on hover any more (owner request, task/notes-badge-sheet,
+   2026-09-24): the title now opens the ticket sheet in place rather than
+   navigating, and underline-on-hover-then-gone read as "this is about to
+   take you somewhere", which is no longer what a plain click does. */
 .gn-note-badge__title:hover {
-  text-decoration: underline;
+  text-decoration: none;
+}
+
+/* The affordance replacing the underline, on the CHIP rather than the title
+   alone: `.gn-note-badge__title` carries no padding of its own (only the
+   parent does), so a background painted on the title alone would be a
+   sharp-cornered patch tight around the glyphs. A `filter`, not a hard-coded
+   background token, because this chip paints one of FIVE tints
+   (`--private`/`--workspace`/`--project`/`--inherit`/`--explicit`, below) —
+   a fixed hover background would be a no-op on `--inherit` (already
+   `--gn-fill-secondary`) and would repaint the × in the exact colour its own
+   `:hover` rule already uses. `brightness` shifts background AND ink
+   together, by the same ratio, whichever tint is underneath, and needs no
+   new entry in `CONTRAST_PAIRS` (a relative filter, not a new named pair). */
+.gn-note-badge:hover {
+  filter: brightness(0.95);
+}
+
+.gn-note-badge__title:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 1px;
+  text-decoration: none;
 }
 
 /* The ✕. A 1.5rem square — under the 2.75rem tap floor the nav's own rule sets,

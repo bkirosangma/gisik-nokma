@@ -1934,13 +1934,47 @@ input, textarea, select { font-family: inherit; }
 .gn-nav__links { display: flex; flex-wrap: wrap; align-items: center; gap: 1rem; flex: 1 1 auto; min-width: 0; }
 .gn-nav__spacer { flex: 1; }
 
-/* The brand tile (owner request 2026-09-23) — the sign-in page's own tile
-   (`.gn-page-header__icon`, packages/ui/src/ui.css:5810) scaled down, same
-   tokens: `--gn-brand` fill, `--gn-text-inverted` glyph, `--gn-radius-card`
-   scaled to the tile's own size rather than reused literally (a 20px/14px
-   card radius on a 1.75rem tile reads as a circle, not a tile). Not a link,
-   not a button — decorative furniture the tile's own `aria-hidden` covers. */
+/* The brand GROUP (owner ruling 2026-09-24: "placement is not balanced ...
+   make it the icon, then 'Gisik Nokma' in bold heavy text on its right ...
+   leave appropriate space before the 'workspace' item") — `NavBrand`
+   (`apps/web/src/nav-brand.tsx`), the tile plus the wordmark, shared by
+   `AppNav` and `LegalNav`. Widened from a tile-ONLY rule (owner request
+   2026-09-23); this class also used to be defined a SECOND time, further
+   down this file, for the legal bar's own hand-rolled markup — see that
+   old location's tombstone comment. One definition now, for both bars.
+
+   `min-height: 2.75rem` is `.gn-nav a, .gn-nav button`'s own control-row
+   height (below), not a new number — `.gn-nav__inner` stays
+   `align-items: flex-start` (sign-out/corner depend on it, see that rule's
+   own docblock), so this is what lands the tile+wordmark's OWN vertical
+   centre on the link row's centre without touching the parent's alignment:
+   the group's box starts at the same top edge as `.gn-nav__links`' first
+   line (both top-aligned by the parent), and `align-items: center` here
+   centres the tile+wordmark within that matched height.
+
+   `margin-inline-end` is a deliberate SECOND gap, added on top of
+   `.gn-nav__inner`'s own `1rem` flex `gap` (which still applies to
+   `.gn-nav__corner` on the far side) — 1rem + 0.5rem = 1.5rem before
+   `Workspaces`, visibly wider than the 1rem between the links themselves. */
 .gn-nav__brand {
+  flex: 0 0 auto;
+  display: flex;
+  align-items: center;
+  gap: 0.5rem;
+  min-height: 2.75rem;
+  margin-inline-end: 0.5rem;
+}
+/* The tile itself — the sign-in page's own tile (`.gn-page-header__icon`,
+   packages/ui/src/ui.css:5810) scaled down, same tokens: `--gn-brand` fill,
+   `--gn-text-inverted` glyph, `--gn-radius-card` scaled to the tile's own
+   size rather than reused literally (a 20px/14px card radius on a 1.75rem
+   tile reads as a circle, not a tile). Not a link, not a button —
+   decorative furniture this rule's own `aria-hidden` (on the JSX) covers.
+   `LegalNav`'s tile used to be `--gn-accent`-tinted at 30px, its own rule
+   further down this file — moved to this ONE tile, `--gn-brand`, a
+   deliberate change (owner ruling 2026-09-24, "one component ... used by
+   app-nav AND legal-nav"). */
+.gn-nav__brand-tile {
   flex: 0 0 auto;
   width: 1.75rem;
   height: 1.75rem;
@@ -1951,6 +1985,13 @@ input, textarea, select { font-family: inherit; }
   align-items: center;
   justify-content: center;
 }
+/* The wordmark — plain, VISIBLE text (not `aria-hidden`, unlike the tile
+   beside it): "Gisik Nokma" in bold heavy text, per the ruling above.
+   `font-weight: 800` is the "bold heavy" the owner asked for; `font-size`/
+   `line-height` are unchanged from the legal bar's own pre-unification
+   values (17px/22px, already measured legible there) rather than an
+   invented new number now that this rule reaches both bars. */
+.gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 800; }
 
 /* PHONE: THE WORKSPACE LINKS COLLAPSE INTO ONE DISCLOSURE (E4-11).
 
@@ -2011,6 +2052,13 @@ input, textarea, select { font-family: inherit; }
     flex-basis: 100%;
     min-width: 0;
   }
+  /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
+     promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
+     line") is a WIDTH budget, and the wordmark ("Gisik Nokma", 17px/800)
+     spends real space that budget never had. Hiding it here, rather than the
+     tile, is what the ruling asks for — the tile alone is what the phone bar
+     already carried before this round. */
+  .gn-nav__wordmark { display: none; }
 }
 /* Never shrinks and never wraps — the other half of the split above. Its
    rendered width is fixed (the inbox icon + the avatar), so unlike
@@ -2558,24 +2606,17 @@ input, textarea, select { font-family: inherit; }
 
 /* ── The bar's own three pieces (`isLegal` `:1722-1729`) ───────────────────
    The BAR is `.gn-nav`, the product's chrome — see `apps/web/src/legal-nav.tsx`
-   for why. Only the parts the export adds are styled here. */
-.gn-nav__brand { display: inline-flex; align-items: center; gap: 0.6rem; flex: none; }
-.gn-nav__brand-tile {
-  display: inline-flex;
-  align-items: center;
-  justify-content: center;
-  flex: none;
-  width: 30px;
-  height: 30px;
-  border-radius: 8px;
-  /* `--gn-accent` on `--gn-accent-text` is the pair `.gn-button--primary` and
-     `.gn-avatar--tint-0` already ship (`ui.css:72`), so this introduces no
-     unmeasured colour pair — the export's `--brand`/`--onColor` map onto it
-     one-for-one. */
-  background: var(--gn-accent);
-  color: var(--gn-accent-text);
-}
-.gn-nav__wordmark { font-size: 17px; line-height: 22px; font-weight: 600; }
+   for why. The brand tile + wordmark pair used to be styled HERE, a second
+   time — `.gn-nav__brand`/`.gn-nav__brand-tile`/`.gn-nav__wordmark` were
+   each already declared above (`AppNav`'s own tile-only rule, in this same
+   file), so this SECOND definition of `.gn-nav__brand` silently overrode
+   the earlier one's layout at equal specificity, and `.gn-nav__brand-tile`
+   painted its own `--gn-accent` tint the app bar's tile never saw. Owner
+   ruling 2026-09-24 ("one component ... used by app-nav AND legal-nav")
+   resolved the collision by DELETING this copy — `NavBrand`
+   (`apps/web/src/nav-brand.tsx`) now renders the same shared markup here
+   too, styled by the one definition near `.gn-nav__inner` above. Only the
+   `Sign in` link (below) is still this bar's own. */
 
 /* ── The 404's own two additions ────────────────────────────────────────────
    `isNotFound` draws a centred 520px column (`:1846`) where this page used the

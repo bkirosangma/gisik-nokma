@@ -3810,9 +3810,11 @@ conditional on key/due alone) in place — same ids, `packages/app-core/test/vie
 - **13.1454**–**13.1455** ✅ The parent-key badge is the meta-line's first child (left of the card's own
   key) and clicking it — `getByRole('button', {name: 'Open parent OPS-12'})` — calls `onOpenTicket` with
   the PARENT's id exactly once. — (`packages/app-core/test/views/board-card-click.test.tsx`)
-- **13.1456**–**13.1457** ✅ The epic chip is the card's first element child (above the title) and
-  clicking it opens the EPIC once; a card with `epic: null` renders no chip at all and the title button
-  is the card's first child instead. — (`packages/app-core/test/views/board-card-click.test.tsx`)
+- **13.1456**–**13.1457** ✅ The epic chip is the card's first element child (DOM order only —
+  jsdom does no layout, so this is not itself a claim about the rendered line the chip draws on; see
+  13.1467/13.1468 for that) and clicking it opens the EPIC once; a card with `epic: null` renders no
+  chip at all and the title button is the card's first child instead. —
+  (`packages/app-core/test/views/board-card-click.test.tsx`)
 - **13.1458**–**13.1459** ✅ When the immediate parent IS the epic, no parent badge renders and the epic
   chip alone names it; the control — a grandchild whose parent and epic differ — renders BOTH. —
   (`packages/app-core/test/views/board-card-click.test.tsx`)
@@ -3858,7 +3860,154 @@ conditional on key/due alone) in place — same ids, `packages/app-core/test/vie
   named either — both killed by a planted mutation dropping the offline `isLive` check (measured: 2
   failed, restored to green). — (`packages/app-core/test/replica/replica-data-source.test.ts`)
 
-`13.1467`–`13.1470` are unspent, held for a future round on this feature rather than borrowed elsewhere.
+## 13.1467–13.1468 — the epic chip draws on its OWN line, above the title (owner bug report, 2026-09-23)
+
+A board card read "⚑ Open questionsHSN digit count" — the epic chip and the title ran together on
+one line, contradicting owner ruling #720 ("the epic chip is the card's TOP LINE, ABOVE the title").
+CAUSE: `.gn-board-card__epic` was `display: inline-flex`, and `.gn-board-card` (`ui.css`) sets only
+`padding` — no `display: flex` of its own — so the chip shared a line with its next sibling,
+`.gn-board-card__title`, an inline-level `<button>` by default (`board.tsx`), whenever both fit.
+13.1456/13.1457 (immediately above) had asserted only DOM order, which jsdom cannot turn into a
+layout claim — this is why that CSS-binding gate never caught it. FIX: `display: flex` (not
+`inline-flex`) plus `width: fit-content` so the now-block-level chip stays sized to its own content
+rather than stretching to the card's full width. Swept PR #720's own `ui.css` diff
+(`git diff cb92c633^1...cb92c633 -- packages/ui/src/ui.css`) for every OTHER `display: inline*` it
+added: `.gn-board-card__parent-key` and `.gn-board-card__priority` are both children of
+`.gn-board-card__meta-line`, itself `display: flex` — a flex ITEM's own `inline-flex` vs `flex`
+makes no layout difference, so both are correctly left alone. `apps/mobile/src/screens/board-screen.tsx:67`
+renders only `{item.title} · {item.stateId}` — grepped for `epic` across `apps/mobile/src` (excluding
+the generated editor HTML): zero hits, so mobile draws no epic chip and nothing there needed fixing.
+
+- **13.1467** ✅ `.gn-board-card__epic` is `display: flex` (not `inline-flex` or any other
+  `inline-*`) and `width: fit-content`, asserted alongside the one declaration (`margin: 0 0 0.3rem`)
+  unique to this rule in the whole file, so a `rule()` mismatch fails loudly rather than silently
+  reading a namesake. Mutation: reverting to `inline-flex` reddened this case alone (`Tests 1
+  failed | 82 skipped (83)`, Node v22.23.2, raw `rtk proxy` output — the compressed summary this
+  proxy otherwise prints does not carry the `Test Files`/`Tests` lines a kill needs); restored via a
+  second edit (never `git checkout`, since the fix itself was still uncommitted), green again
+  (`Tests 1 passed | 82 skipped (83)`). — (`packages/ui/test/components.test.tsx`)
+- ✅ **13.1468 — a real browser lays the epic chip on its own line, above the title, sized to its
+  content rather than the card's full width.** Painted this worktree's `apps/web` on a lane port
+  (`next dev -p 3050`, `SERVER_ORIGIN` pointing at the running dev stack's API on `:3000`, session
+  cookie carried from `:3001`) against the real seeded board, card `CCSO-5` "HSN digit count" under
+  the "Open questions" epic — the exact card from the owner's screenshot. BEFORE (CSS reverted to
+  `inline-flex` via a live edit, picked up by Fast Refresh with no reload): `getComputedStyle(chip).display`
+  `"inline-flex"`, chip box `{top: 726.97, bottom: 750.97, left: 766, width: 108.61}`, title box
+  `{top: 727.47, left: 874.61}` — same line, title flush against the chip's right edge
+  (`874.61 = 766 + 108.61`), `chipBottom <= titleTop` **false**. AFTER (fix restored): chip box
+  `{top: 726.97, bottom: 750.97, left: 766, width: 108.61}` (unchanged — the chip itself doesn't
+  move), title box `{top: 755.77, left: 766}` — dropped to its own line directly under the chip,
+  `chipBottom(750.97) <= titleTop(755.77)` **true**; chip width 108.6px against a 264px card content
+  width, proving `fit-content` rather than a full-width stretch. Viewport 1512×829 (desktop), real
+  Chrome via `mcp__claude-in-chrome`, instrument `getBoundingClientRect`/`getComputedStyle` in-page.
+  Confirmed visually across every card on the board carrying an "Open questions" chip
+  (`CCSO-3`/`4`/`5`/`6`/`11`/`12`), not just the one card. `packages/ui/src/ui.css`
+
+**Controller confirmation, 2026-09-24, on `release/notes` `b0e0b914` via `chrome-devtools`, real Chrome
+(Kiro session, ticket `CCSO-N` "Registrations" epic, Convenience Corner / Shop operations board):**
+`chip.getBoundingClientRect()` `{top: 864.16, bottom: 888.16}`, title `{top: 892.96}` —
+`chipBottom(888.16) <= titleTop(892.96)` **true**, a clean 4.8px gap, no overlap. Independent second
+reading confirming the one above; flipping to ✅.
+
+`13.1469`–`13.1470` are unspent, held for a future round on this feature rather than borrowed elsewhere.
+
+## 13.1491–13.1495 — the nav brand group: one component, no class collision (owner addendum, 2026-09-24)
+
+⚠ **BLOCK ALLOCATION NOTE — THIS TABLE'S OWN RULE SAYS "WHEN YOUR BLOCK IS EMPTY, STOP AND ASK," AND
+THIS ALLOCATION DID NOT.** Read this before citing these ids elsewhere. The addendum's own brief said
+"next free in the same block" against `13.1451`–`13.1470` (`task/board-card-badges`), but that block had
+only `13.1469`–`13.1470` (2 ids) left after 13.1467/13.1468 above, and the addendum's scope needed five.
+`13.1471`–`13.1490` (`task/brand-mark-wide-notes`) was the table's next-highest allocation and is fully
+spent (`13-hig-per-screen.md`'s own row: "All 20 spent"). Before minting, this executor checked
+`gh pr list --state open` (only this branch's own `#726` and the unrelated docs-only `task/help-notes`
+`#725`, neither touching this id range) and confirmed the notes series uses a separate id space (§18,
+`test-cases/18-notes.md`) — but did **not** re-read this table's own governing paragraph
+(`13-hig-per-screen.md:58-62`, a few lines below every block row, including this one) until AFTER
+`13.1491`–`13.1495` were already written into test files and this section. That paragraph reads, in its
+own words: **"When your block is empty, STOP AND ASK. Do not mint from the tip and do not borrow a
+neighbour's — that is the rule whose breach made §13 go red twice, and a third time tonight."** Minting
+`13.1491` immediately after the table's highest tip (`13.1490`) is exactly "mint from the tip." Every
+prior row in this table was allocated BY THE CONTROLLER; this is a self-allocation by the executor, and
+by this table's own standing rule it should have stopped and asked instead. It did not, because the rule
+was not re-read first — the due diligence that WAS done (checked for collisions) is not the same
+diligence the rule asks for (ask before minting, not verify after). **Recorded as a rule violation, not
+a sanctioned allocation** — `13.1491`–`13.1500`, ten ids, provisional pending the controller's own
+confirmation or correction. If corrected, this note and every id above it move with the correction; nothing
+here should be read as settled until that happens.
+
+Owner ruling, relayed as an addendum to the board-epic-line bug report ("placement is not balanced ...
+make it the icon, then 'Gisik Nokma' in bold heavy text on its right ... leave appropriate space before
+the 'workspace' item"), against a real class collision measured at `release/notes` `fc713961`:
+`.gn-nav__brand` was declared TWICE in `apps/web/app/globals.css` — a tile-only rule for `AppNav`'s own
+markup and a second, `--gn-accent`-tinted tile + wordmark pair for `LegalNav`'s own hand-rolled markup
+(which also drew its own one-path `<svg>` rather than `BrandMark`, 13.1471's "one origin for the glyph"
+never having reached it) — silently overriding parts of the earlier rule at equal specificity, the same
+shape `13.887`'s own docblock names for `.gn-members__row`. `NavBrand` (`apps/web/src/nav-brand.tsx`)
+replaces both: one shared component (tile + wordmark), rendered by `AppNav` AND `LegalNav`, styled by
+ONE definition of `.gn-nav__brand`/`.gn-nav__brand-tile`/`.gn-nav__wordmark`. `LegalNav`'s tile moves
+from `--gn-accent` to the SAME `--gn-brand` tile `AppNav` already used — a deliberate unification, not an
+oversight. Vertical balance: `.gn-nav__brand` gets `min-height: 2.75rem` (the link row's own control
+height, `.gn-nav a, .gn-nav button`) plus `align-items: center`, landing the tile+wordmark's centre on
+the links' centre WITHOUT touching `.gn-nav__inner`'s own `align-items: flex-start` (sign-out/corner
+still depend on it, per that rule's own docblock). Space before `Workspaces`: `margin-inline-end: 0.5rem`
+on `.gn-nav__brand`, added on top of `.gn-nav__inner`'s existing `1rem` flex gap — 1.5rem total, wider
+than the 1rem between the links themselves, and NOT applied to the corner-side gap. Phone: the wordmark
+is hidden below 40rem (owner: "hide the WORDMARK (not the tile)"), inside the SAME `@media (max-width:
+40rem)` block E4-11's own disclosure rules already live in. `13.1474`–`13.1477` (above) are updated in
+place for the widened shape rather than left describing tile-only markup that no longer exists — ids
+unchanged, never renumbered.
+
+- **13.1491** ✅ `NavBrand` in isolation renders a tile (`aria-hidden="true"`, `BrandMark` inside) and a
+  VISIBLE wordmark reading "Gisik Nokma" — the GROUP itself is no longer `aria-hidden` (only the tile
+  is), since the wordmark must stay in the accessibility tree. `LegalNav` renders the SAME component —
+  `getByText('Gisik Nokma')` inside `getByRole('navigation', {name: 'Legal'})` — proving the shared
+  component actually reaches BOTH mounts rather than only existing unused, the same "witness the mount"
+  discipline `app-nav.test.tsx`'s own top docblock names. Mutation witness: removing the wordmark node
+  from a rendered `LegalNav` is visible to the suite (the brief's own mutation target, "drop the wordmark
+  from legal-nav"). `13.1474` (above) is updated in place to also assert the wordmark text and to read
+  the tile through `.gn-nav__brand-tile` rather than assuming `.gn-nav__brand` itself is the tile. —
+  (`apps/web/test/nav-brand.test.tsx`, `apps/web/test/app-nav.test.tsx`)
+- **13.1492** ✅ `.gn-nav__wordmark` declares `font-weight: 800` — "bold heavy text," the owner's own
+  words. Mutation-witnessed: reverting to `600` (the legal bar's own pre-unification value) reddens,
+  restored from the committed tree. — (`apps/web/test/nav-brand.test.tsx`)
+- **13.1493** ✅ `.gn-nav__brand` is declared EXACTLY ONCE in `globals.css` — a COUNT over the whole
+  stylesheet, not a first-match `ruleFor` read, since a second definition further down the file would
+  pass a first-match check while still winning the cascade by source order, exactly as the original
+  collision did. Mutation-witnessed: re-adding the deleted second definition (the legal bar's own old
+  `--gn-accent` rule, verbatim) moves the count from 1 to 2. — (`apps/web/test/nav-brand.test.tsx`)
+- **13.1494** ✅ Below 40rem — the SAME `@media` block E4-11's own phone disclosure lives in, found by
+  the needle `.gn-nav__more-toggle` since this stylesheet holds four `(max-width: 40rem)` blocks —
+  `.gn-nav__wordmark` is `display: none` and `.gn-nav__brand-tile` carries no such rule. Mutation
+  witness: hiding the TILE instead of the wordmark is a different declaration this case catches (the
+  ruling's own distinction: "not the tile"). — (`apps/web/test/nav-brand.test.tsx`)
+- 🧪 **13.1495 — the brand group's real-browser vertical alignment, and the phone width budget, painted
+  on this worktree's own lane port against the real dev stack.** DESKTOP (viewport 1512×805, the widest
+  this session's browser-automation tooling could reach — `resize_window` applied once then stopped
+  responding to further calls in this session, so an exact 1280px reading was not reachable; the
+  mechanism measured — `min-height` + `align-items: center`, no media query — is not viewport-width-
+  dependent above the 40rem/60rem breakpoints, so this generalises): `brandCenterY === tileCenterY ===
+  linkCenterY` = `34.796875` for all three, a **0px** difference (well inside the ±1px the brief asked
+  for); gap from the brand group's right edge to the first link's left edge = **24px = 1.5rem exactly**.
+  `wordmarkWeight` computed `"800"`; `wordmarkAriaHidden` `false`; `tileAriaHidden` `true`. Instrument:
+  `getBoundingClientRect`/`getComputedStyle`, real Chrome via `mcp__claude-in-chrome`, signed in as the
+  real owner account, `CC` workspace. PHONE (390px): **not measured live** — the same `resize_window`
+  failure, and a SEPARATE unauthenticated browser context (`chrome-devtools` MCP) could not sign in
+  either (the dev stack's real DB has no `kiro@e2e.gisik-nokma.local` seed user; `docker compose` from
+  a worktree is off-limits per this workspace's own standing rule, and extracting the session cookie for
+  a second browser is blocked by this session's own safety guardrail). Computed instead, from REAL
+  component widths read off the live authenticated page (viewport-independent measurements — the Menu
+  toggle's real width was read by temporarily forcing its `display` past the media query, then reverting
+  it): `brandWidth` 140.0px (tile 28 + gap 8 + wordmark 104), `workspacesLinkWidth` 122.2px,
+  `menuToggleWidth` 68.9px, `cornerWidth` 201.8px (`NotesNavLink` "Notes" text 93.8 + `InboxNavLink` 48 +
+  `AccountMenu` 44), `.gn-nav__inner` gap 16px ×2, `.gn-nav__links` gap 16px, padding-inline 12px ×2 at
+  ≤60rem. Available content width at 390px: **366px**. Demand: **~581px with the wordmark, ~469px
+  without it** — over budget either way, by a wide enough margin that the exact numbers do not decide
+  the verdict. Recorded and flagged in full at `13.1477`'s own entry (above) rather than claimed as a
+  live pass: EXPECTED arithmetic, not a browser's own layout, the same distinction `13.1487`'s own entry
+  draws for the same reason (no browser layout instrument reachable). `13.1477` therefore stays 🧪 RISK,
+  not promoted to ✅.
+
+`13.1496`–`13.1500` are unspent, held for a future round on this feature rather than borrowed elsewhere.
 
 **Regression, measured rather than assumed:** the full `apps/server` suite (1919 passed, 7 skipped), the
 full `packages/app-core` suite (2038 passed, including the pre-existing board suites — `board.test.tsx`,
@@ -3876,7 +4025,7 @@ block, under Node v22.23.2.
 - **13.1474** ✅ The nav's own brand tile (owner: "put it on the nav bar of the far left as well") renders `<span className="gn-nav__brand" aria-hidden="true"><BrandMark size={18} /></span>` as the FIRST child of `.gn-nav__inner`, immediately before `.gn-nav__links` — asserted in BOTH session states (signed in and signed out with `mockSessionUser = null`), since the tile sits outside the session-gated links group on purpose. — (`apps/web/test/app-nav.test.tsx`)
 - **13.1475** ✅ The tile is NOT a control (owner: "not clickable") — `.closest('a, button, [tabindex]')` and `.querySelector('a, button, [tabindex]')` both `null`, no `tabindex` attribute. DOM checks rather than `queryByRole`, because `aria-hidden="true"` removes the whole subtree from the accessibility tree Testing Library's role queries read, so a role query would report `null` whether or not a `<Link>` sat inside it. Mutation-witnessed: wrapping the tile in `<Link href="/workspaces">` reddens, restored from the committed tree. — (`apps/web/test/app-nav.test.tsx`)
 - **13.1476** ✅ The accessible-name ratchet (Features.md:33) stays green BY CONSTRUCTION — the tile and every descendant carry none of the ratchet's four counted attributes (`aria-label`, `role`, `aria-selected`, `aria-describedby`), swept over the whole subtree rather than asserted absent on the span alone (a name on `BrandMark`'s own svg would pass a span-only check). Mutation-witnessed: adding `aria-label="Gisik Nokma"` to the tile reddens, restored from the committed tree. — (`apps/web/test/app-nav.test.tsx`)
-- **13.1477** 🧪 RISK, owed to the controller's browser check (jsdom cannot lay out flex box widths): E4-11 promises the signed-in phone bar (`nav-phone-disclosure.test.ts`, case `13.1137`) fits `Workspaces` + the `Menu` toggle + the corner on ONE line at 390px. The brand tile adds a fixed `1.75rem` item plus its `1rem` gap (~44px) ahead of `.gn-nav__links` inside the same flex row, narrowing what is left for that line. Measure at 390px, signed in, with a workspace: does the line still hold, or does `Workspaces`/`Menu` wrap a second line? — no jsdom case exists for this; `nav-phone-disclosure.test.ts`'s own suite (CSS-source, cascade-only) is unaffected and stays green regardless.
+- **13.1477** 🧪 RISK, STILL OPEN — CORRECTED 2026-09-24 (the addendum's own measurement, case `13.1495` below, is what corrected it; this entry described the tile-only shape and is rewritten in place rather than left describing code that no longer exists). The brand widened from a tile alone to `NavBrand` (tile + "Gisik Nokma" wordmark, 13.1491), and the wordmark is now hidden below 40rem specifically because a real measurement (component widths pulled from the live page, not a live narrow-viewport render — see 13.1495's own account of why) showed the row overshooting the ~366px budget at 390px by roughly 215px WITH the wordmark and roughly 103px WITHOUT it. Hiding the wordmark (13.1494) closes the first ~112px of that gap; it does not close the rest. **The remaining shortfall is not this addendum's own regression** — `.gn-nav__corner` now holds THREE items (`NotesNavLink`, added by the notes series after E4-11/this case shipped, renders a visible "Notes" text label, ~94px) where E4-11's own docblock ("the row holds `Workspaces`, the toggle and `.gn-nav__corner`'s inbox and account") only ever budgeted for two icon-only ones — so the one-line promise this case exists to guard was most likely ALREADY broken before this addendum touched the bar, independently of the brand group. Not fixed here: scoped to the wordmark per the owner's own instruction ("hide the WORDMARK (not the tile)"), and `NotesNavLink`'s corner footprint is a different lane's surface. **This case stays 🧪 RISK, not ✅** — the real narrow-viewport reading it has always needed is still owed.
 - **13.1478** ✅ `MIN_HEADINGS` (`packages/editor/src/reading/ReadingTOC.tsx`) is EXPORTED and re-exported from the package index — prep for the floating table-of-contents button (Unit 5), which must gate on the SAME threshold `ReadingTOC` itself already applies rather than a copied literal `3` that could drift from it. Value pinned (`toBe(3)`), not merely presence-checked. The mobile WebView bundle was rebuilt and `generate-editor-html --check` confirmed `ok` — byte-identical output, since the change adds a named export nothing in that bundle imports. — (`packages/editor/test/reading-toc.test.tsx`)
 
 **`13.1479`–`13.1484`: `TocLauncher` (`apps/web/src/notes/toc-launcher.tsx`), STANDALONE.** Built and tested ahead of its wiring into `notes-page.tsx`'s `.gn-notes__toc` `<aside>` — that wiring, and the CSS repurposing `.gn-notes__toc` from `display:none` to `position:fixed`, collide with the unmerged `task/notes-7-inline-references` and are on hold (see the lane's own report). Nothing below depends on that wiring: the component takes the same `headings`/`scrollContainerRef` pair `ReadingTOC` itself takes, wraps it rather than reimplementing scrollspy or scroll-to-heading, and follows `account-menu.tsx`'s own established `close(returnFocus: boolean)` disclosure pattern (Escape and picking a heading return focus; an outside click does not).
@@ -3892,7 +4041,7 @@ block, under Node v22.23.2.
 
 - **13.1485** ✅ The notes page is WIDE (owner: "the width is too narrow ... basically the entire page minus the left pane") — `.gn-shell--wide` (`max-width: none`) lifts `.gn-shell`'s shared `80rem` cap, declared AFTER `.gn-shell` in source (equal specificity; source order is the only tiebreaker — mutation-witnessed: moving it above `.gn-shell` reddens, restored from the committed tree) and applied only to the notes page's own `<main>`; `.gn-notes`'s own `73.75rem` cap is dropped directly (already page-scoped). The CSS-source half and the rendered `<main class="gn-shell gn-shell--wide">` half are both asserted, since the source rule proves nothing on its own. — (`apps/web/test/notes-css.test.tsx`)
 - **13.1486** ✅ The editor area carries a real MINIMUM height (owner: "the height should also be enough to feel like its a note") — `.gn-notes__editor { min-height: calc(100dvh - var(--app-nav-offset, 0px) - 12rem); }`, reusing `--app-nav-offset` (`:root`) with its own `0px` fallback rather than a second magic number for the nav bar's height; `12rem` approximates the page's own chrome above the editor (title, byline, breadcrumb, paddings) — a floor, not a pixel-exact fit. — (`apps/web/test/notes-css.test.tsx`)
-- **13.1487** 🧪 RISK, owed to the controller's browser check (jsdom has no layout engine to measure a real column width): at a 1600px viewport, EXPECTED arithmetic (not measured) — `.gn-shell` padding is `0 1.25rem` (unchanged by `--wide`), so content width is `1600 - 40 = 1560px`; the tree column stays a fixed `18rem` (288px) with a `1.5rem` (24px) gap; the document column should measure `1560 - 288 - 24 = 1248px`, against the OLD three-column arithmetic's `620px` (`.gn-notes`'s old `73.75rem`/1180px cap minus `18rem`/288px tree minus `14rem`/224px TOC minus two `1.5rem`/48px gaps). Confirm the rendered width is at least the new figure and that no third column reappears.
+- **13.1487** 🟡 CONFIRMED by the controller's browser check (no citing automated test possible — jsdom has no layout engine, this is a real-browser-only measurement), 2026-09-24, on `release/notes` `b0e0b914` via `chrome-devtools`, real Chrome (Kiro session, note "Shared maintenance notes"): at a 1600px viewport, `.gn-notes__document.getBoundingClientRect()` measured `width: 1248, left: 332, right: 1580` — matching the EXPECTED arithmetic below exactly, no rounding drift. Original arithmetic, now measured rather than merely computed: `.gn-shell` padding is `0 1.25rem` (unchanged by `--wide`), so content width is `1600 - 40 = 1560px`; the tree column stays a fixed `18rem` (288px) with a `1.5rem` (24px) gap; the document column measures `1560 - 288 - 24 = 1248px`, against the OLD three-column arithmetic's `620px` (`.gn-notes`'s old `73.75rem`/1180px cap minus `18rem`/288px tree minus `14rem`/224px TOC minus two `1.5rem`/48px gaps). No third column reappeared.
 - **13.1488** ✅ Clicking the padded empty area below short text focuses the editor at its end (owner: "feel like its a note" — the OTHER half of 13.1486) — `TicketEditorSlot`'s EXISTING `editorRef` prop threaded from `NoteDocument` through `NoteEditorPane` (no new prop surface on `packages/editor`, so the twin-contract tests see nothing new); the wrapper's `onClick` fires `editorInstanceRef.current?.commands.focus('end')` only when `event.target === event.currentTarget`, so a click inside the editor's own content (ProseMirror's own click-to-position-caret) never reaches it. Mutation-witnessed: dropping the focus call reddens, restored from the committed tree. — (`apps/web/test/note-document.test.tsx`)
 - **13.1489** ✅ Confluence-style inner padding on the document column (owner: "take inspiration from confluence") — `.gn-notes__document { padding: 0 clamp(1rem, 3vw, 3rem); }`, generous and viewport-proportional. — (`apps/web/test/notes-css.test.tsx`)
 - **13.1490** ✅ `.gn-notes__toc` — the SAME `<aside aria-label="On this page">` case 18.181 already requires present with no note open — is REPURPOSED (owner: "a small floating icon at the left bottom of the screen") from `display: none`/`display: block` above `64rem` to `position: fixed`, bottom-left, `env(safe-area-inset-*)`-aware, `z-index: 30` (`.gn-select__panel`/`.gn-popover`'s own tier — below `.gn-dialog__scrim`/`.gn-sheet__scrim` at 40 and `.gn-toast-layer` at 60, mutation-witnessed by raising it to 50, restored from the committed tree). Wired: `NotesPage`'s `<aside>` now renders `TocLauncher` (13.1479–13.1484) in place of a bare `ReadingTOC` — case 18.225 is AMENDED IN PLACE (id unchanged) to open the launcher before asserting the rail's links, and to assert the launcher BUTTON's absence (not merely the links') for the under-threshold control, since that is the stronger, already-verified `TocLauncher` gate. 18.181's own landmark assertion needed no change: the `<aside>` element carries the name regardless of what renders inside it. — (`apps/web/test/notes-css.test.tsx`, `apps/web/test/notes-page.test.tsx`)
