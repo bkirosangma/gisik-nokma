@@ -1574,7 +1574,11 @@ The author always reads their own note, whatever its scope — that is what **Pr
 ### Writing a note
 
 The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold,
-Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note.
+Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, **Insert note** and
+**Insert ticket**. Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and
+the markdown you can type instead. **Insert note** and **Insert ticket** each drop the `:note`/`:ticket`
+trigger at the cursor and open the same picker typing it would — the same two triggers work from the
+keyboard too, and `[[` still works for a note.
 
 **Notes save themselves.** A couple of seconds after you stop typing, your change is sent — not on
 every keystroke. Until it is accepted the footer says **Saving…**; once it is, **Saved**. If it cannot

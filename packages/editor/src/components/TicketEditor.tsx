@@ -83,6 +83,11 @@ export type TicketEditorProps = {
    * tell which is authoritative.
    */
   hintSlot?: 'below' | 'none';
+  /**
+   * Test-only passthrough to `EditorToolbar`'s own `platform` override — real
+   * callers never set it. See that prop's docblock.
+   */
+  toolbarPlatform?: 'mac' | 'other';
 };
 
 export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
@@ -259,7 +264,7 @@ export function TicketEditor(props: TicketEditorProps): React.JSX.Element {
           read-only: `editable` is `false` for a viewer who may not write, and a
           toolbar of commands that would each be refused is chrome for a door
           that is shut. */}
-      <EditorToolbar editor={editor} editable={editable} />
+      <EditorToolbar editor={editor} editable={editable} platform={props.toolbarPlatform} />
       {/* `gn-field__input` beside the editor's own class (owner, 2026-09-22: the
           description and comment areas follow `#gn-new-project-name`). The coat
           — fill and 1px border under `hig`/`minimal`, borderless sunken surface

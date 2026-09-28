@@ -7912,7 +7912,63 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note."
+                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " each drop the "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "/"
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " trigger at the cursor and open the same picker typing it would — the same two triggers work from the keyboard too, and "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "[["
+                  },
+                  {
+                    "kind": "text",
+                    "text": " still works for a note."
                   }
                 ]
               },
