@@ -2,6 +2,7 @@ import { evaluateEvent } from '@gisik-nokma/rule-engine';
 import type { EventEnvelope, LedgerEvent, SubmittedEvent, TicketState } from '@gisik-nokma/domain';
 import type { SqlRow, SyncStorage } from '../storage/storage.js';
 import type { Replica } from '../replica/replica.js';
+import { deleteNotice, listNotices, type SyncNotice } from './notices.js';
 import { buildLocalEngineContext, buildPendingOverlay, type LocalContextDeps } from '../precheck/local-context.js';
 
 /**
@@ -197,6 +198,10 @@ export type Outbox = {
   recordFailure(eventIds: string[], error: string, now?: () => Date): Promise<void>;
   queuedCount(workspaceId: string): Promise<number>;
   failedItems(workspaceId: string): Promise<OutboxItem[]>;
+  /** Claims removed because their item was permanently erased (trash Plan 3), oldest first. */
+  notices(workspaceId: string): Promise<SyncNotice[]>;
+  /** The person has read it. */
+  dismissNotice(noticeId: string): Promise<void>;
   /** The outbox overlay over confirmed state, or `null` when nothing is queued for this ticket. */
   pendingFor(ticketId: string): Promise<PendingTicket | null>;
   /** Tickets that exist ONLY as queued claims — never in any settled listing. */
@@ -487,6 +492,10 @@ export function createOutbox(deps: { storage: SyncStorage; replica: Replica }): 
       );
       return rows.map(rowToItem);
     },
+
+    notices: (workspaceId) => listNotices(storage, workspaceId),
+
+    dismissNotice: (noticeId) => deleteNotice(storage, noticeId),
 
     pendingFor: overlayFor,
 

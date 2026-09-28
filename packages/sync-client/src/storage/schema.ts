@@ -13,8 +13,11 @@ import type { SyncStorage } from './storage.js';
  * this schema must ALTER rather than CREATE, the version needs a reader and a
  * migration step, and `snapshot_provenance`'s docblock below already records
  * that as unowned.
+ * Raised to 3 by trash series Plan 3, which added `purged_ids`, `sync_notices`
+ * and `deleted_items_cache` — three NEW tables, for the same reason the notes
+ * tables were: `CREATE TABLE IF NOT EXISTS` is the only DDL this file runs.
  */
-export const LOCAL_SCHEMA_VERSION = 2;
+export const LOCAL_SCHEMA_VERSION = 3;
 
 // ULID discipline: no column here carries a hand-written shape constraint.
 // `events.id`, `outbox.event_id` and the entity ids are ULIDs, but the ONE
@@ -162,8 +165,64 @@ const TABLES = [
      status TEXT NOT NULL DEFAULT 'queued', attempts INTEGER NOT NULL DEFAULT 0,
      next_attempt_at TEXT NOT NULL DEFAULT '1970-01-01T00:00:00.000Z', last_error TEXT
    )`,
+  /**
+   * What a permanent purge erased (trash series Plan 3, D2) — kind and id,
+   * content-free. Written by `replica.eraseEntities`, read by `purgedAmong`
+   * (the chips' predicate) and to keep an id out of the next lookup. Never
+   * erased itself: it is the record of an erasure.
+   */
+  `CREATE TABLE IF NOT EXISTS purged_ids (
+     entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL, recorded_at TEXT NOT NULL,
+     PRIMARY KEY (entity_kind, entity_id)
+   )`,
+  /**
+   * Claims this device REMOVED from its outbox and must tell the person about
+   * (spec §5.7: "never silently"). CONTENT-FREE on purpose: the claim's
+   * payload is content of an erased item, so only its event id (the notice's
+   * key), its target and its type are kept.
+   */
+  `CREATE TABLE IF NOT EXISTS sync_notices (
+     notice_id TEXT PRIMARY KEY, workspace_id TEXT NOT NULL, kind TEXT NOT NULL,
+     entity_kind TEXT NOT NULL, entity_id TEXT NOT NULL, event_type TEXT NOT NULL, recorded_at TEXT NOT NULL
+   )`,
+  `CREATE INDEX IF NOT EXISTS sync_notices_workspace_idx ON sync_notices (workspace_id, recorded_at)`,
+  /**
+   * The last ONLINE answer of `GET /v1/me/deleted-items` (spec §6.3's last
+   * line; D9) — the body as served, keyed `'me'` because the read is the
+   * signed-in person's, not a workspace's. An erase strips its rows.
+   */
+  `CREATE TABLE IF NOT EXISTS deleted_items_cache (
+     cache_key TEXT PRIMARY KEY, payload TEXT NOT NULL, fetched_at TEXT NOT NULL
+   )`,
   `CREATE TABLE IF NOT EXISTS meta (key TEXT PRIMARY KEY, value TEXT NOT NULL)`,
 ];
+
+/**
+ * Every local table's rule when a permanent purge reaches this device (trash
+ * series Plan 3, D2) — the device's mirror of Plan 2's `PURGE_TABLE_RULES`.
+ * Case 19.172 compares these keys against `sqlite_master`, so a table added
+ * next month without a rule reddens rather than silently keeping erased data.
+ */
+export const LOCAL_TABLE_RULES: Readonly<Record<string, { rule: 'erase' | 'registry'; why: string }>> = {
+  events: { rule: 'erase', why: "an erased entity's events by (entity_kind, entity_id); a workspace's by workspace_id" },
+  snapshots: { rule: 'erase', why: "an erased ticket's baseline; a workspace erase deletes its tickets' rows" },
+  snapshot_provenance: { rule: 'erase', why: 'the sibling of snapshots, by the same key' },
+  tickets: { rule: 'erase', why: 'the erased ticket and its LOCAL subtree (parent_id), or every ticket naming an erased project' },
+  notes: { rule: 'erase', why: 'the erased note, or every note homed in an erased project' },
+  note_comments: { rule: 'erase', why: "an erased note's comments" },
+  contests: {
+    rule: 'erase',
+    why: "EVERY contest on an erased ticket, the device's own included — unlike purgeEntity (lost access), a purge is an erasure and a stub embeds the claim whole",
+  },
+  outbox: { rule: 'erase', why: 'every queued claim about an erased entity — each one becomes a sync_notices row' },
+  workflows: { rule: 'erase', why: 'a workspace erase only (the replica holds one workspace, as revokeScope assumes)' },
+  ticket_types: { rule: 'erase', why: 'a workspace erase only, as workflows' },
+  meta: { rule: 'erase', why: "a workspace erase deletes its cursor and both pending-pull keys; an entity erase strips it from the pending-pull lists" },
+  deleted_items_cache: { rule: 'erase', why: 'the cached Deleted items body loses every row whose item or workspace was erased' },
+  purged_ids: { rule: 'registry', why: 'the record of what was erased — content-free, never erased' },
+  sync_notices: { rule: 'registry', why: 'the content-free record of removed claims; the person dismisses each one' },
+};
+
 
 export async function migrateLocal(storage: SyncStorage): Promise<void> {
   await storage.transaction(async (tx) => {
