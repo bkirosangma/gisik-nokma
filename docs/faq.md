@@ -586,8 +586,9 @@ cannot open it. That is today's behaviour; whether it should instead hide the ti
 the product owner is still deciding.
 
 **Can I delete a note?**
-Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up
-in the Deleted group, Restore works and brings it back exactly as it was.
+Yes — open it and press **Delete…** beside **History** (its author, a workspace admin or the owner).
+It goes to the **Deleted** group on the Notes page and to **Deleted items** on your Account page, and
+**Restore** in either brings it back exactly as it was.
 
 **What happens if someone stops sharing a note with me while I have it open?**
 You are taken back to the Notes list with a message: "That note is no longer shared with you".

@@ -8372,11 +8372,51 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "As of this writing there is no Delete button on a note's own page"
+                    "text": "Deleting a note:"
                   },
                   {
                     "kind": "text",
-                    "text": " — nothing in the product yet puts a note there for you. The Restore machinery is ready and working; only the control that starts it is still missing."
+                    "text": " open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — only the note's author, a workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete permanently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switch. A deleted note shows a banner on its own page; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " there brings it back, and if the server refuses (for example because the note is marked for permanent deletion elsewhere) the banner says why. Every deleted note is also listed under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page."
                   }
                 ]
               },
@@ -11026,7 +11066,47 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up in the Deleted group, Restore works and brings it back exactly as it was."
+                    "text": "Yes — open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (its author, a workspace admin or the owner). It goes to the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " group on the Notes page and to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in either brings it back exactly as it was."
                   }
                 ]
               }

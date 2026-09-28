@@ -130,3 +130,10 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.232 — Escape inside the delete dialog closes the dialog and NOT the sheet under it;** control: nothing was posted. Mutation: drop `event.preventDefault()` from `Dialog`'s Escape handler (the E5-20 mechanism).
 - ✅ **19.233 — on the project page a PERMANENT delete's toast reads "<name> marked for permanent deletion · …" and its **Undo** posts ONE batch `[purge.unmarked, ticket.restored]` for that ticket;** control: the soft sentence is not on screen (16.84 is the soft Undo's own case). Mutation: always restore with `ticket.restored` alone.
 - ✅ **19.234 — the page strip's Undo after a permanent delete sends the pair; if only the unmark lands, the refusal is shown and the strip's next Undo sends `ticket.restored` alone;** control: the strip's sentence turns to the soft one once the mark is gone. Mutation: keep `permanent: true` on the strip after a `partly` answer.
+
+## 19.24 The note page
+
+- ✅ **19.236 — a note's editor (its author, here the owner) sees **Delete…** in the byline;** control: a plain member who is not the author sees none, and neither does anyone on a note that is already deleted. Mutation: pass `onDelete` regardless of `canEditNow`.
+- ✅ **19.237 — **Delete…** opens `Delete note “<title>”?`; confirming with the switch on posts ONE batch `[note.deleted, purge.marked]` for this note, and the page then shows the deleted banner;** control: switch off posts `[note.deleted]` alone. Mutation: send the batch against `kind: 'ticket'`.
+- ✅ **19.238 — after a permanent delete made on this page, the banner's **Restore** posts ONE batch `[purge.unmarked, note.restored]`;** control: after a soft delete it posts `[note.restored]` alone. Mutation: always restore with `note.restored` alone.
+- ✅ **19.239 — a refused banner Restore shows the server's reason in the banner (`role="alert"`), and the banner stays;** control: a committed Restore removes the banner. Mutation: return on refusal without setting the message (the old silent `write`).

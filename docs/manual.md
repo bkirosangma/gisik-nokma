@@ -1653,9 +1653,12 @@ A deleted note goes into a **Deleted** group on the Notes page, with a **Restore
 see your own there, and an owner or admin sees everyone's. Restoring it brings it back exactly as it
 was; while deleted, the note is read-only for everyone, its own author included.
 
-**As of this writing there is no Delete button on a note's own page** — nothing in the product yet puts
-a note there for you. The Restore machinery is ready and working; only the control that starts it is
-still missing.
+**Deleting a note:** open it and press **Delete…** beside **History** — only the note's author, a
+workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its
+**Delete permanently** switch. A deleted note shows a banner on its own page; **Restore** there brings
+it back, and if the server refuses (for example because the note is marked for permanent deletion
+elsewhere) the banner says why. Every deleted note is also listed under **Deleted items** on your
+Account page.
 
 If a note you have open stops being shared with you — someone narrowed its scope, or detached the last
 job it inherited from — you are taken back to the Notes list with a message: **That note is no longer

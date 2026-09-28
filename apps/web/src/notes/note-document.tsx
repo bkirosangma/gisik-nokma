@@ -13,9 +13,15 @@ import {
 } from '@gisik-nokma/editor';
 import { Button } from '@gisik-nokma/ui';
 import {
+  DeleteDialog,
   TicketSheet,
+  classifyBatch,
   makeSubmittedFactory,
+  restoreSeeds,
+  restoreUnreachableLine,
+  unansweredLine,
   useLiveQuery,
+  writeFailureCopy,
   type DataSource,
   type RosterMember,
   type WorkspaceRef,
@@ -413,6 +419,41 @@ export function NoteDocument({
     return false;
   }
 
+  /**
+   * The deleted banner's Restore (trash Plan 4 Task 6). Not `write`: that
+   * returns `false` on any refusal and shows nothing, and once this page can
+   * mark a note, Restore is refused for a marked one (`UNMARK_FIRST_REASON`) —
+   * the button would silently do nothing. So it goes through `restoreSeeds`
+   * (unmark first after a permanent delete made HERE) and shows the reason.
+   */
+  async function restoreNote(): Promise<void> {
+    if (user === null || note === null) return;
+    const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+    const seeds = restoreSeeds({ kind: 'note', workspaceId: note.workspaceId, entityId: note.noteId }, markedHere);
+    try {
+      const results = await dataSource.ingest(seeds.map(make));
+      const outcome = classifyBatch(results, seeds.length);
+      if (outcome.status === 'committed') {
+        setMarkedHere(false);
+        setRestoreRefusal(null);
+        live.reload();
+        setEditorGeneration((generation) => generation + 1);
+        return;
+      }
+      if (outcome.status === 'partly') {
+        // One of the pair landed: the unmark (still deleted, no longer
+        // marked). Re-read, and say what was refused.
+        setMarkedHere(false);
+        live.reload();
+      }
+      setRestoreRefusal(
+        outcome.status === 'unanswered' ? unansweredLine(outcome.answered, seeds.length) : outcome.reason,
+      );
+    } catch (cause) {
+      setRestoreRefusal(writeFailureCopy(cause, restoreUnreachableLine));
+    }
+  }
+
   const authorName = useMemo(() => {
     if (note === null) return '';
     const author = members.find((member) => member.id === note.authorId);
@@ -450,6 +491,17 @@ export function NoteDocument({
    *   read-only until the person reloaded the page, without this.
    */
   const [editorGeneration, setEditorGeneration] = useState(0);
+  /** The delete dialog's open state (trash Plan 4, D2). */
+  const [deleting, setDeleting] = useState(false);
+  /**
+   * True after a PERMANENT delete made on this page, so the banner's Restore
+   * unmarks before it restores (the server refuses a restore while marked).
+   * `NoteDetail` carries no mark, so a mark made elsewhere is not known here —
+   * that Restore is refused with the server's reason, shown in the banner, and
+   * Deleted items on the Account page is where it can be unmarked.
+   */
+  const [markedHere, setMarkedHere] = useState(false);
+  const [restoreRefusal, setRestoreRefusal] = useState<string | null>(null);
 
   if (note === null) {
     return (
@@ -523,26 +575,24 @@ export function NoteDocument({
           );
         }}
         onOpenHistory={() => setHistoryOpen(true)}
+        {...(canEditNow ? { onDelete: () => setDeleting(true) } : {})}
       />
 
       {note.deleted ? (
         <div className="gn-notes__deleted-banner" role="status" data-testid="note-deleted-banner">
           <p>This note was deleted</p>
           {canEdit ? (
-            <Button
-              onClick={() => {
-                void write('note.restored', {}).then((wrote) => {
-                  if (wrote) setEditorGeneration((generation) => generation + 1);
-                });
-              }}
-            >
-              Restore
-            </Button>
+            <Button onClick={() => void restoreNote()}>Restore</Button>
           ) : (
             <Button variant="ghost" onClick={() => router.push('/notes')}>
               Back
             </Button>
           )}
+          {restoreRefusal !== null ? (
+            <p role="alert" className="gn-refusal gn-refusal--server">
+              {restoreRefusal}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -651,6 +701,29 @@ export function NoteDocument({
             the ticket` scope tied to the now-deleted job).
           */
           onDeleted={() => live.reload()}
+        />
+      ) : null}
+
+      {user !== null ? (
+        <DeleteDialog
+          open={deleting}
+          kind="note"
+          name={note.title}
+          workspaceId={note.workspaceId}
+          entityId={note.noteId}
+          dataSource={dataSource}
+          make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })}
+          onCancel={() => setDeleting(false)}
+          onDeleted={({ permanent }) => {
+            setDeleting(false);
+            setMarkedHere(permanent);
+            setRestoreRefusal(null);
+            // The deleted banner reads \`note.deleted\`; \`TicketEditor\` reads
+            // \`editable\` once at mount, so the pane is remounted too (the
+            // same reason the banner's Restore bumps it).
+            live.reload();
+            setEditorGeneration((generation) => generation + 1);
+          }}
         />
       ) : null}
     </div>
