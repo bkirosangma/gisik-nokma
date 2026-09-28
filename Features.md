@@ -1520,7 +1520,7 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   explicit `false` rather than left to a default — `document` because it is replaced, `link` because it
   is reconfigured, `underline` because it is not this product's vocabulary.
   `packages/editor/src/schema/extensions.ts`
-- ✅ **Task lists in every document** — `[ ] ` / `[x] ` at a line start; schema is version 2
+- ✅ **Task lists in every document** — `[ ] ` / `[x] ` at a line start; schema is version 2 **The checkbox is aligned and styled (owner screenshot 2026-09-29):** it centres on the item's FIRST text line (label `1lh` tall, the item's paragraph margins zeroed — measured 8.5px high before, 0.5px after), is a custom 1rem accent-on-check box inside a 24px hit area with hover, `:focus-visible` and a `neo` sunken coat instead of the native blue one, and a done item is muted, never struck through (owner). The comment body's read-only task item wears the same box (`apps/web/app/globals.css`). Cases `9.360`–`9.362`.
   (`DOC_SCHEMA_VERSION`), version-1 documents render unchanged.
 - ⚙️ **Plain text and the read-only comment renderer understand every v2 node** (task items,
   collapsibles, wiki-links) — search indexing and comment display never drop content silently. Both

@@ -3974,6 +3974,89 @@ input, textarea, select { font-family: inherit; }
   align-items: flex-start;
   gap: 0.5rem;
 }
+/* Owner report 2026-09-29 (screenshot): the checkbox sat ~half a line ABOVE its
+   text and was the browser's native blue box. MEASURED, not assumed: the item's
+   paragraph keeps `.ticket-editor__content p`'s 0.5rem top margin, so the text
+   started 8px down while the 13px native input sat at the top of the row —
+   checkbox centre 8.5px above the first line's centre, single-line and wrapped
+   alike. The label is now one line tall (`1lh`, floored at the 1.5rem touch
+   target) and centres the box on the FIRST line; the item's own paragraphs give
+   up their outer margins so that first line starts at the top of the row. */
+.ticket-editor__content ul[data-type='taskList'] > li > label {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 1.5rem;
+  height: 1lh;
+  min-height: 1.5rem;
+  cursor: pointer;
+}
+.ticket-editor__content ul[data-type='taskList'] > li > div > p:first-child { margin-top: 0; }
+.ticket-editor__content ul[data-type='taskList'] > li > div > p:last-child { margin-bottom: 0; }
+/* A done item reads MUTED, never struck through (owner, 2026-09-29: "done items
+   should not be struck through") — the checked box already says "done". */
+.ticket-editor__content ul[data-type='taskList'] > li[data-checked='true'] > div,
+.gn-comment__task > input[type='checkbox']:checked + span {
+  color: var(--gn-text-muted);
+}
+/* The box: the real `<input type="checkbox">` stays (keyboard toggle, label
+   association, checked state) and is only restyled — the recipe of
+   `.gn-list__column-option`'s box: accent fill + `--gn-text-inverted` mark when
+   checked, `--gn-focus-ring` outline on `:focus-visible`. Shared with the
+   comment body's read-only task item, which drew the same native box. */
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox'],
+.gn-comment__task > input[type='checkbox'] {
+  display: grid;
+  flex: none;
+  place-content: center;
+  box-sizing: border-box;
+  width: 1rem;
+  height: 1rem;
+  margin: 0;
+  appearance: none;
+  -webkit-appearance: none;
+  border: 1.5px solid var(--gn-border-strong);
+  border-radius: 4px;
+  background: var(--gn-fill-quaternary);
+  cursor: pointer;
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:hover,
+.gn-comment__task > input[type='checkbox']:hover {
+  border-color: var(--gn-accent);
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:checked,
+.gn-comment__task > input[type='checkbox']:checked {
+  border-color: var(--gn-accent);
+  background: var(--gn-accent);
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:checked::after,
+.gn-comment__task > input[type='checkbox']:checked::after {
+  content: '';
+  width: 0.3125rem;
+  height: 0.5625rem;
+  border: solid var(--gn-text-inverted);
+  border-width: 0 2px 2px 0;
+  transform: translateY(-1px) rotate(45deg);
+}
+.ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:focus-visible,
+.gn-comment__task > input[type='checkbox']:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+.gn-comment__task > input[type='checkbox']:disabled { cursor: default; }
+/* The comment body's task item is a bare `input + span` row (no label, no
+   paragraph margin), so its box is centred on the first line by a fixed nudge:
+   (23.2px line - 16px box) / 2 at the body's 1.45 line-height. */
+.gn-comment__task > input[type='checkbox'] { margin: 0.225rem 0 0; }
+/* `neo` fields are borderless and sunken (`[data-style="neo"] .gn-field__input`);
+   the unchecked box takes the same coat, the checked one stays a flat accent. */
+[data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked),
+[data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked) {
+  border-color: transparent;
+  background: var(--gn-surface-sunken);
+  box-shadow: var(--gn-shadow-sunken);
+}
 
 /* The fenced code block. `.editor-codeblock`'s own `position: relative` is
    editor.css's; this is its surface. `pre code` resets the inline-code rule
