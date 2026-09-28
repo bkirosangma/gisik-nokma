@@ -166,9 +166,11 @@ ledger event as the only survival signal would flag essentially every live attac
 an orphan. An earlier draft of this section described exactly that one-signal rule — if you are here to
 make the code match the runbook, the runbook was wrong, not the code.
 
-**It does not delete `attachments` rows.** There is no `DELETE FROM attachments` anywhere in
-`apps/server/src`. Orphaned rows — a row whose object never arrived — therefore accumulate and are not
-swept by this tool. That is a known gap, not an oversight of this runbook.
+**It does not delete `attachments` rows.** The one `DELETE FROM attachments` in `apps/server/src` is the
+permanent purge's (`src/purge/erasure.ts`): it deletes an erased ticket's, note's or workspace's rows and
+queues their objects in `purge_pending_objects`, which the purge sweep empties. Orphaned rows — a row whose
+object never arrived — therefore still accumulate and are not swept by this tool. That is a known gap, not
+an oversight of this runbook.
 
 Run with `--dry-run` first and expect single digits; a large count means clients are failing between
 upload and ingest, which is an incident, not a cleanup.
