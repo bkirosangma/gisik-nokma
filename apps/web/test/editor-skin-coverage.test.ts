@@ -521,7 +521,7 @@ describe('9.344 the code-block copy button hides via opacity, not display/visibi
  * its own the way the mention/ticketref chips do). Pinned here because each
  * was a real, silent gap this plan's own first draft shipped with.
  */
-describe('editor skin — colour-alone and token-collision regressions', () => {
+describe('9.354 editor skin — colour-alone and token-collision regressions', () => {
   const bare = stripComments(readFileSync(GLOBALS_CSS_PATH, 'utf8'));
 
   function ruleBody(css: string, selector: string): string {

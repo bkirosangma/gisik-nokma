@@ -285,7 +285,7 @@ describe('table floating toolbar', () => {
     view.unmount();
   });
 
-  it('does not float above the content area (and so cannot cover the main toolbar) when the table is the very first node', async () => {
+  it('9.353 does not float above the content area (and so cannot cover the main toolbar) when the table is the very first node', async () => {
     // Reproduces a live-browser finding: a table with nothing above it inside
     // `.ticket-editor__content` sits right at the content area's own top edge
     // (44px below the main toolbar, in the measured case). The unclamped
