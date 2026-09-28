@@ -22,8 +22,8 @@ function refuse(reason: string): Refusal {
  * `noteMovedPayload`, `noteAttachedPayload`). Read defensively: the payload
  * has already parsed, but this must never throw on a shape it does not know.
  */
-function payloadIds(env: EventEnvelope): Array<[kind: string, id: string]> {
-  const payload = (typeof env.payload === 'object' && env.payload !== null ? env.payload : {}) as Record<
+function payloadIds(type: string, rawPayload: unknown, depth = 0): Array<[kind: string, id: string]> {
+  const payload = (typeof rawPayload === 'object' && rawPayload !== null ? rawPayload : {}) as Record<
     string,
     unknown
   >;
@@ -31,7 +31,7 @@ function payloadIds(env: EventEnvelope): Array<[kind: string, id: string]> {
   const add = (kind: string, value: unknown): void => {
     if (typeof value === 'string' && value !== '') named.push([kind, value]);
   };
-  switch (env.type) {
+  switch (type) {
     case 'ticket.created':
       add('project', payload['projectId']);
       add('ticket', payload['parentId']);
@@ -49,6 +49,21 @@ function payloadIds(env: EventEnvelope): Array<[kind: string, id: string]> {
     case 'note.attached':
       add('ticket', payload['ticketId']);
       break;
+    case 'claim.contested': {
+      // Trash Plan 3 (D10). A refused ticket claim comes back as a contest on
+      // the claim's OWN entity (`sync/sync-service.ts`'s `contest()`), and for a
+      // NEW ticket under an erased parent that entity is not in the registry —
+      // so the contest must be judged by what its embedded claim names. One
+      // level only: a contest never embeds a contest (`sync-service.ts` refuses
+      // a client-submitted `claim.contested` before ingest).
+      const original = payload['originalEvent'];
+      if (depth === 0 && typeof original === 'object' && original !== null) {
+        const embedded = original as { entity?: { kind?: unknown; id?: unknown }; type?: unknown; payload?: unknown };
+        if (typeof embedded.entity?.kind === 'string') add(embedded.entity.kind, embedded.entity.id);
+        if (typeof embedded.type === 'string') named.push(...payloadIds(embedded.type, embedded.payload, depth + 1));
+      }
+      break;
+    }
     default:
       break;
   }
@@ -60,7 +75,7 @@ export async function checkPurged(db: Queryable, env: EventEnvelope): Promise<Re
   const named: Array<[string, string]> = [
     [env.entity.kind, env.entity.id],
     ['workspace', env.workspaceId],
-    ...payloadIds(env),
+    ...payloadIds(env.type, env.payload),
   ];
   const { rows } = await db.query<{ hit: boolean }>(
     `SELECT EXISTS (

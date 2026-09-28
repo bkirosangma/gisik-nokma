@@ -268,3 +268,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.162 — the body is refused with 400 for 501 ids and for an id that is not a ULID;** control: exactly 500 ULIDs answer 200, and an empty list answers `{ purged: [] }`. Mutation: raise `maxItems` to 1000.
 - ✅ **19.163 — a signed-out caller gets 401;** control: the same body with a session answers 200. Mutation: drop `preHandler: requireSession`.
 - ✅ **19.164 — the device vocabulary is pinned: `PURGED_OUTBOX_NOTICE` verbatim, `PURGE_RULE` is `purge.erased` and the server's re-export is the same constant, `PURGED_LOOKUP_MAX_IDS` is 500, and `isPurgedRef` admits the four lifecycle kinds with a non-empty id;** control: a `workflow` ref, an empty id and a ref without an id are refused. Mutation: `isPurgedRef` accepts any string kind.
+
+## 19.31 The door, through sync
+
+- ✅ **19.165 — through `POST /v1/sync`'s service, a `ticket.created` whose parent was purged is answered `refused` with `PURGED_REASON` and rule `purge.erased`, and no row of any kind is written for the new ticket (no `claim.contested`);** control: a legal top-level creation in the same project commits. Mutation: delete the `claim.contested` arm of `payloadIds` — the answer becomes `contested`.
+- ✅ **19.166 — through sync, a `ticket.created` in a purged project and a `ticket.reparented` of a live ticket under a purged one are both refused with `PURGED_REASON`, and the live ticket's stream is unchanged;** control: a creation in the kept project commits. Mutation: read only the original event's ENTITY, not its payload — both answers become `contested`.
