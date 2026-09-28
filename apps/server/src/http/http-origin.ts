@@ -203,6 +203,11 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   '/v1/me/notification-preferences',
   '/v1/me/invitations/:inviteId/accept', // membership-granting, cookie-authenticated
   '/v1/me/invitations/:inviteId/decline',
+  // Access plan Task 6 (case 6.216). The lookup answers "does this address have
+  // an account"; the outsider door GRANTS a workspace role. Both are
+  // cookie-authenticated POSTs a page the victim visits could otherwise send.
+  '/v1/workspaces/:workspaceId/people-lookup',
+  '/v1/workspaces/:workspaceId/assign-outsider',
 ]);
 
 /**

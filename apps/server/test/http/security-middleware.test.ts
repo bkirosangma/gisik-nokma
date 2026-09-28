@@ -188,6 +188,19 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       'POST',
     ],
     ['POST /v1/workspaces', '/v1/workspaces', '/v1/workspaces', 'POST'],
+    // Access plan Task 6 (6.216). A cookie-authenticated POST; the lookup answers "does this address have an account", the other GRANTS a role.
+    [
+      'the people LOOKUP (access plan, 6.216)',
+      '/v1/workspaces/01JQ0000000000000000000000/people-lookup',
+      '/v1/workspaces/:workspaceId/people-lookup',
+      'POST',
+    ],
+    [
+      'the outsider ASSIGNMENT (access plan, 6.216)',
+      '/v1/workspaces/01JQ0000000000000000000000/assign-outsider',
+      '/v1/workspaces/:workspaceId/assign-outsider',
+      'POST',
+    ],
     [
       'the ticket-type MIGRATION',
       '/v1/workspaces/01JQ0000000000000000000000/ticket-types/01JT0000000000000000000000/migrate',
