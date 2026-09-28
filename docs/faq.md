@@ -486,9 +486,9 @@ Enough is known about the writing box to answer this properly:
 - It is proper formatting, not plain text — headings, bold, italic, bullet and numbered lists, quotes.
 - It **auto-formats as you type**: a dash becomes a bullet, "1." starts a numbered list, hashes become
   headings, asterisks become bold. About nineteen of these shortcuts.
-- When it auto-formats, a small chip appears. **Press Backspace, or click the chip, to undo the
-  formatting** and keep your literal characters. **Press Escape and the chip goes away and the
-  formatting stays.** Two opposite results, both of which dismiss the chip. Learn the difference.
+- If a shortcut fires when you did not want it, **press Backspace straight away** — the formatting
+  goes and the characters you typed (the hashes, dashes, backticks) come back as plain text. It works
+  only for the very next keypress; once you type anything else, the formatting stays.
 - **To mention somebody**, type @ and start their name. A list appears — arrows or click to pick,
   Enter to insert, Escape to close and leave what you typed as ordinary text. It will not offer anyone
   without a proper name, and it cannot be tricked into showing one person's name while pointing at

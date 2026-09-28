@@ -231,7 +231,12 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
       markdownLinks: true,
     }),
     Placeholder.configure({ placeholder: options.placeholder ?? 'Write…' }),
-    Table.configure({ resizable: false }),
+    // `renderWrapper: true` (the option's own default is FALSE — measured
+    // against this repo's installed @tiptap/extension-table@3.30.5, not
+    // assumed): without it the library never emits the `.tableWrapper` div,
+    // so the web skin's wide-table horizontal-scroll rule would target
+    // nothing.
+    Table.configure({ resizable: false, renderWrapper: true }),
     TableRow,
     TableHeader,
     TableCell,

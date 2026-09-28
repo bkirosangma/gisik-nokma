@@ -128,19 +128,15 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
    * is a different code path (see escape-suggestion.ts's docblock on why
    * `keyboardShortcut('Backspace')` cannot substitute for it either).
    *
-   * COLLAPSIBLE AND BOTH CODE-BLOCK ROWS ARE DELIBERATELY EXCLUDED from this
-   * table — see the ledger's Task 1 ruling. Measured: two OTHER, pre-existing
-   * Backspace handlers win the real-keydown race before escape-suggestion's
-   * override ever runs, for the identical "cursor at the start of the
-   * freshly-created empty block" state:
-   *   - collapsible.ts's OWN keymap (case 9.295, spec §8.4) deletes the
-   *     empty summary's whole block, leaving one paragraph.
-   *   - `@tiptap/extension-code-block`'s OWN upstream `Backspace` shortcut
-   *     (installed dist, not this repo's code) exits an empty code block
-   *     back to a paragraph, the same way.
-   * Neither is literal "< "/"``` " text; both are pre-existing, more
-   * specific handlers this lane does not override. The two regression
-   * cases below confirm both are unchanged.
+   * COLLAPSIBLE IS DELIBERATELY EXCLUDED from this table — see the ledger's
+   * Task 1 ruling. Measured: collapsible.ts's OWN keymap (case 9.295, spec
+   * §8.4) wins the real-keydown race before escape-suggestion's override
+   * ever runs, for the "cursor at the start of the freshly-created empty
+   * block" state, and deletes the empty summary's whole block, leaving one
+   * paragraph. The regression case below confirms it is unchanged. THE CODE
+   * BLOCK ROWS ARE ALSO EXCLUDED HERE but no longer as an exception: they
+   * have their own 9.359 cases below (owner ruling 2026-09-29), where the
+   * upstream code-block Backspace used to win and no longer does.
    *
    * Mark triggers are the CONTROL, in their own `it` beneath: the mutation
    * this case names (removing the `undoInputRule` override) must leave them
@@ -189,14 +185,63 @@ describe('escape suggestion — every reserved sequence, planted-defect style', 
     editor.destroy();
   });
 
-  it('9.339 REGRESSION — an empty code block still exits to a paragraph on Backspace, not revert-to-literal', () => {
+  /**
+   * 9.359 — A5a (owner ruling 2026-09-29): Backspace pressed IMMEDIATELY after
+   * the ``` (or ~~~) input rule fires restores the typed fence as literal
+   * text; it does NOT run `@tiptap/extension-code-block`'s own upstream
+   * Backspace ("empty code block exits to a paragraph"), which used to win the
+   * real-keydown race and left neither the block nor the backticks. Driven by a
+   * REAL keydown in a real editor mount. Supersedes the earlier 9.339
+   * "code-block exception" regression, which pinned the old behaviour.
+   * Mutation: drop the `addKeyboardShortcuts` override in
+   * code-block-copy.ts → both rows red.
+   */
+  it.each([
+    { typed: '``` ', fence: '```' },
+    { typed: '~~~ ', fence: '~~~' },
+  ])('9.359 $fence + Backspace immediately restores the literal fence, not a bare paragraph', ({ typed, fence }) => {
     const editor = createTestEditor();
-    typeText(editor, '``` ');
+    typeText(editor, typed);
+    expect(firstBlock(editor).type).toBe('codeBlock');
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    expect(editor.view.someProp('handleKeyDown', (h) => h(editor.view, event))).toBe(true);
+    expect(JSON.stringify(editor.state.doc.toJSON())).not.toContain('"codeBlock"');
+    expect(firstBlock(editor)).toEqual({ type: 'paragraph', text: typed });
+    expect(editor.state.doc.textContent).toContain(fence);
+    editor.destroy();
+  });
+
+  /**
+   * 9.359 CONTROL — the upstream exit is untouched when NO input rule just
+   * fired: a code block that was already there (here made by the command, not
+   * by typing ```), caret at its start, still exits to an empty paragraph on
+   * Backspace. Without this, the fix above could pass by making Backspace
+   * always restore backticks.
+   */
+  it('9.359 CONTROL — an empty code block NOT made by the shortcut still exits to a paragraph on Backspace', () => {
+    const editor = createTestEditor();
+    editor.commands.setCodeBlock();
+    expect(firstBlock(editor).type).toBe('codeBlock');
     const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
     editor.view.someProp('handleKeyDown', (h) => h(editor.view, event));
-    const json = editor.state.doc.toJSON();
-    expect(JSON.stringify(json)).not.toContain('"codeBlock"');
-    expect(editor.state.doc.textContent).not.toContain('```');
+    expect(JSON.stringify(editor.state.doc.toJSON())).not.toContain('"codeBlock"');
+    expect(editor.state.doc.textContent).toBe('');
+    editor.destroy();
+  });
+
+  /**
+   * 9.359 CONTROL 2 — the record closes on the first further keystroke, as for
+   * every other rule: after typing inside the fresh block, Backspace is NOT
+   * claimed by either handler (the browser deletes the character natively —
+   * jsdom does not emulate that, so the assertion is "unhandled, block and
+   * text untouched", never "restored to backticks").
+   */
+  it('9.359 CONTROL — after typing inside the fresh block, Backspace is left to the browser and the block stands', () => {
+    const editor = createTestEditor();
+    typeText(editor, '``` ab');
+    const event = new KeyboardEvent('keydown', { key: 'Backspace', bubbles: true });
+    expect(editor.view.someProp('handleKeyDown', (h) => h(editor.view, event))).toBeFalsy();
+    expect(firstBlock(editor)).toEqual({ type: 'codeBlock', text: 'ab' });
     editor.destroy();
   });
 

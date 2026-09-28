@@ -881,3 +881,59 @@
 /* The active entry is marked by WEIGHT, not by colour: this file may not name
    a colour, and colour alone is never the only indicator anyway. */
 .reading-toc__link[aria-current='true'] { font-weight: 600; }
+
+/* The table floating toolbar (TableFloatingToolbar.tsx). Structure here,
+   colour in the web skin (globals.css) — same split `.wikilink-preview`
+   above already uses: `Canvas`/`currentColor` are this file's stand-ins for
+   the surface/border the web skin later overrides with `--gn-*` tokens. This
+   split also matters for the mobile WebView bundle, which loads ONLY this
+   file (`webview/entry.tsx`) and never `globals.css` — without a structural
+   rule here, the toolbar has no layout or borders on the phone at all, not
+   merely no colour.
+   `position: absolute` lives here rather than as an inline style: the
+   component supplies only `top`/`left` (dynamic per render), matching how
+   every other positioned element in this file keeps its static properties
+   in the stylesheet. */
+.table-toolbar {
+  position: absolute;
+  display: flex;
+  flex-wrap: wrap;
+  align-items: center;
+  gap: 2px;
+  padding: 4px;
+  border: 1px solid currentColor;
+  border-radius: 6px;
+  background: Canvas;
+  z-index: 30;
+  /* Resolves against `.ticket-editor`, the containing block for this
+     absolutely-positioned element — 9 buttons + 3 separators run to
+     450px+, wider than a phone editor, and an overflowing absolute child
+     still adds to its ancestors' scrollable overflow. `flex-wrap` alone
+     wraps buttons onto a second row; this stops the row itself from ever
+     being asked to exceed the editor's own width in the first place. */
+  max-width: 100%;
+}
+.table-toolbar__group { display: flex; align-items: center; }
+.table-toolbar__sep {
+  width: 1px;
+  height: 20px;
+  background: currentColor;
+  opacity: 0.3;
+  margin: 0 4px;
+}
+/* 32/34px, the main toolbar's own grouped-button precedent above
+   (`.ticket-editor__tool`), not the 44px standalone floor — these are
+   grouped controls, not a lone target. */
+.table-toolbar__btn {
+  min-height: 32px;
+  min-width: 34px;
+  padding: 0 8px;
+  border: none;
+  border-radius: 4px;
+  background: none;
+  color: inherit;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+.table-toolbar__btn:disabled { opacity: 0.4; cursor: not-allowed; }

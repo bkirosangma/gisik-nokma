@@ -10507,23 +10507,15 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "When it auto-formats, a small chip appears. "
+                      "text": "If a shortcut fires when you did not want it, "
                     },
                     {
                       "kind": "bold",
-                      "text": "Press Backspace, or click the chip, to undo the formatting"
+                      "text": "press Backspace straight away"
                     },
                     {
                       "kind": "text",
-                      "text": " and keep your literal characters. "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "Press Escape and the chip goes away and the formatting stays."
-                    },
-                    {
-                      "kind": "text",
-                      "text": " Two opposite results, both of which dismiss the chip. Learn the difference."
+                      "text": " — the formatting goes and the characters you typed (the hashes, dashes, backticks) come back as plain text. It works only for the very next keypress; once you type anything else, the formatting stays."
                     }
                   ],
                   [

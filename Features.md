@@ -1535,7 +1535,11 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   pill when the target is gone or unreadable (spec §8.5). **The pill is not red**, which is a deviation
   from the spec's wording rather than an omission: `editor.css`'s header forbids every colour form and
   packages/editor must not reach packages/ui's tokens, so the pill is drawn apart from a live link with
-  a wavy underline. `packages/editor/src/extensions/wiki-link.ts`, `wiki-link-popup.ts`
+  a wavy underline. **The live link is underlined at rest** (task/editor-skin, 2026-09-28) — an accent
+  colour alone was the only cue distinguishing it from plain prose, a WCAG 1.4.1 concern the web skin's
+  colour layer (`apps/web/app/globals.css`) now closes; the underline is removed on hover only, the
+  shape `.gn-board-card__parent-key` already uses elsewhere. `packages/editor/src/extensions/wiki-link.ts`,
+  `wiki-link-popup.ts`, `apps/web/app/globals.css`
 - ⚙️ **The editor slot has a `note` mode** — autosave hooks (`onDraft` on every change, `onSave` on
   blur, `saveState` reported in the footer as `Saved` / `Saving…` / `Not saved (kept on this device)`,
   or nothing at all when the host supplies none — it does not default to the reassuring arm)
@@ -1560,8 +1564,26 @@ by Plan 4 and by Plan 5 Task 2, and the reservation logic that kept them out is 
   since Unit 4 (see the toolbar's own bullet above), **Insert note** and **Insert ticket** in place of
   the original single Link-a-note control that inserted the `[[` trigger. The
   code block's node view keeps its name (`codeBlock`) and its two input rules, so the document is
-  unchanged and only its chrome is new. `packages/editor/src/extensions/code-block-copy.ts`,
+  unchanged and only its chrome is new. Backspace pressed straight after typing the ``` / ~~~ shortcut
+  gives the typed fence back as text (A5a, 2026-09-29; case 9.359) rather than deleting the new block —
+  the block's own Backspace tries `undoInputRule` first. `packages/editor/src/extensions/code-block-copy.ts`,
   `packages/editor/src/components/EditorToolbar.tsx`
+- ✅ **The editor's full content skin — headings, marks, chips, code blocks, collapsibles, lists, tables
+  and a table floating toolbar** (task/editor-skin, 2026-09-28) — `apps/web/app/globals.css` had zero
+  rules for anything the editor draws before this; `packages/editor/src/styles/editor.css` stays
+  colour-free by its own standing rule, and the colour layer for every node/mark/chip lives in the web
+  skin instead, scoped under `.ticket-editor__content` (present in the note document, the comment
+  composer and the note's read-only view alike). Chips (mention, ticket ref, wiki-link) are distinguished
+  from plain text and from each other without colour alone. A `TableFloatingToolbar` — 9 row/column/
+  header/delete actions, ported from the owner's knowledge-base component — appears above a table only
+  when editable and the caret sits inside it, anchored against `.ticket-editor` and clamped to
+  `.ticket-editor__content`'s own top edge so it cannot float up into the main toolbar over a table with
+  nothing above it. A table in a comment thread now renders as a real `<table>` (previously fell through
+  to an "unknown node renders its children" fallback and produced no table shape at all). The skin
+  reaches the mobile WebView bundle only where its colour rule lives in `editor.css` (the table toolbar's
+  layout/border) — everything coloured through `globals.css` does not, since the webview loads only
+  `editor.css`. `apps/web/app/globals.css`, `packages/editor/src/styles/editor.css`,
+  `packages/editor/src/components/TableFloatingToolbar.tsx`, `packages/app-core/src/views/comment-body.tsx`
 - ⚙️ **Typed and pasted text still becomes markup, and the count is recorded rather than claimed** —
   `**due soon**` arrives bold whether typed, pasted or dropped. `autolink` and `linkOnPaste` are `false`
   (and `markdownLinks` is `true` since the owner's 2026-09-21 ruling, so the typed `[text](url)` rule
