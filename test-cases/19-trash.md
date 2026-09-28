@@ -325,3 +325,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 
 - ✅ **19.196 — the replica returns and caches an online `getDeletedItems`; offline it rejects with `DeletedItemsFromCache` holding the cached items and when they were read, and an erase strips an erased item from that cache;** control: back online the answer is a plain list again. Mutation: resolve the cached items instead of rejecting with them.
 - ✅ **19.197 — a device that has never cached the list rejects with `ReplicaGapError` naming `DELETED_ITEMS_NOT_CACHED` (the entry `REPLICA_GAPS` lists), and a malformed online body is a `MappingError` that the cache does not mask;** control: a transport failure with a cache is `DeletedItemsFromCache`. Mutation: map inside the transport `try`, so a mapping failure falls back to the cache.
+
+## 19.39 The cached Deleted items view
+
+- ✅ **19.198 — a `DeletedItemsFromCache` answer draws the saved rows under `deletedItemsAsOf(<IST instant>)`, with no button in the list and no "Unmark it to restore it.";** control: a `ReplicaGapError` still reads "Deleted items needs a connection." and never "Nothing deleted.". Mutation: render the row actions for a cached answer.
+- ✅ **19.199 — `deletedItemsAsOf` is pinned verbatim, and an EMPTY saved list reads "Nothing deleted." together with the as-of line, never the offline line;** control: an empty live list reads "Nothing deleted." with no as-of line. Mutation: treat an empty cached list as offline.
