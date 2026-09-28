@@ -410,3 +410,41 @@ export async function buildWorkspacePair(pool: Pool): Promise<WorkspacePair> {
   ]);
   return { U, W1, W2, P1, T1, N1, INV, marker };
 }
+
+export type ReferenceWorld = TicketWorld & { R: string; N1: string; N2: string; NU: string };
+
+/**
+ * The ticket world plus every shape that references T and SURVIVES its purge
+ * (ruling A): S1's comment chips T; N1 is born attached to T with a body chip;
+ * N2 attaches T and then moves to `inherit` (the D8 hazard); R is born under T
+ * and reparented out; NU is unrelated. N1 and NU have chunk rows.
+ */
+export async function buildReferenceWorld(pool: Pool): Promise<ReferenceWorld> {
+  const w = await buildTicketWorld(pool);
+  const [R, N1, N2, NU] = [newUlid(), newUlid(), newUlid(), newUlid()];
+  const chip = ticketRef(w.T, w.P, 'PG-1', `Invoice ${w.marker}`);
+  await applyCommitted(pool, [
+    ev(w, 'ticket', w.S1, 'comment.added', { body: doc(text('see '), chip) }),
+    noteCreated(w, N1, {
+      title: 'Minutes',
+      homeProjectId: '',
+      scope: { mode: 'workspace' },
+      attachTicketId: w.T,
+      body: doc(text('about '), chip),
+    }),
+    noteCreated(w, N2, { title: 'Private', homeProjectId: '', scope: { mode: 'private' } }),
+    ev(w, 'note', N2, 'note.attached', { ticketId: w.T }),
+    ev(w, 'note', N2, 'note.scope_set', { mode: 'inherit' }),
+    ticketCreated(w, R, w.P, 'Moved out', w.T),
+    ev(w, 'ticket', R, 'ticket.reparented', { newParentId: null }),
+    noteCreated(w, NU, {
+      title: 'Unrelated',
+      homeProjectId: '',
+      scope: { mode: 'workspace' },
+      body: doc(text('nothing to see')),
+    }),
+  ]);
+  await insertChunk(pool, w, N1, `about PG-1 Invoice ${w.marker}`);
+  await insertChunk(pool, w, NU, 'nothing to see');
+  return { ...w, R, N1, N2, NU };
+}

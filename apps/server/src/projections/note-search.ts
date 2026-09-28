@@ -10,6 +10,7 @@ import { ticketNumbers } from '../read/ticket-numbers.js';
 import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
 import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
+import { purgedResolverFor } from '../purge/purged-lookup.js';
 import type { Projection } from './registry.js';
 
 /**
@@ -130,7 +131,7 @@ export const noteSearchProjection: Projection = {
  * being written with an empty one: `proj_note_search` exists to be SEARCHED, and
  * a row that can never match is a row that costs an index probe to prove it.
  */
-async function reindexNote(tx: PoolClient, noteId: string): Promise<void> {
+export async function reindexNote(tx: PoolClient, noteId: string): Promise<void> {
   const { rows } = await tx.query<NoteSourceRow>(
     `SELECT note_id, workspace_id, home_project_id, title, body, deleted
        FROM proj_notes WHERE note_id = $1`,
@@ -143,7 +144,7 @@ async function reindexNote(tx: PoolClient, noteId: string): Promise<void> {
   }
 
   const title = foldSearchText(note.title);
-  const bodyText = foldSearchText(docToPlainText(note.body));
+  const bodyText = foldSearchText(docToPlainText(note.body, { isPurged: await purgedResolverFor(tx, [note.body]) }));
   const ticketText = foldSearchText(await ticketTextOf(tx, note.workspace_id, noteId));
 
   await tx.query(

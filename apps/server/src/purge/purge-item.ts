@@ -12,6 +12,7 @@ import { insertEvent, lockEntity, lockWorkspace, nextSeq, nextWorkspaceSeq } fro
 import type { ProjectionRegistry } from '../projections/registry.js';
 import { rederiveWorkspaceLexemes } from '../projections/note-search.js';
 import { eraseRows, objectKeysOf, recordPurged, replayRemaining, toErasureSet, type PurgeTarget } from './erasure.js';
+import { collectSurvivors, rederiveSurvivors } from './survivors.js';
 import { deletePendingObjects, queuePendingObjects } from './pending-objects.js';
 
 export type { PurgeTarget } from './erasure.js';
@@ -120,10 +121,12 @@ export async function purgeItem(pool: Pool, target: PurgeTarget, deps: PurgeDeps
       [target.kind, target.id],
     );
     const set = toErasureSet(target, item.workspaceId, rows);
+    const survivors = await collectSurvivors(client, set);
     const keys = await objectKeysOf(client, set);
     await eraseRows(client, set);
     await recordPurged(client, set, deps.now.toISOString());
     await replayRemaining(client, set, deps.projections);
+    await rederiveSurvivors(client, survivors, set, deps.projections);
     // Last among the re-derivations (Task 7 inserts the survivors above it):
     // the vocabulary is read off the note search rows as they now stand (D3).
     if (target.kind !== 'workspace') {

@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { chunkDoc } from '@gisik-nokma/domain';
 import { CURRENT_MODEL, EMBEDDING_DIM, embedTexts as defaultEmbedTexts } from './embedding.js';
+import { purgedResolverFor } from '../purge/purged-lookup.js';
 import { nudgesEmbedding } from './nudge.js';
 
 /**
@@ -139,7 +140,7 @@ export function startEmbedWorker(pool: Pool, options: EmbedWorkerOptions): Embed
     );
 
     for (const note of rows) {
-      const chunks = chunkDoc(note.body);
+      const chunks = chunkDoc(note.body, { isPurged: await purgedResolverFor(pool, [note.body]) });
       const pieces = chunks.length > 0 ? chunks : [{ headingPath: '', text: note.title }];
       const vectors = await embedTexts(pieces.map((piece) => piece.text));
 
