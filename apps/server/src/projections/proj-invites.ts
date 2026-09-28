@@ -4,6 +4,7 @@ import {
   inviteRevokedPayload,
   inviteSentPayload,
 } from '@gisik-nokma/domain';
+import { purgedIdsAmong } from '../purge/purged-lookup.js';
 import type { Projection } from './registry.js';
 
 /**
@@ -92,13 +93,18 @@ export const projInvites: Projection = {
   async apply(event, tx) {
     if (event.type === 'invite.sent') {
       const payload = inviteSentPayload.parse(event.payload);
+      // Trash series Plan 2 (spec §5.6): a project erased after the invitation
+      // was sent is no longer offered — live (the purge's survivor update) and on
+      // rebuild (this filter) alike.
+      const projectIds = payload.projectIds ?? [];
+      const erased = await purgedIdsAmong(tx, 'project', projectIds);
       await tx.query(INSERT_SENT, [
         payload.inviteId,
         event.workspaceId,
         payload.address,
         payload.channel,
         payload.role,
-        payload.projectIds ?? [],
+        projectIds.filter((id) => !erased.has(id)),
         event.actorId,
         event.serverTime,
       ]);

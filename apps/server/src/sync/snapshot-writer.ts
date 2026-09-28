@@ -1,6 +1,6 @@
 import type { Pool, PoolClient } from 'pg';
 import {
-  applyTicketEvent,
+  foldTicketEvent,
   TICKET_EVENT_TYPES,
   type TicketState,
   type TicketStateDeps,
@@ -80,7 +80,10 @@ export async function foldTicketHead(
   for (const env of tail) {
     seq = env.seq;
     if ((TICKET_EVENT_TYPES as readonly string[]).includes(env.type)) {
-      state = applyTicketEvent(state, env, deps);
+      // `foldTicketEvent`, not `applyTicketEvent`: a purged ticket's redacted
+      // creation produces no state (spec §5.4), and the `state === undefined`
+      // return below already means "nothing to snapshot".
+      state = foldTicketEvent(state, env, deps);
     }
     // READ off the event row, never computed and never a neighbour's: these are
     // the two claims `TicketState` cannot carry. Every FIELD claim already

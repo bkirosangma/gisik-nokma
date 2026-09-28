@@ -7,6 +7,7 @@ import {
   type NoteState,
 } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
+import { purgedIdsAmong } from '../purge/purged-lookup.js';
 import type { Projection } from './registry.js';
 
 /**
@@ -216,6 +217,40 @@ async function upsertNote(
   );
 }
 
+/**
+ * Trash series Plan 2, deviation D8. The tickets this note attached — by its
+ * OWN earlier `note.created`/`note.attached`/`note.detached` — that are now
+ * erased. They have no `proj_note_attachments` row (a purge removes it, and the
+ * fold below never writes one), but the REDUCER must still see them: a note
+ * that attached T and later moved to `inherit` was legal, and without T in
+ * `attachedTicketIds` `applyNoteEvent` refuses the `note.scope_set` and a
+ * rebuild throws. Reads the note's own stream strictly before this event —
+ * per-entity causality, which replay guarantees. The EXISTS short-circuits the
+ * common case (no ticket in this workspace has ever been purged).
+ */
+async function purgedAttachmentsOf(tx: PoolClient, event: LedgerEvent): Promise<string[]> {
+  const any = await tx.query<{ present: boolean }>(
+    `SELECT EXISTS (SELECT 1 FROM purged_entities WHERE workspace_id = $1 AND entity_kind = 'ticket') AS present`,
+    [event.workspaceId],
+  );
+  if (any.rows[0]?.present !== true) return [];
+  const { rows } = await tx.query<{ type: string; payload: { ticketId?: unknown; attachTicketId?: unknown } }>(
+    `SELECT type, payload FROM events
+      WHERE entity_kind = 'note' AND entity_id = $1 AND seq < $2
+        AND type IN ('note.created', 'note.attached', 'note.detached')
+      ORDER BY seq`,
+    [event.entity.id, event.seq],
+  );
+  const attached = new Set<string>();
+  for (const row of rows) {
+    const id = row.type === 'note.created' ? row.payload.attachTicketId : row.payload.ticketId;
+    if (typeof id !== 'string') continue;
+    if (row.type === 'note.detached') attached.delete(id);
+    else attached.add(id);
+  }
+  return [...(await purgedIdsAmong(tx, 'ticket', [...attached]))].sort();
+}
+
 export const notesProjection: Projection = {
   name: 'proj_notes',
   tables: ['proj_notes', 'proj_note_attachments'],
@@ -232,17 +267,27 @@ export const notesProjection: Projection = {
     // event would still cause a pointless full-row write, and `applyNoteEvent`
     // would be asked about a note the comments table already covers.
     if (event.type === 'comment.added') return;
-    const current = await getNoteStateFromDb(tx, event.entity.id);
+    const stored = await getNoteStateFromDb(tx, event.entity.id);
+    const purgedAttached = stored === null ? [] : await purgedAttachmentsOf(tx, event);
+    const current =
+      stored === null || purgedAttached.length === 0
+        ? stored
+        : { ...stored, attachedTicketIds: [...new Set([...stored.attachedTicketIds, ...purgedAttached])].sort() };
     const next = applyNoteEvent(current, event);
     const priorDeletion = await currentNoteDeletion(tx, event.entity.id);
     const deletedAt = event.type === 'note.deleted' ? event.serverTime : event.type === 'note.restored' ? null : priorDeletion.deletedAt;
     const deletedBy = event.type === 'note.deleted' ? event.actorId : event.type === 'note.restored' ? null : priorDeletion.deletedBy;
     await upsertNote(tx, next, event, deletedAt, deletedBy);
+    // A link to an ERASED ticket is never written (spec §5.6: the surviving note
+    // is detached) — live and on rebuild alike, because the registry answers
+    // the same both ways.
+    const isErased = async (ticketId: string) => (await purgedIdsAmong(tx, 'ticket', [ticketId])).size > 0;
     if (event.type === 'note.created' && next.attachedTicketIds.length === 1) {
-      await insertAttachment(tx, next, next.attachedTicketIds[0]!, event);
+      const ticketId = next.attachedTicketIds[0]!;
+      if (!(await isErased(ticketId))) await insertAttachment(tx, next, ticketId, event);
     } else if (event.type === 'note.attached') {
       const ticketId = (event.payload as { ticketId: string }).ticketId;
-      await insertAttachment(tx, next, ticketId, event);
+      if (!(await isErased(ticketId))) await insertAttachment(tx, next, ticketId, event);
     } else if (event.type === 'note.detached') {
       await tx.query('DELETE FROM proj_note_attachments WHERE note_id = $1 AND ticket_id = $2', [
         next.noteId,

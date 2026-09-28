@@ -92,6 +92,12 @@ const LIVE_GATE_EXEMPT: ReadonlySet<string> = new Set([
   // away. `purge.unmarked` is its undo and must reach the same deleted ticket.
   'purge.marked',
   'purge.unmarked',
+  // Trash series, Plan 2: `purge.completed` is the tombstone the purge itself
+  // appends to an item that is, by definition, deleted. It never reaches the
+  // engine through a door (ingest refuses it from anyone, `purge/check-purged.ts`);
+  // it is exempt so that no path that does evaluate it turns it away as a write
+  // to a deleted ticket.
+  'purge.completed',
 ]);
 
 /**

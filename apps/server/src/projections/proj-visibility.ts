@@ -1,4 +1,5 @@
 import {
+  isRedactedTicketCreated,
   ticketCreatedPayload,
   ticketReparentedPayload,
   visibilitySetPayload,
@@ -237,6 +238,11 @@ export const projVisibility: Projection = {
   async apply(event, tx) {
     switch (event.type) {
       case 'ticket.created': {
+        // Trash series Plan 2 (spec §5.4): a redacted creation has no parent,
+        // no audience and no ticket.
+        if (isRedactedTicketCreated(event)) {
+          return;
+        }
         const payload = ticketCreatedPayload.parse(event.payload);
         await tx.query(
           `INSERT INTO proj_visibility

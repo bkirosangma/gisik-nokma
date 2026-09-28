@@ -1,4 +1,5 @@
 import { z } from 'zod';
+import { ISO_DATETIME_REGEX, isRealCalendarDatetime, ulidString } from '../envelope.js';
 
 /**
  * The lifecycle vocabulary (trash series, Plan 1; spec
@@ -24,3 +25,21 @@ export const projectDeletedPayload = z.object({}).strict();
 export const projectUndeletedPayload = z.object({}).strict();
 export const purgeMarkedPayload = z.object({}).strict();
 export const purgeUnmarkedPayload = z.object({}).strict();
+
+/**
+ * The tombstone (spec §5.3): the ONLY trace a purge leaves in the ledger, filed
+ * against the purged item's own entity by `SYSTEM_ACTOR_PURGE`. Content-free by
+ * construction — `.strict()` refuses a title, a name, a body. `markedBy`/
+ * `markedAt` are copied from the item's lifecycle row (`purge_marked_by`,
+ * `purge_marked_at`) inside the purge transaction, never computed.
+ */
+export const purgeCompletedPayload = z
+  .object({
+    kind: z.enum(['workspace', 'project', 'ticket', 'note']),
+    markedBy: ulidString,
+    markedAt: z
+      .string()
+      .regex(ISO_DATETIME_REGEX, 'must be ISO 8601 with at most millisecond precision')
+      .refine(isRealCalendarDatetime, 'must be a real calendar datetime'),
+  })
+  .strict();
