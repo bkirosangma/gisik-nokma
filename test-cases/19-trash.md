@@ -84,7 +84,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 ## 19.8 Client contract
 
 - ✅ **19.070 — the online twin maps every `DeletedItem` field and refuses a row missing `purgeDueAt`;** control: a full row round-trips. Mutation: default a missing `purgeDueAt` to null.
-- ✅ **19.071 — the replica twin rejects with `ReplicaGapError`;** control: `getMyWorkspaces` on the same replica resolves. Mutation: resolve `[]` (an empty list would tell a person they have nothing deleted, when nobody was asked).
+- ✅ **19.071 — the replica twin rejects with `ReplicaGapError`;** control: `getMyWorkspaces` on the same replica resolves. Mutation: resolve `[]` (an empty list would tell a person they have nothing deleted, when nobody was asked). Amended 2026-09-29 by 19.197 (trash Plan 3): the rejection now happens only while nothing is cached — the absence is `DELETED_ITEMS_NOT_CACHED` ("DeletedItem[] — until one online read is cached on this device"); with a cache the replica rejects with `DeletedItemsFromCache` instead (19.196).
 
 ## 19.9 Purge — every table has a rule
 
@@ -320,3 +320,8 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.193 — a purged `wikiLink` renders `PURGED_ITEM_LABEL` in `span.editor-wikilink--purged` even when `resolveNoteTitle` answers a title, and a click does not navigate;** control: a live link resolves its title and navigates. Mutation: ask `resolveNoteTitle` first.
 - ✅ **19.194 — the webview bridge's `loadDoc` carries `purgedIds` (non-strings dropped), and they are applied BEFORE `setContent`, so a loaded chip to a purged id renders `PURGED_ITEM_LABEL`; the phone builds the message with them;** control: a `loadDoc` without the field parses without the key and renders the stored text. Mutation: call `onPurgedIds` after `setContent`.
 - ✅ **19.195 — the ticket sheet mounts its description editor only once the description's chips have an answer, then hands it `isPurged`;** control: a description with no chips mounts on the first render. Mutation: mount the description slot without waiting for `ready`.
+
+## 19.38 Deleted items offline
+
+- ✅ **19.196 — the replica returns and caches an online `getDeletedItems`; offline it rejects with `DeletedItemsFromCache` holding the cached items and when they were read, and an erase strips an erased item from that cache;** control: back online the answer is a plain list again. Mutation: resolve the cached items instead of rejecting with them.
+- ✅ **19.197 — a device that has never cached the list rejects with `ReplicaGapError` naming `DELETED_ITEMS_NOT_CACHED` (the entry `REPLICA_GAPS` lists), and a malformed online body is a `MappingError` that the cache does not mask;** control: a transport failure with a cache is `DeletedItemsFromCache`. Mutation: map inside the transport `try`, so a mapping failure falls back to the cache.

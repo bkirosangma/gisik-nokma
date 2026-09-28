@@ -246,8 +246,10 @@ export type DataSourceQuery = {
   /**
    * Every deleted workspace, project, ticket or note this caller may currently
    * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:
-   * `GET /v1/me/deleted-items`. Replica: throws `ReplicaGapError` — Plan 3
-   * fills it, and the UI renders the gap as "Deleted items needs a connection".
+   * `GET /v1/me/deleted-items`. Replica (trash Plan 3): the online answer when
+   * the server can be reached, cached; otherwise it REJECTS — with
+   * `DeletedItemsFromCache` (the saved list and when it was read) or, before
+   * anything was cached, `ReplicaGapError`. Never a silent `[]`.
    */
   getDeletedItems(): Promise<DeletedItem[]>;
   /**

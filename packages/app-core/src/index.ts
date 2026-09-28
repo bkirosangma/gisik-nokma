@@ -399,3 +399,4 @@ export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
 
 export { DeleteDialog, type DeleteDialogProps } from './views/delete-dialog.js';
 export { DeletedItemsSection, type DeletedItemsSectionProps } from './account/deleted-items-section.js';
+export { DeletedItemsFromCache, cachedDeletedItemsOf } from './deleted-items-from-cache.js';

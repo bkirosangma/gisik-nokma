@@ -19,6 +19,8 @@ import {
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
+import { DeletedItemsFromCache } from '../deleted-items-from-cache.js';
+import { mapDeletedItems } from '../online/mappers.js';
 import { failedClaimNotice, type SyncNoticeView } from '../sync/sync-notices.js';
 import {
   isSyncInstruction,
@@ -349,12 +351,18 @@ const NO_WORKSPACE_TABLE: ReplicaAbsence = {
 
 const MY_WORKSPACES_ABSENCES: readonly ReplicaAbsence[] = [NO_WORKSPACE_TABLE];
 
-const DELETED_ITEMS_ABSENCES: readonly ReplicaAbsence[] = [
+/**
+ * Trash series Plan 3 (D9) NARROWED this entry rather than deleting it: the
+ * replica now serves the last ONLINE answer (as `DeletedItemsFromCache`), but a
+ * device that has never read the list online since then still has nothing it
+ * may honestly show — `[]` would tell a person nothing was deleted.
+ */
+export const DELETED_ITEMS_NOT_CACHED: readonly ReplicaAbsence[] = [
   {
-    field: 'DeletedItem[] — the whole read',
+    field: 'DeletedItem[] — until one online read is cached on this device',
     because:
-      'the local schema (packages/sync-client/src/storage/schema.ts) has no lifecycle columns at all — no deleted_at/purge_marked_at on any local table, no proj_workspaces-equivalent — because the trash series\' Plan 1 introduced them server-side only. Resolving [] here would tell a person they have nothing deleted, when nobody asked this device the question (spec §6.3, the same reasoning that keeps every other unfillable read a refusal rather than an invented empty answer).',
-    owner: 'Trash series Plan 3 — the replica half of spec §6.3',
+      'the local schema holds no lifecycle state (no deleted_at or purge_marked_at on any local table), so the list is never computed here; it is the last GET /v1/me/deleted-items body, kept in deleted_items_cache, and this device has not read it online yet',
+    owner: 'Trash series Plan 3 — the cache fills on the first online read of Deleted items on this device',
   },
 ];
 
@@ -637,7 +645,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
-  getDeletedItems: DELETED_ITEMS_ABSENCES,
+  getDeletedItems: DELETED_ITEMS_NOT_CACHED,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
   getTicketComments: COMMENTS_ABSENCES,
@@ -1187,7 +1195,22 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
 
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
-    getDeletedItems: () => Promise.reject(new ReplicaGapError('getDeletedItems', DELETED_ITEMS_ABSENCES)),
+    getDeletedItems: async () => {
+      let body: unknown;
+      try {
+        body = await engine.fetchDeletedItems();
+      } catch {
+        const cached = await replica.readDeletedItemsCache();
+        if (cached === null) throw new ReplicaGapError('getDeletedItems', DELETED_ITEMS_NOT_CACHED);
+        throw new DeletedItemsFromCache(mapDeletedItems(cached.body), cached.fetchedAt);
+      }
+      // Mapped BEFORE it is cached and OUTSIDE the transport `try`: a body the
+      // mapper refuses is a server fault to surface, never a reason to fall
+      // back to an old list (19.197).
+      const items = mapDeletedItems(body);
+      await replica.cacheDeletedItems(body, new Date().toISOString());
+      return items;
+    },
     purgedAmong: (ids) => replica.purgedAmong(ids),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
     getTicketAttachments: () =>
