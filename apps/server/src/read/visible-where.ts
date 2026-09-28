@@ -38,7 +38,7 @@ import type { SqlParams } from './sql-params.js';
  * |---|---|---|---|
  * | null (non-member)       | no          | no                 | no              |
  * | guest                   | no          | no                 | only if listed  |
- * | member / admin          | yes         | only if on project | only if listed  |
+ * | member / admin          | yes         | yes (rule A: on every project) | only if listed  |
  * | owner                   | yes         | yes                | yes             |
  *
  * **The owner row is a separate row, and the plan text's Task 5 table is wrong
@@ -52,7 +52,8 @@ import type { SqlParams } from './sql-params.js';
  * `test/visibility/visible-tickets.test.ts` commented `from the bypass alone`.
  * So owner compiles to `TRUE` here.
  *
- * **Admins get no bypass.** `admin` shares the member `case` deliberately.
+ * **Admins share the member branch**, and since rule A both are on every founded
+ * project through `eff.projects`.
  *
  * ## The role side is compiler-exhaustive; the mode side, here, cannot be
  *

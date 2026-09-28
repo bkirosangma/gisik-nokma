@@ -345,3 +345,5 @@ section follow the controller's rule, so the next free id after B16 is one past 
   is reported BY NAME; the same ancestor below it is not). Mutation-witnessed: re-inserting a shadowing
   selector above the track reddens this case alone, `expected '.gn-mutation-probe' to be ''`. —
   `packages/ui/test/components.test.tsx`
+
+**Block `3.982`–`3.999` is ALLOCATED to the access-and-invites plan (`docs/superpowers/plans/2026-09-29-workspace-access-and-invites.md`, 2026-09-29).** Measured across all remote branches: §3's tip is `3.974`; `3.975`–`3.981` are the priority plan's reservation.

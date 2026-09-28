@@ -30,7 +30,7 @@ export interface ResolvedVisibility {
  * |---|---|---|---|
  * | null (non-member)       | no          | no                 | no              |
  * | guest                   | no          | no                 | only if listed  |
- * | member / admin          | yes         | only if on project | only if listed  |
+ * | member / admin          | yes         | yes (rule A: on every project) | only if listed  |
  * | owner                   | yes         | yes                | yes             |
  *
  * **Guests** see ONLY what an explicit list names them in. A guest belongs to
@@ -47,12 +47,13 @@ export interface ResolvedVisibility {
  * visibility controls state plainly that the workspace owner can always see
  * (Plan 6 carries the copy). A stated power is not a lie; a hidden one is.
  *
- * **Admins get no bypass.** An admin not on a project does not see its
- * project-mode tickets, and an unlisted admin does not see explicit-mode
- * tickets. An admin who wants to read joins the project — an attributed event —
- * first. `hasProjectAdminRights` is deliberately NOT consulted here: it answers
- * "may they manage this project", which is a different question, and its own
- * docblock says so.
+ * **Admins and members are on every project (rule A, owner ruling 2026-09-29).**
+ * `resolveEffectiveRole` puts every founded project in their set, so the
+ * `project` arm below answers true for them; the arm still asks the set,
+ * because a guest's set is explicit rows only and a revoked member's is empty.
+ * An unlisted admin still does not see an explicit-mode ticket.
+ * `hasProjectAdminRights` is deliberately NOT consulted here: it answers "may
+ * they manage this project", which is a different question.
  *
  * **The explicit list is exactly the authored list.** Creator and assignee are
  * not implicitly appended. Locking yourself out is a legal (attributed) claim,
@@ -132,7 +133,7 @@ export function canSeeResolved(eff: EffectiveRole, userId: string, v: ResolvedVi
         case 'workspace':
           return true;
         case 'project':
-          // No admin bypass — deliberate, see the docblock.
+          // Rule A fills the set for owner/admin/member — see the docblock.
           return eff.projects.has(v.projectId);
         case 'explicit':
           return v.resolvedUserIds.includes(userId);

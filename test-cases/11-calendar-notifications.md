@@ -411,3 +411,5 @@ lost `/help` and `/account`, which are now menu items — an `<a role="menuitem"
 role, not `link`, so `getAllByRole('link')` cannot see them by design even with the menu open. Their
 reachability is pinned separately at **13.417**, which is what keeps this shortening honest: a shorter
 expected list is also what deleting the links would produce.
+
+**Block `11.225`–`11.234` is ALLOCATED to the access-and-invites plan (`docs/superpowers/plans/2026-09-29-workspace-access-and-invites.md`, 2026-09-29).** Measured across all remote branches: §11's tip is `11.224`.

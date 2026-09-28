@@ -780,3 +780,5 @@ is empty.
   match. One bucket before any `field_set` (every seeded ticket is born P2), two after one is raised to
   P1. Before `groupCards` had this arm the switch fell through and the 200 carried no `groups` at all,
   which is the failure the first assertion reads. — `apps/server/test/routes/list.test.ts`
+
+**Block `7.277`–`7.286` is ALLOCATED to the access-and-invites plan (`docs/superpowers/plans/2026-09-29-workspace-access-and-invites.md`, 2026-09-29).** Measured across all remote branches: §7's tip is `7.271`; `7.272`–`7.276` are the priority plan's reservation.
