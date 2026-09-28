@@ -184,6 +184,23 @@ export class WorkspaceAccessLost extends Error {
   }
 }
 
+/**
+ * The server ANSWERED with a non-2xx status (trash series Plan 3 review fix,
+ * M-3). The message is exactly the one the transport threw before this class
+ * existed, so nothing reading it changes; the TYPE is what lets a reader tell
+ * "the server said no" (401 signed out, 403, 500 — surface it, as online) from
+ * "no answer at all" (a `fetch` that rejected — the only thing a saved copy may
+ * stand in for).
+ */
+export class HttpStatusError extends Error {
+  readonly status: number;
+  constructor(message: string, status: number) {
+    super(message);
+    this.name = 'HttpStatusError';
+    this.status = status;
+  }
+}
+
 /** The stream's membership refusal (`apps/server/src/stream/routes.ts`'s `NOT_A_MEMBER_ERROR`), mirrored: this package may not import the server. */
 const NOT_A_MEMBER_CODE = 'not-a-member';
 

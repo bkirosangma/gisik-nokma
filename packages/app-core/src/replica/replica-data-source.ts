@@ -23,6 +23,7 @@ import { DeletedItemsFromCache } from '../deleted-items-from-cache.js';
 import { mapDeletedItems } from '../wire-readers.js';
 import { failedClaimNotice, type SyncNoticeView } from '../sync/sync-notices.js';
 import {
+  HttpStatusError,
   isSyncInstruction,
   workflowVersionsOf,
   type LocalContest,
@@ -1199,7 +1200,11 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       let body: unknown;
       try {
         body = await engine.fetchDeletedItems();
-      } catch {
+      } catch (err) {
+        // The saved copy stands in for NO ANSWER only. A status answer (401
+        // signed out, 403, 500) is the server speaking and surfaces exactly as
+        // it does online — an old list must never mask "sign in again".
+        if (err instanceof HttpStatusError) throw err;
         const cached = await replica.readDeletedItemsCache();
         if (cached === null) throw new ReplicaGapError('getDeletedItems', DELETED_ITEMS_NOT_CACHED);
         throw new DeletedItemsFromCache(mapDeletedItems(cached.body), cached.fetchedAt);

@@ -1,6 +1,6 @@
 import { isPurgedRef, type LedgerEvent, type PurgedRef, type ServerStreamFrame, type SubmittedEvent } from '@gisik-nokma/domain';
 import { viewToEnvelope, type BootstrapResponse, type LedgerEventView, type TicketBootstrap } from '../replica/replica.js';
-import { NotePullNotFound, TicketPullNotFound, WorkspaceAccessLost } from '../engine/sync-engine.js';
+import { HttpStatusError, NotePullNotFound, TicketPullNotFound, WorkspaceAccessLost } from '../engine/sync-engine.js';
 import type { SyncEventResult } from '../outbox/outbox.js';
 import type {
   ReconcileAnswer,
@@ -243,7 +243,9 @@ export function createHttpTransport(opts: {
 
     async deletedItems(): Promise<unknown> {
       const res = await doFetch(`${opts.baseUrl}/v1/me/deleted-items`, { headers });
-      if (!res.ok) throw new Error(`deleted-items failed: ${res.status}`);
+      // A typed status answer, not a bare `Error`: `getDeletedItems` on the replica
+      // serves its saved copy for a transport failure ONLY, never for this.
+      if (!res.ok) throw new HttpStatusError(`deleted-items failed: ${res.status}`, res.status);
       return res.json();
     },
 

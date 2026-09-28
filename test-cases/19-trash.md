@@ -324,7 +324,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 ## 19.38 Deleted items offline
 
 - ✅ **19.196 — the replica returns and caches an online `getDeletedItems`; offline it rejects with `DeletedItemsFromCache` holding the cached items and when they were read, and an erase strips an erased item from that cache;** control: back online the answer is a plain list again. Mutation: resolve the cached items instead of rejecting with them.
-- ✅ **19.197 — a device that has never cached the list rejects with `ReplicaGapError` naming `DELETED_ITEMS_NOT_CACHED` (the entry `REPLICA_GAPS` lists), and a malformed online body is a `MappingError` that the cache does not mask;** control: a transport failure with a cache is `DeletedItemsFromCache`. Mutation: map inside the transport `try`, so a mapping failure falls back to the cache.
+- ✅ **19.197 — a device that has never cached the list rejects with `ReplicaGapError` naming `DELETED_ITEMS_NOT_CACHED` (the entry `REPLICA_GAPS` lists), and a malformed online body is a `MappingError` that the cache does not mask;** control: a transport failure with a cache is `DeletedItemsFromCache`. Mutation: map inside the transport `try`, so a mapping failure falls back to the cache. A 401, 403, 500 and 503 answer (driven through the real `createHttpTransport`, an `HttpStatusError`) still throw with a saved copy present, while a `fetch` that rejects serves the copy. Mutation: widen the catch to everything so a status answer falls back to the cache.
 
 ## 19.39 The cached Deleted items view
 

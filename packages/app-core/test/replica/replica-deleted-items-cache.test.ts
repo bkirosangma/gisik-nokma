@@ -1,6 +1,12 @@
 import { describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
-import { createOutbox, createReplica, createSyncEngine, type SyncTransport } from '@gisik-nokma/sync-client';
+import {
+  createHttpTransport,
+  createOutbox,
+  createReplica,
+  createSyncEngine,
+  type SyncTransport,
+} from '@gisik-nokma/sync-client';
 import { createBetterSqliteStorage } from '@gisik-nokma/sync-client/testing';
 import { DeletedItemsFromCache, cachedDeletedItemsOf } from '../../src/deleted-items-from-cache.js';
 import { MappingError } from '../../src/online/mappers.js';
@@ -38,10 +44,7 @@ const row = (id: string) => ({
 });
 
 async function fixture(serve: () => Promise<unknown>) {
-  const storage = createBetterSqliteStorage();
-  const replica = await createReplica({ storage });
-  const outbox = createOutbox({ storage, replica });
-  const transport: SyncTransport = {
+  return fixtureOver({
     bootstrap: () => Promise.reject(new Error('offline')),
     sync: () => Promise.reject(new Error('offline')),
     openStream: () => ({ close: () => undefined }),
@@ -50,7 +53,13 @@ async function fixture(serve: () => Promise<unknown>) {
     reconcile: () => Promise.reject(new Error('offline')),
     purgedLookup: () => Promise.reject(new Error('offline')),
     deletedItems: serve,
-  };
+  });
+}
+
+async function fixtureOver(transport: SyncTransport) {
+  const storage = createBetterSqliteStorage();
+  const replica = await createReplica({ storage });
+  const outbox = createOutbox({ storage, replica });
   const engine = createSyncEngine({ replica, outbox, transport });
   const ds = createReplicaDataSource({ workspaceId: WS, replica, outbox, engine, storage });
   return { ds, replica };
@@ -61,7 +70,7 @@ describe('19.196 the cached list, offline', () => {
     const [T, other] = [newUlid(), newUlid()];
     let online = true;
     const { ds, replica } = await fixture(async () => {
-      if (!online) throw new Error('deleted-items failed: 503');
+      if (!online) throw new TypeError('fetch failed');
       return { items: [row(T), row(other)] };
     });
 
@@ -84,7 +93,7 @@ describe('19.196 the cached list, offline', () => {
   });
 });
 
-describe('19.197 never cached, and a malformed body', () => {
+describe('19.197 never cached, a malformed body, and a status answer', () => {
   it('19.197 a cold device refuses with the narrowed gap; a mapping failure is not masked by the cache', async () => {
     const cold = await fixture(() => Promise.reject(new Error('offline')));
     const gap = await cold.ds.query.getDeletedItems().catch((e: unknown) => e);
@@ -100,5 +109,34 @@ describe('19.197 never cached, and a malformed body', () => {
     // CONTROL
     answer = () => Promise.reject(new Error('offline'));
     await expect(warm.ds.query.getDeletedItems()).rejects.toBeInstanceOf(DeletedItemsFromCache);
+  });
+});
+
+/**
+ * Only a TRANSPORT failure (no answer at all) is "offline". A status answer
+ * from the server — 401 signed out, 403, 500 — is an answer, and it surfaces
+ * exactly as it does online rather than being papered over with an old list.
+ * Driven through the REAL `createHttpTransport`, because the classification is
+ * made there (`HttpStatusError`), not in the replica.
+ */
+describe('19.197 a status answer is not offline', () => {
+  const httpFixture = (fetchImpl: typeof fetch) =>
+    fixtureOver(createHttpTransport({ baseUrl: 'https://api.test', token: 't', fetchImpl }));
+
+  it('19.197 a 401 and a 500 still throw while a saved copy exists; a transport failure serves the copy', async () => {
+    let answer: () => Promise<Response> = async () => new Response(JSON.stringify({ items: [row(newUlid())] }), { status: 200 });
+    const { ds } = await httpFixture(() => answer());
+    await expect(ds.query.getDeletedItems()).resolves.toHaveLength(1);
+
+    for (const status of [401, 403, 500, 503]) {
+      answer = async () => new Response('{}', { status });
+      const error = await ds.query.getDeletedItems().catch((e: unknown) => e);
+      expect(error, String(status)).not.toBeInstanceOf(DeletedItemsFromCache);
+      expect((error as Error).message).toBe(`deleted-items failed: ${String(status)}`);
+    }
+
+    // CONTROL: a fetch that never gets an answer is the offline case.
+    answer = () => Promise.reject(new TypeError('fetch failed'));
+    await expect(ds.query.getDeletedItems()).rejects.toBeInstanceOf(DeletedItemsFromCache);
   });
 });
