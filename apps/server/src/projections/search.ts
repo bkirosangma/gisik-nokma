@@ -1,5 +1,5 @@
 import type { PoolClient } from 'pg';
-import { docToPlainText, type LedgerEvent } from '@gisik-nokma/domain';
+import { docToPlainText, isRedactedTicketCreated, type LedgerEvent } from '@gisik-nokma/domain';
 import type { Projection } from './registry.js';
 
 /**
@@ -55,6 +55,11 @@ export const searchProjection: Projection = {
     }
 
     if (event.type === 'ticket.created') {
+      // Trash series Plan 2 (spec §5.4): a redacted creation has no title to
+      // index — and `title` is NOT NULL, so indexing it would throw.
+      if (isRedactedTicketCreated(event)) {
+        return;
+      }
       // `description` is optional on the payload (owner request 2026-09-23): the
       // New ticket dialog can compose one at creation. It is rendered by the
       // SAME `docToPlainText` the `ticket.field_set` branch below uses, so the
