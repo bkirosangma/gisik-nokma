@@ -62,7 +62,7 @@ const ROSTER: RosterMember[] = [
  * second caller and passes real rows.
  */
 function workspaceRef(name: string, projects: ProjectRef[] = []): WorkspaceRef {
-  return { id: WS, name, prefix: 'CC', role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects };
+  return { id: WS, name, prefix: 'CC', role: 'owner', archived: false, memberCount: 2, nameRestrictedProjectCount: 0, projects };
 }
 
 /**

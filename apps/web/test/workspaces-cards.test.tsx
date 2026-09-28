@@ -44,6 +44,7 @@ const WORKSPACES: WorkspaceRef[] = [
     name: 'Convenience Corner',
     prefix: 'CC',
     role: 'owner',
+    archived: false,
     // Task 16's fields, filled with what an OWNER is served: counts present
     // (an owner is never withheld from) and nothing archived. This suite is
     // about the card's data-testid keying, not the counts, so the values are
@@ -64,6 +65,7 @@ const WORKSPACES: WorkspaceRef[] = [
     name: 'Second Workspace',
     prefix: 'SW',
     role: 'member',
+    archived: false,
     memberCount: 2,
     nameRestrictedProjectCount: 0,
     projects: [{ id: 'p3', name: 'Only project', prefix: 'OP', archived: false, ticketCount: 2, blockedCount: 0 }],
@@ -191,6 +193,7 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
     name: 'Convenience Corner',
     prefix: 'CC',
     role: 'owner',
+    archived: false,
     memberCount: 0,
     nameRestrictedProjectCount: 0,
     projects: [],

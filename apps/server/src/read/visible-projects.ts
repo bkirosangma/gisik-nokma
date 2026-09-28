@@ -155,20 +155,23 @@ export async function visibleProjects(
     archived: boolean;
     description: string | null;
     prefix: string | null;
+    deleted_at: Date | null;
   }>(
-    `SELECT project_id, name, archived, description, prefix FROM proj_projects
+    `SELECT project_id, name, archived, description, prefix, deleted_at FROM proj_projects
       WHERE workspace_id = $1
       ORDER BY project_id`,
     [workspaceId],
   );
-  // RESOLVED OVER EVERY ROW IN THE WORKSPACE, before the role filter below and
-  // deliberately so. A project's prefix is UNIQUE WITHIN ITS WORKSPACE, so a
-  // derivation that only saw the rows THIS caller may name would let two
-  // projects collide in one viewer's answer and not in another's — the same
-  // project would then read `SO` to its owner and `SO2` to a guest, and a key
-  // that names one thing to one person and a different thing to the next is
-  // worse than no key. `visibleProjects`' own rule is that the filter decides
-  // what is NAMED, never what is TRUE, and this keeps it.
+  // RESOLVED OVER EVERY ROW IN THE WORKSPACE, deleted rows included, before
+  // the role filter AND before the deleted-row filter below, deliberately so.
+  // A project's prefix is UNIQUE WITHIN ITS WORKSPACE, so a derivation that
+  // dropped a deleted row first would let a live sibling's derived prefix
+  // SHIFT (`SO2` -> `SO`) the moment its neighbour is trashed, and shift back
+  // on undelete — changing every ticket key in it under readers who already
+  // quoted one, for an act that named nothing about them. `visibleProjects`'
+  // own rule is that the filter decides what is NAMED, never what is TRUE,
+  // and this keeps it for the role filter same as it always did; the T10
+  // deleted-row filter below is the same discipline, applied after.
   //
   // The order is the query's `ORDER BY project_id`, which is the order
   // `resolveProjectPrefixes` documents as its input contract: a ULID compares
@@ -181,16 +184,22 @@ export async function visibleProjects(
   // function restates nothing about who may see what, it asks `eff` — which is
   // what makes it an application of `resolveEffectiveRole` rather than a second,
   // quieter visibility rule living in a query.
-  const visible = rows.map((row, index) => ({
-    projectId: row.project_id,
-    name: row.name,
-    archived: row.archived,
-    // Passed through as the column holds it. `?? ''` here would be the same
-    // mistake the projection refuses one layer down, one layer closer to the
-    // render.
-    description: row.description,
-    prefix: resolved[index]!,
-  }));
+  const visible: VisibleProject[] = [];
+  for (const [index, row] of rows.entries()) {
+    // T10: a deleted project is absent from the served list — but its row
+    // stayed IN the prefix resolution above.
+    if (row.deleted_at !== null) continue;
+    visible.push({
+      projectId: row.project_id,
+      name: row.name,
+      archived: row.archived,
+      // Passed through as the column holds it. `?? ''` here would be the same
+      // mistake the projection refuses one layer down, one layer closer to the
+      // render.
+      description: row.description,
+      prefix: resolved[index]!,
+    });
+  }
   if (eff.workspaceRole === 'owner') return visible;
   return visible.filter((project) => eff.projects.has(project.projectId));
 }

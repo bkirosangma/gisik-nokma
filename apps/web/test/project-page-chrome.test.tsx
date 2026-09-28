@@ -77,6 +77,7 @@ describe('the project page names itself from the same read AppNav already makes'
               name: 'Garo Hills Logistics',
               prefix: 'GH',
               role: 'owner',
+              archived: false,
               memberCount: 3,
               nameRestrictedProjectCount: 0,
               projects: [
@@ -162,6 +163,7 @@ describe('E2-38 the project page names the project’s own state', () => {
           name: 'Garo Hills Logistics',
           prefix: 'GH',
           role: 'owner',
+          archived: false,
           memberCount: 3,
           nameRestrictedProjectCount: 0,
           projects: [

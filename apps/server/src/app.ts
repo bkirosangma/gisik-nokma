@@ -35,6 +35,7 @@ import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerNoteRoutes } from './routes/notes.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
+import { registerDeletedItemsRoutes } from './routes/deleted-items.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import { registerSyncRoutes } from './sync/sync-routes.js';
 import { createStreamHub } from './stream/hub.js';
@@ -868,6 +869,11 @@ export function buildApp(
   // either, and the same preHandler by parameter, for the same reason: both
   // handlers read `request.currentUserId`.
   registerWorkspaceRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
+  // The Deleted items read (trash series, Plan 1 Task 7, spec §6.3) — every
+  // deleted workspace, project, ticket or note this caller may currently
+  // restore or mark. Registered beside the workspace directory: same door,
+  // same "me"-scoped shape, no workspace id in the path.
+  registerDeletedItemsRoutes(app, { pool: deps.pool }, requireSession);
   // The invitation surface (Plan 4 Task 14): issue, read a link, accept a link,
   // list what is outstanding. It takes BOTH doors — the gated `ingest` for
   // issuance, so the admin-only refusal fires exactly as it would on

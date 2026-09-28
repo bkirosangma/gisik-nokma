@@ -8,6 +8,7 @@ import {
 } from '@gisik-nokma/domain';
 import { ticketNumbers } from '../read/ticket-numbers.js';
 import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
+import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 import type { Projection } from './registry.js';
 
@@ -180,7 +181,7 @@ async function ticketTextOf(tx: PoolClient, workspaceId: string, noteId: string)
     `SELECT t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title
        FROM proj_note_attachments na
        JOIN proj_tickets t ON t.ticket_id = na.ticket_id
-      WHERE na.note_id = $1 AND t.deleted_at IS NULL
+      WHERE na.note_id = $1 AND ${LIVE_TICKET_WHERE}
       ORDER BY t.ticket_id`,
     [noteId],
   );

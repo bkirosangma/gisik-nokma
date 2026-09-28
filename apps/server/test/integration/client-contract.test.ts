@@ -1349,6 +1349,7 @@ describe('GET /v1/me/workspaces vs WorkspaceRef', () => {
     // name of something the caller cannot see, it is half of every key on a
     // ticket they ARE shown.
     expect(Object.keys(ref).sort()).toEqual([
+      'archived',
       'memberCount',
       'name',
       'nameRestrictedProjectCount',

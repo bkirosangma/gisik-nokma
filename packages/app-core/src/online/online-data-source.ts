@@ -8,6 +8,7 @@ import {
   mapAttention,
   mapWorkspaceSettings,
   mapBoardView,
+  mapDeletedItems,
   mapHistory,
   mapIngestResults,
   LIST_PAGE_CAP,
@@ -148,6 +149,8 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
 
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => mapWorkspaceRefs(await http.get('/v1/me/workspaces')),
+
+    getDeletedItems: async () => mapDeletedItems(await http.get('/v1/me/deleted-items')),
 
     /**
      * `[]` on a 404, and the asymmetry with `contested: []` is deliberate rather

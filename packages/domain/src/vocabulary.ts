@@ -14,6 +14,16 @@ import {
   claimContestedResolvedPayloadSchema,
 } from './events/contest-events.js';
 import {
+  projectDeletedPayload,
+  projectUndeletedPayload,
+  purgeMarkedPayload,
+  purgeUnmarkedPayload,
+  workspaceArchivedPayload,
+  workspaceDeletedPayload,
+  workspaceRestoredPayload,
+  workspaceUndeletedPayload,
+} from './events/lifecycle-events.js';
+import {
   attachmentAddedPayload,
   commentAddedPayload,
   ticketAssignedPayload,
@@ -419,6 +429,59 @@ domainRegistry.register({
   version: 1,
   entityKind: 'project',
   payloadSchema: projectRestoredPayload,
+});
+
+/**
+ * The lifecycle vocabulary (trash series, Plan 1, spec
+ * `docs/superpowers/specs/2026-09-23-trash-and-purge-design.md` §4).
+ */
+domainRegistry.register({
+  type: 'workspace.archived',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: workspaceArchivedPayload,
+});
+domainRegistry.register({
+  type: 'workspace.restored',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: workspaceRestoredPayload,
+});
+domainRegistry.register({
+  type: 'workspace.deleted',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: workspaceDeletedPayload,
+});
+domainRegistry.register({
+  type: 'workspace.undeleted',
+  version: 1,
+  entityKind: 'workspace',
+  payloadSchema: workspaceUndeletedPayload,
+});
+domainRegistry.register({
+  type: 'project.deleted',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectDeletedPayload,
+});
+domainRegistry.register({
+  type: 'project.undeleted',
+  version: 1,
+  entityKind: 'project',
+  payloadSchema: projectUndeletedPayload,
+});
+domainRegistry.register({
+  type: 'purge.marked',
+  version: 1,
+  entityKind: ['workspace', 'project', 'ticket', 'note'],
+  payloadSchema: purgeMarkedPayload,
+});
+domainRegistry.register({
+  type: 'purge.unmarked',
+  version: 1,
+  entityKind: ['workspace', 'project', 'ticket', 'note'],
+  payloadSchema: purgeUnmarkedPayload,
 });
 
 domainRegistry.register({

@@ -117,6 +117,10 @@ export function stubServices(
     // asserting the user belongs to no workspace, which is a claim about the
     // world; the same argument `getTicketTypes` below makes for itself.
     getMyWorkspaces: unstubbed('getMyWorkspaces'),
+    // UNSTUBBED, the same rule as `getMyWorkspaces` above: `[]` would be this
+    // helper asserting the caller has nothing deleted — a claim about the
+    // world — and a page under test could pass against a read nobody stubbed.
+    getDeletedItems: unstubbed('getDeletedItems'),
     getMembers: unstubbed('getMembers'),
     getBoard: unstubbed('getBoard'),
     getTickets: unstubbed('getTickets'),

@@ -1,4 +1,5 @@
 import type {
+  DeletedItem,
   IngestResult,
   LedgerEvent,
   ServerStreamFrame,
@@ -241,6 +242,13 @@ export type NoteSearchResult = { notes: NoteSearchHit[]; corrected?: string[] };
 
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
+  /**
+   * Every deleted workspace, project, ticket or note this caller may currently
+   * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:
+   * `GET /v1/me/deleted-items`. Replica: throws `ReplicaGapError` — Plan 3
+   * fills it, and the UI renders the gap as "Deleted items needs a connection".
+   */
+  getDeletedItems(): Promise<DeletedItem[]>;
   /**
    * The workspace roster. `RosterMember[]` and not `Actor[]`: the route sends a
    * `role` per person (`routes/builder-reads.ts:247`) and the members screen

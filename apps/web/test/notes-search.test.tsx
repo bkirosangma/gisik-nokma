@@ -51,6 +51,7 @@ const WORKSPACE: WorkspaceRef = {
   name: 'Garo Hills Logistics',
   prefix: 'CC',
   role: 'owner',
+  archived: false,
   memberCount: 3,
   nameRestrictedProjectCount: 0,
   projects: [project('p_cold', 'Cold room')],

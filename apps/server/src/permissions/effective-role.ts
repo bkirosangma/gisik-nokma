@@ -101,6 +101,7 @@ export async function resolveEffectiveRole(
   db: Queryable,
   userId: string,
   workspaceId: string,
+  opts?: { includeDeleted?: boolean },
 ): Promise<EffectiveRole> {
   const result = await db.query<MembershipRow>(
     `SELECT scope_kind, project_id, role, project_admin
@@ -116,6 +117,22 @@ export async function resolveEffectiveRole(
       workspaceRole = row.role;
     } else {
       projects.set(row.project_id, { projectAdmin: row.project_admin });
+    }
+  }
+
+  // Trash series, Plan 1 Task 5 (spec §4 T10): a deleted workspace has no
+  // members as far as reads are concerned — resolves EXACTLY the value a
+  // stranger gets, by falling into the same early return below, never a
+  // hand-built one. Skipped once already a non-member: no answer changes.
+  // Skipped when `includeDeleted` (the write door, so the owner can still
+  // undelete; the engine, which judges truth and must not filter).
+  if (workspaceRole !== null && !(opts?.includeDeleted ?? false)) {
+    const { rows } = await db.query<{ deleted_at: Date | null }>(
+      'SELECT deleted_at FROM proj_workspaces WHERE workspace_id = $1',
+      [workspaceId],
+    );
+    if (rows[0]?.deleted_at != null) {
+      workspaceRole = null;
     }
   }
 

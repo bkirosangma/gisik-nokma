@@ -343,6 +343,15 @@ const NO_WORKSPACE_TABLE: ReplicaAbsence = {
 
 const MY_WORKSPACES_ABSENCES: readonly ReplicaAbsence[] = [NO_WORKSPACE_TABLE];
 
+const DELETED_ITEMS_ABSENCES: readonly ReplicaAbsence[] = [
+  {
+    field: 'DeletedItem[] — the whole read',
+    because:
+      'the local schema (packages/sync-client/src/storage/schema.ts) has no lifecycle columns at all — no deleted_at/purge_marked_at on any local table, no proj_workspaces-equivalent — because the trash series\' Plan 1 introduced them server-side only. Resolving [] here would tell a person they have nothing deleted, when nobody asked this device the question (spec §6.3, the same reasoning that keeps every other unfillable read a refusal rather than an invented empty answer).',
+    owner: 'Trash series Plan 3 — the replica half of spec §6.3',
+  },
+];
+
 const MEMBERS_ABSENCES: readonly ReplicaAbsence[] = [
   {
     field: 'Actor.name',
@@ -622,6 +631,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
+  getDeletedItems: DELETED_ITEMS_ABSENCES,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
   getTicketComments: COMMENTS_ABSENCES,
@@ -1171,6 +1181,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
 
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
+    getDeletedItems: () => Promise.reject(new ReplicaGapError('getDeletedItems', DELETED_ITEMS_ABSENCES)),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
     getTicketAttachments: () =>
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
