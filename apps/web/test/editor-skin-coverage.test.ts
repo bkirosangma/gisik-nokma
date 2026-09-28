@@ -112,7 +112,23 @@ function extractDeclaredEditorClasses(): string[] {
     assignRe.lastIndex = 0;
     let m: RegExpExecArray | null;
     while ((m = assignRe.exec(text))) {
-      const win = extractWindow(text, assignRe.lastIndex);
+      // A JSX `className="literal"` value starts IMMEDIATELY with a quote —
+      // captured as exactly that one string, never a bounded window. JSX
+      // attributes are whitespace-separated, not comma/semicolon-terminated,
+      // so a window here would bleed into whatever attribute comes next
+      // (measured: `className="table-toolbar" role="toolbar" aria-label=
+      // "Table"` windowed straight through into the sibling attributes and
+      // picked up "Table" as though it were a class). A non-literal start
+      // (a ternary/template assigned via `class:`/`className =` in plain
+      // TS, never JSX) still needs the wider window.
+      let win: string;
+      if (/^['"`]/.test(text.slice(assignRe.lastIndex, assignRe.lastIndex + 1))) {
+        stringRe.lastIndex = 0;
+        const literal = stringRe.exec(text.slice(assignRe.lastIndex));
+        win = literal ? literal[0] : '';
+      } else {
+        win = extractWindow(text, assignRe.lastIndex);
+      }
       stringRe.lastIndex = 0;
       let sm: RegExpExecArray | null;
       while ((sm = stringRe.exec(win))) {
@@ -299,6 +315,18 @@ const GALLERY_DOC = {
  */
 const HOVER_ONLY_CLASSES = new Set(['wikilink-preview']);
 
+/**
+ * `.table-toolbar` and its BEM children are React-COMPONENT-rendered
+ * (`TableFloatingToolbar`), not something the bare `@tiptap/core` `Editor`
+ * this file mounts ever draws — mounting the real `TicketEditor` tree here
+ * would mean pulling React Testing Library into a file that otherwise has no
+ * DOM-testing-library dependency, purely to re-prove what
+ * `table-floating-toolbar.test.tsx`'s own 9.349 case already proves for real
+ * (with an editable mount, a caret inside a table cell, and the actual
+ * component tree). Declared coverage only, here.
+ */
+const COMPONENT_RENDERED_CLASSES = new Set(['table-toolbar', 'table-toolbar__group', 'table-toolbar__sep', 'table-toolbar__btn']);
+
 describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
   // A rule can exist and still match nothing the editor actually draws (this
   // repo's own recorded failure, `editor.css:539-551`'s `.editor-details >
@@ -314,7 +342,9 @@ describe('9.341 editor skin — matched-DOM coverage (paired arm)', () => {
     content: GALLERY_DOC,
   });
   const root = editor.view.dom;
-  const declaredClasses = extractDeclaredEditorClasses().filter((cls) => !HOVER_ONLY_CLASSES.has(cls));
+  const declaredClasses = extractDeclaredEditorClasses().filter(
+    (cls) => !HOVER_ONLY_CLASSES.has(cls) && !COMPONENT_RENDERED_CLASSES.has(cls),
+  );
 
   it.each(declaredClasses)('.%s matches at least one rendered element', (cls) => {
     expect(root.querySelector(`.${cls}`), `no element in the gallery matches .${cls}`).not.toBeNull();

@@ -63,6 +63,10 @@ export {
   MARKDOWN_HINT,
   type EditorToolbarProps,
 } from './components/EditorToolbar.js';
+export {
+  TableFloatingToolbar,
+  type TableFloatingToolbarProps,
+} from './components/TableFloatingToolbar.js';
 export { ImageWrapMenu } from './components/ImageWrapMenu.js';
 export {
   createBrowserPickerDeps,
