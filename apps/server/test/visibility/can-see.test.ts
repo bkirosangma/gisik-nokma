@@ -2,7 +2,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import type { EffectiveRole } from '../../src/permissions/effective-role.js';
 import { canSee, canSeeResolved, type ResolvedVisibility } from '../../src/visibility/can-see.js';
-import { applyAll, revokeMember, seedGuest, seedMember, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+import {
+  applyAll,
+  revokeMember,
+  seedGuest,
+  seedMember,
+  seedProject,
+  seedTicket,
+  setVisibilityEnv,
+} from '../helpers/seed.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
@@ -15,6 +23,17 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  * on the project, plain member off it, project admin, workspace admin, owner,
  * and — the one no mutation would have found on its own — a REVOKED member
  * whose project-scope `proj_memberships` row is still standing.
+ *
+ * ## Rule A and the pure cases (amended 2026-09-29, owner ruling A)
+ *
+ * `resolveEffectiveRole` now fills an owner's, admin's and member's project set
+ * with EVERY founded project of the workspace, so `eff('admin')` or
+ * `eff('member')` with an EMPTY set is a value the resolver can no longer produce
+ * for those roles. The pure cases below still hold that value on purpose: they
+ * measure that `canSeeResolved` consults the project SET by id and grants no
+ * role-based reach beyond it. Which projects the set holds is the resolver's
+ * question, measured against the real projections at the foot of this file and in
+ * `permissions/effective-role*.test.ts`.
  *
  * ## No clock is enumerated, deliberately
  *
@@ -66,7 +85,7 @@ function vis(
 }
 
 /**
- * 6.62 — cited on the block: the decision table enumerated BY PATH and pure — a non-member in all three modes including one that names them, a guest carrying only explicit lists, a member across workspace/project/explicit, an admin with no bypass, the owner reading everything, and the project-admin flag as management rather than reading.
+ * 6.62 — cited on the block: the decision table enumerated BY PATH and pure — a non-member in all three modes including one that names them, a guest carrying only explicit lists, a member across workspace/project/explicit, an admin with no ROLE-based bypass (its reach is the project set, which rule A fills), the owner reading everything, and the project-admin flag as management rather than reading.
  */
 describe('canSeeResolved — the decision table, exactly', () => {
   it('a non-member sees nothing at all, in every mode including one that names them', () => {
@@ -96,6 +115,10 @@ describe('canSeeResolved — the decision table, exactly', () => {
   });
 
   it('an ADMIN gets no visibility bypass — and is not thereby blinded, which is the other half', () => {
+    // Pure-function level (see the docblock): with an EMPTY project set an admin
+    // sees no project-mode ticket. Since 2026-09-29 (owner ruling A) the resolver
+    // never hands an admin an empty set in a workspace that has a founded project,
+    // so this measures that the function's only project-mode door is the SET.
     expect(canSeeResolved(eff('admin'), 'u', vis('project'))).toBe(false);
     expect(canSeeResolved(eff('admin'), 'u', vis('explicit', ['other']))).toBe(false);
     // The positive control: "an admin sees nothing" would also pass if admins
@@ -207,6 +230,11 @@ describe('canSee — against the real projections', () => {
     const workspaceMode = newUlid();
     const explicitMode = newUlid();
 
+    // Founded (AMENDED 2026-09-29, owner ruling A) so that rule A's implicit
+    // membership is ALSO on the table: a revoked member must lose the implicit
+    // set as well as the standing roster row, and an unfounded project would leave
+    // that half of the ruling unmeasured.
+    await seedProject(db.pool, ws, prj);
     await seedMember(db.pool, ws, user, 'member', [{ projectId: prj }]);
     // All three resolved modes, because the guarantee is enforced at two
     // independent points and each mode reaches a different one. `project` is
@@ -278,17 +306,25 @@ describe('canSee — against the real projections', () => {
     expect(await canSee(db.pool, insideOwner, tkt)).toBe(true);
   });
 
-  it('an admin who has not joined the project sees its project-mode tickets only after joining — an attributed event', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This case read "an admin who has not
+   * joined the project sees its project-mode tickets only after joining" and it
+   * seeded NO project, so under rule A it kept passing for a reason production
+   * cannot produce. The project is founded now, and the answer is rule A's.
+   */
+  it('an admin who has not joined the project sees its project-mode tickets — rule A, no join needed', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const admin = newUlid();
+    const guest = newUlid();
     const tkt = newUlid();
 
+    await seedProject(db.pool, ws, prj);
     await seedMember(db.pool, ws, admin, 'admin');
+    await seedGuest(db.pool, ws, guest);
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: tkt });
-    expect(await canSee(db.pool, admin, tkt)).toBe(false);
-
-    await seedMember(db.pool, ws, admin, 'admin', [{ projectId: prj }]);
     expect(await canSee(db.pool, admin, tkt)).toBe(true);
+    // The no-see witness the case used to be: someone on no project by any rule.
+    expect(await canSee(db.pool, guest, tkt)).toBe(false);
   });
 });

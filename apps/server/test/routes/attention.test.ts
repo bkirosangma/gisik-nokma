@@ -14,6 +14,8 @@ import { readAttention } from '../../src/routes/attention.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+import { seedGuest } from '../helpers/seed.js';
+import { signInWithPhone } from '../helpers/session.js';
 import { SCENARIO_NOW } from '../helpers/read-scenario.js';
 
 /**
@@ -81,8 +83,10 @@ import { SCENARIO_NOW } from '../helpers/read-scenario.js';
  * - **404** — a caller outside the workspace, the owner of a NEIGHBOUR
  *   workspace, and a nonexistent workspace id, byte-identical down to
  *   `content-length` against the frozen `READ_NOT_FOUND_BODY` (7.119).
- * - **200 with an empty result** — `outsider`, a workspace MEMBER who is on no
- *   project and named in no explicit list (7.120). The emptiness is the
+ * - **200 with an empty result** — a GUEST named in no explicit list (7.120;
+ *   amended 2026-09-29, owner ruling (A): it was `outsider`, a workspace member
+ *   on no roster, who is now on every project and sees the project-mode items).
+ *   The emptiness is the
  *   visibility predicate answering, not the door, which is why that case reads
  *   the blocked / stale / due rows back out of `proj_tickets` first and holds
  *   the member's non-empty answer beside it. The same case gives the `guest` a
@@ -1038,20 +1042,43 @@ describe('GET /v1/workspaces/:workspaceId/attention — computed, never stored',
     expect(idsOf(response, 'due-soon')).not.toContain(fx.openBlockedId);
   });
 
-  it('7.120 a member who may see nothing gets 200 and an empty strip; a guest gets their own slice', async () => {
+  it('7.120 a viewer who may see nothing gets 200 and an empty strip; a member on no roster sees every project-mode item — rule A', async () => {
     await claimSettings(7, 7);
 
-    // `outsider` is a workspace MEMBER on no project and named in no explicit
-    // list. The door lets them in; the visibility predicate leaves them with
-    // nothing.
+    // AMENDED 2026-09-29, owner ruling (A): an admin/member is on every founded
+    // project, so `outsider` — a workspace MEMBER on no roster — is served the
+    // project-mode items and this case's empty-strip witness is now a GUEST who
+    // is named in no explicit list. The door lets both in; the visibility
+    // predicate leaves the bystander with nothing.
+    const bystander = await signInWithPhone(read.app, read.otp, '+911111111120');
+    await seedGuest(db.pool, read.world.workspaceId, bystander.userId);
+    const bystanderResponse = await read.app.inject({
+      method: 'GET',
+      url: attentionUrl(read.world.workspaceId),
+      headers: { authorization: `Bearer ${bystander.token}` },
+    });
+    expect(bystanderResponse.statusCode).toBe(200);
+    const bystanderStrip = bystanderResponse.json() as AttentionResponse;
+    expect(bystanderStrip.items).toEqual([]);
+    // …and the settings still answer, so this is a computed empty rather than a
+    // route that fell over.
+    expect(bystanderStrip.settings).toMatchObject({ staleDays: 7, dueSoonDays: 7 });
+    expect(bystanderStrip.generatedAt).toBe(SCENARIO_NOW.toISOString());
+
+    // The outsider is NOT empty any more: rule A puts them on the project, so
+    // they get the project-mode items. Both halves in one run — what they gain
+    // (the stale, project-mode `taskInEpic`) and what they still do not
+    // (the explicit-mode blocked ticket shared with the member only).
     const outsider = await attention('outsider');
     expect(outsider.statusCode).toBe(200);
     const outsiderStrip = outsider.json() as AttentionResponse;
-    expect(outsiderStrip.items).toEqual([]);
-    // …and the settings still answer, so this is a computed empty rather than a
-    // route that fell over.
+    const outsiderIds = outsiderStrip.items.map((item) => item.card.ticketId);
+    expect(outsiderIds.length).toBeGreaterThan(0);
+    expect(outsiderIds).toContain(read.world.taskInEpicId);
+    expect(outsiderIds).not.toContain(read.world.sharedTaskId);
+    expect(outsiderIds).not.toContain(read.world.hiddenTaskId);
+    expect(outsiderIds).not.toContain(fx.guestDueId);
     expect(outsiderStrip.settings).toMatchObject({ staleDays: 7, dueSoonDays: 7 });
-    expect(outsiderStrip.generatedAt).toBe(SCENARIO_NOW.toISOString());
 
     // The positive control that the workspace is NOT quiet: the blocked, stale
     // and due rows all exist, read straight out of the projection, and the

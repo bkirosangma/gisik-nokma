@@ -1802,7 +1802,9 @@ describe('the refusal vocabulary, against the real engine over the real door', (
    * be a self-comparison through one module.
    *
    * **What makes this a role measurement rather than a permission one:** the
-   * member is granted workspace membership AND project membership first, and the
+   * member is granted workspace membership AND project membership first (the
+   * project row is redundant since rule A, 2026-09-29 — a member is on every
+   * founded project — and is kept as the fixture the case was measured on), and the
    * control is the SAME actor moving a ticket of the SAME TYPE out of the SAME
    * state along the UNGATED edge. *A different ticket instance* — `approvalTicket()`
    * mints a fresh ULID per call, and an earlier version of this sentence said "the

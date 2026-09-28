@@ -30,23 +30,12 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  *    the request that sends none. MEASURED: `const viewerId = (request.query as
  *    {userId?: string}).userId ?? request.currentUserId` reddens it naming the
  *    owner's ordering fixtures.
- * 2. **Being ASSIGNED a ticket is not being allowed to SEE it.** Assignment is a
- *    claim somebody else can make about you; visibility is Plan 4's decision
- *    table. Four cases separate them, each with the ticket that DID appear
- *    beside the one that did not, because "the invisible one is absent" alone
- *    passes on a route that returns nothing:
- *    - 7.27 the planted hidden ticket, assigned to the member who is not on its
- *      explicit list;
- *    - 7.104 a project-mode ticket assigned to a workspace member who is on no
- *      project (the never-on-the-roster half of "removed from the project");
- *    - 7.107 the other half, executed: `project.member_removed` takes
- *      `projectLead` off the project their assigned ticket lives in, and the
- *      SAME ticket that was in their answer a moment ago is gone from it;
- *    - 7.108 visibility NARROWED after assignment — a `visibility.set` drops the
- *      guest from a list they are still the assignee of;
- *    - 7.113 a workspace ADMIN, who gets no read bypass, is the assignee of a
- *      project-mode row in a project they are on — and their whole answer is
- *      three empty groups at 200.
+ * 2. **Being ASSIGNED a ticket is not being allowed to SEE it — for the tickets
+ *    that are not one's own to read.** Assignment is a claim somebody else can
+ *    make about you; visibility is Plan 4's decision table. Since 2026-09-29
+ *    (owner rulings A and W3) assignment IS enough to see one's own ticket, and
+ *    an admin/member is on every project; the cases that separated assignment
+ *    from visibility are amended in place (7.27, 7.104, 7.107, 7.108, 7.113).
  *
  * ## The three door answers, and which case pins each
  *
@@ -55,23 +44,23 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * - **404** — a caller outside the workspace, the owner of a NEIGHBOUR
  *   workspace, and a nonexistent workspace id, byte-identical down to
  *   `content-length` against the frozen `READ_NOT_FOUND_BODY` (7.111).
- * - **200 with an empty result** — a MEMBER who may see nothing (7.113). The
- *   emptiness is the visibility predicate answering, not the door, which is why
- *   that case seeds a row the caller IS the assignee of and reads it back from
- *   `proj_tickets` before asserting it absent. 7.113 also holds the two answers
- *   side by side: the admin's 200-and-empty against the stranger's 404.
+ * - **200 with the caller's own answer** — a workspace member is let in and
+ *   shown what is theirs (7.113, amended 2026-09-29: rule A puts an admin on
+ *   every project, so their assigned project-mode row is in their answer rather
+ *   than absent). 7.113 also holds the two answers side by side: the admin's
+ *   200 against the stranger's 404.
  *
  * ## Which role cells this file exercises
  *
  * All eight of the shared world's. `owner` (the visibility predicate compiled to
  * `TRUE`, so the tenancy clause is the only boundary left, 7.103/7.106);
  * `member` (the three-armed disjunction, 7.26/7.27/7.105); `outsider` (a
- * workspace member with an EMPTY `eff.projects`, 7.104); `guest` (the explicit
- * arm alone, and an audience narrowing under it, 7.108); `admin` (the cell that
- * proves an admin shares the MEMBER branch rather than the owner's bypass,
- * 7.113 — MEASURED: adding `case 'admin'` to `visibleTicketsWhere`'s owner arm
- * reddens 7.113 and nothing else); `projectLead` (a plain workspace member whose
- * project roster row is then DELETED, 7.26/7.107); `stranger` and `neighbour`
+ * workspace member with NO roster row, 7.104 — on every project by rule A);
+ * `guest` (the explicit arm alone, and an audience narrowing under it, 7.108);
+ * `admin` (on every project by rule A, so their assigned project-mode row is in
+ * their answer, 7.113); `projectLead` (a plain workspace member whose project
+ * roster row is then DELETED, 7.26/7.107 — and who keeps the ticket, rule A);
+ * `stranger` and `neighbour`
  * (the two 404s, 7.111).
  *
  * One over-permissive mutation is NOT caught here and is recorded rather than
@@ -183,7 +172,7 @@ type MyWorkFixtures = {
   memberSiblingOpenId: string;
   /** member, seeded project, transitioned to `done`. */
   memberTerminalId: string;
-  /** outsider, seeded project, project-mode — assigned to somebody on no project. */
+  /** outsider, seeded project, project-mode — assigned to somebody with no roster row (rule A: on the project anyway). */
   outsiderProjectId: string;
   /** outsider, explicit `[owner, outsider]` — the same person's VISIBLE row. */
   outsiderExplicitId: string;
@@ -200,10 +189,9 @@ type MyWorkFixtures = {
   /** owner, but in the NEIGHBOUR workspace. The tenancy row. */
   ownerNeighbourId: string;
   /**
-   * admin, seeded project, project-mode — and `admin` is on NO project, so this
-   * is a row they are the assignee of and may not read. It is what makes their
-   * empty answer the VISIBILITY PREDICATE answering rather than "nobody gave
-   * this person any work".
+   * admin, seeded project, project-mode — and `admin` has no roster row, but
+   * rule A puts an admin on every founded project, so this is a row they are the
+   * assignee of AND may read (7.113, amended 2026-09-29).
    */
   adminProjectId: string;
   /**
@@ -620,47 +608,55 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(groups.terminal).toEqual([]);
   });
 
-  it('7.104 a workspace member on NO project does not get the project-mode ticket assigned to them', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This read "a workspace member on NO
+   * project does not get the project-mode ticket assigned to them". Rule A puts a
+   * member on every founded project (the seeded one is founded), so the outsider's
+   * project-mode ticket is theirs to read and IS in the answer beside the explicit
+   * one. The no-see witness for "assigned but may not read" is the planted hidden
+   * ticket of 7.27 and the narrowed guest of 7.108, both explicit-mode.
+   */
+  it('7.104 AMENDED (A): a workspace member on NO project gets the project-mode ticket assigned to them', async () => {
     const response = await myWork('outsider');
     expect(response.statusCode).toBe(200);
     const groups = await groupIds('outsider');
 
-    // The row they may see, assigned to them, IS here — so the absence below is
-    // this predicate answering and not an empty route.
-    expect(groups.open).toEqual([fx.outsiderExplicitId]);
+    // Both rows assigned to this person, in `ORDER BY t.ticket_id` order: the
+    // project-mode one (…03) sorts before the explicit one (…04).
+    expect(groups.open).toEqual([fx.outsiderProjectId, fx.outsiderExplicitId].sort());
+    expect(groups.open).toEqual([fx.outsiderProjectId, fx.outsiderExplicitId]);
     expect(groups.active).toEqual([]);
     expect(groups.terminal).toEqual([]);
 
-    // The project-mode one, assigned to the same person by the same seeder in
-    // the same project, is absent — id, and title words, from the whole body.
-    expect(response.body).not.toContain(fx.outsiderProjectId);
-    expect(response.body).not.toContain('Stocktake');
+    // The project-mode one is in the body — id and title — by rule A, with no
+    // roster row naming this person on the project.
+    expect(response.body).toContain(fx.outsiderProjectId);
+    expect(response.body).toContain('Stocktake');
 
-    // Positive control for the substring checks themselves: the id and the title
-    // of the row that DID come back are in the body, so `not.toContain` is not
-    // passing on an error page or an empty string.
+    // And the explicit-mode one, whose audience DOES name them, still is.
     expect(response.body).toContain(fx.outsiderExplicitId);
     expect(response.body).toContain('Countersign the lease');
   });
 
-  it('7.113 a workspace ADMIN gets 200 with three EMPTY groups — an admin has no read bypass, and the emptiness is the predicate rather than the door', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This read "a workspace ADMIN gets 200
+   * with three EMPTY groups — an admin has no read bypass". Rule A puts an admin
+   * on every founded project, so the project-mode row assigned to them is theirs
+   * to read and is their whole `open` group. The 200-versus-404 half is unchanged.
+   */
+  it('7.113 AMENDED (A): a workspace ADMIN gets the project-mode row assigned to them — admins are on every project', async () => {
     const response = await myWork('admin');
     expect(response.statusCode).toBe(200);
     const body = response.json() as MyWorkResponse;
 
-    // The third door answer, and the only all-empty one in this file: the gate
-    // asked about the WORKSPACE and this caller is a member of it, so they are
-    // let in and then shown nothing.
-    expect(body.groups).toEqual({ open: [], active: [], terminal: [] });
-    // The envelope still names what was asked, so an empty answer is legible
-    // rather than indistinguishable from a route that lost its body.
+    expect(body.groups.open.map((c) => c.ticketId)).toEqual([fx.adminProjectId]);
+    expect(body.groups.active).toEqual([]);
+    expect(body.groups.terminal).toEqual([]);
+    // The envelope still names what was asked.
     expect(body.workspaceId).toBe(read.world.workspaceId);
 
-    // The emptiness is the VISIBILITY PREDICATE, not "nobody gave this person
-    // work": there IS a ticket assigned to them, read back from the table to
-    // prove the seeder wrote it, and `admin` is on no project so a project-mode
-    // row is not theirs to read. An admin gets NO bypass — that is
-    // `visibleTicketsWhere`'s member branch, deliberately shared.
+    // The row is the one the seeder assigned to them, read back from the table
+    // as an exact row, and it is in the body by title as well as by id.
     const { rows } = await db.pool.query<{ workspace_id: string; assignee_id: string }>(
       `SELECT workspace_id, assignee_id FROM proj_tickets WHERE ticket_id = $1`,
       [fx.adminProjectId],
@@ -668,17 +664,15 @@ describe('GET /v1/me/work — what is mine', () => {
     expect(rows).toEqual([
       { workspace_id: read.world.workspaceId, assignee_id: read.userIds.admin },
     ]);
-    expect(response.body).not.toContain(fx.adminProjectId);
-    expect(response.body).not.toContain('petty cash');
+    expect(response.body).toContain(fx.adminProjectId);
+    expect(response.body).toContain('petty cash');
 
-    // Positive control: the SAME url, a caller who may see rows, a non-empty
-    // answer — so the three empty arrays are this viewer's answer and not the
-    // route's only one.
+    // Positive control: the SAME url, a different caller, a different answer —
+    // so the admin's card is this viewer's answer and not the route's only one.
     expect((await groupIds('member')).open).toEqual([fx.memberOpenId, fx.memberSiblingOpenId]);
 
-    // And the distinction this cell exists for: a member with nothing visible is
-    // 200-and-empty, while somebody outside the workspace is 404. Two different
-    // answers to two different questions, in one case.
+    // And the distinction this cell exists for: a caller in the workspace gets
+    // a 200 with their own answer, while somebody outside the workspace is 404.
     expect((await myWork('stranger')).statusCode).toBe(404);
   });
 
@@ -852,14 +846,23 @@ describe('GET /v1/me/work — what is mine', () => {
     });
   });
 
-  it('7.107 taken OFF the project, the assignee stops seeing their own ticket — the roster is read, not remembered', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This read "taken OFF the project, the
+   * assignee stops seeing their own ticket — the roster is read, not remembered".
+   * `project.member_removed` deletes the roster row, but rule A puts a member on
+   * every founded project whether or not a row names them, so the mover stays in
+   * their answer. The assertion is that the after-state EQUALS the before-state,
+   * and the `assignee_id` read-back is kept: the assignment never moved either.
+   */
+  it('7.107 AMENDED (A): taken OFF the project roster, a member still sees their assigned ticket — rule A and the assignee arm both hold it', async () => {
     // Before: the mover is theirs and it is in their answer (case 7.26 left it
-    // terminal). The explicit row beside it is the control that survives.
-    expect(await groupIds('projectLead')).toEqual({
+    // terminal). The explicit row beside it is the control.
+    const before = {
       open: [fx.leadExplicitId],
       active: [],
       terminal: [fx.leadMoverId],
-    });
+    };
+    expect(await groupIds('projectLead')).toEqual(before);
 
     await applyCommitted(db.pool, [
       makeCommitted({
@@ -871,17 +874,21 @@ describe('GET /v1/me/work — what is mine', () => {
       }),
     ]);
 
+    // The removal really landed: the roster row is gone, so the answer below is
+    // rule A holding the ticket and not a removal that never happened.
+    const roster = await db.pool.query(
+      `SELECT 1 FROM proj_memberships WHERE workspace_id = $1 AND user_id = $2 AND scope_kind = 'project' AND project_id = $3`,
+      [read.world.workspaceId, read.userIds.projectLead, read.sibling.projectId],
+    );
+    expect(roster.rowCount).toBe(0);
+
     const after = await myWork('projectLead');
     expect(after.statusCode).toBe(200);
-    expect(await groupIds('projectLead')).toEqual({
-      open: [fx.leadExplicitId],
-      active: [],
-      terminal: [],
-    });
-    expect(after.body).not.toContain(fx.leadMoverId);
-    expect(after.body).not.toContain('Approve the sibling budget');
+    expect(await groupIds('projectLead')).toEqual(before);
+    expect(after.body).toContain(fx.leadMoverId);
+    expect(after.body).toContain('Approve the sibling budget');
 
-    // Still assigned to them — the assignment did not move, the roster did.
+    // Still assigned to them — the assignment did not move, and neither did the answer.
     const { rows } = await db.pool.query<{ assignee_id: string }>(
       `SELECT assignee_id FROM proj_tickets WHERE ticket_id = $1`,
       [fx.leadMoverId],

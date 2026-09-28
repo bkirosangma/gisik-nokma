@@ -115,8 +115,15 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
       { projectId: joined, projectAdmin: true },
       { projectId: other, projectAdmin: true },
     ]);
-    // Both are workspace members and on NEITHER project, so neither can see a
-    // project-mode ticket in either one to begin with.
+    // Both are workspace members with NO roster row on either project.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): this comment read "so neither can see a
+    // project-mode ticket in either one to begin with". Rule A puts a member on
+    // every founded project, so both already can, and the event no longer WIDENS
+    // anyone's reach. The notice is still owed and still scoped: it answers "what
+    // can this reader see in the project they were just added to" (the documented
+    // over-naming, below), and the scope filter is now killable by `inOther`
+    // itself, which the newcomer can see.
     await seedMember(db.pool, ws, newcomer, 'member');
     await seedMember(db.pool, ws, bystander, 'member');
 
@@ -178,11 +185,14 @@ describe('12.283 a widening on the READER’s side of canSee is owed the same no
     // this member CAN see `alreadyVisibleElsewhere`, so that only the project
     // scope keeps it out of the notice.
     expect(await canSee(db.pool, newcomer, alreadyVisibleElsewhere)).toBe(true);
-    expect(await canSee(db.pool, newcomer, inOther)).toBe(false);
+    // Rule A: the other project's project-mode ticket is visible too (it used to
+    // be the ticket `listVisibleTickets` excluded, `false` here).
+    expect(await canSee(db.pool, newcomer, inOther)).toBe(true);
 
     const forNewcomer = noticesIn(await collect(newcomer, ws, cursor));
     // EXACTLY the joined project's two tickets — not the workspace-mode ticket
-    // this member could already see, and not the other project's. Not
+    // this member could already see, and not the other project's (which rule A
+    // makes visible to them as well, so only the scope keeps it out). Not
     // `toContain`: an implementation that named everything visible would satisfy
     // "contains inJoined" while dragging in both.
     expect(forNewcomer).toEqual([[inJoined, alsoInJoined].sort()]);

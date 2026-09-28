@@ -2199,7 +2199,7 @@ written; they are recorded in `docs/lanes/executor-state-B.md`.
   one `visibility.set` and one `ticket.reparented`, so nothing rests on a same-value short-circuit — name
   it once; a LATER drain that sees a NEW widening is owed the notice again, because the ledger is scoped
   to the drain and not to the subscription.
-- 12.283 ✅ **The THIRD shape of grant — CLOSED by closure 5b(a).** *(Was 🚫, recorded and not built;
+- 12.283 ✅ *Amended 2026-09-29, owner ruling (A): the newcomer already sees the other project's project-mode ticket, so the precondition is flipped to `true`; the `project.member_added` event still widens no reach, and the notice stays scoped.* **The THIRD shape of grant — CLOSED by closure 5b(a).** *(Was 🚫, recorded and not built;
   P37 scoped closure 5 to "the visibility event itself".)* Visibility also widens when the READER's reach
   grew rather than the ticket's — `membership.granted`, `project.member_added` — and every ticket such an
   event reveals carries the identical pre-cursor gap. **It could not be another entry in

@@ -86,13 +86,18 @@ function readableSets(n: ReadWorldNotes['NOTES']): Record<string, string[]> {
     // admits its members", "workspace scope admits every non-guest" and "a private
     // note is the author's alone" are separated from each other.
     member: [n.nWorkspace, n.nProject].sort(),
-    // `outsider` is a member on NO project: workspace scope only.
-    outsider: [n.nWorkspace].sort(),
+    // `outsider` is a member on NO roster. AMENDED 2026-09-29, owner ruling (A):
+    // an admin/member is on every founded project, so they read project scope
+    // too — this row was `[nWorkspace]`. The no-read witness for project scope
+    // is now the guest row below, who reaches explicit lists and nothing else.
+    outsider: [n.nWorkspace, n.nProject].sort(),
     // A guest reaches explicit lists and nothing else.
     guest: [n.nExplicit, n.nInherit].sort(),
-    // A workspace admin who is on no project: the same as `outsider`, and that
-    // equality is the no-admin-bypass rule.
-    admin: [n.nWorkspace].sort(),
+    // A workspace admin who is on no roster: the same as `outsider`, and (rule A,
+    // amended 2026-09-29) both read workspace AND project scope. The equality
+    // used to be the no-admin-bypass rule; it is now "admins and members are on
+    // every project". An admin still reads no private or explicit note.
+    admin: [n.nWorkspace, n.nProject].sort(),
   };
 }
 const ROLES: ReadRole[] = ['owner', 'member', 'outsider', 'guest', 'admin'];

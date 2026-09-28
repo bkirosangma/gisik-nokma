@@ -111,7 +111,7 @@ export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: 
     case 'guest':
       return explicitAudienceWhere(userId, params);
 
-    // member and admin: identical, because an admin gets no read bypass.
+    // member and admin: identical (both on every founded project, rule A).
     case 'admin':
     case 'member': {
       const projects = [...eff.projects.keys()];

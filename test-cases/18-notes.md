@@ -51,21 +51,21 @@ the number you added — an unchanged count has reported a clean sweep over case
 
 ## 18.3 Server — who may read a note
 
-- ✅ **18.020 — `canReadNote` implements spec §4.1** for every (scope × relationship) cell of the fixture: 5 notes × 7 users. Mutation: flip the `guest` arm of `workspace`.
-- ✅ **18.021 — `visibleNotesWhere` returns exactly the notes `canReadNote` accepts,** asserted per user on the same fixture. Mutation: change the `project` arm to ignore project membership.
+- ✅ **18.020 — `canReadNote` implements spec §4.1** for every (scope × relationship) cell of the fixture: 5 notes × 7 users. Mutation: flip the `guest` arm of `workspace`. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest (the `project` note is read by admin and memberOut alike).
+- ✅ **18.021 — `visibleNotesWhere` returns exactly the notes `canReadNote` accepts,** asserted per user on the same fixture. Mutation: change the `project` arm to ignore project membership. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest.
 - ✅ **18.022 — an `inherit` note is readable through ANY one attached visible ticket** (union), and not readable when every attached ticket is invisible or deleted. Mutation: require all.
 - ✅ **18.023 — the owner reads every note; the author reads their own private note; a non-member reads nothing.** Mutation: drop the author arm.
 
 ## 18.4 Server — who may write which note event
 
-- ✅ **18.024 — the matrix of spec §4.2**: every note event × {author, reader-member, non-reader-member, guest-listed, admin-reader, admin-non-reader, owner} refuses or allows exactly as the table says. Mutation: flip one cell.
-- ✅ **18.025 — `note.created` refuses a guest, refuses a project home the actor is not on, and requires ticket visibility for `attachTicketId`.** Control: a member on the project creates. Mutation: drop the project-membership check.
+- ✅ **18.024 — the matrix of spec §4.2**: every note event × {author, reader-member, non-reader-member, guest-listed, admin-reader, admin-non-reader, owner} refuses or allows exactly as the table says. Mutation: flip one cell. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest (an admin now reads a `project` note, so `note.body_set` on it is allowed to the admin; the admin-non-reader cell is the `private` note).
+- ✅ **18.025 — `note.created` refuses a guest, refuses a project home the actor is not on, and requires ticket visibility for `attachTicketId`.** Control: a member on the project creates. Mutation: drop the project-membership check. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest — a member holding no roster row now creates under the project, and the guest is refused under it by the role check.
 - ✅ **18.026 — `note.attached` requires BOTH reading the note AND seeing the ticket;** a reader who cannot see the ticket is refused, a ticket-viewer who cannot read the note is refused. Mutation: drop either half.
 - ✅ **18.027 — refusals carry rule `permission.note` and a plain-language reason;** `note.created` by a guest carries `permission.role` (the role check fires first). Mutation: use the visibility rule id.
 
 ## 18.5 Server — reads
 
-- ✅ **18.028 — `GET …/notes` returns exactly the readable, non-deleted notes for each fixture user,** newest `updated_at` first. Mutation: drop `visibleNotesWhere`.
+- ✅ **18.028 — `GET …/notes` returns exactly the readable, non-deleted notes for each fixture user,** newest `updated_at` first. Mutation: drop `visibleNotesWhere`. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the no-see witness is now a guest.
 - ✅ **18.029 — `?home=`, `?author=`, `?scope=` filters narrow the list;** control: no filter returns the superset. Mutation: ignore `scope`.
 - ✅ **18.030 — `?deleted=1` returns deleted notes only to the author, an admin-reader or the owner;** a member sees `[]`. Mutation: return them to any reader.
 - ✅ **18.031 — `GET /v1/notes/:id` is 404 with the same body for an unreadable note and for a random id.** Mutation: 403 for unreadable.
@@ -85,7 +85,7 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **18.039 — upload with `noteId` succeeds for the author and is 403 for a non-author reader;** control: upload with `ticketId` is unchanged. Mutation: skip the author check.
 - ✅ **18.040 — download of a note-owned attachment is 200 for a reader and 404 for a non-reader** (same body as an unknown id). Mutation: authorise by ticket only.
 - ✅ **18.041 — a request naming both `ticketId` and `noteId`, or neither, is 400.** Mutation: prefer `ticketId` silently.
-- ✅ **18.042 — `note.created` refuses a `homeProjectId` no project was founded under, even for the owner and even when the actor holds a forged membership on it** (spec §3.3's existence precondition); control: a real project is accepted. Mutation: drop the `note.created` case from `projectsNamedBy`.
+- ✅ **18.042 — `note.created` refuses a `homeProjectId` no project was founded under, even for the owner and even when the actor holds a forged membership on it** (spec §3.3's existence precondition); control: a real project is accepted. Mutation: drop the `note.created` case from `projectsNamedBy`. Amended 2026-09-29, owner ruling (A): an admin/member is on every founded project; the same-actor control on a real project the actor holds no roster row on is now accepted (it was refused by the membership arm).
 
 ## 18.8 Sync — server
 

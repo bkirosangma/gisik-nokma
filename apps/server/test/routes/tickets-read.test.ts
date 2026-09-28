@@ -6,7 +6,8 @@ import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
-import { applyAll, seedMember, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+import { applyCommitted, makeCommitted } from '../helpers/apply.js';
+import { applyAll, seedGuest, seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
@@ -102,7 +103,14 @@ function comparableHeaders(res: InjectResponse): Record<string, unknown> {
 }
 
 describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — invisible is nonexistent', () => {
-  it('a member reading another project’s ticket gets a 404 indistinguishable from a ticket that never existed', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This case read "a member reading
+   * another project's ticket gets a 404" and seeded that ticket in a project
+   * NEVER FOUNDED, so it kept passing for a reason production cannot produce.
+   * A member is on every founded project now (asserted below: they read it), and
+   * the viewer who may not see it is a GUEST, shared exactly one ticket.
+   */
+  it('a viewer who may not see a ticket (a guest) gets a 404 indistinguishable from a ticket that never existed; a member reads it', async () => {
     // Mutation that reddens it: give the `canSee` refusal any answer of its own
     // — a 403, or a body naming the ticket — and the two responses stop
     // matching. Deleting the `canSee` guard outright reddens it the other way,
@@ -110,12 +118,15 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — invisible is non
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     const { userId, headers } = await signedIn();
-    await seedMember(db.pool, ws, userId, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, ws, userId);
     const visible = newUlid();
     const invisibleId = newUlid();
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: visible });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: invisibleId });
+    await applyAll(db.pool, [setVisibilityEnv(ws, visible, 'explicit', [userId])]);
 
     // Positive control FIRST: this viewer, this route, an id they may see. It
     // is what stops "404s everything" from passing this test.
@@ -130,21 +141,33 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — invisible is non
     expect(invisible.json()).toEqual({ error: 'not_found' });
     expect(invisible.json()).toEqual(ghost.json());
     expect(comparableHeaders(invisible)).toEqual(comparableHeaders(ghost));
+
+    // Rule A's answer for the SAME ticket: a member on `mine` only reads it.
+    const roster = await signedIn();
+    await seedMember(db.pool, ws, roster.userId, 'member', [{ projectId: mine }]);
+    expect((await get(`/v1/workspaces/${ws}/tickets/${invisibleId}`, roster.headers)).statusCode).toBe(200);
   });
 
   it('history of an invisible ticket is the same 404, indistinguishable from a ticket that never existed', async () => {
     // The history door is a separate registration and would have to be refused
     // separately. Mutation: drop either guard from the `/events` handler and
     // the invisible read answers 200 with an (empty) event list.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): the viewer is a GUEST and the
+    // invisible ticket sits in a FOUNDED project (it was a member and a project
+    // never founded, a green production cannot produce).
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     const { userId, headers } = await signedIn();
-    await seedMember(db.pool, ws, userId, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, ws, userId);
     const visible = newUlid();
     const invisibleId = newUlid();
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: visible });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: invisibleId });
+    await applyAll(db.pool, [setVisibilityEnv(ws, visible, 'explicit', [userId])]);
 
     const allowed = await get(`/v1/workspaces/${ws}/tickets/${visible}/events`, headers);
     expect(allowed.statusCode).toBe(200);
@@ -195,25 +218,42 @@ describe('GET /v1/workspaces/:workspaceId/tickets/:ticketId — invisible is non
 });
 
 describe('GET /v1/workspaces/:workspaceId/tickets — the viewer’s slice, filtered server-side', () => {
-  it('returns only the tickets this viewer may see, and an outsider gets an empty list rather than a refusal', async () => {
+  it('returns only the tickets this viewer may see, and a non-member gets an empty list rather than a refusal', async () => {
     // Mutation: return every row for the workspace instead of
     // `listVisibleTickets`' filtered set and the id-set assertion reddens. The
     // outsider half is the collection-shaped statement of the same honesty rule
     // as the 404 — "you may not see this" and "there is nothing here" must not
     // be tellable apart — so it is a 200 with nothing, never a 403.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): the viewer was a member on `mine`
+    // and `theirs` was a project never founded. Both are founded now; the
+    // narrowed viewer is a GUEST shared `ticketMine`, and the member's list is
+    // asserted to hold the project-mode ticket off their roster (rule A).
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     const { userId, headers } = await signedIn();
-    await seedMember(db.pool, ws, userId, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, ws, userId);
     const ticketMine = newUlid();
     const ticketTheirs = newUlid();
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: ticketMine });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: ticketTheirs });
+    await applyAll(db.pool, [setVisibilityEnv(ws, ticketMine, 'explicit', [userId])]);
 
     const res = await get(`/v1/workspaces/${ws}/tickets`, headers);
     expect(res.statusCode).toBe(200);
     expect(res.json().tickets.map((t: { ticket_id: string }) => t.ticket_id)).toEqual([ticketMine]);
+
+    const roster = await signedIn();
+    await seedMember(db.pool, ws, roster.userId, 'member', [{ projectId: mine }]);
+    const memberView = await get(`/v1/workspaces/${ws}/tickets`, roster.headers);
+    expect(memberView.statusCode).toBe(200);
+    // `ticketMine` is explicit-mode naming only the guest, so the member does
+    // NOT get it; `ticketTheirs` is project-mode in a project off their roster,
+    // which rule A now gives them.
+    expect(memberView.json().tickets.map((t: { ticket_id: string }) => t.ticket_id)).toEqual([ticketTheirs]);
 
     const outsider = await signedIn();
     const theirView = await get(`/v1/workspaces/${ws}/tickets`, outsider.headers);
@@ -254,9 +294,16 @@ describe('the single read carries the rollup — true totals with the restrictio
     // Three different numbers on purpose — three children, two this viewer can
     // reach, one it cannot: a fixture where any two coincided would let a swap
     // through.
+    //
+    // AMENDED 2026-09-29, owner ruling (A). The third child sat in `theirs`, a
+    // project never founded, in PROJECT mode — hidden from a member only because
+    // nobody founded the project. It is now EXPLICIT-mode, listing somebody else,
+    // which is the one thing that still hides a ticket from a member.
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     const { userId, headers } = await signedIn();
     await seedMember(db.pool, ws, userId, 'member', [{ projectId: mine }]);
 
@@ -272,7 +319,7 @@ describe('the single read carries the rollup — true totals with the restrictio
     await applyAll(db.pool, [
       setVisibilityEnv(ws, visibleA, 'workspace'),
       setVisibilityEnv(ws, visibleB, 'workspace'),
-      setVisibilityEnv(ws, hidden, 'project'),
+      setVisibilityEnv(ws, hidden, 'explicit', [newUlid()]),
     ]);
 
     const res = await get(`/v1/workspaces/${ws}/tickets/${parentId}`, headers);
@@ -476,9 +523,19 @@ describe('a served row discloses no ticket the viewer may not see, beyond the on
     //
     // Mutation: put `resolved_from` back into `toTicketView` and this reddens
     // naming the grandparent's id.
+    //
+    // AMENDED 2026-09-29, owner ruling (A). `projectQ` was never founded, so the
+    // member could not read its tickets for a reason production cannot produce;
+    // and once Q is founded a member reads every Q ticket (rule A). What still
+    // puts Q's tickets out of a member's reach is Q being DELETED (case 6.217:
+    // the implicit project set is live projects only), so Q is founded, given
+    // its tickets, and then deleted — the ancestors are out of reach through a
+    // door the ledger really has. R is founded and the member is on its roster.
     const ws = newUlid();
     const projectQ = newUlid();
     const projectR = newUlid();
+    await seedProject(db.pool, ws, projectQ);
+    await seedProject(db.pool, ws, projectR);
     const { userId, headers } = await signedIn();
     await seedMember(db.pool, ws, userId, 'member', [{ projectId: projectR }]);
 
@@ -501,6 +558,11 @@ describe('a served row discloses no ticket the viewer may not see, beyond the on
       ticketId: childId,
       parentId,
     });
+
+    // Q is deleted only NOW, after its tickets exist (amended 2026-09-29, rule A).
+    await applyCommitted(db.pool, [
+      makeCommitted({ workspaceId: ws, actorId: userId, entity: { kind: 'project', id: projectQ }, type: 'project.deleted', payload: {} }),
+    ]);
 
     // Non-vacuity: the projection really did store the grandparent's id on the
     // child's row. Without this the test would pass just as well against a

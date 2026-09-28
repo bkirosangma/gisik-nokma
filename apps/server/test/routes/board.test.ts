@@ -5,6 +5,8 @@ import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+import { seedGuest } from '../helpers/seed.js';
+import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * Plan 5 Task 8 — `GET /v1/projects/:projectId/board`.
@@ -21,7 +23,7 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * | no session | **401** `{error:'unauthenticated'}` | "no session is 401 …" |
  * | a session in a DIFFERENT workspace | **404** | "the neighbour workspace's owner …" |
  * | a project id that does not exist | **404**, byte-identical | "a stranger, a neighbour and an unknown id …" |
- * | a workspace member NOT on the project | **200**, `columns: []` | "an on-workspace, off-project member …" |
+ * | a viewer who may see nothing (a guest, amended 2026-09-29 (A)) | **200**, `columns: []` | "an on-workspace member gets 200 whatever their roster …" |
  *
  * The last row is the one worth stating out loud: the gate is
  * `requireMember`, which asks about the WORKSPACE, so the 404 boundary is the
@@ -44,8 +46,9 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * `seedReadScenario` refuses a second seed into one database, so this file
  * takes one `createTestDatabase` and seeds once in `beforeAll` (via
  * `buildReadTestApp`, which also signs the six users in for real and seeds the
- * neighbour workspace). Nothing here writes to the ledger after that, so no
- * case depends on declaration order.
+ * neighbour workspace). Nothing here writes to the ledger after that except
+ * 7.17's bystander guest (a fresh user no other case reads), so no case depends
+ * on declaration order.
  *
  * ## The one thing this file appends to the shared world: `wf-second` v2
  *
@@ -355,13 +358,29 @@ describe('GET /v1/projects/:projectId/board — visibility', () => {
 });
 
 describe('GET /v1/projects/:projectId/board — the door', () => {
-  it('7.17 an on-workspace, off-project member gets 200 with an empty board, not a 404 — the workspace is the boundary, the project roster is not', async () => {
-    const outsider = await getBoard('outsider', read.world.projectId);
-    expect(outsider.statusCode).toBe(200);
-    expect((outsider.json() as BoardResponse).columns).toEqual([]);
-    expect((outsider.json() as BoardResponse).projectId).toBe(read.world.projectId);
+  it('7.17 an on-workspace member gets 200 whatever their roster, and a viewer who may see nothing gets an empty board, not a 404 — the workspace is the boundary, the project roster is not', async () => {
+    // AMENDED 2026-09-29, owner ruling (A): an admin/member is on every founded
+    // project, so `outsider` (a member on no roster) is served the project-mode
+    // cards; the empty-board witness is now a GUEST named in no explicit list.
+    const bystander = await signInWithPhone(read.app, read.otp, '+911111111121');
+    await seedGuest(db.pool, read.world.workspaceId, bystander.userId);
+    const nothing = await read.app.inject({
+      method: 'GET',
+      url: `/v1/projects/${read.world.projectId}/board`,
+      headers: { authorization: `Bearer ${bystander.token}` },
+    });
+    expect(nothing.statusCode).toBe(200);
+    expect((nothing.json() as BoardResponse).columns).toEqual([]);
+    expect((nothing.json() as BoardResponse).projectId).toBe(read.world.projectId);
 
-    // Positive control, same helper, same project: the emptiness above is this
+    // The member on no roster: 200, and exactly the project-mode cards — the
+    // epic and its child — with none of the three explicit-mode tickets.
+    const outsider = await boardOf('outsider', read.world.projectId);
+    expect(outsider.projectId).toBe(read.world.projectId);
+    expect(outsider.columns.length).toBe(4);
+    expect(cardIds(outsider).sort()).toEqual([read.world.epicId, read.world.taskInEpicId].sort());
+
+    // Positive control, same helper, same project: the emptiness above is that
     // viewer's slice and not a route that answers `[]` to everyone.
     const member = await boardOf('member', read.world.projectId);
     expect(member.columns.length).toBe(4);
