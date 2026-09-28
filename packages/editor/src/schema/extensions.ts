@@ -267,6 +267,14 @@ export function buildEditorExtensions(options: EditorSchemaOptions = {}): Extens
     Details.configure({
       persist: options.readOnly !== true,
       HTMLAttributes: { class: 'editor-details' },
+      // The package's default sets only `aria-label`; the fold button is a
+      // disclosure control, so it also says whether it is expanded. Called on
+      // every toggle and on every node update, so the attribute never lags the
+      // `is-open` class the stylesheet turns the chevron by.
+      renderToggleButton: ({ element, isOpen }) => {
+        element.setAttribute('aria-label', isOpen ? 'Collapse details content' : 'Expand details content');
+        element.setAttribute('aria-expanded', String(isOpen));
+      },
     }),
     DetailsSummary,
     DetailsContent,
