@@ -100,6 +100,23 @@ describe('backup-daemon-main — one scheduler for all six jobs', () => {
     expect(armed.stdout).toContain(SCHEDULED);
   }, 90_000);
 
+  it('19.159 refuses BACKUP_RETENTION_DAYS=abc before arming any job, naming the variable', async () => {
+    const refused = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      BACKUP_RETENTION_DAYS: 'abc',
+    });
+    expect(refused.stdout).not.toContain(SCHEDULED);
+    expect(refused.stderr).toContain('BACKUP_RETENTION_DAYS');
+    // CONTROL
+    const armed = await runDaemon({
+      DATABASE_URL: db.url,
+      NOTIFICATION_SWEEP_INTERVAL_MS: '3600000',
+      BACKUP_RETENTION_DAYS: '30',
+    });
+    expect(armed.stdout).toContain(SCHEDULED);
+  }, 90_000);
+
   /**
    * 13.203 — `sweep-notifications` and `sweep-orphans` are registered on the SAME
    * `startScheduler` call as pg-dump and ledger-export. A refused sweep interval takes the

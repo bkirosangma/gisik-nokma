@@ -144,6 +144,13 @@ backups bucket in BLR1, both alerting the webhook on failure. Manual run:
 
 The managed database's own daily backups are a second string, not the plan.
 
+After each successful scheduled backup the worker prunes the backups bucket: anything under `pg/` or
+`ledger/` older than `BACKUP_RETENTION_DAYS` (default 30) is deleted, except the newest object under each
+prefix, which is kept whatever its age. The bucket has no lifecycle rule of its own (measured
+2026-09-28); this prune is the only retention. A prune failure alerts `backup:prune-after-<job>` and never
+fails the backup. The manual `ops:backup-once` run does not prune. A permanently deleted item therefore
+leaves the last backup within the purge delay plus the retention window of being marked.
+
 ## Orphaned uploads (monthly, with the restore drill)
 
 An upload whose object reached the store but whose row and ledger event never landed leaves **bytes** no

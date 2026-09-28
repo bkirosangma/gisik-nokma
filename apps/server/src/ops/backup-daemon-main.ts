@@ -16,8 +16,9 @@ import { createInAppTransport } from '../notifications/transport.js';
 import { sweepOrphanObjects } from '../tools/sweep-orphans.js';
 import { optionalDatabaseCaCert } from './backup-env.js';
 import { exportLedger } from './export-ledger.js';
-import { s3SinkFromEnv } from './object-sink.js';
+import { s3SinkFromEnv, s3TargetFromEnv } from './object-sink.js';
 import { dumpDatabaseToSink } from './pg-dump.js';
+import { backupRetentionDaysFromEnv, pruneBackups, runThenPrune } from './prune-backups.js';
 import {
   msUntilNextUtc,
   requirePositiveIntervalMs,
@@ -146,6 +147,14 @@ async function main(): Promise<void> {
   const store = createObjectStoreFromEnv(process.env);
   const notificationTransport = createInAppTransport(pool);
 
+  // Backup retention (trash series Plan 2, spec §5.8). Read HERE, after the
+  // `--once` return, for the reason the store above is: the manual path runs
+  // the two backups and nothing destructive. A bad value throws now, before the
+  // scheduler arms anything (19.159).
+  const backupRetentionDays = backupRetentionDaysFromEnv(process.env);
+  const backupTarget = s3TargetFromEnv(process.env, 'BACKUP_S3_BUCKET');
+  const prune = () => pruneBackups(backupTarget, { now: new Date(), retentionDays: backupRetentionDays });
+
   // Read once, validated on every `delayMs()` call below (the same "read
   // once, validate on every call" shape `LEDGER_EXPORT_DOW_UTC` already has
   // via `msUntilNextUtc`). An unset OR EMPTY binding means "use the default":
@@ -204,12 +213,12 @@ async function main(): Promise<void> {
     // would put the same rule in two places for no earlier a failure.
     {
       name: 'pg-dump',
-      run: jobs.runPgDump,
+      run: () => runThenPrune('pg-dump', jobs.runPgDump, prune, alerter),
       delayMs: () => msUntilNextUtc(process.env.BACKUP_TIME_UTC ?? '21:00', new Date()),
     },
     {
       name: 'ledger-export',
-      run: jobs.runLedgerExport,
+      run: () => runThenPrune('ledger-export', jobs.runLedgerExport, prune, alerter),
       delayMs: () =>
         msUntilNextUtc(
           process.env.LEDGER_EXPORT_TIME_UTC ?? '22:00',

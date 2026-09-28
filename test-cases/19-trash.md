@@ -166,3 +166,13 @@ the number you added — an unchanged count has reported a clean sweep over case
 - ✅ **19.149 — the daemon refuses `PURGE_SWEEP_INTERVAL_MS=0` before arming any job, naming the variable;** control: with `3600000` it arms and announces itself. Mutation: remove the `requirePositiveIntervalMs` call from the `purge` job's `delayMs`.
 - ✅ **19.150 — the deploy spec's `backup` worker declares `OBJECT_STORE=s3` and `OBJECT_STORE_S3_BUCKET=gisik-nokma-attachments`;** control: that is the bucket the `server` service writes attachments to, and it differs from `BACKUP_S3_BUCKET`. Mutation: delete the worker's `OBJECT_STORE` entry.
 - ✅ **19.151 — an item already in `purged_entities` is never a candidate, even if its lifecycle row still says it is due;** control: a second due item in the same sweep is a candidate and is purged. Mutation: drop the `NOT EXISTS (… purged_entities …)` filter from the candidate query.
+
+## 19.18 Backup retention
+
+- ✅ **19.153 — `pruneBackups` deletes a `pg/` object older than the window and keeps one exactly at the boundary and the newest;** control: `examined` counts all three and `keptNewest` names the newest. Mutation: delete at `<=` the cutoff instead of `<`.
+- ✅ **19.154 — the newest object under a prefix is kept even when it is older than the window: a lone 90-day-old `pg/` dump survives;** control: under `ledger/`, of a 90-day and a 60-day export, the 90-day one IS deleted. Mutation: drop the newest-per-prefix exclusion.
+- ✅ **19.155 — pagination is followed: an old object on the second `ListObjectsV2` page is deleted, and the second request carries the first page's continuation token;** control: the first page's old object is deleted too. Mutation: read only the first page (ignore `IsTruncated`).
+- ✅ **19.156 — a failing `DeleteObject` is reported in `errors`, not thrown, and the other deletes still happen;** control: the second old object is in `deleted`. Mutation: remove the `try`/`catch` around the delete.
+- ✅ **19.157 — `BACKUP_RETENTION_DAYS` defaults to 30 when unset or empty, accepts `45`, and throws naming the variable for `abc`, `0`, `-3` and `1.5`;** control: the default. Mutation: parse with `Number.parseInt` (accepts `1.5` as 1).
+- ✅ **19.158 — `runThenPrune` prunes only after the job succeeds; a prune that throws or reports errors alerts `backup:prune-after-<job>` and resolves;** control: a failing job rejects and the prune is never called. Mutation: rethrow the prune's error.
+- ✅ **19.159 — the daemon refuses `BACKUP_RETENTION_DAYS=abc` before arming any job, naming the variable;** control: with `30` it arms and announces itself. Mutation: move the `backupRetentionDaysFromEnv` call inside the prune closure (read lazily).
