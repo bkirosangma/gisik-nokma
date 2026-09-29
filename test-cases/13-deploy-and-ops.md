@@ -422,6 +422,62 @@ and each case records what its own run printed.
   `release/*` alone would look identical to the intended one across every other case in this section.
   `scripts/ctl/verbs/rebuild.sh`
 
+## `ctl gate` / `land` / `check-pr` take `--base <branch>` (`fix/ctl-base-flag`, owner-flagged 2026-09-29)
+
+Ids minted from the §13 tip: `13.1495` was the highest id on any remote branch (measured with `check-case-ids.mjs`'s own
+declaration regex over every `origin/*` head, 2026-09-29), and `13.1496`–`13.1500` are held by the notes-help round, so this
+block is `13.1501`–`13.1512`. All twelve are **🧪, not ✅, on purpose:** they run automatically — every one is an arm in
+`scripts/ctl/test/lib.test.sh`, executed by `pnpm check:ctl` / `ctl selftest`, and each test's name starts with its case id —
+but `scripts/check-case-citations.mjs` only scans `apps/` and `packages/`, so a non-suffixed ✅ here would read as uncited.
+The fixtures are throwaway bare repos, a fake `gh` that performs the merge for real inside the fixture, and a private copy of
+the ctl tree whose `checks` verb is a no-op. **No real PR is ever read or merged by these.** Mutation-witnessed 2026-09-29, each mutant a private copy of `scripts/ctl` with one line changed, the block run against
+it (red = failing arms): `--base` validated but never applied 14 · one marker kind for every base 8 · land compares the PR
+base to literal `main` 7 · land fast-forwards a primary on `main` whatever the base 1 · `check-pr.py` ignores its base 5 ·
+the base validator accepts anything 4 · `pr open` reads the main-kind marker 2 · gate measures `origin/main` 2 · land's
+ancestry re-read measures `origin/main` 3 · land's retarget check removed 2. **Every mutant is killed.** The validator mutant
+first SURVIVED (rc 1, zero FAIL lines): the loop's `exit 1` inside `check`'s `eval` ended the whole script instead of
+failing one arm — the loops now run in a subshell.
+
+- 13.1501 🧪 `--base` accepts `main` and `release/<name>` (nested included) and NOTHING else. `develop`, a task branch,
+  `release`, `release/`, `release/../main`, `release/a..b`, `release/a b`, `origin/main`, a dot-led segment and an empty value
+  each exit 1 from `ctl gate`, `ctl land` (a PR whose base is `feat/x`, named by `--base feat/x`) and `check-pr`, with
+  `main or release/` in the FAIL line; `--base` with no value is refused, not swallowed. `check-pr.py` exits non-zero on the
+  same set. `scripts/ctl/lib.sh` (`ctl_base_valid`, `ctl_take_base`), `verbs/{gate,land,check-pr}.sh`, `verbs/check-pr.py`
+- 13.1502 🧪 `ctl gate --base release/x` reads `origin/release/x`, not `origin/main`. With `release/x` ahead of the branch it
+  refuses naming `origin/release/x` and a remedy that merges `origin/release/x` and repeats `--base`; with `main` ahead (and
+  `release/x` contained) it proceeds. The default run — and `--base main` spelled out — still refuse on `main` moving, naming
+  `origin/main`, the text unchanged. `scripts/ctl/verbs/gate.sh`
+- 13.1503 🧪 Markers are per-base. A green `ctl gate --base release/x` writes `gate.release+x-<sha>` and NOT `gate-<sha>`; a
+  default run writes `gate-<sha>`, the name `land` has always read. `ctl_marker_kind` is injective (`release/a/b` and
+  `release/a-b` differ). `scripts/ctl/lib.sh`, `verbs/gate.sh`
+- 13.1504 🧪 `ctl land` merges only a PR whose base EQUALS `--base`. A PR based on `main` under `--base release/x` is refused
+  (`PR #7 base is main, not release/x`); a PR based on `release/x` under the default is refused (`base is release/x, not main`);
+  in both the fixture remote's `main` and `release/x` are byte-unmoved and `gh pr merge` was never called.
+  `scripts/ctl/verbs/land.sh`
+- 13.1505 🧪 A gate marker satisfies only the base it was earned against. With only the `main`-kind marker a release landing
+  says `no gate marker`; with only the release-kind marker a landing into `main` says the same. `verbs/land.sh`
+- 13.1506 🧪 A release landing merges into `release/x` and verifies against `origin/release/x`: the OK line reads
+  `merge <sha> release/x <sha> primary untouched`, the gated head is an ancestor of `origin/release/x`, the tree-identity and
+  drop-check controls hold. **THE SAFETY ARM:** the same landing leaves the remote's `main` at its old sha and a primary
+  checkout standing on `main` at its old sha. If `release/x` moved after the gate it refuses with `origin/release/x moved to`
+  and merges nothing; `--dry-run` merges nothing. `verbs/land.sh`
+- 13.1507 🧪 REGRESSION — the default still lands into `main` and fast-forwards a primary standing on `main`
+  (`… main <sha> primary ff <sha>`). `verbs/land.sh`
+- 13.1508 🧪 A release landing fast-forwards the primary checkout only when it stands on that release branch (`primary ff`),
+  and `main` stays where it was. `verbs/land.sh`
+- 13.1509 🧪 `check-pr.py` takes the diff and the commit list against `origin/<base>`: a branch on top of `release/x` with one
+  task commit reports `1 task commits, 0 bookkeeping commits, 1 files, 0 failures` against `release/x`; CONTROL — the same
+  branch against the default `main` also counts the release branch's own commit and fails on its subject. `verbs/check-pr.py`
+- 13.1510 🧪 `ctl check-pr --base release/x` (real run, `checks` stubbed in a private copy) is green and writes
+  `checked.release+x-<sha>`, not `checked-<sha>`; CONTROL — the default run on the same branch fails on the batch conditions
+  and writes no marker. `verbs/check-pr.sh`
+- 13.1511 🧪 `ctl pr open --require-checked` looks for the marker of the base it targets: `--base release/x` accepts the
+  release-kind marker; **a PR to `main` is NOT admitted by it** (`no checked marker for <sha>`); a PR to `release/x` is not
+  admitted by a `main`-kind marker; REGRESSION — a `main`-kind marker still admits a PR to `main`. `verbs/pr-open.sh`
+- 13.1512 🧪 A PR retargeted between the checks and the merge is refused. `land` re-reads head AND base at the instant of
+  merging; a PR that was `release/x` at the start and reports `main` then is refused with `was retargeted to main`, and
+  nothing merges. `verbs/land.sh`
+
 ## Backup worker TLS to the managed cluster (`hotfix/backup-worker-ca`, 2026-09-23)
 
 The production `backup` worker logged `backup job failed … self-signed certificate in certificate chain`

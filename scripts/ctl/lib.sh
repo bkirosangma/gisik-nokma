@@ -30,6 +30,29 @@ ctl_marker_dir() { local root="$1" gitdir; gitdir="$(cd "$root" && /usr/bin/git 
 ctl_marker_write() { local root="$1" kind="$2" sha="$3" log="$4"; echo "$(date -u '+%Y-%m-%dT%H:%M:%SZ') $log" > "$(ctl_marker_dir "$root")/$kind-$sha"; }
 ctl_marker_has()   { [ -f "$(ctl_marker_dir "$1")/$2-$3" ]; }
 
+# --- the integration ref (owner, 2026-09-29: ctl land/gate/check-pr must serve a release branch, not only main) ---
+# `--base <branch>` names the branch a verb measures against: origin/<base> for the ancestry, tree and diff checks and,
+# for land, the PR's base. Default main. ONLY main or release/<name> is a base — never a task branch, never a path trick.
+# A merge to main deploys to production, so main stays the default and its guards are the strict ones they always were;
+# a release base is the same machinery pointed at a different ref, and its markers are a different KIND so a gate or a
+# check run against one base can never admit a landing or a PR against another.
+ctl_base_valid() {
+  local b="$1" seg='[A-Za-z0-9_][A-Za-z0-9._-]*'
+  [ "$b" = main ] && return 0
+  [[ "$b" =~ ^release/$seg(/$seg)*$ ]] || return 1
+  case "$b" in *..*|*.|*.lock|*.lock/*) return 1;; esac
+}
+# ctl_take_base VERB VALUE...: set CTL_BASE from the value that followed --base, or fail VERB.
+ctl_take_base() {
+  local verb="$1"; shift
+  [ $# -ge 1 ] && [ -n "$1" ] || ctl_fail "$verb" "--base needs a value (main or release/<name>)"
+  ctl_base_valid "$1" || ctl_fail "$verb" "--base $1 is not an integration branch — main or release/<name> only"
+  CTL_BASE="$1"
+}
+# The marker kind for KIND against BASE: main keeps the bare kind the chain always used (gate-<sha>, checked-<sha>); a
+# release base is `KIND.release+<name>` ('/' becomes '+', which ctl_base_valid never lets through, so it is injective).
+ctl_marker_kind() { local kind="$1" base="${2:-main}"; if [ "$base" = main ]; then echo "$kind"; else echo "$kind.${base//\//+}"; fi; }
+
 # Consume --repo X and --dry-run from "$@"; the rest lands in CTL_ARGS.
 ctl_parse_common() {
   CTL_REPO=""; CTL_DRY_RUN="${CTL_DRY_RUN:-0}"; CTL_ARGS=()

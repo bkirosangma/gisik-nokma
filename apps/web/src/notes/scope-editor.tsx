@@ -94,12 +94,13 @@ export function ScopeEditor({
       workspaceId: note.workspaceId,
       entity: { kind: 'note', id: note.noteId },
       type: 'note.scope_set',
-      payload: {
-        scope:
-          next.mode === 'explicit'
-            ? { mode: next.mode, userIds: next.userIds ?? [] }
-            : { mode: next.mode },
-      },
+      // FLAT: `noteScopeSetPayload` IS the scope. Only `note.created` carries it
+      // under a `scope` key — nesting it here made the door answer
+      // `invalid-payload` for every change (case 18.430).
+      payload:
+        next.mode === 'explicit'
+          ? { mode: next.mode, userIds: next.userIds ?? [] }
+          : { mode: next.mode },
     });
     const results = await dataSource.ingest([event]);
     const result = results[0];

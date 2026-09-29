@@ -13,6 +13,7 @@ step "checks --dry-run"      "'$HERE/ctl' checks --repo '$repo' --dry-run"
 # gate refuses a dirty tree and a HEAD that does not contain origin/main before dry-running; both are the verb working, so
 # only those two named refusals are accepted here — any other non-zero exit is a red step.
 step "gate --dry-run"        "out=\$('$HERE/ctl' gate \$(/usr/bin/git -C '$repo' rev-parse HEAD) --repo '$repo' --dry-run 2>&1); [ \$? -eq 0 ] || printf '%s' \"\$out\" | grep -q 'tree is dirty\\|is not an ancestor of HEAD'"
+step "gate refuses a base that is not main or release/*" "out=\$('$HERE/ctl' gate \$(/usr/bin/git -C '$repo' rev-parse HEAD) --repo '$repo' --base feat/x --dry-run 2>&1); [ \$? -eq 1 ] && printf '%s' \"\$out\" | grep -q 'main or release/'"
 step "pr open --dry-run refuses main" "! '$HERE/ctl' pr open main --title t --body '$HERE/README.md' --repo '$repo' --dry-run"
 step "land refuses a merged PR" "'$HERE/ctl' land 638 --repo '$repo' --dry-run; [ \$? -eq 1 ]"
 step "anchor --dry-run"      "'$HERE/ctl' anchor 0 --title t --body '$HERE/README.md' --repo '$repo' --dry-run"
@@ -24,4 +25,4 @@ step "dispatch --dry-run refuses a missing file" "! '$HERE/ctl' dispatch 2 /none
 step "restart --dry-run refuses window 0" "! '$HERE/ctl' restart 0 '$repo' '$HERE/README.md' --dry-run"
 step "rebuild --dry-run"     "'$HERE/ctl' rebuild --dry-run"
 step "close refuses window 0" "! '$HERE/ctl' close 0 --dry-run"
-[ "$fails" -eq 0 ] && ctl_ok selftest "14 steps" || ctl_fail selftest "$fails steps red"
+[ "$fails" -eq 0 ] && ctl_ok selftest "15 steps" || ctl_fail selftest "$fails steps red"

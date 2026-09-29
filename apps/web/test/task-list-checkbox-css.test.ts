@@ -4,6 +4,7 @@ import { fileURLToPath } from 'node:url';
 import { createElement } from 'react';
 import { render } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { themeStylesheet } from '@gisik-nokma/ui/tokens';
 import { renderCommentBody } from '../../../packages/app-core/src/views/comment-body.js';
 
 /**
@@ -83,6 +84,8 @@ describe('9.360 the task-list checkbox is centred on the first line and is not t
     const neo = bodyFor(`[data-style='neo'] ${BOX}:not(:checked)`);
     expect(neo).toMatch(/background:\s*var\(--gn-surface-sunken\);/);
     expect(neo).toMatch(/box-shadow:\s*var\(--gn-shadow-sunken\);/);
+    // …and a BOUNDARY (case 9.481): the sunken coat alone is invisible in neo dark.
+    expect(neo).toMatch(/border-color:\s*var\(--gn-border-strong\);/);
   });
 
   it('9.360 the comment body’s read-only task item wears the same box (shared selector list)', () => {
@@ -105,14 +108,153 @@ describe('9.360 the task-list checkbox is centred on the first line and is not t
 
 describe('9.361 a done task item reads muted and is never struck through', () => {
   it('9.361 the checked item is muted; no task-list or comment-task rule sets a text-decoration', () => {
-    expect(bodyFor(`${TASKS} > li[data-checked='true'] > div`)).toMatch(/color:\s*var\(--gn-text-muted\);/);
-    expect(bodyFor(`${COMMENT_BOX}:checked + span`)).toMatch(/color:\s*var\(--gn-text-muted\);/);
+    expect(bodyFor(`${TASKS} > li[data-checked='true'] > div`)).toMatch(/color:\s*var\(--gn-text-subtle\);/);
+    expect(bodyFor(`${COMMENT_BOX}:checked + span`)).toMatch(/color:\s*var\(--gn-text-subtle\);/);
     const decorated = rulesOf(CSS).filter(
       (rule) =>
         rule.selectors.some((sel) => sel.includes("[data-type='taskList']") || sel.includes('gn-comment__task')) &&
         /text-decoration|line-through/.test(rule.body),
     );
     expect(decorated).toEqual([]);
+  });
+});
+
+/**
+ * 9.480 / 9.481 — the dark-mode defects the controller's browser pass found on PR #751's work.
+ *
+ * (a) A done item was NOT muted in dark. `9.361` above only pinned the rule's TEXT
+ *     (`color: var(--gn-text-muted)`), which reads the same whether the token is visibly dimmer
+ *     than the body or not — and it is not: `--gn-text-muted` is Apple's "secondary label",
+ *     built to stay LEGIBLE (8.94:1 in hig light) and in dark it is `#ebebf5` (14.57:1) against
+ *     a body of `#f2e9e1` (14.40:1) — the "muted" colour is, measured, slightly BRIGHTER than
+ *     the text it was meant to dim (1.01:1 apart). Light is barely better, 1.28:1. The token for
+ *     "dimmer, still readable" is `--gn-text-subtle`.
+ * (b) The unchecked box in `neo` dark had `border-color: transparent`, `background:
+ *     var(--gn-surface-sunken)` — and neo's sunken surface IS its surface (`#1b2340` both) — plus
+ *     a 5%-white inset shadow: no boundary at all. WCAG 1.4.11 wants >= 3:1 for the edge of a
+ *     control.
+ *
+ * These read the ACTUAL token values out of `themeStylesheet()` (the stylesheet `layout.tsx`
+ * injects) and the token each rule names, so a rule pointed at a token that does not do the job
+ * goes red — where a text match on the rule cannot.
+ */
+const THEME_BLOCKS: Record<string, string> = (() => {
+  const lines = themeStylesheet().split('\n');
+  const find = (prefix: string): string => {
+    const line = lines.find((l) => l.startsWith(prefix));
+    if (line === undefined) throw new Error(`no theme block starts with ${prefix}`);
+    return line;
+  };
+  return {
+    'hig light': find(':root { --gn-surface'),
+    'hig dark': find('[data-theme="dark"] {'),
+    'minimal light': find('[data-style="minimal"] {'),
+    'minimal dark': find('[data-style="minimal"][data-theme="dark"]'),
+    'neo light': find('[data-style="neo"] {'),
+    'neo dark': find('[data-style="neo"][data-theme="dark"]'),
+  };
+})();
+
+function tokensOf(block: string): Record<string, string> {
+  return Object.fromEntries([...block.matchAll(/(--gn-[a-z0-9-]+):\s*([^;]+);/g)].map((m) => [m[1]!, m[2]!.trim()]));
+}
+
+/** `var(--gn-x)` -> that token's value in this theme block; anything else is returned as written. */
+function tokenValue(value: string, tokens: Record<string, string>): string {
+  const hit = /^var\((--gn-[a-z0-9-]+)\)$/.exec(value.trim());
+  return hit === null ? value.trim() : (tokens[hit[1]!] ?? `unresolved:${hit[1]}`);
+}
+
+function luminance(hex: string): number {
+  const h = hex.replace('#', '');
+  const [r, g, b] = [0, 2, 4].map((i) => parseInt(h.slice(i, i + 2), 16) / 255).map((v) => (v <= 0.03928 ? v / 12.92 : ((v + 0.055) / 1.055) ** 2.4));
+  return 0.2126 * r! + 0.7152 * g! + 0.0722 * b!;
+}
+
+/** WCAG contrast ratio; a value that is not an opaque hex (`transparent`, `none`) has NO edge: 1. */
+function contrast(a: string, b: string): number {
+  if (!/^#[0-9a-f]{6}$/i.test(a) || !/^#[0-9a-f]{6}$/i.test(b)) return 1;
+  const [hi, lo] = [luminance(a), luminance(b)].sort((x, y) => y - x);
+  return (hi! + 0.05) / (lo! + 0.05);
+}
+
+function declared(selector: string, property: string): string {
+  const hit = new RegExp(`${property}:\\s*([^;]+);`).exec(bodyFor(selector));
+  if (hit === null) throw new Error(`${selector} declares no ${property}`);
+  return hit[1]!.trim();
+}
+
+/**
+ * 9.482 — owner-reported offsets (controller pass 2026-09-29): a POSTED task row's checkbox sat at 0px
+ * and its text at 23.2px, against the composer's 4px and 32px, so the same list moved sideways when
+ * it was sent. The composer's geometry is DERIVED here from its own rules (a 1.5rem label centres
+ * the 1rem box; the row's gap follows the label), and the posted row must land on the same two
+ * numbers: box inset = (label - box) / 2, text start = label + gap.
+ */
+const rem = (value: string): number => {
+  const hit = /^(-?[\d.]+)rem$/.exec(value.trim());
+  if (hit === null) throw new Error(`not a rem length: ${value}`);
+  return Number(hit[1]);
+};
+
+describe('9.482 a posted task row starts where the composer’s does — box inset and text start', () => {
+  const label = rem(declared(`${TASKS} > li > label`, 'width'));
+  const gap = rem(declared(`${TASKS} > li`, 'gap'));
+  const box = rem(declared(`${TASKS} input[type='checkbox']`, 'width'));
+
+  it('9.482 the composer’s numbers parse to the measured 4px and 32px', () => {
+    expect(((label - box) / 2) * 16).toBeCloseTo(4, 4);
+    expect((label + gap) * 16).toBeCloseTo(32, 4);
+  });
+
+  it('9.482 the posted box is inset by the same (label - box) / 2 and its text starts at label + gap', () => {
+    const inset = rem(declared(COMMENT_BOX, 'margin-left'));
+    const postedGap = rem(declared('.gn-comment__task', 'gap'));
+    expect(inset).toBeCloseTo((label - box) / 2, 4);
+    expect(inset + box + postedGap).toBeCloseTo(label + gap, 4);
+  });
+});
+
+describe('9.480 a done task item is visibly dimmer than its neighbours, in every theme, and still readable', () => {
+  for (const [theme, block] of Object.entries(THEME_BLOCKS)) {
+    it(`9.480 ${theme}: the done colour is >= 1.5:1 away from the body text and >= 4.5:1 on every surface`, () => {
+      const tokens = tokensOf(block);
+      for (const selector of [`${TASKS} > li[data-checked='true'] > div`, `${COMMENT_BOX}:checked + span`]) {
+        const done = tokenValue(declared(selector, 'color'), tokens);
+        expect(contrast(done, tokens['--gn-text']!), `${selector} vs body text`).toBeGreaterThanOrEqual(1.5);
+        for (const surface of ['--gn-surface', '--gn-surface-raised', '--gn-surface-sunken']) {
+          expect(contrast(done, tokens[surface]!), `${selector} on ${surface}`).toBeGreaterThanOrEqual(4.5);
+        }
+      }
+    });
+  }
+
+  it('9.480 CONTROL — the matcher sees the defect: the old `--gn-text-muted` is < 1.5:1 from the body text in dark', () => {
+    const tokens = tokensOf(THEME_BLOCKS['hig dark']!);
+    expect(contrast(tokens['--gn-text-muted']!, tokens['--gn-text']!)).toBeLessThan(1.5);
+  });
+});
+
+describe('9.481 an unchecked task box has a visible edge (>= 3:1) in every theme, neo dark included', () => {
+  for (const [theme, block] of Object.entries(THEME_BLOCKS)) {
+    it(`9.481 ${theme}: the unchecked box's border is >= 3:1 against the surface it sits on`, () => {
+      const tokens = tokensOf(block);
+      const neo = theme.startsWith('neo');
+      const border = neo
+        ? declared(`[data-style='neo'] ${BOX}:not(:checked)`, 'border-color')
+        : /solid\s+(var\([^)]+\))/.exec(declared(BOX, 'border'))![1]!;
+      expect(contrast(tokenValue(border, tokens), tokens['--gn-surface']!), `border ${border} on surface`).toBeGreaterThanOrEqual(3);
+      expect(contrast(tokenValue(border, tokens), tokens['--gn-surface-raised']!), `border ${border} on raised`).toBeGreaterThanOrEqual(3);
+    });
+  }
+
+  it('9.481 CONTROL — the matcher sees the defect: a transparent border has no edge (1:1) on neo dark', () => {
+    const tokens = tokensOf(THEME_BLOCKS['neo dark']!);
+    expect(contrast(tokenValue('transparent', tokens), tokens['--gn-surface']!)).toBe(1);
+  });
+
+  it('9.481 the comment body’s box takes the same neo rule (shared selector list)', () => {
+    expect(bodyFor(`[data-style='neo'] ${COMMENT_BOX}:not(:checked)`)).toMatch(/border-color:\s*var\(--gn-border-strong\);/);
   });
 });
 
