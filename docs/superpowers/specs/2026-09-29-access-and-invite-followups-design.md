@@ -77,15 +77,25 @@ Two small findings from the 2026-09-29 production cleanup ride along (§9).
 
 **The path** (`routes/invites.ts:338-417`): ingest `invite.sent` → token insert → two small reads → **`await mailer.send()` inside the request** (`:402-409`). The SMTP transport is created **per send with no pooling** (`invites/invite-mailer.ts:81`; timeouts connect 10 s / greeting 10 s / socket 20 s, `auth/smtp-magic-link-sender.ts:32-36`). The magic-link sender has the same shape and is also awaited in its request (`auth/auth.ts:341-343`).
 
-**Likely causes, ranked (unmeasured):**
-1. **IPv4/IPv6 choice with a 10 s stall.** nodemailer resolves A and AAAA and picks an address at random; if an IPv6 connect is silently dropped it waits the full 10 s `connectionTimeout`, then falls back. 10 s + a normal cold send ≈ 18 s. Nothing logs the fallback today (nodemailer's logger is off).
+**Measured (production run logs, read 2026-09-29 evening; Fastify `responseTime` of each request):**
+
+| Request | UTC | Response time |
+|---|---|---|
+| `POST …/invites` — the FIRST send after the 07:17 deploy | 07:30:00 | **18,379 ms** (201) |
+| `POST …/invites` — 3½ min later | 07:33:25 | **2,949 ms** (201) |
+| `POST /api/auth/sign-in/magic-link` | 07:33:49 | **2,952 ms** (200) |
+
+So the 18 s is a **first-send penalty of ~15 s**, paid once per cold process (and, per the DNS cache, again after 5 idle minutes); every send then costs **~3 s** — the invite and the magic link alike, the unpooled connection. The causes below are ranked against those numbers; the per-phase split is still unmeasured.
+
+**Causes, ranked:**
+1. **First send: cold DNS + an IPv4/IPv6 choice with a 10 s stall** (the ~15 s penalty). nodemailer resolves A and AAAA and picks an address at random; if an IPv6 connect is silently dropped it waits the full 10 s `connectionTimeout`, then falls back. 10 s + a normal cold send ≈ 18 s. Nothing logs the fallback today (nodemailer's logger is off).
 - *Ruled out:* the SMTP port being filtered (every address would time out and the send would FAIL) — the 2026-09-29 production check showed "Invitation emailed to …" and the email arrived.
-2. **A cold connection every send** (DNS + TCP + TLS + AUTH, no pool; a dev send measured 4.2 s).
-3. DNS (first send per 5 min).
+2. **Every send: a cold connection** (TCP + TLS + AUTH, no pool) — the measured ~3 s floor; a dev send measured 4.2 s.
+3. DNS alone (first send per 5 min) — part of cause 1.
 
 **Decision.**
 - S1. **Measure first:** per-phase timing logs around the invite handler (ingest, insert, reads, send) and nodemailer's `logger` enabled for the connection phase (connect target, family, fallback), for both the invite and magic-link senders. One deploy with the release; the owner times 3–4 invites.
-- S2. **Fix what the measurement names;** the plan carries both candidate fixes behind the measurement: one **pooled** transporter reused across sends, and **IPv4-first** connection if the fallback shows up — the plan must first confirm nodemailer exposes an option for it (else resolve the host to an IPv4 address ourselves and pass the name for TLS). The timeouts stay.
+- S2. **Fix:** one **pooled** transporter per sender, reused across sends and kept warm (removes the ~3 s floor and the per-send DNS), for invite and magic link alike; then, if S1 shows the family fallback, an **IPv4-first** connection — the plan must first confirm nodemailer exposes an option for it (else resolve the host to an IPv4 address ourselves and pass the name for TLS). The timeouts stay.
 - S3. **The button shows progress regardless:** disabled with "Sending…" while the request is in flight; the address clears on success; a second submit while one is in flight does nothing.
 - S4. **Server dedupe:** a second invite to an address that already has a PENDING invite in the same workspace re-sends that invite rather than minting another (`invites.ts:341` mints a new id today; there is no uniqueness, `projections/proj-invites.ts:67-71`). **Open for the plan:** if link tokens are stored hashed, the original link cannot be re-emailed — "re-send" then means rotating the token on the existing invite (the old link stops working).
 - S5. Sending the email after the response (fire-and-forget) is **not** chosen: the result card promises "Invitation emailed to …" and must stay true.
@@ -99,8 +109,9 @@ Two small findings from the 2026-09-29 production cleanup ride along (§9).
 ## 9. Riders from the 2026-09-29 production cleanup
 
 - C1. **The delete dialog's switch is named "on" for assistive tech** instead of "Delete permanently" (observed in the ticket and note delete dialogs). The switch gets its visible label as its accessible name.
+- C3. **A magic-link token is written to the production request log in plain text.** The `GET /api/auth/magic-link/verify?token=…` URL is logged verbatim (seen 2026-09-29, 07:34 UTC), while invite tokens are already logged as `[redacted]`. The request logger's URL redaction must cover the magic-link verify query (and any other auth callback carrying a code or token). The token is single-use and expires in 15 minutes, so the exposure is small, but a log should never hold a sign-in credential.
 - C2. **A deleted card lingers ~1–3 s on the board** after the "deleted" toast. The board removes the card when the delete is accepted locally, not when the next read arrives (plan to confirm where the lag comes from before choosing the fix).
 
 ## 10. Order
 
-S3 + S4 + C1 + R7 first (small, user-visible); R2, R3, R4 (server + label work); R1 (visibility write, with its history line); R5 (new UI on an existing event); S1 measurement ships with the release, S2 follows the numbers.
+S3 + S4 + C1 + C3 + R7 first (small, user-visible, and the log fix); S2 (pooled transporter) with them, since the measured ~3 s floor already justifies it; R2, R3, R4 (server + label work); R1 (visibility write, with its history line); R5 (new UI on an existing event); S1 timing logs ship with the release, and decide whether the IPv4-first half of S2 is needed.
