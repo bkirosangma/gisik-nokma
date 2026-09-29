@@ -143,6 +143,65 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     expect(marked).toEqual(['n_2']);
   });
 
+  it('18.413 a note mention opens /notes/<id> with no ticket lookup, and a comment mention adds #comment-<id>', async () => {
+    const noteMention = (id: string, source: 'note' | 'note-comment'): Notification => ({
+      id,
+      userId: 'u_kiro',
+      workspaceId: 'ws_1',
+      kind: 'mention',
+      dedupeKey: `mention:${id}`,
+      read: true,
+      createdAt: '2026-09-29T10:00:00.000Z',
+      payload: {
+        noteId: 'n_cold',
+        noteTitle: 'Cold room audit',
+        mentionedBy: 'u_ana',
+        eventId: `ev_${id}`,
+        source,
+        excerpt: 'please review the compressor log',
+        clientTime: '2026-09-29T09:59:00.000Z',
+        serverTime: '2026-09-29T10:00:00.000Z',
+      },
+    });
+    const located: string[] = [];
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            notifications: {
+              list: async () => ({
+                notifications: [noteMention('n_body', 'note'), noteMention('n_comment', 'note-comment')],
+                nextCursor: null,
+              }),
+              markRead: async () => undefined,
+            },
+            ticketLocation: {
+              locate: async (_workspaceId, ticketId) => {
+                located.push(ticketId);
+                return null;
+              },
+            },
+          },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+    const rows = await screen.findAllByRole('button', { name: /mentioned you/ });
+    expect(rows).toHaveLength(2);
+    // The row says WHERE: the note's title, like a ticket mention says its ticket.
+    expect(screen.getAllByText('Cold room audit')).toHaveLength(2);
+
+    await userEvent.click(rows[0]!);
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/notes/n_cold'));
+    await userEvent.click(rows[1]!);
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/notes/n_cold#comment-ev_n_comment'));
+    // A note is not a ticket: no ticket was looked up and no "cannot be opened" notice.
+    expect(located).toEqual([]);
+    expect(screen.queryByText(CANNOT_OPEN_COPY)).not.toBeInTheDocument();
+  });
+
   it('11.147 reloads the truth when markRead is refused, instead of leaving an invented read flag', async () => {
     let listCalls = 0;
     render(

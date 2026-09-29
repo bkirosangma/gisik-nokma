@@ -5560,6 +5560,10 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "italic",
                       "text": "\"Anselma Marak mentioned you\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", in a job's comment or description, or in a note or one of its comments. The row names the job or the note, and clicking it opens that job or note (for a note's comment, scrolled to that comment)"
                     }
                   ],
                   [
@@ -8606,6 +8610,53 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "mentioning-somebody-in-a-note",
+            "title": "Mentioning somebody in a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Type "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "@"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and start a person's name, in a note or in its comments: the same list of people the job editors offer appears, and picking one drops a mention at the cursor. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "A mention notifies the person, once."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Saving the note again with the same mention in it does not tell them again; adding someone new tells only the new person, and a comment that mentions somebody tells them as soon as it is posted. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Only people who can read the note are told"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — mentioning someone the note is not shared with sends nothing, and you are not told that either. Mentioning yourself sends nothing. A note mention arrives in the Inbox as a "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "mentioned you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message, naming the note, and follows your Mentions setting under Account → Notifications, exactly like a mention on a job."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "linking-to-a-job-or-another-note",
             "title": "Linking to a job or another note",
             "blocks": [
@@ -11364,6 +11415,37 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " deletes them and shows the note as the server has it, which cannot be undone. The bar is only shown to people who can edit the note."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "if-i-mention-someone-in-a-note-do-they-get-told",
+            "title": "If I mention someone in a note, do they get told?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes — type "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "@"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and pick them, in the note or in one of its comments. They get a "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "mentioned you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message in their Inbox that opens the note, or the comment. It is sent once: saving the note again with the same mention in it does not tell them again, and mentioning yourself sends nothing. Only people who can read the note are told — a note shared with nobody else, or with a list that leaves them out, tells them nothing, and you are not shown that. Muting Mentions under Account → Notifications hides these too."
                   }
                 ]
               }

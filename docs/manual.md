@@ -1017,7 +1017,7 @@ Exactly five kinds of message, and no more. The list is deliberately closed — 
 a sixth kind.
 
 1. Somebody assigned something to you — *"Anselma Marak assigned this to you"*
-2. Somebody mentioned you — *"Anselma Marak mentioned you"*
+2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a job's comment or description, or in a note or one of its comments. The row names the job or the note, and clicking it opens that job or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
 5. Something has been sitting in one stage too long — *"In Doing since 21 Aug — moved there by
@@ -1691,6 +1691,16 @@ It works the other way too: an attached job appears as a badge in the note's own
 the job's own panel opens right there, over the note — you are not taken to the job's page. Deleting the
 job from that panel does not remove the badge; a deleted job stays attached (see the Notes FAQ entry on
 this).
+
+### Mentioning somebody in a note
+
+Type `@` and start a person's name, in a note or in its comments: the same list of people the job editors offer
+appears, and picking one drops a mention at the cursor. **A mention notifies the person, once.** Saving the note
+again with the same mention in it does not tell them again; adding someone new tells only the new person, and a
+comment that mentions somebody tells them as soon as it is posted. **Only people who can read the note are told**
+— mentioning someone the note is not shared with sends nothing, and you are not told that either. Mentioning
+yourself sends nothing. A note mention arrives in the Inbox as a *mentioned you* message, naming the note, and follows your Mentions
+setting under Account → Notifications, exactly like a mention on a job.
 
 ### Linking to a job or another note
 

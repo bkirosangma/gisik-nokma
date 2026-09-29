@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   InboxView,
-  notificationTicketId,
+  notificationTarget,
   type InboxFilter,
   type NotificationsPage,
 } from '@gisik-nokma/app-core';
@@ -426,8 +426,17 @@ export default function InboxPage() {
    * this shell does not have.
    */
   function open(notification: Notification): void {
-    const ticketId = notificationTicketId(notification);
+    const target = notificationTarget(notification);
     setOpenFailure(null);
+    // A mention that sat in a NOTE opens the note, and the comment when it sat in
+    // one (`#comment-<id>` — the note page scrolls to it). No location lookup: a
+    // note's route is `/notes/<id>` alone (spec §9.1), and whether the reader may
+    // still open it is the note page's own answer, not a guess made here.
+    if (target.kind === 'note') {
+      router.push(`/notes/${target.noteId}${target.commentId === null ? '' : `#comment-${target.commentId}`}`);
+      return;
+    }
+    const ticketId = target.ticketId;
     void (async () => {
       try {
         const location = await ticketLocation.locate(notification.workspaceId, ticketId);
