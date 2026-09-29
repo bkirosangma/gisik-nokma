@@ -282,6 +282,7 @@ describe('6.268–6.272 R1 — the arm reaches what inherits', () => {
   });
 
   it('6.268 a chain deeper than ARM_MAX_DEPTH is cut at the bound in BOTH spellings; CONTROL: the ticket AT the bound is reached', async () => {
+    expect(ARM_MAX_DEPTH).toBe(64); // the documented bound is pinned, not only "a bound exists"
     const ws = newUlid(); const project = newUlid(); const guest = newUlid();
     await seedProject(db.pool, ws, project);
     await seedGuest(db.pool, ws, guest);
@@ -586,11 +587,20 @@ describe('6.278 R1 — a deleted project or ticket is reached by nobody through 
       return (m.get(scratch) ?? []).map((x) => x.ticketId).sort();
     };
     expect(await shown()).toEqual([w.t.a1, w.t.d1].sort()); // deleted d0 and dd are hidden; live siblings shown
+    // The note readers agree: an inherit note attached ONLY to the deleted inheriting child dd is refused by both
+    // spellings (ticketIsLive / LIVE_TICKET_WHERE); CONTROL: the same shape on the live child d1 is readable.
+    const onDeleted = newUlid();
+    const onLive = newUlid();
+    await seedNote(w.ws, w.project, w.people.author, onDeleted, { mode: 'inherit' }, [w.t.dd]);
+    await seedNote(w.ws, w.project, w.people.author, onLive, { mode: 'inherit' }, [w.t.d1]);
+    expect(await noteReadable(guest, w.ws, onLive)).toEqual({ ts: true, sql: true }); // control
+    expect(await noteReadable(guest, w.ws, onDeleted)).toEqual({ ts: false, sql: false });
     // canSee's own answer for a deleted ticket is UNCHANGED by the arm (deletion is not visibility: the history door keeps serving it).
     expect(await canSee(db.pool, guest, w.t.d0)).toBe(true);
     await softDelete(w.t.d0, false);
     await softDelete(w.t.dd, false);
     expect(await shown()).toEqual([w.t.a1, w.t.d0, w.t.d1, w.t.dd].sort()); // restore brings them back
+    expect(await noteReadable(guest, w.ws, onDeleted)).toEqual({ ts: true, sql: true });
   }, 120_000);
 });
 
