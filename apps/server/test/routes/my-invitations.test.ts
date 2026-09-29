@@ -75,18 +75,46 @@ async function found(caller: Caller, name = 'Convenience Corner'): Promise<strin
   return (res.json() as { workspaceId: string }).workspaceId;
 }
 
+/** Found a project through the product's own door, asserting it committed. */
+async function foundProject(owner: Caller, workspaceId: string): Promise<string> {
+  const projectId = newUlid();
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: owner.headers,
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity: { kind: 'project', id: projectId },
+          type: 'project.created',
+          version: 1,
+          payload: { name: 'Books' },
+          actorId: owner.userId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  expect((res.json() as { results: Array<{ status: string }> }).results[0]?.status, res.body).toBe('committed');
+  return projectId;
+}
+
 /** Mint an invitation through the admin door. Returns the id and the ONE raw token. */
 async function invite(
   admin: Caller,
   workspaceId: string,
   address: string,
   role: 'admin' | 'member' | 'guest' = 'member',
+  projectIds?: string[],
 ): Promise<{ inviteId: string; token: string }> {
   const res = await app.inject({
     method: 'POST',
     url: `/v1/workspaces/${workspaceId}/invites`,
     headers: admin.headers,
-    payload: { address, channel: 'email', role },
+    payload: projectIds === undefined ? { address, channel: 'email', role } : { address, channel: 'email', role, projectIds },
   });
   expect(res.statusCode).toBe(201);
   const body = res.json() as { inviteId: string; url: string };
@@ -192,11 +220,15 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
     const workspaceId = await found(admin, 'Dead Shapes');
     const me = await signedIn();
 
-    const live = await invite(admin, workspaceId, me.email);
-    const accepted = await invite(admin, workspaceId, me.email);
-    const declined = await invite(admin, workspaceId, me.email);
-    const revoked = await invite(admin, workspaceId, me.email);
-    const lapsed = await invite(admin, workspaceId, me.email);
+    // Five invitations to ONE address that must stay five: a repeat of the same
+    // role and project set would rotate the pending one instead of adding a row
+    // (case 6.222), so each differs in role or in project set (case 6.226).
+    const [projectA, projectB] = [await foundProject(admin, workspaceId), await foundProject(admin, workspaceId)];
+    const live = await invite(admin, workspaceId, me.email, 'member');
+    const accepted = await invite(admin, workspaceId, me.email, 'admin');
+    const declined = await invite(admin, workspaceId, me.email, 'guest');
+    const revoked = await invite(admin, workspaceId, me.email, 'member', [projectA as string]);
+    const lapsed = await invite(admin, workspaceId, me.email, 'member', [projectB as string]);
 
     // All five are live before anything kills four of them — the control that
     // says this case's `[live]` at the end is a filter working and not a route

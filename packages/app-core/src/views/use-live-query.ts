@@ -64,6 +64,14 @@ export type LiveQueryResult<T> = {
  * A's board as project B's, self-correcting only if an unrelated stream frame
  * happened to arrive.
  *
+ * `initial` is an answer the caller ALREADY HOLDS for one key (case 18.461) —
+ * typically the read it made to decide that key. It is served for that key from
+ * the first render of that key until the key's own load answers, so the view is
+ * not reset to null for a round trip it did not need. It is never served for
+ * another key, and the load's answer replaces it — a `null` included, so a real
+ * loss of access still shows. The load still runs: the seed is a head start, not
+ * a substitute for the read.
+ *
  * The KEY drives the reload; the WORKSPACE drives the subscription. Two
  * effects, on purpose. Folding the key into the subscription's deps would
  * tear down and re-open the stream on every project switch, and `subscribe`
@@ -77,6 +85,7 @@ export function useLiveQuery<T>(
   queryKey: string,
   load: () => Promise<T>,
   debounceMs = 200,
+  initial?: { key: string; data: T },
 ): LiveQueryResult<T> {
   const [data, setData] = useState<T | null>(null);
   const [error, setError] = useState<string | null>(null);
@@ -86,6 +95,9 @@ export function useLiveQuery<T>(
   const [settled, setSettled] = useState(false);
   // Lifetime, not per-key — see `hasAnswered` on LiveQueryResult.
   const [hasAnswered, setHasAnswered] = useState(false);
+  // The key whose load has most recently answered (data OR error). It is what
+  // retires `initial`: the seed serves only a key that has not yet answered.
+  const [answeredKey, setAnsweredKey] = useState<string | null>(null);
   const loadRef = useRef(load);
   loadRef.current = load;
   const keyRef = useRef(queryKey);
@@ -129,6 +141,7 @@ export function useLiveQuery<T>(
         setError(null);
         setSettled(true);
         setHasAnswered(true);
+        setAnsweredKey(askedFor);
       },
       (cause: unknown) => {
         if (!isCurrent()) return;
@@ -138,6 +151,7 @@ export function useLiveQuery<T>(
         // server and came back. A gate that waited for a SUCCESS would hold a
         // control hostage to a failing read forever.
         setHasAnswered(true);
+        setAnsweredKey(askedFor);
       },
     );
   }, []);
@@ -171,5 +185,6 @@ export function useLiveQuery<T>(
     };
   }, [source, workspaceId, debounceMs, reload]);
 
-  return { data, error, settled, hasAnswered, reload };
+  const seeded = initial !== undefined && initial.key === queryKey && answeredKey !== queryKey;
+  return { data: seeded ? initial.data : data, error, settled, hasAnswered, reload };
 }
