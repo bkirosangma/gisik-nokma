@@ -3,13 +3,13 @@
 **Status:** spec for owner review. Written 2026-09-29 (evening) by the planner, from the production follow-ups of the access release (#761) and the owner's rulings the same evening.
 **Base:** `origin/main` at `bd7440bc` (= `release/2026-09-29` at cut). Citations are a read-only research pass over that tree; the plan re-reads each before building on it.
 **Target branch:** `release/2026-09-29`.
-**Precedes:** `2026-09-29-workspace-access-and-invites-design.md` (shipped). This spec amends two of its decisions (W3's "no implicit append" and the bearer-authorised invite link) on the owner's word.
+**Precedes:** `2026-09-29-workspace-access-and-invites-design.md` (shipped). This spec amends two of its decisions (W3's single-ticket view, extended to inherited items, and the bearer-authorised invite link) on the owner's word.
 
 ## 1. The owner's rulings (2026-09-29 evening), verbatim where quoted
 
 | # | Item | Ruling |
 |---|---|---|
-| R1 | Assigning someone to an explicit-list ticket | *"assignee should always be added to the explicit-list"* |
+| R1 | Assigning someone to an explicit-list ticket | *"keep today's behaviour and just extend it to cover those notes and sub-tickets"* (re-confirmed; supersedes "always added to the explicit-list") |
 | R2 | Email lookup reveals the person's role; guests can use it | as recommended: drop the role, refuse guests |
 | R3 | Users with a blank name, and guests, show raw ids | *"show email."* |
 | R4 | An invite link accepted by an account it was not addressed to | *"refuse"* |
@@ -19,20 +19,20 @@
 
 Two small findings from the 2026-09-29 production cleanup ride along (§9).
 
-## 2. R1 — the assignee joins the explicit list
+## 2. R1 — the assignee's access extends to what inherits the ticket
 
-**Today.** No path adds an assignee to a ticket's explicit list, by design: *"The explicit list is exactly the authored list. Creator and assignee are not implicitly appended"* (`apps/server/src/visibility/can-see.ts:58-60`). Instead a read-time **assignee arm** lets the CURRENT assignee see the ticket (`can-see.ts:193-206`, checked after the audience at `:288-297`); it reads live `proj_tickets.assignee_id`, so unassigning removes access at once. The arm does not open inherited notes or sub-tickets.
+**Owner ruling, 2026-09-29 (re-confirmed after the planner corrected the premise):** *"keep today's behaviour and just extend it to cover those notes and sub-tickets."* This supersedes the earlier reading ("always added to the explicit-list"), which the planner had put to the owner on a misstated premise.
+
+**Today.** No path adds an assignee to a ticket's explicit list, by design: *"The explicit list is exactly the authored list. Creator and assignee are not implicitly appended"* (`apps/server/src/visibility/can-see.ts:58-60`). A read-time **assignee arm** lets the CURRENT assignee see the ticket (`can-see.ts:193-206`, checked after the audience at `:288-297`); it reads live `proj_tickets.assignee_id`, so unassigning removes access at once. The arm does **not** reach what inherits the ticket's audience: notes that inherit from the ticket (`read/visible-where.ts:310`), sub-tickets that inherit its list, and the rollup's restricted count (`visibility/rollup.ts:308-318`) — those three citations come from the research pass's report and were not opened by the planner; the plan opens them first.
 
 **Decision.**
-- A1. When a ticket's audience is an **explicit list** and an assignment names someone NOT on it, the server adds them to the list **in the same accepted batch** as the assignment, as a normal visibility change attributed to the assigning actor. This covers every door that assigns: the ticket sheet (`ticket.assigned`), the New-ticket dialog (`ticket.created` with `assigneeId`), and assign-outsider (`routes/people.ts:196-203`, which grants guest membership first).
-- A2. It is an **authored** change, so it stays after the person is unassigned (removing them from the list is an ordinary visibility edit). That is the difference from today's arm and the reason this is a behaviour change: the assignee also gains what the list confers — notes and sub-tickets that inherit the ticket's list.
-- A3. No extra authority check (the owner's ruling; recorded as closing access finding 10 in the other direction: assigning *is* permission to add the assignee to the list).
-- A4. Project- and workspace-scope tickets are unchanged: the assignee arm still covers an assignee outside that scope (a guest assignee sees that one ticket).
-- A5. The docblock at `can-see.ts:58-60` and the shipped spec's W3 are amended to say so; history shows the list change as its own line beside the assignment.
-
-**⚠ Re-confirm A2 with the owner before planning R1.** The ruling was given on a premise the planner misstated in chat ("assigning adds them to its visibility" — it does not; today only the read-time arm applies). The deciding question: *once someone is unassigned, should they keep seeing the ticket and the notes and sub-tickets that inherit its list?* Yes → A1–A5 as written. No → keep today's arm and extend it to inherited notes/sub-tickets instead. This blocks building R1, not merging this spec.
-
-**Open for the plan:** whether the append is a separate `visibility.*` event in the batch or a field on the assignment event. Recommendation: a separate, ordinary visibility event — every reader of the list already understands it.
+- A1. **The list is untouched.** Assigning never writes a visibility change; the explicit list stays exactly the authored list (`can-see.ts:58-60` holds).
+- A2. **The arm is extended by inheritance.** While someone is the current assignee of ticket T, they may also see every item whose audience is INHERITED from T: notes attached to T that inherit its audience, and sub-tickets of T that inherit its list (recursively, as far as the inheritance chain runs). An item with its OWN audience (an explicit list of its own, or a narrower scope) is judged by that audience alone, never by T's arm.
+- A3. **It ends when the assignment ends.** Unassign or reassign T and the extended access disappears with the arm — the same live read, no stored grant.
+- A4. **Not extended:** T's parent, T's project, sibling tickets, and notes merely mentioning T. A sub-ticket's OWN assignee arm stays its own.
+- A5. **Every reader agrees.** The single-item check (`canSee`), the list/search reads (`visible-where`), sync's visible-event filter and the rollup counts must all apply the same extension, or an item shows in one place and 404s in another. The plan names each reader and gives each a case.
+- A6. No authority check changes (access finding 10 closes as: assigning keeps its current reach, now including inherited items).
+- A7. The shipped spec's W3 is amended to say the assignee's single-ticket view extends to items that inherit that ticket's audience.
 
 ## 3. R2 — email lookup: no role, no guests
 
@@ -47,7 +47,7 @@ Two small findings from the 2026-09-29 production cleanup ride along (§9).
 **Decision.**
 - N1. `/actor-names` returns every workspace member including guests, with the **email as the label when the name is blank** (synthetic phone addresses excepted: those show the phone number, formatted) — the server already does this at `people.ts:62` and `invites.ts:54-63`.
 - N2. The four id-only sites go through the shared label (`actorLabelFrom` with the actor-names map).
-- N3. **A guest viewer sees labels only for the people on tickets they can see** (the payloads they already receive carry those people's labels), not the whole directory — R2 refuses guests the email lookup, and handing them every member's email through `/actor-names` would give back more than R2 withholds. **Owner question:** open `/actor-names` to guests in full instead (the deployment is private to one team)?
+- N3. **A guest viewer sees labels only for the people on tickets they can see** (the payloads they already receive carry those people's labels), not the whole directory — R2 refuses guests the email lookup, and handing them every member's email through `/actor-names` would give back more than R2 withholds. **Owner ruling 2026-09-29 (evening): "go with the recommendation"** — the narrow option; widening later is a one-line change, narrowing after exposure is not.
 - N4. A raw id is never shown as a person's name anywhere; a truly unknown id (deleted account) reads "Unknown person".
 
 ## 5. R4 — a link opened by the wrong account is refused
@@ -114,4 +114,4 @@ So the 18 s is a **first-send penalty of ~15 s**, paid once per cold process (an
 
 ## 10. Order
 
-S3 + S4 + C1 + C3 + R7 first (small, user-visible, and the log fix); S2 (pooled transporter) with them, since the measured ~3 s floor already justifies it; R2, R3, R4 (server + label work); R1 (visibility write, with its history line); R5 (new UI on an existing event); S1 timing logs ship with the release, and decide whether the IPv4-first half of S2 is needed.
+S3 + S4 + C1 + C3 + R7 first (small, user-visible, and the log fix); S2 (pooled transporter) with them, since the measured ~3 s floor already justifies it; R2, R3, R4 (server + label work); R1 (the arm's extension across every reader); R5 (new UI on an existing event); S1 timing logs ship with the release, and decide whether the IPv4-first half of S2 is needed.
