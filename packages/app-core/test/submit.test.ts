@@ -1,7 +1,12 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import { isUlid, newSubmittedEvent, submittedEventSchema } from '@gisik-nokma/domain';
 import { makeSubmittedFactory } from '../src/submit.js';
 import { PROJECT, TICKET, WS } from './helpers/seed.js';
+
+// This file builds events the door WOULD refuse, on purpose — the factory is tested for its envelope and stamps, with `{}` payloads that say nothing. The
+// suite-wide payload guard in `test/setup.ts` would throw at the factory, so it
+// is switched off for this file alone.
+vi.unmock('@gisik-nokma/domain');
 
 /**
  * A ULID actor id. `seed.ts` uses `user_kiro`-shaped ids, which are fine where

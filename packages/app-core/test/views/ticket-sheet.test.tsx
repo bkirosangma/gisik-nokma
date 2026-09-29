@@ -2426,6 +2426,9 @@ describe('F — the subtasks section', () => {
   });
 
   it('16.21 a refused title shows the SERVER’s sentence and KEEPS what was typed', async () => {
+    // The view forwards a blank title on purpose so the server's refusal can be
+    // shown; the suite-wide payload guard would throw at the factory.
+    (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
     const read = ticketRead({ rollup: null });
     const source = sheetSource(read, [], []);
     source.ingest = async (events) => {
