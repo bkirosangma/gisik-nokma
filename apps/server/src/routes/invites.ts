@@ -7,6 +7,7 @@ import { isSyntheticPhoneEmail } from '../auth/synthetic-address.js';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import { appendAcceptance } from '../invites/acceptance.js';
+import { addressMatchesAccount, maskAddress } from '../invites/address-match.js';
 import { INVITER_FALLBACK, type InviteMailer } from '../invites/invite-mailer.js';
 import { checkPermission } from '../permissions/check-permission.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
@@ -131,6 +132,20 @@ export const INVITE_NOT_OPENABLE_BODY = {
   message:
     'This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.',
 } as const;
+
+/**
+ * R4 (owner ruling 2026-09-29, "refuse"): the link was addressed to another
+ * account. `403`, and the body names the address only in its MASKED form
+ * (`maskAddress`). Sent only for a link that is still openable, so it never
+ * tells anyone that a revoked, lapsed, spent or unknown link is live.
+ */
+export const INVITE_NOT_YOURS_STATUS = 403;
+export function inviteNotYoursBody(masked: string): { error: 'not_yours'; message: string } {
+  return {
+    error: 'not_yours',
+    message: `This invitation was sent to ${masked}. Sign in with that account to accept it.`,
+  };
+}
 
 /** The refusal a plain member meets on both admin-only invite doors. */
 export const INVITE_ADMIN_ONLY_BODY = {
@@ -269,6 +284,9 @@ type InviteRow = {
   role: 'admin' | 'member' | 'guest';
   status: 'pending' | 'accepted' | 'revoked' | 'declined';
   project_ids: string[];
+  /** R4: who the link was addressed to; read for the acceptance check, never served. */
+  address: string;
+  channel: 'email' | 'phone';
 };
 
 /**
@@ -379,17 +397,20 @@ type OpenableInvite = InviteRow & { expires_at: Date };
  *
  * ## What acceptance does NOT do
  *
- * It does not change the workspace role of somebody who already has one. An
- * invitation link is bearer-authorised: whoever holds it may use it, which is
- * the point (the address is a claim about where to reach a person, never an
- * assertion about who they are). But `membership.granted` is an UPSERT keyed on
- * the person, so an owner who opened a guest link addressed to somebody else
- * would demote themselves out of their own workspace, and no event would look
- * wrong. Changing an existing member's role is `membership.granted` submitted by
- * an admin, an attributed act with its own gate; it is not something a link
- * someone forwarded may do. So an existing member's acceptance records
- * `invite.accepted` — the invitation really was consumed — and appends the
- * promised project rows, and leaves their role exactly as it was.
+ * The link is NOT bearer-authorised any more (R4, owner ruling 2026-09-29): it
+ * opens only for the account the address names, matching the `/workspaces`
+ * banner door. A different account — including an existing member — is refused
+ * `403` before anything is consumed or appended.
+ *
+ * It does not change the workspace role of somebody who already has one.
+ * `membership.granted` is an UPSERT keyed on the person, so an owner who opened
+ * a guest link addressed to THEM (their own address, a second invitation) would
+ * demote themselves out of their own workspace, and no event would look wrong.
+ * Changing an existing member's role is `membership.granted` submitted by an
+ * admin, an attributed act with its own gate; it is not something a link may do.
+ * So an existing member's acceptance records `invite.accepted` — the invitation
+ * really was consumed — and appends the promised project rows, and leaves their
+ * role exactly as it was.
  */
 export function registerInviteRoutes(
   app: FastifyInstance,
@@ -642,6 +663,17 @@ export function registerInviteRoutes(
         return reply.code(404).send(INVITE_NOT_OPENABLE_BODY);
       }
 
+      // R4 (owner ruling 2026-09-29: "refuse"). AFTER the openable read, so a
+      // revoked, lapsed, spent or unknown link answers its usual 404 and this
+      // refusal never says a link is live; BEFORE the consume, so a
+      // wrong-account attempt does not burn the link for the person it names.
+      const account = await accountOf(deps.pool, request.currentUserId);
+      if (account === null || !addressMatchesAccount(invite.channel, invite.address, account)) {
+        return reply
+          .code(INVITE_NOT_YOURS_STATUS)
+          .send(inviteNotYoursBody(maskAddress(invite.channel, invite.address)));
+      }
+
       // THE CONSUME, and the only thing that makes this link single-use. The
       // read above says the invitation still opens something; this says THIS
       // presentation is the one that gets to open it. Losing it is a 404 with
@@ -664,7 +696,8 @@ export function registerInviteRoutes(
       // the actor/origin split, the membership read through
       // `resolveEffectiveRole`, and the guest-stays-guest projectIds guard that
       // closes a measured hole. This handler keeps what is ITS OWN — the proof
-      // it demands (possession of the link) and the refusal that follows.
+      // it demands (possession of the link, and — R4 — being the account it names) and
+      // the refusal that follows.
       const workspaceId = await appendAcceptance(deps, invite, request.currentUserId);
 
       // No deletion here any more: the token row went at the consume, before a
@@ -773,6 +806,22 @@ export function registerInviteRoutes(
  * test on this path could only assert that nothing changed, which is a check
  * that cannot fail.
  */
+type AcceptingAccount = {
+  email: string;
+  emailVerified: boolean;
+  phoneNumber: string | null;
+  phoneNumberVerified: boolean | null;
+};
+
+/** The columns `addressMatchesAccount` compares an invitation's address against. */
+async function accountOf(db: Queryable, userId: string): Promise<AcceptingAccount | null> {
+  const { rows } = await db.query<AcceptingAccount>(
+    `SELECT "email", "emailVerified", "phoneNumber", "phoneNumberVerified" FROM "user" WHERE "id" = $1`,
+    [userId],
+  );
+  return rows[0] ?? null;
+}
+
 async function openableInvite(db: Queryable, token: string): Promise<OpenableInvite | null> {
   const { rows: tokenRows } = await db.query<TokenRow>(
     `SELECT invite_id, expires_at FROM invite_tokens
@@ -784,7 +833,7 @@ async function openableInvite(db: Queryable, token: string): Promise<OpenableInv
     return null;
   }
   const { rows } = await db.query<InviteRow>(
-    `SELECT invite_id, workspace_id, role, status, project_ids
+    `SELECT invite_id, workspace_id, role, status, project_ids, address, channel
        FROM proj_invites WHERE invite_id = $1`,
     [tokenRow.invite_id],
   );
