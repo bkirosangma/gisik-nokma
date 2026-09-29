@@ -172,3 +172,43 @@ describe('useLiveQuery — overlapping reloads for the SAME key', () => {
     expect(result.current.data).toBe('second');
   });
 });
+
+describe('useLiveQuery — a keyed initial answer (case 18.461)', () => {
+  /**
+   * 18.461 — the caller already HAS the answer for a key (it read it to decide
+   * the key), so it hands it over and the hook serves it from the first render
+   * of that key instead of resetting to null and waiting a round trip (R7: the
+   * note page drew "no longer shared" in that gap).
+   *
+   * Three claims in one case, each against the others: the seed is served for ITS
+   * key from the very first render; a seed for a DIFFERENT key is never served; and
+   * once the key's own load answers, the load wins — including with null, so a
+   * real loss of access still shows.
+   */
+  it('18.461 serves the seed for its own key until that key answers, never for another key, and yields to a null answer', async () => {
+    const loads: Array<(value: string | null) => void> = [];
+    const load = () => new Promise<string | null>((resolve) => loads.push(resolve));
+
+    const { result, rerender } = renderHook(
+      ({ key }: { key: string }) => useLiveQuery<string>(SOURCE, 'ws', key, load, 200, { key: 'k1', data: 'seeded' }),
+      { initialProps: { key: 'k1' } },
+    );
+    // Served on the FIRST render, before any load has answered — not after an effect.
+    expect(result.current.data).toBe('seeded');
+    await waitFor(() => expect(loads.length).toBeGreaterThanOrEqual(1));
+    expect(result.current.data).toBe('seeded');
+
+    // CONTROL: another key never receives the seed.
+    rerender({ key: 'k2' });
+    expect(result.current.data).toBeNull();
+    rerender({ key: 'k1' });
+    expect(result.current.data).toBe('seeded');
+
+    // The key's own answer wins — a null answer is a real answer, not a gap to paper over.
+    await act(async () => {
+      for (const resolve of loads.splice(0)) resolve(null);
+    });
+    await waitFor(() => expect(result.current.settled).toBe(true));
+    expect(result.current.data).toBeNull();
+  });
+});

@@ -116,6 +116,7 @@ function world(
     role?: string;
     search?: DataSourceQuery['search'];
     getTickets?: DataSourceQuery['getTickets'];
+    getNote?: DataSourceQuery['getNote'];
     actorNames?: Actor[];
   } = {},
 ) {
@@ -126,8 +127,9 @@ function world(
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
-    getNote: async (_workspaceId: string, id: string) =>
-      id === NOTE ? (opts.note ?? noteDetail()) : null,
+    getNote:
+      opts.getNote ??
+      (async (_workspaceId: string, id: string) => (id === NOTE ? (opts.note ?? noteDetail()) : null)),
     getMembers: async () => MEMBERS,
     getActorNames: async () => opts.actorNames ?? [],
     getNotes: async () => [
@@ -205,6 +207,88 @@ describe('18.440 the note byline names its author even when the roster omits the
     // CONTROL: nobody names this author — the id is what the byline shows.
     renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_zed' }) });
     expect(await screen.findByText('u_zed')).toBeInTheDocument();
+  });
+});
+
+describe('18.460 opening a note never draws the lost-access copy while the note is being read again', () => {
+  /**
+   * 18.460 (owner report 2026-09-29: "a new note flashes 'no longer shared' for
+   * a second", R7). The search loop reads the note, finds it, and used to throw
+   * that read away: it changed the live query's key, which reset the answer to
+   * null and drew "That note is no longer shared with you." for one round trip.
+   * It happened on EVERY open. The second read is held open here, so the window
+   * is as wide as a slow network — and a MutationObserver records the lost-access
+   * copy at ANY moment, not just at the instant the test looks.
+   *
+   * Two controls in the same test, each the other half of the claim: a note that
+   * is genuinely unreadable still draws the copy, and so does a note whose
+   * SECOND read answers null (access lost between the two reads) — the seed
+   * covers the gap and must not mask a real answer.
+   */
+  const LOST = 'That note is no longer shared with you.';
+
+  function deferredWorld(second: 'hold' | 'null' | 'note', reads: { count: number; release: () => void }) {
+    let release: () => void = () => undefined;
+    const gate = new Promise<void>((resolve) => {
+      release = resolve;
+    });
+    reads.release = release;
+    return world({
+      getNote: async (_workspaceId: string, id: string) => {
+        if (id !== NOTE) return null;
+        reads.count += 1;
+        if (reads.count === 1) return noteDetail();
+        if (second === 'null') return null;
+        if (second === 'hold') await gate;
+        return noteDetail();
+      },
+    });
+  }
+
+  it('18.460 the found note stays on screen through the second read; CONTROL: an unreadable note and a second-read null still draw the copy', async () => {
+    let flashed = false;
+    const observer = new MutationObserver(() => {
+      if (document.body.textContent?.includes(LOST) === true) flashed = true;
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    try {
+      const reads = { count: 0, release: () => undefined as void };
+      const services = deferredWorld('hold', reads);
+      render(
+        <Providers services={services}>
+          <NoteDocument noteId={NOTE} workspaces={[WS_A_REF]} />
+        </Providers>,
+      );
+      // The search read answered and the live query's read is now in flight.
+      await waitFor(() => expect(reads.count).toBeGreaterThanOrEqual(2));
+      // The note is on screen while that read is open, and the copy is not.
+      expect(await screen.findByRole('navigation', { name: 'Breadcrumb' })).toHaveTextContent('Compressor log');
+      expect(screen.queryByText(LOST)).not.toBeInTheDocument();
+      reads.release();
+      await waitFor(() => expect(reads.count).toBeGreaterThanOrEqual(2));
+      expect(flashed).toBe(false);
+    } finally {
+      observer.disconnect();
+    }
+    cleanup();
+
+    // CONTROL 1 — a note nothing holds: the search finds nothing and the copy IS drawn.
+    render(
+      <Providers services={world()}>
+        <NoteDocument noteId={OTHER_NOTE} workspaces={[WS_A_REF]} />
+      </Providers>,
+    );
+    expect(await screen.findByText(LOST)).toBeInTheDocument();
+    cleanup();
+
+    // CONTROL 2 — found by the search, but the live read answers null: the seed does not mask it.
+    const reads2 = { count: 0, release: () => undefined as void };
+    render(
+      <Providers services={deferredWorld('null', reads2)}>
+        <NoteDocument noteId={NOTE} workspaces={[WS_A_REF]} />
+      </Providers>,
+    );
+    expect(await screen.findByText(LOST)).toBeInTheDocument();
   });
 });
 
