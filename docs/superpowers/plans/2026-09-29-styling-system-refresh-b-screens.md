@@ -7,7 +7,7 @@
 - the **Global Constraints**, which this plan inherits WORD FOR WORD, with the branch name changed (below);
 - the per-style table;
 - the token translation;
-- deviations D1–D27 (D21 retired, D25–D27 added 2026-09-29).
+- deviations D1–D27 (D21 retired, D25–D27 added 2026-09-29; D6, D11 and D27 owner-confirmed the evening of 2026-09-29).
 
 This plan adds the inventory and one task per screen.
 
@@ -15,6 +15,8 @@ This plan adds the inventory and one task per screen.
 > - The door cards (B13's workspace card, project card and the home's section cards) answer hover with `lift-near` above their neighbours and press with `lift-press`. Nothing scales.
 > - With no transform and no filter on a door card, the `:not(:has(.gn-dialog__scrim))` guard and the reduced-motion arms have nothing left to protect. They are removed (Plan A D21, retired). B1's `expectReducedMotionFor` helper loses its only consumer and is not written.
 > - Primary buttons keep their 1.04/0.98 hover and press (Plan A Task 3). Cases 20.321, 20.322, 20.593 and 20.595 are rewritten in place, so no ids are added.
+>
+> **Owner rulings, 2026-09-29 evening.** B-D1 is confirmed: mobile is a separate plan, which the owner will schedule. Plan A's D6 is confirmed too (borders on quiet BUTTONS only, so this plan's P-QUIET edge is right). So is D11 (quieter priority).
 
 **Depends on:** Plan A Tasks 1–4. Those are the tokens, the shared `Button` (P-PRIMARY, P-QUIET), `Card` (P-RAISED) and `Dialog`, plus the test helpers `packages/ui/test/helpers/css-rules.ts` and `contrast.ts`. Plan B Task B1 may start once Plan A Task 4 has merged into the release branch. Plan B's screen tasks are independent of one another, and they may run in any order after B1.
 
@@ -110,7 +112,7 @@ The audit tables mark those rows **kept**, with the reason.
 
 ## Recorded deviations (Plan B)
 
-- **B-D1 — `apps/mobile` is out of scope.** Its screens (`apps/mobile/src/screens/board-screen.tsx`, `ticket-screen.tsx`, `help-screen.tsx`) would need a React Native port of the rules. That is a follow-up plan, owner to schedule.
+- **B-D1 — `apps/mobile` is out of scope.** Its screens (`apps/mobile/src/screens/board-screen.tsx`, `ticket-screen.tsx`, `help-screen.tsx`) would need a React Native port of the rules. That is a follow-up plan. **CONFIRMED by the owner 2026-09-29 (evening): mobile is a separate plan, which the owner will schedule.** Nothing in this plan targets `apps/mobile`.
 - **B-D2 — Text fields are not pills.** Rule 05 ("radius = height ÷ 2") is a BUTTON rule, and a multi-line field cannot be a pill. Fields keep the control radius and gain only depth (B2).
 - **B-D3 — `neo` keeps its own pressed-in selected tab and its sunken field.** `[data-style="neo"] .gn-segmented__item--on` and `[data-style="neo"] .gn-field__input` are neo's character (10.80, 13.339). The rules reach them through the tokens they already name.
 - **B-D4 — Second primaries.** Where a screen shows two primaries at once (the workspaces page: **Create workspace** plus one **Accept** per invitation), the per-row one becomes P-QUIET, and its task says so and amends any case that pinned it.

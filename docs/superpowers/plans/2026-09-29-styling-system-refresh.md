@@ -7,9 +7,15 @@
 > **Amended 2026-09-29 (owner kanban rulings).** After a kanban-UX video the owner ruled: *"yes, update the mockup and the styling plan"*, for three things.
 > 1. **Hover is shadow only.** A card's hover changes its shadow (`lift-near`) and nothing else. There is no scale. Press settles onto `lift-press`, also with no scale. This supersedes the "lift comes toward the user" ruling FOR CARDS (Task 5, and Plan B's P-LIFT door cards). Primary and danger BUTTONS keep their 1.04 hover and 0.98 press (Task 3, unchanged).
 > 2. **The full lift happens only while a card is DRAGGED.** The dragged card scales 1.03, takes a deeper spreading shadow (new role `lift-drag`, Task 2) and tilts 2.5°. It leaves behind a placeholder sized to the card, so nothing jumps. This is new **Task 5A**.
-> 3. **A single column collapses to a narrow labelled strip with a count.** The owner named Done and Backlog. This is new **Task 5B**, and it covers TERMINAL columns only. Backlog is never a board column (D27).
+> 3. **Every column collapses to a narrow labelled strip with a count.** This is new **Task 5B**. The owner first named Done and Backlog, then ruled that evening: *"all columns are collapsible"* (D27, resolved). Backlog itself is not a board column, so it has no strip.
 >
-> D21 is retired (nothing on a card slot transforms any more). D13 is amended for the strip. D25–D27 are new. Cases 20.043–20.045 and 20.094 are rewritten. New cases are 20.101–20.105 (5A), 20.111–20.116 (5B) and 20.121–20.122 (browser).
+> D21 is retired (nothing on a card slot transforms any more). D13 is amended for the strip. D25–D27 are new. Cases 20.043–20.045 and 20.094 are rewritten. New cases are 20.101–20.105 (5A), 20.111–20.118 (5B) and 20.121–20.122 (browser).
+>
+> **Owner rulings, 2026-09-29 evening.**
+> - **D27 resolved:** every column is collapsible, not only terminal ones. Task 5B has no category gate, and 20.117–20.118 were added.
+> - **D11 confirmed:** quieter priority. Urgent stays red, the others are neutral, and the tints are retired.
+> - **D6 confirmed:** borders go on quiet BUTTONS only.
+> - **Plan B's B-D1 confirmed:** mobile is a separate plan, which the owner will schedule.
 > - Soft WIP limits and swimlanes came from the same video. They are NOT in this plan and each needs its own short spec.
 > - A pointer-based drag (a custom overlay rather than the browser's drag image) is also out of scope (D26).
 
@@ -57,7 +63,7 @@ There is no separate spec. The owner-approved design is the mockup together with
   - Primary buttons keep the hover lift at 1.04 hover / 0.98 press, 200ms. Owner: *"yes, apply the same lift to the buttons"*. The 2026-09-29 ruling leaves buttons as they are.
   - Every scale and tilt is off under `prefers-reduced-motion`. That means the buttons' scale and the drag image's scale and tilt. Shadows still change.
 - **Drag placeholder** (owner, 2026-09-29): the dragged card leaves a placeholder the size of the card, so the column does not jump (Task 5A).
-- **Collapsible single columns** (owner, 2026-09-29: Done and Backlog). A column collapses to a narrow labelled strip with its count. The plan builds this for terminal columns (Task 5B, D27).
+- **Collapsible columns** (owner, 2026-09-29). The owner first named Done and Backlog. The ruling that evening was *"all columns are collapsible"*. Every board column collapses to a narrow labelled strip with its count (Task 5B, D27 resolved).
 - **No per-card tick.** Owner: *"the tick button shouldnt be there"*. Close stays a TEXT button, on terminal-column cards only, as today (`board.tsx:2374`, `category === 'terminal'`).
 - **Parent separator.** Owner: *"if parent is present, separate with >"*. The keys row reads `GN-17 › GN-15`: the parent link, then an `aria-hidden` `›`, then the key.
 - **Applies everywhere.** Owner, 2026-09-29, the scope change: *"hope the plan includes on applying this styling everywhere. consistency."* That is why there are two plans and why the primary `Button` changes product-wide.
@@ -226,20 +232,21 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
   - R1(c) removed every control border and identified controls by fill plus an accent label (13.289, 13.284). Rule 03 says a flat grey fill vanishes (1.09–1.15:1 measured, `ui.css:84-85`) and the edge must clear 3:1.
   - The ghost `Button` becomes transparent with a 1px `border` edge (4.27–6.01:1) in EVERY style, **neo included**, although neo's depth language is shadow-only. A shadow below 3:1 does not identify a control under WCAG 1.4.11, and 13.340 forbids a neo fork.
   - 13.289 and 13.284 are amended in place.
+  - **CONFIRMED by the owner 2026-09-29 (evening): borders on quiet BUTTONS only.** R1(c)'s no-border rule stands for every other control (fields keep their own edge, 13.291). Only the ghost/quiet `Button` and Plan B's P-QUIET raw elements gain the 1px edge.
 - **D7 — The ghost label moves off the accent.** Rule 03 says "1 accent saved for the action". The ghost label changes from `textAccent` to `textMuted` (text2), which clears 4.5 on every declared surface.
 - **D8 — No working spinner and no done check.** Rule 06 names both, and the coordinator scoped them "where the component already has a pending state". `Button` has none (`packages/ui/src/components/button.tsx:12-15`). Hosts keep their current disabled-while-busy behaviour. A `busy` prop is a follow-up; Plan B lists the hosts that hold a busy flag.
 - **D9 — The focus ring stays the house 2px** (`outline: 2px solid var(--gn-focus-ring)`), not the mockup's 3px/offset-2. Several ✅ cases pin 2px (e.g. `components.test.tsx:1226-1259`). The ring is a keyboard user's only locator, and 2px at 3:1+ already meets WCAG 2.4.13's minimum area.
 - **D10 — "New ticket" keeps its label.** Rule 02 wants a verb plus an object, and the mockup reads "Create ticket". The label is pinned by tests that press it by name and by the help corpus (`pnpm check:help`), so changing it is a copy change and needs its own ruling. Follow-up for the owner. It also gains no icon (rule 05 says "one icon", which is a maximum).
-- **D11 — Priority keeps its icons and loses its per-level tint. NEEDS OWNER CONFIRMATION.**
+- **D11 — Priority keeps its icons and loses its per-level tint. CONFIRMED by the owner 2026-09-29 (evening): quieter priority, with Urgent red, the others neutral and the tints retired.**
   - The planner's decision (already owner-seen in the mockup) makes P2/P3 ink neutral. The mockup draws no card tint on any card, Urgent included (`Main.dc.html:72`). The owner's 2026-09-23 request asked for the opposite: red fire P1, green leaf P2, frozen-blue snowflake P3, each card tinted by its priority (`board.tsx:1540-1547`).
   - This plan follows the approved mockup:
     - the icons (fire / leaf / snowflake) stay as "the shape";
     - P1 ink stays `danger`, P2 becomes `textMuted`, P3 becomes `textSubtle`;
     - the three card tints are deleted, and their four roles are retired (`priorityP1Tint`, `priorityP2Tint`, `priorityP3Tint`, `priorityP3`).
   - Cases 13.1452 and 13.1453 are amended in place.
-  - **The report flags this for the owner.** If the owner wants the tints back, revert Task 6 Step 5's items 2a (the tint rules), 2h (the priority ink) and 3 (the retired roles), and the 13.1453 rewrite in item 4.
+  - The owner confirmed it on 2026-09-29 (evening). This supersedes the 2026-09-23 request. The rollback path, should it ever be wanted: revert Task 6 Step 5's items 2a (the tint rules), 2h (the priority ink) and 3 (the retired roles), and the 13.1453 rewrite in item 4.
 - **D12 — The column name stays a category `Chip`.** The mockup draws plain 15px/600 text. Ruling 14 (`ui.css:962-974`) keeps the name inside the tone chip, because the chip's tone carries CATEGORY for every column.
-- **D13 — Lanes keep their 18rem fixed width in a scrolling rail** (`ui.css:951-961`). The mockup's 5-column grid is a fixed 1440px artboard. **Amended 2026-09-29:** a COLLAPSED terminal column (Task 5B) is a 3.5rem strip (`flex: 0 0 3.5rem`). That is the one exception to the 18rem lane, and an expanded column is still 18rem.
+- **D13 — Lanes keep their 18rem fixed width in a scrolling rail** (`ui.css:951-961`). The mockup's 5-column grid is a fixed 1440px artboard. **Amended 2026-09-29:** a COLLAPSED column (Task 5B; any column, D27 resolved) is a 3.5rem strip (`flex: 0 0 3.5rem`). That is the one exception to the 18rem lane, and an expanded column is still 18rem. With every column collapsed, the rail is a row of strips side by side (20.118).
 - **D14 — Two markup changes in `board.tsx`, both layout-only.**
   - the `›` span (the owner's ruling);
   - a `gn-board-card__footer` wrapper around "who · when" and the move arrows, so they share one row that reaches into the card's padding.
@@ -274,14 +281,12 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
   - The tilt, the scale and the `lift-drag` shadow are therefore painted on an off-screen clone handed to `event.dataTransfer.setDragImage` at `dragstart`, then removed.
   - The browser adds its own translucency to a drag image (Chromium and Safari both do), and no page can switch that off. Full fidelity is therefore witnessed in browser case 20.121, not claimed by a unit test.
   - An opaque lifted card that follows the pointer needs a pointer-events drag with a custom overlay. That is a different interaction model, touching every drag-drop case, so it is a SEPARATE plan and out of scope here.
-- **D27 — Only TERMINAL columns collapse. Backlog is not built. NEEDS OWNER RULING** (Task 5B, added 2026-09-29).
-  - The owner named "Done + Backlog". But Backlog is never a board column (spec §1.1). `packages/app-core/src/views/board.tsx:1700-1705` records it: "Backlog is never a board column (spec §1.1), so a card dropped there has no column to land in". Backlog is its own tab.
-  - So Task 5B offers the collapse on every `column.category === 'terminal'` column, which is Done on the standard workflows.
-  - The options for the owner:
-    - (a) terminal columns only, as built here;
-    - (b) also the workflow's FIRST open column (its `initialStateId`, e.g. "To do"), which is a small extension of Task 5B's predicate;
-    - (c) bring Backlog onto the board, which is a spec §1.1 change and not styling.
-  - The mockup follows (a): only Done carries the control.
+- **D27 — RESOLVED 2026-09-29 (evening): EVERY board column is collapsible.** Owner: *"all columns are collapsible"*.
+  - It was raised as a question. The owner had named "Done + Backlog", but Backlog is never a board column (spec §1.1). `packages/app-core/src/views/board.tsx:1700-1705` records it: "Backlog is never a board column (spec §1.1), so a card dropped there has no column to land in". Backlog is its own tab.
+  - The ruling generalises the collapse. Task 5B offers it on every column of every category (open, active and terminal), with no `column.category` gate. Backlog stays off the board, so it has no strip, and spec §1.1 is unchanged.
+  - Kept from the first draft: collapse defaults to expanded; the memory is per user and per project; a collapsed section is still the drop target; `Close all (N)` is hidden while collapsed.
+  - The edge case is every column collapsed at once. The board is then a row of 3.5rem strips side by side, each still a drop target with its own Expand button, and the workflow group's heading stays visible. Collapsing columns never collapses the group, because the two memories are separate (20.118).
+  - The mockup follows the ruling: every column carries the control.
 
 ## Review Focus
 
@@ -322,9 +327,9 @@ Most likely to bite first. Each item has its test in the owning task.
 |---|---|
 | `packages/ui/src/tokens.ts` | roles `surfaceTrack`, `surfaceWell`, `accentEdge`; 11 `CONTRAST_PAIRS` rows; `ShadowLayer.spread`; 9 shadow roles (incl. `lift-drag`, Task 5A); radius `track`; `spacing` + `motion` (emitted once); retire 4 priority roles (Task 6) |
 | `packages/ui/src/ui.css` | `.gn-button` family, `.gn-card`, `.gn-dialog`, the board rules (`:883-1549`), the sheet rules (`:352-847`, `:2313-2536`) — edited in place |
-| `packages/app-core/src/views/board.tsx` | `›` after the parent key (`:1628-1637`); `gn-board-card__footer` around provenance + arrows (`:1658-1666`); the drag image, source placeholder and target highlight (Task 5A); the terminal-column collapse (Task 5B) |
+| `packages/app-core/src/views/board.tsx` | `›` after the parent key (`:1628-1637`); `gn-board-card__footer` around provenance + arrows (`:1658-1666`); the drag image, source placeholder and target highlight (Task 5A); the column collapse, on every column (Task 5B) |
 | `packages/app-core/src/views/board-drag-image.ts` (new, Task 5A) | `setCardDragImage(event, cardElement)`: the feature-guarded, detached, id-stripped clone |
-| `packages/app-core/src/preferences/column-collapse.ts` (new, Task 5B) | which terminal columns a person collapsed, per user and project, in `localStorage` (the `workflow-collapse.ts` shape) |
+| `packages/app-core/src/preferences/column-collapse.ts` (new, Task 5B) | which columns a person collapsed, per user and project, in `localStorage` (the `workflow-collapse.ts` shape) |
 | `packages/ui/test/helpers/css-rules.ts` (new) | `parseRules`, `ruleExactly`, `rulesNaming`, `valueOf` — the exact-selector reader Plan B reuses |
 | `packages/ui/test/helpers/contrast.ts` (new) | `contrastRatio`, `over` |
 | `test-cases/20-styling-system.md` (new), `test-cases/README.md`, `scripts/fixtures/check-case-citations-baseline.json` | the bucket |
@@ -2258,9 +2263,9 @@ frameRef.current = requestAnimationFrame(() => {
 
 ---
 
-### Task 5B: Terminal columns collapse to a labelled strip (added 2026-09-29, owner kanban rulings)
+### Task 5B: Every column collapses to a labelled strip (added 2026-09-29, owner kanban rulings; generalised that evening)
 
-Owner, 2026-09-29: single columns (Done and Backlog) collapse to a narrow labelled strip with a count. **Backlog is never a board column** (spec §1.1; `board.tsx:1700-1705`), so this task builds the collapse for TERMINAL columns only, pending the owner's ruling on D27. It is a behaviour change as well as a styling one, and it is remembered in `localStorage` on the pattern `preferences/workflow-collapse.ts` set. That precedent is the owner's own: *"only on the local storage, clientside"* (`workflow-collapse.ts:1-60`).
+Owner, 2026-09-29: single columns (Done and Backlog) collapse to a narrow labelled strip with a count. That evening the owner generalised it: *"all columns are collapsible"* (D27, resolved). So this task builds the collapse for EVERY board column, whatever its category. **Backlog is never a board column** (spec §1.1; `board.tsx:1700-1705`), so it has no strip. It is a behaviour change as well as a styling one, and it is remembered in `localStorage` on the pattern `preferences/workflow-collapse.ts` set. That precedent is the owner's own: *"only on the local storage, clientside"* (`workflow-collapse.ts:1-60`).
 
 **Files:**
 - Create: `packages/app-core/src/preferences/column-collapse.ts`.
@@ -2269,7 +2274,7 @@ Owner, 2026-09-29: single columns (Done and Backlog) collapse to a narrow labell
   - `Board`: a `columnChoices` state read with the `useHydrationLayoutEffect` that already reads `groupChoices` (`:505-545`);
   - `BoardGroupSection`'s column `<section>` (`:1058-1200`): the header toggle, the collapsed branch and the props that carry the choices down.
 - Modify: `packages/ui/src/ui.css`: new rules after `.gn-board__column-header > .gn-board__column-action` (Task 5).
-- Modify: `packages/ui/test/styling-board.test.ts` (append), `test-cases/20-styling-system.md` (new `## 20.11 Board — collapsible terminal columns`), `Features.md`.
+- Modify: `packages/ui/test/styling-board.test.ts` (append), `test-cases/20-styling-system.md` (new `## 20.11 Board — collapsible columns`), `Features.md`.
 
 **Interfaces:**
 - Consumes: Task 5 (P-TRACK column; `.gn-board__column-header`), the Pattern table's P-GHOST declarations (written out in full in Step 4, since Task 6, which first applies P-GHOST on the board, runs after this task), and Task 5A (the section's drag handlers stay on the section in both states).
@@ -2288,35 +2293,56 @@ Owner, 2026-09-29: single columns (Done and Backlog) collapse to a narrow labell
 - choices only, never resolved states;
 - `''` or `undefined` means no session, so nothing is read and nothing is written.
 
-The one difference is that there is no auto-expand rule here. The default is EXPANDED for every terminal column, so nobody's board changes until they press the control.
+The one difference is that there is no auto-expand rule here. The default is EXPANDED for every column, so nobody's board changes until they press the control.
 
 **The markup.**
-- **Expanded terminal column.** The header gains a 44×44 ghost icon button at the far edge, AFTER `Close all (N)`: `<button type="button" className="gn-board__column-collapse" aria-expanded="true" aria-controls={cardsId} aria-label={`Collapse ${column.name}`}>`, with a chevron icon (`aria-hidden`). The `<ul className="gn-board__cards">` gains `id={cardsId}`, where `cardsId = `board-cards-${group.workflowId}-${column.stateId}``.
-- **Collapsed terminal column.** The SAME `<section>` stays, with the same `role`, `aria-label`, `data-testid` and the same `onDragOver`/`onDragEnter`/`onDragLeave`/`onDrop`, so it is still a drop target. It adds the class `gn-board__column--collapsed` and holds ONLY `<button type="button" className="gn-board__column-strip" aria-expanded="false" aria-label={`Expand ${column.name}, ${n} ${n === 1 ? 'ticket' : 'tickets'}`}>`. Inside it is the count (`gn-board__count`) and then the name, written vertically (`gn-board__column-strip-name`, `aria-hidden` because the button's name already says it). It has no `aria-controls`, because the list it would control is not rendered.
-- **Collapsed hides everything else.** The header, the card list, `Close all (N)`, the per-column empty state and its `Add a ticket` are all hidden. The owner asked for a strip. Close all returns on expand.
+- **Expanded column (any category).** The header gains a 44×44 ghost icon button at the far edge. In a terminal column that shows `Close all (N)`, it sits right after that button: `<button type="button" className="gn-board__column-collapse" aria-expanded="true" aria-controls={cardsId} aria-label={`Collapse ${column.name}`}>`, with a chevron icon (`aria-hidden`). The `<ul className="gn-board__cards">` gains `id={cardsId}`, where `cardsId = `board-cards-${group.workflowId}-${column.stateId}``.
+- **Collapsed column.** The SAME `<section>` stays, with the same `role`, `aria-label`, `data-testid` and the same `onDragOver`/`onDragEnter`/`onDragLeave`/`onDrop`, so it is still a drop target. It adds the class `gn-board__column--collapsed` and holds ONLY `<button type="button" className="gn-board__column-strip" aria-expanded="false" aria-label={`Expand ${column.name}, ${n} ${n === 1 ? 'ticket' : 'tickets'}`}>`. Inside it is the count (`gn-board__count`) and then the name, written vertically (`gn-board__column-strip-name`, `aria-hidden` because the button's name already says it). It has no `aria-controls`, because the list it would control is not rendered.
+- **Collapsed hides everything else.** The header, the card list, `Close all (N)` (terminal columns), the per-column empty state and its `Add a ticket` (creatable columns) are all hidden. The owner asked for a strip. Everything returns on expand.
 - **Focus follows the toggle.** Pressing Collapse moves focus to the strip's button, and pressing the strip moves focus to the Collapse button, because the pressed control unmounts. Use a ref and a layout effect keyed on the column's state.
-- **Scope.** Only `column.category === 'terminal'` columns get either control. Open and active columns render exactly as Task 5 left them.
+- **Scope.** EVERY column gets the control, with no `column.category` test anywhere in this task (D27, resolved).
+- **Every column collapsed at once.** This is a legitimate state and must leave a usable board.
+  - The rail shows the strips side by side, each 3.5rem wide with the rail's 1rem gap between them.
+  - Each strip is still a drop target, and each Expand button is reachable in tab order, left to right.
+  - The workflow group's heading and its own collapse toggle stay, because group collapse (`workflow-collapse.ts`) and column collapse are independent memories. Collapsing every column never hides the group, and collapsing the group still hides the whole rail, strips included.
+  - Nothing else on the board changes. The whole-board empty banner depends on tickets, not on columns.
+  - A collapsed strip stretches to the rail's height (`align-self: stretch`, with a 12rem floor), so it is a tall drop target beside expanded columns and never a sliver when every column is collapsed.
 
-Cases (`## 20.11 Board — collapsible terminal columns`). The guard moves by **6**:
+Cases (`## 20.11 Board — collapsible columns`). The guard moves by **8** (6, plus 20.117–20.118 added for the evening ruling):
 
 ```markdown
 - ❌ **20.111 — `column-collapse.ts` remembers a person's column choices per user AND project in `localStorage` under `gn-board-column-collapse`, choices only (an absent key is "nobody chose", not `false`), merging one project's write without touching another's, and answers `NO_COLUMN_CHOICES` for no session, a throwing accessor, unparseable text, a non-object document and another user's document — whose projects are also never carried into this user's write;** control: `workflow-collapse.ts`'s key is untouched by a column write (the two memories are separate documents). Mutation: drop the `storedUserId !== userId` check from the read.
-- ❌ **20.112 — ONLY terminal columns carry the control: an expanded terminal column's header holds a 44×44 ghost `Collapse <name>` button (`aria-expanded="true"`, `aria-controls` naming the column's card list, which exists), after `Close all (N)`; open and active columns hold no collapse control;** control: the open and active columns' headers hold exactly the children Task 5 left them (the name chip and the count), and no element in those sections has the class `gn-board__column-collapse`. Mutation: offer the control on every column.
+- ❌ **20.112 — EVERY column carries the control (owner ruling 2026-09-29 evening, "all columns are collapsible"): each expanded column's header — open, active and terminal alike — holds a 44×44 ghost `Collapse <name>` button (`aria-expanded="true"`, `aria-controls` naming the column's card list, which exists); in a terminal column showing `Close all (N)` it comes right after that button, and in any other column it takes the far edge;** control: the number of `Collapse …` buttons equals the number of columns on the board. Mutation: re-add a `column.category === 'terminal'` gate (the open and active columns lose the control).
 - ❌ **20.113 — collapsing keeps the SAME `<section>` (same role, name and test id) and renders in it only a `<button aria-expanded="false">` named `Expand <name>, <n> tickets` (`1 ticket` when there is one), with the count and the name visible; the card list, `Close all (N)`, the empty copy and `Add a ticket` are not rendered; focus moves to the strip, and expanding restores everything and moves focus to `Collapse <name>`;** control: a collapsed column with zero cards is named `Expand Done, 0 tickets`. Mutation: leave the count out of the strip's accessible name.
 - ❌ **20.114 — a COLLAPSED column is still a drop target: dropping a card from another column on the strip moves the ticket to that state (the same `onDropCard` call an expanded column makes), the strip's count and name go up by one, and the column stays collapsed;** control: the same drop on the expanded column makes the identical `onDropCard(event, stateId)` call. Mutation: attach the drag handlers only in the expanded branch.
-- ❌ **20.115 — the choice survives a remount for the same user and project, a fresh user and a board with no `currentUserId` see every terminal column expanded, and pressing the toggle with no session changes the board for that session but writes nothing;** control: expanding a column a person collapsed writes `true`, not a deleted key, and a record with no choices removes the project's entry. Mutation: make the default collapsed.
-- ❌ **20.116 — the collapsed column is a 3.5rem strip (`flex: 0 0 3.5rem; min-width: 3.5rem`, plan D13 amended) whose button fills it (`width: 100%`, `min-height: 2.75rem`, the P-GHOST ground and hover), with the name set vertically (`writing-mode: vertical-rl`) in the second text tier and the count in the third; the expanded header's collapse button is P-GHOST, icon-only, 44×44;** control: `.gn-board__column` itself still declares `flex: 0 0 18rem`. Mutation: remove `writing-mode` from the strip name.
+- ❌ **20.115 — the choice survives a remount for the same user and project, a fresh user and a board with no `currentUserId` see every column expanded, and pressing the toggle with no session changes the board for that session but writes nothing;** control: expanding a column a person collapsed writes `true`, not a deleted key, and a record with no choices removes the project's entry. Mutation: make the default collapsed.
+- ❌ **20.116 — the collapsed column is a 3.5rem strip (`flex: 0 0 3.5rem; min-width: 3.5rem`, plan D13 amended) that stretches to the rail's height with a 12rem floor (`align-self: stretch; min-height: 12rem`, so it stays a real drop target), whose button fills it (`width: 100%`, `min-height: 2.75rem`, the P-GHOST ground and hover), with the name set vertically (`writing-mode: vertical-rl`) in the second text tier and the count in the third; the expanded header's collapse button is P-GHOST, icon-only, 44×44;** control: `.gn-board__column` itself still declares `flex: 0 0 18rem`. Mutation: remove `writing-mode` from the strip name.
+- ❌ **20.117 — a NON-terminal column collapses exactly as Done does: collapsing an OPEN column (a creatable one, holding `Add a ticket` when empty) and an ACTIVE column each leaves the same `<section>` holding only `Expand <name>, <n> tickets`, hides that column's cards, empty copy and `Add a ticket`, still takes a drop, and is remembered under its own `columnCollapseKey(workflowId, stateId)`;** control: collapsing the open column leaves the active and terminal columns expanded, with their own `Collapse …` buttons. Mutation: key the memory on `stateId` alone, so a second workflow's column with the same state id collapses too (seed two groups sharing a state id).
+- ❌ **20.118 — EVERY column collapsed at once still leaves a usable board: the rail holds one strip per column side by side (every section `gn-board__column--collapsed`, the rail's `gap` unchanged), each strip's Expand button is reachable by Tab in column order, a card dropped on any strip moves there, the workflow group's heading and its own collapse toggle are still rendered and the rail is NOT `hidden`, and expanding any one strip restores that column alone;** control: collapsing the workflow GROUP afterwards still hides the whole rail (`hidden`), strips included, and expanding the group shows the strips again, still collapsed (two independent memories). Mutation: have the board treat "every column collapsed" as a collapsed group (derive the group's default from its columns).
 ```
 
 - [ ] **Step 1: Write the cases.** +6.
 
 - [ ] **Step 2: Write the failing tests.**
   - `packages/app-core/test/preferences/column-collapse.test.ts`. Mirror the cases that pin `workflow-collapse.ts`, found with `git grep -n "WORKFLOW_COLLAPSE_KEY" -- packages/app-core/test`: the same arms, with the column module's names. 20.111's control writes a column choice and asserts `localStorage.getItem(WORKFLOW_COLLAPSE_KEY)` is unchanged.
-  - `packages/app-core/test/views/board-column-collapse.test.tsx`. Seed a board whose workflow has an open, an active and a terminal state, with two cards in the terminal one. Mount it as `board-workflow-collapse.test.tsx` does, with `currentUserId` and a project id.
-    - **20.112:** `getByRole('button', { name: 'Collapse Done' })` has `aria-expanded="true"`, and its `aria-controls` resolves to a `<ul>` in the Done region. `queryByRole('button', { name: /^Collapse (To do|Doing)$/ })` is null. The control: each open and active header's `children` are exactly the chip and the `.gn-board__count`, and `section.querySelector('.gn-board__column-collapse')` is null.
+  - `packages/app-core/test/views/board-column-collapse.test.tsx`. Seed a board whose workflow has an open, an active and a terminal state, with two cards in the terminal one and one in the active one. For 20.117's mutation, a second group has a workflow sharing the open state's id. Mount it as `board-workflow-collapse.test.tsx` does, with `currentUserId` and a project id.
+    - **20.112:** `getAllByRole('button', { name: /^Collapse / })` has one entry per column, and each has `aria-expanded="true"` and an `aria-controls` that resolves to a `<ul>` in its own region. In Done, the Collapse button is the next element sibling of `Close all (2)`. The control compares that count with `getAllByRole('region').length` for the columns.
     - **20.113:** press Collapse. `within(getByTestId('board-column-<done>')).getAllByRole('button')` is exactly `[Expand Done, 2 tickets]` with `aria-expanded="false"`, and `document.activeElement` is that button. `queryByText('Close all (2)')` is null. Press it, and `document.activeElement` is `Collapse Done` and `Close all (2)` is back. The control: an empty Done.
     - **20.114:** collapse Done, then `dragStart` a card in the active column and `drop` on `board-column-<done>` (the `fakeDataTransfer` of `board-drag-drop.test.tsx:100-109`). The move is called with the Done state id. After the reload the strip is named `Expand Done, 3 tickets` and still has `aria-expanded="false"`.
     - **20.115:** collapse, unmount, remount with the same user, and the strip is shown. Remount as another user, and Collapse is shown. Mount with no `currentUserId`, press Collapse, and `localStorage.getItem(COLUMN_COLLAPSE_KEY)` is null.
+    - **20.117:**
+      - collapse the open column (empty, so it held `Add a ticket`), and its region holds only `Expand To do, 0 tickets` and `queryByRole('button', { name: 'Add a ticket' })` in it is null;
+      - collapse the active column, and it holds `Expand Doing, 1 ticket`;
+      - drop the Done card on the collapsed open column, and the move is called with the open state id;
+      - the control: Done still has `Collapse Done`;
+      - the mutation arm: the second group's same-id column is still expanded.
+    - **20.118:**
+      - collapse every column and assert each section has `gn-board__column--collapsed`;
+      - `userEvent.tab()` from the group heading's toggle visits the strips' Expand buttons in column order;
+      - a drop on the middle strip moves the ticket there;
+      - the group heading's button is present and the rail's `hidden` is false;
+      - expanding one strip leaves the others collapsed;
+      - the control: press the group toggle and the rail is `hidden`; press it again and the strips are back, all still collapsed.
   - Append 20.116 to `packages/ui/test/styling-board.test.ts`:
 
 ```ts
@@ -2325,6 +2351,8 @@ describe('20.116 the collapsed column is a labelled 3.5rem strip', () => {
     const collapsed = ruleExactly(CSS, '.gn-board__column--collapsed');
     expect(valueOf(collapsed, 'flex')).toBe('0 0 3.5rem');
     expect(valueOf(collapsed, 'min-width')).toBe('3.5rem');
+    expect(valueOf(collapsed, 'align-self')).toBe('stretch');
+    expect(valueOf(collapsed, 'min-height')).toBe('12rem');
     const strip = ruleExactly(CSS, '.gn-board__column-strip');
     expect(valueOf(strip, 'width')).toBe('100%');
     expect(valueOf(strip, 'min-height')).toBe('2.75rem');
@@ -2347,22 +2375,25 @@ describe('20.116 the collapsed column is a labelled 3.5rem strip', () => {
 });
 ```
 
-- [ ] **Step 3: Run to see them fail.** All six are RED.
+- [ ] **Step 3: Run to see them fail.** All eight are RED.
 
 - [ ] **Step 4: Implement.**
-  1. `column-collapse.ts`: copy `workflow-collapse.ts` (`:1-216`) and rename it. The module docblock points back at `workflow-collapse.ts` for the reasoning instead of restating it, and adds one paragraph for the difference: no auto-expand, the default is expanded, and the scope is terminal columns (plan D27). Add `columnCollapseKey`.
+  1. `column-collapse.ts`: copy `workflow-collapse.ts` (`:1-216`) and rename it. The module docblock points back at `workflow-collapse.ts` for the reasoning instead of restating it, and adds one paragraph for the difference: no auto-expand, the default is expanded, and the scope is every column (plan D27, resolved). Add `columnCollapseKey`.
   2. `board.tsx`:
      - in `Board`, add `const [columnChoices, setColumnChoices] = useState<ColumnCollapseChoices>(NO_COLUMN_CHOICES);` beside `groupChoices`, and read it inside the SAME `useHydrationLayoutEffect` (`:543-545`);
      - pass `columnChoices` and `onToggleColumn(workflowId, stateId, expanded)` to `BoardGroupSection`. The toggle builds the next choices, calls `setColumnChoices`, and calls `rememberColumnCollapse(currentUserId ?? '', board.projectId, next)`;
-     - in the column map, `const collapsible = column.category === 'terminal'; const collapsed = collapsible && columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false;`;
+     - in the column map, `const collapsed = columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false;`. There is no category test (D27, resolved);
      - render the collapsed branch or the expanded one as **The markup** above says, keeping the section's attributes and handlers in ONE place outside the branch.
   3. `ui.css`, after `.gn-board__column-header > .gn-board__column-action`:
 
 ```css
-/* COLLAPSIBLE TERMINAL COLUMNS (owner ruling 2026-09-29; plan D27 — Backlog is
-   never a board column). The collapsed column is the same section, a 3.5rem
-   strip (D13 amended), still a drop target; its one control fills it. */
-.gn-board__column--collapsed { flex: 0 0 3.5rem; min-width: 3.5rem; }
+/* COLLAPSIBLE COLUMNS (owner rulings 2026-09-29: "all columns are
+   collapsible"; plan D27). The collapsed column is the same section, a 3.5rem
+   strip (D13 amended), still a drop target; its one control fills it. It
+   stretches to the rail's height with a 12rem floor, so beside expanded
+   columns it is a full-height drop target and with EVERY column collapsed the
+   board is a row of usable strips, not slivers (20.118). */
+.gn-board__column--collapsed { flex: 0 0 3.5rem; min-width: 3.5rem; align-self: stretch; min-height: 12rem; }
 .gn-board__column-strip {
   width: 100%;
   min-height: 2.75rem;
@@ -2412,15 +2443,15 @@ describe('20.116 the collapsed column is a labelled 3.5rem strip', () => {
 
 - [ ] **Step 5: Run to see them pass.** Then run the whole `packages/app-core` suite (the workflow-collapse and drag-drop suites must stay green) and the whole `packages/ui` suite, then build, typecheck and `pnpm check:help`. The two new accessible names are the only new strings.
 
-- [ ] **Step 6: Catalogue.** Flip 20.111–20.116. Append to §17:
+- [ ] **Step 6: Catalogue.** Flip 20.111–20.118. Append to §17:
 
 ```markdown
-- ✅ **Terminal columns collapse to a labelled strip** (styling refresh Plan A Task 5B; `packages/app-core/src/preferences/column-collapse.ts`, `board.tsx` column section, `ui.css` `.gn-board__column--collapsed`, `.gn-board__column-strip`, `.gn-board__column-collapse`) — owner ruling 2026-09-29. A terminal column (Done) carries a 44×44 **Collapse Done** control; collapsed, it is a 3.5rem strip holding one button, **Expand Done, N tickets**, with the name set vertically and the count, and it still takes drops. Close all and the column's cards return on expand. Remembered per user and per project in `localStorage` (the workflow-collapse shape), default expanded. Backlog is not a board column (spec §1.1), so it has no strip; the owner's ruling on that is open (plan D27). Cases 20.111–20.116.
+- ✅ **Every board column collapses to a labelled strip** (styling refresh Plan A Task 5B; `packages/app-core/src/preferences/column-collapse.ts`, `board.tsx` column section, `ui.css` `.gn-board__column--collapsed`, `.gn-board__column-strip`, `.gn-board__column-collapse`) — owner rulings 2026-09-29 ("all columns are collapsible"). Every column, whatever its category, carries a 44×44 **Collapse <column>** control; collapsed, it is a 3.5rem strip at the rail's full height holding one button, **Expand <column>, N tickets**, with the name set vertically and the count, and it still takes drops. The column's cards, Close all (terminal columns) and Add a ticket (empty creatable columns) return on expand. With every column collapsed the board is a row of strips side by side; the workflow group's own collapse is separate. Remembered per user and per project in `localStorage` (the workflow-collapse shape), default expanded. Backlog is not a board column (spec §1.1), so it has no strip. Cases 20.111–20.118.
 ```
 
-  Under the board bullet at `:182`, append: `  - ✅ **Collapsible terminal columns (2026-09-29):** Done collapses to a labelled strip with its count, still a drop target, remembered locally. Cases 20.111–20.116.`
+  Under the board bullet at `:182`, append: `  - ✅ **Collapsible columns (2026-09-29):** every column collapses to a labelled strip with its count, still a drop target, remembered locally. Cases 20.111–20.118.`
 
-- [ ] **Step 7: Commit** `Styling A/Task 5B: terminal columns collapse to a labelled strip (20.111-20.116)`. Then mutate, show red, restore.
+- [ ] **Step 7: Commit** `Styling A/Task 5B: every column collapses to a labelled strip (20.111-20.118)`. Then mutate, show red, restore.
 
 ---
 
@@ -2857,7 +2888,7 @@ Then replace the provenance button and `{arrows}` (`:1658-1666`) with:
    ground in every style×theme (case 20.057). This SUPERSEDES the owner's
    2026-09-23 request (red fire / green leaf / blue snowflake on a card tinted
    by its priority): the tint rules and their four roles are retired (plan D11,
-   flagged for owner confirmation). The icon inherits this element's `color`
+   confirmed by the owner 2026-09-29). The icon inherits this element's `color`
    through `currentColor`, so one declaration per level sets both. */
 .gn-board-card__priority {
   display: inline-flex;
@@ -3326,7 +3357,7 @@ Cases. The guard moves by **10** (8, plus 20.121–20.122 added 2026-09-29): `�
 - 🧪 **20.097 — every primary Button in the product stays in layout at 48px/24px/17px, at 390px AND 1280px wide: for each of the 26 usages in Plan A Task 3's table, open its screen, measure the button's `getBoundingClientRect()` and its parent's, and record any button that overflows its row or forces horizontal scroll;** control: the board's New ticket (20.091) is in layout. Evidence: a table of 26 rows (usage, 390 result, 1280 result). Any overflow is fixed in the owning Plan B screen task, never by excluding the usage (D5).
 - 🧪 **20.098 — the ticket sheet: the panel computes `border-top-left-radius: 24px` (neo 28px) and `border-top-right-radius: 0px`, the header `padding: 24px 24px 16px`, the title `font-size: 26px; font-weight: 700`, the fields group an `inset` box-shadow with 8px padding, the close button transparent at rest and filled on hover, and every `Move…`/`Close`/`Reopen` 44px tall with a 1px edge;** control: Full screen removes the radius and the shadow. Steps: open any ticket from the board; hover the ✕; press Full screen.
 - 🧪 **20.121 — dragging a card (added 2026-09-29): the image under the pointer is the card tilted about 2.5° and slightly larger, with a deep shadow that is not clipped at the card's edge (the browser's own translucency is expected and recorded, D26); the source column does not move — every other card's `getBoundingClientRect().top` is identical before and during the drag (read in a `dragover` listener) — and the source slot shows a dashed recessed outline the size of the card; the column under the pointer shows an accent outline and nothing is inserted into it; Esc restores the card and clears every outline;** control: a drop onto another column moves the ticket exactly as before this plan. Evidence: a screen recording (GIF) per browser — Chromium and Safari — plus the before/during `top` values. Steps: open a Board with a column holding at least three cards; drag the middle card across two columns, pause over each, press Esc; drag again and drop.
-- 🧪 **20.122 — a terminal column collapses (added 2026-09-29): pressing Collapse Done leaves a 56px-wide strip (`getBoundingClientRect().width` = 56) reading the count and "Done" vertically, the neighbouring columns keep 288px, dragging a card onto the strip moves it there and the count goes up, and a reload keeps the column collapsed; VoiceOver reads the strip as "Expand Done, N tickets, button, collapsed";** control: another browser profile (a different signed-in user) sees Done expanded. Steps: open a Board whose workflow has a terminal state; collapse Done; drag a card onto the strip; reload; turn VoiceOver on and focus the strip.
+- 🧪 **20.122 — columns collapse (added 2026-09-29; every column per the evening ruling): pressing Collapse Done leaves a 56px-wide strip (`getBoundingClientRect().width` = 56) at the rail's full height, reading the count and "Done" vertically; the neighbouring columns keep 288px; dragging a card onto the strip moves it there and the count goes up; a reload keeps the column collapsed; VoiceOver reads the strip as "Expand Done, N tickets, button, collapsed"; then collapsing EVERY column leaves a row of 56px strips side by side, each at least 192px tall, with the workflow heading still shown and no horizontal scroll at 1280px for a five-column workflow;** control: another browser profile (a different signed-in user) sees every column expanded. Steps: open a Board whose workflow has at least an open, an active and a terminal state; collapse Done; drag a card onto the strip; reload; turn VoiceOver on and focus the strip; collapse the rest.
 ```
 
 - [ ] **Step 1: Write the cases** under `## 20.8 Browser — Plan A`. Guard: +10.
@@ -3347,7 +3378,7 @@ Cases. The guard moves by **10** (8, plus 20.121–20.122 added 2026-09-29): `�
 - [ ] **Re-read the catalogue.**
   - Read `Features.md` §17's nine bullets and the five sub-bullets (`:32`, `:43`, `:55`, and two under `:182`) against the code.
   - Read every id line you flipped, and the eleven amended cases.
-  - The id count moves by **58** in total (47, plus 11 added 2026-09-29):
+  - The id count moves by **60** in total (47, plus 13 added 2026-09-29):
 
     | Task | Cases |
     |---|---|
@@ -3357,19 +3388,19 @@ Cases. The guard moves by **10** (8, plus 20.121–20.122 added 2026-09-29): `�
     | 4 | 2 |
     | 5 | 6 |
     | 5A | 5 |
-    | 5B | 6 |
+    | 5B | 8 |
     | 6 | 9 |
     | 7 | 7 |
     | 8 | 10 |
 
-  - That uses `20.001`–`20.122` with gaps at 20.005–20.010, 20.016–20.020, 20.027–20.030, 20.033–20.040, 20.047–20.050, 20.060–20.070, 20.078–20.090, 20.099–20.100, 20.106–20.110, 20.117–20.120 and 20.123–20.150. Those gaps are reserved for this plan's own follow-ups and are never used by Plan B.
+  - That uses `20.001`–`20.122` with gaps at 20.005–20.010, 20.016–20.020, 20.027–20.030, 20.033–20.040, 20.047–20.050, 20.060–20.070, 20.078–20.090, 20.099–20.100, 20.106–20.110, 20.119–20.120 and 20.123–20.150. Those gaps are reserved for this plan's own follow-ups and are never used by Plan B.
 - [ ] **Merge forward before the PR:**
   1. Record the guard count.
   2. `git fetch origin && git merge origin/release/<date>`.
   3. Re-run build, typecheck, the four suites and the checks.
   4. Confirm the guard count is yours plus exactly the id lines the merge brought in.
 - [ ] **PR body** (`bash scripts/ctl/ctl pr open task/styling-a-foundation --repo <worktree> --base release/<date> --title "Styling refresh Plan A: tokens, Button, surfaces, board, sheet" --body FILE`). It lists:
-  - every deviation D1–D27, in one line each. **D11 (priority tints retired) and D27 (terminal columns only; Backlog is not a board column) are flagged for the owner's confirmation.**
+  - every deviation D1–D27, in one line each. D11 (priority tints retired), D6 (borders on quiet buttons only) and D27 (every column collapsible) are owner-confirmed rulings of 2026-09-29. Quote each one.
   - the eleven amended cases, each with its new sentence;
   - each mutation, with its red summary line;
   - that 20.091–20.098 and 20.121–20.122 are 🧪 and need the controller;
