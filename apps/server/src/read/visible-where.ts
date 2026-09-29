@@ -1,4 +1,5 @@
 import type { EffectiveRole } from '../permissions/effective-role.js';
+import { assigneeReachWhere } from '../visibility/assignee-arm.js';
 import type { SqlParams } from './sql-params.js';
 
 // `ticketAudienceWhere` is the AUDIENCE table alone — the note inherit arm's question.
@@ -123,19 +124,11 @@ export function ticketAudienceWhere(eff: EffectiveRole, userId: string, params: 
 }
 
 /**
- * The assignee arm in SQL (W3) — `assigneeSees`' twin. A subquery over `v`,
- * not `t.assignee_id`, because `listVisibleTickets` joins no `t`
- * (deviation D6; this file's own note on `LIVE_TICKET_WHERE`, reason 2).
- */
-export function assigneeArmWhere(userId: string, params: SqlParams): string {
-  return `EXISTS (SELECT 1 FROM proj_tickets asg WHERE asg.ticket_id = v.ticket_id AND asg.assignee_id = ${params.add(userId)} AND NOT EXISTS (SELECT 1 FROM proj_projects adp WHERE adp.project_id = v.project_id AND adp.deleted_at IS NOT NULL))`;
-}
-
-/**
- * May this viewer see these tickets — the audience table OR the assignee arm.
+ * May this viewer see these tickets — the audience table OR the assignee arm
+ * (`assigneeReachWhere`: the assigned tickets and what inherits from them, R1).
  * Requires `proj_visibility` joined as `v`. Every list, board, search,
- * attention and My Work read calls this; the note inherit arm calls
- * `ticketAudienceWhere` instead (a note is not opened by an assignment).
+ * attention and My Work read calls this; the note inherit arm asks the same two
+ * halves over `na.ticket_id`.
  *
  * The two constant answers return BEFORE any parameter is bound, exactly as the
  * audience function's do (see "No parameter it does not use" above).
@@ -143,7 +136,7 @@ export function assigneeArmWhere(userId: string, params: SqlParams): string {
 export function visibleTicketsWhere(eff: EffectiveRole, userId: string, params: SqlParams): string {
   if (eff.workspaceRole === null) return 'FALSE';
   if (eff.workspaceRole === 'owner') return 'TRUE';
-  return `(${ticketAudienceWhere(eff, userId, params)} OR ${assigneeArmWhere(userId, params)})`;
+  return `(${ticketAudienceWhere(eff, userId, params)} OR ${assigneeReachWhere(userId, params)})`;
 }
 
 /**
@@ -293,8 +286,8 @@ export function explicitAudienceWhere(userId: string, params: SqlParams): string
  * `TRUE` for the owner and `FALSE` for a null role, both with NO value bound,
  * for the reason above and matching `visibleTicketsWhere` exactly.
  *
- * The inherit arm reaches `visibleTicketsWhere` over alias `v`, with
- * `proj_tickets` joined as `t` for `LIVE_TICKET_WHERE`. One consequence worth
+ * The inherit arm asks the ticket audience OR the assignee arm over the attached ticket (alias `v`, with
+ * `proj_tickets` joined as `t` for `LIVE_TICKET_WHERE`). One consequence worth
  * naming: a note attached to a DELETED ticket is not admitted through it, which
  * is the SQL half of `loadNoteForVisibility`'s `ticketIsLive` filter.
  */
@@ -307,8 +300,11 @@ export function visibleNotesWhere(eff: EffectiveRole, userId: string, params: Sq
       SELECT 1 FROM proj_note_attachments na
       JOIN proj_visibility v ON v.ticket_id = na.ticket_id
       JOIN proj_tickets t ON t.ticket_id = na.ticket_id
-      WHERE na.note_id = n.note_id AND ${LIVE_TICKET_WHERE} AND ${ticketAudienceWhere(eff, userId, params)}))`;
-  // the AUDIENCE, not `visibleTicketsWhere` — a note is not opened by assigning its ticket (W3, case 6.191).
+      WHERE na.note_id = n.note_id AND ${LIVE_TICKET_WHERE}
+        AND (${ticketAudienceWhere(eff, userId, params)} OR ${assigneeReachWhere(userId, params, 'na.ticket_id')})))`;
+  // The audience OR the assignee arm over the attached ticket: an inherit note follows the ticket's
+  // readers, and since R1 (case 6.273) the assignee of an attached ticket — or of one it inherits from —
+  // is one of them. Any ONE attached ticket admits (FD7), as in `canReadNote`.
   const arms = [
     `n.author_id = ${user}`,
     isGuest ? null : `n.scope_mode = 'workspace'`,

@@ -1,5 +1,6 @@
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
+import { assigneeArmTickets } from './assignee-arm.js';
 
 /**
  * One ticket's audience as `proj_visibility` resolved it (Plan 4 Task 6):
@@ -175,34 +176,27 @@ export async function getResolvedVisibility(
 }
 
 /**
- * THE ASSIGNEE ARM (owner ruling 2026-09-29, access plan W3): "if an assignee is
- * assigned, even if that person does not have visibility to the workspace or
- * project, they can still get visibility to just that single ticket."
+ * THE ASSIGNEE ARM (owner ruling 2026-09-29, access plan W3; EXTENDED the same day, R1): "if an
+ * assignee is assigned, even if that person does not have visibility to the workspace or project,
+ * they can still get visibility to just that single ticket" — and, by the late ruling, to the notes
+ * and sub-tickets that INHERIT its audience ("keep today's behaviour and just extend it to cover
+ * those notes and sub-tickets"). The explicit list is never written; the reach is read.
  *
- * Kept OUT of `canSeeResolved` deliberately. That function is the AUDIENCE
- * rule, and it has callers that must not widen with an assignment:
- * `canReadNote`'s inherit arm (a note is not opened by assigning its ticket),
- * the rollup's `restrictedCount` and the restricted-parent chip (the ticket's
- * relatives are not opened either). `canSee` — the one-ticket question — is the
- * only reader that ORs this in; its SQL twin is `assigneeArmWhere`.
+ * Kept OUT of `canSeeResolved` deliberately: that function is the AUDIENCE rule, a pure function of
+ * a resolved row, and an assignment is not part of a row's audience. Every reader asks the arm
+ * itself and ANDs the two: `canSee` (`assigneeArmTickets`), the list reads (`assigneeReachWhere`
+ * inside `visibleTicketsWhere`), `canReadNote`'s inherit arm and `visibleNotesWhere`'s, the
+ * rollup's `restrictedCount` and the restricted-parent chip (FD1 of the access follow-ups plan).
+ * The two spellings live in `./assignee-arm.ts` and are pinned equal by case 6.272.
  *
- * A workspace role is still required: an assignee put out of the workspace keeps
- * their name on the head row (`membership.revoked` touches no ticket) and sees
- * nothing (case 6.193).
+ * `assigneeSees` is the single-ticket special case of that reach, kept pure so case 6.187 can pin
+ * the role term without a database.
+ *
+ * A workspace role is still required: an assignee put out of the workspace keeps their name on the
+ * head row (`membership.revoked` touches no ticket) and sees nothing (cases 6.193, 6.276).
  */
 export function assigneeSees(eff: EffectiveRole, userId: string, assigneeId: string | null): boolean {
   return eff.workspaceRole !== null && assigneeId !== null && assigneeId === userId;
-}
-
-async function currentAssignee(db: Queryable, ticketId: string): Promise<string | null> {
-  const { rows } = await db.query<{ assignee_id: string | null }>(
-    // A DELETED project's tickets are out of reach for an assignee too (final
-    // review, 2026-09-29) — the same exclusion rule A applies to a roster.
-    `SELECT t.assignee_id FROM proj_tickets t WHERE t.ticket_id = $1
-       AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL)`,
-    [ticketId],
-  );
-  return rows[0]?.assignee_id ?? null;
 }
 
 /**
@@ -282,8 +276,9 @@ async function currentAssignee(db: Queryable, ticketId: string): Promise<string 
  *
  * ## The assignee arm (W3)
  *
- * `canSeeResolved` OR `assigneeSees`. The head row's CURRENT `assignee_id` is
- * read, so reassigning takes the ticket away at once.
+ * `canSeeResolved` OR the assignee arm (R1): the ticket, or an ancestor on its inheritance chain, is
+ * CURRENTLY assigned to this user. Read fresh from the head rows, so reassigning takes the whole
+ * inherited subtree away at once. The workspace role is ANDed here — the arm itself has none.
  */
 export async function canSee(db: Queryable, userId: string, ticketId: string): Promise<boolean> {
   const v = await getResolvedVisibility(db, ticketId);
@@ -293,5 +288,6 @@ export async function canSee(db: Queryable, userId: string, ticketId: string): P
   const eff = await resolveEffectiveRole(db, userId, v.workspaceId);
   if (canSeeResolved(eff, userId, v)) return true;
   // Only when the audience says no — the common answer costs no second read.
-  return assigneeSees(eff, userId, await currentAssignee(db, ticketId));
+  if (eff.workspaceRole === null) return false;
+  return (await assigneeArmTickets(db, userId, [ticketId])).has(ticketId);
 }

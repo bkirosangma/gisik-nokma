@@ -1,7 +1,7 @@
 import type { ReachGrantedNote, ReachGrantedTicket } from '@gisik-nokma/domain';
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
-import { canReadNote, loadNoteForVisibility } from './can-read-note.js';
+import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
 import { canSee } from './can-see.js';
 import { listVisibleTickets } from './visible-tickets.js';
 
@@ -126,7 +126,7 @@ import { listVisibleTickets } from './visible-tickets.js';
  *
  * ## The trigger is the EVENT, never a reconstructed prior audience
  *
- * **`ticket.assigned` (W3, 2026-09-29)** widens the ticket to its new assignee, and only to them. It reaches this module only for readers `canSee` admits now, so it self-selects exactly as a widening `visibility.set` does. The former assignee is narrowed, never reaches this line, and loses the ticket at their next reconcile.
+ * **`ticket.assigned` (W3, 2026-09-29)** widens the ticket to its new assignee, and only to them. It reaches this module only for readers `canSee` admits now, so it self-selects exactly as a widening `visibility.set` does. Since R1 (2026-09-30) "the ticket" is the reach: its inheriting children and their `inherit` notes come with it (`grantNoticeFor` and `noteGrantNoticeFor` ask the same `canSee`/`canReadNote`, arm included). The former assignee is narrowed, never reaches this line, and loses the ticket and that subtree at their next reconcile.
  *
  * This module never asks "who could see this before". It cannot: `proj_visibility`
  * keeps no history and neither payload carries a before-image, and re-deriving
@@ -480,7 +480,8 @@ export async function noteGrantNoticeFor(
       eff = await resolveEffectiveRole(db, userId, loaded.note.workspaceId);
       effs.set(loaded.note.workspaceId, eff);
     }
-    if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities)) continue;
+    const armReach = await noteArmReach(db, userId, loaded.attachedVisibilities);
+    if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities, armReach)) continue;
     admitted.push(id);
   }
   return withNoteHeadSeq(db, admitted, afterSeq);
