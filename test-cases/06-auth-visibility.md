@@ -419,3 +419,15 @@ Ids `6.151`–`6.152` are the next free in this section by the controller's 22:0
 - ✅ **6.214 — an assignee who is ALREADY a member is not re-granted: a MEMBER stays a member (never demoted to guest) and the assignment commits;** control: no `membership.granted` is appended. Mutation: grant regardless of membership.
 - ✅ **6.215 — a `userId` that is no account answers 422 `That person has no account.` and appends nothing;** control: a real account's id proceeds. Mutation: skip the `"user"` existence read.
 - ✅ **6.216 — both routes are HTTP-Origin-protected, cookie-authenticated POSTs: each has a `PROTECTED` row and is in the production set (the 13.116 drift guard);** control: a forged-Origin request to each is refused before any session work. Mutation: remove `/v1/workspaces/:workspaceId/assign-outsider` from `HTTP_ORIGIN_PROTECTED_ROUTES`.
+
+
+## Names on the wire — blank names, former members, a guest's scope (access follow-ups R3, 2026-09-29)
+
+- ✅ **6.245 — a member with a BLANK name is served with their verified email as `displayName`;** control: a member with a name is served by name. Mutation: restore the `display_name.trim() !== ''` filter.
+- ✅ **6.246 — a phone-signed member (synthetic address) with a blank name is still NOT served (FD3);** control: a phone member WITH a name is also not served, exactly as before, and an email member is. Mutation: drop the `isSyntheticPhoneEmail` filter.
+- ✅ **6.247 — a FORMER member (granted, then revoked) is served with `removed: true` and their name (or email);** control: a current member carries no `removed` key at all, and a member granted, revoked and granted again is current. Mutation: drop the former-members half of the union.
+- ✅ **6.248 — a GUEST caller gets 200 with ONLY the people on tickets they can see: the assignee of a ticket on their list and the actor who created it — not a member who never touched those tickets;** control: `/members` still answers the same guest 404. Mutation: serve the guest `readActorNames` (the whole workspace).
+- ✅ **6.249 — the guest's list follows visibility NOW: once the guest is taken off the ticket's list, its people drop out of their names;** control: a second ticket still on their list keeps its people. Mutation: read the guest's tickets without the audience predicate.
+- ✅ **6.250 — a person in ANOTHER workspace, and a person nobody in this workspace ever granted, are never served, to a member or to a guest;** control: this workspace's members are. Mutation: remove the `workspace_id` clause from the former-members query.
+
+Lane A's reserved and unused ids in this block: `6.251`–`6.252`. Tests: `apps/server/test/routes/actor-names.test.ts` (its own database: the cases need a guest on an explicit list, a revoked and a re-granted member and a second workspace, which the read-only world of `builder-reads.test.ts` keeps to the end of its file).

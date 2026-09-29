@@ -749,8 +749,12 @@ export type MemberListResponse = { workspaceId: string; members: WorkspaceMember
  * shape of `GET /v1/workspaces/:id/actor-names`: what a client joins onto an
  * actor id it already holds when the roster (`MemberListResponse`) does not
  * name that person (a guest is withheld from a non-admin's roster).
+ *
+ * `removed` is present ONLY when true: the person was granted in this workspace
+ * and no longer holds a membership (R3/R5), so a client writes "Name (removed)".
+ * `displayName` is the name, or the verified email when the name is blank.
  */
-export type ActorName = { userId: string; displayName: string };
+export type ActorName = { userId: string; displayName: string; removed?: true };
 export type ActorNameListResponse = { workspaceId: string; names: ActorName[] };
 
 /**
