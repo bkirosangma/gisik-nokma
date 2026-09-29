@@ -71,6 +71,26 @@ describe('19.218 the dialog names the item, starts with the switch off, and alwa
   });
 });
 
+describe('19.281 the switch resolves to "Delete permanently" through aria-labelledby, for every kind', () => {
+  it('19.281 ticket, project and workspace dialogs; CONTROL: the named element is the visible switch text', () => {
+    const kinds: Array<[Partial<DeleteDialogProps>, string]> = [
+      [{}, TICKET_TITLE],
+      [{ kind: 'project', name: 'Compressor', entityId: 'prj_1' }, 'Delete project “Compressor”?'],
+      [{ kind: 'workspace', name: 'Convenience Corner', workspaceId: 'ws_cc', entityId: 'ws_cc' }, WORKSPACE_TITLE],
+    ];
+    for (const [over, title] of kinds) {
+      mount(over);
+      const control = within(dialog(title)).getByRole('checkbox', { name: 'Delete permanently' });
+      const labelId = control.getAttribute('aria-labelledby');
+      expect(labelId, title).toBeTruthy();
+      const target = document.getElementById(labelId ?? '');
+      expect(target, title).not.toBeNull();
+      expect(target, title).toHaveTextContent(/^Delete permanently$/);
+      cleanup();
+    }
+  });
+});
+
 describe('19.219 the confirm reads Delete, or Delete permanently with the switch on', () => {
   it('19.219 the label flips; CONTROL: one confirm at a time', () => {
     mount();

@@ -3,6 +3,7 @@ import { alerterFromConfig } from './alerts/error-alerter.js';
 import { buildApp } from './app.js';
 import { createObjectStoreFromEnv } from './attachments/store-config.js';
 import { createAuth } from './auth/auth.js';
+import type { SmtpLog } from './auth/smtp-magic-link-sender.js';
 import { selectInviteMailer } from './invites/invite-mailer.js';
 import { selectMagicLinkSender, selectOtpSender } from './auth/select-senders.js';
 import { loadConfig } from './config.js';
@@ -82,6 +83,12 @@ async function main(): Promise<void> {
     projections,
     gates: buildServerGates(),
   });
+  // The SMTP connection-phase records (`connectionPhaseLogger`) go to the app
+  // logger, which only exists after `buildApp` — the same holder trick as
+  // `nudgeEmbedWorker` below. Null for the few statements before the
+  // assignment; nothing sends mail in that window.
+  let appLog: { info: (fields: object, message: string) => void } | null = null;
+  const smtpLog: SmtpLog = (fields, message) => appLog?.info(fields, message);
   const auth = createAuth({
     pool,
     // The senders, chosen by `select-senders.ts` and by nothing here.
@@ -104,7 +111,7 @@ async function main(): Promise<void> {
     // `SMTP_URL` set means real mail (Mailpit in dev-compose, any SMTP provider
     // in production — the vendor stays out of this repository); unset keeps the
     // log sender, which is the dev path and not a degraded server.
-    magicLinkSender: selectMagicLinkSender(config),
+    magicLinkSender: selectMagicLinkSender(config, smtpLog),
     // Both come from validated configuration, not from `process.env` with a
     // fallback: a server that silently signs sessions with a secret checked into
     // the repository is worse than a server that will not start.
@@ -136,7 +143,7 @@ async function main(): Promise<void> {
       // but the one that was given this can reach the ungated path.
       serverAppend: (events) => ingest.ingestBatch(events),
       webOrigin: config.webOrigin,
-      inviteMailer: selectInviteMailer(config),
+      inviteMailer: selectInviteMailer(config, smtpLog),
       // The commit-feed listener `app.ts` registers when this is given. It
       // forwards to the worker created below; `EMBED_WORKER_ENABLED=false`
       // leaves the worker uncreated, and this closure then drops the nudge on
@@ -245,6 +252,7 @@ async function main(): Promise<void> {
       },
     },
   );
+  appLog = app.log;
   // The snapshot writer (Plan 10 Task 5), and THREE deliberate departures from
   // what the plan text said to do here. Each is a place the repo disagreed with
   // the plan, and the repo won.

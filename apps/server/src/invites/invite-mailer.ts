@@ -1,6 +1,6 @@
 import { formatIstInstant } from '@gisik-nokma/domain';
 import { createTransport, type Transporter } from 'nodemailer';
-import { SMTP_TIMEOUTS_MS } from '../auth/smtp-magic-link-sender.js';
+import { smtpTransportOptions, type SmtpLog } from '../auth/smtp-magic-link-sender.js';
 import type { AppConfig } from '../config.js';
 
 /**
@@ -77,8 +77,9 @@ export class SmtpInviteMailer implements InviteMailer {
     smtpUrl: string,
     private readonly from: string,
     transporter?: Transporter,
+    log?: SmtpLog,
   ) {
-    this.transporter = transporter ?? createTransport({ url: smtpUrl, ...SMTP_TIMEOUTS_MS });
+    this.transporter = transporter ?? createTransport(smtpTransportOptions(smtpUrl, log));
   }
 
   async send(mail: InviteEmail): Promise<void> {
@@ -88,6 +89,8 @@ export class SmtpInviteMailer implements InviteMailer {
 }
 
 /** `SMTP_URL` set means real mail; unset means the log mailer — the magic-link rule (`../auth/select-senders.ts:32-38`). */
-export function selectInviteMailer(config: Pick<AppConfig, 'smtpUrl' | 'inviteFrom'>): InviteMailer {
-  return config.smtpUrl === null ? new LogInviteMailer() : new SmtpInviteMailer(config.smtpUrl, config.inviteFrom);
+export function selectInviteMailer(config: Pick<AppConfig, 'smtpUrl' | 'inviteFrom'>, log?: SmtpLog): InviteMailer {
+  return config.smtpUrl === null
+    ? new LogInviteMailer()
+    : new SmtpInviteMailer(config.smtpUrl, config.inviteFrom, undefined, log);
 }
