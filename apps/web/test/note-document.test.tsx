@@ -975,6 +975,17 @@ describe('19.236–19.239 the note page deletes, and restores what it deleted', 
     expect(screen.queryByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeNull();
   });
 
+  it('19.282 the note dialog’s switch resolves to "Delete permanently" through aria-labelledby', async () => {
+    mountLive();
+    await userEvent.click(await screen.findByRole('button', { name: DELETE_TRIGGER_LABEL }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    const control = within(dialog).getByRole('checkbox', { name: 'Delete permanently' });
+    const labelId = control.getAttribute('aria-labelledby');
+    expect(labelId).toBeTruthy();
+    // CONTROL: the id names the visible text, which exists in the document.
+    expect(document.getElementById(labelId ?? '')).toHaveTextContent(/^Delete permanently$/);
+  });
+
   it('19.237 permanent posts [note.deleted, purge.marked] and the banner appears; CONTROL: soft posts [note.deleted]', async () => {
     const hard = mountLive();
     await deleteFromByline(true);
