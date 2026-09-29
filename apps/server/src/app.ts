@@ -32,6 +32,7 @@ import { registerSearchRoutes } from './routes/search.js';
 import { LogInviteMailer, type InviteMailer } from './invites/invite-mailer.js';
 import { redactRequestUrl } from './http/redact-url.js';
 import { registerInviteRoutes, type ServerAppend } from './routes/invites.js';
+import { registerMemberRoutes } from './routes/members.js';
 import { registerPeopleRoutes } from './routes/people.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
@@ -920,6 +921,7 @@ export function buildApp(
   );
   // Access plan Task 6 — the exact-email lookup and the outsider door.
   registerPeopleRoutes(app, { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend }, requireSession);
+  registerMemberRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
   // The CALLER-scoped half of that surface (Task 17): the invitations addressed
   // to the signed-in person's verified email, plus Accept and Decline for them.
   // A separate module rather than four more handlers in `routes/invites.ts`,

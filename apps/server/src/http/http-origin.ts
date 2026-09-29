@@ -208,6 +208,9 @@ export const HTTP_ORIGIN_PROTECTED_ROUTES: ReadonlySet<string> = new Set([
   // cookie-authenticated POSTs a page the victim visits could otherwise send.
   '/v1/workspaces/:workspaceId/people-lookup',
   '/v1/workspaces/:workspaceId/assign-outsider',
+  // Access follow-ups R5 (case 6.216's shape): a cookie-authenticated POST that
+  // ends a person's access, so a page the victim visits must not be able to send it.
+  '/v1/workspaces/:workspaceId/members/:userId/remove',
 ]);
 
 /**

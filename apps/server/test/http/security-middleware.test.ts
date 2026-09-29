@@ -202,6 +202,12 @@ describe('HTTP-Origin check on cookie-authenticated product mutations', () => {
       'POST',
     ],
     [
+      'the member REMOVAL (access follow-ups R5, 6.216)',
+      '/v1/workspaces/01JQ0000000000000000000000/members/01JU0000000000000000000000/remove',
+      '/v1/workspaces/:workspaceId/members/:userId/remove',
+      'POST',
+    ],
+    [
       'the ticket-type MIGRATION',
       '/v1/workspaces/01JQ0000000000000000000000/ticket-types/01JT0000000000000000000000/migrate',
       '/v1/workspaces/:workspaceId/ticket-types/:typeId/migrate',
