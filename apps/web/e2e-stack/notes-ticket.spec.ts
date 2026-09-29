@@ -177,7 +177,9 @@ test('18.255 × on a note badge detaches it; Undo brings it back', async ({ page
 });
 
 /**
- * Spec §11.10 item 3, two sessions. The scenario needs a ticket the
+ * Spec §11.10 item 3, two sessions — asserting the LAZY behaviour the product
+ * has by design (owner ruling 2026-09-29; case 6.104: no frame on narrowing).
+ * The scenario needs a ticket the
  * accountant can read (workspace role `guest`, no project membership — the
  * seed's four explicit-visibility errands are one route, but this spec does
  * not depend on their titles: it grants the accountant EXPLICIT visibility on
@@ -190,7 +192,7 @@ test('18.255 × on a note badge detaches it; Undo brings it back', async ({ page
  * guess against a known name). If the seed or a future sign-in flow ever
  * sets a name, this selector is the first thing to fix.
  */
-test('18.256 two sessions: narrowing a ticket away from a guest evicts them from its inherit-scoped note', async ({
+test('18.256 two sessions: narrowing a ticket away from a guest leaves their open inherit-scoped note page in place, and their next read is refused', async ({
   browser,
 }) => {
   const ownerContext = await browser.newContext();
@@ -252,13 +254,26 @@ test('18.256 two sessions: narrowing a ticket away from a guest evicts them from
     // success and leaves it open on a refusal) before B is asked to react to it.
     await expect(ownerPage.getByRole('button', { name: 'Apply' })).toBeHidden({ timeout: 10_000 });
 
-    // B's OPEN note page — no navigation performed by B — returns to /notes
-    // with the toast (spec §9.6, case 18.221's own wiring, seen through the
-    // real inherit cascade rather than a mocked dataSource).
-    await expect(guestPage).toHaveURL(/\/notes$/, { timeout: 30_000 });
-    await expect(guestPage.getByText('That note is no longer shared with you')).toBeVisible({
-      timeout: 10_000,
-    });
+    // B's OPEN note page is NOT evicted live — by design. Narrowing a ticket's
+    // visibility pushes B no frame at all (`visible-events-for.ts`, case 6.104:
+    // from the current table a ticket just lost and one never held look the
+    // same, so a per-event purge would disclose ids), so nothing tells the open
+    // page to leave. Case 18.221's toast-and-return path fires only when an
+    // event or a read reaches B. POSITIVE CONTROL: B is still on the note, with
+    // its title, after the narrowing has been accepted and given time to arrive.
+    await guestPage.waitForTimeout(3_000);
+    await expect(guestPage).toHaveURL(noteUrl);
+    await expect(guestPage.getByTestId('note-title')).toHaveText('Shared maintenance notes');
+
+    // Eviction happens on the next READ: B reloads the same URL and the server
+    // now refuses the note, so the page shows the not-shared hint instead of
+    // the document.
+    await guestPage.reload();
+    await expect(guestPage.getByTestId('note-document-missing')).toHaveText(
+      'That note is no longer shared with you.',
+      { timeout: 30_000 },
+    );
+    await expect(guestPage.getByTestId('note-title')).toHaveCount(0);
   } finally {
     await ownerContext.close();
     await guestContext.close();
