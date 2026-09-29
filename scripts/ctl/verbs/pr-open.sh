@@ -12,7 +12,8 @@ cd "$CTL_REPO" || exit 1
 [ "$(/usr/bin/git branch --show-current)" = "$branch" ] || ctl_fail pr-open "checked-out branch is not $branch"
 [ -z "$(/usr/bin/git status --porcelain)" ] || ctl_fail pr-open "tree is dirty"
 head="$(/usr/bin/git rev-parse HEAD)"
-if [ "$require" = 1 ]; then ctl_marker_has "$CTL_REPO" checked "$head" || ctl_fail pr-open "no checked marker for $head — run: ctl check-pr $branch"; fi
+# The marker must have been earned against the SAME base this PR targets: a check against release/x never admits a PR to main.
+if [ "$require" = 1 ]; then ctl_marker_has "$CTL_REPO" "$(ctl_marker_kind checked "$base")" "$head" || ctl_fail pr-open "no checked marker for $head — run: ctl check-pr $branch$([ "$base" = main ] || echo " --base $base")"; fi
 ctl_run /usr/bin/git push -u origin "$branch" || ctl_fail pr-open "push rejected"
 if [ "$CTL_DRY_RUN" = 1 ]; then ctl_ok pr-open "dry-run"; fi
 remote="$(/usr/bin/git ls-remote origin "refs/heads/$branch" | cut -f1)"

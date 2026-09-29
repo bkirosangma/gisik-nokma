@@ -103,6 +103,97 @@ check "check-pr logs: a cited log that does not exist still fails" 'logbody "see
 rm -rf "$lg" "$cr-logs.md"
 rm -rf "$cb" "$cr" "$cr-body.md" "$co"
 rm -rf "$bare" "$gr" "$other"
+# --base <branch> (13.1501-13.1512, test-cases/13-deploy-and-ops.md): gate, land, check-pr and pr open's marker lookup measure against origin/<base>, default main.
+# The base is main or release/<name> and nothing else; main's behaviour is the default and is asserted unchanged (regression arms).
+G=/usr/bin/git
+check "13.1501 base: ctl_base_valid accepts main and release/<name>, incl. nested" 'ctl_base_valid main && ctl_base_valid release/trash && ctl_base_valid release/2026-09-23 && ctl_base_valid release/a/b'
+check "13.1501 base: ctl_base_valid refuses every other name, incl. traversal and an empty release/" '( for b in "" develop feat/x mainx release release/ release/../main release/a..b "release/a b" "release/a;b" releases/x origin/main release/.hidden; do ! ctl_base_valid "$b" || { echo "accepted: [$b]"; exit 1; }; done )'
+check "13.1503 base: main keeps the marker kind the chain always used" '[ "$(ctl_marker_kind gate main)" = gate ] && [ "$(ctl_marker_kind checked main)" = checked ]'
+check "13.1503 base: a release base gets its OWN marker kind, injectively" '[ "$(ctl_marker_kind gate release/x)" = "gate.release+x" ] && [ "$(ctl_marker_kind gate release/a/b)" != "$(ctl_marker_kind gate release/a-b)" ]'
+bb=$(mktemp -d); $G init -q --bare "$bb"
+br=$(mktemp -d); ( cd "$br" && $G init -q . && $G symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes/gate-lock && printf '%s\n' '#!/bin/bash' 'printf "Tasks:    33 successful, 33 total\nCached:    0 cached, 33 total\n" > "$1"' 'echo EXIT=0' 'echo NODE=v22.22.2' > docs/lanes/gate-lock/gate.sh && echo one > f.txt && $G add -A && $G commit -q -m base && $G remote add origin "$bb" && $G push -q -u origin main && $G checkout -q -b release/x && echo rel > rel.txt && $G add -A && $G commit -q -m rel1 && $G push -q -u origin release/x && $G checkout -q -b task && echo task > task.txt && $G add -A && $G commit -q -m task1 && $G push -q origin task )
+bump() { ( c=$(mktemp -d); rm -rf "$c"; $G clone -q "$bb" "$c" && cd "$c" && $G checkout -q "$1" && echo "$RANDOM" > "moved-$RANDOM.txt" && $G add -A && $G commit -q -m "$1 moved" && $G push -q origin "$1"; rm -rf "$c" ); }
+gb() { ( cd "$br" && CTL_LOG_DIR="$ld" "$HERE/ctl" gate "$($G rev-parse HEAD)" --repo "$br" "$@" 2>&1 ); }
+check "13.1502 base gate: --base release/x on a branch containing origin/release/x proceeds" 'gb --base release/x --dry-run | tail -1 | grep -q "^OK gate dry-run"'
+bump release/x
+check "13.1502 base gate: origin/release/x moved past the branch → refuses, names origin/release/x and its own remedy" 'out=$(gb --base release/x --dry-run); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "origin/release/x [0-9a-f]\{12\} is not an ancestor of HEAD.*Remedy: git merge --no-edit origin/release/x && git push"'
+check "13.1502 base gate: CONTROL — the default still measures against main, which the branch contains, so it proceeds" 'gb --dry-run | tail -1 | grep -q "^OK gate dry-run"'
+( cd "$br" && $G merge -q --no-edit origin/release/x )
+bump main
+check "13.1502 base gate: main moved and the branch does not contain it — --base release/x does not care" 'gb --base release/x --dry-run | tail -1 | grep -q "^OK gate dry-run"'
+check "13.1502 base gate: REGRESSION — the default still refuses on main's move, naming origin/main" 'out=$(gb --dry-run); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "origin/main [0-9a-f]\{12\} is not an ancestor of HEAD.*Remedy: git merge --no-edit origin/main && git push"'
+check "13.1502 base gate: --base main is the default spelled out (same refusal)" 'out=$(gb --base main --dry-run); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "origin/main [0-9a-f]\{12\} is not an ancestor"'
+check "13.1501 base gate: only main or release/* — every other base is refused before anything runs, with the rule named" '( for b in develop feat/x release/ release/../main "release/a b" ""; do out=$(gb --base "$b" --dry-run); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*main or release/" || { echo "not refused: [$b] $out"; exit 1; }; done )'
+check "13.1501 base gate: --base with no value is refused, not swallowed" 'out=$(gb --dry-run --base); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL gate .*--base needs a value"'
+( cd "$br" && $G merge -q --no-edit origin/main && $G push -q origin task )
+gbr() { CTL_DRY_RUN=0 gb "$@"; }
+sha=$(cd "$br" && $G rev-parse HEAD); mk="$br/.git/ctl"
+check "13.1503 base gate: a real --base release/x run is green and writes the release-kind marker, NOT the main one" 'gbr --base release/x | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0" && [ -f "$mk/gate.release+x-$sha" ] && [ ! -f "$mk/gate-$sha" ]'
+check "13.1503 base gate: REGRESSION — a default real run writes gate-<sha>, the marker land has always read" 'gbr | tail -1 | grep -qE "^OK gate [0-9a-f]{40} EXIT=0" && [ -f "$mk/gate-$sha" ]'
+# ctl land, against a fake gh that answers pr view/comment and performs the merge for real inside the fixture bare repo.
+fg=$(mktemp -d); cat > "$fg/gh" <<'FAKEGH'
+#!/usr/bin/env bash
+printf '%s\n' "$*" >> "$FAKE_DIR/calls"
+[ "$1" = pr ] || exit 2
+case "$2" in
+  comment) exit 0;;
+  view) case "$*" in
+      *headRefOid,state,baseRefName*) echo "$FAKE_HEAD $(cat "$FAKE_DIR/state") $FAKE_BASE";;
+      *headRefOid,baseRefName*) echo "$FAKE_HEAD ${FAKE_BASE_LATER:-$FAKE_BASE}";;
+      *state,mergeCommit*) echo "$(cat "$FAKE_DIR/state") $(cat "$FAKE_DIR/mc")";;
+      *) exit 2;;
+    esac;;
+  merge) c=$(mktemp -d); rm -rf "$c"
+    /usr/bin/git clone -q "$FAKE_BARE" "$c" && cd "$c" && /usr/bin/git checkout -q -B "$FAKE_BASE" "origin/$FAKE_BASE" && GIT_AUTHOR_NAME=f GIT_AUTHOR_EMAIL=f@f GIT_COMMITTER_NAME=f GIT_COMMITTER_EMAIL=f@f /usr/bin/git merge -q --no-ff -m "Merge PR" "$FAKE_HEAD" && /usr/bin/git push -q origin "HEAD:refs/heads/$FAKE_BASE" && /usr/bin/git rev-parse HEAD > "$FAKE_DIR/mc" && echo MERGED > "$FAKE_DIR/state";;
+  *) exit 2;;
+esac
+FAKEGH
+chmod +x "$fg/gh"
+pp=$(mktemp -d); rm -rf "$pp"; $G clone -q "$bb" "$pp"
+ref() { $G -C "$bb" rev-parse "refs/heads/$1"; }
+# land <prbase> [land args]: PR 7 whose head is the checkout's HEAD and whose base (per the fake gh) is <prbase>.
+land() { local prbase="$1"; shift; echo OPEN > "$fg/state"; ( cd "$br" && FAKE_DIR="$fg" FAKE_BARE="$bb" FAKE_HEAD="$($G rev-parse HEAD)" FAKE_BASE="$prbase" PATH="$fg:$PATH" GISIK_PRIMARY="$pp" CTL_DRY_RUN=0 CTL_LOG_DIR="$ld" "$HERE/ctl" land 7 --repo "$br" "$@" 2>&1 ); }
+check "13.1506 base land: --dry-run with a matching release base and its marker is OK and merges nothing" 'rx=$(ref release/x); land release/x --base release/x --dry-run | tail -1 | grep -q "^OK land dry-run" && [ "$(ref release/x)" = "$rx" ] && ! grep -q "pr merge" "$fg/calls" 2>/dev/null'
+check "13.1504 base land: a PR whose base is main is refused under --base release/x, and nothing merges" 'rm -f "$fg/calls"; mn=$(ref main); rx=$(ref release/x); out=$(land main --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land PR #7 base is main, not release/x" && [ "$(ref main)" = "$mn" ] && [ "$(ref release/x)" = "$rx" ] && ! grep -q "pr merge" "$fg/calls"'
+check "13.1504 base land: REGRESSION — a PR whose base is release/x is refused by the DEFAULT (main) guard, and nothing merges" 'rm -f "$fg/calls"; rx=$(ref release/x); out=$(land release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land PR #7 base is release/x, not main" && [ "$(ref release/x)" = "$rx" ] && ! grep -q "pr merge" "$fg/calls"'
+check "13.1501 base land: a PR whose base is a task branch is refused even when named by --base (the flag admits main/release/* only)" 'out=$(land feat/x --base feat/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land .*main or release/"'
+check "13.1505 base land: a main-kind marker does not satisfy a release landing" 'mv "$mk/gate.release+x-$sha" "$mk/hold"; out=$(land release/x --base release/x); rc=$?; mv "$mk/hold" "$mk/gate.release+x-$sha"; [ $rc -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land no gate marker for $sha"'
+check "13.1505 base land: a release-kind marker does not satisfy a landing into main" 'mv "$mk/gate-$sha" "$mk/hold"; out=$(land main); rc=$?; mv "$mk/hold" "$mk/gate-$sha"; [ $rc -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land no gate marker for $sha"'
+check "13.1512 base land: a PR retargeted to main between the checks and the merge is refused, and nothing merges" 'rm -f "$fg/calls"; mn=$(ref main); rx=$(ref release/x); out=$(FAKE_BASE_LATER=main land release/x --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land PR #7 was retargeted to main" && [ "$(ref main)" = "$mn" ] && [ "$(ref release/x)" = "$rx" ] && ! grep -q "pr merge" "$fg/calls"'
+bump release/x
+check "13.1506 base land: release/x moved after the gate → refuses naming origin/release/x, and nothing merges" 'rx=$(ref release/x); out=$(land release/x --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL land origin/release/x moved to [0-9a-f]\{12\} since the gate" && [ "$(ref release/x)" = "$rx" ]'
+( cd "$br" && $G merge -q --no-edit origin/release/x && $G push -q origin task )
+sha=$(cd "$br" && $G rev-parse HEAD); mn=$(ref main); ppm=$($G -C "$pp" rev-parse HEAD)
+gbr --base release/x >/dev/null
+check "13.1506 base land: a release landing merges into release/x, verifies against origin/release/x, and says which base" 'rx=$(ref release/x); out=$(land release/x --base release/x); [ $? -eq 0 ] && printf "%s" "$out" | tail -1 | grep -qE "^OK land #7 merge [0-9a-f]{12} release/x [0-9a-f]{12} primary untouched" && [ "$(ref release/x)" != "$rx" ] && $G -C "$bb" merge-base --is-ancestor "$sha" refs/heads/release/x'
+check "13.1506 base land: THE SAFETY ARM — a release landing leaves main untouched, in the remote and in the primary checkout standing on main" '[ "$(ref main)" = "$mn" ] && [ "$($G -C "$pp" rev-parse HEAD)" = "$ppm" ] && [ "$($G -C "$pp" branch --show-current)" = main ]'
+gbr >/dev/null
+check "13.1507 base land: REGRESSION — the default still lands into main and fast-forwards a primary standing on main" 'mn=$(ref main); out=$(land main); [ $? -eq 0 ] && printf "%s" "$out" | tail -1 | grep -qE "^OK land #7 merge [0-9a-f]{12} main [0-9a-f]{12} primary ff [0-9a-f]{12}" && [ "$(ref main)" != "$mn" ] && [ "$($G -C "$pp" rev-parse HEAD)" = "$(ref main)" ]'
+# a second head: a release landing fast-forwards a primary that stands on THAT release branch, and only then
+( cd "$br" && $G checkout -q -b task2 origin/release/x && echo t2 > t2.txt && $G add -A && $G commit -q -m task2 && $G push -q origin task2 )
+gbr --base release/x >/dev/null; ( cd "$pp" && $G checkout -q release/x ); mn=$(ref main)
+check "13.1508 base land: a primary standing on the landed release branch is fast-forwarded to it; main still untouched" 'out=$(land release/x --base release/x); [ $? -eq 0 ] && printf "%s" "$out" | tail -1 | grep -qE "primary ff [0-9a-f]{12}$" && [ "$($G -C "$pp" rev-parse HEAD)" = "$(ref release/x)" ] && [ "$(ref main)" = "$mn" ]'
+# check-pr.py / check-pr.sh: the diff and the commit list are taken against origin/<base>.
+kb=$(mktemp -d); $G init -q --bare "$kb"
+kr=$(mktemp -d); ( cd "$kr" && $G init -q . && $G symbolic-ref HEAD refs/heads/main && mkdir -p docs/lanes && printf '#### T-X1 — a task\n' > plan.md && printf '| T-X1 | done | abc | note |\n' > docs/lanes/release-2026-09-22-progress.md && echo one > docs/x.md && $G add -A && $G commit -q -m base && $G remote add origin "$kb" && $G push -q -u origin main && $G checkout -q -b release/x && echo rel > docs/y.md && $G add -A && $G commit -q -m "release: work already on the release branch" && $G push -q -u origin release/x && $G checkout -q -b feat && echo two > docs/x.md && $G commit -q -am "X1: change x" )
+printf 'no logs here\n' > "$kr-body.md"
+kpr() { ( cd "$kr" && python3 "$HERE/verbs/check-pr.py" "$kr" plan.md docs/lanes/release-2026-09-22-progress.md "$kr-body.md" "$@" 2>&1 ); }
+check "13.1509 base check-pr.py: against origin/release/x only the branch's own commit counts — 1 task commit, 0 failures" 'out=$(kpr release/x); [ $? -eq 0 ] && printf "%s" "$out" | grep -q "1 task commits, 0 bookkeeping commits, 1 files, 0 failures"'
+check "13.1509 base check-pr.py: CONTROL — the same branch against the default main sees the release branch commit and fails on it" 'out=$(kpr); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "ruling id in the plan: .release: work already on the release branch"'
+check "13.1509 base check-pr.py: main spelled out is the default" 'a=$(kpr main); b=$(kpr); [ "$a" = "$b" ]'
+check "13.1501 base check-pr.py: a base outside main / release/* exits non-zero, naming the rule" 'out=$(kpr develop); [ $? -ne 0 ] && printf "%s" "$out" | grep -q "main or release/"'
+kc="$kr-ctl"; cp -R "$HERE" "$kc"; printf '#!/usr/bin/env bash\nexit 0\n' > "$kc/verbs/checks.sh"   # a private copy whose `checks` is a no-op: the repo's real checks are not this test's business
+ksha=$(cd "$kr" && $G rev-parse HEAD)
+kv() { ( cd "$kr" && CTL_DRY_RUN=0 CTL_LOG_DIR="$ld" "$kc/ctl" check-pr feat --repo "$kr" --plan plan.md --body "$kr-body.md" "$@" 2>&1 ); }
+check "13.1510 base check-pr: a real --base release/x run is green and writes the release-kind checked marker, NOT the main one" 'kv --base release/x | tail -1 | grep -q "^OK check-pr feat [0-9a-f]\{12\} checked" && [ -f "$kr/.git/ctl/checked.release+x-$ksha" ] && [ ! -f "$kr/.git/ctl/checked-$ksha" ]'
+check "13.1510 base check-pr: CONTROL — the default (main) run fails on the same branch, so the release run was not vacuous" 'out=$(kv); [ $? -eq 1 ] && printf "%s" "$out" | tail -1 | grep -q "^FAIL check-pr conditions failed" && [ ! -f "$kr/.git/ctl/checked-$ksha" ]'
+check "13.1501 base check-pr: a base outside main / release/* is refused by the verb" 'out=$(kv --base develop); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL check-pr .*main or release/"'
+kpo() { ( cd "$kr" && "$HERE/ctl" pr open feat --title t --body "$kr-body.md" --repo "$kr" --dry-run --require-checked "$@" 2>&1 ); }
+check "13.1511 base pr open: --base release/x --require-checked accepts the release-kind marker" 'kpo --base release/x | tail -1 | grep -q "^OK pr-open dry-run"'
+check "13.1511 base pr open: SAFETY — a PR to main is NOT admitted by a release-kind checked marker" 'out=$(kpo); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL pr-open no checked marker for $ksha"'
+check "13.1511 base pr open: a PR to release/x is not admitted by a main-kind marker either" 'mv "$kr/.git/ctl/checked.release+x-$ksha" "$kr/.git/ctl/checked-$ksha"; out=$(kpo --base release/x); [ $? -eq 1 ] && printf "%s" "$out" | grep -q "^FAIL pr-open no checked marker for $ksha"; r=$?; mv "$kr/.git/ctl/checked-$ksha" "$kr/.git/ctl/checked.release+x-$ksha"; [ $r -eq 0 ]'
+check "13.1511 base pr open: REGRESSION — a main-kind marker still admits a PR to main" 'cp "$kr/.git/ctl/checked.release+x-$ksha" "$kr/.git/ctl/checked-$ksha"; kpo | tail -1 | grep -q "^OK pr-open dry-run"'
+rm -rf "$bb" "$br" "$pp" "$fg" "$kb" "$kr" "$kr-body.md" "$kc"
 # Pane delivery helpers against a fake tmux on PATH: it records every call, answers display-message with $FAKE_MODE,
 # counts the Enters it receives, and its capture-pane shows a real multi-line box until $FAKE_NEEDS Enters have
 # arrived, then the dim "Press up to edit queued messages" hint (the shapes are copied from real captures).
