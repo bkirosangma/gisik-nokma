@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { memberLabel } from '../src/member-label.js';
+import { actorLabelFrom, memberLabel } from '../src/member-label.js';
 
 /**
  * 13.1291 — the label a person is shown and named by is resolved in ONE place,
@@ -45,5 +45,36 @@ describe('memberLabel — name, then email, then id (13.1291)', () => {
     // phone-only sign-up's synthetic address is withheld — so this arm and the
     // one above are different shapes of input reaching the same floor.
     expect(memberLabel({ id: 'u4', name: '' })).toBe('u4');
+  });
+});
+
+describe('actorLabelFrom — the roster first, the names-only read second, null when neither (cases 7.296–7.297)', () => {
+  const roster = [
+    { id: 'named', name: 'Anselma', email: 'a@example.test' },
+    { id: 'email-only', name: '', email: 'kiro@example.test' },
+    { id: 'bare', name: '' },
+  ];
+  const names = [
+    { id: 'guest', name: 'Gita Guest' },
+    { id: 'named', name: 'Someone Else' },
+    { id: 'bare', name: 'Bea' },
+    { id: 'blank', name: '   ' },
+  ];
+
+  it('7.296 a person the roster omits is named by the names read; the roster wins where it says more than the id', () => {
+    expect(actorLabelFrom('guest', roster, names)).toBe('Gita Guest');
+    // CONTROL: roster label wins over a different name in the names read.
+    expect(actorLabelFrom('named', roster, names)).toBe('Anselma');
+    // CONTROL: an email label is better than the id, so it is kept.
+    expect(actorLabelFrom('email-only', roster, names)).toBe('kiro@example.test');
+  });
+
+  it('7.297 a roster row with nothing better than the id yields to the names read; nobody named is null so the caller’s id floor answers', () => {
+    expect(actorLabelFrom('bare', roster, names)).toBe('Bea');
+    expect(actorLabelFrom('blank', roster, names)).toBeNull();
+    expect(actorLabelFrom('nobody', roster, names)).toBeNull();
+    expect(actorLabelFrom('guest', null, undefined)).toBeNull();
+    // A blank names-read entry does not erase a roster row's own id floor.
+    expect(actorLabelFrom('bare', roster, [{ id: 'bare', name: ' ' }])).toBe('bare');
   });
 });

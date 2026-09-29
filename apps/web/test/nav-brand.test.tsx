@@ -135,11 +135,10 @@ describe('13.1493 .gn-nav__brand is defined exactly once in globals.css', () => 
  * 13.1494 — the phone arm of the 390px width budget (owner ruling 2026-09-24:
  * "hide the WORDMARK (not the tile)"). `globals.css` holds FOUR
  * `@media (max-width: 40rem)` blocks (`nav-phone-disclosure.test.ts`'s own
- * docblock), so "the 40rem block" is found by a needle unique to the phone
- * DISCLOSURE one (`.gn-nav__more-toggle`), the same block E4-11's own cases
- * already read — this rule was added to THAT block, not a new one, so the
- * two families cannot drift into two different phone breakpoints for the
- * same bar.
+ * docblock), so "the 40rem block" is found by a needle unique to it
+ * (`.gn-nav__wordmark`). The disclosure moved to its own 70rem block on
+ * 2026-09-29 (`nav-phone-disclosure.test.ts`); the wordmark is a WIDTH budget
+ * of the PHONE row alone and stays at 40rem.
  */
 describe('13.1494 below 40rem the wordmark is hidden, the tile is not', () => {
   /** Brace-matched, single needle — same shape as `nav-phone-disclosure.test.ts`'s `blockContaining`. */
@@ -167,9 +166,9 @@ describe('13.1494 below 40rem the wordmark is hidden, the tile is not', () => {
     }
   }
 
-  it('the disclosure\'s own 40rem block hides the wordmark and leaves the tile alone', () => {
-    const phone = fortyRemBlockNaming(css, '.gn-nav__more-toggle');
-    expect(phone, 'no 40rem block names .gn-nav__more-toggle').toBeDefined();
+  it('the phone 40rem block hides the wordmark and leaves the tile alone', () => {
+    const phone = fortyRemBlockNaming(css, '.gn-nav__wordmark');
+    expect(phone, 'no 40rem block names .gn-nav__wordmark').toBeDefined();
     expect(phone).toContain('.gn-nav__wordmark { display: none; }');
     // The tile must NOT be hidden — a mutation swapping the class would pass
     // a bare-substring check for "something is hidden below 40rem" while
@@ -183,7 +182,7 @@ describe('13.1494 below 40rem the wordmark is hidden, the tile is not', () => {
       '.gn-nav__brand-tile { display: none; }',
     );
     expect(mutant, 'the planted text matched nothing — the witness is inert').not.toBe(css);
-    const phone = fortyRemBlockNaming(mutant, '.gn-nav__more-toggle');
+    const phone = fortyRemBlockNaming(mutant, '.gn-nav__brand-tile { display: none; }');
     expect(phone).not.toContain('.gn-nav__wordmark { display: none; }');
     expect(phone).toContain('.gn-nav__brand-tile { display: none; }');
   });

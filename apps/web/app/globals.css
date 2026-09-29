@@ -2066,7 +2066,53 @@ input, textarea, select { font-family: inherit; }
    declaration; `nav-phone-disclosure.test.ts` now resolves the cascade. */
 .gn-nav .gn-nav__more-toggle { display: none; }
 
-@media (max-width: 40rem) {
+/* ABOVE the disclosure breakpoint the links are ONE line, always. The row used
+   to `wrap`, which is what put "Settings" alone on a second row whenever the
+   workspace or project name was longer than the seed data's ("Convenience
+   Corner" + "gggg"). The two names are the only data-driven widths in the bar,
+   so THEY give way: each truncates with an ellipsis (`.gn-nav__label` is the
+   text span — `text-overflow` does not apply to the `inline-flex` link itself)
+   while every fixed link keeps its full label at the house size. `min-width:
+   0` is what lets a flex item go below its content width at all. */
+@media (min-width: 70.0625rem) {
+  .gn-nav__links { flex-wrap: nowrap; }
+  .gn-nav__links > a,
+  .gn-nav__more > a { white-space: nowrap; flex: none; }
+  .gn-nav__more > a.gn-nav__workspace,
+  .gn-nav__more > .gn-nav__project {
+    flex: 0 1 auto;
+    max-width: 16rem;
+  }
+  .gn-nav__more > .gn-nav__project > a { max-width: 100%; }
+  /* The floor a name may be squeezed to: 4.5rem is the 0.875rem padding twice
+     plus ~2.75rem of label (five characters and an ellipsis). It is a floor,
+     not a size: at 1121px, the narrowest width this arm serves, the row has
+     220px for the two names (measured) so each keeps ~110px, and the floor
+     only matters if a fixed link ever grows. It is small enough not to pad a
+     short name much (a four-letter project name is 66px; the floor is 72). */
+  .gn-nav__more > a.gn-nav__workspace,
+  .gn-nav__more > .gn-nav__project { min-width: 4.5rem; }
+  .gn-nav__label {
+    min-width: 0;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+  }
+}
+
+/* THE DISCLOSURE BREAKS AT 70rem, NOT 40rem (owner browser pass 2026-09-29:
+   "Settings" wrapped to a second row at 1280 with a real workspace name).
+   MEASURED before the change, on the dev stack with the shipped 16px labels:
+   the desktop row is brand + Workspaces + workspace name + last project +
+   My Work + Members + Settings + Notes + inbox + avatar. The five fixed links
+   are 463px with their gaps and the corner + brand are 366px, so the row needs
+   ~830px before either data-driven name — and 1024px (which is 64rem) left the
+   links 602px, so the bar was two rows at 1024 and FOUR at 768 (250px tall)
+   even with the short seed names. 70rem is where the fixed links, the corner,
+   the brand and a floor of 4.5rem for each of the two names (they truncate
+   above, `.gn-nav__label`) still fit one line: 1120px. The text stays at the
+   house 16px everywhere; nothing was shrunk to make it fit. */
+@media (max-width: 70rem) {
   .gn-nav .gn-nav__more-toggle { display: inline-flex; align-items: center; }
   .gn-nav__more { display: none; }
   .gn-nav__more[data-open="true"] {
@@ -2077,6 +2123,8 @@ input, textarea, select { font-family: inherit; }
     flex-basis: 100%;
     min-width: 0;
   }
+}
+@media (max-width: 40rem) {
   /* The wordmark (owner ruling 2026-09-24), not the tile: this row's phone
      promise above ("Workspaces, the toggle and .gn-nav__corner's ... on ONE
      line") is a WIDTH budget, and the wordmark ("Gisik Nokma", 17px/800)

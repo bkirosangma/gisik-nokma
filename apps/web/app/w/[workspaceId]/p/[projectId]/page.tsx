@@ -23,9 +23,11 @@ import {
   makeSubmittedFactory,
   matchesBoardCard,
   matchesListRow,
+  actorLabelFrom,
   memberLabel,
   sortByRank,
   useBoard,
+  useActorNames,
   useLiveQuery,
   useTicketList,
   type Actor,
@@ -1484,6 +1486,12 @@ function ProjectBoard() {
   const members = useLiveQuery(dataSource, workspaceId, `${workspaceId}:members`, () =>
     dataSource.query.getMembers(workspaceId),
   );
+  /**
+   * The names-only read (`getActorNames`), for the people the roster omits — a
+   * guest, for a plain member. It feeds `nameOf` only, never `assigneeCandidates`
+   * below: a guest must not be offered as an assignee. One-time, not live.
+   */
+  const actorNames = useActorNames(dataSource, workspaceId);
   const nameOf = useMemo(() => {
     // `memberLabel`, not `member.name` (2026-09-22). The old value was the raw
     // display name, and `?? userId` does NOT save it from a blank one: `''` is
@@ -1497,11 +1505,8 @@ function ProjectBoard() {
     // for the calendar and the timeline), none of them renders a claim, and the
     // system-actor override belongs to claims. Auto-close has no card in either
     // view to be drawn on.
-    const byId = new Map(
-      (members.data ?? []).map((member) => [member.id, memberLabel(member)]),
-    );
-    return (userId: string): string => byId.get(userId) ?? userId;
-  }, [members.data]);
+    return (userId: string): string => actorLabelFrom(userId, members.data, actorNames) ?? userId;
+  }, [members.data, actorNames]);
 
   /**
    * The Assignee picker's options for the New-ticket dialog (owner request

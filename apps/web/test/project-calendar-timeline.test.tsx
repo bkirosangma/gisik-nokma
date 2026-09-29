@@ -444,6 +444,32 @@ describe('the project page mounts four views over one list read', () => {
     expect(screen.queryByRole('button', { name: /user_kiro/ })).not.toBeInTheDocument();
   });
 
+  it('11.243 a claim made by a person the roster omits (a guest, for a member) is attributed by the names-only read, not the raw id', async () => {
+    vi.useFakeTimers({ shouldAdvanceTime: true });
+    vi.setSystemTime(new Date('2026-08-23T06:00:00.000Z'));
+    render(
+      <Providers
+        services={stubServices({
+          getBoard: async () => ({ projectId: 'p_1', groups: [] }),
+          getMembers: async () => MEMBERS,
+          getActorNames: async () => [{ id: 'user_gita', name: 'Gita Guest' }],
+          getTicketTypes: async () => [typeDef()],
+          getTickets: async (): Promise<TicketListView> => ({
+            projectId: 'p_1',
+            rows: [row({ fields: { title: claim('DLT'), dueDate: claim({ date: '2026-08-30' }, 'user_gita') } })],
+          }),
+        })}
+      >
+        <ProjectPage />
+      </Providers>,
+    );
+    await openTab('Calendar');
+    expect(
+      await screen.findByRole('button', { name: "needed by 30 Aug — Gita Guest's claim" }),
+    ).toBeInTheDocument();
+    expect(screen.queryByRole('button', { name: /user_gita/ })).not.toBeInTheDocument();
+  });
+
   /**
    * 11.164 — THE DAY, PINNED AT AN IST-MIDNIGHT BOUNDARY.
    *

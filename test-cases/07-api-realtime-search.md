@@ -788,3 +788,17 @@ is empty.
 - ✅ **7.277 — a GUEST's My Work lists the project-mode ticket assigned to them;** control: their unassigned sibling is absent. Mutation: `visibleTicketsWhere` without the assignee arm.
 - ✅ **7.278 — reassigning a ticket away removes the card from the former (guest) assignee's My Work at once;** control: a second ticket still assigned to them stays. Mutation: `assigneeArmWhere` matches `asg.assignee_id IS NOT NULL` instead of the viewer (the reassigned card stays).
 - ✅ **7.279 — a guest assignee's My Work carries NO project name for the card's project — the assignment does not put the project in their list;** control: a member's My Work for the same card carries the name. Mutation: `readMyWork` builds `projectNames` from every card's project, not from `visibleProjects`.
+
+## Actor names — every signed-in member sees who acted (`fix/names-nav-focus`, 2026-09-29) — block `7.290`–`7.299`
+
+*Ids `7.298`–`7.299` are unused. Server cases run on the real DB; the app-core cases pin the client join.*
+
+- ✅ **7.290 — a plain MEMBER calling `GET /workspaces/:id/actor-names` is told the guest's display name (which `/members` withholds from them), the response's per-row keys are exactly `userId` and `displayName`, and it carries no email, role or synthetic (`@phone.gisik-nokma.invalid`) domain.** Mutation: filter guests out of the query → red. (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **7.291 — a person whose display name IS their phone number is left out of the response.** Mutation: drop the synthetic-user filter → red. (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **7.292 — owner, admin, member, outsider and project lead get the same answer; a guest (7.91), a stranger and a neighbour get the byte-identical 404 the roster gives.** (`apps/server/test/routes/builder-reads.test.ts`)
+- ✅ **7.293 — the online data source's roster join names a guest the roster omits from the names read: a card's assignee and provenance actor carry the NAME; a person NEITHER read names keeps the id.** Mutation: make the overlay in `withActorNames` a no-op → red. (`packages/app-core/test/online/online-data-source.test.ts`)
+- ✅ **7.294 — the roster keeps priority: a member the roster labels by email is not renamed by the names read, and a refused (404) names read costs nothing.** (`packages/app-core/test/online/online-data-source.test.ts`)
+- ✅ **7.295 — `getActorNames` answers `{id, name}` for the route's rows and `[]` for a refusal.** (`packages/app-core/test/online/online-data-source.test.ts`)
+- ✅ **7.296 — `actorLabelFrom`: a person the roster omits is named by the names read; the roster wins where it says more than the id.** (`packages/app-core/test/member-label.test.ts`)
+- ✅ **7.297 — `actorLabelFrom`: a roster row with nothing better than the id yields to the names read; nobody named is `null`, so the caller's id floor answers.** Mutation (7.296, 7.297 and 11.244 together): make `actorLabelFrom` ignore the names read → red. (`packages/app-core/test/member-label.test.ts`)
+

@@ -10,7 +10,9 @@ import { describe, expect, it } from 'vitest';
  * it the first card sat 1105 px down — **no ticket was on screen when the board
  * opened**.
  *
- * The fix puts the workspace-scoped links behind one disclosure below 40rem.
+ * The fix puts the workspace-scoped links behind one disclosure below 70rem
+ * (it was 40rem until 2026-09-29, when a 1024 and a 768 bar were measured at two
+ * and four rows — see the 70rem block's own docblock in `globals.css`).
  * That is a PAINT decision, and the gate has no browser (`apps/web/e2e-*` is
  * Playwright, not in `pnpm test`), so this is a SOURCE scan — the shape
  * `neo-card-radius.test.ts` uses next door, and for the same reason: the thing
@@ -79,7 +81,7 @@ function mediaBlocks(source: string, query: string): string[] {
 
 /**
  * The block for `query` that CONTAINS `needle`. `globals.css` holds FOUR
- * `@media (max-width: 40rem)` blocks, so "the 40rem block" is not a thing that
+ * `@media (max-width: 70rem)` blocks, so "the 70rem block" is not a thing that
  * exists — asking for the first one answers about `.gn-workspace-list`.
  */
 function blockContaining(source: string, query: string, needle: string): string | undefined {
@@ -128,7 +130,7 @@ function rule(block: string, selector: string): string | undefined {
  * code path as the assertion rather than a hand-assembled equivalent.
  */
 function phoneHidesTheWrapper(source: string): boolean {
-  const phone = blockContaining(source, '(max-width: 40rem)', '.gn-nav__more');
+  const phone = blockContaining(source, '(max-width: 70rem)', '.gn-nav__more');
   if (phone === undefined) return false;
   return (rule(phone, '.gn-nav__more') ?? '').includes('display: none');
 }
@@ -246,7 +248,7 @@ function declarationRules(source: string): { selector: string; body: string }[] 
  * code path for both widths, so the phone reading is the same instrument as the
  * desktop one rather than a hand-assembled equivalent.
  *
- * `phone` is the 40rem block, APPENDED: that is where the file puts it relative
+ * `phone` is the 70rem block, APPENDED: that is where the file puts it relative
  * to the rules it competes with at equal specificity, and a specificity-decided
  * pair cannot be moved by the concatenation either way.
  */
@@ -271,7 +273,7 @@ function winner(source: string, model: ElementModel, property: string): string |
 
 /**
  * The cascade a browser applies at 390 px: everything unconditional, then the
- * 40rem block's CONTENTS.
+ * 70rem block's CONTENTS.
  *
  * **The `@media … {` wrapper is stripped before appending, and that is not
  * tidiness.** The splitter below is deliberately naive — it takes the first `}`
@@ -283,7 +285,7 @@ function winner(source: string, model: ElementModel, property: string): string |
  * exactly what the first version of this function produced.
  */
 function phoneContext(source: string): string {
-  const block = blockContaining(source, '(max-width: 40rem)', '.gn-nav__more') ?? '';
+  const block = blockContaining(source, '(max-width: 70rem)', '.gn-nav__more') ?? '';
   const open = block.indexOf('{');
   return withoutMediaBlocks(source) + (open === -1 ? '' : block.slice(open + 1, -1));
 }
@@ -317,7 +319,7 @@ describe('E4-11 — the phone breakpoint collapses the workspace links into one 
    * (0,1,0) — source order is not what decides that. So the case now reads the
    * WINNING value on both sides of the breakpoint.
    */
-  it('13.1218 the toggle LOSES the cascade above 40rem and WINS it below', () => {
+  it('13.1218 the toggle LOSES the cascade above 70rem and WINS it below', () => {
     // The declaration half is still pinned, now as a precondition rather than as
     // the property: a rule that is not there cannot win, and this names which
     // rule the reading below is about.
@@ -351,24 +353,24 @@ describe('E4-11 — the phone breakpoint collapses the workspace links into one 
     expect(winner(phoneContext(mutant), TOGGLE, 'display')).toBe('inline-flex');
   });
 
-  it('the 40rem block that carries the disclosure exists, and is the one read below', () => {
+  it('the 70rem block that carries the disclosure exists, and is the one read below', () => {
     // POSITIVE CONTROL for every assertion under it: if this is undefined they
     // fail for the wrong reason, and `rule()` of a missing block throws rather
     // than reddening on the declaration.
     expect(
-      blockContaining(css, '(max-width: 40rem)', '.gn-nav__more'),
-      'no 40rem block names .gn-nav__more',
+      blockContaining(css, '(max-width: 70rem)', '.gn-nav__more'),
+      'no 70rem block names .gn-nav__more',
     ).toBeDefined();
   });
 
-  it('below 40rem the wrapper is hidden and the toggle is shown', () => {
-    const phone = blockContaining(css, '(max-width: 40rem)', '.gn-nav__more') as string;
+  it('below 70rem the wrapper is hidden and the toggle is shown', () => {
+    const phone = blockContaining(css, '(max-width: 70rem)', '.gn-nav__more') as string;
     expect(rule(phone, '.gn-nav__more-toggle')).toContain('display: inline-flex');
     expect(rule(phone, '.gn-nav__more')).toContain('display: none');
   });
 
-  it('below 40rem the OPEN wrapper takes a line of its own', () => {
-    const phone = blockContaining(css, '(max-width: 40rem)', '.gn-nav__more') as string;
+  it('below 70rem the OPEN wrapper takes a line of its own', () => {
+    const phone = blockContaining(css, '(max-width: 70rem)', '.gn-nav__more') as string;
     const open = rule(phone, '.gn-nav__more[data-open="true"]');
     expect(open, 'no [data-open="true"] arm').toBeDefined();
     expect(open).toContain('display: flex');

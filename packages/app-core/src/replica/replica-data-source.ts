@@ -1218,6 +1218,10 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
     },
     purgedAmong: (ids) => replica.purgedAmong(ids),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
+    // No names are replicated either, and an empty answer is the honest one: `[]` is
+    // "no name known", which every join already reads as "show the id" — the same
+    // position `getMembers` is in, without the refusal (a label join must not fail a read).
+    getActorNames: async () => [],
     getTicketAttachments: () =>
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getTicketComments: () =>

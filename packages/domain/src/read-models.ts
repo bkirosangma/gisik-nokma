@@ -745,6 +745,15 @@ export type WorkspaceMember = {
 export type MemberListResponse = { workspaceId: string; members: WorkspaceMember[] };
 
 /**
+ * One person's display name, and NOTHING else — no role, no address. The wire
+ * shape of `GET /v1/workspaces/:id/actor-names`: what a client joins onto an
+ * actor id it already holds when the roster (`MemberListResponse`) does not
+ * name that person (a guest is withheld from a non-admin's roster).
+ */
+export type ActorName = { userId: string; displayName: string };
+export type ActorNameListResponse = { workspaceId: string; names: ActorName[] };
+
+/**
  * Tickets currently sitting in each state of one workflow. Counts cover the
  * WHOLE workspace, not the caller's view — the route is admin-only for exactly
  * that reason, so there is no per-viewer variant to drift out of step. Every

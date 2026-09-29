@@ -37,6 +37,7 @@ import type {
   // this return carries `source`, which the server does not send (it is the
   // mode of the request) and which the merged list (spec §7.8) needs per row.
   NoteSearchHit,
+  Actor,
   RosterMember,
   SearchHit,
   TicketHistoryEvent,
@@ -267,6 +268,19 @@ export type DataSourceQuery = {
    * every caller that only wants names is unaffected.
    */
   getMembers(workspaceId: string): Promise<RosterMember[]>;
+  /**
+   * Display NAMES for the people who may have acted in the workspace — `id` and
+   * `name`, nothing else — read from `GET /v1/workspaces/:id/actor-names`.
+   *
+   * The complement of `getMembers`, not a replacement: the roster is the
+   * directory (pickers, counts, the members screen) and withholds guests from a
+   * non-admin, so a label join that only had the roster showed a guest's raw id.
+   * Callers that turn an actor id into words try the roster first and this
+   * second (`nameJoin` in `online/mappers.ts`). `[]` for a refusal — a guest
+   * viewer, or a workspace the caller is not in — because "no name known" is
+   * what an empty answer means to every join.
+   */
+  getActorNames(workspaceId: string): Promise<Actor[]>;
   getBoard(projectId: string): Promise<BoardView>;
   getTickets(projectId: string, filter: FilterSpec, grouping: Grouping): Promise<TicketListView>;
   getTicket(workspaceId: string, ticketId: string): Promise<TicketRead | null>;

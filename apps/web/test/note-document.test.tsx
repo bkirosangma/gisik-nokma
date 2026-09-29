@@ -6,7 +6,7 @@ import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-li
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { DELETE_TRIGGER_LABEL } from '@gisik-nokma/app-core';
-import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { Actor, DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
 import type { IngestResult, NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { noteDraftKey } from '../src/notes/use-note-autosave.js';
@@ -116,6 +116,7 @@ function world(
     role?: string;
     search?: DataSourceQuery['search'];
     getTickets?: DataSourceQuery['getTickets'];
+    actorNames?: Actor[];
   } = {},
 ) {
   const services = stubServices({
@@ -128,6 +129,7 @@ function world(
     getNote: async (_workspaceId: string, id: string) =>
       id === NOTE ? (opts.note ?? noteDetail()) : null,
     getMembers: async () => MEMBERS,
+    getActorNames: async () => opts.actorNames ?? [],
     getNotes: async () => [
       {
         noteId: OTHER_NOTE,
@@ -161,7 +163,7 @@ beforeEach(() => {
   });
 });
 
-function renderDocument(opts: { note?: NoteDetail; role?: string } = {}) {
+function renderDocument(opts: { note?: NoteDetail; role?: string; actorNames?: Actor[] } = {}) {
   return render(
     <Providers services={world(opts)}>
       <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
@@ -183,6 +185,28 @@ function slotProps(): Record<string, unknown> {
   if (last === undefined) throw new Error('the note-mode slot was never rendered');
   return last;
 }
+
+describe('18.440 the note byline names its author even when the roster omits them', () => {
+  it('18.440 a note written by a guest (absent from a member’s roster) shows the guest’s name, not their id; a roster author and an unnamed author are the controls', async () => {
+    const guest = renderDocument({
+      role: 'member',
+      note: noteDetail({ authorId: 'u_gita' }),
+      actorNames: [{ id: 'u_gita', name: 'Gita Guest' }],
+    });
+    expect(await screen.findByText('Gita Guest')).toBeInTheDocument();
+    expect(screen.queryByText('u_gita')).not.toBeInTheDocument();
+    guest.unmount();
+
+    // CONTROL: a roster author is still named by the roster.
+    const ana = renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
+    ana.unmount();
+
+    // CONTROL: nobody names this author — the id is what the byline shows.
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_zed' }) });
+    expect(await screen.findByText('u_zed')).toBeInTheDocument();
+  });
+});
 
 describe('18.11 The Notes page — the document', () => {
   /**
