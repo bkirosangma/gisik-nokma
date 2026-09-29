@@ -6,7 +6,6 @@ export type LookedUpPerson = {
   name: string;
   email: string;
   inWorkspace: boolean;
-  role: 'owner' | 'admin' | 'member' | 'guest' | null;
 };
 
 export type LookupPerson = (email: string) => Promise<LookedUpPerson | null>;

@@ -26,7 +26,6 @@ export type LookedUpPerson = {
   name: string;
   email: string;
   inWorkspace: boolean;
-  role: 'owner' | 'admin' | 'member' | 'guest' | null;
 };
 
 /**
@@ -40,6 +39,8 @@ export type LookedUpPerson = {
  *   with that email" (the `my-invitations.ts` rule).
  * - A synthetic phone address never matches (`auth/synthetic-address.ts`),
  *   typed or not: its local part IS a phone number (case 6.207).
+ * - NO ROLE and NO GUEST CALLER (R2, owner ruling 2026-09-29): the pickers need
+ *   only `inWorkspace`, and a guest is not given a people directory.
  * - TWO case-variant accounts (constructible — `my-invitations.ts` records
  *   why) answer `null` rather than a guess: "the one exact match" does not exist.
  */
@@ -62,7 +63,6 @@ export async function lookupPerson(db: Queryable, workspaceId: string, email: st
     name: name === '' ? row.email : name,
     email: row.email,
     inWorkspace: eff.workspaceRole !== null,
-    role: eff.workspaceRole,
   };
 }
 
@@ -124,7 +124,10 @@ export function registerPeopleRoutes(
     },
     async (request, reply) => {
       const { workspaceId } = request.params;
-      if ((await requireMember(deps.pool, request.currentUserId, workspaceId)) === null) {
+      const eff = await requireMember(deps.pool, request.currentUserId, workspaceId);
+      // R2 (owner ruling 2026-09-29): a guest may not look people up. The same
+      // 404 a non-member gets — the route does not confirm the workspace to them.
+      if (eff === null || eff.workspaceRole === 'guest') {
         return reply.status(404).send(READ_NOT_FOUND_BODY);
       }
       return { user: await lookupPerson(deps.pool, workspaceId, request.body.email) };
