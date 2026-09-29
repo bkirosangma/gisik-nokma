@@ -1,15 +1,21 @@
 #!/usr/bin/env python3
-"""check-pr.py <repo> <plan.md> <progress.md> <body-or-empty> — the mechanical half of the plan's §4. Exits 1 with every failed condition listed."""
+"""check-pr.py <repo> <plan.md> <progress.md> <body-or-empty> [base] — the mechanical half of the plan's §4. Exits 1 with every failed condition listed.
+base (default main; main or release/<name> only) is the integration branch the diff and the commit list are taken against, as origin/<base>."""
 import re, subprocess, sys, os
 repo, plan, progress, body = sys.argv[1:5]
+base = sys.argv[5] if len(sys.argv) > 5 else 'main'
+# Same rule as lib.sh's ctl_base_valid: main, or release/<segments>; nothing else is an integration branch.
+_seg = r'[A-Za-z0-9_][A-Za-z0-9._-]*'
+if not (base == 'main' or (re.fullmatch(rf'release/{_seg}(/{_seg})*', base) and '..' not in base and not base.endswith(('.', '.lock')) and '.lock/' not in base)):
+    print(f"check-pr.py: base {base!r} is not an integration branch — main or release/<name> only"); sys.exit(2)
 def git(*a): return subprocess.run(['/usr/bin/git', '-C', repo, *a], capture_output=True, text=True).stdout
 ids = set(re.findall(r'^#### (T-[\w./-]+)', open(os.path.join(repo, plan), encoding='utf-8').read(), re.M))
 ruling_of = {t: t[2:] for t in ids}  # T-E6-15 -> E6-15 ; T-F3-ux -> F3-ux (commit subjects use the ruling id: F3)
 def ruling_id(subject):
     m = re.match(r'([A-Z]+\d*-?\d+)\b', subject); return m.group(1) if m else None
 fails = []
-files = [f for f in git('diff', '--name-only', 'origin/main...HEAD').split('\n') if f]
-# A branch satisfies the gate's "contains origin/main" by MERGING origin/main (never rebasing: PR bodies and DONE reports
+files = [f for f in git('diff', '--name-only', f'origin/{base}...HEAD').split('\n') if f]
+# A branch satisfies the gate's "contains origin/<base>" by MERGING origin/<base> (never rebasing: PR bodies and DONE reports
 # cite lane commits by sha), so the merge commit's subject is not a task and is not held to the ruling-id rule.
 # Every batch branch carries protocol commits whose subjects start with the batch id ("B05: …", "B05 PR body …",
 # "| B05 | claimed") or with "Progress:" (a lane's per-task progress-row commits). Controller rulings 2026-09-21:
@@ -21,7 +27,7 @@ files = [f for f in git('diff', '--name-only', 'origin/main...HEAD').split('\n')
 #     a ruling id.
 BOOKKEEPING = re.compile(r'^\|?\s*(B\d\d\b|Progress\b)')
 BOOKKEEPING_PATHS = ('docs/lanes/release-2026-09-22-progress.md', 'docs/lanes/pr-bodies/', 'test-cases/', 'Features.md', 'docs/')
-commits = [c.split('\x00', 1) for c in git('log', '--no-merges', '--format=%H%x00%s', 'origin/main..HEAD').split('\n') if c]
+commits = [c.split('\x00', 1) for c in git('log', '--no-merges', '--format=%H%x00%s', f'origin/{base}..HEAD').split('\n') if c]
 tasks, bookkeeping, fixups = [], [], []
 for sha, s in commits:
     if BOOKKEEPING.match(s):

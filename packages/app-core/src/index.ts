@@ -10,7 +10,8 @@ export * from './workflow-builder/index.js';
 export * from './view-types.js';
 export { makeSubmittedFactory, type EnvelopeSeed, type MakeSubmitted } from './submit.js';
 export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from './provenance.js';
-export { memberLabel } from './member-label.js';
+export { actorLabelFrom, memberLabel } from './member-label.js';
+export { mentionCandidatesOf, type MentionPerson } from './mention-candidates.js';
 export { createClientStateCache, type ClientStateCache } from './cache.js';
 export { withCacheFeed } from './cache-feed.js';
 export {
@@ -29,6 +30,7 @@ export {
 } from './precheck.js';
 export { formatRollup } from './views/rollup-text.js';
 export { useLiveQuery, type LiveQueryResult } from './views/use-live-query.js';
+export { useActorNames } from './views/use-actor-names.js';
 export {
   Board,
   EMPTY_BOARD_COPY,
@@ -135,6 +137,22 @@ export {
   type NewTicketDraft,
 } from './views/new-ticket-dialog.js';
 export { CreateTicketFlow, type CreateTicketFlowProps } from './views/create-ticket-flow.js';
+export { OutsiderFinder } from './views/outsider-finder.js';
+export type { AssignOutsider, LookedUpPerson, LookupPerson } from './people/types.js';
+export { outsiderIngest } from './people/outsider-ingest.js';
+export {
+  ASSIGNEE_OUTSIDE_ROSTER,
+  ASSIGN_OUTSIDER_OPTION,
+  OUTSIDER_ASSIGN,
+  OUTSIDER_CANCEL,
+  OUTSIDER_EMAIL_LABEL,
+  OUTSIDER_FIND,
+  OUTSIDER_JOINS_AS_GUEST,
+  OUTSIDER_NOT_FOUND,
+  alreadyInWorkspaceLine,
+  foundLine,
+  lookupFailedLine,
+} from './people/copy.js';
 export {
   LOCKOUT_WARNING_COPY,
   OWNER_ALWAYS_SEES_COPY,
@@ -270,7 +288,9 @@ export type { InboxFilter, NotificationsGateway, NotificationsPage } from './inb
 export {
   notificationBody,
   notificationHeadline,
+  notificationTarget,
   notificationTicketId,
+  type NotificationTarget,
 } from './inbox/format.js';
 export { NotificationIcon, type NotificationIconProps } from './inbox/icons.js';
 export { UnreadBadge, type UnreadBadgeProps } from './inbox/unread-badge.js';
@@ -343,6 +363,8 @@ export { ContestBanner } from './contests/contest-banner.js';
 export { buildReopenPair, nonTerminalStates } from './offline/reopen-pair.js';
 export { ClockSkewBadge, formatClockSkew } from './history/clock-skew-badge.js';
 export { SyncStatusBar, syncStatusLabel } from './sync/sync-status-bar.js';
+export { usePurgedPredicate, type PurgedLookupQuery, type PurgedPredicateState } from './views/use-purged-predicate.js';
+export { SyncNotices, SYNC_NOTICE_DISMISS, failedClaimNotice, type SyncNoticeView } from './sync/sync-notices.js';
 // Account/help-screens plan, Task 6 — the Notifications section of
 // `/account` and the abstract half of its gateway. The concrete HTTP
 // adapter (`createHttpNotificationPreferencesGateway`) is a `./online`
@@ -377,3 +399,24 @@ export {
   type PasskeysSectionProps,
 } from './account/passkeys-section.js';
 export * from './help/index.js';
+
+// Trash series Plan 4 — the pure half of the trash UI: every string it shows,
+// which events each act sends and in which order, what a batch answer means,
+// and the IST day. The dialog and the Deleted items section (Tasks 4 and 9)
+// are exported beside these by their own tasks.
+export * from './trash/copy.js';
+export {
+  archiveWorkspaceSeeds,
+  deleteSeeds,
+  markSeeds,
+  restoreSeeds,
+  targetOf,
+  unmarkSeeds,
+  type LifecycleTarget,
+} from './trash/seeds.js';
+export { classifyBatch, type BatchOutcome } from './trash/batch.js';
+export { isPurgeOverdue, istDayLabel } from './trash/dates.js';
+
+export { DeleteDialog, type DeleteDialogProps } from './views/delete-dialog.js';
+export { DeletedItemsSection, type DeletedItemsSectionProps } from './account/deleted-items-section.js';
+export { DeletedItemsFromCache, cachedDeletedItemsOf } from './deleted-items-from-cache.js';

@@ -1,5 +1,5 @@
 import { Extension, InputRule, type JSONContent } from '@tiptap/core';
-import { TextSelection } from '@tiptap/pm/state';
+import { Plugin, TextSelection } from '@tiptap/pm/state';
 
 /**
  * The collapsible block (spec §8.4). The NODE is `details`, shipped by
@@ -110,8 +110,78 @@ const DETAILS: JSONContent = {
   content: [{ type: 'detailsSummary' }, { type: 'detailsContent', content: [{ type: 'paragraph' }] }],
 };
 
+/**
+ * The Details node view's fold `<button>` (an EMPTY, classless child of the block
+ * root — see `editor.css`), or `null` for any other target.
+ */
+function foldButton(target: EventTarget | null): HTMLButtonElement | null {
+  if (!(target instanceof Element)) return null;
+  const button = target.closest('button');
+  return button !== null && button.parentElement?.matches('.editor-details') === true
+    ? (button as HTMLButtonElement)
+    : null;
+}
+
 export const Collapsible = Extension.create({
   name: 'collapsible',
+
+  /**
+   * ENTER AND SPACE ON THE FOCUSED FOLD BUTTON. MEASURED in a browser: with the
+   * button focused, ProseMirror's keydown handling runs first and CONSUMES the
+   * key (the base keymap splits a block at the stale selection and calls
+   * `preventDefault`), so the browser never turns it into a `click` — the
+   * keyboard could neither fold the block nor stop editing the note. The
+   * button's own `click` listener (Tiptap's) is the toggle, so this hands the
+   * key to it: `click()` and consume the key, once.
+   *
+   * It is a `handleDOMEvents` handler rather than `handleKeyDown` on purpose:
+   * DOM-event handlers run BEFORE ProseMirror's own keydown handling, so it
+   * wins without giving this extension a `priority` (which would move its
+   * keymap ahead of every other extension's — see the note above). Editable
+   * views only: a read-only view skips ProseMirror's keydown handling, and the
+   * browser's own button activation works there.
+   * Focus goes back to the button afterwards because Tiptap's click handler
+   * moves it into the document, which would strand a keyboard user one press
+   * from the control they were on.
+   */
+  addProseMirrorPlugins() {
+    return [
+      new Plugin({
+        props: {
+          handleDOMEvents: {
+            keydown: (view, event) => {
+              if (!view.editable || (event.key !== 'Enter' && event.key !== ' ')) return false;
+              const button = foldButton(event.target);
+              if (button === null) return false;
+              event.preventDefault();
+              button.click();
+              requestAnimationFrame(() => button.focus({ preventScroll: true }));
+              return true;
+            },
+            /**
+             * A CLICK THAT IS NOT A MOUSE (case 9.490). Tiptap's click handler moves
+             * focus into the document after every toggle — right for a pointer,
+             * whose caret is restored where the writer left it, wrong for a
+             * keyboard or assistive-technology activation, which fires a `click`
+             * with `detail === 0` and would strand that user in the body with the
+             * new `aria-expanded` never read. The listener on the button itself
+             * runs first (target phase), so by the time this bubbles up focus has
+             * already been taken, and the same next-frame hand-back the key path
+             * uses gives it back. `detail >= 1` is a pointer: left alone.
+             */
+            click: (_view, event) => {
+              if (event.detail !== 0) return false;
+              const button = foldButton(event.target);
+              if (button === null) return false;
+              requestAnimationFrame(() => button.focus({ preventScroll: true }));
+              return false;
+            },
+          },
+        },
+      }),
+    ];
+  },
+
   addInputRules() {
     return [
       new InputRule({

@@ -1083,6 +1083,64 @@ export const HELP_CONTENT: HelpContent = [
                       "kind": "text",
                       "text": ". There is nothing per-project to click there; the project list is one click further in, on the workspace's own page."
                     }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "If you own a workspace, its card has a menu"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " (the "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "⋯"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button in its corner): "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Archive"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " moves the workspace into an "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Archived"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " group below the others — collapsed until you open it — without taking anyone's access away, and "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " there brings it back. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete…"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " asks you to type the workspace's name first, because it removes the workspace from every member at once; it then sits under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Deleted items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on your Account page until you restore it. Nobody but the owner sees the menu."
+                    }
                   ]
                 ]
               },
@@ -1157,6 +1215,78 @@ export const HELP_CONTENT: HelpContent = [
                 ]
               }
             ]
+          },
+          {
+            "id": "deleted-items-and-getting-things-back",
+            "title": "Deleted items, and getting things back",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Everything deleted that you may bring back is listed under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page: the workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived, and who deleted it and when. A deleted workspace or project also says how many things are inside it — they come back with it, and are not listed separately."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": false,
+                "items": [
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " brings it back."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "bold",
+                      "text": "Mark for permanent deletion"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " starts the waiting period, and the row then shows the day it will be erased for good. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Unmark"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " stops that. A marked item has to be unmarked before it can be restored."
+                    }
+                  ],
+                  [
+                    {
+                      "kind": "text",
+                      "text": "Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing is already under way."
+                    }
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the list cannot be read, the section says so, rather than showing an empty list."
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -1220,7 +1350,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — a dropdown offering email, sms and whatsapp. - "
+                      "text": " — "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "email"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " or "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Phone (SMS)"
+                    },
+                    {
+                      "kind": "text",
+                      "text": ". - "
                     },
                     {
                       "kind": "bold",
@@ -1228,17 +1374,24 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " — admin, member or guest. (See below.) - "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "Projects"
-                    },
-                    {
-                      "kind": "text",
-                      "text": " — this box appears for admin and member, and is hidden for guest."
+                      "text": " — admin, member or guest. (See below.)"
                     }
-                  ],
+                  ]
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "If the email address you typed belongs to somebody who already has an account, the form says so when you leave the box, and the invitation goes to the address that account signs in with."
+                  }
+                ]
+              },
+              {
+                "kind": "list",
+                "ordered": true,
+                "items": [
                   [
                     {
                       "kind": "text",
@@ -1250,7 +1403,15 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": "."
+                      "text": " (for Phone (SMS) the button reads "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Create invite link"
+                    },
+                    {
+                      "kind": "text",
+                      "text": "). For email, the product sends the invitation to that address, and the next screen says it was emailed. If the email could not be sent, the screen says so, and you send the link yourself."
                     }
                   ],
                   [
@@ -1274,15 +1435,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Copy that link before you do anything else.  It means exactly what it says. That link appears once, on that screen, at that moment. It is not in the pending list. It is nowhere else. Nobody — including you — can look it up again. If you close the tab you have to withdraw the invitation and start over.  Paste it into an email to the person "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "first"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ", then carry on."
+                    "text": "Copy that link before you do anything else.  The link is still shown once. For an emailed invitation you do not need it, but copy it anyway if the email did not go. It appears on that screen, at that moment; it is not in the pending list and nobody — including you — can look it up again. If you close the tab you have to withdraw the invitation and start over."
                   }
                 ]
               }
@@ -1296,25 +1449,20 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "email"
+                  },
+                  {
                     "kind": "text",
-                    "text": "The dropdown offers email, sms and whatsapp, but "
+                    "text": " sends the invitation for you. "
                   },
                   {
                     "kind": "bold",
-                    "text": "the product does not appear to send the invitation by any of them."
+                    "text": "Phone (SMS)"
                   },
                   {
                     "kind": "text",
-                    "text": " It makes a link, shows it to you once, and you send it however you like."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "So treat \"Channel\" as a note to yourself about how you intend to reach the person, and plan on sending the link by hand."
+                    "text": " does not send anything yet: it makes the link, and you send it by message yourself."
                   }
                 ]
               }
@@ -1328,95 +1476,12 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
-                    "kind": "text",
-                    "text": "It is a dropdown, and it offers "
-                  },
-                  {
                     "kind": "bold",
-                    "text": "All projects in this workspace"
+                    "text": "Removed on 29 September 2026."
                   },
                   {
                     "kind": "text",
-                    "text": " plus one *"
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "Only "
-                  },
-                  {
-                    "kind": "text",
-                    "text": "<project name>*** entry for each project you can see. Pick a name; the product works out the identifier behind it."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "bold",
-                    "text": "⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so."
-                  },
-                  {
-                    "kind": "text",
-                    "text": " Until 2026-09-21 the box was labelled "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "\"Projects (comma-separated ids, optional)\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " and wanted long strings of letters and numbers that you would have to go and find from somewhere — the manual's own verdict was "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "\"In practice this box is not usable by a person.\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " It is kept here, rather than deleted, so a reader who remembers it as an unusable box finds the correction where they last saw it."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "Leave it on "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "All projects in this workspace"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " unless the invitation really is for one project only."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "text",
-                    "text": "It is correctly hidden when you pick "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "guest"
-                  },
-                  {
-                    "kind": "text",
-                    "text": ", and if you try to invite a guest "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " name projects it refuses and tells you to share individual jobs with them instead."
+                    "text": " Admins and members now see every project in their workspace, so there is nothing to choose. A guest still sees only the jobs shared with them or assigned to them."
                   }
                 ]
               }
@@ -1466,12 +1531,8 @@ export const HELP_CONTENT: HelpContent = [
                     ],
                     [
                       {
-                        "kind": "bold",
-                        "text": "A \"can change things\" role, not a \"can see things\" role."
-                      },
-                      {
                         "kind": "text",
-                        "text": " This surprises everybody. An admin can invite people and set up stages and job types — but only sees the projects they have personally been put on, same as anyone else."
+                        "text": "Can invite people and set up stages and job types, and sees every project in the workspace."
                       }
                     ]
                   ],
@@ -1485,7 +1546,7 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "Ordinary staff. Does the work. Cannot invite people, cannot change how the stages work."
+                        "text": "Ordinary staff. Sees every project in the workspace and does the work. Cannot invite people, cannot change how the stages work."
                       }
                     ]
                   ],
@@ -1499,39 +1560,10 @@ export const HELP_CONTENT: HelpContent = [
                     [
                       {
                         "kind": "text",
-                        "text": "An outsider — a client, your accountant. Sees only the specific jobs somebody has explicitly shared with them. Nothing else. Cannot see the people list. Cannot create jobs."
+                        "text": "An outsider — a client, your accountant. Sees only the jobs somebody has shared with them or assigned to them, and nothing else. Cannot see the people list. Cannot create jobs."
                       }
                     ]
                   ]
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "bold",
-                    "text": "The practical consequence of the admin rule:"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " if you want somebody to be able to invite people "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " see the work, you have to make them an admin "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " get them onto the projects. One does not come with the other."
-                  }
                 ]
               },
               {
@@ -2333,6 +2365,61 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "assigning-somebody-who-is-not-in-the-workspace",
+            "title": "Assigning somebody who is not in the workspace",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "In the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assignee"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " picker, choose "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assign someone outside this workspace…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", type their email and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Find"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If an account has exactly that email, it is shown. Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assign"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and they join the workspace as a guest who sees only that job. Nothing is listed or suggested: you have to know their email. If nobody has that email, the picker says "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "No user with that email."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Anyone who can assign a job can do this."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "the-things-you-cannot-do-to-a-job",
             "title": "The things you cannot do to a job",
             "blocks": [
@@ -2484,7 +2571,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " tab lists the job's files, and the comment box takes one too. The "
+                      "text": " tab lists the job's files and has its own "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attach a file"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button, and the comment box takes one too — paste it, drop it, or press its own paperclip "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Attach"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " button, left of the posting note. The "
                     },
                     {
                       "kind": "bold",
@@ -2492,7 +2595,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " box is still the exception: a file dropped into it is refused rather than quietly lost. A move carrying the \"require evidence\" rule still puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7)."
+                      "text": " box is still the exception: a file dropped into it is refused rather than quietly lost, and it draws no Attach button either. A move carrying the \"require evidence\" rule still puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7)."
                     }
                   ],
                   [
@@ -2536,7 +2639,31 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and "
+                      "text": " in the sheet's footer. A confirmation opens first: it names the job, has a "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete permanently"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " switch (off unless you turn it on), and says where deleted things go. "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Cancel"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " is where the cursor starts, so pressing Enter by reflex deletes nothing. Press "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Delete"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " and the job stops appearing in every view — boards, lists, search, My Work — while "
                     },
                     {
                       "kind": "bold",
@@ -2552,15 +2679,7 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": ", and the button is not hidden from anybody: press it without the right and the server refuses, saying so. A "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "\"… deleted · its history is retained\""
-                    },
-                    {
-                      "kind": "text",
-                      "text": " message follows with an "
+                      "text": ", and the button is not hidden from anybody: press it without the right and the confirmation shows the server's refusal and stays open. A message follows with an "
                     },
                     {
                       "kind": "bold",
@@ -2568,7 +2687,23 @@ export const HELP_CONTENT: HelpContent = [
                     },
                     {
                       "kind": "text",
-                      "text": " for about fifteen seconds, and that Undo is the product's only route back — once it goes, no control anywhere restores the job."
+                      "text": " for about fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After that the job is still listed under "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Deleted items"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " on your Account page, where "
+                    },
+                    {
+                      "kind": "bold",
+                      "text": "Restore"
+                    },
+                    {
+                      "kind": "text",
+                      "text": " brings it back."
                     }
                   ]
                 ]
@@ -2578,15 +2713,48 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "One exception, added 2026-09-23: a job deleted from My Work has no Undo."
+                    "text": "Delete permanently"
                   },
                   {
                     "kind": "text",
-                    "text": " The message and the fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place without them, so the deletion there is silent and final. The job still stops appearing in every view and its history is still kept. "
+                    "text": " does all of that and also marks the job to be erased for good after the waiting period the confirmation states. Until then the "
                   },
                   {
                     "kind": "bold",
-                    "text": "If you want the way back, delete the job from its project page."
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items) takes the mark off; once the period is over it cannot be undone."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A job deleted from My Work has no Undo there."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " The message and the Undo belong to the job's own project page, and My Work opens the sheet in place without them. The job still stops appearing in every view, its history is still kept, and it is still in "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page."
                   }
                 ]
               },
@@ -5349,6 +5517,10 @@ export const HELP_CONTENT: HelpContent = [
                     {
                       "kind": "italic",
                       "text": "\"Anselma Marak mentioned you\""
+                    },
+                    {
+                      "kind": "text",
+                      "text": ", in a job's comment or description, or in a note or one of its comments. The row names the job or the note, and clicking it opens that job or note (for a note's comment, scrolled to that comment)"
                     }
                   ],
                   [
@@ -7072,6 +7244,35 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "A change to something that was permanently deleted while you were offline cannot be saved."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " When the app reconnects it takes that change out of its queue and puts a note in its place — \"A change to an item that was permanently deleted could not be saved, and was removed.\" — with a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Dismiss"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button. Any other change the server refused is listed the same way, with the server's reason, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Dismiss"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " lets it go."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
                     "kind": "text",
                     "text": "When everything is fine and nothing is queued, it shows no alarming badge at all. If the connection errors, the message appears "
                   },
@@ -7912,7 +8113,153 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold, Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note."
+                    "text": "The editor is the same one the rest of the product uses, with headings and a formatting toolbar: "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Undo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Redo"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", a "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Heading level"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link, Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Hover or tab to any tool to see its name, its keyboard shortcut where it has one, and the markdown you can type instead. Undo and Redo grey out when there is nothing to step back or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " each drop the "
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":note"
+                  },
+                  {
+                    "kind": "text",
+                    "text": "/"
+                  },
+                  {
+                    "kind": "code",
+                    "text": ":ticket"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " trigger at the cursor and open the same picker typing it would — the same two triggers work from the keyboard too, and "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "[["
+                  },
+                  {
+                    "kind": "text",
+                    "text": " still works for a note."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you want, the label reads, for example, \"2 × 3 table\", then click (or press Enter) to insert it with a header row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is inside a table, because a table cannot be placed inside another."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Editing a link."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Click into any link's text and a small panel opens beside it with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "URL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Text"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shortcut (web, email and phone addresses only) and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unlink"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Enter or clicking away keeps a change, Escape puts it back. An empty URL, or Unlink, takes the link off and keeps the words; an empty Text deletes the link. Ctrl-K (Cmd-K on a Mac) with the cursor in a link jumps straight into the URL field. The panel appears only for the box you are typing in."
                   }
                 ]
               },
@@ -7958,6 +8305,43 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
+                    "text": "Reopening a note after an unsaved session shows a banner."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " If a note opens with words that never reached the server, a bar above the text reads "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restored unsaved changes from 5m ago."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to carry on with them (they save as usual), or "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " to throw them away and load the note as the server has it. Discard cannot be undone. Only people who can edit the note see the bar."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
                     "text": "History"
                   },
                   {
@@ -7991,7 +8375,49 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen."
+                    "text": " Press it to open a table of contents over the note; press a heading in it to jump straight there. It appears at any window width once a note has enough headings, whereas it used to be a column that showed only on a wide screen. The heading you jump to lands just under the top bar, not behind it."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "Every heading in a note can be linked to."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Hover a heading (on a phone or tablet the small link icon is always there, faintly) and press the link icon at the end of it — or Tab to it and press Enter — to copy a link to that exact heading. Paste it anywhere; whoever opens it lands on that heading, provided they can read the note. The icon appears on all six heading levels, and if two headings read the same the second gets a "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-2"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on the end of its link, the third "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-3"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Only the note page has this; the comment box and the job sheet do not."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A thin line under the top bar shows how far down a note you have read."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " It fills from the left as you scroll the note (the title and byline above the text do not count) and starts again at empty when you open another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops animating if your device is set to reduce motion."
                   }
                 ]
               }
@@ -8141,6 +8567,53 @@ export const HELP_CONTENT: HelpContent = [
             ]
           },
           {
+            "id": "mentioning-somebody-in-a-note",
+            "title": "Mentioning somebody in a note",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Type "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "@"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and start a person's name, in a note or in its comments: the same list of people the job editors offer appears, and picking one drops a mention at the cursor. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "A mention notifies the person, once."
+                  },
+                  {
+                    "kind": "text",
+                    "text": " Saving the note again with the same mention in it does not tell them again; adding someone new tells only the new person, and a comment that mentions somebody tells them as soon as it is posted. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Only people who can read the note are told"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — mentioning someone the note is not shared with sends nothing, and you are not told that either. Mentioning yourself sends nothing. A note mention arrives in the Inbox as a "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "mentioned you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message, naming the note, and follows your Mentions setting under Account → Notifications, exactly like a mention on a job."
+                  }
+                ]
+              }
+            ]
+          },
+          {
             "id": "linking-to-a-job-or-another-note",
             "title": "Linking to a job or another note",
             "blocks": [
@@ -8157,7 +8630,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job."
+                    "text": " followed by a few words, in a comment or in a note, opens a picker over the jobs you can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type."
                   }
                 ]
               },
@@ -8183,6 +8656,19 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": ") the same way opens a picker over the notes you can read, and inserts a link to the one you pick."
+                  }
+                ]
+              },
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "bold",
+                    "text": "A chip or link to something that was permanently deleted reads Deleted item"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — no key, no title, and nothing to open. The comment or note that holds it is not changed: only the chip is drawn differently, because the thing it pointed at no longer exists."
                   }
                 ]
               },
@@ -8235,11 +8721,51 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "As of this writing there is no Delete button on a note's own page"
+                    "text": "Deleting a note:"
                   },
                   {
                     "kind": "text",
-                    "text": " — nothing in the product yet puts a note there for you. The Restore machinery is ready and working; only the control that starts it is still missing."
+                    "text": " open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " — only the note's author, a workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete permanently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " switch. A deleted note shows a banner on its own page; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " there brings it back, and if the server refuses (for example because the note is marked for permanent deletion elsewhere) the banner says why. Every deleted note is also listed under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page."
                   }
                 ]
               },
@@ -8932,8 +9458,28 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "By email, yes."
+                  },
+                  {
                     "kind": "text",
-                    "text": "It does not appear to. The Channel dropdown offers email, sms and whatsapp, and nothing was found that sends by any of them. What happens is that the product makes a link, shows it to you once, and you send it however you like."
+                    "text": " Pick "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "email"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the product sends it, and the screen tells you whether it went. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Phone (SMS)"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " is not sent for you: copy the link and send it yourself."
                   }
                 ]
               }
@@ -8966,33 +9512,8 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
-                    "kind": "bold",
-                    "text": "All projects in this workspace"
-                  },
-                  {
                     "kind": "text",
-                    "text": ", unless the invitation is genuinely for one project only — in which case pick the project by NAME from the same dropdown. It is a list of names; you never type an identifier."
-                  }
-                ]
-              },
-              {
-                "kind": "paragraph",
-                "spans": [
-                  {
-                    "kind": "bold",
-                    "text": "⚠ It used to ask you to type identifiers, and this answer said to leave it empty."
-                  },
-                  {
-                    "kind": "text",
-                    "text": " Until 2026-09-21 the box was labelled "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "\"Projects (comma-separated ids, optional)\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " and wanted long strings of letters and numbers you would have to go and find. The old answer is kept here so a reader who remembers it finds the correction where they last saw it."
+                    "text": "Nothing: the box was removed on 29 September 2026. Admins and members see every project in the workspace."
                   }
                 ]
               }
@@ -9006,32 +9527,59 @@ export const HELP_CONTENT: HelpContent = [
                 "kind": "paragraph",
                 "spans": [
                   {
+                    "kind": "bold",
+                    "text": "Close to it."
+                  },
+                  {
                     "kind": "text",
-                    "text": "No, and this surprises everybody. "
+                    "text": " Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "can-i-assign-a-job-to-somebody-who-is-not-in-the-workspace",
+            "title": "Can I assign a job to somebody who is not in the workspace?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes. In the "
                   },
                   {
                     "kind": "bold",
-                    "text": "Admin is a \"can change things\" role, not a \"can see things\" role."
+                    "text": "Assignee"
                   },
                   {
                     "kind": "text",
-                    "text": " An admin can invite people and set up stages and job types, but only sees the projects they have personally been put on. If you want somebody to manage the workspace "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "and"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " see the work, you have to do both — one does not come with the other. Only the "
+                    "text": " picker choose "
                   },
                   {
                     "kind": "bold",
-                    "text": "owner"
+                    "text": "Assign someone outside this workspace…"
                   },
                   {
                     "kind": "text",
-                    "text": " automatically sees everything."
+                    "text": ", type their exact email and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Find"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". If an account has that email you can press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Assign"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email."
                   }
                 ]
               }
@@ -9475,15 +10023,7 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " in the sheet's footer. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. A "
-                  },
-                  {
-                    "kind": "bold",
-                    "text": "\"… deleted · its history is retained\""
-                  },
-                  {
-                    "kind": "text",
-                    "text": " message follows with an "
+                    "text": " in the sheet's footer, then confirm. The job stops appearing in every view — boards, lists, search, My Work — and its history is kept, because other events cite it. An "
                   },
                   {
                     "kind": "bold",
@@ -9491,7 +10031,39 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " for about fifteen seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the job. If you would rather not lose it, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
+                    "text": " follows for about fifteen seconds, and after that the job is still under "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, where "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " brings it back. Turning on "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete permanently"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the confirmation also marks it to be erased for good after the waiting period the confirmation states; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items takes that back until then. If you would rather not lose it at all, a \"won't do\" or \"cancelled\" stage in your workflow remains the alternative."
                   }
                 ]
               }
@@ -10331,7 +10903,15 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Through a comment, and the file travels with the comment that carries it. Drop an image into the comment box and it is stored and put inside what you are writing; the comment then names it, and the chip under the comment is how you reach it. "
+                    "text": "Through a comment, and the file travels with the comment that carries it. Drop an image into the comment box, paste it, or press the paperclip "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attach"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button in the comment box's own footer, and it is stored and put inside what you are writing; the comment then names it, and the chip under the comment is how you reach it. "
                   },
                   {
                     "kind": "bold",
@@ -10339,7 +10919,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " — it is stored against the job instead and appears in the job's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with."
+                    "text": " — it is stored against the job instead and appears in the job's list of files, not in your comment. That split is the product's own rule rather than a limitation of the box: a comment's files are the ones its own text carries, so a comment can never be missing a file it was written with. The "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attachments"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " tab has its own "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Attach a file"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " button too, for a file that has no comment to travel with."
                   }
                 ]
               },
@@ -10411,23 +11007,15 @@ export const HELP_CONTENT: HelpContent = [
                   [
                     {
                       "kind": "text",
-                      "text": "When it auto-formats, a small chip appears. "
+                      "text": "If a shortcut fires when you did not want it, "
                     },
                     {
                       "kind": "bold",
-                      "text": "Press Backspace, or click the chip, to undo the formatting"
+                      "text": "press Backspace straight away"
                     },
                     {
                       "kind": "text",
-                      "text": " and keep your literal characters. "
-                    },
-                    {
-                      "kind": "bold",
-                      "text": "Press Escape and the chip goes away and the formatting stays."
-                    },
-                    {
-                      "kind": "text",
-                      "text": " Two opposite results, both of which dismiss the chip. Learn the difference."
+                      "text": " — the formatting goes and the characters you typed (the hashes, dashes, backticks) come back as plain text. It works only for the very next keypress; once you type anything else, the formatting stays."
                     }
                   ],
                   [
@@ -10625,6 +11213,76 @@ export const HELP_CONTENT: HelpContent = [
                 ]
               }
             ]
+          },
+          {
+            "id": "how-do-i-change-a-link-i-already-wrote-its-address-its-words",
+            "title": "How do I change a link I already wrote — its address, its words, or take it off?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Click into the link's text. A small panel appears next to it with the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "URL"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Text"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", an "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Open link"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " shortcut for web, email and phone addresses, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unlink"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ". Change either field and press Enter (or click away) to keep the change; press Escape to put it back. Clearing the URL, or pressing Unlink, removes the link and leaves the words; clearing the Text deletes the link. From the keyboard, press Ctrl-K (Cmd-K on a Mac) with the cursor in a link to jump into the URL field. It only shows in the box you are typing in, and never in a box you can only read."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-put-a-table-in-a-note-or-a-comment",
+            "title": "How do I put a table in a note or a comment?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Use "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Insert table"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in the formatting strip: an eight-by-eight grid opens, move over it (or use the arrow keys) until the label reads the size you want — \"2 × 3 table\" — then click, or press Enter. The first row is a header row. Escape closes the grid without inserting. The tool is greyed out while your cursor is already inside a table, because a table cannot go inside another one."
+                  }
+                ]
+              }
+            ]
           }
         ]
       },
@@ -10651,6 +11309,122 @@ export const HELP_CONTENT: HelpContent = [
                   {
                     "kind": "text",
                     "text": " in the nav, left of Inbox."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "what-is-the-thin-line-at-the-top-of-a-note",
+            "title": "What is the thin line at the top of a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "A reading-progress bar: it fills from the left as you scroll down the note, so you can see how far through a long one you are. It measures the text of the note only (not the title or byline above it), starts over when you open another note, and is there whether or not you can edit the note. If your device is set to reduce motion it moves without the smoothing."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "how-do-i-link-to-one-heading-in-a-note",
+            "title": "How do I link to one heading in a note?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Hover the heading and press the small link icon at its end (Tab to it and press Enter with the keyboard; on a touch screen the icon is always visible). That copies a link ending in "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "#"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and the heading's name, and opening it scrolls straight to the heading. It works on all six heading levels. Two headings with the same words get "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-2"
+                  },
+                  {
+                    "kind": "text",
+                    "text": ", "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "-3"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and so on, in the order they appear — so a link can point at the wrong one if you rearrange headings that share a name. The person you send it to still needs access to the note."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "why-does-my-note-open-with-a-bar-saying-restored-unsaved-cha",
+            "title": "Why does my note open with a bar saying \"Restored unsaved changes\"?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Last time you had it open, some of what you typed never reached the server (you lost the connection, or closed the tab first), so it was kept on your device and is showing now. "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Keep"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " carries on with those words; "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Discard"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " deletes them and shows the note as the server has it, which cannot be undone. The bar is only shown to people who can edit the note."
+                  }
+                ]
+              }
+            ]
+          },
+          {
+            "id": "if-i-mention-someone-in-a-note-do-they-get-told",
+            "title": "If I mention someone in a note, do they get told?",
+            "blocks": [
+              {
+                "kind": "paragraph",
+                "spans": [
+                  {
+                    "kind": "text",
+                    "text": "Yes — type "
+                  },
+                  {
+                    "kind": "code",
+                    "text": "@"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " and pick them, in the note or in one of its comments. They get a "
+                  },
+                  {
+                    "kind": "italic",
+                    "text": "mentioned you"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " message in their Inbox that opens the note, or the comment. It is sent once: saving the note again with the same mention in it does not tell them again, and mentioning yourself sends nothing. Only people who can read the note are told — a note shared with nobody else, or with a list that leaves them out, tells them nothing, and you are not shown that. Muting Mentions under Account → Notifications hides these too."
                   }
                 ]
               }
@@ -10849,7 +11623,55 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up in the Deleted group, Restore works and brings it back exactly as it was."
+                    "text": "Yes — open it and press "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Delete…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " beside "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "History"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " (its author, a workspace admin or the owner). It goes to the "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " group on the Notes page and to "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Deleted items"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on your Account page, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Restore"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in either brings it back exactly as it was; a note marked for permanent deletion has to be unmarked first, with "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Unmark"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " in Deleted items."
                   }
                 ]
               }
@@ -11826,7 +12648,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Only the specific jobs somebody explicitly shared with them. Not the project, not the workspace's other work. They see the workspace's name and an empty project list — intended, not broken. They can see a child of something shared with them if that child inherits. They cannot open the people list and cannot create jobs."
+                    "text": "Only the jobs somebody explicitly shared with them, and any job assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create jobs."
                   }
                 ]
               }

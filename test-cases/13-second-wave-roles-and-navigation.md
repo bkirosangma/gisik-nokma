@@ -1356,6 +1356,8 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   the handler is the other one. Mutation-witnessed: removing `className="gn-field__input"` from the
   address input reddens this case ALONE (1 failed / 37), and un-wrapping the projects field back to the
   bare pair reddens it alone as well.
+  ⚠ **AMENDED 2026-09-29 (owner ruling A):** the invite form's second field, Project access, is gone. "Two
+  native fields" is now ONE, the address field; the test keeps the address half and drops the projects half.
   ⚠ **AMENDED BY RULING E5-11 (2026-09-21) — the projects half is no longer a NATIVE field.** It is the
   shared `Select` now, so it wears the pattern the way `Channel`/`Role` do (inside a `.gn-field` with a
   `.gn-field__label`, the component's own trigger carrying `gn-field__input`), and the case asserts the
@@ -1365,8 +1367,9 @@ id that stays true. **`13.889` joined the set later in the same change set**, wh
   'Project access' })` returns 0 on this trigger while `/Project access/` returns 1, measured — which
   is also why this file's own `Role` queries have always been regexes.
 
-- ✅ **13.1181 — the invite form's project field offers project NAMES, not identifiers (ruling E5-11,
-  2026-09-21).** `apps/web/test/members-page.test.tsx`. It was a text box labelled *"Projects
+- 🚫 **13.1181 — the invite form's project field offers project NAMES, not identifiers (ruling E5-11,
+  2026-09-21).** 🚫 Retired 2026-09-29, owner ruling (A): the project select no longer exists; 3.991 pins its absence.
+  `apps/web/test/members-page.test.tsx`. It was a text box labelled *"Projects
   (comma-separated ids, optional)"*, so a person had to transcribe project ULIDs from somewhere else;
   `docs/manual.md` said so in as many words — *"In practice this box is not usable by a person"* — and
   the finding's judge measured a form whose own docblock already refused to "offer a choice the door
@@ -1739,3 +1742,15 @@ mechanism the height depends on.
   remembered workspace**, where every child of the wrapper is gated away and the toggle must not render —
   it fails both if the toggle becomes unconditional and if the gate is tightened to
   `workspaceName !== null` (the name is unresolved there, but the three id-only links are not).
+
+## The signed-in nav is one line at 1280 (`fix/names-nav-focus`, 2026-09-29) — block `13.1530`–`13.1539`
+
+*Ids `13.1536`–`13.1539` are unused. Amends the phone-disclosure cases `13.1137`–`13.1138`: the breakpoint moved from 40rem to 70rem.*
+
+- ✅ **13.1530 — above 70rem the links row does not wrap.** Mutation: `flex-wrap: wrap` back in the wide arm → red (with 13.1534). (`apps/web/test/nav-one-line.test.ts`)
+- ✅ **13.1531 — the two data-driven names (workspace, last project) truncate with an ellipsis; every fixed link keeps its full label.** (`apps/web/test/nav-one-line.test.ts`)
+- ✅ **13.1532 — the disclosure and the wide arm meet at 70rem with no gap and no overlap.** (`apps/web/test/nav-one-line.test.ts`)
+- ✅ **13.1533 — nothing in either arm shrinks the house text size to make the bar fit.** (`apps/web/test/nav-one-line.test.ts`)
+- ✅ **13.1534 — MUTATION WITNESS: a wrapping wide arm is a reading the cases catch.** (`apps/web/test/nav-one-line.test.ts`)
+- 🧪 **13.1535 — browser: the bar is one row at 1280 and at 1121 (links fit 699/699 px), and one row with a `Menu` toggle at 1024 and 768.** Measured 2026-09-29 by real computed sizes on a lane `next dev` (before: `Settings` alone on a second row at 1280; 4 rows at 1024 and 768). The reported scrollbar could not be reproduced. (`apps/web/app/globals.css`) *Measured 2026-09-29, controller browser pass on the dev stack built from `release/trash` b75ad0ce (LOCAL): one 70px row at 1280, 1121, 1024 and 768 with no horizontal scroll; the Menu toggle at 1024 and 768; names truncate with an ellipsis at 1121.* MANUAL by nature (no automated test cites 13.1535), so it stays 🧪: the run above is its evidence.
+

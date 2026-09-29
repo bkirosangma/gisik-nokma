@@ -2,7 +2,7 @@ import { render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
 import type { ProjectRef, WorkspaceRef } from '@gisik-nokma/app-core';
-import type { NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
+import { domainRegistry, type NoteDetail, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { RosterMember } from '@gisik-nokma/app-core';
 import { Providers } from '../src/providers.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -56,6 +56,7 @@ function workspace(over: Partial<WorkspaceRef> & { id: string }): WorkspaceRef {
     name: 'Convenience Corner',
     prefix: 'CC',
     role: 'owner',
+    archived: false,
     memberCount: 3,
     nameRestrictedProjectCount: 0,
     projects: [],
@@ -397,7 +398,11 @@ describe('18.11 The Notes page — creating a note', () => {
     await waitFor(() => expect(ingested).toHaveLength(1));
     expect(ingested[0]!.type).toBe('note.scope_set');
     expect(ingested[0]!.entity).toEqual({ kind: 'note', id: NOTE });
-    expect(ingested[0]!.payload).toEqual({ scope: { mode: 'workspace' } });
+    // FLAT — `note.scope_set`'s payload IS the scope (`noteScopePayload`), unlike
+    // `note.created`, which carries it under a `scope` key. The expectation used
+    // to read `{ scope: { mode } }` and agreed with a caller that built the same
+    // wrong shape; case 18.430 runs it through the real schema instead.
+    expect(ingested[0]!.payload).toEqual({ mode: 'workspace' });
     await waitFor(() => expect(onChanged).toHaveBeenCalled());
     view.unmount();
 
@@ -410,6 +415,64 @@ describe('18.11 The Notes page — creating a note', () => {
     expect(screen.getByTestId('note-scope').tagName).not.toBe('BUTTON');
     await user.click(screen.getByTestId('note-scope'));
     expect(screen.queryByRole('option')).toBeNull();
+  });
+
+  /**
+   * 18.430 — what the scope editor SENDS is what the domain schema ACCEPTS.
+   *
+   * The editor once built `{ scope: { mode } }` for `note.scope_set` while
+   * `noteScopeSetPayload` wants `{ mode }` — and 18.195 asserted `toEqual` on
+   * the stubbed `ingest`, so the test and the caller shared one wrong guess and
+   * the door's `invalid-payload` was first seen in a browser. This runs the
+   * event the editor really built through the registry's own schema, for BOTH
+   * arms (a mode that writes on choose, and `explicit`, which writes on Save).
+   */
+  it('18.430 the events the scope editor builds pass the note.scope_set payload schema', async () => {
+    const user = userEvent.setup();
+    const ingested: SubmittedEvent[] = [];
+    const services = stubServices({ getMembers: async () => MEMBERS });
+    services.dataSource.ingest = async (events: SubmittedEvent[]) => {
+      ingested.push(...events);
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-23T14:00:00.000Z',
+      }));
+    };
+    const schema = domainRegistry.get('note.scope_set', 1)!.payloadSchema;
+
+    // Arm 1: a mode that writes on choose.
+    const first = render(
+      <Providers services={services}>
+        <ScopeEditor note={NOTE_DETAIL} members={MEMBERS} canEdit onChanged={vi.fn()} />
+      </Providers>,
+    );
+    await user.click(screen.getByTestId('note-scope'));
+    await optionsOf(user, /Scope/);
+    await user.click(await screen.findByRole('option', { name: 'Workspace' }));
+    await waitFor(() => expect(ingested).toHaveLength(1));
+    expect(schema.safeParse(ingested[0]!.payload).success).toBe(true);
+    first.unmount();
+
+    // Arm 2: `explicit` — the picker gathers the audience, Save submits it.
+    render(
+      <Providers services={services}>
+        <ScopeEditor note={NOTE_DETAIL} members={MEMBERS} canEdit onChanged={vi.fn()} />
+      </Providers>,
+    );
+    await user.click(screen.getByTestId('note-scope'));
+    await optionsOf(user, /Scope/);
+    await user.click(await screen.findByRole('option', { name: 'Specific people' }));
+    await user.click(await screen.findByRole('checkbox', { name: /Anselma Marak/ }));
+    await user.click(screen.getByRole('button', { name: 'Save audience' }));
+    await waitFor(() => expect(ingested).toHaveLength(2));
+    expect(ingested[1]!.payload).toEqual({ mode: 'explicit', userIds: ['u_ana'] });
+    expect(schema.safeParse(ingested[1]!.payload).success).toBe(true);
+
+    // CONTROL: the schema is not a rubber stamp — the nested shape the editor
+    // used to send is refused by the very same parse.
+    expect(schema.safeParse({ scope: { mode: 'workspace' } }).success).toBe(false);
   });
 
   /**
@@ -445,5 +508,32 @@ describe('18.11 The Notes page — creating a note', () => {
     await user.click(screen.getByTestId('note-scope'));
     labels = await optionsOf(user, /Scope/);
     expect(labels).toContain('Same as the ticket');
+  });
+
+  /**
+   * 18.433 — the dialog re-seeds on OPEN, not on a parent re-render. `NotesPage`
+   * passes `defaultHome` as an inline object, so every page re-render hands the
+   * dialog a fresh one; keyed on identity, that re-render emptied the title a
+   * person was typing (seen as an intermittent browser-run failure: Create stayed
+   * disabled after the title was filled). Mutation: put `defaultHome` back in the
+   * effect's deps and this fails on the empty value.
+   */
+  it('18.433 a parent re-render with an equal defaultHome keeps the typed title', async () => {
+    const user = userEvent.setup();
+    const ui = () => (
+      <Providers services={stubServices({ getMembers: async () => MEMBERS })}>
+        <CreateNoteDialog
+          open
+          onClose={vi.fn()}
+          workspaces={WORKSPACES}
+          defaultHome={{ workspaceId: WS_A, projectId: '' }}
+          onCreated={vi.fn()}
+        />
+      </Providers>
+    );
+    const view = render(ui());
+    await user.type(screen.getByRole('textbox', { name: 'Title' }), 'Typed title');
+    view.rerender(ui());
+    expect((screen.getByRole('textbox', { name: 'Title' }) as HTMLInputElement).value).toBe('Typed title');
   });
 });

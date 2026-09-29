@@ -8,7 +8,9 @@ import {
 } from '@gisik-nokma/domain';
 import { ticketNumbers } from '../read/ticket-numbers.js';
 import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
+import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
+import { purgedResolverFor } from '../purge/purged-lookup.js';
 import type { Projection } from './registry.js';
 
 /**
@@ -129,7 +131,7 @@ export const noteSearchProjection: Projection = {
  * being written with an empty one: `proj_note_search` exists to be SEARCHED, and
  * a row that can never match is a row that costs an index probe to prove it.
  */
-async function reindexNote(tx: PoolClient, noteId: string): Promise<void> {
+export async function reindexNote(tx: PoolClient, noteId: string): Promise<void> {
   const { rows } = await tx.query<NoteSourceRow>(
     `SELECT note_id, workspace_id, home_project_id, title, body, deleted
        FROM proj_notes WHERE note_id = $1`,
@@ -142,7 +144,7 @@ async function reindexNote(tx: PoolClient, noteId: string): Promise<void> {
   }
 
   const title = foldSearchText(note.title);
-  const bodyText = foldSearchText(docToPlainText(note.body));
+  const bodyText = foldSearchText(docToPlainText(note.body, { isPurged: await purgedResolverFor(tx, [note.body]) }));
   const ticketText = foldSearchText(await ticketTextOf(tx, note.workspace_id, noteId));
 
   await tx.query(
@@ -180,7 +182,7 @@ async function ticketTextOf(tx: PoolClient, workspaceId: string, noteId: string)
     `SELECT t.ticket_id, t.project_id, t.fields -> 'title' ->> 'value' AS title
        FROM proj_note_attachments na
        JOIN proj_tickets t ON t.ticket_id = na.ticket_id
-      WHERE na.note_id = $1 AND t.deleted_at IS NULL
+      WHERE na.note_id = $1 AND ${LIVE_TICKET_WHERE}
       ORDER BY t.ticket_id`,
     [noteId],
   );
@@ -229,4 +231,25 @@ async function insertLexemes(tx: PoolClient, workspaceId: string, text: string):
      ON CONFLICT DO NOTHING`,
     [workspaceId, tokens],
   );
+}
+
+/**
+ * Re-derives one workspace's lexemes from its CURRENT `proj_note_search` rows —
+ * trash series Plan 2, deviation D3. The table has no note id, so an erased
+ * note's words cannot be deleted by key. This is what a rebuild produces:
+ * during a rebuild `reindexNote` reads each note's FINAL `proj_notes` row, so the
+ * rebuilt vocabulary is the tokens of every surviving note's final text. It
+ * narrows the "a lexeme is never deleted" property of
+ * `migrations/1790200000000_note-search.sql:66-70` for a workspace that has had
+ * a purge — recorded in the plan.
+ */
+export async function rederiveWorkspaceLexemes(tx: PoolClient, workspaceId: string): Promise<void> {
+  await tx.query('DELETE FROM proj_note_lexemes WHERE workspace_id = $1', [workspaceId]);
+  const { rows } = await tx.query<{ title: string; body_text: string; ticket_text: string }>(
+    'SELECT title, body_text, ticket_text FROM proj_note_search WHERE workspace_id = $1 ORDER BY note_id',
+    [workspaceId],
+  );
+  for (const row of rows) {
+    await insertLexemes(tx, workspaceId, `${row.title} ${row.body_text} ${row.ticket_text}`);
+  }
 }

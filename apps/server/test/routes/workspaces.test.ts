@@ -308,11 +308,13 @@ describe('POST /v1/workspaces — the founding door', () => {
     // reached `proj_memberships` and is being read by the gate.
     expect((projectRes.json() as { results: [{ status: string }] }).results[0]?.status).toBe('committed');
 
-    // The roster step the reserved text names. Without it the founder — owner
-    // of the workspace, but not ON the project — is refused
-    // `NOT_ON_PROJECT_REASON` by the visibility pass, which would make the
-    // assertion below fire before the type check it is about. Every earlier
-    // guard is made to pass first, deliberately.
+    // The roster step the reserved text names. AMENDED 2026-09-29, owner ruling
+    // (A) and deviation D7: this step USED TO be load-bearing — without it the
+    // founder was not ON the project and was refused `NOT_ON_PROJECT_REASON`
+    // before the type check the assertion below is about. An owner is on every
+    // founded project now, so that refusal is unreachable and the step is no
+    // longer needed for the reason it was written; it stays, because the
+    // founding form still submits it and this case is about the type check.
     const roster: SubmittedEvent = {
       id: newUlid(),
       workspaceId,
@@ -413,8 +415,8 @@ describe('GET /v1/me/workspaces — the directory', () => {
         // absent one is a route that stopped serving it, which the client's
         // mapper refuses outright. Both are DERIVED here, because `found()`
         // enters no prefix: 'Alpha' -> AL, 'Beta' -> BE.
-        { workspaceId: a, name: 'Alpha', prefix: 'AL', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
-        { workspaceId: b, name: 'Beta', prefix: 'BE', role: 'owner', memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: a, name: 'Alpha', prefix: 'AL', role: 'owner', archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId: b, name: 'Beta', prefix: 'BE', role: 'owner', archived: false, memberCount: 1, nameRestrictedProjectCount: 0, projects: [] },
       ].sort((x, y) => x.workspaceId.localeCompare(y.workspaceId)),
     );
     expect(workspaces.map((w) => w.workspaceId)).not.toContain(theirs);
@@ -478,7 +480,7 @@ describe('GET /v1/me/workspaces — the directory', () => {
         // prefix is not a count and not a name of something they cannot see —
         // it is half of every key they will read on a ticket they ARE shown,
         // and a guest holding one ticket needs it to say which ticket it is.
-        { workspaceId, name: 'Hosted', prefix: 'HO', role: 'guest', nameRestrictedProjectCount: 0, projects: [] },
+        { workspaceId, name: 'Hosted', prefix: 'HO', role: 'guest', archived: false, nameRestrictedProjectCount: 0, projects: [] },
       ],
     });
   });
@@ -506,6 +508,7 @@ describe('GET /v1/me/workspaces — the directory', () => {
       workspaceId,
       name: 'Leaving',
       role: 'owner',
+      archived: false,
       // `toContainEqual` is a DEEP equality on the whole object, so the new
       // fields belong here too — this is not a partial match that would have
       // ignored them.

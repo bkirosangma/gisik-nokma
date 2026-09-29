@@ -303,4 +303,34 @@ describe('TicketNotesSection', () => {
       vi.useRealTimers();
     }
   });
+
+  /**
+   * 9.323 — Unit 2 styling (owner screenshot, 2026-09-23: "add note button
+   * does not have a style"): the trigger draws the house ghost-button
+   * treatment, the same pair `.gn-button`/`.gn-button--ghost` "Add subtask"
+   * (`ticket-sheet.tsx`'s own `<Button>`) already carries — added onto the
+   * native `<button>` rather than swapping in the `<Button>` component
+   * itself, because `Button` is a plain function component (no
+   * `forwardRef`) and this trigger's ref is load-bearing: `Popover` anchors
+   * its position from it.
+   */
+  it('9.323 the Attach-note trigger carries gn-button/gn-button--ghost, matching Add subtask', async () => {
+    const source = createFakeDataSource({ getNotesForTicket: async () => [] });
+    render(
+      <Harness
+        dataSource={source}
+        workspaceId={WS}
+        ticketId={TICKET}
+        projectId={PROJECT}
+        currentUserId="user_kiro"
+        canEdit
+        make={makeFactory()}
+        onRefusal={vi.fn()}
+      />,
+    );
+    const trigger = await screen.findByTestId('attach-note');
+    expect(trigger).toHaveClass('gn-button');
+    expect(trigger).toHaveClass('gn-button--ghost');
+    expect(trigger).toHaveClass('gn-ticket-sheet__attach');
+  });
 });

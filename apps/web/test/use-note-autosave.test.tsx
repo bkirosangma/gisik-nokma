@@ -341,3 +341,43 @@ describe('18.205-18.209 useNoteAutosave', () => {
     }
   });
 });
+
+describe('9.426 restoredAt and discardDraft', () => {
+  const hookFor = (note: NoteDetail, dataSource: DataSource) =>
+    renderHook(() =>
+      useNoteAutosave({ dataSource, userId: USER, workspaceId: WORKSPACE, noteId: NOTE, note }),
+    );
+
+  it('9.426 restoredAt is the recovered draft\'s time, and null for no draft or a stale one', () => {
+    const { dataSource } = fakeDataSource(committed);
+    const note = noteDetail('2026-09-23T08:00:00.000Z');
+    expect(hookFor(note, dataSource).result.current.restoredAt).toBeNull();
+    const newer = Date.parse('2026-09-23T09:00:00.000Z');
+    window.localStorage.setItem(draftKey(USER, NOTE), JSON.stringify({ doc: doc('mine'), at: newer }));
+    expect(hookFor(note, dataSource).result.current.restoredAt).toBe(newer);
+    window.localStorage.setItem(
+      draftKey(USER, NOTE),
+      JSON.stringify({ doc: doc('old'), at: Date.parse('2026-09-23T07:00:00.000Z') }),
+    );
+    expect(hookFor(note, dataSource).result.current.restoredAt).toBeNull();
+  });
+
+  it('9.427 discardDraft deletes the key and cancels the pending write, so neither the timer nor the unmount flush saves the discarded words', async () => {
+    const { dataSource, ingest } = fakeDataSource(committed);
+    window.localStorage.setItem(
+      draftKey(USER, NOTE),
+      JSON.stringify({ doc: doc('mine'), at: Date.parse('2026-09-23T09:00:00.000Z') }),
+    );
+    const hook = hookFor(noteDetail('2026-09-23T08:00:00.000Z'), dataSource);
+    // CONTROL: the recovered draft IS pending, so without the discard the unmount below would write it.
+    expect(hook.result.current.saveState).toBe('unsaved');
+    act(() => hook.result.current.discardDraft());
+    expect(window.localStorage.getItem(draftKey(USER, NOTE))).toBeNull();
+    expect(hook.result.current.saveState).toBe('saved');
+    await act(async () => {
+      vi.advanceTimersByTime(5000);
+    });
+    hook.unmount();
+    expect(ingest).not.toHaveBeenCalled();
+  });
+});

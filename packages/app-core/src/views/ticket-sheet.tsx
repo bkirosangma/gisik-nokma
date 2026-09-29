@@ -8,19 +8,26 @@ import {
   type SubmittedEvent,
   type TicketTypeDef,
 } from '@gisik-nokma/domain';
-import { Button, Chip, Dialog, SegmentedControl, Select, Sheet, Toast } from '@gisik-nokma/ui';
+import { Button, Chip, SegmentedControl, Select, Sheet, Toast } from '@gisik-nokma/ui';
 import type { ClientStateCache } from '../cache.js';
 import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
-import { memberLabel } from '../member-label.js';
+import { actorLabelFrom, memberLabel } from '../member-label.js';
+import { useActorNames } from './use-actor-names.js';
+import { mentionCandidatesOf } from '../mention-candidates.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
 import type { ParentRef, TicketHistoryEvent, TicketRead } from '../view-types.js';
 import { attachmentsImpliedBy, noteReferencesIn } from '../flows/attachments-implied-by.js';
 import { AttachmentList, type AttachmentListEntry } from './attachment-list.js';
 import { CommentsThread, type TicketComment } from './comments-thread.js';
+import { ASSIGNEE_OUTSIDE_ROSTER, ASSIGN_OUTSIDER_OPTION } from '../people/copy.js';
+import { outsiderIngest } from '../people/outsider-ingest.js';
+import type { AssignOutsider, LookupPerson } from '../people/types.js';
+import { OutsiderFinder } from './outsider-finder.js';
+import { DeleteDialog } from './delete-dialog.js';
 import {
   PlainTextEditorSlot,
   type EditorSlotComponent,
@@ -33,6 +40,31 @@ import { TicketNotesSection } from './ticket-notes-section.js';
 import { TransitionDialog, type TransitionSubmission } from './transition-dialog.js';
 import { VisibilityEditor, type VisibilityClaim } from './visibility-editor.js';
 import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
+import { usePurgedPredicate } from './use-purged-predicate.js';
+
+/**
+ * The Attachments tab's "Attach a file" button `accept` hint (Unit 5(b)) —
+ * the SAME eleven types `apps/server/src/attachments/sniff.ts`'s
+ * `ALLOWED_ATTACHMENT_MIME` accepts, transcribed rather than imported (this
+ * package cannot depend on `apps/server`, and `packages/editor`'s own copy —
+ * `TicketEditorSlot.tsx`'s `ATTACHMENT_ACCEPT` — is unreachable too: `app-
+ * core` must never depend on `@gisik-nokma/editor`, the same direction
+ * `editor-slot.tsx`'s docblock states for the reverse edge). A UX hint
+ * only — the server decides by magic bytes, never by this string.
+ */
+const ATTACHMENT_ACCEPT = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+].join(',');
 
 /**
  * How many ledger entries this sheet asks for, and the reason it names a number
@@ -326,8 +358,16 @@ export type TicketSheetProps = {
    * that same expression: the key when the workspace has a prefix, the title
    * when it does not. The toast therefore says what the prototype says wherever
    * a key exists, and still names the ticket where one does not.
+   *
+   * ## `{ permanent }` (trash Plan 4, D11)
+   *
+   * True when the delete dialog's **Delete permanently** switch was on AND the
+   * mark committed. The host's Undo then sends `purge.unmarked` before
+   * `ticket.restored`, in one batch — the server refuses a restore while the
+   * ticket is marked (`UNMARK_FIRST_REASON`). Additive: a host that takes two
+   * arguments is unaffected.
    */
-  onDeleted?: (ticketId: string, name: string) => void;
+  onDeleted?: (ticketId: string, name: string, outcome: { permanent: boolean }) => void;
   /**
    * The two names the breadcrumb above the title shows — the workspace's and
    * the project's — supplied by the host, which already holds both.
@@ -417,6 +457,10 @@ export type TicketSheetProps = {
    * assumed.
    */
   onNavigate?: (href: string) => void;
+  /** See `NewTicketDialogProps.lookupPerson`: present → the Assignee picker offers the outsider arm. */
+  lookupPerson?: LookupPerson;
+  /** See `CreateTicketFlowProps.assignOutsider`: an outsider pick's `ticket.assigned` goes through it. */
+  assignOutsider?: AssignOutsider;
 };
 
 /**
@@ -578,9 +622,21 @@ export function TicketSheet({
   workspaceHref,
   projectHref,
   onNavigate,
+  lookupPerson,
+  assignOutsider,
 }: TicketSheetProps) {
   const EditorSlot = editorSlot ?? PlainTextEditorSlot;
   const [tab, setTab] = useState<'details' | 'history' | 'attachments'>('details');
+  // Unit 5(b), owner: "I thought we already made the attachment feature but
+  // i dont see where we can attach files in our build" — the Attachments
+  // tab's own "Attach a file" (prototype `addFile`, `desktop.dc.html:1363-
+  //1366`). `attachTabInputRef` is the hidden file input the button clicks;
+  // `attachTabRefusal` is a LOCAL failure sentence, not `attachRefusals`
+  // (that Toast is specifically for notes a COMMENT implied and does not fit
+  // a plain upload failure).
+  const attachTabInputRef = useRef<HTMLInputElement | null>(null);
+  const [attachingTab, setAttachingTab] = useState(false);
+  const [attachTabRefusal, setAttachTabRefusal] = useState<string | null>(null);
   /**
    * Full screen (sheet prototype parity, 2026-09-20). Local state, like `tab`:
    * it is a way of LOOKING at this sheet rather than anything the server holds,
@@ -588,6 +644,11 @@ export function TicketSheet({
    */
   const [sheetFull, setSheetFull] = useState(false);
   const [moveOpen, setMoveOpen] = useState(false);
+  // The outsider arm of the Assignee row (access plan W6) — state lives up here, not in the row's IIFE.
+  const [findingOutsider, setFindingOutsider] = useState(false);
+  // Who was just pulled in through the finder, so the picker can NAME them while
+  // the roster (which hides guests from non-admins) cannot.
+  const [pickedOutsider, setPickedOutsider] = useState<{ userId: string; name: string } | null>(null);
   /**
    * How many moves have COMMITTED. Bumped beside `setMoveOpen(false)` on the
    * success path and used as `TransitionDialog`'s `key`, so a committed move is a
@@ -610,27 +671,6 @@ export function TicketSheet({
    * name until this ruling gave it a proper slot.
    */
   const [transportError, setTransportError] = useState<string | null>(null);
-  /**
-   * THE FOOTER'S OWN PAIR, and the same two facts as `serverRefusal` /
-   * `transportError` one screen down (E5-9, 2026-09-21).
-   *
-   * WHY PLACEMENT IS PART OF THE ANSWER HERE. `Delete` is the last thing in the
-   * sheet's body, and that body scrolls: the lane that filed this measured
-   * `.gn-ticket-sheet__body` at `clientHeight 756` against `scrollHeight 4036`,
-   * with the footer's top 3,942.8 px below the tab bar. The shared slots sit at
-   * the HEAD of that body, so a person who scrolled to the foot, pressed Delete
-   * and was refused was answered about five viewports above their own eyes —
-   * the sentence was on screen in the DOM and nowhere near the screen they were
-   * looking at. `TransitionDialog` already owns its own refusal slots for
-   * exactly this reason; Delete had none.
-   *
-   * These are separate STATE, not a flag on the shared pair, because the two
-   * sentences must never coexist: every submission clears BOTH pairs (see
-   * `submitTicketEvent`'s `clearBoth`), so one click's outcome is one sentence
-   * in one place.
-   */
-  const [footerRefusal, setFooterRefusal] = useState<{ rule: string; reason: string } | null>(null);
-  const [footerTransport, setFooterTransport] = useState<string | null>(null);
   /**
    * A THIRD slot, and the third distinct fact: something the editor itself
    * could not do, where the server was never asked.
@@ -761,7 +801,7 @@ export function TicketSheet({
    *
    * ## What this does NOT do, and why each omission is deliberate
    *
-   * **The control is NOT hidden** — the docblock beside `deleteTicket` is right
+   * **The control is NOT hidden** — the docblock beside `onDeleteCommitted` is right
    * that a hidden control cannot explain itself, and the finding says so in as
    * many words. This asks; it does not conceal.
    *
@@ -782,6 +822,12 @@ export function TicketSheet({
    * the ruled 15 seconds (the host owns it) and the page strip this batch added.
    * Saying "its history is retained" alone would be the same misleading half
    * E2-30 corrected in the toast's own sentence.
+   *
+   * ## Amended by trash Plan 4 (spec §6.1, D6)
+   *
+   * The confirmation is now `DeleteDialog`, the one every delete door opens. Its
+   * note replaces the sentence above about "two routes back": Deleted items on
+   * the Account page is the durable route that now exists, and the note names it.
    */
   const [confirmingDelete, setConfirmingDelete] = useState(false);
   /**
@@ -814,6 +860,13 @@ export function TicketSheet({
   const members = useLiveQuery(dataSource, workspaceId, workspaceId, () =>
     dataSource.query.getMembers(workspaceId),
   );
+  /**
+   * The names-only read, for the people the roster omits — a guest, for a plain
+   * member's roster. It feeds `nameOf` (labels) and NOTHING ELSE: `members`
+   * above is what the pickers and the visibility editor offer, and a guest must
+   * not be offered there. One-time, not live — see `useActorNames`.
+   */
+  const actorNames = useActorNames(dataSource, workspaceId);
   const history = useLiveQuery(dataSource, workspaceId, `${ticketId}:history`, () =>
     dataSource.query.getTicketHistory(ticketId, undefined, HISTORY_PAGE_LIMIT),
   );
@@ -961,6 +1014,23 @@ export function TicketSheet({
     dataSource.query.getTicketTypes(workspaceId),
   );
 
+  /**
+   * Trash Plan 3 — which chips in this ticket's STORED documents point at
+   * permanently erased items. Hooks run before the early returns below, so the
+   * documents are read off `read.data` rather than off `descriptionClaim`.
+   */
+  // Two predicates, one session cache: the description's editor waits only for
+  // the description's own chips (Task 8), never for the thread's.
+  const purgedDescription = usePurgedPredicate(
+    dataSource.query,
+    [read.data?.ticket.fields['description']?.value],
+    read.data !== null,
+  );
+  const purgedComments = usePurgedPredicate(
+    dataSource.query,
+    (comments.data ?? []).map((comment) => comment.body),
+  );
+
   if (read.error !== null) {
     return (
       <Sheet open title="Ticket" onClose={onClose}>
@@ -1024,10 +1094,8 @@ export function TicketSheet({
   // display name, so the magic-link population reads as their address here
   // instead of as an empty string. A member the roster does not cover is still
   // `null`, and `actorLabel`'s own id floor answers for it, unchanged.
-  const nameOf = (userId: string): string => {
-    const member = members.data?.find((candidate) => candidate.id === userId);
-    return actorLabel(userId, member === undefined ? null : memberLabel(member));
-  };
+  const nameOf = (userId: string): string =>
+    actorLabel(userId, actorLabelFrom(userId, members.data, actorNames));
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
 
   /**
@@ -1227,14 +1295,20 @@ export function TicketSheet({
    * a control that hid itself would leave a refusal unreachable and therefore
    * unrendered.
    */
-  const submitAssignee = async (assigneeId: string | null): Promise<void> => {
+  const submitAssignee = async (assigneeId: string | null, viaOutsider = false): Promise<void> => {
     const event = make({
       workspaceId,
       entity: { kind: 'ticket', id: ticketId },
       type: 'ticket.assigned',
       payload: { assigneeId },
     });
-    const results = await dataSource.ingest([event]);
+    // The outsider door (access plan W6) for someone found by email who is not
+    // in the workspace; the ordinary door for everyone else. Same answer shape,
+    // same refusal rendering below (case 3.990).
+    const results =
+      viaOutsider && assignOutsider !== undefined && assigneeId !== null
+        ? await outsiderIngest(assignOutsider, assigneeId)([event])
+        : await dataSource.ingest([event]);
     const failed = results.find((result) => result.status !== 'committed');
     if (failed === undefined) {
       setServerRefusal(null);
@@ -1476,6 +1550,29 @@ export function TicketSheet({
   };
 
   /**
+   * Unit 5(b) — the Attachments tab's own upload, through the SAME two-step
+   * path the composer's Attach button and paste/drop all use:
+   * `uploadAttachment` then `emitAttachmentAdded`. No node to insert here
+   * (this tab holds no document) and no local list to update — `attachments`
+   * is the page's own live query, prop-fed, and reads the newly-added file
+   * the same way it already reads one a paste implied, once the ledger
+   * write above lands and the page's stream re-fetches.
+   */
+  async function handleAttachmentTabUpload(file: File): Promise<void> {
+    if (!uploadAttachment) return;
+    setAttachingTab(true);
+    setAttachTabRefusal(null);
+    try {
+      const uploaded = await uploadAttachment(file);
+      await emitAttachmentAdded(uploaded);
+    } catch (err) {
+      setAttachTabRefusal(err instanceof Error ? err.message : String(err));
+    } finally {
+      setAttachingTab(false);
+    }
+  }
+
+  /**
    * Mentions, resolved off the roster this sheet ALREADY reads for `nameOf`
    * and for the assignee picker — nothing new is read and nothing is passed in,
    * the same argument the assignee row's own case makes.
@@ -1499,26 +1596,11 @@ export function TicketSheet({
    * **Named owner: whoever next widens `EditorSlotProps.queryUsers`** — an
    * absent-roster signal has to exist before this can tell the truth.
    */
-  const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> => {
-    const people = members.data ?? [];
-    const needle = query.trim().toLowerCase();
-    // RULING E5-4: `member.name` verbatim is blank for the magic-link
-    // population (`name: ''`) — the same defect E4-18 closed on the
-    // Assignee picker, here on the @mention list. Resolved BEFORE matching,
-    // not after: a nameless member is otherwise never reachable by typing
-    // (their raw name never matches anything) and, once resolved, is found
-    // the same way any other person is — by what this list actually shows
-    // for them.
-    //
-    // Resolved through `memberLabel` (2026-09-22), not `actorLabel`: a row in
-    // this list IS a roster member, so the address step applies, and "what this
-    // list shows for them" is now name → email → id rather than name → id.
-    // `actorLabel` would be wrong here for its FIRST step as well — the system
-    // override is for claims, not for a person you can @mention.
-    return people
-      .map((member) => ({ userId: member.id, name: memberLabel(member) }))
-      .filter((person) => needle === '' || person.name.toLowerCase().includes(needle));
-  };
+  const queryUsers = async (query: string): Promise<Array<{ userId: string; name: string }>> =>
+    // The list itself is `mentionCandidatesOf` — shared with the note editors
+    // (`apps/web/src/notes`), which is where RULING E5-4's label-before-match
+    // note now lives.
+    mentionCandidatesOf(members.data ?? [], query);
 
   /**
    * Close / Reopen — the same `make`/`ingest`/result idiom `submitTransition`
@@ -1595,39 +1677,21 @@ export function TicketSheet({
    * names this one first; the reasoning above is why it is the one taken.
    */
   const submitTicketEvent = async (
-    type: 'ticket.closed' | 'ticket.reopened' | 'ticket.deleted',
+    type: 'ticket.closed' | 'ticket.reopened',
     onCommitted: () => void,
-    /**
-     * WHERE this event's answer is shown (E5-9). `'sheet'` is the shared slot at
-     * the head of the body; `'footer'` is the one beside Delete.
-     *
-     * The state machine is SHARED on purpose — the refusal/transport split, the
-     * `submitting` latch and the three-outcome branch are one decision, and a
-     * delete that grew a private copy is how the two drift. What is NOT shared
-     * is the PLACEMENT, because the two controls are not equally far from the
-     * shared slot: `Delete` sits at the end of a body that legitimately scrolls
-     * thousands of pixels, and the lane that filed this measured the footer's
-     * top 3,942.8 px below the tab bar — so an answer rendered at the head is an
-     * answer the person who pressed the button cannot see. `Close`/`Reopen` sit
-     * in that same footer, but their refusals are rendered by `TransitionDialog`
-     * (which owns its own slot) or by the shared one while the person is still
-     * at the head of the body.
-     */
-    sink: 'sheet' | 'footer',
   ): Promise<void> => {
-    // ONE pair of writers per sink, chosen once. Every branch below states its
-    // outcome through these rather than through the setters directly, so a
-    // future outcome cannot land in the wrong place by omission.
-    const putRefusal = sink === 'footer' ? setFooterRefusal : setServerRefusal;
-    const putTransport = sink === 'footer' ? setFooterTransport : setTransportError;
-    // Both sinks are cleared by every submission, whichever one this is: two
-    // sentences about one click's outcome — one stale, one current — is the
-    // defect the shared slot's own comment below already refuses.
+    // The head-slot writers. Until trash Plan 4 a Delete answered through a
+    // FOOTER pair chosen by a `sink` parameter (E5-9); Delete now answers inside
+    // `DeleteDialog` (D7), so Close/Reopen are the only callers and one pair of
+    // writers is left.
+    const putRefusal = setServerRefusal;
+    const putTransport = setTransportError;
+    // Both slots are cleared by every submission: two sentences about one
+    // click's outcome — one stale, one current — is the defect the shared slot's
+    // own comment below already refuses.
     const clearBoth = (): void => {
       setServerRefusal(null);
       setTransportError(null);
-      setFooterRefusal(null);
-      setFooterTransport(null);
     };
     setSubmitting(true);
     try {
@@ -1655,11 +1719,9 @@ export function TicketSheet({
       if (result.status === 'committed') {
         clearBoth();
         // What a COMMITTED event does next is the caller's — Close/Reopen
-        // re-read (the ticket's own state moved), Delete closes and narrates
-        // (the ticket is gone from every view). Everything before this line is
+        // re-read (the ticket's own state moved). Everything before this line is
         // shared on purpose: the refusal and transport-error slots, the
-        // `submitting` latch, and the three-outcome split are one decision, and
-        // a delete that grew its own private copy of them is how the two drift.
+        // `submitting` latch, and the three-outcome split are one decision.
         onCommitted();
         return;
       }
@@ -1964,12 +2026,6 @@ export function TicketSheet({
         read.reload();
         history.reload();
       },
-      // The shared slot. Their own refusals are the one case that reaches it
-      // from the foot of the sheet: Close/Reopen are rendered only while
-      // `TransitionDialog` is closed, and its copy is not on screen then — see
-      // the slot's own comment, which is what makes that placement deliberate
-      // rather than an oversight.
-      'sheet',
     );
 
   /**
@@ -1996,22 +2052,16 @@ export function TicketSheet({
    * button that silently is not there. **A hidden control cannot explain
    * itself.**
    *
-   * ## ⚠ AND ITS REFUSAL ANSWERS IN THE FOOTER, NOT AT THE HEAD OF THE BODY
+   * ## ITS REFUSAL ANSWERS INSIDE THE DIALOG (trash Plan 4, D7, case 19.231)
    *
-   * The ruling above is about WHETHER Delete is offered; it never weighed
-   * WHERE its answer lands, and the answer landed five screens away (E5-9;
-   * the measurement is on `footerRefusal`). The sink is `'footer'` for that
-   * reason: the sentence renders beside the button the person just pressed.
+   * Spec §7: the dialog that asked shows the answer and stays open, which is
+   * where the person is when they press.
    */
-  const deleteTicket = (): Promise<void> =>
-    submitTicketEvent(
-      'ticket.deleted',
-      () => {
-        onClose();
-        onDeleted?.(ticketId, ticketRead.key ?? ticketRead.title);
-      },
-      'footer',
-    );
+  const onDeleteCommitted = ({ permanent }: { permanent: boolean }): void => {
+    setConfirmingDelete(false);
+    onClose();
+    onDeleted?.(ticketId, ticketRead.key ?? ticketRead.title, { permanent });
+  };
 
   const state = ticketRead.ticket;
   /**
@@ -2648,6 +2698,7 @@ export function TicketSheet({
    * assignee is among the options, and the row falls back to saying what it is.
    */
   const UNASSIGNED = '__unassigned__';
+  const OUTSIDER_OPTION = '__outsider__';
   const assigneeRow = ((): { control: ReactNode; claim: string } => {
     const claim =
       ticketRead.assignedProvenance === null
@@ -2678,14 +2729,28 @@ export function TicketSheet({
       };
     }
     const people = members.data;
-    if (state.assigneeId !== null && !people.some((member) => member.id === state.assigneeId)) {
+    const outsideRoster = state.assigneeId !== null && !people.some((member) => member.id === state.assigneeId);
+    if (outsideRoster && lookupPerson === undefined) {
       // Assigned to somebody this viewer's roster does not list — a guest, to a
       // non-admin caller. The row says the name it can and offers no control,
       // rather than offering one that cannot state the value.
       return { control: readOnly, claim: `${claim} — not in the roster you can see` };
     }
+    // With the outsider arm on (final review, 2026-09-29): a member who pulls an
+    // outsider in must be able to change or clear that assignment, so the picker
+    // stays and carries the current assignee as ONE labelled option.
+    const outsideOption =
+      outsideRoster && state.assigneeId !== null
+        ? [
+            {
+              value: state.assigneeId,
+              label: pickedOutsider?.userId === state.assigneeId ? pickedOutsider.name : ASSIGNEE_OUTSIDE_ROSTER,
+            },
+          ]
+        : [];
     return {
       control: (
+        <>
         <Select
           aria-label="Assignee"
           options={[
@@ -2703,16 +2768,34 @@ export function TicketSheet({
             // id. `actorLabel` is deliberately NOT used: a picker option is a
             // person, and the system-actor override belongs to claims — the
             // same reason `visibility-editor.tsx`'s picker has its own label.
+            ...outsideOption,
             ...people.map((member) => ({
               value: member.id,
               label: memberLabel(member),
             })),
+            ...(lookupPerson === undefined ? [] : [{ value: OUTSIDER_OPTION, label: ASSIGN_OUTSIDER_OPTION }]),
           ]}
           value={state.assigneeId ?? UNASSIGNED}
           onChange={(next) => {
+            if (next === OUTSIDER_OPTION) {
+              setFindingOutsider(true);
+              return;
+            }
             void submitAssignee(next === UNASSIGNED ? null : next);
           }}
         />
+        {findingOutsider && lookupPerson !== undefined ? (
+          <OutsiderFinder
+            lookup={lookupPerson}
+            onCancel={() => setFindingOutsider(false)}
+            onPick={(person) => {
+              setFindingOutsider(false);
+              setPickedOutsider({ userId: person.userId, name: person.name });
+              void submitAssignee(person.userId, !person.inWorkspace);
+            }}
+          />
+        ) : null}
+        </>
       ),
       claim,
     };
@@ -3221,6 +3304,7 @@ export function TicketSheet({
                 passed unconditionally because the read-only fallback ignores
                 every capability prop on purpose.
               */}
+              {purgedDescription.ready ? (
               <EditorSlot
                 mode="description"
                 // The composer is NAMED BY the `<dt>` above rather than given
@@ -3238,8 +3322,10 @@ export function TicketSheet({
                 queryNotes={queryNotes}
                 {...(queryTickets === undefined ? {} : { queryTickets })}
                 {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                isPurged={purgedDescription.isPurged}
                 onError={reportEditorError}
               />
+              ) : null}
               <span className="gn-ticket-sheet__claim">{descriptionClaimLine}</span>
           </section>
           <dl className="gn-ticket-sheet__fields">
@@ -3891,6 +3977,7 @@ export function TicketSheet({
             commentsUnavailable={comments.error ?? undefined}
             nameOf={nameOf}
             {...(resolveTicketHref === undefined ? {} : { ticketHref: resolveTicketHref })}
+            isPurged={purgedComments.isPurged}
             composer={
               editorSlot === undefined ? undefined : (
                 <EditorSlot
@@ -3908,6 +3995,7 @@ export function TicketSheet({
                   queryNotes={queryNotes}
                   {...(queryTickets === undefined ? {} : { queryTickets })}
                   {...(resolveTicketHref === undefined ? {} : { resolveTicketHref })}
+                  isPurged={purgedComments.isPurged}
                   uploadAttachment={uploadAttachment}
                   emitAttachmentAdded={emitAttachmentAdded}
                   onError={reportEditorError}
@@ -3953,7 +4041,47 @@ export function TicketSheet({
       ) : tab === 'attachments' ? (
         <div className="gn-ticket-sheet__attachments">
           {attachmentsUnavailable === undefined ? (
-            <AttachmentList entries={attachments ?? []} />
+            <>
+              <AttachmentList entries={attachments ?? []} />
+              {/*
+                Unit 5(b) — the prototype's own footer control inside this
+                same "answered" arm (`desktop.dc.html:1363-1366`: the list
+                rows, the empty state, THEN this button, in that order) —
+                never drawn over a FAILED read, the same "not a dead button"
+                rule the composer's own Attach button follows: there is no
+                known list here to add a file to honestly.
+              */}
+              {uploadAttachment === undefined ? null : (
+                <>
+                  <button
+                    type="button"
+                    className="gn-ticket-sheet__attach-file"
+                    disabled={attachingTab}
+                    onClick={() => attachTabInputRef.current?.click()}
+                  >
+                    {attachingTab ? 'Attaching…' : 'Attach a file'}
+                  </button>
+                  <input
+                    ref={attachTabInputRef}
+                    type="file"
+                    className="gn-ticket-sheet__attach-file-input"
+                    accept={ATTACHMENT_ACCEPT}
+                    tabIndex={-1}
+                    aria-hidden="true"
+                    onChange={(event) => {
+                      const file = event.target.files?.[0];
+                      if (file) void handleAttachmentTabUpload(file);
+                      event.target.value = '';
+                    }}
+                  />
+                </>
+              )}
+              {attachTabRefusal === null ? null : (
+                <p role="alert" className="gn-ticket-sheet__refusal" data-testid="sheet-attach-tab-refusal">
+                  {attachTabRefusal}
+                </p>
+              )}
+            </>
           ) : (
             /*
               The three-way distinction this sheet draws for the ledger tab,
@@ -4020,39 +4148,12 @@ export function TicketSheet({
           sheet is already open on. So the footer draws on every mount, and
           `onDeleted` (the host's half) is optional and NOT load-bearing: the
           close happens here, and a host that narrates nothing still gets a closed
-          sheet. See `deleteTicket`'s docblock.
+          sheet. See `onDeleteCommitted`'s docblock.
 
           The strip's fill and its full-bleed inset remain the recorded departure
           `ui.css` carries beside `.gn-ticket-sheet__footer` — the reason is a
           `Sheet` API change, measured there rather than asserted here. */}
       <footer className="gn-ticket-sheet__footer">
-        {/*
-          DELETE'S OWN ANSWER, HERE RATHER THAN AT THE HEAD OF THE BODY.
-
-          The shared slots above sit at the top of the one scrolling body; this
-          one is where the person is when they press the button. The lane that
-          filed E5-9 measured the footer's top **3,942.8 px** below the tab bar
-          (`scrollHeight 4036` against `clientHeight 756`), so an answer rendered
-          in the shared slot arrived about five viewports above the eyes that
-          asked for it. Same two facts, same sentences, own placement — the
-          reasoning, and why this is a separate PAIR of states rather than a flag
-          on the shared one, is on `footerRefusal`'s declaration.
-
-          It renders INSIDE the footer element so the answer is structurally
-          attached to the control, which is the property the case asserts: a
-          jsdom sheet lays nothing out, so the pixel claim is the lane's and the
-          containment claim is this test's.
-        */}
-        {footerRefusal !== null ? (
-          <p role="alert" className="gn-refusal gn-refusal--server">
-            {`Refused by the server — ${footerRefusal.rule}: ${footerRefusal.reason}`}
-          </p>
-        ) : null}
-        {footerTransport !== null ? (
-          <p role="alert" className="gn-refusal gn-refusal--transport">
-            {footerTransport}
-          </p>
-        ) : null}
         <button
           type="button"
           className="gn-ticket-sheet__delete"
@@ -4064,45 +4165,26 @@ export function TicketSheet({
       </footer>
 
       {/*
-        RULING E2-35 — the confirmation, in `BulkCloseDialog`'s shape: a `Dialog`
-        with a title, the consequence, and Cancel beside a primary confirm.
-        Rendered HERE, beside `TransitionDialog`'s own mount, so the sheet owns
-        both of its modal decisions from one place.
-
-        ⚠ THE CONFIRM IS NAMED **Delete ticket**, not "Delete". The footer's
-        control is called "Delete", and a second button with the same accessible
-        name on one screen is ambiguous to a screen-reader user and
-        unaddressable by role and name — the same collision this batch's E2-30
-        hit on the deleted-ticket strip's Undo.
-
-        ⚠ AND THE CONFIRM CARRIES NO `disabled`. It unmounts on its own click
-        (`setConfirmingDelete(false)` runs before the submit), so a disabled
-        state there is a term nobody can ever observe — which is exactly the
-        defect E2-31 removed one function up. The guard for the submit in flight
-        is the FOOTER's own `disabled={submitting}`, which is set before the
-        first await and blocks a second press from opening this dialog again.
+        RULING E2-35, NOW THE SHARED CONFIRMATION (trash Plan 4, spec §6.1). The
+        sheet's own `Dialog` became `DeleteDialog` — the component every delete
+        door opens — so its title is `Delete ticket “<title>”?`, its note names
+        Deleted items (the durable way back), its refusal answers inside it
+        (§7), and its **Delete permanently** switch marks the ticket too. The
+        confirm's accessible name is still `Delete ticket` (D8), so the footer's
+        `Delete` stays the only button of that name. It unmounts on commit via
+        `onDeleteCommitted`, and on Cancel/Escape via `setConfirmingDelete`.
       */}
-      <Dialog
+      <DeleteDialog
         open={confirmingDelete}
-        title="Delete this ticket?"
-        onClose={() => setConfirmingDelete(false)}
-      >
-        <p>
-          {`${ticketRead.title} will stop appearing in the Board, the List, the Calendar and the Timeline. Nothing is erased — its history is kept — and you can put it back for 15 seconds from the message that follows, or from the message on the page until you delete another ticket.`}
-        </p>
-        <div>
-          <Button onClick={() => setConfirmingDelete(false)}>Cancel</Button>
-          <Button
-            variant="primary"
-            onClick={() => {
-              setConfirmingDelete(false);
-              void deleteTicket();
-            }}
-          >
-            Delete ticket
-          </Button>
-        </div>
-      </Dialog>
+        kind="ticket"
+        name={ticketRead.title}
+        workspaceId={workspaceId}
+        entityId={ticketId}
+        dataSource={dataSource}
+        make={make}
+        onCancel={() => setConfirmingDelete(false)}
+        onDeleted={onDeleteCommitted}
+      />
 
       {workflow.data != null ? (
         <TransitionDialog

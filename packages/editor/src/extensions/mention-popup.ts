@@ -6,6 +6,12 @@ export type MentionPopupProps = {
   command: (item: MentionCandidate) => void;
   clientRect?: (() => DOMRect | null) | null;
   /**
+   * The row to highlight when the popup opens (the person a mention being
+   * replaced already names). Absent, or naming nobody listed, the first row is
+   * highlighted, as it is for the `@` trigger.
+   */
+  selectedUserId?: string;
+  /**
    * Narrowed to what this file touches. `@tiptap/suggestion` passes the whole
    * `Editor`; the popup needs one thing from it — the contenteditable element
    * that keeps focus while the popup is open, and therefore the element that
@@ -170,7 +176,7 @@ export function createMentionPopup(): MentionPopupRenderer {
       claimEditor(props.editor.view.dom);
       items = props.items;
       command = props.command;
-      selectedIndex = 0;
+      selectedIndex = Math.max(0, items.findIndex((item) => item.userId === props.selectedUserId));
       paint();
       positionBinding = bindSuggestionPopupPosition(container);
       positionBinding.reposition(props.clientRect);

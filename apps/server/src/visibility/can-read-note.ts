@@ -65,8 +65,7 @@ export function canReadNote(
     // workspace-mode TICKET: a guest reaches work through explicit lists only.
     case 'workspace':
       return eff.workspaceRole !== 'guest';
-    // Membership, NOT role. An admin on no project does not read a project's
-    // notes — the same no-bypass rule `canSeeResolved` states for tickets.
+    // Membership, NOT role — and since rule A an owner/admin/member is on every founded project; a guest never.
     case 'project':
       return eff.workspaceRole !== 'guest' && eff.projects.has(note.homeProjectId);
     // `explicit` admits guests, as it does for tickets, and consults the USER

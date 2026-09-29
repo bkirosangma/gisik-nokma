@@ -1,9 +1,13 @@
+import { readFileSync } from 'node:fs';
+import { resolve } from 'node:path';
+import { searchTermSchema } from '@gisik-nokma/domain';
 import { createElement } from 'react';
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import userEvent from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
-import type { NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
+import { DELETE_TRIGGER_LABEL } from '@gisik-nokma/app-core';
+import type { Actor, DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import type { IngestResult, NoteDetail, SubmittedEvent } from '@gisik-nokma/domain';
 import { Providers } from '../src/providers.js';
 import { noteDraftKey } from '../src/notes/use-note-autosave.js';
 import { stubServices } from './helpers/stub-services.js';
@@ -70,6 +74,7 @@ const WS_A_REF: WorkspaceRef = {
   name: 'Garo Hills Logistics',
   prefix: 'CC',
   role: 'owner',
+  archived: false,
   memberCount: 3,
   nameRestrictedProjectCount: 0,
   projects: [project(P_COLD, 'Cold room')],
@@ -106,17 +111,25 @@ function noteDetail(over: Partial<NoteDetail> = {}): NoteDetail {
 }
 
 function world(
-  opts: { note?: NoteDetail; role?: string; search?: DataSourceQuery['search'] } = {},
+  opts: {
+    note?: NoteDetail;
+    role?: string;
+    search?: DataSourceQuery['search'];
+    getTickets?: DataSourceQuery['getTickets'];
+    actorNames?: Actor[];
+  } = {},
 ) {
   const services = stubServices({
     getMyWorkspaces: async () => [{ ...WS_A_REF, role: opts.role ?? 'owner' }],
     ...(opts.search === undefined ? {} : { search: opts.search }),
+    ...(opts.getTickets === undefined ? {} : { getTickets: opts.getTickets }),
     // The read REFUSES an id nothing holds, as the route does — a stub that
     // answered the same note for every id would make 18.202's "unknown target"
     // arm unfalsifiable, since `previewNote` would always find something.
     getNote: async (_workspaceId: string, id: string) =>
       id === NOTE ? (opts.note ?? noteDetail()) : null,
     getMembers: async () => MEMBERS,
+    getActorNames: async () => opts.actorNames ?? [],
     getNotes: async () => [
       {
         noteId: OTHER_NOTE,
@@ -150,7 +163,7 @@ beforeEach(() => {
   });
 });
 
-function renderDocument(opts: { note?: NoteDetail; role?: string } = {}) {
+function renderDocument(opts: { note?: NoteDetail; role?: string; actorNames?: Actor[] } = {}) {
   return render(
     <Providers services={world(opts)}>
       <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
@@ -172,6 +185,28 @@ function slotProps(): Record<string, unknown> {
   if (last === undefined) throw new Error('the note-mode slot was never rendered');
   return last;
 }
+
+describe('18.440 the note byline names its author even when the roster omits them', () => {
+  it('18.440 a note written by a guest (absent from a member’s roster) shows the guest’s name, not their id; a roster author and an unnamed author are the controls', async () => {
+    const guest = renderDocument({
+      role: 'member',
+      note: noteDetail({ authorId: 'u_gita' }),
+      actorNames: [{ id: 'u_gita', name: 'Gita Guest' }],
+    });
+    expect(await screen.findByText('Gita Guest')).toBeInTheDocument();
+    expect(screen.queryByText('u_gita')).not.toBeInTheDocument();
+    guest.unmount();
+
+    // CONTROL: a roster author is still named by the roster.
+    const ana = renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
+    ana.unmount();
+
+    // CONTROL: nobody names this author — the id is what the byline shows.
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_zed' }) });
+    expect(await screen.findByText('u_zed')).toBeInTheDocument();
+  });
+});
 
 describe('18.11 The Notes page — the document', () => {
   /**
@@ -436,6 +471,38 @@ describe('18.11 The Notes page — the document', () => {
   });
 
   /**
+   * 18.310 — Unit 6e (owner ruling 2026-09-29): the note editor's bare
+   * `:ticket` — no project in this context — lists the workspace's tickets
+   * instead of reaching `search('')`, which the route refuses (400), drawn as
+   * "Search needs a connection". Same mount as 18.273; the comment box's half
+   * is in `note-comments.test.tsx`.
+   */
+  it('18.310 the note editor\'s empty :ticket query lists the workspace\'s tickets and never calls search', async () => {
+    stubSlot = true;
+    capturedSlotProps = [];
+    const search = vi.fn(async (_workspaceId: string, text: string) => {
+      searchTermSchema.parse(text);
+      return [];
+    });
+    const getTickets = vi.fn(async (projectId: string) => ({
+      projectId,
+      rows: [{ ticketId: TICKET, title: 'Renew the trade licence', key: 'CCSO-1183' }],
+    })) as unknown as DataSourceQuery['getTickets'];
+    render(
+      <Providers services={world({ search, getTickets })}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+    await waitFor(() => {
+      expect(slotProps().queryTickets).toBeDefined();
+    });
+    const queryTickets = slotProps().queryTickets as (q: string) => Promise<Array<{ key: string }>>;
+    const listed = await queryTickets('');
+    expect(listed.map((c) => c.key)).toContain('CCSO-1183');
+    expect(search).not.toHaveBeenCalled();
+  });
+
+  /**
    * 18.203 — Copy as Markdown, and it is the SERIALISER's output.
    *
    * `exportMarkdown` is the same function the paste/copy round trip uses, so a
@@ -650,5 +717,330 @@ describe('13.1488 clicking below the text focuses the editor', () => {
     fireEvent.click(wrapper);
 
     await waitFor(() => expect(textbox).toHaveFocus());
+  });
+});
+
+/**
+ * 9.409 / 9.410 — KB parity: the reading-progress bar on the note page.
+ *
+ * gisik has no read/edit toggle, so the note page is the reading surface and
+ * the bar is there for an editor and a reader alike (the source mounts it in
+ * read mode only). 9.410 is the skin: the bar is under the sticky nav, painted
+ * from tokens, still under reduced motion, and a heading scrolled to clears the
+ * nav.
+ */
+describe('9.409 the note page carries a reading-progress bar', () => {
+  it('9.409 a labelled progressbar is mounted for an editor and for a read-only viewer', async () => {
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    renderDocument({ role: 'member' });
+    const bar = await screen.findByRole('progressbar', { name: 'Reading progress' });
+    expect(bar).toHaveAttribute('aria-valuenow', '0');
+    cleanup();
+
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(await screen.findByRole('progressbar', { name: 'Reading progress' })).toBeInTheDocument();
+  });
+
+  it('9.410 the skin: tokens only, under the nav, motion off under prefers-reduced-motion, headings clear the nav', () => {
+    const css = readFileSync(resolve(process.cwd(), 'app/globals.css'), 'utf8').replace(/\/\*[\s\S]*?\*\//g, '');
+    const rule = (selector: string): string => {
+      const match = new RegExp(`${selector.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')}\\s*\\{([^}]*)\\}`).exec(css);
+      expect(match, `a rule for ${selector}`).not.toBeNull();
+      return match?.[1] ?? '';
+    };
+    expect(rule('.reading-progress')).toMatch(/top:\s*var\(--app-nav-offset/);
+    expect(rule('.reading-progress')).toMatch(/background:\s*var\(--gn-border\)/);
+    expect(rule('.reading-progress__bar')).toMatch(/background:\s*var\(--gn-accent\)/);
+    expect(rule('.reading-progress__bar')).toMatch(/transition:\s*transform/);
+    expect(css).toMatch(/prefers-reduced-motion:\s*reduce\)\s*\{\s*\.reading-progress__bar\s*\{\s*transition:\s*none/);
+    expect(rule('.gn-notes__editor :is(h1, h2, h3, h4, h5, h6)')).toMatch(/scroll-margin-top:\s*calc\(var\(--app-nav-offset/);
+    // No literal colour in the section this piece added.
+    const section = css.slice(css.indexOf('.reading-progress {'));
+    expect(section).not.toMatch(/#[0-9a-fA-F]{3,8}\b|rgba?\(|hsla?\(/);
+  });
+});
+
+/**
+ * 9.418–9.420 — KB parity: heading anchors on the note page. The extension and
+ * the button are proved in `packages/editor/test/heading-anchors.test.ts`; what
+ * belongs here is what only the page knows — the URL it hands the button, and
+ * the arrival at `/notes/<id>#slug`, which has to wait for the headings.
+ */
+const HEADED_BODY = {
+  type: 'doc',
+  content: [
+    { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Overview' }] },
+    { type: 'paragraph', content: [{ type: 'text', text: 'body' }] },
+    { type: 'heading', attrs: { level: 4 }, content: [{ type: 'text', text: 'Deep detail' }] },
+  ],
+};
+
+describe('9.418 heading anchors on the note page', () => {
+  it('9.418 the note editor gets a copy-link button per heading, carrying this note\'s absolute URL', async () => {
+    const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+    await waitFor(() => expect(container.querySelectorAll('.ProseMirror h2 .editor-heading-link, .ProseMirror h4 .editor-heading-link')).toHaveLength(2));
+    const headingLink = slotProps().headingLink as (id: string) => string | null;
+    expect(headingLink('deep-detail')).toBe(`${window.location.origin}/notes/${NOTE}#deep-detail`);
+    expect(container.querySelector('.ProseMirror h4')?.getAttribute('id')).toBe('deep-detail');
+    // The comment composer is not a page: it gets no anchors.
+    const composer = [...capturedSlotProps].reverse().find((props) => props['mode'] === 'comment');
+    expect(composer?.['headingLink']).toBeUndefined();
+  });
+
+  it('9.419 arriving at #slug scrolls that heading into view once the editor has drawn it', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    window.history.replaceState(null, '', `/notes/${NOTE}#deep-detail`);
+    try {
+      const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+      await waitFor(() => expect(scrolled.length).toBeGreaterThan(0));
+      expect(scrolled[0]).toBe(container.querySelector('.ProseMirror h4'));
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.history.replaceState(null, '', '/');
+    }
+  });
+
+  it('9.420 a fragment naming no heading scrolls nothing and does not throw', async () => {
+    const scrolled: Element[] = [];
+    const original = Element.prototype.scrollIntoView;
+    Element.prototype.scrollIntoView = function (this: Element) {
+      scrolled.push(this);
+    };
+    window.history.replaceState(null, '', `/notes/${NOTE}#no-such-heading`);
+    try {
+      const { container } = renderDocument({ note: noteDetail({ body: HEADED_BODY as never }) });
+      await waitFor(() => expect(container.querySelector('.ProseMirror h2')).not.toBeNull());
+      await new Promise((resolve) => setTimeout(resolve, 50));
+      expect(scrolled).toHaveLength(0);
+    } finally {
+      Element.prototype.scrollIntoView = original;
+      window.history.replaceState(null, '', '/');
+    }
+  });
+});
+
+describe('9.422 the draft-restore banner', () => {
+  const DRAFT_TEXT = 'a draft nobody has seen yet';
+  function seedDraft(): void {
+    window.localStorage.setItem(
+      noteDraftKey('u_kiro', NOTE),
+      JSON.stringify({ doc: body(DRAFT_TEXT), at: Date.now() - 5 * 60_000 }),
+    );
+  }
+  const editorText = (container: HTMLElement): string => container.querySelector('.ProseMirror')?.textContent ?? '';
+
+  beforeEach(() => {
+    window.localStorage.clear();
+  });
+
+  it('9.422 a recovered draft opens with a banner naming its age; a note with no draft has none', async () => {
+    seedDraft();
+    const { container } = renderDocument();
+    const banner = await screen.findByTestId('draft-restore-banner');
+    expect(banner).toHaveTextContent('Restored unsaved changes from 5m ago.');
+    expect(editorText(container)).toContain(DRAFT_TEXT);
+    // CONTROL, same it: with no draft stored the same page draws no banner.
+    cleanup();
+    window.localStorage.clear();
+    renderDocument();
+    await waitFor(() => expect(screen.getByTestId('note-editor')).toBeInTheDocument());
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+
+  it('9.423 Keep hides the banner and leaves the recovered words and their stored draft in place', async () => {
+    seedDraft();
+    const { container } = renderDocument();
+    await userEvent.click(await screen.findByRole('button', { name: 'Keep' }));
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+    expect(editorText(container)).toContain(DRAFT_TEXT);
+    expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).not.toBeNull();
+  });
+
+  it('9.424 Discard reloads the server body, deletes the draft key and writes nothing to the server', async () => {
+    seedDraft();
+    const services = world();
+    const ingested: SubmittedEvent[] = [];
+    services.dataSource.ingest = async (events: SubmittedEvent[]) => {
+      ingested.push(...events);
+      return events.map((event) => ({
+        status: 'committed' as const,
+        eventId: event.id,
+        seq: 1,
+        serverTime: '2026-09-29T09:00:00.000Z',
+      }));
+    };
+    const { container } = render(
+      <Providers services={services}>
+        <NoteDocument noteId={NOTE} workspaces={[{ ...WS_A_REF, role: 'owner' }]} />
+      </Providers>,
+    );
+    await userEvent.click(await screen.findByRole('button', { name: 'Discard' }));
+    await waitFor(() => expect(editorText(container)).toContain('Compressor stopped in the cold room'));
+    expect(editorText(container)).not.toContain(DRAFT_TEXT);
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+    expect(window.localStorage.getItem(noteDraftKey('u_kiro', NOTE))).toBeNull();
+    // Give an unmount flush and the coalescing timer their turn: neither may write the discarded words.
+    await new Promise((resolve) => setTimeout(resolve, 50));
+    expect(ingested.filter((event) => event.type === 'note.body_set')).toHaveLength(0);
+    expect(screen.getByTestId('editor-save-state')).toHaveTextContent('Saved');
+  });
+
+  it('9.425 a reader who cannot edit is not offered the banner', async () => {
+    seedDraft();
+    // CONTROL, same it: the author's own page over the same draft shows the banner.
+    renderDocument();
+    await screen.findByTestId('draft-restore-banner');
+    cleanup();
+    // Authored by somebody else, so the member role is the only thing making them a reader (18.204's recipe).
+    renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_ana' }) });
+    await waitFor(() => expect(slotProps().readOnly).toBe(true));
+    expect(screen.queryByTestId('draft-restore-banner')).toBeNull();
+  });
+});
+
+/**
+ * Trash series Plan 4, Task 6. Cases 19.236–19.239 (`test-cases/19-trash.md`
+ * §19.24). The note page's Delete door (D2) and the banner's Restore (the
+ * silent `write` it used could not show `UNMARK_FIRST_REASON`).
+ */
+describe('19.236–19.239 the note page deletes, and restores what it deleted', () => {
+  function mountLive(opts: {
+    role?: string;
+    note?: NoteDetail;
+    answer?: (events: SubmittedEvent[], call: number) => IngestResult[];
+  } = {}) {
+    let current = opts.note ?? noteDetail();
+    const batches: SubmittedEvent[][] = [];
+    const services = world({ role: opts.role });
+    services.dataSource.query.getNote = async (_ws: string, id: string) => (id === NOTE ? current : null);
+    services.dataSource.ingest = async (events) => {
+      batches.push(events);
+      const answer =
+        opts.answer?.(events, batches.length) ??
+        events.map((event) => ({
+          status: 'committed' as const,
+          eventId: event.id,
+          seq: batches.length,
+          serverTime: '2026-09-29T10:00:00.000Z',
+        }));
+      // The server's projection, as far as this page can see it.
+      events.forEach((event, index) => {
+        if (answer[index]?.status !== 'committed') return;
+        if (event.type === 'note.deleted') current = { ...current, deleted: true };
+        if (event.type === 'note.restored') current = { ...current, deleted: false };
+      });
+      return answer;
+    };
+    const tree = (noteId: string) => (
+      <Providers services={services}>
+        <NoteDocument noteId={noteId} workspaces={[{ ...WS_A_REF, role: opts.role ?? 'owner' }]} />
+      </Providers>
+    );
+    const view = render(tree(NOTE));
+    return { batches, services, show: (noteId: string) => view.rerender(tree(noteId)) };
+  }
+  const types = (batch: SubmittedEvent[] | undefined) => (batch ?? []).map((event) => event.type);
+  const TITLE = 'Delete note “Compressor log”?';
+
+  async function deleteFromByline(permanent: boolean): Promise<void> {
+    await userEvent.click(await screen.findByRole('button', { name: DELETE_TRIGGER_LABEL }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    if (permanent) {
+      await userEvent.click(within(dialog).getByRole('checkbox', { name: 'Delete permanently' }));
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
+    } else {
+      await userEvent.click(within(dialog).getByRole('button', { name: 'Delete note' }));
+    }
+  }
+
+  it('19.236 the editor sees Delete…; CONTROL: a non-author member and a deleted note do not', async () => {
+    mountLive();
+    expect(await screen.findByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeInTheDocument();
+    cleanup();
+
+    mockSessionUser = { id: 'u_ana', name: 'Anselma Marak', email: 'ana@example.com' };
+    mountLive({ role: 'member' });
+    await screen.findByTestId('note-editor');
+    expect(screen.queryByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeNull();
+    cleanup();
+
+    mockSessionUser = { id: 'u_kiro', name: 'Kiro', email: 'kiro@example.com' };
+    mountLive({ note: noteDetail({ deleted: true }) });
+    await screen.findByTestId('note-deleted-banner');
+    expect(screen.queryByRole('button', { name: DELETE_TRIGGER_LABEL })).toBeNull();
+  });
+
+  it('19.237 permanent posts [note.deleted, purge.marked] and the banner appears; CONTROL: soft posts [note.deleted]', async () => {
+    const hard = mountLive();
+    await deleteFromByline(true);
+    await waitFor(() => expect(hard.batches).toHaveLength(1));
+    expect(types(hard.batches[0])).toEqual(['note.deleted', 'purge.marked']);
+    expect(hard.batches[0]!.every((event) => event.entity.kind === 'note' && event.entity.id === NOTE)).toBe(true);
+    expect(await screen.findByTestId('note-deleted-banner')).toBeInTheDocument();
+    cleanup();
+
+    const soft = mountLive();
+    await deleteFromByline(false);
+    await waitFor(() => expect(soft.batches).toHaveLength(1));
+    expect(types(soft.batches[0])).toEqual(['note.deleted']);
+  });
+
+  it('19.238 after a permanent delete here, Restore posts [purge.unmarked, note.restored]; CONTROL: after a soft one, [note.restored]', async () => {
+    const hard = mountLive();
+    await deleteFromByline(true);
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(hard.batches).toHaveLength(2));
+    expect(types(hard.batches[1])).toEqual(['purge.unmarked', 'note.restored']);
+    cleanup();
+
+    const soft = mountLive();
+    await deleteFromByline(false);
+    const softBanner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(softBanner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(soft.batches).toHaveLength(2));
+    expect(types(soft.batches[1])).toEqual(['note.restored']);
+  });
+
+  it('19.239 a refused Restore says why in the banner; CONTROL: a committed one removes the banner', async () => {
+    const reason = 'Unmark this note for permanent deletion before restoring it.';
+    mountLive({
+      note: noteDetail({ deleted: true }),
+      answer: (events) =>
+        events.map((event) => ({ status: 'refused' as const, eventId: event.id, rule: 'lifecycle.state', reason })),
+    });
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    expect(await within(banner).findByRole('alert')).toHaveTextContent(reason);
+    expect(screen.getByTestId('note-deleted-banner')).toBeInTheDocument();
+    cleanup();
+
+    mountLive({ note: noteDetail({ deleted: true }) });
+    const okBanner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(okBanner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(screen.queryByTestId('note-deleted-banner')).toBeNull());
+  });
+
+  it('19.238 opening another note starts clean — a permanent delete here is not remembered for the next note', async () => {
+    const OTHER = '01J9NOTEOTHER0000000000000';
+    const first = mountLive();
+    const getNote = first.services.dataSource.query.getNote;
+    first.services.dataSource.query.getNote = async (ws: string, id: string) =>
+      id === OTHER ? noteDetail({ noteId: OTHER, deleted: true }) : getNote(ws, id);
+    await deleteFromByline(true);
+    await screen.findByTestId('note-deleted-banner');
+    expect(types(first.batches[0])).toEqual(['note.deleted', 'purge.marked']);
+
+    first.show(OTHER);
+    const banner = await screen.findByTestId('note-deleted-banner');
+    await userEvent.click(within(banner).getByRole('button', { name: 'Restore' }));
+    await waitFor(() => expect(first.batches).toHaveLength(2));
+    // The other note was never marked here: no unmark in front of the restore.
+    expect(types(first.batches[1])).toEqual(['note.restored']);
   });
 });

@@ -179,6 +179,15 @@ export type WorkspaceRef = {
   prefix: string;
   role: string;
   /**
+   * Trash series, Plan 1 Task 5 (spec T8). **REQUIRED, never optional**: a
+   * construction site that forgets it must fail to compile, the same
+   * discipline `prefix` above states — the mapper refuses a wire row that
+   * omits it. Served for every workspace the caller is told about at all,
+   * archived or not: T8 says archive removes nobody's access, so this is
+   * metadata every viewer sees, never a withholding like the counts below.
+   */
+  archived: boolean;
+  /**
    * null = withheld (guest). When served it counts exactly the people
    * `GET /v1/workspaces/:id/members` would list for this caller — guests
    * included for an admin, excluded for anyone else — because a count and a

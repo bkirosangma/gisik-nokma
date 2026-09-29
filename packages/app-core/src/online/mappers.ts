@@ -1,5 +1,7 @@
 import { isRankKey, NOTE_SCOPE_MODES, PRIORITIES, VISIBILITY_MODES } from '@gisik-nokma/domain';
+import { MappingError, asArray, asDeletedItemKind, asNumber, asRecord, asString, asStringOrNull, mapDeletedItems } from '../wire-readers.js';
 import type {
+  DeletedItem,
   FieldClaim,
   IngestResult,
   NoteComment,
@@ -9,6 +11,7 @@ import type {
   NoteSummary,
   NoteVersion,
   Priority,
+  PurgedRef,
   StateCategory,
   TicketState,
   TicketTypeDef,
@@ -106,12 +109,7 @@ import type { TicketComment } from '../views/comments-thread.js';
  * server side — which is the only place that can notice, since nothing in this
  * package talks to a server.
  */
-export class MappingError extends Error {
-  constructor(path: string, expected: string) {
-    super(`response mapping failed at ${path}: expected ${expected}`);
-    this.name = 'MappingError';
-  }
-}
+export { MappingError };
 
 /**
  * One fact a view type needs and the wire does not carry.
@@ -273,28 +271,6 @@ export class UnexpressibleFilterError extends Error {
     super(`filter key ${key} cannot be expressed by the shipped read surface: ${detail}`);
     this.name = 'UnexpressibleFilterError';
   }
-}
-
-function asRecord(value: unknown, path: string): Record<string, unknown> {
-  if (value === null || typeof value !== 'object' || Array.isArray(value)) {
-    throw new MappingError(path, 'an object');
-  }
-  return value as Record<string, unknown>;
-}
-
-function asArray(value: unknown, path: string): unknown[] {
-  if (!Array.isArray(value)) throw new MappingError(path, 'an array');
-  return value;
-}
-
-function asString(value: unknown, path: string): string {
-  if (typeof value !== 'string') throw new MappingError(path, 'a string');
-  return value;
-}
-
-function asNumber(value: unknown, path: string): number {
-  if (typeof value !== 'number') throw new MappingError(path, 'a number');
-  return value;
 }
 
 /**
@@ -530,6 +506,41 @@ export function rosterByActorId(
   actors: readonly { id: string; name: string; email?: string }[],
 ): Map<string, string> {
   return new Map(actors.map((actor) => [actor.id, memberLabel(actor)]));
+}
+
+/**
+ * `GET /v1/workspaces/:id/actor-names` → `Actor[]`. Two fields a row, both
+ * required: unlike the roster's `email`, nothing here is absent-by-decision.
+ */
+export function mapActorNames(raw: unknown): Actor[] {
+  const record = asRecord(raw, 'actorNames');
+  return asArray(record['names'], 'actorNames.names').map((entry, index) => {
+    const row = asRecord(entry, `actorNames.names[${index}]`);
+    return {
+      id: asString(row['userId'], `actorNames.names[${index}].userId`),
+      name: asString(row['displayName'], `actorNames.names[${index}].displayName`),
+    };
+  });
+}
+
+/**
+ * The roster join with the names-only read laid UNDER it: an id the roster
+ * labels keeps the roster's label (which may be an email — `memberLabel`), and
+ * an id the roster does not carry, or carries with no better label than the id
+ * itself, takes the names read's name. Returns a new map.
+ */
+export function withActorNames(
+  roster: ReadonlyMap<string, string>,
+  names: readonly { id: string; name: string }[],
+): Map<string, string> {
+  const joined = new Map(roster);
+  for (const { id, name } of names) {
+    const label = name.trim();
+    if (label === '') continue;
+    const existing = joined.get(id);
+    if (existing === undefined || existing === id) joined.set(id, label);
+  }
+  return joined;
 }
 
 /**
@@ -1493,6 +1504,13 @@ export function mapWorkspaceRefs(raw: unknown): WorkspaceRef[] {
       // half of every key in the workspace.
       prefix: asString(workspace['prefix'], `${path}.prefix`),
       role: asString(workspace['role'], `${path}.role`),
+      // Trash series, Plan 1 Task 5 (spec T8). REQUIRED, not `withheldOrNumber`-
+      // style optional — same reasoning `nameRestrictedProjectCount` gives
+      // below and the sibling `project.archived` mapping gives two screens
+      // down: served to every caller told about this workspace at all, guest
+      // included, so an absent key is a construction site that forgot the
+      // field, not a withholding.
+      archived: asBoolean(workspace['archived'], `${path}.archived`),
       memberCount: withheldOrNumber(workspace, 'memberCount', `${path}.memberCount`),
       // REQUIRED, and deliberately not `withheldOrNumber`: this count has no
       // withheld state on the wire — the server serves it to every caller
@@ -2857,3 +2875,17 @@ export function mapNoteVersionBody(raw: unknown): unknown {
   const record = asRecord(raw, 'version');
   return record['body'] ?? null;
 }
+
+export { mapDeletedItems };
+
+/** `POST /v1/purged-lookup`'s body (trash Plan 3). A row that is not a lifecycle ref is a `MappingError`, never skipped. */
+export function mapPurgedLookup(raw: unknown): PurgedRef[] {
+  const record = asRecord(raw, 'purged-lookup');
+  return asArray(record['purged'], 'purged-lookup.purged').map((entry, index) => {
+    const path = `purged-lookup.purged[${index}]`;
+    const item = asRecord(entry, path);
+    return { kind: asDeletedItemKind(item['kind'], `${path}.kind`), id: asString(item['id'], `${path}.id`) };
+  });
+}
+
+

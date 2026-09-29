@@ -450,6 +450,113 @@ describe('GET /v1/workspaces/:workspaceId/members', () => {
   });
 });
 
+describe('GET /v1/workspaces/:workspaceId/actor-names', () => {
+  /**
+   * NAMES ARE NOT THE SENSITIVE PART (owner, 2026-09-29): every signed-in
+   * member of a workspace sees the display name of anyone who acted in it. The
+   * roster (`/members`) cannot serve that by itself — it hides guests from a
+   * non-admin and refuses a guest altogether — so a member reading a note a
+   * guest wrote saw the guest's raw ULID. This route is the names-only answer:
+   * `{userId, displayName}` and nothing else.
+   *
+   * The fixture users are phone sign-ups (name = the phone, address synthetic),
+   * so each case names the people it needs and puts the vendor columns back.
+   */
+  async function withNamedPeople<T>(
+    people: Array<{ id: string; name: string; email: string }>,
+    body: () => Promise<T>,
+  ): Promise<T> {
+    const { rows } = await db.pool.query<{ id: string; name: string; email: string }>(
+      'SELECT "id", "name", "email" FROM "user" WHERE "id" = ANY ($1::text[])',
+      [people.map((p) => p.id)],
+    );
+    for (const p of people) {
+      await db.pool.query('UPDATE "user" SET name = $1, email = $2 WHERE id = $3', [p.name, p.email, p.id]);
+    }
+    try {
+      return await body();
+    } finally {
+      for (const row of rows) {
+        await db.pool.query('UPDATE "user" SET name = $1, email = $2 WHERE id = $3', [row.name, row.email, row.id]);
+      }
+    }
+  }
+
+  const NAMED = () => [
+    { id: read.userIds.owner, name: 'Anselma Marak', email: 'anselma@example.test' },
+    { id: read.userIds.member, name: 'Mika Sangma', email: 'mika@example.test' },
+    { id: read.userIds.guest, name: 'Gita Guest', email: 'gita@example.test' },
+    { id: read.userIds.neighbour, name: 'Nadia Neighbour', email: 'nadia@example.test' },
+  ];
+
+  it('7.290 a plain member is told the guest’s display name — which the roster withholds from them — and no email, role or phone', async () => {
+    await withNamedPeople(NAMED(), async () => {
+      // THE CONTROL: the roster really does withhold the guest from this member,
+      // so the name below is not one the member already had.
+      const roster = await okJson<MemberListResponse>('member', '/members');
+      expect(roster.members.map((m) => m.userId)).not.toContain(read.userIds.guest);
+
+      const response = await get('member', '/actor-names');
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as { workspaceId: string; names: Array<Record<string, unknown>> };
+      expect(body.workspaceId).toBe(read.world.workspaceId);
+      const byUser = Object.fromEntries(body.names.map((n) => [n['userId'], n['displayName']]));
+      expect(byUser[read.userIds.guest]).toBe('Gita Guest');
+      expect(byUser[read.userIds.owner]).toBe('Anselma Marak');
+      expect(byUser[read.userIds.member]).toBe('Mika Sangma');
+      // Another workspace's person is not in this workspace's answer.
+      expect(byUser[read.userIds.neighbour]).toBeUndefined();
+
+      // NAME ONLY: exactly two keys per row, and none of the gated fields' bytes.
+      for (const row of body.names) expect(Object.keys(row).sort()).toEqual(['displayName', 'userId']);
+      const bytes = JSON.stringify(body);
+      for (const gated of ['@example.test', SYNTHETIC_PHONE_EMAIL_DOMAIN, '"role"', '"email"']) {
+        expect(bytes).not.toContain(gated);
+      }
+    });
+  });
+
+  it('7.291 a person whose name IS their phone is left out — the name would otherwise put a phone number on the wire for a viewer the roster would not tell', async () => {
+    await withNamedPeople(NAMED(), async () => {
+      // CONTROL: the admin and the outsider still hold the seeded phone-as-name.
+      const { rows } = await db.pool.query<{ id: string; name: string; email: string }>(
+        'SELECT "id", "name", "email" FROM "user" WHERE "id" = ANY ($1::text[])',
+        [[read.userIds.admin, read.userIds.outsider]],
+      );
+      expect(rows).toHaveLength(2);
+      for (const row of rows) expect(isSyntheticPhoneEmail(row.email)).toBe(true);
+
+      const body = await okJson<{ names: Array<{ userId: string; displayName: string }> }>('member', '/actor-names');
+      const ids = body.names.map((n) => n.userId);
+      expect(ids).not.toContain(read.userIds.admin);
+      expect(ids).not.toContain(read.userIds.outsider);
+      const bytes = JSON.stringify(body);
+      for (const row of rows) expect(bytes).not.toContain(row.name);
+    });
+  });
+
+  it('7.292 owner, admin, member, outsider and project lead all get the same answer; a guest (7.91), a stranger and a neighbour get the roster’s 404', async () => {
+    await withNamedPeople(NAMED(), async () => {
+      const owner = await okJson('owner', '/actor-names');
+      for (const role of ['admin', 'member', 'outsider', 'projectLead'] as const) {
+        expect([role, await okJson(role, '/actor-names')]).toEqual([role, owner]);
+      }
+      const refusals = [];
+      for (const role of ['guest', 'stranger', 'neighbour'] as const) {
+        const response = await get(role, '/actor-names');
+        expect([role, response.statusCode]).toEqual([role, 404]);
+        expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
+        refusals.push(response);
+      }
+      // Byte-identical: nobody learns the route or a name by the shape of the refusal.
+      for (const refusal of refusals) {
+        expect(comparableHeaders(refusal)).toEqual(comparableHeaders(refusals[0]!));
+      }
+      expect(JSON.stringify(refusals.map((r) => r.body))).not.toContain('Gita Guest');
+    });
+  });
+});
+
 describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy', () => {
   it('7.40 counts the tickets sitting in each state of the workflow, zeroes included', async () => {
     const errands = await okJson<StateOccupancyResponse>('owner', '/workflows/wf-errands/state-occupancy');
@@ -1888,8 +1995,10 @@ describe('POST …/migrate — a closed ticket may only migrate to a terminal st
  * `ticket.workflow_rebound` per ticket through `ingestClientBatch`, which
  * commits one transaction per event — but it never asked the question the
  * PERMISSION GATE asks per event: `canSee`. `canSeeResolved` answers false for
- * an `admin` on a project-mode ticket whose project they are not on (there is
- * deliberately no admin read bypass), so an admin's migration of a type with
+ * an `admin` on an EXPLICIT-mode ticket whose list omits them (there is
+ * deliberately no admin read bypass; since 2026-09-29, rule A, an admin is on
+ * every project, so a project-mode ticket no longer hides from them and the
+ * fixture below is explicit-mode), so an admin's migration of a type with
  * one ticket they could see and one they could not moved the first, was
  * refused on the second, and answered `refused` — a type split across two
  * workflows under a docblock that called the window unreachable, and a client
@@ -1911,7 +2020,7 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
   let adminAuth: { authorization: string };
   /** In the project the admin IS on — created first, so it sorts first under `ORDER BY ticket_id`. */
   let visibleId = '';
-  /** In the project the admin is NOT on. */
+  /** In the project the admin is NOT on roster-wise, and EXPLICIT-mode naming the owner only (amended 2026-09-29 (A)). */
   let hiddenId = '';
 
   const flow = (id: string, name: string) => ({
@@ -1960,6 +2069,11 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
       makeCommitted({ ...ws, entity: { kind: 'ticket-type', id: TYPE }, type: 'ticket-type.defined', payload: { id: TYPE, name: 'Audit', icon: 'check', rank: 3, workflowId: FROM, fields: [] } }),
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: visibleId }, type: 'ticket.created', payload: { typeId: TYPE, projectId: onProject, parentId: null, title: 'Audit the admin can see' } }),
       makeCommitted({ ...ws, entity: { kind: 'ticket', id: hiddenId }, type: 'ticket.created', payload: { typeId: TYPE, projectId: offProject, parentId: null, title: 'Audit the admin cannot see' } }),
+      // AMENDED 2026-09-29, owner ruling (A): an admin is on EVERY project, so
+      // being off `offProject` no longer hides this ticket. The only thing that
+      // still can is an EXPLICIT list that omits the admin, so this ticket is
+      // explicit-mode and lists the owner alone.
+      makeCommitted({ ...ws, entity: { kind: 'ticket', id: hiddenId }, type: 'visibility.set', payload: { ticketId: hiddenId, mode: 'explicit', userIds: [owner.userId] } }),
     ]);
   }, 60_000);
 
@@ -1981,7 +2095,7 @@ describe('7.266 POST …/migrate — the pre-flight asks the permission gate\'s 
     return (response.json() as TypePopulationResponse).count;
   }
 
-  it('an admin not on one of the projects is refused UP FRONT with the count, and nothing is appended', async () => {
+  it('an admin who cannot see one of the tickets (explicit-mode, not listed) is refused UP FRONT with the count, and nothing is appended', async () => {
     // The gate's own answer, ticket by ticket, through the ticket door: this
     // is the fact the pre-flight has to ask about, asserted rather than
     // assumed of the seed.

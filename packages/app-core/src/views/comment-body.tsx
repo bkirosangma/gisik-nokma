@@ -1,4 +1,5 @@
 import { createElement, Fragment, type ReactNode } from 'react';
+import { PURGED_ITEM_LABEL, type PurgedPredicate } from '@gisik-nokma/domain';
 
 /**
  * F3 — the comment thread's body, rendered as the DOCUMENT the composer wrote
@@ -30,7 +31,7 @@ import { createElement, Fragment, type ReactNode } from 'react';
  *
  * Marks: `bold` → `<strong>`, `italic` → `<em>`, `strike` → `<s>`, `code` →
  * `<code>`, `link` → `<a href>` (sanitised — see below). Blocks: `paragraph` →
- * `<p>`, `heading` → `<p>`, `bulletList`/`orderedList`/`listItem` → the real
+ * `<p>`, `heading` → `<p class="gn-comment__heading gn-comment__heading--N">`, `horizontalRule` → `<hr>`, `bulletList`/`orderedList`/`listItem` → the real
  * list elements, so the browser supplies the markers the plain-text renderer
  * dropped, `blockquote` → `<blockquote>`, `codeBlock` → `<pre><code>`,
  * `hardBreak` → `<br>`, `mention` → the same `@label` the plain renderer
@@ -161,14 +162,26 @@ function applyMarks(text: string, marks: unknown, key: string): ReactNode {
 /** The `href` resolver `ticketRef` renders through — see `renderCommentBody`'s parameter. */
 type TicketHrefResolver = (ref: { ticketId: string; projectId: string }) => string | null;
 
-function childrenOf(node: Node, depth: number, keyPrefix: string, ticketHref: TicketHrefResolver): ReactNode[] {
+function childrenOf(
+  node: Node,
+  depth: number,
+  keyPrefix: string,
+  ticketHref: TicketHrefResolver,
+  isPurged: PurgedPredicate,
+): ReactNode[] {
   if (!Array.isArray(node.content)) return [];
   return node.content
-    .map((child, index) => renderNode(child, depth + 1, `${keyPrefix}.${index}`, ticketHref))
+    .map((child, index) => renderNode(child, depth + 1, `${keyPrefix}.${index}`, ticketHref, isPurged))
     .filter((child): child is ReactNode => child !== null);
 }
 
-function renderNode(value: unknown, depth: number, key: string, ticketHref: TicketHrefResolver): ReactNode | null {
+function renderNode(
+  value: unknown,
+  depth: number,
+  key: string,
+  ticketHref: TicketHrefResolver,
+  isPurged: PurgedPredicate,
+): ReactNode | null {
   if (depth > MAX_DEPTH) return null;
   const node = asNode(value);
   if (node === null) return null;
@@ -198,7 +211,7 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
   // place they are drawn — the declared decision, unchanged.
   if (node.type === 'image') return null;
 
-  const children = childrenOf(node, depth, key, ticketHref);
+  const children = childrenOf(node, depth, key, ticketHref, isPurged);
 
   if (node.type === 'bulletList' || node.type === 'bullet_list') {
     return createElement('ul', { className: 'gn-comment__list', key }, children);
@@ -238,8 +251,12 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
         disabled: true,
         readOnly: true,
         checked: attrs !== null && attrs['checked'] === true,
+        // The box's accessible name is its own text (case 9.483). `key` is the
+        // item's path in the body, so it is unique within one body; the body's
+        // `idPrefix` makes it unique across a thread.
+        'aria-labelledby': `${key}-task`,
       }),
-      createElement('span', null, children),
+      createElement('span', { id: `${key}-task` }, children),
     );
   }
   if (node.type === 'details') {
@@ -259,6 +276,11 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
   if (node.type === 'wikiLink') {
     const attrs = asNode(node.attrs);
     const noteId = attrs !== null && typeof attrs['noteId'] === 'string' ? attrs['noteId'] : '';
+    // Trash Plan 3 (T11): the target was permanently erased. The stored title
+    // stays in the stored document; what is DRAWN is the label, with no link.
+    if (noteId !== '' && isPurged('note', noteId)) {
+      return createElement('span', { className: 'gn-comment__wikilink gn-comment__ref--purged', key }, PURGED_ITEM_LABEL);
+    }
     // The stored title is the fallback when there is no id to link to, which
     // is the same preference the walker takes (doc-text.ts): the words a
     // person read, never the ULID. A link with no id would point at
@@ -271,6 +293,10 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
   if (node.type === 'ticketRef') {
     const attrs = asNode(node.attrs);
     const ticketId = attrs !== null && typeof attrs['ticketId'] === 'string' ? attrs['ticketId'] : '';
+    // Asked BEFORE the href resolver: an erased ticket has no page to link to.
+    if (ticketId !== '' && isPurged('ticket', ticketId)) {
+      return createElement('span', { className: 'gn-comment__ticketref gn-comment__ref--purged', key }, PURGED_ITEM_LABEL);
+    }
     const projectId = attrs !== null && typeof attrs['projectId'] === 'string' ? attrs['projectId'] : '';
     const ticketKey = attrs !== null && typeof attrs['key'] === 'string' ? attrs['key'] : '';
     const title = attrs !== null && typeof attrs['title'] === 'string' ? attrs['title'] : '';
@@ -287,9 +313,51 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
     const href = resolved === null ? null : safeHref(resolved);
     return href === null
       ? createElement('span', { className: 'gn-comment__ticketref', key }, text)
-      : createElement('a', { className: 'gn-comment__ticketref', href, key }, text);
+      : createElement(
+          'a',
+          // `data-ticket-id` lets a host that opens the ticket in place (the Notes page's
+          // `ticketChipClickHandler`) find the chip without parsing its href.
+          { className: 'gn-comment__ticketref', href, key, 'data-ticket-id': ticketId },
+          text,
+        );
   }
-  if (node.type === 'paragraph' || node.type === 'heading' || node.type === 'doc') {
+  // A table (spec's schema v2, shared with the note document). Real
+  // table/tr/th/td, not the "unknown type renders its children" fallback —
+  // that fallback used to flatten a comment's table into unstructured nested
+  // fragments with no `<table>` at all (9.348).
+  if (node.type === 'table') {
+    // Wrapped in a scrolling container for the same reason the live editor's
+    // `.tableWrapper` exists: a wide, unbreakable table must scroll inside
+    // itself, never widen the comment thread (or the ticket sheet) around it.
+    return createElement(
+      'div',
+      { className: 'gn-comment__table-wrap', key },
+      createElement('table', { className: 'gn-comment__table' }, createElement('tbody', null, children)),
+    );
+  }
+  if (node.type === 'tableRow') {
+    return createElement('tr', { key }, children);
+  }
+  if (node.type === 'tableHeader') {
+    return createElement('th', { key }, children);
+  }
+  if (node.type === 'tableCell') {
+    return createElement('td', { key }, children);
+  }
+  // The toolbar offers H1-H6 and a horizontal rule (kb-editor-parity), so both
+  // must SURVIVE the trip to the thread. A heading stays a `<p>` on purpose: a
+  // real `<h1>`-`<h6>` inside a comment would enter the ticket sheet's own
+  // heading outline for assistive tech, and a comment is not a page section.
+  // The level rides on a modifier class so the eye still gets the hierarchy.
+  if (node.type === 'heading') {
+    const level = Number((node.attrs as { level?: unknown } | undefined)?.level);
+    const modifier = Number.isInteger(level) && level >= 1 && level <= 6 ? ` gn-comment__heading--${level}` : '';
+    return createElement('p', { className: `gn-comment__heading${modifier}`, key }, children);
+  }
+  if (node.type === 'horizontalRule' || node.type === 'horizontal_rule') {
+    return createElement('hr', { className: 'gn-comment__rule', key });
+  }
+  if (node.type === 'paragraph' || node.type === 'doc') {
     const element = node.type === 'doc' ? Fragment : 'p';
     return createElement(element, node.type === 'doc' ? { key } : { key }, children);
   }
@@ -306,7 +374,16 @@ function renderNode(value: unknown, depth: number, key: string, ticketHref: Tick
  * this renderer has no href resolver of its own the way `wikiLink`'s
  * `/notes/<id>` is built in, so a caller that supplies none gets a `ticketRef`
  * chip rendered as a plain span (spec §14.2).
+ *
+ * `idPrefix` seeds the ids a task item's checkbox points its label at
+ * (`aria-labelledby`, case 9.483). A page that renders several bodies must give
+ * each its own — the thread passes the comment id.
  */
-export function renderCommentBody(doc: unknown, ticketHref: TicketHrefResolver = () => null): ReactNode {
-  return renderNode(doc, 0, 'b', ticketHref);
+export function renderCommentBody(
+  doc: unknown,
+  ticketHref: TicketHrefResolver = () => null,
+  isPurged: PurgedPredicate = () => false,
+  idPrefix = 'b',
+): ReactNode {
+  return renderNode(doc, 0, idPrefix, ticketHref, isPurged);
 }

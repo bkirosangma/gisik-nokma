@@ -116,3 +116,67 @@ export function buildProjectPageQueryTickets(
     return prioritizeProject(ticketRefCandidatesOf(hits), projectId);
   };
 }
+
+/** The subset of `WorkspaceRef` the no-project browse default reads. */
+type WorkspaceProjects = { id: string; projects: Array<{ id: string; archived: boolean }> };
+
+/**
+ * `queryTickets` for a context with NO project of its own — a note's editor
+ * and a note's comment box (Unit 6e, owner ruling 2026-09-29; case 18.310).
+ *
+ * A typed query is `search` exactly as before. The EMPTY query is the bug
+ * this exists for: those two mounts used to hand the raw query to `search`,
+ * whose route refuses an empty term (`searchTermSchema.min(1)`, see the
+ * docblock at the top of this file), so a bare `:ticket` drew "Search needs a
+ * connection". It is answered locally instead, as the workspace's recent
+ * tickets: `getTickets` for every live (non-archived) project the caller can
+ * see — `getMyWorkspaces` lists only projects the caller may read, so the
+ * server's own visibility decides what is offered — merged newest first.
+ *
+ * "Recent" is creation order: `ListRow` carries no updated-at, and a ticket
+ * id is a ULID, so a descending id sort IS newest-created first. Unsliced —
+ * the picker's own 8-row cap applies after this returns.
+ *
+ * One project failing does not blank the picker (a restricted or racing
+ * project must not hide the rest); only when EVERY project read fails does the
+ * first rejection propagate, which is the offline arm the picker's own catch
+ * turns into "Search needs a connection".
+ */
+export function buildWorkspaceQueryTickets(
+  dataSource: {
+    query: {
+      search: (workspaceId: string, text: string) => Promise<TicketSearchHit[]>;
+      getMyWorkspaces: () => Promise<WorkspaceProjects[]>;
+      getTickets: (
+        projectId: string,
+        filter: Record<string, never>,
+        grouping: 'flat',
+      ) => Promise<{ rows: TicketListRow[] }>;
+    };
+  },
+  workspaceId: string,
+): (query: string) => Promise<TicketRefCandidate[]> {
+  return async (query: string) => {
+    if (query.trim() !== '') {
+      return ticketRefCandidatesOf(await dataSource.query.search(workspaceId, query));
+    }
+    const workspace = (await dataSource.query.getMyWorkspaces()).find((w) => w.id === workspaceId);
+    const projectIds = (workspace?.projects ?? []).filter((p) => !p.archived).map((p) => p.id);
+    const settled = await Promise.allSettled(
+      projectIds.map((projectId) => dataSource.query.getTickets(projectId, {}, 'flat')),
+    );
+    const failed = settled.find((result): result is PromiseRejectedResult => result.status === 'rejected');
+    if (failed !== undefined && failed.reason !== undefined && settled.every((r) => r.status === 'rejected')) {
+      throw failed.reason;
+    }
+    const candidates: TicketRefCandidate[] = [];
+    settled.forEach((result, index) => {
+      if (result.status !== 'fulfilled') return;
+      const projectId = projectIds[index] as string;
+      for (const row of result.value.rows) {
+        candidates.push({ ticketId: row.ticketId, projectId, key: row.key ?? row.ticketId.slice(-6), title: row.title });
+      }
+    });
+    return candidates.sort((a, b) => (a.ticketId < b.ticketId ? 1 : a.ticketId > b.ticketId ? -1 : 0));
+  };
+}

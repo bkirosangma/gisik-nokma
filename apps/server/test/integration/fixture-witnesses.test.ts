@@ -344,13 +344,18 @@ describe('the list cursor, against the real route', () => {
     // ONE roster request for the whole walk — the same property 13.1290 pins at
     // the unit level, here against the real route.
     expect(rosters).toHaveLength(1);
+    // ...and ONE names-only read beside it (`/actor-names`, cases 7.290–7.297): the
+    // roster join falls back to it for a person the member roster omits, so a walk
+    // now makes it once, counted as its own bucket rather than folded into either.
+    const actorNames = calls.filter((url) => url.includes('/actor-names'));
+    expect(actorNames).toHaveLength(1);
     // THE PARTITION'S TOTAL, and it is asserted rather than left to the two
     // counts above: `pages = 1` and `rosters = 1` are both satisfied by a walk
     // that also made a THIRD request, so on their own they do not say the walk
     // made two. With this line the two buckets and the total are three views of
     // one list, and the walk can neither lose nor gain a request in silence.
-    expect(calls).toHaveLength(2);
-    expect(pages.length + rosters.length).toBe(calls.length);
+    expect(calls).toHaveLength(3);
+    expect(pages.length + rosters.length + actorNames.length).toBe(calls.length);
   });
 });
 
@@ -1802,7 +1807,9 @@ describe('the refusal vocabulary, against the real engine over the real door', (
    * be a self-comparison through one module.
    *
    * **What makes this a role measurement rather than a permission one:** the
-   * member is granted workspace membership AND project membership first, and the
+   * member is granted workspace membership AND project membership first (the
+   * project row is redundant since rule A, 2026-09-29 — a member is on every
+   * founded project — and is kept as the fixture the case was measured on), and the
    * control is the SAME actor moving a ticket of the SAME TYPE out of the SAME
    * state along the UNGATED edge. *A different ticket instance* — `approvalTicket()`
    * mints a fresh ULID per call, and an earlier version of this sentence said "the

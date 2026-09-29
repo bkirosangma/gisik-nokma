@@ -2,7 +2,7 @@ import { Text } from 'react-native';
 import { useEffect, useMemo, useState } from 'react';
 import { NavigationContainer } from '@react-navigation/native';
 import { createNativeStackNavigator } from '@react-navigation/native-stack';
-import { createReplicaDataSource, type ReplicaDataSource } from '@gisik-nokma/app-core';
+import { createReplicaDataSource, type ReplicaDataSource, type SyncNoticeView } from '@gisik-nokma/app-core';
 import { createHttpTransport, createOutbox, createReplica, createSyncEngine, type SyncStatus } from '@gisik-nokma/sync-client';
 import { createOpSqliteStorage } from './storage/op-sqlite-storage.js';
 import { BoardScreen } from './screens/board-screen.js';
@@ -24,6 +24,7 @@ export function App() {
   const [status, setStatus] = useState<SyncStatus>('offline');
   const [queued, setQueued] = useState(0);
   const [failed, setFailed] = useState(0);
+  const [notices, setNotices] = useState<SyncNoticeView[]>([]);
   const [initError, setInitError] = useState<string | null>(null);
   const workspaceId = useMemo(() => WORKSPACE, []);
 
@@ -54,6 +55,7 @@ export function App() {
           setQueued(s.queued);
           setFailed(s.failed);
         });
+        void dataSource.query.syncNotices(workspaceId).then(setNotices);
       };
       const offStatus = engine.onStatus(setStatus);
       const offChange = dataSource.subscribe(workspaceId, 0, refreshQueue);
@@ -94,6 +96,14 @@ export function App() {
               status={status}
               queued={queued}
               failed={failed}
+              notices={notices}
+              onDismissNotice={(id) => {
+                if (ds === null) return;
+                void ds.query
+                  .dismissSyncNotice(id)
+                  .then(() => ds.query.syncNotices(workspaceId))
+                  .then(setNotices);
+              }}
               initError={initError}
             />
           )}

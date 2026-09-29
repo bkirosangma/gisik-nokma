@@ -42,6 +42,36 @@ function asJson(node: { getJSON(): unknown }): Json {
   return node.getJSON() as Json;
 }
 
+const tick = (): Promise<void> => new Promise((r) => setTimeout(r, 0));
+
+/** A collapsible with a title and one body line; `open` is the document's own attribute. */
+function detailsDoc(open: boolean): unknown {
+  return {
+    type: 'doc',
+    content: [
+      {
+        type: 'details',
+        attrs: { open },
+        content: [
+          { type: 'detailsSummary', content: [{ type: 'text', text: 'Why it broke' }] },
+          { type: 'detailsContent', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'the body' }] }] },
+        ],
+      },
+      { type: 'paragraph' },
+    ],
+  };
+}
+
+/** The pieces of the rendered block a person interacts with. */
+function parts(editor: Editor): { root: HTMLElement; toggle: HTMLButtonElement; body: HTMLElement } {
+  const root = editor.view.dom.querySelector<HTMLElement>('.editor-details')!;
+  return {
+    root,
+    toggle: root.querySelector<HTMLButtonElement>(':scope > button')!,
+    body: root.querySelector<HTMLElement>('[data-type="detailsContent"]')!,
+  };
+}
+
 describe('9.268-9.271 collapsible block', () => {
   /**
    * The `< ` trigger, and the two controls that keep it from being a greedy
@@ -167,9 +197,14 @@ describe('9.268-9.271 collapsible block', () => {
  * the DOM, not the file.
  */
 describe('9.272 the collapsible selectors match the rendered DOM', () => {
-  it('9.272 every selector the stylesheet declares for the block matches a real element', () => {
-    const editor = createTestEditor();
-    typeText(editor, '< T');
+  it('9.272 every selector the stylesheet declares for the block matches a real element', async () => {
+    // Loaded rather than typed: the node view adds `is-open` on a `setTimeout`
+    // (Tiptap's own) and an `update` in the SAME tick — which synchronous
+    // `typeText` produces — flips it straight back off, so a typed block is
+    // folded in the DOM while its document says `open: true`. A loaded one is
+    // open once that tick has run, which the `.is-open` selectors need.
+    const editor = createTestEditor({}, detailsDoc(true));
+    await tick();
     const root = editor.view.dom.querySelector('.editor-details');
     expect(root, 'the node view did not render .editor-details').not.toBeNull();
     const summary = root!.querySelector('summary');
@@ -189,13 +224,195 @@ describe('9.272 the collapsible selectors match the rendered DOM', () => {
     // vacuous, which is the failure mode this whole assertion exists to close.
     expect(selectors.length, 'no .editor-details selectors extracted — the extractor is broken').toBeGreaterThan(0);
     for (const selector of selectors) {
-      const matched = [root, summary, toggle].some((el) => el!.matches(selector));
+      // `matches()` cannot see a pseudo-element (`::before`) or a state a
+      // static DOM is not in (`:hover`, `:focus-visible`); both are removed so
+      // the selector is asked about the ELEMENT it styles.
+      const element = selector.replace(/::(?:before|after)/g, '').replace(/:(?:hover|focus-visible|focus)/g, '');
+      const matched = [root, summary, toggle].some((el) => el!.matches(element));
       expect(matched, `editor.css declares \`${selector}\`, which matches nothing the editor draws`).toBe(true);
     }
     // …and the CONTROL for the other direction: the selector that USED to be
     // declared must still match nothing, so this case cannot pass by the DOM
     // bending to the old spelling.
     expect(summary!.matches('.editor-details > summary')).toBe(false);
+    editor.destroy();
+  });
+});
+
+
+/**
+ * 9.451-9.454 — THE FOLD CONTROL IS SEEN, ANNOUNCED AND OPERABLE (owner report,
+ * 2026-09-29: "the collapsible does not seem to be working. i dont see anyway i
+ * can collapse the section.").
+ *
+ * The control was always THERE and always worked — the Details node view's
+ * `<button>` toggled the body — but the extension renders it EMPTY and expects
+ * the host stylesheet to draw its indicator, and `editor.css` reset it to
+ * `border: none; background: none; padding: 0` and drew nothing: MEASURED in a
+ * browser, a 0 x 0 box. A person cannot press what has no box.
+ *
+ * jsdom applies no stylesheet, so the DRAWING is asserted against the file
+ * (9.451, comment-stripped, like every css-binding case in this package) and the
+ * BEHAVIOUR against a real mounted editor (9.452-9.454).
+ */
+describe('9.451-9.454 the collapsible fold control', () => {
+  const css = readFileSync(resolve(dirname(fileURLToPath(import.meta.url)), '../src/styles/editor.css'), 'utf8');
+  const bare = css.replace(/\/\*[\s\S]*?\*\//g, '');
+
+  /** The declarations of the rule whose selector list is EXACTLY `selector`. */
+  function body(selector: string): string {
+    const escaped = selector.replace(/[.*+?^${}()|[\]\\>]/g, '\\$&');
+    const match = new RegExp(`(?:^|\\})\\s*${escaped}\\s*\\{([^}]*)\\}`).exec(bare);
+    expect(match, `no rule for \`${selector}\` in editor.css`).not.toBeNull();
+    return match![1]!;
+  }
+  const value = (rule: string, property: string): string | null =>
+    new RegExp(`(?:^|;)\\s*${property}\\s*:\\s*([^;]+)`).exec(rule)?.[1]?.trim() ?? null;
+  const px = (v: string | null): number => {
+    const m = /^([\d.]+)(px|rem)$/.exec(v ?? '');
+    return m === null ? 0 : parseFloat(m[1]!) * (m[2] === 'rem' ? 16 : 1);
+  };
+
+  it('9.451 the fold button has a hit area of at least 24px, a drawn chevron, and it turns when open', () => {
+    const button = body('.editor-details > button');
+    // CONTROL: this is the BUTTON's rule, not the block's.
+    expect(value(button, 'cursor')).toBe('pointer');
+    // A 0 x 0 button is the defect; WCAG 2.2 target size (minimum) is 24 x 24.
+    expect(px(value(button, 'width')), 'width').toBeGreaterThanOrEqual(24);
+    expect(px(value(button, 'height')), 'height').toBeGreaterThanOrEqual(24);
+    // The extension renders the button EMPTY: the indicator is a pseudo-element
+    // or it does not exist.
+    const chevron = body('.editor-details > button::before');
+    expect(value(chevron, 'content')).not.toBeNull();
+    expect(value(chevron, 'content')).not.toBe('none');
+    const closed = value(chevron, 'transform');
+    const open = value(body('.editor-details.is-open > button::before'), 'transform');
+    expect(closed, 'the closed chevron is rotated').toMatch(/rotate\(/);
+    expect(open, 'the open chevron is rotated').toMatch(/rotate\(/);
+    expect(open, 'open and closed must differ').not.toBe(closed);
+    // Keyboard focus is visible (this button is the ONLY way to fold).
+    expect(value(body('.editor-details > button:focus-visible'), 'outline')).not.toBeNull();
+    // The summary leaves room for the button rather than running under it.
+    expect(px(value(body('.editor-details summary'), 'padding-left'))).toBeGreaterThanOrEqual(24);
+    // Reduced motion: the turn is not animated for people who ask for none.
+    expect(bare).toMatch(/prefers-reduced-motion[^{]*\{[^}]*\.editor-details > button::before[^}]*transition:\s*none/);
+  });
+
+  it('9.452 aria-expanded follows the state and a click folds and unfolds the body, in the document too', async () => {
+    const editor = createTestEditor({}, detailsDoc(true));
+    await tick();
+    const { root, toggle, body: content } = parts(editor);
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(content.hasAttribute('hidden')).toBe(false);
+    expect(root.classList.contains('is-open')).toBe(true);
+
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(content.hasAttribute('hidden')).toBe(true);
+    expect(root.classList.contains('is-open')).toBe(false);
+    expect(asJson(editor).content?.[0]?.attrs?.open).toBe(false); // folded state is saved with the note (D10)
+
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(content.hasAttribute('hidden')).toBe(false);
+    expect(asJson(editor).content?.[0]?.attrs?.open).toBe(true);
+    editor.destroy();
+
+    // A document saved folded arrives folded.
+    const folded = createTestEditor({}, detailsDoc(false));
+    await tick();
+    expect(parts(folded).toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(parts(folded).body.hasAttribute('hidden')).toBe(true);
+    folded.destroy();
+  });
+
+  it('9.453 a reader folds and unfolds too, and nothing reaches the document', async () => {
+    const reader = createTestEditor({ readOnly: true }, detailsDoc(true));
+    await tick();
+    const { toggle, body: content } = parts(reader);
+    // `persist: false` drops the attribute, so a reader starts folded.
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(content.hasAttribute('hidden')).toBe(true);
+    const before = JSON.stringify(reader.getJSON());
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    expect(content.hasAttribute('hidden')).toBe(false);
+    toggle.click();
+    expect(toggle.getAttribute('aria-expanded')).toBe('false');
+    expect(content.hasAttribute('hidden')).toBe(true);
+    expect(JSON.stringify(reader.getJSON())).toBe(before);
+    reader.destroy();
+  });
+
+  /**
+   * MEASURED in a browser: with the button focused, a real Enter is consumed
+   * by ProseMirror's keymap (`defaultPrevented` at bubble, no `click`), and it
+   * SPLITS A BLOCK in the document instead — so the keyboard could not fold at
+   * all and typing at the button edited the note. Enter and Space on the button
+   * therefore have to be answered by the button.
+   */
+  it('9.454 Enter and Space on the focused fold button toggle it and edit nothing else', async () => {
+    const editor = createTestEditor({}, detailsDoc(true));
+    await tick();
+    const { toggle, body: content } = parts(editor);
+    const blocks = (): number => asJson(editor).content?.length ?? 0;
+    const before = blocks();
+
+    const press = (name: string): KeyboardEvent => {
+      const event = new KeyboardEvent('keydown', { key: name, bubbles: true, cancelable: true });
+      toggle.dispatchEvent(event);
+      return event;
+    };
+    press('Enter');
+    expect(toggle.getAttribute('aria-expanded'), 'Enter folds').toBe('false');
+    expect(content.hasAttribute('hidden')).toBe(true);
+    press(' ');
+    expect(toggle.getAttribute('aria-expanded'), 'Space unfolds').toBe('true');
+    expect(content.hasAttribute('hidden')).toBe(false);
+    expect(blocks(), 'the keys must not split or add a block').toBe(before);
+
+    // CONTROL, same `it`: Enter in the SUMMARY is still 9.269's — it goes into
+    // the body and does not toggle.
+    editor.commands.setTextSelection(3);
+    key(editor, 'Enter');
+    expect(editor.state.selection.$from.node(-1).type.name).toBe('detailsContent');
+    expect(toggle.getAttribute('aria-expanded')).toBe('true');
+    editor.destroy();
+  });
+
+  /**
+   * 9.490 — WHERE FOCUS LANDS AFTER A CLICK (controller browser pass 2026-09-29;
+   * case 9.455's wording said "after a key" and was silent on a click).
+   *
+   * Tiptap's own click handler moves focus INTO the document
+   * (`editor.commands.focus()`), and 9.454's key path puts it back on the
+   * button. The same move happens for ANY click, and a `click` with `detail ===
+   * 0` is not a mouse: it is a keyboard activation or an assistive technology's
+   * (VoiceOver's VO-Space, a screen reader's browse-mode Enter) — which are
+   * exactly the users who lose their place when the button they just pressed
+   * stops being the focused element and the new `aria-expanded` is never read.
+   * A pointer click (`detail >= 1`) keeps the editor focus: the caret is
+   * restored where the writer left it, so typing carries on.
+   */
+  it('9.490 a keyboard/AT click keeps focus on the fold button; a pointer click leaves it in the editor', async () => {
+    const editor = createTestEditor({}, detailsDoc(true));
+    document.body.append(editor.view.dom.parentElement ?? editor.view.dom);
+    await tick();
+    const { toggle } = parts(editor);
+    const raf = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+    // CONTROL, same `it`: a pointer click still moves focus into the editor.
+    toggle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+    await raf();
+    expect(toggle.getAttribute('aria-expanded'), 'the pointer click folded it').toBe('false');
+    expect(document.activeElement, 'a pointer click leaves focus in the editor').toBe(editor.view.dom);
+
+    // The keyboard/AT click: `detail === 0`, as `HTMLElement.click()` makes it.
+    toggle.focus();
+    toggle.click();
+    await raf();
+    expect(toggle.getAttribute('aria-expanded'), 'the AT click unfolded it').toBe('true');
+    expect(document.activeElement, 'focus stays on the button after a keyboard/AT click').toBe(toggle);
     editor.destroy();
   });
 });

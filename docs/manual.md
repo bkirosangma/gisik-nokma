@@ -193,6 +193,11 @@ count and — once it has any projects — a line naming them.
   heading and is in fact the door.
 - The projects on the card are a **line of text, not links**. There is nothing per-project to click
   there; the project list is one click further in, on the workspace's own page.
+- **If you own a workspace, its card has a menu** (the **⋯** button in its corner): **Archive** moves
+  the workspace into an **Archived** group below the others — collapsed until you open it — without
+  taking anyone's access away, and **Restore** there brings it back. **Delete…** asks you to type the
+  workspace's name first, because it removes the workspace from every member at once; it then sits
+  under **Deleted items** on your Account page until you restore it. Nobody but the owner sees the menu.
 
 If you belong to no workspace yet, the page says: *"No workspaces yet. Ask an admin for an invite link
 — or create your own."* Both of those are real options.
@@ -208,6 +213,22 @@ You can rename a workspace and the new name appears in everybody's list.
 > limited kind of guest. Nobody has yet decided who should be allowed to. It is not a disaster (the
 > rename is recorded with a name on it and can be changed back) but it is worth keeping an eye on.
 
+### Deleted items, and getting things back
+
+Everything deleted that you may bring back is listed under **Deleted items** on your Account page: the
+workspaces you own, the projects in workspaces you run, the jobs in projects you administer, and your
+own notes (an owner or admin sees everyone's). Newest first, each row says what it was, where it lived,
+and who deleted it and when. A deleted workspace or project also says how many things are inside it —
+they come back with it, and are not listed separately.
+
+- **Restore** brings it back.
+- **Mark for permanent deletion** starts the waiting period, and the row then shows the day it will be
+  erased for good. **Unmark** stops that. A marked item has to be unmarked before it can be restored.
+- Once that day has come the row still shows the date, but it can no longer be unmarked — the erasing
+  is already under way.
+
+If the list cannot be read, the section says so, rather than showing an empty list.
+
 ---
 
 ## §4 — Getting your people in
@@ -220,57 +241,42 @@ You can rename a workspace and the new name appears in everybody's list.
    correct, not a fault.)
 3. Fill in:
    - **Address** — their email address or phone number.
-   - **Channel** — a dropdown offering email, sms and whatsapp.
+   - **Channel** — **email** or **Phone (SMS)**.
    - **Role** — admin, member or guest. (See below.)
-   - **Projects** — this box appears for admin and member, and is hidden for guest.
-4. Press **Send invitation**.
+
+   If the email address you typed belongs to somebody who already has an account, the form says so
+   when you leave the box, and the invitation goes to the address that account signs in with.
+4. Press **Send invitation** (for Phone (SMS) the button reads **Create invite link**). For email, the
+   product sends the invitation to that address, and the next screen says it was emailed. If the email
+   could not be sent, the screen says so, and you send the link yourself.
 5. **The next screen shows you a link, once.** It says: *"Copy it now — it is not stored and cannot be
    shown again."*
 
 > ## Copy that link before you do anything else.
 >
-> It means exactly what it says. That link appears once, on that screen, at that moment. It is not in
-> the pending list. It is nowhere else. Nobody — including you — can look it up again. If you close
-> the tab you have to withdraw the invitation and start over.
->
-> Paste it into an email to the person **first**, then carry on.
+> The link is still shown once. For an emailed invitation you do not need it, but copy it anyway if
+> the email did not go. It appears on that screen, at that moment; it is not in the pending list and
+> nobody — including you — can look it up again. If you close the tab you have to withdraw the
+> invitation and start over.
 
 ### About the "Channel" dropdown
 
-The dropdown offers email, sms and whatsapp, but **the product does not appear to send the invitation
-by any of them.** It makes a link, shows it to you once, and you send it however you like.
-
-So treat "Channel" as a note to yourself about how you intend to reach the person, and plan on sending
-the link by hand.
+**email** sends the invitation for you. **Phone (SMS)** does not send anything yet: it makes the link,
+and you send it by message yourself.
 
 ### About the "Project access" box
 
-It is a dropdown, and it offers **All projects in this workspace** plus one **Only *<project name>***
-entry for each project you can see. Pick a name; the product works out the identifier behind it.
-
-**⚠ IT USED TO ASK YOU TO TYPE IDENTIFIERS, and this paragraph said so.** Until 2026-09-21 the box
-was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters and
-numbers that you would have to go and find from somewhere — the manual's own verdict was *"In practice
-this box is not usable by a person."* It is kept here, rather than deleted, so a reader who remembers
-it as an unusable box finds the correction where they last saw it.
-
-Leave it on **All projects in this workspace** unless the invitation really is for one project only.
-
-It is correctly hidden when you pick **guest**, and if you try to invite a guest *and* name projects
-it refuses and tells you to share individual jobs with them instead.
+**Removed on 29 September 2026.** Admins and members now see every project in their workspace, so there
+is nothing to choose. A guest still sees only the jobs shared with them or assigned to them.
 
 ### The four roles
 
 | Role | What it means |
 |---|---|
 | **Owner** | You, if you created the workspace. Sees absolutely everything in the workspace, including jobs shared with only a few named people. There is no way to hide anything from the owner. No way to hand ownership to somebody else was found on any screen, so plan on the founder staying the owner. |
-| **Admin** | **A "can change things" role, not a "can see things" role.** This surprises everybody. An admin can invite people and set up stages and job types — but only sees the projects they have personally been put on, same as anyone else. |
-| **Member** | Ordinary staff. Does the work. Cannot invite people, cannot change how the stages work. |
-| **Guest** | An outsider — a client, your accountant. Sees only the specific jobs somebody has explicitly shared with them. Nothing else. Cannot see the people list. Cannot create jobs. |
-
-**The practical consequence of the admin rule:** if you want somebody to be able to invite people
-*and* see the work, you have to make them an admin *and* get them onto the projects. One does not come
-with the other.
+| **Admin** | Can invite people and set up stages and job types, and sees every project in the workspace. |
+| **Member** | Ordinary staff. Sees every project in the workspace and does the work. Cannot invite people, cannot change how the stages work. |
+| **Guest** | An outsider — a client, your accountant. Sees only the jobs somebody has shared with them or assigned to them, and nothing else. Cannot see the people list. Cannot create jobs. |
 
 **You cannot invite somebody as an owner.** That option is not in the dropdown and the product refuses
 it if it is forced.
@@ -393,6 +399,10 @@ all show who claimed the value and when. The controls are the title box at the t
 picker, the **Priority** picker, the description box, the **Due** and **Start** date boxes, and the
 **Visibility** pill.
 
+### Assigning somebody who is not in the workspace
+
+In the **Assignee** picker, choose **Assign someone outside this workspace…**, type their email and press **Find**. If an account has exactly that email, it is shown. Press **Assign**, and they join the workspace as a guest who sees only that job. Nothing is listed or suggested: you have to know their email. If nobody has that email, the picker says **No user with that email.** Anyone who can assign a job can do this.
+
 ### The things you cannot do to a job
 
 This is the honest list. Each one is an absence, not a hidden button.
@@ -424,25 +434,34 @@ This is the honest list. Each one is an absence, not a hidden button.
   shipped in a shape that always fails silently (E5-44).
 - **You can attach a file to a job now.** It is kept here, rather than deleted, so a reader who
   remembers it as an absence finds the correction where they last saw it. The job sheet's
-  **Attachments** tab lists the job's files, and the comment box takes one too. The **description** box is still the exception: a file
-  dropped into it is refused rather than quietly lost. A move carrying the "require evidence" rule still
-  puts its own file box on the Move dialog and stays blocked until the server has stored the file (§7).
+  **Attachments** tab lists the job's files and has its own **Attach a file** button, and the comment
+  box takes one too — paste it, drop it, or press its own paperclip **Attach** button, left of the
+  posting note. The **description** box is still the exception: a file dropped into it is refused
+  rather than quietly lost, and it draws no Attach button either. A move carrying the "require evidence"
+  rule still puts its own file box on the Move dialog and stays blocked until the server has
+  stored the file (§7).
 - **You can rename a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and type into the title at the top
   of the sheet: **Enter** or clicking away saves it, **Escape** abandons the change.
 - **You can delete a job now.** It is kept here, rather than deleted, so a reader who remembers it as an
   absence finds the correction where they last saw it. Open the job and press **Delete** in the sheet's
-  footer. The job stops appearing in every view — boards, lists, search, My Work — and **its history is
-  kept**, because other events cite it. **Only a project admin may delete**, and the button is not hidden
-  from anybody: press it without the right and the server refuses, saying so. A **"… deleted · its
-  history is retained"** message follows with an **Undo** for about fifteen seconds, and that Undo is the
-  product's only route back — once it goes, no control anywhere restores the job.
+  footer. A confirmation opens first: it names the job, has a **Delete permanently** switch (off unless
+  you turn it on), and says where deleted things go. **Cancel** is where the cursor starts, so pressing
+  Enter by reflex deletes nothing. Press **Delete** and the job stops appearing in every view — boards,
+  lists, search, My Work — while **its history is kept**, because other events cite it. **Only a project
+  admin may delete**, and the button is not hidden from anybody: press it without the right and the
+  confirmation shows the server's refusal and stays open. A message follows with an **Undo** for about
+  fifteen seconds, and a line on the page keeps an Undo until you delete another job or reload. After
+  that the job is still listed under **Deleted items** on your Account page, where **Restore** brings it
+  back.
 
-  **One exception, added 2026-09-23: a job deleted from My Work has no Undo.** The message and the
-  fifteen seconds belong to the job's own project page, and My Work now opens the sheet in place
-  without them, so the deletion there is silent and final. The job still stops appearing in every
-  view and its history is still kept. **If you want the way back, delete the job from its project
-  page.**
+  **Delete permanently** does all of that and also marks the job to be erased for good after the
+  waiting period the confirmation states. Until then the **Undo** (or **Unmark** in Deleted items) takes
+  the mark off; once the period is over it cannot be undone.
+
+  **A job deleted from My Work has no Undo there.** The message and the Undo belong to the job's own
+  project page, and My Work opens the sheet in place without them. The job still stops appearing in
+  every view, its history is still kept, and it is still in **Deleted items** on your Account page.
 
   If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
   alternative.
@@ -987,7 +1006,7 @@ Exactly five kinds of message, and no more. The list is deliberately closed — 
 a sixth kind.
 
 1. Somebody assigned something to you — *"Anselma Marak assigned this to you"*
-2. Somebody mentioned you — *"Anselma Marak mentioned you"*
+2. Somebody mentioned you — *"Anselma Marak mentioned you"*, in a job's comment or description, or in a note or one of its comments. The row names the job or the note, and clicking it opens that job or note (for a note's comment, scrolled to that comment)
 3. A change of yours was disputed — *"Your claim was contested — [the rule]"*
 4. A claimed date is coming up
 5. Something has been sitting in one stage too long — *"In Doing since 21 Aug — moved there by
@@ -1378,6 +1397,11 @@ Both apps show a strip with plain-English states:
 - **"Offline — 3 claims waiting to send"**
 - a separate "needs attention" count for changes that were permanently refused
 
+**A change to something that was permanently deleted while you were offline cannot be saved.** When the
+app reconnects it takes that change out of its queue and puts a note in its place — "A change to an item
+that was permanently deleted could not be saved, and was removed." — with a **Dismiss** button. Any other
+change the server refused is listed the same way, with the server's reason, and **Dismiss** lets it go.
+
 When everything is fine and nothing is queued, it shows no alarming badge at all. If the connection
 errors, the message appears *beside* the status rather than replacing it, in the server's own words,
 ending with **"still retrying"** — it is specifically forbidden from ever saying it will not
@@ -1573,14 +1597,36 @@ The author always reads their own note, whatever its scope — that is what **Pr
 
 ### Writing a note
 
-The editor is the same one the rest of the product uses, with headings and a formatting toolbar: Bold,
-Italic, Code, Link, Bullet list, Quote, Task item, Code block, Collapsible, and Link a note.
+The editor is the same one the rest of the product uses, with headings and a formatting toolbar: **Undo** and
+**Redo**, a **Heading level** menu (Paragraph, then Heading 1 to 6), Bold, Italic, Strikethrough, Code, Link,
+Bullet list, Numbered list, Quote, Task item, Code block, Collapsible, Horizontal rule, **Insert table**,
+**Insert note** and **Insert ticket**. Hover or tab to any tool to see its name, its keyboard shortcut where
+it has one, and the markdown you can type instead. Undo and Redo grey out when there is nothing to step back
+or forward to. Pressing Bold, Italic or Strikethrough with the cursor inside a link formats the whole link.
+**Insert note** and **Insert ticket** each drop the `:note`/`:ticket` trigger at the cursor and open the same
+picker typing it would — the same two triggers work from the keyboard too, and `[[` still works for a note.
+
+**Insert table** opens an eight-by-eight grid: move the pointer (or the arrow keys) to light the size you
+want, the label reads, for example, "2 × 3 table", then click (or press Enter) to insert it with a header
+row. Escape closes the grid; press elsewhere to dismiss it. The tool is greyed out while your cursor is
+inside a table, because a table cannot be placed inside another.
+
+**Editing a link.** Click into any link's text and a small panel opens beside it with the **URL** and the
+**Text**, an **Open link** shortcut (web, email and phone addresses only) and **Unlink**. Enter or clicking
+away keeps a change, Escape puts it back. An empty URL, or Unlink, takes the link off and keeps the words;
+an empty Text deletes the link. Ctrl-K (Cmd-K on a Mac) with the cursor in a link jumps straight into the
+URL field. The panel appears only for the box you are typing in.
 
 **Notes save themselves.** A couple of seconds after you stop typing, your change is sent — not on
 every keystroke. Until it is accepted the footer says **Saving…**; once it is, **Saved**. If it cannot
 reach the server your change is not lost: it is kept on this device and the footer says **Not saved
 (kept on this device)** until it goes through. Leaving the note, switching away, or closing the tab all
 flush a change in progress rather than dropping it.
+
+**Reopening a note after an unsaved session shows a banner.** If a note opens with words that never
+reached the server, a bar above the text reads **Restored unsaved changes from 5m ago.** Press **Keep**
+to carry on with them (they save as usual), or **Discard** to throw them away and load the note as the
+server has it. Discard cannot be undone. Only people who can edit the note see the bar.
 
 **History** keeps every version you have saved, newest first, each one named by who saved it and when.
 Open one and it opens read-only with a banner reading **Viewing version from …**; press **Restore** to
@@ -1590,7 +1636,19 @@ old versions, just not put one back).
 **A note with several headings gets a small floating button, bottom left, labelled "On this page".**
 Press it to open a table of contents over the note; press a heading in it to jump straight there. It
 appears at any window width once a note has enough headings, whereas it used to be a column that showed
-only on a wide screen.
+only on a wide screen. The heading you jump to lands just under the top bar, not behind it.
+
+**Every heading in a note can be linked to.** Hover a heading (on a phone or tablet the small link icon is
+always there, faintly) and press the link icon at the end of it — or Tab to it and press Enter — to copy a
+link to that exact heading. Paste it anywhere; whoever opens it lands on that heading, provided they can read
+the note. The icon appears on all six heading levels, and if two headings read the same the second gets a
+`-2` on the end of its link, the third `-3`. Only the note page has this; the comment box and the job sheet
+do not.
+
+**A thin line under the top bar shows how far down a note you have read.** It fills from the left as you
+scroll the note (the title and byline above the text do not count) and starts again at empty when you open
+another note. It is there for everyone who can open the note, whether or not they can edit it, and it stops
+animating if your device is set to reduce motion.
 
 ### Finding a note
 
@@ -1623,13 +1681,27 @@ the job's own panel opens right there, over the note — you are not taken to th
 job from that panel does not remove the badge; a deleted job stays attached (see the Notes FAQ entry on
 this).
 
+### Mentioning somebody in a note
+
+Type `@` and start a person's name, in a note or in its comments: the same list of people the job editors offer
+appears, and picking one drops a mention at the cursor. **A mention notifies the person, once.** Saving the note
+again with the same mention in it does not tell them again; adding someone new tells only the new person, and a
+comment that mentions somebody tells them as soon as it is posted. **Only people who can read the note are told**
+— mentioning someone the note is not shared with sends nothing, and you are not told that either. Mentioning
+yourself sends nothing. A note mention arrives in the Inbox as a *mentioned you* message, naming the note, and follows your Mentions
+setting under Account → Notifications, exactly like a mention on a job.
+
 ### Linking to a job or another note
 
 Typing `:ticket ` followed by a few words, in a comment or in a note, opens a picker over the jobs you
-can see; pick one and it inserts a chip showing the job's key and title, which opens that job.
+can see; pick one and it inserts a chip showing the job's key and title, which opens that job. Typed with nothing after it, the picker lists the most recently created jobs you can see across the workspace (in a note, which belongs to no single project) or in the current project (in a job's own comment), so you can browse before you type.
 
 Typing `:note ` (or `[[`) the same way opens a picker over the notes you can read, and inserts a link to
 the one you pick.
+
+**A chip or link to something that was permanently deleted reads Deleted item** — no key, no title, and
+nothing to open. The comment or note that holds it is not changed: only the chip is drawn differently,
+because the thing it pointed at no longer exists.
 
 **Tagging a note in a job's own comment attaches that note to the job** — the same as pressing Attach
 note yourself. Referencing a note inside the note's own comments does not attach anything anywhere.
@@ -1640,9 +1712,12 @@ A deleted note goes into a **Deleted** group on the Notes page, with a **Restore
 see your own there, and an owner or admin sees everyone's. Restoring it brings it back exactly as it
 was; while deleted, the note is read-only for everyone, its own author included.
 
-**As of this writing there is no Delete button on a note's own page** — nothing in the product yet puts
-a note there for you. The Restore machinery is ready and working; only the control that starts it is
-still missing.
+**Deleting a note:** open it and press **Delete…** beside **History** — only the note's author, a
+workspace admin or the owner sees it. The same confirmation a job's delete uses opens, with its
+**Delete permanently** switch. A deleted note shows a banner on its own page; **Restore** there brings
+it back, and if the server refuses (for example because the note is marked for permanent deletion
+elsewhere) the banner says why. Every deleted note is also listed under **Deleted items** on your
+Account page.
 
 If a note you have open stops being shared with you — someone narrowed its scope, or detached the last
 job it inherited from — you are taken back to the Notes list with a message: **That note is no longer

@@ -30,7 +30,7 @@ export interface ResolvedVisibility {
  * |---|---|---|---|
  * | null (non-member)       | no          | no                 | no              |
  * | guest                   | no          | no                 | only if listed  |
- * | member / admin          | yes         | only if on project | only if listed  |
+ * | member / admin          | yes         | yes (rule A: on every project) | only if listed  |
  * | owner                   | yes         | yes                | yes             |
  *
  * **Guests** see ONLY what an explicit list names them in. A guest belongs to
@@ -47,12 +47,13 @@ export interface ResolvedVisibility {
  * visibility controls state plainly that the workspace owner can always see
  * (Plan 6 carries the copy). A stated power is not a lie; a hidden one is.
  *
- * **Admins get no bypass.** An admin not on a project does not see its
- * project-mode tickets, and an unlisted admin does not see explicit-mode
- * tickets. An admin who wants to read joins the project — an attributed event —
- * first. `hasProjectAdminRights` is deliberately NOT consulted here: it answers
- * "may they manage this project", which is a different question, and its own
- * docblock says so.
+ * **Admins and members are on every project (rule A, owner ruling 2026-09-29).**
+ * `resolveEffectiveRole` puts every founded project in their set, so the
+ * `project` arm below answers true for them; the arm still asks the set,
+ * because a guest's set is explicit rows only and a revoked member's is empty.
+ * An unlisted admin still does not see an explicit-mode ticket.
+ * `hasProjectAdminRights` is deliberately NOT consulted here: it answers "may
+ * they manage this project", which is a different question.
  *
  * **The explicit list is exactly the authored list.** Creator and assignee are
  * not implicitly appended. Locking yourself out is a legal (attributed) claim,
@@ -132,7 +133,7 @@ export function canSeeResolved(eff: EffectiveRole, userId: string, v: ResolvedVi
         case 'workspace':
           return true;
         case 'project':
-          // No admin bypass — deliberate, see the docblock.
+          // Rule A fills the set for owner/admin/member — see the docblock.
           return eff.projects.has(v.projectId);
         case 'explicit':
           return v.resolvedUserIds.includes(userId);
@@ -171,6 +172,37 @@ export async function getResolvedVisibility(
     resolvedMode: row.resolved_mode,
     resolvedUserIds: row.resolved_user_ids,
   };
+}
+
+/**
+ * THE ASSIGNEE ARM (owner ruling 2026-09-29, access plan W3): "if an assignee is
+ * assigned, even if that person does not have visibility to the workspace or
+ * project, they can still get visibility to just that single ticket."
+ *
+ * Kept OUT of `canSeeResolved` deliberately. That function is the AUDIENCE
+ * rule, and it has callers that must not widen with an assignment:
+ * `canReadNote`'s inherit arm (a note is not opened by assigning its ticket),
+ * the rollup's `restrictedCount` and the restricted-parent chip (the ticket's
+ * relatives are not opened either). `canSee` — the one-ticket question — is the
+ * only reader that ORs this in; its SQL twin is `assigneeArmWhere`.
+ *
+ * A workspace role is still required: an assignee put out of the workspace keeps
+ * their name on the head row (`membership.revoked` touches no ticket) and sees
+ * nothing (case 6.193).
+ */
+export function assigneeSees(eff: EffectiveRole, userId: string, assigneeId: string | null): boolean {
+  return eff.workspaceRole !== null && assigneeId !== null && assigneeId === userId;
+}
+
+async function currentAssignee(db: Queryable, ticketId: string): Promise<string | null> {
+  const { rows } = await db.query<{ assignee_id: string | null }>(
+    // A DELETED project's tickets are out of reach for an assignee too (final
+    // review, 2026-09-29) — the same exclusion rule A applies to a roster.
+    `SELECT t.assignee_id FROM proj_tickets t WHERE t.ticket_id = $1
+       AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = t.project_id AND dp.deleted_at IS NOT NULL)`,
+    [ticketId],
+  );
+  return rows[0]?.assignee_id ?? null;
 }
 
 /**
@@ -247,6 +279,11 @@ export async function getResolvedVisibility(
  * ticket the viewer may not see. Task 8's route turns both into the same 404,
  * so a member probing ids learns nothing; giving them different answers here
  * would put the oracle one layer down instead of removing it.
+ *
+ * ## The assignee arm (W3)
+ *
+ * `canSeeResolved` OR `assigneeSees`. The head row's CURRENT `assignee_id` is
+ * read, so reassigning takes the ticket away at once.
  */
 export async function canSee(db: Queryable, userId: string, ticketId: string): Promise<boolean> {
   const v = await getResolvedVisibility(db, ticketId);
@@ -254,5 +291,7 @@ export async function canSee(db: Queryable, userId: string, ticketId: string): P
     return false;
   }
   const eff = await resolveEffectiveRole(db, userId, v.workspaceId);
-  return canSeeResolved(eff, userId, v);
+  if (canSeeResolved(eff, userId, v)) return true;
+  // Only when the audience says no — the common answer costs no second read.
+  return assigneeSees(eff, userId, await currentAssignee(db, ticketId));
 }

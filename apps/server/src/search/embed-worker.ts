@@ -1,6 +1,7 @@
 import type { Pool } from 'pg';
 import { chunkDoc } from '@gisik-nokma/domain';
 import { CURRENT_MODEL, EMBEDDING_DIM, embedTexts as defaultEmbedTexts } from './embedding.js';
+import { purgedResolverFor } from '../purge/purged-lookup.js';
 import { nudgesEmbedding } from './nudge.js';
 
 /**
@@ -115,13 +116,14 @@ export function startEmbedWorker(pool: Pool, options: EmbedWorkerOptions): Embed
 
     // Deleted notes first, and by their own statement rather than by the
     // staleness query below: that query filters `deleted = FALSE`, so a deleted
-    // note's chunks would never be reached by it. `USING` rather than a
-    // subquery so the row count is the number of chunk rows removed, which is
-    // what makes "nothing left to clean" observable on the next pass.
+    // note's chunks would never be reached by it. The row count is the number
+    // of chunk rows removed, which is what makes "nothing left to clean"
+    // observable on the next pass. One statement, both kinds: chunks of a deleted note, and (trash Plan 2)
+    // chunks whose note row no longer exists — an erased note's residue, which a
+    // join against `proj_notes` cannot reach.
     const cleaned = await pool.query(
       `DELETE FROM search_note_chunks c
-        USING proj_notes n
-        WHERE c.note_id = n.note_id AND n.deleted = TRUE`,
+        WHERE NOT EXISTS (SELECT 1 FROM proj_notes n WHERE n.note_id = c.note_id AND n.deleted = FALSE)`,
     );
     processed += cleaned.rowCount ?? 0;
 
@@ -139,13 +141,27 @@ export function startEmbedWorker(pool: Pool, options: EmbedWorkerOptions): Embed
     );
 
     for (const note of rows) {
-      const chunks = chunkDoc(note.body);
+      const chunks = chunkDoc(note.body, { isPurged: await purgedResolverFor(pool, [note.body]) });
       const pieces = chunks.length > 0 ? chunks : [{ headingPath: '', text: note.title }];
       const vectors = await embedTexts(pieces.map((piece) => piece.text));
 
       const client = await pool.connect();
       try {
         await client.query('BEGIN');
+        // Trash Plan 2 (whole-branch review): the embedding call above ran
+        // outside any transaction, so a purge may have erased this note since
+        // the staleness query picked it. Lock the note's row and look again:
+        // FOR SHARE makes a purge that arrives next wait for this commit, and one
+        // that already committed leaves no row — either way nothing is written
+        // for an erased note.
+        const still = await client.query(
+          'SELECT 1 FROM proj_notes WHERE note_id = $1 AND deleted = FALSE FOR SHARE',
+          [note.note_id],
+        );
+        if (still.rowCount === 0) {
+          await client.query('ROLLBACK');
+          continue;
+        }
         // REPLACE, not append: `(note_id, chunk_index)` is the primary key and
         // a new body can have fewer chunks than the old one, so an upsert would
         // leave the tail of the previous body searchable forever.

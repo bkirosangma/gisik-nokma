@@ -297,7 +297,7 @@ export function LastProjectNav({
         }}
         onClick={() => openProject(shown.id)}
       >
-        {shown.name}
+        <span className="gn-nav__label">{shown.name}</span>
         {/* E5-34: named as archived in the item itself, the way the workspace
             home's card names it ("<name>, archived") — so the one route where
             the bar names an archived project says so rather than looking like

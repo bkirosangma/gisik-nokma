@@ -175,6 +175,7 @@ export function AttachNotePicker({
     <div className="gn-attach-note-picker">
       <input
         type="text"
+        className="gn-field__input gn-attach-note-picker__search"
         aria-label="Find a note"
         value={text}
         onChange={(event) => {
@@ -195,20 +196,23 @@ export function AttachNotePicker({
             key={candidate.noteId}
             type="button"
             role="option"
+            className="gn-attach-note-picker__option"
             aria-selected={index === activeIndex}
             onClick={() => void chooseExisting(candidate)}
           >
-            {`${candidate.title} · ${candidate.homeProjectId}`}
+            <span className="gn-attach-note-picker__option-title">{candidate.title}</span>
+            <span className="gn-attach-note-picker__option-meta">{` · ${candidate.homeProjectId}`}</span>
           </button>
         ))}
         <button
           type="button"
           role="option"
+          className="gn-attach-note-picker__option gn-attach-note-picker__option--create"
           aria-selected={merged.length === activeIndex}
           disabled={trimmed === ''}
           onClick={() => void chooseNew()}
         >
-          {`New note: ${text}`}
+          <span className="gn-attach-note-picker__option-title">{`New note: ${text}`}</span>
         </button>
       </div>
     </div>

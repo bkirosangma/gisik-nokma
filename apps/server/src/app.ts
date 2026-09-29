@@ -29,12 +29,16 @@ import { registerNotificationRoutes } from './routes/notifications.js';
 import { registerNotificationPreferencesRoutes } from './routes/notification-preferences.js';
 import { registerPreferencesRoutes } from './routes/preferences.js';
 import { registerSearchRoutes } from './routes/search.js';
+import { LogInviteMailer, type InviteMailer } from './invites/invite-mailer.js';
 import { redactInviteToken, registerInviteRoutes, type ServerAppend } from './routes/invites.js';
+import { registerPeopleRoutes } from './routes/people.js';
 import { registerMyInvitationRoutes } from './routes/my-invitations.js';
 import { registerTicketHistoryRoute } from './routes/ticket-history.js';
 import { registerTicketRoutes } from './routes/tickets.js';
 import { registerNoteRoutes } from './routes/notes.js';
 import { registerWorkspaceRoutes } from './routes/workspaces.js';
+import { registerPurgedLookupRoute } from './purge/lookup-route.js';
+import { registerDeletedItemsRoutes } from './routes/deleted-items.js';
 import { registerContestsRoute } from './sync/contests-route.js';
 import { registerSyncRoutes } from './sync/sync-routes.js';
 import { createStreamHub } from './stream/hub.js';
@@ -129,6 +133,13 @@ export type AppDeps = {
    * them silently.
    */
   webOrigin: string;
+  /**
+   * Where invitation letters go (access plan W5). OPTIONAL, and absent means a
+   * SILENT `LogInviteMailer`: that is the ~sixty test files' default, which mint
+   * invitations and never asked for mail. `index.ts` always passes
+   * `selectInviteMailer(config)`, so a deployment decides by `SMTP_URL` alone.
+   */
+  inviteMailer?: InviteMailer;
   /**
    * The clock the ATTENTION strip computes against. Optional, and the only
    * dependency here that a test would ever want to freeze: the strip is the one
@@ -627,7 +638,14 @@ export function buildApp(
         // wrong direction is the one this replaces, where uploads were bounded
         // by nothing.
         verdict = eventsLimiter.check(`events:${clientKey}`, now());
-      } else if (method === 'POST' && routeUrl === '/v1/workspaces/:workspaceId/invites') {
+      } else if (
+        method === 'POST' &&
+        (routeUrl === '/v1/workspaces/:workspaceId/invites' ||
+          // Deviation D9: the lookup answers "does this address have an
+          // account" — an address oracle, the same scarcity as minting a
+          // credential, so it spends the same budget.
+          routeUrl === '/v1/workspaces/:workspaceId/people-lookup')
+      ) {
         // The second inherited errand — see `SecurityOptions.rateLimit`.
         // Per IP, not per user: `request.currentUserId` is written by
         // `requireSession`, which is a route-level `preHandler` and therefore
@@ -868,6 +886,14 @@ export function buildApp(
   // either, and the same preHandler by parameter, for the same reason: both
   // handlers read `request.currentUserId`.
   registerWorkspaceRoutes(app, { pool: deps.pool, ingest: deps.ingest }, requireSession);
+  // The Deleted items read (trash series, Plan 1 Task 7, spec §6.3) — every
+  // deleted workspace, project, ticket or note this caller may currently
+  // restore or mark. Registered beside the workspace directory: same door,
+  // same "me"-scoped shape, no workspace id in the path.
+  registerDeletedItemsRoutes(app, { pool: deps.pool }, requireSession);
+  // The purged-id lookup (trash series Plan 3, D1): which of the ids a caller
+  // holds were permanently erased. Same "me"-scoped door as Deleted items.
+  registerPurgedLookupRoute(app, { pool: deps.pool }, requireSession);
   // The invitation surface (Plan 4 Task 14): issue, read a link, accept a link,
   // list what is outstanding. It takes BOTH doors — the gated `ingest` for
   // issuance, so the admin-only refusal fires exactly as it would on
@@ -875,9 +901,18 @@ export function buildApp(
   // events are all refused at the client door by design.
   registerInviteRoutes(
     app,
-    { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend, webOrigin: deps.webOrigin },
+    {
+      pool: deps.pool,
+      ingest: deps.ingest,
+      serverAppend: deps.serverAppend,
+      webOrigin: deps.webOrigin,
+      mailer: deps.inviteMailer ?? new LogInviteMailer(() => {}),
+      alerter,
+    },
     requireSession,
   );
+  // Access plan Task 6 — the exact-email lookup and the outsider door.
+  registerPeopleRoutes(app, { pool: deps.pool, ingest: deps.ingest, serverAppend: deps.serverAppend }, requireSession);
   // The CALLER-scoped half of that surface (Task 17): the invitations addressed
   // to the signed-in person's verified email, plus Accept and Decline for them.
   // A separate module rather than four more handlers in `routes/invites.ts`,

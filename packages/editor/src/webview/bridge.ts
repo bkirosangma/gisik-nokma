@@ -7,7 +7,7 @@ import type { TicketRefCandidate } from '../extensions/ticket-ref.js';
 export const EDITOR_BRIDGE_VERSION = 1 as const;
 
 export type HostToEditorMessage =
-  | { bridge: 1; kind: 'loadDoc'; doc: DocJson | null; editable: boolean }
+  | { bridge: 1; kind: 'loadDoc'; doc: DocJson | null; editable: boolean; purgedIds?: string[] }
   | { bridge: 1; kind: 'insertImage'; attachmentId: string; mime: string; alt?: string }
   | { bridge: 1; kind: 'requestSubmit' }
   | { bridge: 1; kind: 'mentionResults'; requestId: string; users: MentionCandidate[] }
@@ -106,10 +106,20 @@ export function parseHostMessage(raw: unknown): HostToEditorMessage | null {
   const record = raw as Record<string, unknown>;
   if (record.bridge !== EDITOR_BRIDGE_VERSION) return null;
   switch (record.kind) {
-    case 'loadDoc':
+    case 'loadDoc': {
       if (record.doc !== null && !isDocJson(record.doc)) return null;
       if (typeof record.editable !== 'boolean') return null;
-      return { bridge: 1, kind: 'loadDoc', doc: record.doc as DocJson | null, editable: record.editable };
+      const purgedIds = Array.isArray(record.purgedIds)
+        ? record.purgedIds.filter((id): id is string => typeof id === 'string')
+        : undefined;
+      return {
+        bridge: 1,
+        kind: 'loadDoc',
+        doc: record.doc as DocJson | null,
+        editable: record.editable,
+        ...(purgedIds === undefined ? {} : { purgedIds }),
+      };
+    }
     case 'insertImage':
       if (typeof record.attachmentId !== 'string' || typeof record.mime !== 'string') return null;
       return {

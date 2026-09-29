@@ -5,7 +5,7 @@ import { readStreamSeq } from '../../src/sync/stream-seq.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { resetTestSequences, testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
-import { applyAll, seedMember, seedTicket } from '../helpers/seed.js';
+import { applyAll, seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 import { fakeSocket, frameIds, rawSince, type FakeSocket } from '../helpers/stream-socket.js';
 
 /**
@@ -151,6 +151,17 @@ const eventFrames = (socket: FakeSocket): LedgerEvent[] =>
   socket.frames.flatMap((f) => (f.type === 'event' ? [f.envelope] : []));
 
 describe('stream hub over the real visibility filter', () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). Two members with different rosters used
+   * to be two different slices of the workspace, and `withheld` was a
+   * project-mode ticket in a project only `insider` was on. Under rule A every
+   * member is on every FOUNDED project, so rosters no longer separate them and
+   * that ticket would reach `outsider`. The per-subscriber claim now rests on the
+   * one thing that still separates two members: an EXPLICIT list. `withheld` is
+   * explicit to `insider` alone. Both projects are founded too — the earlier
+   * fixture left `theirs` unfounded, which made the old assertion true for a
+   * reason production cannot produce (the vacuous-green pass).
+   */
   it('7.134 filters the fan-out PER SUBSCRIBER on both the catch-up and the live path', async () => {
     const ws = newUlid();
     const mine = newUlid();
@@ -159,10 +170,9 @@ describe('stream hub over the real visibility filter', () => {
     const outsider = newUlid();
     const shared = newUlid();
     const withheld = newUlid();
-    // Two members of ONE workspace with genuinely different slices of it: both
-    // are on `mine`, only `insider` is on `theirs`. Without this the whole
-    // per-subscriber claim would be untestable — a hub with a single hardcoded
-    // viewer answers identically when everyone sees everything.
+    const openElsewhere = newUlid();
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     await seedMember(db.pool, ws, insider, 'member', [
       { projectId: mine },
       { projectId: theirs },
@@ -170,9 +180,14 @@ describe('stream hub over the real visibility filter', () => {
     await seedMember(db.pool, ws, outsider, 'member', [{ projectId: mine }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: shared });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: withheld });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: openElsewhere });
+    await record(setVisibilityEnv(ws, withheld, 'explicit', [insider]));
 
     const onShared = await record(ticketEvent(ws, shared, 'everyone', insider));
     const onWithheld = await record(ticketEvent(ws, withheld, 'not everyone', insider));
+    // Rule A's positive control, over the same range: `outsider` is on `mine`
+    // only, and a project-mode ticket in `theirs` reaches them all the same.
+    const onOpenElsewhere = await record(ticketEvent(ws, openElsewhere, 'project wide', insider));
 
     const { hub, commit } = realHub();
     const insiderSocket = fakeSocket();
@@ -193,6 +208,7 @@ describe('stream hub over the real visibility filter', () => {
     expect(outsiderIds).toContain(onShared.id);
     expect(insiderIds).toContain(onWithheld.id);
     expect(outsiderIds).not.toContain(onWithheld.id);
+    expect(outsiderIds).toContain(onOpenElsewhere.id);
     // Not merely the payload: the withheld TICKET's id must not appear anywhere
     // in the BYTES the hub wrote to the outsider — not in a declared field, and
     // not in one the frame schema would have stripped out of `frames` before
@@ -237,10 +253,17 @@ describe('stream hub over the real visibility filter', () => {
     const witness = newUlid();
     const seen = newUlid();
     const unseen = newUlid();
+    // AMENDED 2026-09-29, owner ruling (A): both projects are founded, and
+    // `unseen` is explicit to `witness` alone. Its project no longer hides it
+    // from `viewer` — rule A puts a member on every founded project — so the
+    // explicit list is what keeps the trailing event invisible to them.
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: mine }]);
     await seedMember(db.pool, ws, witness, 'member', [{ projectId: theirs }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: seen });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: unseen });
+    await record(setVisibilityEnv(ws, unseen, 'explicit', [witness]));
 
     const lastVisible = await record(ticketEvent(ws, seen, 'mine', viewer));
     // The trailing events are invisible to `viewer`, which is what makes the
@@ -297,15 +320,31 @@ describe('stream hub over the real visibility filter', () => {
     hub.close();
   });
 
-  it('7.137 a narrowing that lands MID-SUBSCRIPTION reaches the subscriber as purge frames', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This case read "taken OFF the project
+   * inside the open subscription, a ticket they held is retracted by id". Under
+   * rule A a member is on every founded project, so a `project.member_removed`
+   * takes NOTHING from them: the ticket they held keeps arriving and is not
+   * purged. What still travels as a purge frame is the id of a ticket in the
+   * lost scope they can NOT see now and never held — an explicit list that omits
+   * them (the accepted in-scope leak, `visible-events-for.test.ts` 6.17). The
+   * case therefore still pins what it was written to pin — the hub carries an
+   * ITEMISED purge over the open socket, and the subscription lives on — with
+   * the rule-A truth that the retraction is of the never-held id only.
+   */
+  it('7.137 a roster narrowing MID-SUBSCRIPTION reaches the subscriber as a purge frame for what they cannot see, and retracts nothing they hold', async () => {
     const ws = newUlid();
     const prj = newUlid();
     const viewer = newUlid();
     const witness = newUlid();
     const ticket = newUlid();
+    const sealed = newUlid();
+    await seedProject(db.pool, ws, prj);
     await seedMember(db.pool, ws, viewer, 'member', [{ projectId: prj }]);
     await seedMember(db.pool, ws, witness, 'member', [{ projectId: prj }]);
     await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: ticket });
+    await seedTicket(db.pool, { workspaceId: ws, projectId: prj, ticketId: sealed });
+    await record(setVisibilityEnv(ws, sealed, 'explicit', [witness]));
     const held = await record(ticketEvent(ws, ticket, 'while I could see it', viewer));
 
     const { hub, commit } = realHub();
@@ -314,16 +353,17 @@ describe('stream hub over the real visibility filter', () => {
     await hub.subscribe(viewer, socket, ws, 0);
     await hub.subscribe(witness, witnessSocket, ws, 0);
     expect(frameIds(socket)).toContain(held.id);
+    // The premise the purge assertion below rests on: they never saw `sealed`.
+    expect(frameIds(socket)).not.toContain(`purge:${sealed}`);
 
-    // Taken off the project inside the open subscription. They are still in
-    // the workspace, so they are answered with an ITEMISED purge rather than a
-    // scope instruction, and the subscription lives on.
+    // Taken off the project roster inside the open subscription. They are still
+    // in the workspace, so they are answered with an ITEMISED purge rather than
+    // a scope instruction, and the subscription lives on.
     //
-    // The first fixture here revoked and re-granted at `member` and produced no
-    // purge at all. That was a missing fixture, not a hub defect: a revocation
-    // deletes the workspace-scope row and leaves the project row standing, so
-    // the re-granted member was still on the project and had lost nothing.
-    // `project.member_removed` is the boundary that actually narrows.
+    // (An earlier fixture revoked and re-granted at `member` and produced no
+    // purge at all: a revocation deletes the workspace-scope row and leaves the
+    // project row standing. `project.member_removed` is the roster boundary.)
+    const beforeRemoval = socket.raw.length;
     const removal = await record(
       testEnvelope({
         workspaceId: ws,
@@ -336,19 +376,28 @@ describe('stream hub over the real visibility filter', () => {
     commit(removal);
     await hub.settled();
 
-    // A ticket they held a moment ago is retracted, by id, over the open
-    // socket — the whole point of the instruction existing.
-    expect(frameIds(socket)).toContain(`purge:${ticket}`);
+    // The scope's never-held explicit-unlisted id travels as a purge, by id,
+    // over the open socket.
+    expect(frameIds(socket)).toContain(`purge:${sealed}`);
+    // What they HELD is not retracted — rule A keeps them on the project.
+    expect(frameIds(socket)).not.toContain(`purge:${ticket}`);
+    expect(rawSince(socket, beforeRemoval)).not.toContain(`purge:${ticket}`);
     // The roster event itself travels too — they are still inside the workspace
     // — which is the positive control that this drain ran and yielded.
     expect(frameIds(socket)).toContain(removal.id);
-    // And the narrowing really narrowed: the next event about that ticket does
-    // not arrive, while the witness — same workspace, same commit — gets it.
+    // And the next event about the held ticket STILL arrives (it used to be the
+    // proof of narrowing; under rule A it is the proof there was none), while a
+    // later event about `sealed` does not.
     const afterNarrowing = await record(ticketEvent(ws, ticket, 'after', witness));
+    const afterSealed = await record(ticketEvent(ws, sealed, 'sealed after', witness));
     commit(afterNarrowing);
+    commit(afterSealed);
     await hub.settled();
-    expect(frameIds(witnessSocket)).toContain(afterNarrowing.id);
-    expect(frameIds(socket)).not.toContain(afterNarrowing.id);
+    expect(frameIds(witnessSocket)).toEqual(
+      expect.arrayContaining([afterNarrowing.id, afterSealed.id]),
+    );
+    expect(frameIds(socket)).toContain(afterNarrowing.id);
+    expect(frameIds(socket)).not.toContain(afterSealed.id);
     expect(socket.closes).toEqual([]);
     hub.close();
   });

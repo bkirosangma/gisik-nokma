@@ -50,16 +50,13 @@ import { canSee } from '../visibility/can-see.js';
  * member's session, and pins the response byte-for-byte (headers included)
  * against the request that sends none.
  *
- * ## Assignment is not visibility, and both conjuncts are here for that reason
+ * ## Assignment IS enough to see one's own ticket (owner ruling 2026-09-29, W3)
  *
- * `t.assignee_id = $n` says a claim was made about this person. It says nothing
- * about whether they may READ the row, and the two come apart in four reachable
- * ways this route is measured against: a ticket explicitly shared with somebody
- * else, a project-mode ticket in a project the assignee is not on, an assignee
- * REMOVED from that project afterwards, and an audience narrowed by a later
- * `visibility.set`. Every one of them is a row that satisfies the assignee
- * clause and must not appear, so `visibleTicketsWhere` is not a second gate
- * behind the door — it is half of what makes the answer correct.
+ * `visibleTicketsWhere` now ORs the assignee arm, so `t.assignee_id = $n` alone
+ * decides membership of this answer for anyone holding a workspace role. The
+ * predicate stays in the conjunction because it is also the tenancy-free
+ * statement of who may see a row, and removing it would make this the one read
+ * that re-expresses the rule.
  *
  * It is CONSUMED, never re-expressed: Task 5 spent a review making that
  * predicate the single SQL statement of Plan 4's decision table, and a second
@@ -316,6 +313,7 @@ async function contestedFor(
     contested_at: Date;
     ticket_fields: Record<string, FieldClaim> | null;
     deleted_at: Date | null;
+    project_deleted_at: Date | null;
   }>(
     // `t.deleted_at` is selected and the LEFT JOIN is NOT filtered by it. The
     // ROW must survive — a contest is the VIEWER's own refused claim, and the
@@ -323,7 +321,9 @@ async function contestedFor(
     // row because the ticket it cites was deleted would strand a claim the
     // person can never clear, from a route whose whole subject is their own
     // open refusals. What must NOT survive is the deleted ticket's TITLE, so the
-    // flag is carried out and the title gate below consults it.
+    // flag is carried out and the title gate below consults it. `p.deleted_at`
+    // (Task 6, T10) joins the same way, for the same reason: a project's
+    // deletion must blank the title without dropping the row.
     //
     // Filtering the ON clause instead would be worse than wrong: `titleOf`
     // throws when `ticket_fields` is null ("visible to this viewer but has no
@@ -331,10 +331,11 @@ async function contestedFor(
     // deleted ticket with an open contest would 500 the whole My Work route for
     // its claimant.
     `SELECT c.ticket_id, c.rule, c.reason, c.original_event, c.contested_at,
-            t.fields AS ticket_fields, t.deleted_at
+            t.fields AS ticket_fields, t.deleted_at, p.deleted_at AS project_deleted_at
        FROM proj_contested c
        LEFT JOIN proj_tickets t
          ON t.ticket_id = c.ticket_id AND t.workspace_id = c.workspace_id
+       LEFT JOIN proj_projects p ON p.project_id = t.project_id
       WHERE c.workspace_id = $1 AND c.claimant_id = $2 AND NOT c.resolved
       ORDER BY c.contested_at, c.contested_event_id`,
     [workspaceId, viewerId],
@@ -357,11 +358,13 @@ async function contestedFor(
       ticketId: row.ticket_id,
       // Two ways to earn `null`, and they are the same register — "the claim is
       // yours, the ticket's content is not": the viewer may no longer see the
-      // ticket (`canSee`), or the ticket has been soft-deleted. The second is
-      // `LIVE_TICKET_WHERE`'s rule reaching the one surface that cannot filter
-      // its row, so it is applied to the TITLE alone.
+      // ticket (`canSee`), or the ticket (or its project, Task 6) has been
+      // soft-deleted. The second is `LIVE_TICKET_WHERE`'s rule reaching the one
+      // surface that cannot filter its row, so it is applied to the TITLE alone.
       title:
-        row.deleted_at === null && (await canSee(db, viewerId, row.ticket_id))
+        row.deleted_at === null &&
+        row.project_deleted_at === null &&
+        (await canSee(db, viewerId, row.ticket_id))
           ? titleOf(row.ticket_fields, row.ticket_id)
           : null,
       rule: row.rule,

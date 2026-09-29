@@ -31,7 +31,10 @@ export function createFakeDataSource(
   let nextSeq = 1;
   const query: DataSourceQuery = {
     getMyWorkspaces: async () => [],
+    getDeletedItems: async () => [],
+    purgedAmong: async () => [],
     getMembers: async () => [],
+    getActorNames: async () => [],
     getBoard: async () => ({ projectId: 'prj_unset', groups: [] }),
     getTickets: async () => ({ projectId: 'prj_unset', rows: [] }),
     getTicket: async () => null,

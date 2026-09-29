@@ -2,7 +2,7 @@
 
 import { Avatar, Button, NoteBadge } from '@gisik-nokma/ui';
 import type { NoteDetail } from '@gisik-nokma/domain';
-import type { RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
+import { DELETE_TRIGGER_LABEL, type RosterMember, type WorkspaceRef } from '@gisik-nokma/app-core';
 import { ticketSheetPath } from '../ticket-location.js';
 import { ScopeEditor } from './scope-editor.js';
 
@@ -56,6 +56,7 @@ export function NoteByline({
   readingLabel,
   onCopyMarkdown,
   onOpenHistory,
+  onDelete,
 }: {
   note: NoteDetail;
   workspace: WorkspaceRef;
@@ -77,6 +78,13 @@ export function NoteByline({
   readingLabel: string;
   onCopyMarkdown: () => void;
   onOpenHistory: () => void;
+  /**
+   * The note's delete door (trash Plan 4, D2) — present only for someone who
+   * may edit the note right now (`NoteDocument`'s `canEditNow`: its author, a
+   * workspace admin or the owner, and not already deleted). Absent, no button:
+   * a door the server would refuse is not drawn (D4).
+   */
+  onDelete?: () => void;
 }) {
   return (
     <div className="gn-notes__byline">
@@ -116,6 +124,11 @@ export function NoteByline({
         <Button variant="ghost" onClick={onOpenHistory}>
           History
         </Button>
+        {onDelete !== undefined ? (
+          <Button variant="ghost" onClick={onDelete}>
+            {DELETE_TRIGGER_LABEL}
+          </Button>
+        ) : null}
       </span>
     </div>
   );

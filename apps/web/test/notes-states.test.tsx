@@ -44,6 +44,7 @@ const WS_A_REF: WorkspaceRef = {
   name: 'Garo Hills Logistics',
   prefix: 'CC',
   role: 'owner',
+  archived: false,
   memberCount: 3,
   nameRestrictedProjectCount: 0,
   projects: [],

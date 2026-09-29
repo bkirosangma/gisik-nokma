@@ -35,6 +35,7 @@ const MINTED = {
   inviteId: '01J0000000000000000000000A',
   url: 'http://localhost:3001/invite/tok_raw',
   expiresAt: '2026-09-09T00:00:00.000Z',
+  emailSent: true,
 };
 
 describe('3.95 mintInvite — the body the door accepts, and the one it refuses', () => {
@@ -100,6 +101,15 @@ describe('3.95 mintInvite — the body the door accepts, and the one it refuses'
       status: 422,
       serverMessage: refusal.reason,
     });
+  });
+
+  it('3.95 AMENDED (W5): a mint answer without emailSent is refused like one without expiresAt', async () => {
+    const http = fakeHttp({
+      'POST /v1/workspaces/ws_1/invites': { inviteId: 'i_1', url: 'http://x/invite/t', expiresAt: '2026-09-09T00:00:00.000Z' },
+    });
+    await expect(
+      createHttpInviteAdminGateway(http).mintInvite('ws_1', { address: 'a@b.test', channel: 'email', role: 'member' }),
+    ).rejects.toBeInstanceOf(InviteAdminError);
   });
 
   it('3.96 a mint answering no expiry is a failure, not a link shown under copy that promises one', async () => {

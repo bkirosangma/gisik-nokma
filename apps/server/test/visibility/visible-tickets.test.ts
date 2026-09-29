@@ -2,7 +2,15 @@ import { afterAll, beforeAll, beforeEach, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import { canSee } from '../../src/visibility/can-see.js';
 import { listVisibleTickets } from '../../src/visibility/visible-tickets.js';
-import { applyAll, revokeMember, seedGuest, seedMember, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
+import {
+  applyAll,
+  revokeMember,
+  seedGuest,
+  seedMember,
+  seedProject,
+  seedTicket,
+  setVisibilityEnv,
+} from '../helpers/seed.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 
 /**
@@ -54,12 +62,21 @@ describe('listVisibleTickets — server-side filtering, one SQL pass', () => {
     const memberOn1 = newUlid();
     const memberOn2 = newUlid();
     const admin = newUlid();
+    const memberNoRoster = newUlid();
     const owner = newUlid();
     const revoked = newUlid();
 
+    // AMENDED 2026-09-29, owner ruling (A). Both projects are FOUNDED now: they
+    // were bare ULIDs, so `admin` and the members below "saw" only their own
+    // roster for a reason no rule gave. An admin/member is on every founded
+    // project, so the roster row no longer changes what a member lists; the
+    // no-see witnesses are the guest, the outsider and the revoked member.
+    await seedProject(db.pool, ws, prj1);
+    await seedProject(db.pool, ws, prj2);
     await seedMember(db.pool, ws, memberOn1, 'member', [{ projectId: prj1 }]);
     await seedMember(db.pool, ws, memberOn2, 'member', [{ projectId: prj2 }]);
-    await seedMember(db.pool, ws, admin, 'admin'); // on no project — no bypass
+    await seedMember(db.pool, ws, admin, 'admin'); // no roster row — on every project by rule A
+    await seedMember(db.pool, ws, memberNoRoster, 'member'); // likewise
     await seedMember(db.pool, ws, owner, 'owner'); // on no project — bypass only
     await seedGuest(db.pool, ws, guest);
     // Was on prj1, then put out of the workspace: the project-scope row survives
@@ -85,9 +102,10 @@ describe('listVisibleTickets — server-side filtering, one SQL pass', () => {
     const expected: ReadonlyArray<readonly [string, string[]]> = [
       [outsider, []],
       [guest, [tktEx]], // guests: explicit only, never the workspace-mode one
-      [memberOn1, [tktWs, tktP1]],
-      [memberOn2, [tktWs, tktP2, tktEx]],
-      [admin, [tktWs]], // no project, not listed: an admin reads what any member would
+      [memberOn1, [tktWs, tktP1, tktP2]], // rule A: prj2's ticket too; not the explicit one
+      [memberOn2, [tktWs, tktP1, tktP2, tktEx]], // …plus the explicit list that names them
+      [memberNoRoster, [tktWs, tktP1, tktP2]], // a roster row adds nothing
+      [admin, [tktWs, tktP1, tktP2]], // not listed on tktEx: an admin reads what any member would
       [owner, allTickets], // from the bypass alone
       [revoked, []],
     ];
@@ -109,8 +127,8 @@ describe('listVisibleTickets — server-side filtering, one SQL pass', () => {
       }
     }
 
-    // …and the fixture is not one where everybody sees nothing: three of the
-    // seven classes receive a non-empty, non-identical slice, so the agreement
+    // …and the fixture is not one where everybody sees nothing: several of the
+    // classes receive a non-empty, non-identical slice, so the agreement
     // above is agreement about something.
     expect(sorted(await listedIds(memberOn1, ws))).not.toEqual(sorted(await listedIds(memberOn2, ws)));
     expect((await listedIds(owner, ws)).length).toBe(4);

@@ -74,6 +74,46 @@ export const mentionNotificationPayloadSchema = z
   .strict();
 export type MentionNotificationPayload = z.infer<typeof mentionNotificationPayloadSchema>;
 
+/**
+ * A mention in a NOTE — its body or one of its comments (owner ruling
+ * 2026-09-29, "yes, notify on note mentions").
+ *
+ * It is a second SHAPE of the `mention` kind, not a sixth kind, and that is the
+ * least invasive way to honour "it follows the existing `mention` mute": the
+ * kind is what `notification_preferences.mutedKinds`, the inbox's Mentions tab,
+ * the `/account` row and the unread count all key on, so one kind means a person
+ * who muted mentions is not told about note mentions either, with no second
+ * setting and no second SQL filter to keep in step. What differs is the TARGET,
+ * so the payload names a note where the ticket shape names a ticket — the two
+ * are told apart by which of `noteId` / `ticketId` a payload carries (both
+ * schemas are `.strict()`, so a payload with both is refused by each).
+ *
+ * `source` says where the mention sat: `note` (the body) or `note-comment`. For
+ * `note-comment` the comment's id IS `eventId` — the comments projection files a
+ * comment under its event id (`projections/ticket-comments.ts`), which is why no
+ * `commentId` field exists to drift from it.
+ */
+export const noteMentionNotificationPayloadSchema = z
+  .object({
+    noteId: nonEmpty,
+    noteTitle: z.string(),
+    mentionedBy: nonEmpty,
+    eventId: nonEmpty,
+    source: z.enum(['note', 'note-comment']),
+    excerpt: z.string(),
+    clientTime: nonEmpty,
+    serverTime: nonEmpty,
+  })
+  .strict();
+export type NoteMentionNotificationPayload = z.infer<typeof noteMentionNotificationPayloadSchema>;
+
+/** True for the note shape of a `mention` payload — the one place the two are told apart. */
+export function isNoteMentionPayload(
+  payload: MentionNotificationPayload | NoteMentionNotificationPayload,
+): payload is NoteMentionNotificationPayload {
+  return 'noteId' in payload;
+}
+
 export const contestedClaimNotificationPayloadSchema = z
   .object({
     ticketId: nonEmpty,
@@ -110,7 +150,7 @@ export type StaleTicketNotificationPayload = z.infer<typeof staleTicketNotificat
 
 export const notificationPayloadSchemaByKind = {
   assignment: assignmentNotificationPayloadSchema,
-  mention: mentionNotificationPayloadSchema,
+  mention: z.union([mentionNotificationPayloadSchema, noteMentionNotificationPayloadSchema]),
   'contested-claim': contestedClaimNotificationPayloadSchema,
   'date-approaching': dateApproachingNotificationPayloadSchema,
   'stale-ticket': staleTicketNotificationPayloadSchema,
@@ -119,6 +159,7 @@ export const notificationPayloadSchemaByKind = {
 export type NotificationPayload =
   | AssignmentNotificationPayload
   | MentionNotificationPayload
+  | NoteMentionNotificationPayload
   | ContestedClaimNotificationPayload
   | DateApproachingNotificationPayload
   | StaleTicketNotificationPayload;

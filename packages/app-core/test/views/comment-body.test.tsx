@@ -1,5 +1,6 @@
 import { render, screen, within } from '@testing-library/react';
 import { describe, expect, it } from 'vitest';
+import { PURGED_ITEM_LABEL } from '@gisik-nokma/domain';
 import { renderCommentBody, safeHref } from '../../src/views/comment-body.js';
 
 /**
@@ -350,5 +351,205 @@ describe('9.312 ticketRef in a comment', () => {
     const { container: note } = render(<>{renderCommentBody(noteBody, () => '/w/x/p/p1?ticket=t2')}</>);
     const noteLink = within(note).getByRole('link', { name: 'Cold room' });
     expect(noteLink.getAttribute('href')).toBe('/notes/n1');
+  });
+});
+
+/**
+ * 9.348 — a TABLE in a comment currently produces no `<table>` at all: `table`/
+ * `tableRow`/`tableHeader`/`tableCell` all fall through to the "unknown type
+ * renders its children" branch, so a pasted or typed table in a comment loses
+ * its shape entirely (measured against the plan this test came from — a
+ * comment's schema is the same v2 schema the note document uses, and the
+ * owner's screenshot named this surface explicitly: "confirm it gets the
+ * skin"). `.gn-comment__table` is styled alongside `.ticket-editor__content
+ * table` in the same globals.css section.
+ */
+describe('9.348 table in a comment', () => {
+  it('9.348 renders a table node as real table/tr/th/td elements, not flattened children', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            {
+              type: 'tableRow',
+              content: [
+                { type: 'tableHeader', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Name' }] }] },
+              ],
+            },
+            {
+              type: 'tableRow',
+              content: [
+                { type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'Ada' }] }] },
+              ],
+            },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    expect(container.querySelector('table.gn-comment__table')).not.toBeNull();
+    expect(container.querySelectorAll('tr')).toHaveLength(2);
+    expect(container.querySelector('th')?.textContent).toBe('Name');
+    expect(container.querySelector('td')?.textContent).toBe('Ada');
+  });
+
+  /**
+   * Review finding: a wide comment table (long unbreakable cell values) had
+   * no scroll container at all — `.gn-comment__table` alone would widen the
+   * comment thread and the ticket sheet around it, the exact "must scroll
+   * inside the document, never widen the page" failure the plan's Review
+   * Focus names, on a SECOND rendering surface the plan's own gallery
+   * (which only ever exercises the live editor) never touched.
+   */
+  it('9.356 wraps the table in a scrolling container, so a wide table cannot widen the thread', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'table',
+          content: [
+            { type: 'tableRow', content: [{ type: 'tableCell', content: [{ type: 'paragraph', content: [{ type: 'text', text: 'a' }] }] }] },
+          ],
+        },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    const wrap = container.querySelector('.gn-comment__table-wrap');
+    expect(wrap, 'no .gn-comment__table-wrap around the table').not.toBeNull();
+    expect(wrap!.querySelector('table.gn-comment__table')).not.toBeNull();
+  });
+
+  /**
+   * kb-editor-parity: the toolbar now offers H1-H6 and a horizontal rule, so a
+   * comment that carries either must show it. Before this, `heading` was the
+   * same arm as `paragraph` (level dropped) and `horizontalRule` fell to the
+   * "unknown type renders its children" arm — an `<hr>` has no children, so it
+   * rendered as NOTHING.
+   */
+  it('9.371 renders a heading as a paragraph that keeps its level, without entering the heading outline', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        { type: 'heading', attrs: { level: 2 }, content: [{ type: 'text', text: 'Plan' }] },
+        { type: 'paragraph', content: [{ type: 'text', text: 'body' }] },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    const heading = container.querySelector('.gn-comment__heading');
+    expect(heading?.tagName).toBe('P');
+    expect(heading?.className).toContain('gn-comment__heading--2');
+    expect(heading?.textContent).toBe('Plan');
+    expect(container.querySelector('h1, h2, h3, h4, h5, h6')).toBeNull();
+    // CONTROL: the plain paragraph beside it carries no heading class.
+    expect(container.querySelectorAll('.gn-comment__heading')).toHaveLength(1);
+  });
+
+  it('9.372 a heading with a malformed level still renders its text, with no modifier class', () => {
+    for (const level of [0, 7, 'x', null, undefined]) {
+      const body = { type: 'doc', content: [{ type: 'heading', attrs: { level }, content: [{ type: 'text', text: 'T' }] }] };
+      const { container, unmount } = render(<>{renderCommentBody(body)}</>);
+      const heading = container.querySelector('.gn-comment__heading');
+      expect(heading?.textContent, `level ${String(level)}`).toBe('T');
+      expect(heading?.className, `level ${String(level)}`).toBe('gn-comment__heading');
+      unmount();
+    }
+  });
+
+  it('9.373 renders a horizontal rule as an <hr>, not as nothing', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        { type: 'paragraph', content: [{ type: 'text', text: 'above' }] },
+        { type: 'horizontalRule' },
+        { type: 'paragraph', content: [{ type: 'text', text: 'below' }] },
+      ],
+    };
+    const { container } = render(<>{renderCommentBody(body)}</>);
+    expect(container.querySelector('hr.gn-comment__rule')).not.toBeNull();
+    expect(container.querySelectorAll('p')).toHaveLength(2);
+  });
+});
+
+describe('19.188 a chip to an erased item', () => {
+  it('19.188 renders PURGED_ITEM_LABEL with no link for a purged ticketRef and wikiLink; a live chip keeps its text and link', () => {
+    const body = {
+      type: 'doc',
+      content: [
+        {
+          type: 'paragraph',
+          content: [
+            { type: 'ticketRef', attrs: { ticketId: 'gone_ticket', projectId: 'p1', key: 'SHOP-7', title: 'Invoice' } },
+            { type: 'text', text: ' / ' },
+            { type: 'wikiLink', attrs: { noteId: 'gone_note', title: 'Cold room' } },
+            { type: 'text', text: ' / ' },
+            { type: 'ticketRef', attrs: { ticketId: 'live_ticket', projectId: 'p1', key: 'SHOP-9', title: 'Fix the freezer' } },
+          ],
+        },
+      ],
+    };
+    const isPurged = (_kind: 'ticket' | 'note', id: string) => id === 'gone_ticket' || id === 'gone_note';
+    const { container } = render(<>{renderCommentBody(body, () => '/w/x/p/p1?ticket=t', isPurged)}</>);
+    const purged = [...container.querySelectorAll('.gn-comment__ref--purged')];
+    expect(purged.map((el) => [el.tagName, el.textContent])).toEqual([
+      ['SPAN', PURGED_ITEM_LABEL],
+      ['SPAN', PURGED_ITEM_LABEL],
+    ]);
+    expect(container.textContent).not.toContain('Invoice');
+    expect(container.textContent).not.toContain('Cold room');
+    // CONTROL
+    const links = [...container.querySelectorAll('a')];
+    expect(links.map((a) => a.textContent)).toEqual(['SHOP-9 Fix the freezer']);
+  });
+  /**
+   * CASE 9.483 — a posted comment's task checkbox has an ACCESSIBLE NAME.
+   *
+   * The box is `<input type="checkbox" disabled>` beside a `<span>` that holds
+   * the text; nothing joined them, so a screen reader announced "checkbox,
+   * checked" with no words. `aria-labelledby` points each box at ITS OWN span.
+   * The id must be unique across the PAGE, not just this body: a thread renders
+   * many comments, so two bodies with the same shape must not share ids
+   * (`idPrefix` — the thread passes the comment id).
+   */
+  it('9.483 every task checkbox is labelled by its own text span, with an id unique across bodies', () => {
+    const tasks = (...texts: string[]): unknown => ({
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: texts.map((text, index) => ({
+            type: 'taskItem',
+            attrs: { checked: index === 1 },
+            content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+          })),
+        },
+      ],
+    });
+    const { container } = render(
+      <>
+        <div data-testid="a">{renderCommentBody(tasks('Order filters', 'Call the vendor'), () => null, () => false, 'comment-a')}</div>
+        <div data-testid="b">{renderCommentBody(tasks('Same shape', 'Different words'), () => null, () => false, 'comment-b')}</div>
+      </>,
+    );
+    const boxes = [...container.querySelectorAll<HTMLInputElement>('li.gn-comment__task > input')];
+    expect(boxes).toHaveLength(4);
+    const ids = boxes.map((box) => box.getAttribute('aria-labelledby'));
+    expect(ids.every((id) => id !== null && id !== ''), 'every box names a label').toBe(true);
+    expect(new Set(ids).size, 'no two boxes share a label id, across both bodies').toBe(4);
+    for (const box of boxes) {
+      const label = container.querySelector(`#${CSS.escape(box.getAttribute('aria-labelledby')!)}`);
+      expect(label, 'the id resolves').not.toBeNull();
+      expect(label!.parentElement, 'and it is this box\'s OWN row').toBe(box.parentElement);
+      expect(label!.tagName).toBe('SPAN');
+    }
+    expect(boxes.map((box) => document.getElementById(box.getAttribute('aria-labelledby')!)?.textContent)).toEqual([
+      'Order filters',
+      'Call the vendor',
+      'Same shape',
+      'Different words',
+    ]);
+    // CONTROL: the accessible-name computation actually reads it — the role query resolves by that name.
+    expect(screen.getByRole('checkbox', { name: 'Call the vendor', checked: true })).toBe(boxes[1]);
   });
 });

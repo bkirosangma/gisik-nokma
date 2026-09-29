@@ -6,6 +6,8 @@ import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+import { seedGuest } from '../helpers/seed.js';
+import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * Plan 5 Task 10 — `GET /v1/search`, the workspace-wide full-text read.
@@ -83,16 +85,17 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * Six of the shared world's eight: `owner` (the visibility predicate compiled to
  * `TRUE`, so the tenancy clause is the only boundary left), `member` (the
  * three-armed disjunction), `outsider` (a workspace member with an EMPTY
- * `eff.projects` — the cell that makes the project-roster arm falsifiable, since
- * deleting it would admit every project-mode row to them and 7.97 reddens),
+ * ROSTER — under rule A, amended 2026-09-29, still on every project; 7.97's
+ * empty-answer witness is a fresh GUEST, the cell that makes the project arm
+ * falsifiable since a guest's project rows confer nothing),
  * `guest` (the explicit-list arm alone), `stranger` (the 404) and `neighbour`
  * (the tenancy 404, with their own workspace as the control).
  *
  * `admin` and `projectLead` are NOT exercised here, and that is stated rather
  * than left to look like coverage. Neither can discriminate anything on this
  * route: `admin` shares the `member` case in `visibleTicketsWhere` by design
- * (an admin gets no read bypass) and is on no project, so its answer is
- * `outsider`'s exactly; `projectLead` is a plain workspace member on the sibling
+ * (an admin gets no explicit-mode read bypass) and is on no roster, so its
+ * answer is `outsider`'s exactly; `projectLead` is a plain workspace member on the sibling
  * project, which `member` is on too, so its answer is `member`'s. They are the
  * cells that separate a workspace-admin gate from a project-admin gate, and this
  * route has neither gate.
@@ -631,15 +634,32 @@ describe('GET /v1/search — finding text across a workspace', () => {
     expect(ownerIds.slice(1).sort()).toEqual([read.world.sharedTaskId, read.world.guestTaskId].sort());
   });
 
-  it('7.97 an on-workspace member who is on no project gets 200 with `hits: []` — the emptiness is the predicate, not the door', async () => {
-    const outsider = await seededSearch('outsider', 'the');
-    expect(outsider.statusCode).toBe(200);
-    const body = outsider.json() as SearchResponse;
+  it('7.97 an on-workspace viewer who may see nothing gets 200 with `hits: []`, and a member on no roster finds the project-mode row — the emptiness is the predicate, not the door', async () => {
+    // AMENDED 2026-09-29, owner ruling (A): an admin/member is on every founded
+    // project, so `outsider` (a member on no roster) finds project-mode rows;
+    // the empty-answer witness is now a GUEST named in no explicit list.
+    const bystander = await signInWithPhone(read.app, read.otp, '+911111111123');
+    await seedGuest(db.pool, read.world.workspaceId, bystander.userId);
+    const nothing = await read.app.inject({
+      method: 'GET',
+      url: searchUrl({ workspaceId: read.world.workspaceId, q: 'the' }),
+      headers: { authorization: `Bearer ${bystander.token}` },
+    });
+    expect(nothing.statusCode).toBe(200);
+    const body = nothing.json() as SearchResponse;
     expect(body.hits).toEqual([]);
     // The envelope still names what was asked, so an empty answer is legible.
     expect(body.workspaceId).toBe(read.world.workspaceId);
     expect(body.query).toBe('the');
-    expect(outsider.body).not.toContain(read.world.taskInEpicId);
+    expect(nothing.body).not.toContain(read.world.taskInEpicId);
+
+    // The member on no roster: the project-mode `taskInEpic` and NONE of the
+    // explicit-mode rows the `the` query also matches.
+    const outsider = await seededSearch('outsider', 'the');
+    expect(outsider.statusCode).toBe(200);
+    expect((outsider.json() as SearchResponse).hits.map((hit) => hit.card.ticketId)).toEqual([read.world.taskInEpicId]);
+    expect(outsider.body).not.toContain(read.world.sharedTaskId);
+    expect(outsider.body).not.toContain(read.world.guestTaskId);
 
     // Positive control in the same case: the same q, the same workspace, a
     // caller who may see rows.

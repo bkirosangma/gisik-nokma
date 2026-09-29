@@ -3,12 +3,20 @@ import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { membershipId, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
-import { InviteAdminError, type PendingInvite } from '@gisik-nokma/app-core/online';
+import { InviteAdminError, type PeopleGateway, type PendingInvite } from '@gisik-nokma/app-core/online';
 import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js';
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
 import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
 import { shellRefusalCopy } from '../src/shell-refusal.js';
+import {
+  CREATE_INVITE_LINK,
+  INVITE_EMAIL_FAILED,
+  SEND_INVITATION,
+  alreadyMemberLine,
+  hasAccountLine,
+  inviteEmailedLine,
+} from '../src/invite-copy.js';
 
 /**
  * The roster, the invite mint, the pending list, and the role gate (Plan 6
@@ -62,7 +70,7 @@ const ROSTER: RosterMember[] = [
  * second caller and passes real rows.
  */
 function workspaceRef(name: string, projects: ProjectRef[] = []): WorkspaceRef {
-  return { id: WS, name, prefix: 'CC', role: 'owner', memberCount: 2, nameRestrictedProjectCount: 0, projects };
+  return { id: WS, name, prefix: 'CC', role: 'owner', archived: false, memberCount: 2, nameRestrictedProjectCount: 0, projects };
 }
 
 /**
@@ -129,8 +137,10 @@ function mount(
    * name — which is the null-name reading 13.764's second half needs.
    */
   query: Partial<DataSourceQuery> = {},
+  /** The exact-email lookup (access plan W8); un-stubbed members reject by name. */
+  people: Partial<PeopleGateway> = {},
 ) {
-  const services = stubServices({ getMembers: async () => ROSTER, ...query }, { invitesAdmin });
+  const services = stubServices({ getMembers: async () => ROSTER, ...query }, { invitesAdmin, people });
   // ALWAYS replaced, whether or not a recorder was asked for. `stubServices`
   // hands back `ingest: async () => []`, and an empty results array is not a
   // commit — the page reports it as "the server returned no answer", which is
@@ -256,27 +266,15 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
         listPending: async () => [],
         mintInvite: async (_workspaceId, request) => {
           bodies.push(request);
-          return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+          return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later', emailSent: true };
         },
       },
-      undefined,
-      undefined,
-      // ⚠ ADDED BY RULING E5-11 (2026-09-21): the field was a text box that
-      // accepted any string, so this case never needed a project to EXIST. It is
-      // a select of served names now, so the choice this case makes before
-      // switching to guest has to be a real one.
-      { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
     );
+    // ⚠ AMENDED 2026-09-29 (owner ruling A): the Project access field is gone, so
+    // there is no project to choose before switching to guest; the assertion is
+    // unchanged — the key set on the wire.
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
-    // Choose a project FIRST, then switch to guest — the state survives the
-    // switch, so this is the shape that would leak the key.
-    await user.click(screen.getByRole('button', { name: /Project access/ }));
-    await user.click(
-      within(await screen.findByRole('listbox')).getByRole('option', {
-        name: 'Only Errand tracking',
-      }),
-    );
     // Scoped for the same reason as the case above: the roster's own role
     // control also matches `/Role/` since 2026-09-18, and this case is about the
     // mint form's picker.
@@ -290,133 +288,20 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
     expect(Object.keys(bodies[0] as object).sort()).toEqual(['address', 'channel', 'role']);
   });
 
-  it('3.133 sends projectIds for a MEMBER who named some', async () => {
+  it('3.133 AMENDED (A): a MEMBER invitation sends no projectIds — the field is gone', async () => {
     const bodies: unknown[] = [];
-    mount(
-      {
-        listPending: async () => [],
-        mintInvite: async (_workspaceId, request) => {
-          bodies.push(request);
-          return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
-        },
+    mount({
+      listPending: async () => [],
+      mintInvite: async (_workspaceId, request) => {
+        bodies.push(request);
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later', emailSent: true };
       },
-      undefined,
-      undefined,
-      // ⚠ AMENDED BY RULING E5-11 (2026-09-21): this case used to TYPE a ULID
-      // into a text box. It now picks the same project by NAME from the served
-      // list — which is the whole of the ruling, and the assertion below is
-      // unchanged: the door still receives the ID.
-      { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
-    );
+    });
     const user = userEvent.setup();
     await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
-    await user.click(screen.getByRole('button', { name: /Project access/ }));
-    await user.click(
-      within(await screen.findByRole('listbox')).getByRole('option', {
-        name: 'Only Errand tracking',
-      }),
-    );
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     await waitFor(() => expect(bodies).toHaveLength(1));
-    expect(bodies[0]).toEqual({
-      address: 'anselma@example.test',
-      channel: 'email',
-      role: 'member',
-      projectIds: ['01J9PROJECT000000000000000'],
-    });
-  });
-
-  /**
-   * 13.1181 — ruling E5-11: THE PROJECT FIELD OFFERS NAMES, not identifiers.
-   *
-   * It was a text box labelled *"Projects (comma-separated ids, optional)"*, so
-   * a person had to transcribe project ULIDs from somewhere else — and the
-   * manual's own verdict was *"In practice this box is not usable by a person."*
-   * The names were one read away the whole time (`GET /v1/me/workspaces` serves
-   * `projects[]{id,name}`, the same read the workspace name beside it already
-   * makes), and the export draws a `<select>` of them.
-   *
-   * The queries below are REGEXES, which is not a style choice: an exact
-   * `{ name: 'Project access' }` matches ZERO buttons on the trigger this
-   * `Select` renders while `/Project access/` matches one — measured, and the
-   * reason the file's own `Role` queries are already regexes.
-   */
-  describe('13.1181 the project field offers project NAMES', () => {
-    /** The opened panel — `listbox`, with the `option`s hanging directly off it. */
-    const openProjects = async (user: ReturnType<typeof userEvent.setup>): Promise<HTMLElement> => {
-      await user.click(screen.getByRole('button', { name: /Project access/ }));
-      return screen.findByRole('listbox');
-    };
-
-    it('13.1181 offers the export’s options — All projects first, then one Only <name> per project, in served order', async () => {
-      mount(
-        { listPending: async () => [], mintInvite: async () => ({ inviteId: 'i', url: 'u', expiresAt: 'e' }) },
-        undefined,
-        undefined,
-        { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
-      );
-      const user = userEvent.setup();
-      await screen.findByLabelText('Address');
-
-      const options = within(await openProjects(user)).getAllByRole('option');
-      expect(options.map((option) => option.textContent)).toEqual([
-        'All projects in this workspace',
-        'Only Errand tracking',
-        'Only Shop operations',
-      ]);
-      // The ID is the option's VALUE, never its label — the whole of the ruling
-      // is that a person chooses a name and the wire still carries the id.
-      expect(options[1]?.getAttribute('data-key')).toBe(PROJECTS[0]!.id);
-    });
-
-    it('13.1181 CONTROL — an UNANSWERED projects read offers no projects, rather than inventing any', async () => {
-      // `useWorkspaceProjects` holds `null` for a read that is pending or
-      // refused, and `null` is NOT `[]` — the hook's own docblock: `[]` would be
-      // the claim "this workspace has no projects". The select renders the one
-      // option that is true either way, so the absence is an OMISSION and never
-      // a raw id or a stale name. Without this arm, a select that fell back to
-      // the id would pass the case above.
-      mount(
-        { listPending: async () => [], mintInvite: async () => ({ inviteId: 'i', url: 'u', expiresAt: 'e' }) },
-        undefined,
-        undefined,
-        {
-          getMyWorkspaces: async () => {
-            throw new Error('the read is down');
-          },
-        },
-      );
-      const user = userEvent.setup();
-      await screen.findByLabelText('Address');
-
-      const options = within(await openProjects(user)).getAllByRole('option');
-      expect(options.map((option) => option.textContent)).toEqual(['All projects in this workspace']);
-    });
-
-    it('13.1181 CONTROL — the default choice sends NO projectIds key at all', async () => {
-      // The door refuses `projectIds: []` exactly as it refuses a guest's, and
-      // "All projects" is not a narrowing — so the key is OMITTED rather than
-      // sent empty. The 3.133 case above covers the named arm.
-      const bodies: unknown[] = [];
-      mount(
-        {
-          listPending: async () => [],
-          mintInvite: async (_workspaceId, request) => {
-            bodies.push(request);
-            return { inviteId: 'i', url: 'u', expiresAt: 'e' };
-          },
-        },
-        undefined,
-        undefined,
-        { getMyWorkspaces: async () => [workspaceRef('Convenience Corner', PROJECTS)] },
-      );
-      const user = userEvent.setup();
-      await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
-      await user.click(screen.getByRole('button', { name: 'Send invitation' }));
-
-      await waitFor(() => expect(bodies).toHaveLength(1));
-      expect(Object.keys(bodies[0] as object).sort()).toEqual(['address', 'channel', 'role']);
-    });
+    expect(Object.keys(bodies[0] as object).sort()).toEqual(['address', 'channel', 'role']);
   });
 
   it('3.134 renders the door’s own 422 refusal verbatim', async () => {
@@ -471,7 +356,7 @@ describe('3.902 the Channel select offers exactly what the door accepts (E6-9)',
       listPending: async () => [],
       mintInvite: async (_workspaceId, request) => {
         bodies.push(request);
-        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later', emailSent: true };
       },
     });
     const user = userEvent.setup();
@@ -480,7 +365,9 @@ describe('3.902 the Channel select offers exactly what the door accepts (E6-9)',
     expect(form).not.toBeNull();
     await user.click(within(form!).getByRole('button', { name: /Channel/ }));
     await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: optionLabel }));
-    await user.click(screen.getByRole('button', { name: 'Send invitation' }));
+    // ⚠ AMENDED 2026-09-29 (3.994): the button is keyed on the CHANNEL — a phone
+    // invitation is a link to hand over, not an email to send.
+    await user.click(screen.getByRole('button', { name: wireValue === 'phone' ? CREATE_INVITE_LINK : SEND_INVITATION }));
     await waitFor(() => expect(bodies).toHaveLength(1));
     expect((bodies[0] as { channel: string }).channel).toBe(wireValue);
   });
@@ -503,6 +390,7 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
         inviteId: PENDING.inviteId,
         url,
         expiresAt: '2026-09-08T10:00:00.000Z',
+        emailSent: true,
       }),
     });
     const user = userEvent.setup();
@@ -547,6 +435,7 @@ describe('3.135 the minted link is shown once, and the list never carries one', 
         inviteId: PENDING.inviteId,
         url,
         expiresAt: '2026-09-08T10:00:00.000Z',
+        emailSent: true,
       }),
     });
     const user = userEvent.setup();
@@ -1384,13 +1273,13 @@ describe('13.824 the roster’s role control, and the option it deliberately doe
  * and this paragraph is the correction an independent review forced.
  */
 describe('13.886 the invite form’s fields wear the shared .gn-field pattern', () => {
-  it('13.886 the address and projects fields are .gn-field/__label/__input, and still submit', async () => {
+  it('13.886 the address field is .gn-field/__label/__input, and still submits', async () => {
     const bodies: unknown[] = [];
     mount({
       listPending: async () => [],
       mintInvite: async (_workspaceId, request) => {
         bodies.push(request);
-        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later' };
+        return { inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later', emailSent: true };
       },
     });
     const user = userEvent.setup();
@@ -1405,17 +1294,8 @@ describe('13.886 the invite form’s fields wear the shared .gn-field pattern', 
     expect(addressWrap?.className).toContain('gn-field');
     expect(addressWrap?.querySelector('.gn-field__label')?.textContent).toBe('Address');
 
-    // ⚠ AMENDED BY RULING E5-11 (2026-09-21): this field is the shared `Select`
-    // now, not a native input — so it wears the pattern the way `Channel` and
-    // `Role` do, which is the fact this case's own docblock settled
-    // (`select.tsx:254` puts `gn-field__input` on the component's OWN trigger).
-    // The assertions are the same three about the same three things; what
-    // changed is the label's text and the tag underneath it.
-    const projects = screen.getByRole('button', { name: /Project access/ });
-    expect(projects.className).toContain('gn-field__input');
-    const projectsWrap = projects.closest('label');
-    expect(projectsWrap?.className).toContain('gn-field');
-    expect(projectsWrap?.querySelector('.gn-field__label')?.textContent).toBe('Project access');
+    // ⚠ AMENDED 2026-09-29 (owner ruling A): the projects half is gone with the
+    // Project access field; the address half stands.
 
     // And the wrapper moves no behaviour: what was entered still reaches the door.
     await user.type(address, 'anselma@example.test');
@@ -1562,5 +1442,187 @@ describe('13.960 the roster shows the address when the name is absent, and names
         true,
       ]);
     }
+  });
+});
+
+describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () => {
+  const MINT_OK = (emailSent: boolean) => ({
+    inviteId: 'i_1',
+    url: 'http://localhost:3001/invite/tok',
+    expiresAt: '2026-10-13T10:00:00.000Z',
+    emailSent,
+  });
+
+  it('pins the invite copy literally, once', () => {
+    expect(SEND_INVITATION).toBe('Send invitation');
+    expect(CREATE_INVITE_LINK).toBe('Create invite link');
+    expect(inviteEmailedLine('a@b.test')).toBe('Invitation emailed to a@b.test.');
+    expect(INVITE_EMAIL_FAILED).toBe('The email could not be sent — copy the link below and send it yourself.');
+    expect(hasAccountLine('Anselma')).toBe('Anselma already has an account.');
+    expect(alreadyMemberLine('Anselma')).toBe('Anselma is already in this workspace.');
+  });
+
+  it('3.991 no Project access for any role; the body is exactly address/channel/role; CONTROL: Channel and Role remain', async () => {
+    const bodies: unknown[] = [];
+    mount({
+      listPending: async () => [],
+      mintInvite: async (_ws, request) => {
+        bodies.push(request);
+        return MINT_OK(true);
+      },
+    });
+    const user = userEvent.setup();
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form')!;
+    expect(within(form).queryByRole('button', { name: /Project access/ })).toBeNull();
+    expect(within(form).getByRole('button', { name: /Channel/ })).toBeInTheDocument();
+    for (const role of ['member', 'admin', 'guest']) {
+      await user.click(within(form).getByRole('button', { name: /Role/ }));
+      await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: role }));
+      await user.clear(screen.getByLabelText('Address'));
+      await user.type(screen.getByLabelText('Address'), `${role}@example.test`);
+      await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+      // Wait for THIS role's body, not any body: a `> 0` wait is already true on
+      // the second pass and would read the previous role's request.
+      const expected = ['member', 'admin', 'guest'].indexOf(role) + 1;
+      await waitFor(() => expect(bodies).toHaveLength(expected));
+      expect(Object.keys(bodies[expected - 1] as object).sort()).toEqual(['address', 'channel', 'role']);
+    }
+  });
+
+  it('3.992 a mailed invitation says so above the link; CONTROL: the link and expiry remain', async () => {
+    mount({ listPending: async () => [], mintInvite: async () => MINT_OK(true) });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    expect(await screen.findByText(inviteEmailedLine('anselma@example.test'))).toHaveAttribute('role', 'status');
+    expect(screen.getByText('http://localhost:3001/invite/tok')).toBeInTheDocument();
+    expect(screen.getByText(/It stops working after/)).toBeInTheDocument();
+  });
+
+  it('3.993 a failed mail is an alert, with the link; CONTROL: no emailed line', async () => {
+    mount({ listPending: async () => [], mintInvite: async () => MINT_OK(false) });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    expect(await screen.findByRole('alert')).toHaveTextContent(INVITE_EMAIL_FAILED);
+    expect(screen.queryByText(inviteEmailedLine('anselma@example.test'))).toBeNull();
+    expect(screen.getByText('http://localhost:3001/invite/tok')).toBeInTheDocument();
+  });
+
+  it('3.994 Phone (SMS) reads Create invite link and says nothing about email; CONTROL: email reads Send invitation', async () => {
+    mount({ listPending: async () => [], mintInvite: async () => MINT_OK(false) });
+    const user = userEvent.setup();
+    expect(await screen.findByRole('button', { name: SEND_INVITATION })).toBeInTheDocument();
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form')!;
+    await user.click(within(form).getByRole('button', { name: /Channel/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Phone (SMS)' }));
+    await user.type(screen.getByLabelText('Address'), '+919001400001');
+    await user.click(screen.getByRole('button', { name: CREATE_INVITE_LINK }));
+    expect(await screen.findByText('http://localhost:3001/invite/tok')).toBeInTheDocument();
+    expect(screen.queryByText(INVITE_EMAIL_FAILED)).toBeNull();
+    expect(screen.queryByText(/emailed/)).toBeNull();
+  });
+
+  it('3.995 a matching account is named on blur, and the invite goes to its email; CONTROL: looked up with the typed address', async () => {
+    const bodies: Array<{ address: string }> = [];
+    const lookups: string[] = [];
+    mount(
+      {
+        listPending: async () => [],
+        mintInvite: async (_ws, request) => {
+          bodies.push(request);
+          return MINT_OK(true);
+        },
+      },
+      undefined,
+      undefined,
+      {},
+      {
+        lookup: async (_ws, email) => {
+          lookups.push(email);
+          return { userId: 'u_a', name: 'Anselma Marak', email: 'anselma@example.test', inWorkspace: false, role: null };
+        },
+      },
+    );
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'Anselma@Example.test');
+    await user.tab();
+    expect(await screen.findByText(hasAccountLine('Anselma Marak'))).toBeInTheDocument();
+    expect(lookups).toEqual(['Anselma@Example.test']);
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]!.address).toBe('anselma@example.test');
+  });
+
+  it('3.995 a slow lookup for an address since edited is dropped, and the invite goes to the typed address', async () => {
+    // Final review (2026-09-29): the late answer used to name account A and send
+    // the one-time link to A's email although the box held B.
+    const bodies: Array<{ address: string }> = [];
+    let release: (person: { userId: string; name: string; email: string; inWorkspace: boolean; role: null }) => void = () => undefined;
+    mount(
+      {
+        listPending: async () => [],
+        mintInvite: async (_ws, request) => {
+          bodies.push(request);
+          return MINT_OK(true);
+        },
+      },
+      undefined,
+      undefined,
+      {},
+      {
+        lookup: () =>
+          new Promise((resolve) => {
+            release = resolve;
+          }),
+      },
+    );
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText('Address');
+    await user.type(field, 'a@x.test');
+    await user.tab();
+    await user.clear(field);
+    await user.type(field, 'b@x.test');
+    release({ userId: 'u_a', name: 'Anselma Marak', email: 'a@x.test', inWorkspace: false, role: null });
+    await new Promise((resolve) => setTimeout(resolve, 20));
+    expect(screen.queryByText(hasAccountLine('Anselma Marak'))).toBeNull();
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    await waitFor(() => expect(bodies).toHaveLength(1));
+    expect(bodies[0]!.address).toBe('b@x.test');
+  });
+
+  it('3.996 an existing member is named as one; CONTROL: Send stays enabled', async () => {
+    mount({ listPending: async () => [], mintInvite: async () => MINT_OK(true) }, undefined, undefined, {}, {
+      lookup: async () => ({ userId: 'u_b', name: 'Balti Sangma', email: 'balti@example.test', inWorkspace: true, role: 'member' }),
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'balti@example.test');
+    await user.tab();
+    expect(await screen.findByText(alreadyMemberLine('Balti Sangma'))).toBeInTheDocument();
+    expect(screen.queryByText(hasAccountLine('Balti Sangma'))).toBeNull();
+    expect(screen.getByRole('button', { name: SEND_INVITATION })).toBeEnabled();
+  });
+
+  it('3.997 no match shows nothing; a phone address is never looked up; CONTROL: an email one is', async () => {
+    const lookups: string[] = [];
+    mount({ listPending: async () => [], mintInvite: async () => MINT_OK(false) }, undefined, undefined, {}, {
+      lookup: async (_ws, email) => {
+        lookups.push(email);
+        return null;
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'nobody@example.test');
+    await user.tab();
+    await waitFor(() => expect(lookups).toEqual(['nobody@example.test']));
+    expect(screen.queryByText(/already/)).toBeNull();
+
+    const form = (await screen.findByRole('heading', { name: 'Invite somebody' })).closest('form')!;
+    await user.click(within(form).getByRole('button', { name: /Channel/ }));
+    await user.click(within(await screen.findByRole('listbox')).getByRole('option', { name: 'Phone (SMS)' }));
+    await user.clear(screen.getByLabelText('Address'));
+    await user.type(screen.getByLabelText('Address'), '+919001400001');
+    await user.tab();
+    expect(lookups).toEqual(['nobody@example.test']);
   });
 });

@@ -16,6 +16,16 @@ import { projectPrefixesInWorkspace } from './visible-projects.js';
 import { workspaceIdentityFromLedger } from '../workspaces/workspace-name.js';
 
 /**
+ * A project-scoped note whose home project is deleted is gone from the notes
+ * list and from a ticket's attached-notes read (Task 6, T10) — the note's own
+ * `deleted` column says nothing about its CONTAINER. `n.home_project_id = ''`
+ * (a workspace-scoped note) matches no `proj_projects` row, so `NOT EXISTS` is
+ * trivially true for it and this clause is a no-op there.
+ */
+const NOTE_PROJECT_LIVE_WHERE =
+  'NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = n.home_project_id AND dp.deleted_at IS NOT NULL)';
+
+/**
  * The note reads (notes series, Plan 1 of 6, spec §6.4).
  *
  * ## Every function takes `(db, eff, userId, …)` and applies the predicate itself
@@ -177,7 +187,11 @@ export async function listNotes(
   filter: { homeProjectId?: string; authorId?: string; scopeMode?: NoteScopeMode; deleted?: boolean } = {},
 ): Promise<NoteSummary[]> {
   const params = new SqlParams();
-  const clauses = [`n.workspace_id = ${params.add(workspaceId)}`, visibleNotesWhere(eff, userId, params)];
+  const clauses = [
+    `n.workspace_id = ${params.add(workspaceId)}`,
+    visibleNotesWhere(eff, userId, params),
+    NOTE_PROJECT_LIVE_WHERE,
+  ];
   if (filter.deleted === true) {
     clauses.push('n.deleted = TRUE');
     // Spec §4.1's deleted rule, and it is NOT `visibleNotesWhere`'s: a deleted
@@ -243,6 +257,7 @@ export async function listNotesForTicket(
     `na.ticket_id = ${params.add(ticketId)}`,
     'n.deleted = FALSE',
     visibleNotesWhere(eff, userId, params),
+    NOTE_PROJECT_LIVE_WHERE,
   ];
   const { rows } = await db.query<NoteRow>(
     `SELECT n.* FROM proj_notes n

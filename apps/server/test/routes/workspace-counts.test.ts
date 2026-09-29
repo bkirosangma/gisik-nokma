@@ -274,9 +274,9 @@ describe('13.368 ticketCount counts what THIS caller may see, never what the tab
     await seedProject(db.pool, workspaceId, unseen, 'Back office');
 
     const member = await signedIn();
-    // On `seen` and NOT on `unseen`, so `unseen`'s NAME is withheld from them
-    // (P32/P38) and only `seen` is countable at all. Both tickets below live in
-    // `seen`; what separates them is their AUDIENCE, which is the only lever
+    // On `seen` by roster and NOT on `unseen` (amended 2026-09-29, rule A: they
+    // are on it by the rule, so its name is served too — this case reads only
+    // `seen`). Both tickets below live in `seen`; what separates them is their AUDIENCE, which is the only lever
     // that can make a member's count differ from the table's inside a project
     // they are on.
     await seedMember(db.pool, workspaceId, member.userId, 'member', [{ projectId: seen }]);
@@ -525,6 +525,9 @@ describe('13.371 the shape the directory already served is unchanged', () => {
       // a new field on this route must be impossible to add by accident.
       prefix: 'UC',
       role: 'member',
+      // Trash series, Plan 1 Task 5 (spec T8): served for every caller told
+      // about this workspace at all, never a withholding.
+      archived: false,
       memberCount: 2,
       // Task 18. Zero here for the reason 13.382 measures at length: this
       // member is on the only project seeded, so there is nothing they hold the
@@ -577,7 +580,15 @@ describe('13.371 the shape the directory already served is unchanged', () => {
  *    another workspace and asserts the number does not move.
  */
 describe('13.382 nameRestrictedProjectCount counts what the caller already holds, never the workspace', () => {
-  it('counts a ticket-visible unnameable project and NOT one the caller has no sight into, for a member and for a guest', async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A): an admin/member is on every founded
+   * project, so every project is NAMEABLE to them and the number is 0 for both —
+   * the member half below pins that. The only viewer with something unnameable
+   * to count is a GUEST, so the option-2-versus-option-3 discriminator (`dark`)
+   * now lives on the guest: a guest on `named` alone, shared one ticket in
+   * `derivable` and none in `dark`, counts 1 under option 2 and 2 under option 3.
+   */
+  it('counts a ticket-visible unnameable project and NOT one the caller has no sight into, for a guest — and is 0 for a member (rule A)', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner.headers);
     const named = newUlid();
@@ -588,12 +599,21 @@ describe('13.382 nameRestrictedProjectCount counts what the caller already holds
     await seedProject(db.pool, workspaceId, dark, 'Nothing you can reach');
 
     const member = await signedIn();
-    // On `named` ONLY, so `derivable` and `dark` are both unnameable to them
-    // (P32/P38). What separates the two is the tickets below, which is the
-    // whole point of the fixture.
+    // On `named` ONLY by roster — and, under rule A, on all three anyway.
     await seedMember(db.pool, workspaceId, member.userId, 'member', [{ projectId: named }]);
     const guest = await signedIn();
     await seedGuest(db.pool, workspaceId, guest.userId);
+    // The guest holds ONE explicit project row, on `named`: the only shape in
+    // which a guest is told a project's name (see 13.366's second case).
+    await applyAll(db.pool, [
+      testEnvelope({
+        workspaceId,
+        entity: { kind: 'project', id: named },
+        type: 'project.member_added',
+        payload: { userId: guest.userId, projectAdmin: false },
+        actorId: owner.userId,
+      }),
+    ]);
 
     const inNamed = newUlid();
     const inDerivable = newUlid();
@@ -602,44 +622,39 @@ describe('13.382 nameRestrictedProjectCount counts what the caller already holds
     await seedTicket(db.pool, { workspaceId, projectId: derivable, ticketId: inDerivable });
     await seedTicket(db.pool, { workspaceId, projectId: dark, ticketId: inDark });
     await applyAll(db.pool, [
-      // Workspace-mode: the member sees it, the guest does not (the guest
-      // branch of `visibleTicketsWhere` reaches explicit audiences and nothing
-      // else). It makes `named` ticket-visible AND nameable, so it must NOT be
-      // counted — the subtraction is what removes it.
-      setVisibilityEnv(workspaceId, inNamed, 'workspace'),
-      // Workspace-mode in a project the member is not on: visible to them,
-      // unnameable to them. THE one project option 2 counts for the member.
-      setVisibilityEnv(workspaceId, inDerivable, 'workspace'),
+      // Explicit, naming the guest: it makes `named` ticket-visible AND
+      // nameable to them, so it must NOT be counted — the subtraction is what
+      // removes it.
+      setVisibilityEnv(workspaceId, inNamed, 'explicit', [guest.userId]),
+      // Explicit, naming the guest, in a project they hold no row on: visible
+      // to them, unnameable to them. THE one project option 2 counts.
+      setVisibilityEnv(workspaceId, inDerivable, 'explicit', [guest.userId]),
       // Explicit, naming the OWNER alone. `dark` therefore exists, holds work,
-      // and is invisible to both the member and the guest — the project option
-      // 3 would count and option 2 must not.
+      // and is invisible to the guest — the project option 3 would count and
+      // option 2 must not.
       setVisibilityEnv(workspaceId, inDark, 'explicit', [owner.userId]),
     ]);
 
-    const memberEntry = await entryFor(member.headers, workspaceId);
+    const guestEntry = await entryFor(guest.headers, workspaceId);
     // The controls, so `1` below is not one number agreeing with itself: the
-    // member is told exactly ONE project name out of three seeded.
-    expect(memberEntry.projects.map((p) => p.projectId)).toEqual([named]);
+    // guest is told exactly ONE project name out of three seeded.
+    expect(guestEntry.projects.map((p) => p.projectId)).toEqual([named]);
     // OPTION 2 = 1 (`derivable`). OPTION 3 = 2 (`derivable` + `dark`). A
     // mutation replacing the ticket-visible set with every project in the
     // workspace produces 2 and reddens here — which is the refused option
     // measured rather than described.
-    expect(memberEntry['nameRestrictedProjectCount']).toBe(1);
-
-    // THE GUEST, in the same run and the same workspace. The two counts beside
-    // this one are withheld from them; this one is not, and the value is
-    // positive rather than 0 so a copied guard cannot hide behind an
+    expect(guestEntry['nameRestrictedProjectCount']).toBe(1);
+    // The two counts beside this one are withheld from a guest; this one is
+    // not, and its value is positive so a copied guard cannot hide behind an
     // uninteresting number.
-    const guestTicket = newUlid();
-    await seedTicket(db.pool, { workspaceId, projectId: derivable, ticketId: guestTicket });
-    await applyAll(db.pool, [
-      setVisibilityEnv(workspaceId, guestTicket, 'explicit', [guest.userId]),
-    ]);
-    const guestEntry = await entryFor(guest.headers, workspaceId);
     expect('memberCount' in guestEntry, 'the withheld count is still withheld').toBe(false);
     expect('nameRestrictedProjectCount' in guestEntry, 'and this one is NOT').toBe(true);
-    expect(guestEntry.projects).toEqual([]);
-    expect(guestEntry['nameRestrictedProjectCount']).toBe(1);
+
+    // THE MEMBER, same run, same workspace: rule A names all three projects to
+    // them, so there is nothing they hold the id of and may not name.
+    const memberEntry = await entryFor(member.headers, workspaceId);
+    expect(memberEntry.projects.map((p) => p.projectId).sort()).toEqual([named, derivable, dark].sort());
+    expect(memberEntry['nameRestrictedProjectCount']).toBe(0);
 
     // The owner: every project nameable, so the subtraction empties. Asserted
     // because `0` for an owner is the shape that proves the number is a
@@ -657,38 +672,51 @@ describe('13.382 nameRestrictedProjectCount counts what the caller already holds
     await seedProject(db.pool, workspaceId, named, 'Ours, named');
     await seedProject(db.pool, workspaceId, derivable, 'Ours, unnameable');
 
-    const member = await signedIn();
-    await seedMember(db.pool, workspaceId, member.userId, 'member', [{ projectId: named }]);
+    // Amended 2026-09-29 (A): the viewer is a GUEST on `named` — a member names
+    // both projects now, so the count would be 0 for them whatever the tenancy
+    // clause did and the case could not fail.
+    const guest = await signedIn();
+    await seedGuest(db.pool, workspaceId, guest.userId);
+    await applyAll(db.pool, [
+      testEnvelope({
+        workspaceId,
+        entity: { kind: 'project', id: named },
+        type: 'project.member_added',
+        payload: { userId: guest.userId, projectAdmin: false },
+        actorId: owner.userId,
+      }),
+    ]);
 
     const ours = newUlid();
     await seedTicket(db.pool, { workspaceId, projectId: derivable, ticketId: ours });
-    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ours, 'workspace')]);
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ours, 'explicit', [guest.userId])]);
 
-    // A SECOND workspace the member has no membership in at all, holding a
-    // workspace-mode ticket. `visibleTicketsWhere` compiles the member's branch
-    // as `resolved_mode = 'workspace' OR …` with NO workspace predicate of its
-    // own — that is stated in its docblock — so without this query's own
-    // `v.workspace_id = $n` this row matches, its foreign `project_id` is
-    // absent from the first workspace's named set, and the count reads 2.
+    // A SECOND workspace the guest has no membership in at all, holding an
+    // explicit ticket that NAMES them. `visibleTicketsWhere` compiles the
+    // guest's branch as `resolved_mode = 'explicit' AND $n = ANY (…)` with NO
+    // workspace predicate of its own — that is stated in its docblock — so
+    // without this query's own `v.workspace_id = $n` this row matches, its
+    // foreign `project_id` is absent from the first workspace's named set, and
+    // the count reads 2.
     const stranger = await signedIn();
     const otherWorkspace = await found(stranger.headers, 'Somebody else');
     const otherProject = newUlid();
     await seedProject(db.pool, otherWorkspace, otherProject, 'Not yours');
     const theirs = newUlid();
     await seedTicket(db.pool, { workspaceId: otherWorkspace, projectId: otherProject, ticketId: theirs });
-    await applyAll(db.pool, [setVisibilityEnv(otherWorkspace, theirs, 'workspace')]);
+    await applyAll(db.pool, [setVisibilityEnv(otherWorkspace, theirs, 'explicit', [guest.userId])]);
 
     // The positive control the tenancy assertion needs: the foreign ticket has
-    // to be the KIND this member's predicate matches, or a `1` below would
-    // prove only that the fixture was inert. The member's own predicate is
+    // to be the KIND this guest's predicate matches, or a `1` below would
+    // prove only that the fixture was inert. The guest's own predicate is
     // satisfied by `theirs` in every respect except the workspace.
     const { rows } = await db.pool.query<{ n: number }>(
-      "SELECT count(*)::int AS n FROM proj_visibility WHERE ticket_id = $1 AND resolved_mode = 'workspace'",
-      [theirs],
+      "SELECT count(*)::int AS n FROM proj_visibility WHERE ticket_id = $1 AND resolved_mode = 'explicit' AND $2 = ANY (resolved_user_ids)",
+      [theirs, guest.userId],
     );
-    expect(rows[0]?.n, 'the foreign ticket must be workspace-mode, or this case is vacuous').toBe(1);
+    expect(rows[0]?.n, 'the foreign ticket must be explicit and name the guest, or this case is vacuous').toBe(1);
 
-    const entry = await entryFor(member.headers, workspaceId);
+    const entry = await entryFor(guest.headers, workspaceId);
     expect(entry['nameRestrictedProjectCount']).toBe(1);
   });
 });

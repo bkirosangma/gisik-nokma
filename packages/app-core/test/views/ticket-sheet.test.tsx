@@ -1,7 +1,8 @@
 import { act, cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { describe, expect, it, vi } from 'vitest';
-import type { IngestResult, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import type { IngestResult, SubmittedEvent, TicketTypeDef, WorkflowDef } from '@gisik-nokma/domain';
+import { ASSIGNEE_OUTSIDE_ROSTER, ASSIGN_OUTSIDER_OPTION, OUTSIDER_ASSIGN, OUTSIDER_EMAIL_LABEL } from '../../src/people/copy.js';
 import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
 import { createClientStateCache } from '../../src/cache.js';
 import { formatDate } from '../../src/provenance.js';
@@ -10,6 +11,7 @@ import type { AttachmentListEntry } from '../../src/views/attachment-list.js';
 import type { EditorSlotComponent } from '../../src/views/editor-slot.js';
 import type { ListRow, TicketHistoryEvent, TicketRead, TicketVisibility } from '../../src/view-types.js';
 import { HISTORY_PAGE_LIMIT, TicketSheet } from '../../src/views/ticket-sheet.js';
+import { DELETE_NOTE, unansweredLine } from '../../src/trash/copy.js';
 import { createFakeDataSource } from '../helpers/fake-data-source.js';
 import {
   PARENT,
@@ -200,6 +202,27 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(within(dueDateRow).getByText('set by user_kiro on 18 Aug 2026')).toBeInTheDocument();
     expect(screen.getByTestId('field-assignee').textContent).toContain('user_anselma');
     expect(document.body.textContent).not.toContain('system');
+  });
+
+  it('11.244 people the roster omits (a guest, for a member) are named from the names-only read on claims and the assignee; the roster keeps priority', async () => {
+    const source = createFakeDataSource({
+      getTicket: async () => ticketRead(),
+      getWorkflowDef: async () => WF_ERRAND,
+      // The roster names Kiro only; Anselma (the assignee) is omitted from it.
+      getMembers: async () => [{ id: 'user_kiro', name: 'Kiro', role: 'member' }],
+      getActorNames: async () => [
+        { id: 'user_anselma', name: 'Anselma Marak' },
+        { id: 'user_kiro', name: 'Someone Else' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(ticketRead(), source);
+    await settled();
+    // Kiro, by the roster's label — priority over the names read's other spelling.
+    expect(within(screen.getByTestId('field-due')).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
+    // Anselma, only the names-only read knows.
+    expect(screen.getByTestId('field-assignee').textContent).toContain('Anselma Marak');
+    expect(screen.getByTestId('field-assignee').textContent).not.toContain('user_anselma');
   });
 
   it('PLANTED DEFECT: every field carries a claim line — a value is never a standing property', async () => {
@@ -1894,6 +1917,77 @@ describe('13.968 the Assignee row is editable, and a refused roster is not an em
   });
 });
 
+describe('3.989–3.990 the sheet’s outsider arm (access plan Task 7)', () => {
+  const OUT = { userId: 'user_out', name: 'Era Momin', email: 'era@example.test', inWorkspace: false, role: null } as const;
+  const ANSELMA = { userId: 'user_anselma', name: 'Anselma Marak', email: 'anselma@example.test', inWorkspace: true, role: 'member' } as const;
+
+  async function pickVia(finderAnswer: typeof OUT | typeof ANSELMA): Promise<void> {
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    await userEvent.click(within(await screen.findByRole('listbox')).getByRole('option', { name: ASSIGN_OUTSIDER_OPTION }));
+    await userEvent.type(screen.getByLabelText(OUTSIDER_EMAIL_LABEL), `${finderAnswer.email}{Enter}`);
+    await userEvent.click(await screen.findByRole('button', { name: OUTSIDER_ASSIGN }));
+  }
+
+  it('3.989 an outsider pick sends ticket.assigned through assignOutsider; CONTROL: a member found goes through ingest', async () => {
+    const assignOutsider = vi.fn(async (_u: string, e: SubmittedEvent): Promise<IngestResult> => ({
+      status: 'committed',
+      eventId: e.id,
+      seq: 2,
+      serverTime: '2026-09-29T10:00:00.000Z',
+    }));
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { lookupPerson: async () => OUT, assignOutsider });
+    await settled();
+    await pickVia(OUT);
+    await waitFor(() => expect(assignOutsider).toHaveBeenCalledTimes(1));
+    expect(assignOutsider.mock.calls[0]![0]).toBe('user_out');
+    expect(assignOutsider.mock.calls[0]![1]).toMatchObject({ type: 'ticket.assigned', payload: { assigneeId: 'user_out' } });
+    expect(source.ingested).toHaveLength(0);
+  });
+
+  it('3.989 CONTROL: someone already in the workspace goes through the ordinary door', async () => {
+    const assignOutsider = vi.fn();
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), { lookupPerson: async () => ANSELMA, assignOutsider });
+    await settled();
+    await pickVia(ANSELMA);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    expect(assignOutsider).not.toHaveBeenCalled();
+  });
+
+  it('3.989 a member can still clear an assignee the roster hides, once the outsider arm is on; CONTROL: without it the row is read-only', async () => {
+    // Final review (2026-09-29): pulling an outsider in made the assignment
+    // unmanageable by the member who made it (guests are hidden from the roster).
+    const ghost = ticketRead({ ticket: ticketStateSeed({ assigneeId: 'user_hidden_guest' }) });
+    const withArm = renderSheet(ghost, sheetSource(ghost), { lookupPerson: async () => OUT, assignOutsider: vi.fn() });
+    await settled();
+    const row = screen.getByTestId('field-assignee');
+    await userEvent.click(within(row).getByRole('button'));
+    const listbox = await screen.findByRole('listbox');
+    expect(within(listbox).getByRole('option', { name: ASSIGNEE_OUTSIDE_ROSTER })).toBeInTheDocument();
+    await userEvent.click(within(listbox).getByRole('option', { name: 'Unassigned' }));
+    await waitFor(() => expect(withArm.ingested).toHaveLength(1));
+    expect(withArm.ingested[0]![0]).toMatchObject({ type: 'ticket.assigned', payload: { assigneeId: null } });
+  });
+
+  it('3.989 CONTROL: without the outsider arm the same ticket stays read-only', async () => {
+    const ghost = ticketRead({ ticket: ticketStateSeed({ assigneeId: 'user_hidden_guest' }) });
+    renderSheet(ghost, sheetSource(ghost));
+    await settled();
+    expect(within(screen.getByTestId('field-assignee')).queryByRole('button')).toBeNull();
+  });
+
+  it('3.990 the outsider door’s refusal is shown verbatim; CONTROL: none on commit', async () => {
+    const reason = 'That person has no account.';
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      lookupPerson: async () => OUT,
+      assignOutsider: async (_u, e) => ({ status: 'refused', eventId: e.id, rule: 'people.outsider', reason }),
+    });
+    await settled();
+    await pickVia(OUT);
+    expect(await screen.findByText(reason, { exact: false })).toBeInTheDocument();
+  });
+});
+
 /**
  * **13.989 — the description is EDITABLE, on the door that already exists.**
  *
@@ -2353,6 +2447,9 @@ describe('F — the subtasks section', () => {
   });
 
   it('16.21 a refused title shows the SERVER’s sentence and KEEPS what was typed', async () => {
+    // The view forwards a blank title on purpose so the server's refusal can be
+    // shown; the suite-wide payload guard would throw at the factory.
+    (globalThis as Record<string, unknown>).__gnAllowRefusedPayloads = true;
     const read = ticketRead({ rollup: null });
     const source = sheetSource(read, [], []);
     source.ingest = async (events) => {
@@ -3799,7 +3896,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     // product has no ticket KEY" while `ticketRead()`'s own fixture had carried
     // `CCSO-1183` all along; the fallback arm is the test below.
     await waitFor(() => expect(onClose).toHaveBeenCalledTimes(1));
-    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183');
+    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183', { permanent: false });
   });
 
   it('16.84 the SAME handover carries the title when the read composed no key', async () => {
@@ -3819,7 +3916,7 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     await user.click(await screen.findByRole('button', { name: 'Delete ticket' }));
     await waitFor(() => expect(onDeleted).toHaveBeenCalledTimes(1));
 
-    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return');
+    expect(onDeleted).toHaveBeenCalledWith(TICKET, 'File the GST return', { permanent: false });
   });
 
   it('16.84 closes even when the host passes NO onDeleted — the close is not the host\'s to forget', async () => {
@@ -3892,9 +3989,13 @@ describe('16.84 — the sheet footer deletes the ticket, and the navigation is g
     await settled();
 
     await pressDelete(user);
-    await waitFor(() =>
-      expect(screen.getByText(/The server did not answer this change\./)).toBeInTheDocument(),
-    );
+    // Trash Plan 4 (D7): the answer lands INSIDE the delete dialog, in the
+    // transport class — silence is still never a refusal.
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
+    const alert = await within(dialog).findByRole('alert');
+    expect(alert).toHaveTextContent(unansweredLine(0, 1));
+    expect(alert).toHaveClass('gn-refusal--transport');
+    expect(alert).not.toHaveClass('gn-refusal--server');
     expect(onDeleted).not.toHaveBeenCalled();
     expect(onClose).not.toHaveBeenCalled();
   });
@@ -4957,6 +5058,74 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
 });
 
 /**
+ * 9.336–9.337 — Unit 5(b) (owner: "I thought we already made the attachment
+ * feature but i dont see where we can attach files in our build"): the
+ * Attachments tab's own "Attach a file" button. Case ids live in
+ * `test-cases/09-editor-attachments.md`, block `9.313`–`9.337`.
+ */
+describe('9.336-9.337 the Attachments tab draws its own Attach-a-file button', () => {
+  it('9.336 clicking Attach a file uploads through the SAME uploadAttachment path and writes attachment.added to the ledger', async () => {
+    const uploaded = {
+      attachmentId: '01J9GATA100000000000000001',
+      filename: 'evidence.pdf',
+      mime: 'application/pdf',
+      size: 4096,
+      url: '/v1/attachments/01J9GATA100000000000000001',
+      sha256: 'a'.repeat(64),
+    };
+    const uploadAttachment = vi.fn(async (_file: File) => uploaded);
+    const source = renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      attachments: [],
+      uploadAttachment,
+    });
+    await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    const button = document.querySelector('.gn-ticket-sheet__attach-file') as HTMLButtonElement;
+    expect(button, 'no Attach a file button rendered').not.toBeNull();
+    expect(button.textContent).toContain('Attach a file');
+    const input = document.querySelector('.gn-ticket-sheet__attach-file-input') as HTMLInputElement;
+    const file = new File([new Uint8Array(4)], 'evidence.pdf', { type: 'application/pdf' });
+    fireEvent.change(input, { target: { files: [file] } });
+    await waitFor(() => {
+      expect(uploadAttachment).toHaveBeenCalledTimes(1);
+    });
+    expect(uploadAttachment.mock.lastCall?.[0]).toBe(file);
+    await waitFor(() => expect(source.ingested).toHaveLength(1));
+    const event = source.ingested[0]![0]!;
+    expect(event.type).toBe('attachment.added');
+    expect(event.payload).toMatchObject({ kind: 'upload', attachmentId: uploaded.attachmentId });
+  });
+
+  it('9.337 with no uploader, the button is absent; with a FAILED attachments read, it is absent too — never a dead control over an unknown list', async () => {
+    // ARM ONE — no uploader wired at all.
+    renderSheet(ticketRead(), sheetSource(ticketRead()), { attachments: [] });
+    await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    expect(document.querySelector('.gn-ticket-sheet__attach-file')).toBeNull();
+    cleanup();
+
+    // ARM TWO — an uploader IS wired, but the read failed: the button still
+    // must not draw, since there is no known list to add a file to honestly.
+    const uploadAttachment = vi.fn(async (_file: File) => ({
+      attachmentId: '01J9GATA200000000000000002',
+      filename: 'x.pdf',
+      mime: 'application/pdf',
+      size: 1,
+      url: '/v1/attachments/01J9GATA200000000000000002',
+      sha256: 'b'.repeat(64),
+    }));
+    renderSheet(ticketRead(), sheetSource(ticketRead()), {
+      attachmentsUnavailable: 'HTTP 500',
+      uploadAttachment,
+    });
+    await settled();
+    fireEvent.click(screen.getByRole('tab', { name: 'Attachments' }));
+    expect(screen.getByTestId('sheet-attachments-unavailable')).toBeInTheDocument();
+    expect(document.querySelector('.gn-ticket-sheet__attach-file')).toBeNull();
+  });
+});
+
+/**
  * 3.190 (E5-9) — A REFUSAL ANSWERS WHERE THE CONTROL IS.
  *
  * `Delete` sits in the sheet's footer, at the very END of a body that scrolls:
@@ -4970,8 +5139,8 @@ describe('16.57 the attachments section keeps an empty list and a failed read ap
  * that ruling is about WHETHER Delete is offered, not about where its answer
  * lands, so this case does not disturb it.
  */
-describe('E5-9 a refused Delete answers beside the button that was pressed', () => {
-  it('PLANTED DEFECT: ONE sentence, inside the footer, not at the head of the body', async () => {
+describe('E5-9 / 19.231 a refused Delete answers inside the dialog that asked', () => {
+  it('PLANTED DEFECT: ONE sentence, inside the dialog, not in the footer or the head of the body', async () => {
     const user = userEvent.setup();
     const read = ticketRead();
     const source = createFakeDataSource(
@@ -4992,19 +5161,18 @@ describe('E5-9 a refused Delete answers beside the button that was pressed', () 
     renderSheet(read, source);
     await settled();
     await user.click(screen.getByRole('button', { name: 'Delete' }));
-    // E2-35 (B13) put a confirm in front of the delete; the refusal this case
-    // is about is the SERVER's, so press through the confirm to reach it.
-    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
-    await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete ticket' }));
 
-    const refusal = await screen.findByText(/Refused by the server/);
-    // One sentence, never two: the footer answer REPLACES the shared slot's,
-    // rather than being a second copy of the same fact on one screen.
-    expect(screen.getAllByText(/Refused by the server/)).toHaveLength(1);
-    // …and it is in the surface the person is looking at. `.closest('footer')`
-    // is the structural claim; the pixel claim is the lane's measurement above,
-    // which a jsdom sheet cannot make (it lays nothing out).
-    expect(refusal.closest('footer')).not.toBeNull();
+    // Spec §7: the refusal is shown INSIDE the dialog, which stays open. One
+    // sentence, never two — nothing lands in the footer or the head slot.
+    const refusal = await within(dialog).findByRole('alert');
+    expect(refusal).toHaveTextContent('Only an admin may delete this ticket.');
+    expect(screen.getAllByText('Only an admin may delete this ticket.')).toHaveLength(1);
+    const footer = document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+    expect(within(footer).queryByRole('alert')).toBeNull();
+    // CONTROL — the door is still there to press again once the dialog closes.
+    expect(within(footer).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
   });
 });
 
@@ -5292,13 +5460,12 @@ describe('13.1183 Delete asks first', () => {
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
 
-    const dialog = await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    const dialog = await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
     // It names the ticket and the consequence, INCLUDING the two ways back —
     // "its history is retained" alone would be the misleading half E2-30
     // corrected in the toast's own sentence.
     expect(within(dialog).getByText(new RegExp(ticketRead().title))).toBeInTheDocument();
-    expect(dialog.textContent).toContain('the Board, the List, the Calendar and the Timeline');
-    expect(dialog.textContent).toContain('15 seconds');
+    expect(within(dialog).getByText(DELETE_NOTE)).toBeInTheDocument();
     // THE ASK IS NOT THE ACT.
     expect(source.ingested).toHaveLength(0);
 
@@ -5315,10 +5482,10 @@ describe('13.1183 Delete asks first', () => {
     await settled();
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
-    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
     await user.click(screen.getByRole('button', { name: 'Cancel' }));
 
-    await waitFor(() => expect(screen.queryByRole('dialog', { name: 'Delete this ticket?' })).toBeNull());
+    await waitFor(() => expect(screen.queryByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' })).toBeNull());
     expect(source.ingested).toHaveLength(0);
     // The sheet is still here — a Cancel that closed it would be a delete by
     // another name.
@@ -5331,7 +5498,7 @@ describe('13.1183 Delete asks first', () => {
     await settled();
 
     await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
-    await screen.findByRole('dialog', { name: 'Delete this ticket?' });
+    await screen.findByRole('alertdialog', { name: 'Delete ticket “File the GST return”?' });
     await user.click(screen.getByRole('button', { name: 'Delete ticket' }));
 
     await waitFor(() => expect(source.ingested).toHaveLength(1));
@@ -5340,5 +5507,100 @@ describe('13.1183 Delete asks first', () => {
     expect(batch[0]!.type).toBe('ticket.deleted');
     expect(batch[0]!.entity).toEqual({ kind: 'ticket', id: TICKET });
     expect(batch[0]!.payload).toEqual({});
+  });
+});
+
+/**
+ * Trash series Plan 4, Task 5. Cases 19.228–19.232 (`test-cases/19-trash.md`
+ * §19.23): the sheet's delete goes through the shared `DeleteDialog`.
+ */
+describe('19.228–19.232 the ticket sheet asks through DeleteDialog', () => {
+  const TITLE = 'Delete ticket “File the GST return”?';
+  function footer(): HTMLElement {
+    return document.querySelector('.gn-ticket-sheet__footer') as HTMLElement;
+  }
+
+  it('19.228 Delete opens the shared alertdialog and posts nothing; CONTROL: one Delete, one Delete ticket', async () => {
+    const user = userEvent.setup();
+    const source = renderSheet(ticketRead());
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    expect(within(dialog).getByRole('checkbox', { name: 'Delete permanently' })).not.toBeChecked();
+    expect(source.ingested).toHaveLength(0);
+    expect(screen.getAllByRole('button', { name: 'Delete' })).toHaveLength(1);
+    expect(screen.getAllByRole('button', { name: 'Delete ticket' })).toHaveLength(1);
+  });
+
+  it('19.229 confirming posts one ticket.deleted, closes, and hands over { permanent: false }', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const onDeleted = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onClose, onDeleted });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await user.click(await screen.findByRole('button', { name: 'Delete ticket' }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183', { permanent: false }));
+    expect(onClose).toHaveBeenCalledTimes(1);
+    expect(source.ingested.map((batch) => batch.map((event) => event.type))).toEqual([['ticket.deleted']]);
+  });
+
+  it('19.230 with the switch on, ONE batch [ticket.deleted, purge.marked] and { permanent: true }', async () => {
+    const user = userEvent.setup();
+    const onDeleted = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onDeleted });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    await user.click(within(dialog).getByRole('checkbox', { name: 'Delete permanently' }));
+    await user.click(within(dialog).getByRole('button', { name: 'Delete permanently' }));
+    await waitFor(() => expect(onDeleted).toHaveBeenCalledWith(TICKET, 'CCSO-1183', { permanent: true }));
+    expect(source.ingested).toHaveLength(1);
+    expect(source.ingested[0]!.map((event) => event.type)).toEqual(['ticket.deleted', 'purge.marked']);
+    expect(source.ingested[0]!.every((event) => event.entity.kind === 'ticket' && event.entity.id === TICKET)).toBe(true);
+  });
+
+  it('19.231 a refusal answers inside the dialog and the sheet stays; CONTROL: the footer Delete remains', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const read = ticketRead();
+    const source = createFakeDataSource(
+      {
+        getTicket: async () => read,
+        getWorkflowDef: async () => WF_ERRAND,
+        getMembers: async () => [],
+        getTicketHistory: async () => [],
+      },
+      (events) =>
+        events.map((event) => ({
+          status: 'refused' as const,
+          eventId: event.id,
+          rule: 'permission.role',
+          reason: 'Only a project admin can delete this ticket.',
+        })),
+    );
+    renderSheet(read, source, { onClose });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    const dialog = await screen.findByRole('alertdialog', { name: TITLE });
+    await user.click(within(dialog).getByRole('button', { name: 'Delete ticket' }));
+    expect(await within(dialog).findByRole('alert')).toHaveTextContent('Only a project admin can delete this ticket.');
+    expect(screen.getAllByText('Only a project admin can delete this ticket.')).toHaveLength(1);
+    expect(onClose).not.toHaveBeenCalled();
+    expect(within(footer()).queryByRole('alert')).toBeNull();
+    expect(within(footer()).getByRole('button', { name: 'Delete' })).toBeInTheDocument();
+  });
+
+  it('19.232 Escape closes the delete dialog, not the sheet; CONTROL: nothing posted', async () => {
+    const user = userEvent.setup();
+    const onClose = vi.fn();
+    const source = renderSheet(ticketRead(), undefined, { onClose });
+    await settled();
+    await user.click(within(footer()).getByRole('button', { name: 'Delete' }));
+    await screen.findByRole('alertdialog', { name: TITLE });
+    await user.keyboard('{Escape}');
+    await waitFor(() => expect(screen.queryByRole('alertdialog', { name: TITLE })).toBeNull());
+    expect(onClose).not.toHaveBeenCalled();
+    expect(source.ingested).toHaveLength(0);
   });
 });

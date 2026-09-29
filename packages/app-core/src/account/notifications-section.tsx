@@ -3,7 +3,7 @@ import { Switch } from '@gisik-nokma/ui';
 
 const LABELS: Record<NotificationKind, string> = {
   assignment: 'A ticket is assigned to you',
-  mention: 'You are mentioned in a comment or description',
+  mention: 'You are mentioned in a comment, description or note',
   'contested-claim': 'A claim of yours is contested',
   'date-approaching': 'A date you are watching is approaching',
   'stale-ticket': 'A ticket has sat unmoved for a while',

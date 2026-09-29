@@ -194,6 +194,7 @@ function servedWorld(
           // an absent one (sheet-delete's own note for the same field).
           prefix: 'GH',
           role: 'owner' as const,
+          archived: false,
           memberCount: 1,
           nameRestrictedProjectCount: 0,
           projects: [

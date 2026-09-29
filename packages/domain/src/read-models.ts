@@ -745,6 +745,15 @@ export type WorkspaceMember = {
 export type MemberListResponse = { workspaceId: string; members: WorkspaceMember[] };
 
 /**
+ * One person's display name, and NOTHING else — no role, no address. The wire
+ * shape of `GET /v1/workspaces/:id/actor-names`: what a client joins onto an
+ * actor id it already holds when the roster (`MemberListResponse`) does not
+ * name that person (a guest is withheld from a non-admin's roster).
+ */
+export type ActorName = { userId: string; displayName: string };
+export type ActorNameListResponse = { workspaceId: string; names: ActorName[] };
+
+/**
  * Tickets currently sitting in each state of one workflow. Counts cover the
  * WHOLE workspace, not the caller's view — the route is admin-only for exactly
  * that reason, so there is no per-viewer variant to drift out of step. Every
@@ -870,3 +879,37 @@ export type NoteSummary = {
 export type NoteDetail = NoteSummary & { body: unknown; schemaVersion: number };
 export type NoteVersion = { eventId: string; authorId: string; recordedAt: string; seq: number };
 export type NoteComment = { commentId: string; authorId: string; body: unknown; recordedAt: string };
+
+/**
+ * `GET /v1/me/deleted-items` (trash series, Plan 1 Task 7, spec §6.3's read).
+ *
+ * One item per deleted workspace, project, ticket or note this caller may
+ * currently restore or mark — by CURRENT authority (T3), never by who deleted
+ * it. An item inside a deleted container is NOT listed on its own; the
+ * container's own row carries `containedCount` instead (spec §6.3).
+ */
+export type DeletedItem = {
+  kind: 'workspace' | 'project' | 'ticket' | 'note';
+  id: string;
+  workspaceId: string;
+  workspaceName: string;
+  projectId: string | null;
+  projectName: string | null;
+  /** Workspace/project name, ticket `KEY title`, note title. */
+  label: string;
+  deletedBy: string;
+  /**
+   * The deleter's display name (trash Plan 4, D1) — `"user"."name"` trimmed, or
+   * `null` when it is blank or the account is gone. The Deleted items screen
+   * says "you" for the viewer's own deletions and "someone" for `null`; the id
+   * above stays the identity, this is only what a person reads.
+   */
+  deletedByName: string | null;
+  deletedAt: string;
+  purgeMarkedAt: string | null;
+  /** `purgeDueAt(purgeMarkedAt)`, computed by the server; `null` when unmarked. */
+  purgeDueAt: string | null;
+  /** Live items inside a deleted workspace/project (projects + tickets + notes); 0 for tickets and notes. */
+  containedCount: number;
+};
+export type DeletedItemsRead = { items: DeletedItem[] };

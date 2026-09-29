@@ -4,7 +4,7 @@ import { useCallback, useEffect, useState } from 'react';
 import { useRouter } from 'next/navigation';
 import {
   InboxView,
-  notificationTicketId,
+  notificationTarget,
   type InboxFilter,
   type NotificationsPage,
 } from '@gisik-nokma/app-core';
@@ -14,6 +14,7 @@ import type { Notification } from '@gisik-nokma/domain';
 import { AppNav } from '../../src/app-nav.js';
 import { ExpiredSessionNotice, useSignInOnExpiredSession } from '../../src/expired-session.js';
 import { useAppServices } from '../../src/providers.js';
+import { useActorLabels } from '../../src/use-actor-labels.js';
 import { ShellRefusal } from '../../src/shell-refusal.js';
 import { ticketSheetPath } from '../../src/ticket-location.js';
 
@@ -178,18 +179,17 @@ export const PAGING_FAILURE_PREFIX = 'More of your inbox could not be loaded, so
  * arm and took every delivered message off the screen; measured with a probe,
  * zero rows and one panel. See `PAGING_FAILURE_PREFIX`.
  *
- * ## Display names are ids, and the reason is not "not yet wired"
+ * ## Display names — read per workspace on the page, once each
  *
- * The plan's Guard says to use the shell's member-directory hook if one exists.
- * Measured: `grep -rn "useWorkspaceMembers\|memberName\|userName" apps/web/src
- * apps/web/app` returns nothing — there is no such hook. `DataSource.getMembers`
- * exists and is served, but it is keyed BY WORKSPACE and this page has no
- * workspace: a cross-workspace inbox would have to fan out one roster read per
- * distinct `workspaceId` on the page and rebuild it as rows page in. That is a
- * directory, not a wiring line, and inventing a half of one here would put a
- * second naming authority in the product beside whatever Plan 6's eventually is.
- * So the actor id renders — attributed, if unpolished, and never anonymous.
- * Recorded as a finding rather than left as a silent `(id) => id`.
+ * **CORRECTED (2026-09-29).** This block used to read *"Display names are ids"*:
+ * the actor id rendered because a cross-workspace inbox has no workspace to key
+ * the roster read by, and building a directory in a page looked like a second
+ * naming authority. That put a raw ULID in every row for every role. The rows DO
+ * carry a `workspaceId`, and `useActorLabels` reads each distinct one once
+ * (`getMembers` for the roster's name/email label, `getActorNames` for the people
+ * a member's roster omits) — the same two sources the notes byline and the ticket
+ * sheet use, ordered by `actorLabelFrom`, so this is not a third authority. A
+ * person no read names still renders as their id: attributed, never anonymous.
  */
 export default function InboxPage() {
   const router = useRouter();
@@ -233,6 +233,8 @@ export default function InboxPage() {
    */
   const [tab, setTab] = useState<InboxTab>('all');
   const filter = FILTER_OF[tab];
+  // Who did it, by name — every workspace on the page read once (`useActorLabels`).
+  const userName = useActorLabels(page?.notifications.map((notification) => notification.workspaceId) ?? []);
 
   /**
    * Both reads and the mark-read write fail the same way, so the message is
@@ -426,8 +428,17 @@ export default function InboxPage() {
    * this shell does not have.
    */
   function open(notification: Notification): void {
-    const ticketId = notificationTicketId(notification);
+    const target = notificationTarget(notification);
     setOpenFailure(null);
+    // A mention that sat in a NOTE opens the note, and the comment when it sat in
+    // one (`#comment-<id>` — the note page scrolls to it). No location lookup: a
+    // note's route is `/notes/<id>` alone (spec §9.1), and whether the reader may
+    // still open it is the note page's own answer, not a guess made here.
+    if (target.kind === 'note') {
+      router.push(`/notes/${target.noteId}${target.commentId === null ? '' : `#comment-${target.commentId}`}`);
+      return;
+    }
+    const ticketId = target.ticketId;
     void (async () => {
       try {
         const location = await ticketLocation.locate(notification.workspaceId, ticketId);
@@ -517,7 +528,7 @@ export default function InboxPage() {
               <>
                 <InboxView
                   notifications={page.notifications}
-                  userName={(id) => id}
+                  userName={userName}
                   onOpen={open}
                   onMarkRead={markRead}
                   onLoadMore={page.nextCursor === null ? null : loadMore}

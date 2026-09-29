@@ -25,6 +25,8 @@
  * stack (tens of thousands of frames), so a cyclic or deep-chain input
  * returns long before the stack itself is at risk.
  */
+
+import { PURGED_ITEM_LABEL } from './purge.js';
 export type MentionNodeAttrs = { userId: string; label?: string };
 
 const MAX_DEPTH = 200;
@@ -61,11 +63,24 @@ const BLOCK_NODE_TYPES = new Set([
   'detailsContent',
 ]);
 
-export function docToPlainText(doc: unknown): string {
-  return render(doc, 0).replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
+/**
+ * Trash series Plan 2 (spec §5.6; owner ruling 2026-09-28 A). A chip to an
+ * ERASED item keeps its baked KEY and title in the stored document — a purge
+ * does not rewrite other documents — but a caller that knows which ids are
+ * erased passes `isPurged`, and the chip then renders as `PURGED_ITEM_LABEL`.
+ * Synchronous on purpose: this function runs inside projections and the embed
+ * worker, which look the ids up first (`collectDocReferences` below) and pass a
+ * predicate over the answer.
+ */
+export type DocTextOptions = {
+  isPurged?: (kind: 'ticket' | 'note', id: string) => boolean;
+};
+
+export function docToPlainText(doc: unknown, options: DocTextOptions = {}): string {
+  return render(doc, 0, options).replace(/[ \t]+\n/g, '\n').replace(/\n{2,}/g, '\n').trim();
 }
 
-function render(node: unknown, depth: number): string {
+function render(node: unknown, depth: number, options: DocTextOptions): string {
   if (depth > MAX_DEPTH) return '';
   if (node === null || typeof node !== 'object' || Array.isArray(node)) return '';
   const candidate = node as { type?: unknown; text?: unknown; attrs?: unknown; content?: unknown };
@@ -89,28 +104,70 @@ function render(node: unknown, depth: number): string {
   // The id is what the editor navigates by; the title is what a person read,
   // and a search index that carried `01J9GNOTE…` would match nothing anyone
   // typed. An absent or non-string title renders '', the same safe branch the
-  // mention node takes for a missing label.
+  // mention node takes for a missing label. A link to an ERASED note renders
+  // `PURGED_ITEM_LABEL` (trash Plan 2).
   if (candidate.type === 'wikiLink') {
     const attrs = (
       typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
-    ) as { title?: unknown };
+    ) as { title?: unknown; noteId?: unknown };
+    if (typeof attrs.noteId === 'string' && options.isPurged?.('note', attrs.noteId) === true) {
+      return PURGED_ITEM_LABEL;
+    }
     return typeof attrs.title === 'string' ? attrs.title : '';
   }
   // A ticket reference (spec §14.2, Plan 7 Task 1) contributes `KEY title`,
   // never its ticketId — the same rule the wiki-link branch above follows for
   // its own id. A missing key falls back to the title alone rather than
-  // gluing an empty string onto the front of it.
+  // gluing an empty string onto the front of it. A reference to an ERASED
+  // ticket renders `PURGED_ITEM_LABEL` (trash Plan 2).
   if (candidate.type === 'ticketRef') {
     const attrs = (
       typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
-    ) as { key?: unknown; title?: unknown };
+    ) as { key?: unknown; title?: unknown; ticketId?: unknown };
+    if (typeof attrs.ticketId === 'string' && options.isPurged?.('ticket', attrs.ticketId) === true) {
+      return PURGED_ITEM_LABEL;
+    }
     const key = typeof attrs.key === 'string' ? attrs.key : '';
     const title = typeof attrs.title === 'string' ? attrs.title : '';
     return key.length > 0 ? `${key} ${title}` : title;
   }
   const children = Array.isArray(candidate.content)
-    ? candidate.content.map((child) => render(child, depth + 1)).join('')
+    ? candidate.content.map((child) => render(child, depth + 1, options)).join('')
     : '';
   const isBlock = typeof candidate.type === 'string' && BLOCK_NODE_TYPES.has(candidate.type);
   return isBlock && children.length > 0 ? `${children}\n` : children;
+}
+
+export type DocReferences = { ticketIds: string[]; noteIds: string[] };
+
+/**
+ * Every ticket a `ticketRef` chips and every note a `wikiLink` links, once each,
+ * in document order — what a caller must look up before it can build an
+ * `isPurged` predicate. Total, and depth-capped by the same `MAX_DEPTH` as
+ * `render`, for the same reasons.
+ */
+export function collectDocReferences(doc: unknown): DocReferences {
+  const ticketIds: string[] = [];
+  const noteIds: string[] = [];
+  const walk = (node: unknown, depth: number): void => {
+    if (depth > MAX_DEPTH) return;
+    if (Array.isArray(node)) {
+      for (const child of node) walk(child, depth);
+      return;
+    }
+    if (node === null || typeof node !== 'object') return;
+    const candidate = node as { type?: unknown; attrs?: unknown; content?: unknown };
+    const attrs = (
+      typeof candidate.attrs === 'object' && candidate.attrs !== null ? candidate.attrs : {}
+    ) as { ticketId?: unknown; noteId?: unknown };
+    if (candidate.type === 'ticketRef' && typeof attrs.ticketId === 'string' && attrs.ticketId !== '') {
+      if (!ticketIds.includes(attrs.ticketId)) ticketIds.push(attrs.ticketId);
+    }
+    if (candidate.type === 'wikiLink' && typeof attrs.noteId === 'string' && attrs.noteId !== '') {
+      if (!noteIds.includes(attrs.noteId)) noteIds.push(attrs.noteId);
+    }
+    if (candidate.content !== undefined) walk(candidate.content, depth + 1);
+  };
+  walk(doc, 0);
+  return { ticketIds, noteIds };
 }

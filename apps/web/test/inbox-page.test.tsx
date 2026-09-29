@@ -69,6 +69,74 @@ function deferred<T>() {
   return { promise, settle };
 }
 
+describe('/inbox — who did it is a NAME, not an id (cases 11.240–11.242)', () => {
+  function inboxOf(rows: Notification[], services: Parameters<typeof stubServices>[0]) {
+    return render(
+      <Providers
+        services={stubServices(services, {
+          notifications: { list: async () => ({ notifications: rows, nextCursor: null }) },
+        })}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+  }
+
+  it('11.240 an assignment row names the assigner from the roster or the names-only read; a person NEITHER names keeps the id', async () => {
+    const byGuest = { ...assignment('n_g'), workspaceId: 'ws_1' } as Notification;
+    (byGuest.payload as { assignedBy: string }).assignedBy = 'u_gita';
+    const byEmailOnly = { ...assignment('n_e'), workspaceId: 'ws_1' } as Notification;
+    (byEmailOnly.payload as { assignedBy: string }).assignedBy = 'u_mail';
+    const byNobody = { ...assignment('n_z'), workspaceId: 'ws_1' } as Notification;
+    (byNobody.payload as { assignedBy: string }).assignedBy = 'u_zed';
+    inboxOf([assignment('n_a'), byGuest, byEmailOnly, byNobody], {
+      getMembers: async () => [
+        { id: 'u_ana', name: 'Anselma Marak', role: 'member' },
+        { id: 'u_mail', name: '', role: 'member', email: 'mail@example.test' },
+      ],
+      getActorNames: async () => [{ id: 'u_gita', name: 'Gita Guest' }],
+    });
+
+    expect(await screen.findByText('Anselma Marak assigned this to you')).toBeInTheDocument();
+    expect(screen.getByText('Gita Guest assigned this to you')).toBeInTheDocument();
+    expect(screen.getByText('mail@example.test assigned this to you')).toBeInTheDocument();
+    // CONTROL: nobody names u_zed, so the id is what is there — the floor is unchanged.
+    expect(screen.getByText('u_zed assigned this to you')).toBeInTheDocument();
+    // And no raw id sits where a name was found.
+    expect(screen.queryByText(/u_ana|u_gita/)).not.toBeInTheDocument();
+  });
+
+  it('11.241 a refused roster and names read (a guest viewer) leaves the id — and the page still draws', async () => {
+    inboxOf([assignment('n_a')], {
+      getMembers: async () => {
+        throw new Error('refused');
+      },
+      getActorNames: async () => {
+        throw new Error('refused');
+      },
+    });
+    expect(await screen.findByText('u_ana assigned this to you')).toBeInTheDocument();
+  });
+
+  it('11.242 each workspace on the page is read once, for its own rows', async () => {
+    const other = { ...assignment('n_o'), workspaceId: 'ws_2' } as Notification;
+    (other.payload as { assignedBy: string }).assignedBy = 'u_bea';
+    const asked: string[] = [];
+    inboxOf([assignment('n_a'), assignment('n_b'), other], {
+      getMembers: async (workspaceId: string) => {
+        asked.push(workspaceId);
+        return workspaceId === 'ws_2'
+          ? [{ id: 'u_bea', name: 'Bea', role: 'member' }]
+          : [{ id: 'u_ana', name: 'Anselma Marak', role: 'member' }];
+      },
+      getActorNames: async () => [],
+    });
+    expect(await screen.findByText('Bea assigned this to you')).toBeInTheDocument();
+    expect(screen.getAllByText('Anselma Marak assigned this to you')).toHaveLength(2);
+    expect([...asked].sort()).toEqual(['ws_1', 'ws_2']);
+  });
+});
+
 describe('/inbox — four states, because the plan’s two collapse the one that lies', () => {
   it('11.144 says "Loading…" while the first page is in flight, NOT that the inbox is empty', async () => {
     const first = deferred<{ notifications: Notification[]; nextCursor: string | null }>();
@@ -141,6 +209,65 @@ describe('/inbox — four states, because the plan’s two collapse the one that
     // this is about not spending a request per click on a row with nothing to change.
     await userEvent.click(rows[1]!);
     expect(marked).toEqual(['n_2']);
+  });
+
+  it('18.413 a note mention opens /notes/<id> with no ticket lookup, and a comment mention adds #comment-<id>', async () => {
+    const noteMention = (id: string, source: 'note' | 'note-comment'): Notification => ({
+      id,
+      userId: 'u_kiro',
+      workspaceId: 'ws_1',
+      kind: 'mention',
+      dedupeKey: `mention:${id}`,
+      read: true,
+      createdAt: '2026-09-29T10:00:00.000Z',
+      payload: {
+        noteId: 'n_cold',
+        noteTitle: 'Cold room audit',
+        mentionedBy: 'u_ana',
+        eventId: `ev_${id}`,
+        source,
+        excerpt: 'please review the compressor log',
+        clientTime: '2026-09-29T09:59:00.000Z',
+        serverTime: '2026-09-29T10:00:00.000Z',
+      },
+    });
+    const located: string[] = [];
+    render(
+      <Providers
+        services={stubServices(
+          {},
+          {
+            notifications: {
+              list: async () => ({
+                notifications: [noteMention('n_body', 'note'), noteMention('n_comment', 'note-comment')],
+                nextCursor: null,
+              }),
+              markRead: async () => undefined,
+            },
+            ticketLocation: {
+              locate: async (_workspaceId, ticketId) => {
+                located.push(ticketId);
+                return null;
+              },
+            },
+          },
+        )}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+    const rows = await screen.findAllByRole('button', { name: /mentioned you/ });
+    expect(rows).toHaveLength(2);
+    // The row says WHERE: the note's title, like a ticket mention says its ticket.
+    expect(screen.getAllByText('Cold room audit')).toHaveLength(2);
+
+    await userEvent.click(rows[0]!);
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/notes/n_cold'));
+    await userEvent.click(rows[1]!);
+    await waitFor(() => expect(push).toHaveBeenCalledWith('/notes/n_cold#comment-ev_n_comment'));
+    // A note is not a ticket: no ticket was looked up and no "cannot be opened" notice.
+    expect(located).toEqual([]);
+    expect(screen.queryByText(CANNOT_OPEN_COPY)).not.toBeInTheDocument();
   });
 
   it('11.147 reloads the truth when markRead is refused, instead of leaving an invented read flag', async () => {

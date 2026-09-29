@@ -1,4 +1,4 @@
-import { docToPlainText } from './doc-text.js';
+import { docToPlainText, type DocTextOptions } from './doc-text.js';
 
 /**
  * `chunkDoc` — a ProseMirror document split into the units a meaning search
@@ -70,7 +70,7 @@ function headingLevel(node: { attrs?: unknown }): number {
   return Number.isInteger(level) && level >= 1 && level <= 6 ? level : 1;
 }
 
-export function chunkDoc(doc: unknown): DocChunk[] {
+export function chunkDoc(doc: unknown, options: DocTextOptions = {}): DocChunk[] {
   const content =
     typeof doc === 'object' && doc !== null && Array.isArray((doc as { content?: unknown }).content)
       ? ((doc as { content: unknown[] }).content as unknown[])
@@ -96,11 +96,11 @@ export function chunkDoc(doc: unknown): DocChunk[] {
       flush();
       const level = headingLevel(node);
       path.length = Math.min(path.length, Math.max(level - 1, 0));
-      path[level - 1] = docToPlainText(block);
+      path[level - 1] = docToPlainText(block, options);
       continue;
     }
 
-    const text = docToPlainText(block);
+    const text = docToPlainText(block, options);
     if (text === '') continue;
     if (wordCount(current.join(' ')) + wordCount(text) > MAX_WORDS) flush();
     current.push(text);

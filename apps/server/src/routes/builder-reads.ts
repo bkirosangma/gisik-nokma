@@ -2,6 +2,8 @@ import type { FastifyInstance, FastifyReply, FastifyRequest, preHandlerHookHandl
 import { z } from 'zod';
 import { BACKLOG_STATE_ID, newUlid, type SubmittedEvent } from '@gisik-nokma/domain';
 import type {
+  ActorName,
+  ActorNameListResponse,
   MemberListResponse,
   MigrationOutcome,
   PublishedWorkflowDef,
@@ -281,6 +283,47 @@ export async function readMembers(
 }
 
 /**
+ * Who acted here, by display name and nothing more — the read behind every
+ * "who did this" label a member sees (owner ruling 2026-09-29: names are not
+ * the sensitive part; emails, phones and roles stay exactly as gated).
+ *
+ * ## Why it is not `readMembers`
+ *
+ * The roster is a DIRECTORY: it feeds pickers, the members screen and the
+ * member count, and it withholds guests from a non-admin (`ROSTER_VISIBLE_CLAUSE`).
+ * A label join needs the guest too — a member reading a note a guest wrote
+ * would otherwise see the author's raw id — but widening the roster would put
+ * the guest in every picker and break the count/list agreement. So the join
+ * reads this instead, and the directory is untouched.
+ *
+ * ## What is left out, and why
+ *
+ * - A blank name: there is nothing to say, and the caller's own fallback
+ *   (roster email, then id) is unchanged.
+ * - A person whose address is synthetic: their name IS their phone number
+ *   (`auth.ts`'s `getTempName`), and the roster withholds that address for
+ *   exactly this reason. Their name travels only where the roster already
+ *   carried it, which is where the client's roster join already finds it.
+ * - Anyone with no CURRENT workspace-scope membership here: a removed person,
+ *   and every other workspace's people. What the product shows for a removed
+ *   person is unchanged (their id).
+ */
+export async function readActorNames(db: Queryable, workspaceId: string): Promise<ActorName[]> {
+  const { rows } = await db.query<{ user_id: string; display_name: string; email: string }>(
+    `SELECT m.user_id, u."name" AS display_name, u."email"
+       FROM proj_memberships m
+       JOIN "user" u ON u."id" = m.user_id
+      WHERE m.workspace_id = $1
+        AND m.scope_kind = 'workspace'
+      ORDER BY m.user_id`,
+    [workspaceId],
+  );
+  return rows
+    .filter((row) => !isSyntheticPhoneEmail(row.email) && (row.display_name ?? '').trim() !== '')
+    .map((row) => ({ userId: row.user_id, displayName: row.display_name.trim() }));
+}
+
+/**
  * Occupancy of one workflow's states, over the whole workspace.
  *
  * Seeded from the DEFINITION so an empty state reports 0 rather than vanishing —
@@ -494,15 +537,17 @@ export async function readTicketCounts(db: Queryable, workspaceId: string): Prom
   const { rows } = await db.query<{ type_id: string; count: number }>(
     // The soft-delete predicate written LONGHAND on the `k` alias — this is the
     // one builder read whose `t` is already taken, by `proj_ticket_types`. It is
-    // `LIVE_TICKET_WHERE`'s clause on a different alias, and it is in the JOIN's
-    // ON clause rather than the WHERE, deliberately: this is a LEFT JOIN whose
-    // whole job is to report a count of ZERO for a type that has no tickets, and
-    // a WHERE on the right-hand alias would turn a zero into an absent row.
+    // `LIVE_TICKET_WHERE`'s clause on a different alias (Task 6 added the
+    // container half), and it is in the JOIN's ON clause rather than the
+    // WHERE, deliberately: this is a LEFT JOIN whose whole job is to report a
+    // count of ZERO for a type that has no tickets, and a WHERE on the
+    // right-hand alias would turn a zero into an absent row.
     `SELECT t.type_id, count(k.ticket_id)::int AS count
        FROM proj_ticket_types t
        LEFT JOIN proj_tickets k
          ON k.workspace_id = t.workspace_id AND k.type_id = t.type_id
         AND k.deleted_at IS NULL
+        AND NOT EXISTS (SELECT 1 FROM proj_projects dp WHERE dp.project_id = k.project_id AND dp.deleted_at IS NOT NULL)
       WHERE t.workspace_id = $1
       GROUP BY t.type_id`,
     [workspaceId],
@@ -700,6 +745,23 @@ export function registerBuilderReadRoutes(
         // the door's answer threaded through, never a second resolution.
         members: await readMembers(deps.pool, workspaceId, isWorkspaceAdmin(eff)),
       };
+      return body;
+    },
+  );
+
+  app.get<{ Params: { workspaceId: string } }>(
+    '/v1/workspaces/:workspaceId/actor-names',
+    { preHandler: requireSession },
+    async (request, reply) => {
+      const { workspaceId } = request.params;
+      // The roster's door, and on purpose: 7.91 keeps a guest out of anything
+      // that lists the workspace's people, and this lists them (names only).
+      // Letting a guest see staff names is one enum value here — `'no-guests'`
+      // to the door's member-level answer — and is the owner's call, not this
+      // route's.
+      const eff = await door(request, workspaceId, 'no-guests');
+      if (eff === null) return reply.code(404).send(READ_NOT_FOUND_BODY);
+      const body: ActorNameListResponse = { workspaceId, names: await readActorNames(deps.pool, workspaceId) };
       return body;
     },
   );

@@ -1,6 +1,8 @@
 import type {
+  DeletedItem,
   IngestResult,
   LedgerEvent,
+  PurgedRef,
   ServerStreamFrame,
   SubmittedEvent,
   TicketTypeDef,
@@ -35,6 +37,7 @@ import type {
   // this return carries `source`, which the server does not send (it is the
   // mode of the request) and which the merged list (spec §7.8) needs per row.
   NoteSearchHit,
+  Actor,
   RosterMember,
   SearchHit,
   TicketHistoryEvent,
@@ -242,6 +245,22 @@ export type NoteSearchResult = { notes: NoteSearchHit[]; corrected?: string[] };
 export type DataSourceQuery = {
   getMyWorkspaces(): Promise<WorkspaceRef[]>;
   /**
+   * Every deleted workspace, project, ticket or note this caller may currently
+   * restore or mark (trash series, Plan 1 Task 8; spec §6.3's read). Online:
+   * `GET /v1/me/deleted-items`. Replica (trash Plan 3): the online answer when
+   * the server can be reached, cached; otherwise it REJECTS — with
+   * `DeletedItemsFromCache` (the saved list and when it was read) or, before
+   * anything was cached, `ReplicaGapError`. Never a silent `[]`.
+   */
+  getDeletedItems(): Promise<DeletedItem[]>;
+  /**
+   * Of `ids`, those a permanent purge erased (trash series Plan 3, D7) — the
+   * data behind every "Deleted item" chip. Online: `POST /v1/purged-lookup`,
+   * chunked at `PURGED_LOOKUP_MAX_IDS`. Replica: the local `purged_ids`
+   * registry, offline. Content-free either way: kinds and ids.
+   */
+  purgedAmong(ids: readonly string[]): Promise<PurgedRef[]>;
+  /**
    * The workspace roster. `RosterMember[]` and not `Actor[]`: the route sends a
    * `role` per person (`routes/builder-reads.ts:247`) and the members screen
    * DRAWS it, so a signature that did not carry it would be the client asking
@@ -249,6 +268,19 @@ export type DataSourceQuery = {
    * every caller that only wants names is unaffected.
    */
   getMembers(workspaceId: string): Promise<RosterMember[]>;
+  /**
+   * Display NAMES for the people who may have acted in the workspace — `id` and
+   * `name`, nothing else — read from `GET /v1/workspaces/:id/actor-names`.
+   *
+   * The complement of `getMembers`, not a replacement: the roster is the
+   * directory (pickers, counts, the members screen) and withholds guests from a
+   * non-admin, so a label join that only had the roster showed a guest's raw id.
+   * Callers that turn an actor id into words try the roster first and this
+   * second (`nameJoin` in `online/mappers.ts`). `[]` for a refusal — a guest
+   * viewer, or a workspace the caller is not in — because "no name known" is
+   * what an empty answer means to every join.
+   */
+  getActorNames(workspaceId: string): Promise<Actor[]>;
   getBoard(projectId: string): Promise<BoardView>;
   getTickets(projectId: string, filter: FilterSpec, grouping: Grouping): Promise<TicketListView>;
   getTicket(workspaceId: string, ticketId: string): Promise<TicketRead | null>;

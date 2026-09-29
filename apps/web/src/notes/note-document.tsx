@@ -1,10 +1,11 @@
 'use client';
 
-import { useEffect, useMemo, useRef, useState, type RefObject } from 'react';
+import { useEffect, useMemo, useRef, useState, type ComponentProps, type RefObject } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import {
   TicketEditorSlot,
   exportMarkdown,
+  ReadingProgress,
   extractReadingMeta,
   readingTimeMinutes,
   uploadAttachmentHttp,
@@ -13,19 +14,32 @@ import {
 } from '@gisik-nokma/editor';
 import { Button } from '@gisik-nokma/ui';
 import {
+  DeleteDialog,
   TicketSheet,
+  actorLabelFrom,
+  classifyBatch,
   makeSubmittedFactory,
+  mentionCandidatesOf,
+  restoreSeeds,
+  restoreUnreachableLine,
+  unansweredLine,
   useLiveQuery,
+  usePurgedPredicate,
+  writeFailureCopy,
+  type Actor,
   type DataSource,
   type RosterMember,
   type WorkspaceRef,
 } from '@gisik-nokma/app-core';
 import { docToPlainText, type NoteDetail, type NoteSummary } from '@gisik-nokma/domain';
 import { useAppServices, useCurrentUser, useSessionStatus } from '../providers.js';
-import { buildProjectPageQueryTickets, ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
+import { peopleProps } from '../people-props.js';
+import { buildProjectPageQueryTickets, buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
+import { DraftRestoreBanner } from './draft-restore-banner.js';
 import { HistoryPanel } from './history-panel.js';
 import { NoteByline } from './note-byline.js';
 import { NoteComments } from './note-comments.js';
+import { ticketChipClickHandler } from './ticket-chip-click.js';
 import { NoteTitle } from './note-title.js';
 import { useNoteAutosave } from './use-note-autosave.js';
 
@@ -86,7 +100,7 @@ type Placement = { ticketId: string; projectId: string | null; notice: string | 
  * draws the same frozen sentence My Work draws, for the same reason: a 404
  * that could mean "gone" or "not yours" must not guess which.
  */
-export function NoteDocument({
+function NoteDocumentBody({
   noteId,
   workspaces,
   editorRootRef,
@@ -105,7 +119,7 @@ export function NoteDocument({
    */
   onLostAccess?: () => void;
 }) {
-  const { dataSource, cache, ticketLocation } = useAppServices();
+  const { dataSource, cache, ticketLocation, people } = useAppServices();
   const user = useCurrentUser();
   /**
    * `useSessionStatus`, not `useCurrentUser`, for the reason
@@ -331,6 +345,29 @@ export function NoteDocument({
   }, [dataSource, note?.workspaceId]);
 
   /**
+   * The names-only read, for the people the roster omits — a guest author, for a
+   * member's roster. Kept apart from `members` on purpose: `members` feeds the
+   * scope picker and the mention list, which must not offer a guest; this feeds
+   * labels only (`actorLabelFrom`). A refusal is an empty list.
+   */
+  const [actorNames, setActorNames] = useState<Actor[]>([]);
+  useEffect(() => {
+    if (note === null) return;
+    let cancelled = false;
+    dataSource.query.getActorNames(note.workspaceId).then(
+      (rows) => {
+        if (!cancelled) setActorNames(rows);
+      },
+      () => {
+        if (!cancelled) setActorNames([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, note?.workspaceId]);
+
+  /**
    * The document as the editor last reported it. `onDraft` fires on every
    * change in note mode, and this is what "Copy as Markdown" and the reading
    * time read — WITHOUT it they would serialise the body the note was LOADED
@@ -363,6 +400,50 @@ export function NoteDocument({
     setWordCount(meta.wordCount);
     onHeadingsChange?.(meta.headings);
   }, [draft, note?.noteId, editorRoot, onHeadingsChange]);
+
+  // A link to a heading (`/notes/<id>#slug`, copied from the heading's button or
+  // typed by hand) arrives at a page whose headings do not exist yet: the note
+  // loads, then the editor mounts, then the ids are stamped. So the browser's
+  // own jump-to-fragment finds nothing, and this waits for the target — once
+  // per note, so a reader who has scrolled away is not pulled back by a later
+  // re-render.
+  useEffect(() => {
+    if (note?.noteId === undefined) return;
+    const raw = window.location.hash.slice(1);
+    if (raw === '') return;
+    const root = editorRoot.current;
+    if (root === null) return;
+    let id = raw;
+    try {
+      id = decodeURIComponent(raw);
+    } catch {
+      // a malformed escape: use it as typed
+    }
+    const find = (): Element | null => root.querySelector(`#${CSS.escape(id)}`);
+    const reveal = (target: Element): void => target.scrollIntoView?.({ block: 'start' });
+    const now = find();
+    if (now !== null) {
+      reveal(now);
+      return;
+    }
+    let timer: ReturnType<typeof setTimeout> | null = null;
+    const observer = new MutationObserver(() => {
+      const target = find();
+      if (target === null) return;
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+      reveal(target);
+    });
+    observer.observe(root, { childList: true, subtree: true });
+    // Give up after a while: a fragment naming no heading must not watch forever.
+    timer = setTimeout(() => observer.disconnect(), 5000);
+    return () => {
+      observer.disconnect();
+      if (timer !== null) clearTimeout(timer);
+    };
+    // Once per note: `note` itself changes on every autosave and live update.
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [note?.noteId, editorRoot]);
 
   /** The loaded list for `queryNotes` and `resolveNoteTitle`. */
   const [treeNotes, setTreeNotes] = useState<NoteSummary[]>([]);
@@ -413,20 +494,48 @@ export function NoteDocument({
     return false;
   }
 
-  const authorName = useMemo(() => {
-    if (note === null) return '';
-    const author = members.find((member) => member.id === note.authorId);
-    return author?.name?.trim() || author?.email?.trim() || note.authorId;
-  }, [note, members]);
+  /**
+   * The deleted banner's Restore (trash Plan 4 Task 6). Not `write`: that
+   * returns `false` on any refusal and shows nothing, and once this page can
+   * mark a note, Restore is refused for a marked one (`UNMARK_FIRST_REASON`) —
+   * the button would silently do nothing. So it goes through `restoreSeeds`
+   * (unmark first after a permanent delete made HERE) and shows the reason.
+   */
+  async function restoreNote(): Promise<void> {
+    if (user === null || note === null) return;
+    const make = makeSubmittedFactory({ actorId: user.id, origin: 'web' });
+    const seeds = restoreSeeds({ kind: 'note', workspaceId: note.workspaceId, entityId: note.noteId }, markedHere);
+    try {
+      const results = await dataSource.ingest(seeds.map(make));
+      const outcome = classifyBatch(results, seeds.length);
+      if (outcome.status === 'committed') {
+        setMarkedHere(false);
+        setRestoreRefusal(null);
+        live.reload();
+        setEditorGeneration((generation) => generation + 1);
+        return;
+      }
+      if (outcome.status === 'partly') {
+        // One of the pair landed: the unmark (still deleted, no longer
+        // marked). Re-read, and say what was refused.
+        setMarkedHere(false);
+        live.reload();
+      }
+      setRestoreRefusal(
+        outcome.status === 'unanswered' ? unansweredLine(outcome.answered, seeds.length) : outcome.reason,
+      );
+    } catch (cause) {
+      setRestoreRefusal(writeFailureCopy(cause, restoreUnreachableLine));
+    }
+  }
 
-  /** Any author's name from the SAME roster `authorName` reads — History rows name whoever recorded each version, not just the note's own author. */
+  /** Any author's name from the roster, then the names-only read — History rows and comments name whoever wrote them, not just the note's own author. */
   const nameOf = useMemo(
-    () => (authorId: string) => {
-      const member = members.find((candidate) => candidate.id === authorId);
-      return member?.name?.trim() || member?.email?.trim() || authorId;
-    },
-    [members],
+    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? authorId,
+    [members, actorNames],
   );
+
+  const authorName = useMemo(() => (note === null ? '' : nameOf(note.authorId)), [note, nameOf]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   /**
@@ -450,6 +559,17 @@ export function NoteDocument({
    *   read-only until the person reloaded the page, without this.
    */
   const [editorGeneration, setEditorGeneration] = useState(0);
+  /** The delete dialog's open state (trash Plan 4, D2). */
+  const [deleting, setDeleting] = useState(false);
+  /**
+   * True after a PERMANENT delete made on this page, so the banner's Restore
+   * unmarks before it restores (the server refuses a restore while marked).
+   * `NoteDetail` carries no mark, so a mark made elsewhere is not known here —
+   * that Restore is refused with the server's reason, shown in the banner, and
+   * Deleted items on the Account page is where it can be unmarked.
+   */
+  const [markedHere, setMarkedHere] = useState(false);
+  const [restoreRefusal, setRestoreRefusal] = useState<string | null>(null);
 
   if (note === null) {
     return (
@@ -480,7 +600,7 @@ export function NoteDocument({
     workspace?.projects.find((project) => project.id === note.homeProjectId)?.name ?? null;
 
   return (
-    <div className="gn-note-document" data-testid="note-document">
+    <div className="gn-note-document" data-testid="note-document" onClick={ticketChipClickHandler(openTicket)}>
       {/* An absent level renders NO `<li>` at all, not an empty one — the
           stylesheet's own separator rule (`.gn-breadcrumb__item +
           .gn-breadcrumb__item::before`) draws `/` only BETWEEN two
@@ -504,7 +624,7 @@ export function NoteDocument({
 
       <NoteByline
         note={note}
-        workspace={workspace ?? { id: note.workspaceId, name: '', prefix: '', role: 'member', memberCount: null, nameRestrictedProjectCount: 0, projects: [] }}
+        workspace={workspace ?? { id: note.workspaceId, name: '', prefix: '', role: 'member', archived: false, memberCount: null, nameRestrictedProjectCount: 0, projects: [] }}
         members={members}
         authorName={authorName}
         editedLabel={editedLabel(note.updatedAt)}
@@ -523,26 +643,24 @@ export function NoteDocument({
           );
         }}
         onOpenHistory={() => setHistoryOpen(true)}
+        {...(canEditNow ? { onDelete: () => setDeleting(true) } : {})}
       />
 
       {note.deleted ? (
         <div className="gn-notes__deleted-banner" role="status" data-testid="note-deleted-banner">
           <p>This note was deleted</p>
           {canEdit ? (
-            <Button
-              onClick={() => {
-                void write('note.restored', {}).then((wrote) => {
-                  if (wrote) setEditorGeneration((generation) => generation + 1);
-                });
-              }}
-            >
-              Restore
-            </Button>
+            <Button onClick={() => void restoreNote()}>Restore</Button>
           ) : (
             <Button variant="ghost" onClick={() => router.push('/notes')}>
               Back
             </Button>
           )}
+          {restoreRefusal !== null ? (
+            <p role="alert" className="gn-refusal gn-refusal--server">
+              {restoreRefusal}
+            </p>
+          ) : null}
         </div>
       ) : null}
 
@@ -551,6 +669,11 @@ export function NoteDocument({
           or the toolbar, never this element, so ProseMirror's own
           click-to-position-caret is untouched; what this catches is the
           padded empty space the `min-height` rule adds below short text. */}
+      {/* No read/edit toggle here, so the note page IS the reading surface
+          and every viewer gets the bar (the KB source mounts it in read mode
+          only). Bound to the same element as the table of contents; it works
+          out for itself that the WINDOW scrolls (`findScroller`). */}
+      <ReadingProgress scrollContainerRef={editorRoot} resetKey={note.noteId} />
       <div
         className="gn-notes__editor"
         ref={editorRoot}
@@ -570,6 +693,8 @@ export function NoteDocument({
           onDraftChange={setDraft}
           onNavigateNote={(id) => router.push(`/notes/${id}`)}
           editorRef={editorInstanceRef}
+          members={members}
+          onDraftDiscarded={() => setEditorGeneration((generation) => generation + 1)}
         />
       </div>
 
@@ -579,6 +704,7 @@ export function NoteDocument({
         nameOf={nameOf}
         canComment
         notes={treeNotes}
+        members={members}
       />
 
       <HistoryPanel
@@ -617,6 +743,7 @@ export function NoteDocument({
       */}
       {openTicketId !== null && openTicketProjectId !== null && session.kind === 'signed-in' ? (
         <TicketSheet
+          {...peopleProps(people, note.workspaceId)}
           dataSource={dataSource}
           cache={cache}
           workspaceId={note.workspaceId}
@@ -653,8 +780,42 @@ export function NoteDocument({
           onDeleted={() => live.reload()}
         />
       ) : null}
+
+      {user !== null ? (
+        <DeleteDialog
+          open={deleting}
+          kind="note"
+          name={note.title}
+          workspaceId={note.workspaceId}
+          entityId={note.noteId}
+          dataSource={dataSource}
+          make={makeSubmittedFactory({ actorId: user.id, origin: 'web' })}
+          onCancel={() => setDeleting(false)}
+          onDeleted={({ permanent }) => {
+            setDeleting(false);
+            setMarkedHere(permanent);
+            setRestoreRefusal(null);
+            // The deleted banner reads \`note.deleted\`; \`TicketEditor\` reads
+            // \`editable\` once at mount, so the pane is remounted too (the
+            // same reason the banner's Restore bumps it).
+            live.reload();
+            setEditorGeneration((generation) => generation + 1);
+          }}
+        />
+      ) : null}
     </div>
   );
+}
+
+/**
+ * `NoteDocumentBody` keyed by the note. Its Delete dialog, its
+ * "deleted here on purpose" memory and a refused Restore's sentence belong to
+ * ONE note; a route change to another note (browser Back included) must not
+ * carry them over — the dialog would delete the new note, and a Restore would
+ * send an unmark the new note was never given.
+ */
+export function NoteDocument(props: ComponentProps<typeof NoteDocumentBody>) {
+  return <NoteDocumentBody key={props.noteId} {...props} />;
 }
 
 /**
@@ -674,6 +835,8 @@ function NoteEditorPane({
   onDraftChange,
   onNavigateNote,
   editorRef,
+  members,
+  onDraftDiscarded,
 }: {
   note: NoteDetail;
   treeNotes: NoteSummary[];
@@ -683,6 +846,16 @@ function NoteEditorPane({
   onDraftChange: (doc: unknown) => void;
   onNavigateNote: (id: string) => void;
   editorRef: TicketEditorSlotProps['editorRef'];
+  /**
+   * The workspace roster `NoteDocument` already loads for the byline — the
+   * `@` picker's people (`mentionCandidatesOf`, the SAME source the ticket
+   * sheet's editors use). Read through a closure at query time, and
+   * `TicketEditor` threads `queryUsers` through a props ref, so a roster that
+   * arrives after the editor mounted is still what the picker searches.
+   */
+  members: RosterMember[];
+  /** The banner's Discard: the parent remounts this pane, which then recovers nothing and mounts with the server's body. */
+  onDraftDiscarded: () => void;
 }) {
   const autosave = useNoteAutosave({
     dataSource,
@@ -705,49 +878,72 @@ function NoteEditorPane({
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
+  // Keep only hides the banner; the draft stays live and saves as any edit.
+  const [bannerKept, setBannerKept] = useState(false);
+
+  // Trash Plan 3 (D7): chips in the stored body that point at erased items. The
+  // editor mounts on `ready` — a node view is built once, and the autosave must
+  // never see a remount mid-edit, so the wait happens before the first draw.
+  const purged = usePurgedPredicate(dataSource.query, [autosave.initialDoc]);
+
   return (
-    <TicketEditorSlot
-      mode="note"
-      doc={autosave.initialDoc}
-      readOnly={!canEdit}
-      workspaceId={note.workspaceId}
-      ticketId=""
-      noteId={note.noteId}
-      submitSlot="none"
-      editorRef={editorRef}
-      onDraft={(doc) => {
-        onDraftChange(doc);
-        autosave.onDraft(doc);
-      }}
-      onSave={autosave.onSave}
-      saveState={autosave.saveState}
-      placeholder="Write the note…"
-      queryNotes={async (query: string) => {
-        const needle = query.trim().toLowerCase();
-        const hits: Array<{ noteId: string; title: string }> = [];
-        for (const candidate of [note, ...treeNotes]) {
-          if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
-          if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
-          hits.push({ noteId: candidate.noteId, title: candidate.title });
-          if (hits.length === 8) break;
-        }
-        return hits;
-      }}
-      resolveNoteTitle={(id: string) => {
-        if (id === note.noteId) return note.title;
-        return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
-      }}
-      previewNote={async (id: string) => {
-        const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
-        if (target === null) return null;
-        return docToPlainText(target.body).slice(0, 200);
-      }}
-      onNavigateNote={onNavigateNote}
-      queryTickets={async (query: string) =>
-        ticketRefCandidatesOf(await dataSource.query.search(note.workspaceId, query))
-      }
-      resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
-    />
+    <>
+      {autosave.restoredAt !== null && !bannerKept && canEdit ? (
+        <DraftRestoreBanner
+          savedAt={autosave.restoredAt}
+          onKeep={() => setBannerKept(true)}
+          onDiscard={() => {
+            autosave.discardDraft();
+            onDraftDiscarded();
+          }}
+        />
+      ) : null}
+      {purged.ready ? (
+      <TicketEditorSlot
+        mode="note"
+        doc={autosave.initialDoc}
+        readOnly={!canEdit}
+        workspaceId={note.workspaceId}
+        ticketId=""
+        noteId={note.noteId}
+        submitSlot="none"
+        editorRef={editorRef}
+        onDraft={(doc) => {
+          onDraftChange(doc);
+          autosave.onDraft(doc);
+        }}
+        onSave={autosave.onSave}
+        saveState={autosave.saveState}
+        placeholder="Write the note…"
+        queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
+        queryNotes={async (query: string) => {
+          const needle = query.trim().toLowerCase();
+          const hits: Array<{ noteId: string; title: string }> = [];
+          for (const candidate of [note, ...treeNotes]) {
+            if (needle !== '' && !candidate.title.toLowerCase().includes(needle)) continue;
+            if (hits.some((hit) => hit.noteId === candidate.noteId)) continue;
+            hits.push({ noteId: candidate.noteId, title: candidate.title });
+            if (hits.length === 8) break;
+          }
+          return hits;
+        }}
+        resolveNoteTitle={(id: string) => {
+          if (id === note.noteId) return note.title;
+          return treeNotes.find((candidate) => candidate.noteId === id)?.title ?? null;
+        }}
+        previewNote={async (id: string) => {
+          const target = id === note.noteId ? note : await dataSource.query.getNote(note.workspaceId, id);
+          if (target === null) return null;
+          return docToPlainText(target.body).slice(0, 200);
+        }}
+        onNavigateNote={onNavigateNote}
+        headingLink={(id: string) => `${window.location.origin}/notes/${note.noteId}#${id}`}
+        queryTickets={buildWorkspaceQueryTickets(dataSource, note.workspaceId)}
+        resolveTicketHref={ticketRefHrefIn(note.workspaceId)}
+        isPurged={purged.isPurged}
+      />
+      ) : null}
+    </>
   );
 }
 

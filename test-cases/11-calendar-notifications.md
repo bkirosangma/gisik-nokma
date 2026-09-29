@@ -336,6 +336,14 @@ matching `notifications.test.ts`'s own argument against a hand-written `HttpClie
 - **11.219** ✅ RULING E2-24(a)'s compounding-failure case — a refused save whose REVERT read also fails falls back to the disabled `prefsError` state (11.215's own treatment) rather than leaving the optimistic, wrong flip standing with no trace at all, which is what the revert `.load()`'s missing rejection handler used to do — (`apps/web/test/account-page.test.tsx`)
 - **11.220** ✅ RULING E2-24(b) — a revoke refusal on `/account` renders verbatim in a `role="alert"` (the same one-prop shape `PasskeysSection`'s add/remove `error` already carries) and the session list is NOT re-read, since the revoke never actually succeeded — before this ruling the result was read and discarded entirely, so the session simply failed to leave the list with nothing on screen to say why — (`packages/app-core/test/account/sessions-section.test.tsx`, `apps/web/test/account-page.test.tsx`)
 
+## Notify on create (access plan, W4)
+
+The New ticket dialog puts the assignee on `ticket.created`; the fan-out now reads it as an assignment (owner ruling 2026-09-29).
+
+- ✅ **11.225 — a `ticket.created` carrying `assigneeId` (not the actor) delivers ONE `assignment` notification to that person, with the ticket's title and the creator as `assignedBy`, keyed `assignment:<event id>`;** control: a `ticket.created` with no `assigneeId` delivers nothing. Mutation: delete the `ticket.created` branch from `onCommitted`.
+- ✅ **11.226 — the creator assigning themselves at birth, and `assigneeId: null`, deliver nothing;** control: the same event with another person does. Mutation: route `ticket.created` around `handleAssigned`'s self/null guard (call `deliverToAll` directly).
+- ✅ **11.227 — the same committed `ticket.created` delivered twice yields ONE row;** control: a different `ticket.created` for the same person is a second row. Mutation: key the dedupe on `newUlid()` instead of `env.id`.
+
 ## Permanently unused id ranges
 
 Three disjoint ranges/ids will never be filled, for three different reasons. Neither is a gap
@@ -411,3 +419,16 @@ lost `/help` and `/account`, which are now menu items — an `<a role="menuitem"
 role, not `link`, so `getAllByRole('link')` cannot see them by design even with the menu open. Their
 reachability is pinned separately at **13.417**, which is what keeps this shortening honest: a shorter
 expected list is also what deleting the links would produce.
+
+**Block `11.225`–`11.234` is ALLOCATED to the access-and-invites plan (`docs/superpowers/plans/2026-09-29-workspace-access-and-invites.md`, 2026-09-29).** Measured across all remote branches: §11's tip is `11.224`.
+
+## Actor names on the inbox, the project calendar and the ticket sheet (`fix/names-nav-focus`, 2026-09-29) — block `11.240`–`11.249`
+
+*Ids `11.245`–`11.249` are unused. Sits after the access plan's block `11.225`–`11.234`.*
+
+- ✅ **11.240 — an assignment row on `/inbox` names the assigner from the roster or the names-only read; a person NEITHER names keeps the id.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.241 — a refused roster and names read (a guest viewer) leaves the id, and the page still draws.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.242 — each workspace on the inbox is read once, for its own rows.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.243 — a claim made by a person the roster omits (a guest, for a member) is attributed on the project calendar/timeline by the names-only read, not the raw id.** (`apps/web/test/project-calendar-timeline.test.tsx`)
+- ✅ **11.244 — the ticket sheet names the people the roster omits on claims and the assignee from the names-only read; the roster keeps priority.** (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+

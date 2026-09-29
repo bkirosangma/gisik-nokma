@@ -1,7 +1,25 @@
-import { useEffect, useRef, type ReactNode } from 'react';
+import { useEffect, useRef, type ReactNode, type RefObject } from 'react';
 import { FocusScope } from '@react-aria/focus';
 
-export type DialogProps = { open: boolean; title: string; onClose: () => void; children: ReactNode };
+export type DialogProps = {
+  open: boolean;
+  title: string;
+  onClose: () => void;
+  children: ReactNode;
+  /**
+   * The control that takes the first focus instead of the panel (trash Plan 4,
+   * case 19.201). ABSENT everywhere but a destructive confirm: P8's reason for
+   * focusing the panel — the dialog's name is announced on arrival — still holds
+   * when focus lands on a control INSIDE the panel, because entering a named
+   * dialog announces it; what changes is where Enter goes, and for a destructive
+   * confirm the safe answer is Cancel (spec §6.1).
+   */
+  initialFocusRef?: RefObject<HTMLElement | null>;
+  /** `alertdialog` for a destructive confirm (19.202); `dialog` otherwise. */
+  role?: 'dialog' | 'alertdialog';
+  /** An element id inside the dialog, announced as its description (19.203). */
+  describedBy?: string;
+};
 
 /**
  * P8 — `aria-modal="true"` is a CLAIM that everything outside this panel is
@@ -40,7 +58,7 @@ export type DialogProps = { open: boolean; title: string; onClose: () => void; c
  * the panel keeps its place as the scrim's own child and nothing here changes
  * layout.
  */
-export function Dialog({ open, title, onClose, children }: DialogProps) {
+export function Dialog({ open, title, onClose, children, initialFocusRef, role = 'dialog', describedBy }: DialogProps) {
   const panelRef = useRef<HTMLElement | null>(null);
 
   useEffect(() => {
@@ -90,11 +108,13 @@ export function Dialog({ open, title, onClose, children }: DialogProps) {
   }, [open, onClose]);
 
   // See the docblock above: focus enters the panel on open, so the dialog is
-  // announced and Tab starts from inside it. Keyed on `open` alone — this must
-  // not re-run and steal focus back every time a parent re-renders.
+  // announced and Tab starts from inside it — or, when the caller named one,
+  // enters on that control (19.201). Keyed on `open` alone — this must not
+  // re-run and steal focus back every time a parent re-renders. The child's ref
+  // is attached before this parent effect runs, so `.current` is the element.
   useEffect(() => {
     if (!open) return;
-    panelRef.current?.focus();
+    (initialFocusRef?.current ?? panelRef.current)?.focus();
   }, [open]);
 
   if (!open) return null;
@@ -104,9 +124,10 @@ export function Dialog({ open, title, onClose, children }: DialogProps) {
       <section
         ref={panelRef}
         tabIndex={-1}
-        role="dialog"
+        role={role}
         aria-modal="true"
         aria-label={title}
+        aria-describedby={describedBy}
         className="gn-dialog"
         onClick={(event) => event.stopPropagation()}
       >

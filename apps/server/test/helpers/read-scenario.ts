@@ -88,9 +88,9 @@ export function scenarioUsers(): ReadScenarioUsers {
  *   seeds one of its own beside it, and any later task that needs the
  *   workspace-mode row must do the same.
  * - **No admin, and no second project.** There is no viewer with workspace role
- *   `'admin'`, and no project the owner is off. A test that wants to tell an
- *   owner's read bypass apart from what a project member would see anyway
- *   cannot do it with this world alone — the owner is on the only project and
+ *   `'admin'`, and no project the owner is off. Since rule A (2026-09-29) a
+ *   member or admin is on every founded project, so the owner's read bypass
+ *   cannot be told apart from what a member sees with this world alone — the owner is on the only project and
  *   is named in every explicit list here.
  * - **No revoked membership.** The surviving-project-row hazard
  *   (`proj-memberships.ts`) has no instance here.

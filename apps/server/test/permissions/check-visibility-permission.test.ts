@@ -4,7 +4,6 @@ import {
   checkPermission,
   GUESTS_CANNOT_CREATE_REASON,
   NAMED_PERSON_NOT_IN_WORKSPACE_REASON,
-  NOT_ON_PROJECT_REASON,
   PERMISSION_ROLE_RULE,
   PERMISSION_VISIBILITY_RULE,
   TICKET_DELETE_UNRESOLVED_REASON,
@@ -123,12 +122,14 @@ describe('check 2 — creating a ticket', () => {
     });
   });
 
-  it('planted defect: creating a ticket requires being ON the project — there is no admin shortcut', async () => {
-    // Both a workspace admin and a plain member off the project are walked,
-    // because "no admin shortcut" is a claim about the admin specifically and
-    // the member case alone would pass against a build that had one.
-    // Mutation: `|| ctx.eff.workspaceRole === 'admin'` on the project check —
-    // the admin line reddens, the member line does not.
+  /**
+   * AMENDED 2026-09-29, owner ruling (A) and deviation D7. This was "creating a
+   * ticket requires being ON the project — there is no admin shortcut". Rule A
+   * puts an admin and a member on every FOUNDED project, so both now create; the
+   * refusal `NOT_ON_PROJECT_REASON` is unreachable by any shipped role (a guest
+   * is refused earlier, an unfounded project earlier still) — recorded as D7.
+   */
+  it('rule A: an admin and a member off every roster create tickets in a founded project', async () => {
     const { workspaceId, projectId } = await workspace();
     const admin = newUlid();
     const member = newUlid();
@@ -136,11 +137,7 @@ describe('check 2 — creating a ticket', () => {
     await seedMember(db.pool, workspaceId, member, 'member', [{ projectId: newUlid() }]);
 
     for (const actor of [admin, member]) {
-      expect(await gate(createTicketEvent(workspaceId, projectId, actor), actor)).toEqual({
-        refused: true,
-        rule: PERMISSION_ROLE_RULE,
-        reason: NOT_ON_PROJECT_REASON,
-      });
+      expect(await gate(createTicketEvent(workspaceId, projectId, actor), actor)).toBeNull();
     }
   });
 
@@ -328,21 +325,33 @@ describe('check 4 — acting on a ticket you cannot see', () => {
     ).toBeNull();
   });
 
-  it("planted defect: a member acting on another project's ticket by direct id is refused", async () => {
+  /**
+   * AMENDED 2026-09-29, owner ruling (A). This read "a member acting on another
+   * project's ticket by direct id is refused". A member is on every founded
+   * project now, so the member acts on it; the refusal is the GUEST's, who is on
+   * no project by any rule.
+   */
+  it("rule A: a member acts on another project's ticket by direct id; a guest is refused it", async () => {
     // The probe Task 8 answers with an indistinguishable 404 on the read path,
     // met here at the ingest door. Mutation: delete the canSee call.
     const workspaceId = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
     const member = newUlid();
+    const guest = newUlid();
     const ticketId = newUlid();
     await seedProject(db.pool, workspaceId, mine);
     await seedProject(db.pool, workspaceId, theirs);
     await seedMember(db.pool, workspaceId, member, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, workspaceId, guest);
     await seedTicket(db.pool, { workspaceId, projectId: theirs, ticketId });
 
+    // The control the refusal needs: same ticket, same event, the member acts.
     expect(
       await gate(ticketEvent(workspaceId, 'ticket.assigned', ticketId, member, { assigneeId: member }), member),
+    ).toBeNull();
+    expect(
+      await gate(ticketEvent(workspaceId, 'comment.added', ticketId, guest, { body: 'x' }), guest),
     ).toEqual({
       refused: true,
       rule: PERMISSION_VISIBILITY_RULE,
@@ -372,23 +381,26 @@ describe('check 4 — acting on a ticket you cannot see', () => {
     // refusals. canSee cannot tell the two apart by design, and this asserts
     // the whole refusal object rather than the rule, because a differing
     // `reason` would be the oracle just as surely as a differing rule.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): the actor was a member off the
+    // ticket's project. A member is on every founded project now, so the actor who
+    // cannot see the ticket is a GUEST (on no project by any rule, named on no
+    // list).
     const workspaceId = newUlid();
-    const mine = newUlid();
     const theirs = newUlid();
-    const member = newUlid();
+    const guest = newUlid();
     const invisible = newUlid();
-    await seedProject(db.pool, workspaceId, mine);
     await seedProject(db.pool, workspaceId, theirs);
-    await seedMember(db.pool, workspaceId, member, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, workspaceId, guest);
     await seedTicket(db.pool, { workspaceId, projectId: theirs, ticketId: invisible });
 
     const forInvisible = await gate(
-      ticketEvent(workspaceId, 'ticket.transitioned', invisible, member, { to: 'done' }),
-      member,
+      ticketEvent(workspaceId, 'ticket.transitioned', invisible, guest, { to: 'done' }),
+      guest,
     );
     const forNonexistent = await gate(
-      ticketEvent(workspaceId, 'ticket.transitioned', newUlid(), member, { to: 'done' }),
-      member,
+      ticketEvent(workspaceId, 'ticket.transitioned', newUlid(), guest, { to: 'done' }),
+      guest,
     );
     expect(forInvisible).toEqual(forNonexistent);
     // Non-vacuity: both really are refusals, not two nulls agreeing.
@@ -615,13 +627,22 @@ describe('check 5 — who may change who sees a ticket', () => {
     // REFUSE them on a nonexistent one, telling them apart. Run after check 4,
     // both answer the same sentence. Mutation: hoist the check 5 block above
     // the canSee call and the two lines below diverge.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): the ticket was project-mode and the
+    // admin sat off the roster. An admin is on every founded project now, so the
+    // ticket the admin cannot see is an EXPLICIT one that does not list them —
+    // the explicit-mode arm is unchanged by rule A. A guest could not stand in:
+    // a guest has no project-admin rights, so the mutation would not diverge.
     const workspaceId = newUlid();
     const projectId = newUlid();
     const admin = newUlid();
+    const listed = newUlid();
     const invisible = newUlid();
     await seedProject(db.pool, workspaceId, projectId);
     await seedMember(db.pool, workspaceId, admin, 'admin');
+    await seedMember(db.pool, workspaceId, listed, 'member');
     await seedTicket(db.pool, { workspaceId, projectId, ticketId: invisible, createdBy: newUlid() });
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, invisible, 'explicit', [listed])]);
 
     const onInvisible = await gate(
       setVisibilityEnv(workspaceId, invisible, 'workspace', undefined, admin),
@@ -721,7 +742,9 @@ describe('check 6 — who may delete or restore a ticket', () => {
   it('a workspace OWNER is admitted, and so is an ADMIN who is on the project', async () => {
     // `hasProjectAdminRights` answers true for `owner` and `admin` at the
     // workspace level, so an admin needs no roster row — but they DO need
-    // check 4, and the case below is where an admin off the project is answered.
+    // check 4, and the case below is where an admin who cannot see the ticket
+    // is answered. (AMENDED 2026-09-29, owner ruling (A): an admin with no roster
+    // row is now admitted too, asserted at the foot of this case.)
     const { workspaceId, ticketId, owner } = await deletableTicket();
     expect(await gate(deleteTicket(workspaceId, ticketId, owner), owner)).toBeNull();
 
@@ -732,6 +755,12 @@ describe('check 6 — who may delete or restore a ticket', () => {
     const admin = newUlid();
     await seedMember(db.pool, second.workspaceId, admin, 'admin', [{ projectId: second.projectId }]);
     expect(await gate(deleteTicket(second.workspaceId, second.ticketId, admin), admin)).toBeNull();
+
+    // Rule A: the same admin with NO roster row is on the project all the same.
+    const third = await deletableTicket();
+    const rosterless = newUlid();
+    await seedMember(db.pool, third.workspaceId, rosterless, 'admin');
+    expect(await gate(deleteTicket(third.workspaceId, third.ticketId, rosterless), rosterless)).toBeNull();
   });
 
   it('planted defect: a GUEST explicitly named on the ticket is refused — check 4 admits them and check 6 does not', async () => {
@@ -761,7 +790,7 @@ describe('check 6 — who may delete or restore a ticket', () => {
     });
   });
 
-  it('check 6 runs AFTER check 4: an off-project admin answers the AUDIENCE refusal, so authority is not a read bypass', async () => {
+  it('check 6 runs AFTER check 4: an admin who cannot see the ticket answers the AUDIENCE refusal, so authority is not a read bypass', async () => {
     // A workspace admin holds project-admin rights on every project that exists
     // — including this one — so a check-6-first ordering would ADMIT them on a
     // real ticket and REFUSE them on one nobody has, telling the two apart and
@@ -772,12 +801,18 @@ describe('check 6 — who may delete or restore a ticket', () => {
     // `canSee` call makes this line return `ticketDeleteAuthorityReason('delete')`
     // for BOTH envelopes, while the `toBeNull` in the owner case two tests up
     // stays green — a mutation this case alone kills.
-    const { workspaceId, projectId, ticketId } = await deletableTicket();
+    //
+    // AMENDED 2026-09-29, owner ruling (A): the admin was "in the workspace, on no
+    // project" and the ticket project-mode. An admin is on every founded project
+    // now, so the ticket is made EXPLICIT to the plain member alone — the
+    // explicit-mode arm (an unlisted admin does not see it) is unchanged.
+    const { workspaceId, ticketId, member } = await deletableTicket();
     const admin = newUlid();
-    await seedMember(db.pool, workspaceId, admin, 'admin'); // in the workspace, on no project
-    // `seedTicket`'s visibility is PROJECT mode and this admin is not on the
-    // roster, so they cannot see it — asserted through the probe rather than
-    // inferred, because "the admin cannot see it" is the premise of the case.
+    await seedMember(db.pool, workspaceId, admin, 'admin');
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'explicit', [member])]);
+    // The ticket is explicit to the member and this admin is not listed, so they
+    // cannot see it — asserted through the probe rather than inferred, because
+    // "the admin cannot see it" is the premise of the case.
     expect(await gate(ticketEvent(workspaceId, 'ticket.transitioned', ticketId, admin, { to: 'doing' }), admin)).toEqual({
       refused: true,
       rule: PERMISSION_VISIBILITY_RULE,
@@ -937,11 +972,14 @@ describe('E6-17 — the person an assignment names must be in the workspace', ()
     // Ordering: an admin of ANOTHER workspace naming a non-member on a ticket
     // they cannot see gets the audience refusal, not the membership one — the
     // role gate refuses a non-member actor even earlier, so the actor here is
-    // a member of THIS workspace who is not on the ticket's project, with the
-    // ticket in project mode.
+    // a member of THIS workspace who cannot see the ticket.
+    //
+    // AMENDED 2026-09-29, owner ruling (A): "not on the ticket's project, with the
+    // ticket in project mode". A member is on every founded project now, so the
+    // ticket is EXPLICIT to `member` alone, which an unlisted member cannot see.
     const outsider = newUlid();
     await seedMember(db.pool, workspaceId, outsider, 'member');
-    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'project')]);
+    await applyAll(db.pool, [setVisibilityEnv(workspaceId, ticketId, 'explicit', [member])]);
     expect(await gate(assign(workspaceId, ticketId, outsider, 'nobody-here'), outsider)).toEqual({
       refused: true,
       rule: PERMISSION_VISIBILITY_RULE,

@@ -172,12 +172,16 @@ export type EditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  headingLink?: (id: string) => string | null;
   // Ticket-reference capabilities (Plan 7 Task 1), the twin of the block in
   // `packages/editor/src/components/TicketEditorSlot.tsx`. Same reasoning as
   // the wiki-link four above: field names, not deep types, are what the
   // transcription case compares.
   queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  // Trash series Plan 3 — which chips point at permanently erased items; the twin
+  // of `packages/editor/src/components/TicketEditorSlot.tsx`'s field.
+  isPurged?: (kind: 'ticket' | 'note', id: string) => boolean;
   uploadAttachment?: (file: File) => Promise<EditorSlotUpload>;
   emitAttachmentAdded?: (uploaded: EditorSlotUpload) => Promise<void>;
   /**

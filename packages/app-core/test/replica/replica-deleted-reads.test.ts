@@ -63,6 +63,8 @@ const idleTransport: SyncTransport = {
   bootstrapTicket: () => Promise.reject(new Error('offline')),
   bootstrapNote: () => Promise.reject(new Error('offline')),
   reconcile: () => Promise.reject(new Error('offline')),
+  purgedLookup: () => Promise.reject(new Error('offline')),
+  deletedItems: () => Promise.reject(new Error('offline')),
 };
 
 type World = {

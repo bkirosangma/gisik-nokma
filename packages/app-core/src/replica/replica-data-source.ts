@@ -14,11 +14,16 @@ import {
   BACKLOG_STATE_ID,
   IST_DAY_REGEX,
   PRIORITIES,
+  PURGED_OUTBOX_NOTICE,
   isCreatableState,
   statesWithBacklog,
   type Priority,
 } from '@gisik-nokma/domain';
+import { DeletedItemsFromCache } from '../deleted-items-from-cache.js';
+import { mapDeletedItems } from '../wire-readers.js';
+import { failedClaimNotice, type SyncNoticeView } from '../sync/sync-notices.js';
 import {
+  HttpStatusError,
   isSyncInstruction,
   workflowVersionsOf,
   type LocalContest,
@@ -277,6 +282,10 @@ export type ReplicaOnlyQuery = {
     text: string,
   ): Promise<{ offlineCopy: true; hits: Array<{ ticketId: string; title: string }> }>;
   syncStatus(workspaceId: string): Promise<{ status: SyncStatus; queued: number; failed: number }>;
+  /** Purge notices (oldest first), then failed claims with the server's words — trash Plan 3. */
+  syncNotices(workspaceId: string): Promise<SyncNoticeView[]>;
+  /** `purged:<eventId>` dismisses a notice; `failed:<eventId>` deletes a failed claim; anything else is ignored. */
+  dismissSyncNotice(id: string): Promise<void>;
 };
 
 /**
@@ -342,6 +351,21 @@ const NO_WORKSPACE_TABLE: ReplicaAbsence = {
 };
 
 const MY_WORKSPACES_ABSENCES: readonly ReplicaAbsence[] = [NO_WORKSPACE_TABLE];
+
+/**
+ * Trash series Plan 3 (D9) NARROWED this entry rather than deleting it: the
+ * replica now serves the last ONLINE answer (as `DeletedItemsFromCache`), but a
+ * device that has never read the list online since then still has nothing it
+ * may honestly show — `[]` would tell a person nothing was deleted.
+ */
+export const DELETED_ITEMS_NOT_CACHED: readonly ReplicaAbsence[] = [
+  {
+    field: 'DeletedItem[] — until one online read is cached on this device',
+    because:
+      'the local schema holds no lifecycle state (no deleted_at or purge_marked_at on any local table), so the list is never computed here; it is the last GET /v1/me/deleted-items body, kept in deleted_items_cache, and this device has not read it online yet',
+    owner: 'Trash series Plan 3 — the cache fills on the first online read of Deleted items on this device',
+  },
+];
 
 const MEMBERS_ABSENCES: readonly ReplicaAbsence[] = [
   {
@@ -622,6 +646,7 @@ export const OFFLINE_BORN_OMISSIONS: Readonly<Record<string, ReplicaAbsence>> = 
 /** Every refusal this source makes, so a caller can enumerate them without calling. */
 export const REPLICA_GAPS: Readonly<Record<string, readonly ReplicaAbsence[]>> = {
   getMyWorkspaces: MY_WORKSPACES_ABSENCES,
+  getDeletedItems: DELETED_ITEMS_NOT_CACHED,
   getMembers: MEMBERS_ABSENCES,
   getTicketAttachments: ATTACHMENTS_ABSENCES,
   getTicketComments: COMMENTS_ABSENCES,
@@ -1171,7 +1196,32 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
 
   const query: DataSourceQuery & ReplicaOnlyQuery = {
     getMyWorkspaces: () => Promise.reject(new ReplicaGapError('getMyWorkspaces', MY_WORKSPACES_ABSENCES)),
+    getDeletedItems: async () => {
+      let body: unknown;
+      try {
+        body = await engine.fetchDeletedItems();
+      } catch (err) {
+        // The saved copy stands in for NO ANSWER only. A status answer (401
+        // signed out, 403, 500) is the server speaking and surfaces exactly as
+        // it does online — an old list must never mask "sign in again".
+        if (err instanceof HttpStatusError) throw err;
+        const cached = await replica.readDeletedItemsCache();
+        if (cached === null) throw new ReplicaGapError('getDeletedItems', DELETED_ITEMS_NOT_CACHED);
+        throw new DeletedItemsFromCache(mapDeletedItems(cached.body), cached.fetchedAt);
+      }
+      // Mapped BEFORE it is cached and OUTSIDE the transport `try`: a body the
+      // mapper refuses is a server fault to surface, never a reason to fall
+      // back to an old list (19.197).
+      const items = mapDeletedItems(body);
+      await replica.cacheDeletedItems(body, new Date().toISOString());
+      return items;
+    },
+    purgedAmong: (ids) => replica.purgedAmong(ids),
     getMembers: () => Promise.reject(new ReplicaGapError('getMembers', MEMBERS_ABSENCES)),
+    // No names are replicated either, and an empty answer is the honest one: `[]` is
+    // "no name known", which every join already reads as "show the id" — the same
+    // position `getMembers` is in, without the refusal (a label join must not fail a read).
+    getActorNames: async () => [],
     getTicketAttachments: () =>
       Promise.reject(new ReplicaGapError('getTicketAttachments', ATTACHMENTS_ABSENCES)),
     getTicketComments: () =>
@@ -1758,6 +1808,21 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
         failed: (await outbox.failedItems(workspaceId)).length,
       };
     },
+
+    async syncNotices(workspaceId) {
+      const purged = (await outbox.notices(workspaceId)).map(
+        (notice): SyncNoticeView => ({ id: `purged:${notice.noticeId}`, text: PURGED_OUTBOX_NOTICE }),
+      );
+      const failed = (await outbox.failedItems(workspaceId)).map(
+        (item): SyncNoticeView => ({ id: `failed:${item.eventId}`, text: failedClaimNotice(item.lastError) }),
+      );
+      return [...purged, ...failed];
+    },
+
+    async dismissSyncNotice(id) {
+      if (id.startsWith('purged:')) await outbox.dismissNotice(id.slice('purged:'.length));
+      else if (id.startsWith('failed:')) await outbox.dismissFailed(id.slice('failed:'.length));
+    },
   };
 
   return {
@@ -1889,6 +1954,13 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       const offPull = engine.onPullApplied(() => {
         cb({ type: 'refresh', workspaceId });
       });
+      // Trash Plan 3 (review fix I-1): a refused claim turning into a notice, and
+      // an erase a purge lookup caused, both land AFTER the `live` status and
+      // announce nothing else — so a quiet workspace would keep drawing the old
+      // board and no notice until an unrelated frame arrived.
+      const offNotices = engine.onNoticesChanged(() => {
+        cb({ type: 'refresh', workspaceId });
+      });
       const offStatus = engine.onStatus((status) => {
         // `live` is set immediately after the cursor is written, so the value
         // read back IS the seq the server's caught-up frame named. Not
@@ -1904,6 +1976,7 @@ export function createReplicaDataSource(deps: ReplicaDataSourceDeps): ReplicaDat
       return () => {
         offItem();
         offPull();
+        offNotices();
         offStatus();
       };
     },

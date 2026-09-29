@@ -13,6 +13,7 @@ import {
   type InviteAdminGateway,
   type InviteGateway,
   type MyInvitationsGateway,
+  type PeopleGateway,
 } from '@gisik-nokma/app-core/online';
 import type { AppServices } from '../../src/providers.js';
 import type { TicketLocator } from '../../src/ticket-location.js';
@@ -73,6 +74,8 @@ export function refuse(method: keyof typeof SERVING_GAPS): () => Promise<never> 
 export type GatewayStubs = {
   invites?: Partial<InviteGateway>;
   invitesAdmin?: Partial<InviteAdminGateway>;
+  /** Access plan: the exact-email lookup and the outsider door. Same rule: un-stubbed members reject BY NAME. */
+  people?: Partial<PeopleGateway>;
   /**
    * Task 17's caller-scoped invitations. Same rule as every gateway here:
    * un-stubbed members reject BY NAME. A case that mounts `/workspaces` and
@@ -117,7 +120,17 @@ export function stubServices(
     // asserting the user belongs to no workspace, which is a claim about the
     // world; the same argument `getTicketTypes` below makes for itself.
     getMyWorkspaces: unstubbed('getMyWorkspaces'),
+    // UNSTUBBED, the same rule as `getMyWorkspaces` above: `[]` would be this
+    // helper asserting the caller has nothing deleted — a claim about the
+    // world — and a page under test could pass against a read nobody stubbed.
+    getDeletedItems: unstubbed('getDeletedItems'),
+    // Every document render asks this in the background (trash Plan 3); "nothing
+    // was purged" is exactly what every page saw before the read existed, so a
+    // case that does not care is not made to stub it. A case that does, stubs it.
+    purgedAmong: async () => [],
     getMembers: unstubbed('getMembers'),
+    // A label join must not fail a read, so `[]` (no name known) rather than `unstubbed`.
+    getActorNames: async () => [],
     getBoard: unstubbed('getBoard'),
     getTickets: unstubbed('getTickets'),
     getTicket: unstubbed('getTicket'),
@@ -218,6 +231,11 @@ export function stubServices(
       listPending: unstubbedGateway('invitesAdmin.listPending'),
       ...gateways.invitesAdmin,
     },
+    people: {
+      lookup: unstubbedGateway('people.lookup'),
+      assignOutsider: unstubbedGateway('people.assignOutsider'),
+      ...gateways.people,
+    } as PeopleGateway,
     myInvitations: {
       list: unstubbedGateway('myInvitations.list'),
       accept: unstubbedGateway('myInvitations.accept'),

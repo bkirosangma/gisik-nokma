@@ -153,8 +153,7 @@ describe('13.1004-13.1013 the ticket key', () => {
     expect(deliveryPrefix).toBe('DE');
     expect(designPrefix).not.toBe(deliveryPrefix);
 
-    // And a viewer who is on no project must not be able to shift what another
-    // viewer reads. The resolution runs over the WHOLE workspace before the role
+    // And no viewer may shift what another viewer reads. The resolution runs over the WHOLE workspace before the role
     // filter, so one owner's answer cannot depend on another caller's rows. It
     // is asserted through a SECOND OWNER rather than a guest only because a
     // guest's list is empty by construction and could not show a difference;
@@ -165,6 +164,15 @@ describe('13.1004-13.1013 the ticket key', () => {
     const secondEff = await resolveEffectiveRole(db.pool, ownerAgain, ws);
     const asSecondOwner = await visibleProjects(db.pool, secondEff, ws);
     expect(asSecondOwner.map((p) => [p.projectId, p.prefix])).toEqual(
+      asOwner.map((p) => [p.projectId, p.prefix]),
+    );
+    // Amended 2026-09-29, owner ruling (A): a MEMBER on no roster is on every
+    // founded project, so their list is the owner's and the prefixes agree too.
+    const member = newUlid();
+    await seedMember(db.pool, ws, member, 'member', []);
+    const memberEff = await resolveEffectiveRole(db.pool, member, ws);
+    const asMember = await visibleProjects(db.pool, memberEff, ws);
+    expect(asMember.map((p) => [p.projectId, p.prefix])).toEqual(
       asOwner.map((p) => [p.projectId, p.prefix]),
     );
   });

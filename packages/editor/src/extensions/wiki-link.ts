@@ -1,6 +1,8 @@
 import { mergeAttributes, Node } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
+import { PURGED_ITEM_LABEL, type PurgedPredicate } from '@gisik-nokma/domain';
 import Suggestion from '@tiptap/suggestion';
+import { placePopover } from '../components/popover-position.js';
 import { createWikiLinkPopup } from './wiki-link-popup.js';
 
 /** A note this editor may link to: the id it stores and the title it shows. */
@@ -21,6 +23,8 @@ export type WikiLinkOptions = {
   previewNote?: (noteId: string) => Promise<string | null>;
   /** Following the link is the HOST's navigation, not the editor's. */
   onNavigateNote?: (noteId: string) => void;
+  /** Trash series Plan 3 (T11): the linked note was permanently erased — asked before `resolveNoteTitle`. */
+  isPurged?: PurgedPredicate;
 };
 
 export const wikiLinkSuggestionKey = new PluginKey('wikiLinkSuggestion');
@@ -91,6 +95,9 @@ export const WikiLink = Node.create<WikiLinkOptions>({
   },
 
   renderHTML({ node, HTMLAttributes }) {
+    if (this.options.isPurged?.('note', String(node.attrs['noteId'])) === true) {
+      return ['span', mergeAttributes(HTMLAttributes, { class: 'editor-wikilink editor-wikilink--purged' }), PURGED_ITEM_LABEL];
+    }
     return [
       'a',
       mergeAttributes(HTMLAttributes, {
@@ -102,6 +109,7 @@ export const WikiLink = Node.create<WikiLinkOptions>({
   },
 
   renderText({ node }) {
+    if (this.options.isPurged?.('note', String(node.attrs['noteId'])) === true) return PURGED_ITEM_LABEL;
     // The plain-text projection (`docToPlainText`) is the reader this serves,
     // and it must agree with the node's own `wikiLink` branch there: the TITLE,
     // never the id.
@@ -114,9 +122,18 @@ export const WikiLink = Node.create<WikiLinkOptions>({
     return ({ node }) => {
       const stored: string = String(node.attrs['title']);
       const noteId: string = String(node.attrs['noteId']);
+      if (this.options.isPurged?.('note', noteId) === true) {
+        const dom = document.createElement('span');
+        dom.className = 'editor-wikilink editor-wikilink--purged';
+        dom.setAttribute('data-note-id', noteId);
+        dom.setAttribute('data-note-title', stored);
+        dom.textContent = PURGED_ITEM_LABEL;
+        return { dom };
+      }
       const resolver = this.options.resolveNoteTitle;
       const resolved = resolver === undefined ? stored : resolver(noteId);
       const missing = resolved === null;
+      let dismissPreview: (() => void) | undefined;
       const dom = document.createElement(missing ? 'span' : 'a');
       dom.className = missing
         ? 'editor-wikilink editor-wikilink--missing'
@@ -133,9 +150,9 @@ export const WikiLink = Node.create<WikiLinkOptions>({
           navigate(noteId);
         });
         const preview = this.options.previewNote;
-        if (preview !== undefined) attachHoverPreview(dom, () => preview(noteId));
+        if (preview !== undefined) dismissPreview = attachHoverPreview(dom, () => preview(noteId));
       }
-      return { dom };
+      return { dom, destroy: () => dismissPreview?.() };
     };
   },
 
@@ -228,41 +245,117 @@ export const WikiLink = Node.create<WikiLinkOptions>({
 
 /** How long the pointer must rest on a link before the card is fetched (spec §8.5). */
 const HOVER_DELAY_MS = 400;
+/**
+ * How long the card outlives the pointer leaving the link, so a pointer that
+ * crosses the gap between the link and the card (or overshoots it) does not
+ * lose the card on the way. The knowledge-base reference's own figure.
+ */
+const LEAVE_GRACE_MS = 60;
 /** Characters of the target's plain text the card shows. */
 const PREVIEW_CHARS = 200;
+
+let previewSeq = 0;
 
 /**
  * The hover card (spec §8.5): rest on a link for 400 ms and see the first 200
  * characters of what it points at. Plain DOM, like the node and the popup —
  * this package's plugin UI stays out of the React tree.
  *
+ * ## KB EDITOR PARITY — what the reference's `WikiLinkHoverCard` taught it
+ *
+ * The first cut appended a `position: absolute` card with NO offsets, so it
+ * landed wherever the body's flow ended — not beside the link. Now it is
+ * `position: fixed`, placed from the link's own rect by the shared
+ * `placePopover` (below the link, flipped above when it would clip, clamped to
+ * the viewport). It is HOVERABLE: leaving the link starts a 60 ms grace, and
+ * entering the card cancels it, so the card can be reached and its text
+ * selected. It is dismissed by scrolling, by any key (an edit is coming), by
+ * Escape, and by the link leaving the document. The delay stays 400 ms — spec
+ * §8.5's number — where the reference's is 200 ms.
+ *
+ * Not ported: the reference's heading line and "N backlinks · size" footer.
+ * `previewNote` answers with plain text only, and a backlink count is the
+ * follow-up the brief says to report, not build.
+ *
  * A `null` from `load` shows NOTHING rather than an empty card: the target is
  * gone or unreadable, and a card that opened to say so would be a second,
  * quieter version of the missing pill the link already wears. The timer is
- * cleared on `mouseleave` so a passing pointer never fires a fetch, and the
- * card is removed on both `mouseleave` and a second `mouseenter`.
+ * cleared on `mouseleave` so a passing pointer never fires a fetch, and a
+ * fetch that resolves AFTER the pointer left shows nothing either.
  */
-function attachHoverPreview(element: HTMLElement, load: () => Promise<string | null>): void {
+function attachHoverPreview(element: HTMLElement, load: () => Promise<string | null>): () => void {
   let timer: ReturnType<typeof setTimeout> | null = null;
+  let leaveTimer: ReturnType<typeof setTimeout> | null = null;
   let card: HTMLDivElement | null = null;
+  // Bumped on every leave/dismiss: a fetch started under an older value is stale.
+  let generation = 0;
 
-  const removeCard = (): void => {
+  const cancelLeave = (): void => {
+    if (leaveTimer !== null) {
+      clearTimeout(leaveTimer);
+      leaveTimer = null;
+    }
+  };
+
+  const onScroll = (): void => dismiss();
+  const onKeyDown = (): void => dismiss();
+
+  function dismiss(): void {
+    generation += 1;
+    if (timer !== null) {
+      clearTimeout(timer);
+      timer = null;
+    }
+    cancelLeave();
     card?.remove();
     card = null;
+    element.removeAttribute('aria-describedby');
+    window.removeEventListener('scroll', onScroll, true);
+    window.removeEventListener('keydown', onKeyDown, true);
+  }
+
+  const scheduleLeave = (): void => {
+    cancelLeave();
+    leaveTimer = setTimeout(dismiss, LEAVE_GRACE_MS);
+  };
+
+  const show = (text: string): void => {
+    card?.remove();
+    card = document.createElement('div');
+    card.className = 'wikilink-preview';
+    card.id = `wikilink-preview-${(previewSeq += 1)}`;
+    card.setAttribute('role', 'tooltip');
+    card.textContent = text.slice(0, PREVIEW_CHARS);
+    card.addEventListener('mouseenter', cancelLeave);
+    card.addEventListener('mouseleave', scheduleLeave);
+    document.body.appendChild(card);
+    // Placed after it is in the document, so its own size is known.
+    const anchor = element.getBoundingClientRect();
+    const { top, left } = placePopover({
+      anchor: { top: anchor.top, bottom: anchor.bottom, left: anchor.left },
+      size: { width: card.offsetWidth, height: card.offsetHeight },
+      viewport: { width: window.innerWidth, height: window.innerHeight },
+      gap: 8,
+    });
+    card.style.top = `${top}px`;
+    card.style.left = `${left}px`;
+    element.setAttribute('aria-describedby', card.id);
+    window.addEventListener('scroll', onScroll, true);
+    window.addEventListener('keydown', onKeyDown, true);
   };
 
   element.addEventListener('mouseenter', () => {
+    cancelLeave();
+    // Back on the link while its card is up: keep the card, start nothing.
+    if (card !== null) return;
     if (timer !== null) clearTimeout(timer);
+    const started = generation;
     timer = setTimeout(() => {
       timer = null;
       void load().then(
         (text) => {
-          if (text === null) return;
-          removeCard();
-          card = document.createElement('div');
-          card.className = 'wikilink-preview';
-          card.textContent = text.slice(0, PREVIEW_CHARS);
-          document.body.appendChild(card);
+          if (text === null || started !== generation) return;
+          show(text);
         },
         () => undefined,
       );
@@ -271,9 +364,15 @@ function attachHoverPreview(element: HTMLElement, load: () => Promise<string | n
 
   element.addEventListener('mouseleave', () => {
     if (timer !== null) {
-      clearTimeout(timer);
-      timer = null;
+      // Not shown yet: nothing to grace, cancel the fetch outright.
+      dismiss();
+      return;
     }
-    removeCard();
+    if (card !== null) scheduleLeave();
+    else generation += 1; // a fetch in flight is now stale
   });
+
+  // The node view's `destroy`: a link deleted while its card is up (or its
+  // fetch is in flight) must not leave the card on the body.
+  return dismiss;
 }

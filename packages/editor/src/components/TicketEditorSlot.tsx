@@ -15,6 +15,27 @@ import { TicketEditor } from './TicketEditor.js';
 export type EditorSlotUpload = UploadResult;
 
 /**
+ * The Attach button's `accept` hint — the SAME eleven types
+ * `apps/server/src/attachments/sniff.ts`'s `ALLOWED_ATTACHMENT_MIME`
+ * accepts, transcribed rather than imported (that file is server-only; this
+ * package cannot depend on `apps/server`). A UX hint only — the server
+ * decides by magic bytes, never by this string or the browser's own filter.
+ */
+const ATTACHMENT_ACCEPT = [
+  'image/png',
+  'image/jpeg',
+  'image/gif',
+  'image/webp',
+  'application/pdf',
+  'application/vnd.openxmlformats-officedocument.wordprocessingml.document',
+  'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
+  'application/zip',
+  'video/mp4',
+  'video/webm',
+  'audio/mpeg',
+].join(',');
+
+/**
  * ## ONE CONTRACT WRITTEN TWICE — and this half is the one that had to move
  *
  * Plan 6 owns the declaration (`packages/app-core/src/views/editor-slot.tsx`).
@@ -90,6 +111,7 @@ export type EditorSlotProps = {
   resolveNoteTitle?: (noteId: string) => string | null;
   previewNote?: (noteId: string) => Promise<string | null>;
   onNavigateNote?: (noteId: string) => void;
+  headingLink?: (id: string) => string | null;
   // Ticket-reference capabilities (Plan 7 Task 1), the twin of the block in
   // `packages/app-core/src/views/editor-slot.tsx`. Same two names and the
   // same inline shapes ON PURPOSE — see that file's docblock on the
@@ -99,6 +121,8 @@ export type EditorSlotProps = {
   // fails a build.
   queryTickets?: (query: string) => Promise<Array<{ ticketId: string; projectId: string; key: string; title: string }>>;
   resolveTicketHref?: (ref: { ticketId: string; projectId: string }) => string | null;
+  // Trash series Plan 3 — the twin of `packages/app-core/src/views/editor-slot.tsx`'s field (9.75 compares names).
+  isPurged?: (kind: 'ticket' | 'note', id: string) => boolean;
   /**
    * Contract-required, and THIS IMPLEMENTATION READS NEITHER — said plainly
    * rather than dressed up as a guarantee. Both scopes arrive already baked
@@ -252,6 +276,11 @@ const NO_EMIT = async (): Promise<void> => {};
 export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Element {
   const ownRef = useRef<Editor | null>(null);
   const editorRef: React.MutableRefObject<Editor | null> = props.editorRef ?? ownRef;
+  // Unit 5's Attach button: `TicketEditor` fills this in with a function that
+  // runs the SAME `handleFile` a paste/drop does, once the editor exists —
+  // see that prop's own docblock.
+  const attachFileRef = useRef<((file: File) => void) | null>(null);
+  const attachInputRef = useRef<HTMLInputElement | null>(null);
   // TWO flags, on purpose, because they answer different questions at different
   // instants. `submitting` is render state and drives `disabled`; it is useless
   // as a re-entrancy guard, because two clicks in one React batch both read the
@@ -422,10 +451,12 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         {...(props.onNavigateNote === undefined
           ? {}
           : { onNavigateNote: props.onNavigateNote })}
+        {...(props.headingLink === undefined ? {} : { headingLink: props.headingLink })}
         {...(props.queryTickets === undefined ? {} : { queryTickets: props.queryTickets })}
         {...(props.resolveTicketHref === undefined
           ? {}
           : { resolveTicketHref: props.resolveTicketHref })}
+        {...(props.isPurged === undefined ? {} : { isPurged: props.isPurged })}
         uploadAttachment={uploadOrRefuse}
         // The host owns event emission. Non-image uploads reach the ticket's
         // attachment list the same way — through this event and the ledger —
@@ -468,6 +499,7 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
           : { onDocChange: (doc: DocJson): void => props.onChange?.(doc) })}
         onEditorReady={() => setReady(true)}
         editorRef={editorRef}
+        attachFileRef={attachFileRef}
         /*
           ⚠ THE PROMPT'S OWN HINT LINE IS SUPPRESSED HERE, and the footer below
           is what draws it instead.
@@ -484,6 +516,73 @@ export function TicketEditorSlot(props: TicketEditorSlotProps): React.JSX.Elemen
         hintSlot="none"
       />
       <div className="editor-slot__footer">
+        {/*
+          Unit 5 (owner: "I thought we already made the attachment feature
+          but i dont see where we can attach files in our build") — the
+          prototype's own Attach button (`desktop.dc.html:1314-1330`,
+          `attachToComment`), left of the hint and submit control exactly as
+          drawn there. Gated on `uploadAttachment` alone, not on `mode`: a
+          mount with no uploader (the new-ticket description slot,
+          `new-ticket-description-slot.tsx:31-34`) draws no button rather
+          than a dead one, and any mount WITH one — comment, description or
+          note — gets it, matching the paste/drop path's own reach.
+
+          The hidden `<input type="file">` is triggered by a real `<button>`
+          rather than wrapped in a `<label>` (`EvidencePicker.tsx`'s own
+          pattern): this control needs the house `:hover`/`:focus-visible`
+          treatment and a stable `getByRole('button', …)` seam, both plainer
+          on an explicit button than on native label/input association.
+          Visually hidden (not `display:none`), the SAME clip-path recipe
+          the disabled-reason span below already uses, since a hidden input
+          still needs to be a real, clickable, keyboard-reachable element for
+          `.click()` to trigger reliably everywhere.
+        */}
+        {props.uploadAttachment === undefined ? null : (
+          <span className="editor-slot__attach-wrap">
+            <button
+              type="button"
+              className="editor-slot__attach"
+              onClick={() => attachInputRef.current?.click()}
+            >
+              <svg
+                width="16"
+                height="16"
+                viewBox="0 0 24 24"
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+                aria-hidden="true"
+              >
+                <path d="M20 12.5 12.5 20a4.5 4.5 0 0 1-6.4-6.4l7.6-7.6a3 3 0 0 1 4.3 4.3l-7.6 7.6a1.5 1.5 0 0 1-2.2-2.2l6.9-6.9" />
+              </svg>
+              Attach
+            </button>
+            <input
+              ref={attachInputRef}
+              type="file"
+              className="editor-slot__attach-input"
+              /*
+                Not a security boundary — `apps/server/src/attachments/
+                sniff.ts` decides by magic bytes alone and consults neither
+                this hint nor the browser's own filter — but a UX one, so it
+                is kept identical to that file's own `ALLOWED_ATTACHMENT_MIME`
+                rather than invented: keep the two in sync by hand if that
+                list changes, there being no import path from this package to
+                `apps/server`.
+              */
+              accept={ATTACHMENT_ACCEPT}
+              tabIndex={-1}
+              aria-hidden="true"
+              onChange={(event) => {
+                const file = event.target.files?.[0];
+                if (file) attachFileRef.current?.(file);
+                event.target.value = '';
+              }}
+            />
+          </span>
+        )}
         {/*
           THE LEFT OF THE FOOTER IS A SLOT, and WHICH SENTENCE FILLS IT IS THE
           WHOLE OF THE `footerNote` CONTRACT. The prototype draws a hint in both

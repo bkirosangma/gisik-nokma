@@ -114,9 +114,7 @@ settings screens for stages and job types are behind **Settings**. See
 ## People and roles
 
 **Does the invitation get sent for me?**
-It does not appear to. The Channel dropdown offers email, sms and whatsapp, and nothing was found that
-sends by any of them. What happens is that the product makes a link, shows it to you once, and you
-send it however you like.
+**By email, yes.** Pick **email** and the product sends it, and the screen tells you whether it went. **Phone (SMS)** is not sent for you: copy the link and send it yourself.
 
 **"Copy it now — it is not stored and cannot be shown again." Does it mean that?**
 Absolutely. That link appears once, on that screen, at that moment. It is not in the pending list. It
@@ -124,20 +122,13 @@ is nowhere else. Close the tab and you have to withdraw the invitation and start
 your email before you do anything else.**
 
 **What do I put in the "Project access" box on the invite form?**
-**All projects in this workspace**, unless the invitation is genuinely for one project only — in which
-case pick the project by NAME from the same dropdown. It is a list of names; you never type an
-identifier.
-
-**⚠ It used to ask you to type identifiers, and this answer said to leave it empty.** Until 2026-09-21
-the box was labelled *"Projects (comma-separated ids, optional)"* and wanted long strings of letters
-and numbers you would have to go and find. The old answer is kept here so a reader who remembers it
-finds the correction where they last saw it.
+Nothing: the box was removed on 29 September 2026. Admins and members see every project in the workspace.
 
 **Is an admin the same as "sees everything"?**
-No, and this surprises everybody. **Admin is a "can change things" role, not a "can see things"
-role.** An admin can invite people and set up stages and job types, but only sees the projects they
-have personally been put on. If you want somebody to manage the workspace *and* see the work, you have
-to do both — one does not come with the other. Only the **owner** automatically sees everything.
+**Close to it.** Since 29 September 2026 an admin, like every member, sees every project in the workspace. What they still do not see is a job shared with only named people who are not them, unless it is assigned to them. Only the owner sees every one of those.
+
+**Can I assign a job to somebody who is not in the workspace?**
+Yes. In the **Assignee** picker choose **Assign someone outside this workspace…**, type their exact email and press **Find**. If an account has that email you can press **Assign**, and they join as a guest who sees only that job; nothing is listed or suggested, so you have to know the email.
 
 **Can I make somebody else an owner, or a co-owner?**
 No. "Owner" is never offered in the invitation dropdown, it is refused if forced, and no way was found
@@ -240,12 +231,13 @@ Yes. Open the job and type into the title at the top of the sheet. **Enter** or 
 **Escape** abandons the change.
 
 **Can I delete a job I created by mistake?**
-Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer. The job stops
-appearing in every view — boards, lists, search, My Work — and its history is kept, because other events
-cite it. A **"… deleted · its history is retained"** message follows with an **Undo** for about fifteen
-seconds, and that Undo is the product's only route back: once it goes, no control anywhere restores the
-job. If you would rather not lose it, a "won't do" or "cancelled" stage in your workflow remains the
-alternative.
+Yes, if you are a project admin. Open the job and press **Delete** in the sheet's footer, then confirm.
+The job stops appearing in every view — boards, lists, search, My Work — and its history is kept,
+because other events cite it. An **Undo** follows for about fifteen seconds, and after that the job is
+still under **Deleted items** on your Account page, where **Restore** brings it back. Turning on
+**Delete permanently** in the confirmation also marks it to be erased for good after the waiting period
+the confirmation states; **Unmark** in Deleted items takes that back until then. If you would rather
+not lose it at all, a "won't do" or "cancelled" stage in your workflow remains the alternative.
 
 **Can I move a job to a different project?**
 No. Parents have to be in the same project, and no way to move a job across projects was found.
@@ -464,11 +456,13 @@ settled — the website has one now, and the two record the same thing.
 
 **Can I attach a photo or a file to a job?**
 Through a comment, and the file travels with the comment that carries it. Drop an image into the comment
-box and it is stored and put inside what you are writing; the comment then names it, and the chip under
-the comment is how you reach it. **A file that is not an image cannot be put inside a comment** — it is
-stored against the job instead and appears in the job's list of files, not in your comment. That split
-is the product's own rule rather than a limitation of the box: a comment's files are the ones its own
-text carries, so a comment can never be missing a file it was written with.
+box, paste it, or press the paperclip **Attach** button in the comment box's own footer, and it is
+stored and put inside what you are writing; the comment then names it, and the chip under the comment
+is how you reach it. **A file that is not an image cannot be put inside a comment** — it is stored
+against the job instead and appears in the job's list of files, not in your comment. That split is the
+product's own rule rather than a limitation of the box: a comment's files are the ones its own text
+carries, so a comment can never be missing a file it was written with. The **Attachments** tab has its
+own **Attach a file** button too, for a file that has no comment to travel with.
 
 **A file can also be attached to a Move:** a move carrying the "require evidence" rule puts a file box
 in its dialog and stays blocked until the server has stored the file.
@@ -484,9 +478,9 @@ Enough is known about the writing box to answer this properly:
 - It is proper formatting, not plain text — headings, bold, italic, bullet and numbered lists, quotes.
 - It **auto-formats as you type**: a dash becomes a bullet, "1." starts a numbered list, hashes become
   headings, asterisks become bold. About nineteen of these shortcuts.
-- When it auto-formats, a small chip appears. **Press Backspace, or click the chip, to undo the
-  formatting** and keep your literal characters. **Press Escape and the chip goes away and the
-  formatting stays.** Two opposite results, both of which dismiss the chip. Learn the difference.
+- If a shortcut fires when you did not want it, **press Backspace straight away** — the formatting
+  goes and the characters you typed (the hashes, dashes, backticks) come back as plain text. It works
+  only for the very next keypress; once you type anything else, the formatting stays.
 - **To mention somebody**, type @ and start their name. A list appears — arrows or click to pick,
   Enter to insert, Escape to close and leave what you typed as ordinary text. It will not offer anyone
   without a proper name, and it cannot be tricked into showing one person's name while pointing at
@@ -534,12 +528,52 @@ as an open question rather than a no.
 
 ---
 
+**How do I change a link I already wrote — its address, its words, or take it off?**
+Click into the link's text. A small panel appears next to it with the **URL** and the **Text**, an **Open
+link** shortcut for web, email and phone addresses, and **Unlink**. Change either field and press Enter
+(or click away) to keep the change; press Escape to put it back. Clearing the URL, or pressing Unlink,
+removes the link and leaves the words; clearing the Text deletes the link. From the keyboard, press
+Ctrl-K (Cmd-K on a Mac) with the cursor in a link to jump into the URL field. It only shows in the box you
+are typing in, and never in a box you can only read.
+
+**How do I put a table in a note or a comment?**
+Use **Insert table** in the formatting strip: an eight-by-eight grid opens, move over it (or use the arrow
+keys) until the label reads the size you want — "2 × 3 table" — then click, or press Enter. The first row
+is a header row. Escape closes the grid without inserting. The tool is greyed out while your cursor is
+already inside a table, because a table cannot go inside another one.
+
 ## Notes
 
 **What is a note, and how is it different from a job?**
 A note is a page of writing that belongs to a workspace or a project, not to a job. Use it for anything
 that is not one piece of work — a log, a parts list, something you want to keep after the job it came
 from closes. Find it at **Notes** in the nav, left of Inbox.
+
+**What is the thin line at the top of a note?**
+A reading-progress bar: it fills from the left as you scroll down the note, so you can see how far through
+a long one you are. It measures the text of the note only (not the title or byline above it), starts over
+when you open another note, and is there whether or not you can edit the note. If your device is set to
+reduce motion it moves without the smoothing.
+
+**How do I link to one heading in a note?**
+Hover the heading and press the small link icon at its end (Tab to it and press Enter with the keyboard; on a
+touch screen the icon is always visible). That copies a link ending in `#` and the heading's name, and
+opening it scrolls straight to the heading. It works on all six heading levels. Two headings with the same
+words get `-2`, `-3` and so on, in the order they appear — so a link can point at the wrong one if you
+rearrange headings that share a name. The person you send it to still needs access to the note.
+
+**Why does my note open with a bar saying "Restored unsaved changes"?**
+Last time you had it open, some of what you typed never reached the server (you lost the connection, or
+closed the tab first), so it was kept on your device and is showing now. **Keep** carries on with those
+words; **Discard** deletes them and shows the note as the server has it, which cannot be undone. The
+bar is only shown to people who can edit the note.
+
+**If I mention someone in a note, do they get told?**
+Yes — type `@` and pick them, in the note or in one of its comments. They get a *mentioned you* message in their Inbox
+that opens the note, or the comment. It is sent once: saving the note again with the same
+mention in it does not tell them again, and mentioning yourself sends nothing. Only people who can read the note
+are told — a note shared with nobody else, or with a list that leaves them out, tells them nothing, and you are
+not shown that. Muting Mentions under Account → Notifications hides these too.
 
 **Who can read my note?**
 Whoever the Scope you picked names — **Private** means only you, **Workspace** means everyone in the
@@ -583,8 +617,9 @@ cannot open it. That is today's behaviour; whether it should instead hide the ti
 the product owner is still deciding.
 
 **Can I delete a note?**
-Not yet from the screen — there is no Delete button on a note's own page today. If a note does end up
-in the Deleted group, Restore works and brings it back exactly as it was.
+Yes — open it and press **Delete…** beside **History** (its author, a workspace admin or the owner).
+It goes to the **Deleted** group on the Notes page and to **Deleted items** on your Account page, and
+**Restore** in either brings it back exactly as it was; a note marked for permanent deletion has to be unmarked first, with **Unmark** in Deleted items.
 
 **What happens if someone stops sharing a note with me while I have it open?**
 You are taken back to the Notes list with a message: "That note is no longer shared with you".
@@ -819,10 +854,7 @@ made-up reference, deliberately identical, so that nobody can work out what exis
 refusals they get. The same is true of a job's history and of trying to change one.
 
 **What can a guest see?**
-Only the specific jobs somebody explicitly shared with them. Not the project, not the workspace's
-other work. They see the workspace's name and an empty project list — intended, not broken. They can
-see a child of something shared with them if that child inherits. They cannot open the people list and
-cannot create jobs.
+Only the jobs somebody explicitly shared with them, and any job assigned to them. Not the project, not the rest of the workspace. They see the workspace's name and an empty project list — intended, not broken. They cannot open the people list and cannot create jobs.
 
 **Can somebody hide who they are?**
 No. History always shows who did what and when, untouched, to anybody entitled to see the job — even

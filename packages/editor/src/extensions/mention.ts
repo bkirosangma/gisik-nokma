@@ -2,6 +2,7 @@ import { Node, mergeAttributes } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
 import Suggestion from '@tiptap/suggestion';
 import { createMentionPopup } from './mention-popup.js';
+import { createMentionReplacePlugin } from './mention-replace.js';
 
 export type MentionCandidate = { userId: string; name: string };
 
@@ -256,6 +257,15 @@ export const Mention = Node.create<MentionOptions>({
             .run();
         },
         render: () => createMentionPopup(),
+      }),
+      // Clicking a mention in an editable editor reopens the same picker to
+      // replace it (`mention-replace.ts`). It rides on the node so EVERY host
+      // that has mentions — ticket description and comments, note body and
+      // comments, the mobile webview — gets it from the one extension.
+      createMentionReplacePlugin({
+        nodeName: this.name,
+        queryUsers: (query) => this.options.queryUsers(query),
+        toAttrs: mentionAttrsOf,
       }),
     ];
   },

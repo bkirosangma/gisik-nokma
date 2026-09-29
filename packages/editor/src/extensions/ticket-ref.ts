@@ -1,5 +1,6 @@
 import { Node, mergeAttributes } from '@tiptap/core';
 import { PluginKey } from '@tiptap/pm/state';
+import { PURGED_ITEM_LABEL, type PurgedPredicate } from '@gisik-nokma/domain';
 import Suggestion from '@tiptap/suggestion';
 import { createTicketRefPopup } from './ticket-ref-popup.js';
 
@@ -18,6 +19,13 @@ export type TicketRefOptions = {
    * mapper, not to this resolver).
    */
   resolveTicketHref: (ref: { ticketId: string; projectId: string }) => string | null;
+  /**
+   * Trash series Plan 3 (T11): the chip's target was permanently erased. Asked
+   * BEFORE `resolveTicketHref` — an erased ticket has no page — and it changes
+   * only what is DRAWN: the node's attrs, and so `getJSON()`, keep the stored
+   * key and title.
+   */
+  isPurged: PurgedPredicate;
 };
 
 export const ticketRefSuggestionKey = new PluginKey('ticketRefSuggestion');
@@ -59,7 +67,7 @@ export const TicketRef = Node.create<TicketRefOptions>({
   selectable: true,
 
   addOptions() {
-    return { queryTickets: async () => [], resolveTicketHref: () => null };
+    return { queryTickets: async () => [], resolveTicketHref: () => null, isPurged: () => false };
   },
 
   addAttributes() {
@@ -94,6 +102,9 @@ export const TicketRef = Node.create<TicketRefOptions>({
   renderHTML({ node, HTMLAttributes }) {
     const ticketId = String(node.attrs['ticketId']);
     const projectId = String(node.attrs['projectId']);
+    if (this.options.isPurged('ticket', ticketId)) {
+      return ['span', mergeAttributes(HTMLAttributes, { class: 'editor-ticketref editor-ticketref--purged' }), PURGED_ITEM_LABEL];
+    }
     const href = this.options.resolveTicketHref({ ticketId, projectId });
     const text = ticketRefText(node.attrs);
     if (href === null) {
@@ -103,7 +114,7 @@ export const TicketRef = Node.create<TicketRefOptions>({
   },
 
   renderText({ node }) {
-    return ticketRefText(node.attrs);
+    return this.options.isPurged('ticket', String(node.attrs['ticketId'])) ? PURGED_ITEM_LABEL : ticketRefText(node.attrs);
   },
 
   addNodeView() {
@@ -115,6 +126,16 @@ export const TicketRef = Node.create<TicketRefOptions>({
       const projectId = String(node.attrs['projectId']);
       const key = String(node.attrs['key']);
       const title = String(node.attrs['title']);
+      if (this.options.isPurged('ticket', ticketId)) {
+        const dom = document.createElement('span');
+        dom.className = 'editor-ticketref editor-ticketref--purged';
+        dom.setAttribute('data-ticket-id', ticketId);
+        dom.setAttribute('data-project-id', projectId);
+        dom.setAttribute('data-ticket-key', key);
+        dom.setAttribute('data-ticket-title', title);
+        dom.textContent = PURGED_ITEM_LABEL;
+        return { dom };
+      }
       const href = this.options.resolveTicketHref({ ticketId, projectId });
       const dom = document.createElement(href === null ? 'span' : 'a');
       dom.className = 'editor-ticketref';

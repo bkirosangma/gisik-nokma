@@ -13,7 +13,7 @@ import { buildTestApp } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { testEnvelope } from '../helpers/envelope.js';
 import { appendTestEvent } from '../helpers/ledger.js';
-import { seedMember, seedTicket } from '../helpers/seed.js';
+import { applyAll, seedGuest, seedMember, seedProject, seedTicket, setVisibilityEnv } from '../helpers/seed.js';
 import { signInWithPhone } from '../helpers/session.js';
 
 /**
@@ -384,15 +384,29 @@ describe('GET /v1/tickets/:id/history — invisible is nonexistent', () => {
     // Paging is ABSENT on all three requests on purpose: paging is validated
     // before the audience is consulted, so a junk parameter here would refuse
     // above the guard this case is about.
+    //
+    // AMENDED 2026-09-29, owner ruling (A). The viewer was a member on `mine`
+    // and the invisible ticket sat in `theirs`, a project NEVER FOUNDED — so it
+    // stayed 404 for a reason production cannot produce, and under rule A a
+    // member would read it once `theirs` exists. `theirs` is founded now and the
+    // no-see viewer is a GUEST, shared exactly one ticket (`visible`).
     const ws = newUlid();
     const mine = newUlid();
     const theirs = newUlid();
+    await seedProject(db.pool, ws, mine);
+    await seedProject(db.pool, ws, theirs);
     const { userId, headers } = await signedIn();
-    await seedMember(db.pool, ws, userId, 'member', [{ projectId: mine }]);
+    await seedGuest(db.pool, ws, userId);
     const visible = newUlid();
     const invisibleId = newUlid();
     await seedTicket(db.pool, { workspaceId: ws, projectId: mine, ticketId: visible });
     await seedTicket(db.pool, { workspaceId: ws, projectId: theirs, ticketId: invisibleId });
+    await applyAll(db.pool, [setVisibilityEnv(ws, visible, 'explicit', [userId])]);
+    // The rule-A half: a MEMBER on no roster reads the very ticket the guest
+    // is refused, so the 404 below is the viewer and not the ticket.
+    const roster = await signedIn();
+    await seedMember(db.pool, ws, roster.userId, 'member', []);
+    expect((await get(`/v1/tickets/${invisibleId}/history`, roster.headers)).statusCode).toBe(200);
 
     // Positive control FIRST: this viewer, this route, an id they may see. It
     // is what stops "404s everything" from passing this test.
@@ -426,6 +440,10 @@ describe('GET /v1/tickets/:id/history — invisible is nonexistent', () => {
     const prjB = newUlid();
     const outsider = await signedIn();
     const insider = await signedIn();
+    // Founded (2026-09-29, rule A): the refusal below must be the TENANCY
+    // boundary, not an unfounded project.
+    await seedProject(db.pool, wsA, prjA);
+    await seedProject(db.pool, wsB, prjB);
     await seedMember(db.pool, wsA, outsider.userId, 'member', [{ projectId: prjA }]);
     await seedMember(db.pool, wsB, insider.userId, 'member', [{ projectId: prjB }]);
     const ticketInB = newUlid();

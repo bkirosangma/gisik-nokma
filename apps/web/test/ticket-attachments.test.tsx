@@ -136,6 +136,7 @@ function openTheTicket(read: () => Promise<AttachmentListEntry[]>) {
         name: 'Garo Hills Logistics',
         prefix: 'GH',
         role: 'owner',
+        archived: false,
         memberCount: 1,
         nameRestrictedProjectCount: 0,
         projects: [

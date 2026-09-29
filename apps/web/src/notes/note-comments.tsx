@@ -1,9 +1,17 @@
 'use client';
 
+import { useEffect, useRef } from 'react';
 import { TicketEditorSlot, type EditorSubmission } from '@gisik-nokma/editor';
-import { CommentsThread, makeSubmittedFactory, useLiveQuery, type TicketComment } from '@gisik-nokma/app-core';
+import {
+  CommentsThread,
+  makeSubmittedFactory,
+  mentionCandidatesOf,
+  useLiveQuery,
+  usePurgedPredicate,
+  type TicketComment,
+} from '@gisik-nokma/app-core';
 import { useAppServices, useCurrentUser } from '../providers.js';
-import { ticketRefCandidatesOf, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
+import { buildWorkspaceQueryTickets, ticketRefHrefIn } from '../ticket-ref-callbacks.js';
 
 /**
  * The comment thread under a note's editor — the same kit component the
@@ -37,6 +45,7 @@ export function NoteComments({
   nameOf,
   canComment,
   notes = [],
+  members = [],
 }: {
   workspaceId: string;
   noteId: string;
@@ -53,6 +62,14 @@ export function NoteComments({
    * (or a test) still renders a composer whose picker simply finds nothing.
    */
   notes?: ReadonlyArray<{ noteId: string; title: string }>;
+  /**
+   * The workspace roster, for the composer's `@` picker (`mentionCandidatesOf`,
+   * the source the ticket sheet's composer uses). `note-document.tsx` already
+   * holds it for the byline and passes it straight through, like `notes` above.
+   * Optional and empty by default, so a caller with no roster yet still renders
+   * a composer whose picker simply finds nobody.
+   */
+  members?: ReadonlyArray<{ id: string; name: string; email?: string }>;
 }) {
   const { dataSource } = useAppServices();
   const user = useCurrentUser();
@@ -61,6 +78,26 @@ export function NoteComments({
     const rows = await dataSource.query.getNoteComments(workspaceId, noteId);
     return rows.map((row): TicketComment => ({ ...row, files: [] }));
   });
+  const purged = usePurgedPredicate(
+    dataSource.query,
+    (comments.data ?? []).map((row) => row.body),
+  );
+
+  // A notification about a comment opens `/notes/<id>#comment-<commentId>`. The
+  // browser's own hash scroll has nothing to land on — the thread is fetched
+  // AFTER the page paints — so once the comments are here, bring the named one
+  // into view. Once per hash: a later reload (after posting, say) must not pull
+  // the reader back up to it.
+  const scrolledHash = useRef<string | null>(null);
+  useEffect(() => {
+    if (comments.data == null) return;
+    const hash = window.location.hash;
+    if (!hash.startsWith('#comment-') || scrolledHash.current === hash) return;
+    const target = document.getElementById(hash.slice(1));
+    if (target === null) return;
+    scrolledHash.current = hash;
+    target.scrollIntoView?.({ block: 'center' });
+  }, [comments.data]);
 
   const submitComment = async (submission: EditorSubmission): Promise<boolean> => {
     if (user === null) return false;
@@ -85,6 +122,7 @@ export function NoteComments({
       commentsUnavailable={comments.error ?? undefined}
       nameOf={nameOf}
       ticketHref={ticketRefHrefIn(workspaceId)}
+      isPurged={purged.isPurged}
       composer={
         canComment ? (
           <TicketEditorSlot
@@ -97,9 +135,8 @@ export function NoteComments({
             placeholder="Add a comment"
             submit={submitComment}
             footerNote="Posting records an event citing you."
-            queryTickets={async (query: string) =>
-              ticketRefCandidatesOf(await dataSource.query.search(workspaceId, query))
-            }
+            queryUsers={async (query: string) => mentionCandidatesOf(members, query)}
+            queryTickets={buildWorkspaceQueryTickets(dataSource, workspaceId)}
             resolveTicketHref={ticketRefHrefIn(workspaceId)}
             queryNotes={async (query: string) => {
               const needle = query.trim().toLowerCase();

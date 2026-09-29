@@ -6,6 +6,7 @@ import {
   contestedClaimNotificationPayloadSchema,
   dateApproachingNotificationPayloadSchema,
   dateClaimProvenanceSchema,
+  isNoteMentionPayload,
   mentionNotificationPayloadSchema,
   notificationPayloadSchemaByKind,
   parseNotification,
@@ -434,5 +435,55 @@ describe('the payload union and the schema map are one vocabulary', () => {
     expect(notificationPayloadSchemaByKind['contested-claim'].safeParse(contestedPayload).success).toBe(true);
     expect(notificationPayloadSchemaByKind['stale-ticket'].safeParse(stalePayload).success).toBe(true);
     expect(notificationPayloadSchemaByKind['stale-ticket'].safeParse(mentionPayload).success).toBe(false);
+  });
+});
+
+/**
+ * 18.410 — a note mention is a second SHAPE of the `mention` kind, not a sixth
+ * kind, so the mute setting, the Mentions tab and the unread count already cover
+ * it. The two shapes are told apart by `noteId` / `ticketId`, and both schemas
+ * are `.strict()`.
+ */
+describe('18.410 the mention kind carries a ticket shape or a note shape, never both', () => {
+  const notePayload = {
+    noteId: '01J9GNOTE00000000000000000',
+    noteTitle: 'Weekly notes',
+    mentionedBy: 'user_kiro',
+    eventId: '01J9GEVT000000000000000000',
+    source: 'note' as const,
+    excerpt: 'please look',
+    clientTime: '2026-09-29T05:00:00.000Z',
+    serverTime: '2026-09-29T05:00:01.000Z',
+  };
+  const row = (payload: unknown) => ({
+    id: '01J9GNTF000000000000000001',
+    userId: 'user_anselma',
+    workspaceId: 'ws_1',
+    kind: 'mention',
+    dedupeKey: 'mention:e:user_anselma',
+    payload,
+    read: false,
+    createdAt: '2026-09-29T05:00:02.000Z',
+  });
+
+  it('a note-shaped payload parses under kind mention, for the body and for a comment', () => {
+    expect(parseNotification(row(notePayload)).payload).toEqual(notePayload);
+    expect(parseNotification(row({ ...notePayload, source: 'note-comment' })).payload).toMatchObject({
+      source: 'note-comment',
+    });
+  });
+
+  it('the ticket shape still parses (CONTROL) and the two shapes are told apart', () => {
+    const parsed = parseNotification(row(mentionPayload));
+    expect(isNoteMentionPayload(parsed.payload as never)).toBe(false);
+    expect(isNoteMentionPayload(parseNotification(row(notePayload)).payload as never)).toBe(true);
+  });
+
+  it('refuses a payload that is both, neither, or a note payload with a ticket source', () => {
+    expect(() => parseNotification(row({ ...notePayload, ticketId: 'T1' }))).toThrow();
+    expect(() => parseNotification(row({ ...mentionPayload, noteId: 'N1' }))).toThrow();
+    expect(() => parseNotification(row({ mentionedBy: 'user_kiro' }))).toThrow();
+    expect(() => parseNotification(row({ ...notePayload, source: 'comment' }))).toThrow();
+    expect(() => parseNotification(row({ ...notePayload, noteId: '' }))).toThrow();
   });
 });

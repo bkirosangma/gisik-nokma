@@ -45,3 +45,10 @@ var/
 # `git add -A` swept it into two commits on exec/31 before this line existed.
 gate.log
 gate*.log
+
+# Lane scratch space (dev-stack screenshots, one-off working notes) — never
+# under version control (docs/held-work.md's own convention: briefs written
+# here are copied to docs/lanes/held/ precisely because this directory isn't
+# tracked). Explicit here so a lane's evidence screenshots don't read as an
+# uncommitted-work dirty tree to `ctl pr open`'s own check.
+gisik-nokma-lanes/

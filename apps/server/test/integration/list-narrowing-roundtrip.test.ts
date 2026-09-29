@@ -232,9 +232,12 @@ beforeAll(async () => {
     },
     1,
   );
-  // The founder owns the workspace but is not on the project until this lands;
-  // without it the visibility pass refuses every read below and the assertions
+  // The founder owns the workspace but was not on the project until this landed;
+  // without it the visibility pass refused every read below and the assertions
   // would fire on the wrong guard.
+  // Amended 2026-09-29 (rule A): the owner is on every founded project without this
+  // event, so it no longer gates the reads below. It stays as a fixture: it makes
+  // the founder an explicit project admin, which is what the assertions were built on.
   await post(
     me.headers,
     {
@@ -371,8 +374,12 @@ describe('13.304 — the List narrows at the real door when the checkbox is tick
     expect(narrowedPages).toHaveLength(1);
     expect(decodeURIComponent(narrowedPages[0] ?? '')).toContain('"stateCategory":"active"');
     expect(narrowedRosters).toHaveLength(1);
-    expect(narrowedCalls).toHaveLength(2);
-    expect(narrowedPages.length + narrowedRosters.length).toBe(narrowedCalls.length);
+    // The names-only read (`/actor-names`, cases 7.290–7.297) the roster join
+    // falls back to: once per walk, its own bucket.
+    const narrowedNames = narrowedCalls.filter((url) => url.includes('/actor-names'));
+    expect(narrowedNames).toHaveLength(1);
+    expect(narrowedCalls).toHaveLength(3);
+    expect(narrowedPages.length + narrowedRosters.length + narrowedNames.length).toBe(narrowedCalls.length);
 
     // ─── THE BOARD READ IS UNNARROWED — a SUPPORTING fact, NOT the negative arm ─
     // `getBoard(projectId)` takes NO filter (`data-source.ts:142`), so the Board's

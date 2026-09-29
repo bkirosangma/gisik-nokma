@@ -6,7 +6,6 @@ import { buildProjectionRegistry } from '../../src/projections/index.js';
 import {
   checkPermission,
   NOT_A_MEMBER_REASON,
-  NOT_ON_PROJECT_REASON,
   PERMISSION_ROLE_RULE,
   PROJECT_UNKNOWN_RULE,
   projectUnknownReason,
@@ -115,16 +114,14 @@ describe('checkProjectExists — the honest precondition', () => {
       rule: PROJECT_UNKNOWN_RULE,
       reason: projectUnknownReason(ghost),
     });
-    // The control for the sentence above, and the reason it is a MEASUREMENT of
-    // ordering rather than a description of one: the SAME actor, off the
-    // project either way, is told the membership fact as soon as the project
-    // really exists. Without this line the case would pass against a build that
-    // answered project.unknown to everything.
-    expect(await gate(ticketCreated(ws, realProject, user), user)).toEqual({
-      refused: true,
-      rule: PERMISSION_ROLE_RULE,
-      reason: NOT_ON_PROJECT_REASON,
-    });
+    // AMENDED 2026-09-29, owner ruling (A) and deviation D7. The control used to be
+    // the SAME actor told NOT_ON_PROJECT_REASON on a project that really exists.
+    // Rule A: the membership refusal no longer exists for a member; the ordering
+    // claim is now measured against the `project.unknown` arm alone — D7. The
+    // ghost id is in no founded-project set, so a build that asked membership
+    // BEFORE existence would still answer NOT_ON_PROJECT_REASON to the line above.
+    // The control is the same actor on a founded project, admitted.
+    expect(await gate(ticketCreated(ws, realProject, user), user)).toBeNull();
   });
 
   it('the ordering has a BOUND: a workspace non-member is refused before the project is ever looked up', async () => {
@@ -142,21 +139,24 @@ describe('checkProjectExists — the honest precondition', () => {
     });
   });
 
-  it('a member ON a founded project still meets the project-membership refusal when they are not', async () => {
-    // The refusal check 2's project half owns, observed where it can only be
-    // itself: the project exists, so project.unknown cannot fire, and the actor
-    // is a workspace member, so NOT_A_MEMBER_REASON cannot either.
+  /**
+   * AMENDED 2026-09-29, owner ruling (A) and deviation D7. This was "a member ON a
+   * founded project still meets the project-membership refusal when they are not".
+   * Rule A puts a member on every FOUNDED project, so `NOT_ON_PROJECT_REASON` is
+   * unreachable by any shipped role (a guest is refused earlier, an unfounded
+   * project earlier still) — recorded as D7.
+   */
+  it('rule A: a member off every roster creates in a founded project (D7 — NOT_ON_PROJECT is unreachable)', async () => {
+    // The project exists, so project.unknown cannot fire, and the actor is a
+    // workspace member, so NOT_A_MEMBER_REASON cannot either; the roster row they
+    // hold names some OTHER project and confers nothing here.
     const ws = newUlid();
     const projectId = newUlid();
     const outsider = newUlid();
     await seedMember(db.pool, ws, outsider, 'member', [{ projectId: newUlid() }]);
     await seedProject(db.pool, ws, projectId);
 
-    expect(await gate(ticketCreated(ws, projectId, outsider), outsider)).toEqual({
-      refused: true,
-      rule: PERMISSION_ROLE_RULE,
-      reason: NOT_ON_PROJECT_REASON,
-    });
+    expect(await gate(ticketCreated(ws, projectId, outsider), outsider)).toBeNull();
   });
 });
 

@@ -48,9 +48,13 @@ export {
   extractReadingMeta,
   headerSlug,
   readingTimeMinutes,
+  assignHeadingIds,
   type ReadingMeta,
 } from './reading/reading-meta.js';
 export { MIN_HEADINGS, ReadingTOC, type ReadingTOCProps } from './reading/ReadingTOC.js';
+export { HeadingAnchors, headingAnchorsKey, type HeadingAnchorsOptions } from './extensions/heading-anchors.js';
+export { ReadingProgress, type ReadingProgressProps } from './reading/ReadingProgress.js';
+export { findScroller, readingProgress, type Scroller } from './reading/scroller.js';
 export { UploadRefusedError, uploadAttachmentHttp, uploadNoteAttachmentHttp, type UploadResult } from './upload.js';
 export {
   attachmentPasteKey,
@@ -63,6 +67,13 @@ export {
   MARKDOWN_HINT,
   type EditorToolbarProps,
 } from './components/EditorToolbar.js';
+export { LinkEditorPopover, type LinkEditorPopoverProps } from './components/LinkEditorPopover.js';
+export { placePopover, type PlaceInput } from './components/popover-position.js';
+export { TablePicker, TABLE_PICKER_SIZE, type TablePickerProps } from './components/TablePicker.js';
+export {
+  TableFloatingToolbar,
+  type TableFloatingToolbarProps,
+} from './components/TableFloatingToolbar.js';
 export { ImageWrapMenu } from './components/ImageWrapMenu.js';
 export {
   createBrowserPickerDeps,

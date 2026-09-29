@@ -224,6 +224,16 @@ const configSchema = z.object({
    */
   MAGIC_LINK_FROM: unsetWhenEmpty(z.string().email().default('sign-in@gisik-nokma.local')),
 
+  /**
+   * The From address on INVITATION mail (access plan W5). Optional: absent means
+   * the sign-in sender's address (`MAGIC_LINK_FROM`), which in production is
+   * `contact@artsourced.in` (`deploy/do/app.yaml:181-182`) — so no app-spec change
+   * is needed to start sending. A separate knob because an invitation and a
+   * sign-in link are different letters and an operator may want them from
+   * different mailboxes.
+   */
+  INVITE_FROM: unsetWhenEmpty(z.string().email().optional()),
+
   /** The CA managed Postgres presents. Optional; PEM. Consumed by `createPool`. */
   DATABASE_CA_CERT: unsetWhenEmpty(pemCertificate().optional()),
 
@@ -262,6 +272,7 @@ export type AppConfig = {
   alertWebhookUrl: string | null;
   smtpUrl: string | null;
   magicLinkFrom: string;
+  inviteFrom: string;
   databaseCaCert: string | null;
   deploySha: string;
 };
@@ -300,6 +311,7 @@ export function loadConfig(env: NodeJS.ProcessEnv | Record<string, string>): App
     alertWebhookUrl: parsed.data.ALERT_WEBHOOK_URL ?? null,
     smtpUrl: parsed.data.SMTP_URL ?? null,
     magicLinkFrom: parsed.data.MAGIC_LINK_FROM,
+    inviteFrom: parsed.data.INVITE_FROM ?? parsed.data.MAGIC_LINK_FROM,
     databaseCaCert: parsed.data.DATABASE_CA_CERT ?? null,
     deploySha: parsed.data.DEPLOY_SHA,
   };

@@ -6,6 +6,8 @@ import { UNAUTHENTICATED_BODY } from '../../src/auth/require-session.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read-app.js';
+import { seedGuest } from '../helpers/seed.js';
+import { signInWithPhone } from '../helpers/session.js';
 
 /**
  * Plan 5 Task 9 — `GET /v1/projects/:projectId/tickets`, the list read.
@@ -22,7 +24,7 @@ import { buildReadTestApp, type ReadRole, type ReadWorld } from '../helpers/read
  * | no session, or a forged bearer | **401** `{error:'unauthenticated'}` | "7.17 no session is 401 …" |
  * | a session in a DIFFERENT workspace | **404** | "7.17 a stranger, a neighbour …" |
  * | a project id that does not exist | **404**, byte-identical | same case, headers compared |
- * | a workspace member NOT on the project | **200**, `groups: []` | "7.17 an on-workspace, off-project member …" |
+ * | a viewer who may see nothing (a guest; amended 2026-09-29 (A)) | **200**, `groups: []` | "7.17 an on-workspace member gets 200 whatever their roster …" |
  *
  * ## Three things this file works hard not to prove vacuously
  *
@@ -1122,13 +1124,29 @@ describe('GET /v1/projects/:projectId/tickets — the door', () => {
     expect(await idsOf('member', read.world.projectId)).toEqual(memberVisible());
   });
 
-  it('7.17 an on-workspace, off-project member gets 200 with `groups: []`, not a 404 — the workspace is the boundary, the project roster is not', async () => {
-    const outsider = await listOf('outsider', read.world.projectId);
-    expect(outsider.groups).toEqual([]);
-    expect(outsider.projectId).toBe(read.world.projectId);
-    expect(outsider.nextCursor).toBeNull();
+  it('7.17 an on-workspace member gets 200 whatever their roster, and a viewer who may see nothing gets `groups: []`, not a 404 — the workspace is the boundary, the project roster is not', async () => {
+    // AMENDED 2026-09-29, owner ruling (A): an admin/member is on every founded
+    // project, so `outsider` (a member on no roster) is served the project-mode
+    // rows; the empty-list witness is now a GUEST named in no explicit list.
+    const bystander = await signInWithPhone(read.app, read.otp, '+911111111122');
+    await seedGuest(db.pool, read.world.workspaceId, bystander.userId);
+    const nothingResponse = await read.app.inject({
+      method: 'GET',
+      url: listUrl(read.world.projectId),
+      headers: { authorization: `Bearer ${bystander.token}` },
+    });
+    expect(nothingResponse.statusCode).toBe(200);
+    const nothing = nothingResponse.json() as ListResponse;
+    expect(nothing.groups).toEqual([]);
+    expect(nothing.projectId).toBe(read.world.projectId);
+    expect(nothing.nextCursor).toBeNull();
 
-    // Positive control, same helper, same project: the emptiness above is this
+    // The member on no roster: 200 and the project-mode rows — the epic and its
+    // child — and none of the explicit-mode ones.
+    const outsider = await idsOf('outsider', read.world.projectId);
+    expect(outsider).toEqual([read.world.epicId, read.world.taskInEpicId].sort());
+
+    // Positive control, same helper, same project: the emptiness above is that
     // viewer's slice and not a route that answers `[]` to everyone.
     expect(await idsOf('member', read.world.projectId)).toEqual(memberVisible());
   });

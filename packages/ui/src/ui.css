@@ -2452,9 +2452,44 @@ a.gn-ticket-sheet__crumb--link {
 .gn-ticket-sheet__subtask-add .gn-ticket-sheet__subtask-input { flex: 1; min-width: 12.5rem; }
 /* The ticket's Notes section (notes series, Plan 6 of 7, spec §10.1) — the
    caption is `.gn-ticket-sheet__caption`, already shared with Subtasks and
-   Comments, so only the badge row and the Attach button need their own rule. */
+   Comments, so only the badge row and the Attach button need their own rule.
+   The trigger itself now carries `gn-button gn-button--ghost` too
+   (`ticket-notes-section.tsx`, Unit 2 styling fix, owner screenshot
+   2026-09-23: "add note button does not have a style") — this rule stays as
+   layout ONLY (`margin-top`), no property conflict with `.gn-button--ghost`'s
+   own visual coat. */
 .gn-ticket-sheet__note-badges { display: flex; flex-wrap: wrap; gap: 0.5rem; list-style: none; padding: 0; margin: 0.5rem 0; }
 .gn-ticket-sheet__attach { margin-top: 0.5rem; }
+/* The AttachNotePicker menu — `.gn-popover` (below) already supplies the
+   floating shell (surface/shadow/radius), so this block is internal layout
+   and the house menu-item treatment only. Selected state by BACKGROUND, not
+   outline, the same `--gn-fill-tertiary` tier `.gn-select__option[data-
+   focused]` and the suggestion popups' own `--selected` rules use — reused
+   rather than a bespoke value. `[aria-selected="true"]`, not a class: the
+   component already writes this ARIA state for the roving-tabindex listbox,
+   so the selector needs no new prop to read it. */
+.gn-attach-note-picker { display: flex; flex-direction: column; gap: 0.5rem; min-width: 16rem; }
+.gn-attach-note-picker__search { width: 100%; }
+.gn-attach-note-picker__status { color: var(--gn-text-muted); font-size: 0.85em; margin: 0; }
+.gn-attach-note-picker__refusal { color: var(--gn-danger); margin: 0; }
+.gn-attach-note-picker__list { display: flex; flex-direction: column; gap: 0.15rem; max-height: 16rem; overflow-y: auto; }
+.gn-attach-note-picker__option {
+  display: flex;
+  align-items: baseline;
+  width: 100%;
+  padding: 0.4rem 0.6rem;
+  border: none;
+  background: transparent;
+  border-radius: var(--gn-radius-control);
+  font: inherit;
+  color: inherit;
+  text-align: left;
+  cursor: pointer;
+}
+.gn-attach-note-picker__option[aria-selected="true"] { background: var(--gn-fill-tertiary); }
+.gn-attach-note-picker__option:disabled { color: var(--gn-text-muted); cursor: not-allowed; }
+.gn-attach-note-picker__option-title { flex: 1; }
+.gn-attach-note-picker__option-meta { color: var(--gn-text-muted); font-size: 0.85em; }
 button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family: inherit; }
 .gn-ticket-sheet__progress { margin: 0.4rem 0; color: var(--gn-text-muted); }
 .gn-ticket-sheet__loading { color: var(--gn-text-muted); margin: 0; }
@@ -2611,6 +2646,46 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 .gn-ticket-sheet__attachments-error { color: var(--gn-danger); margin: 0; }
 .gn-ticket-sheet__history-empty { color: var(--gn-text-muted); margin: 0; }
 .gn-ticket-sheet__history-partial { color: var(--gn-text-muted); font-size: 0.8rem; margin: 0 0 0.6rem; }
+/* The Attachments tab's own "Attach a file" (Unit 5(b), owner: "I thought
+   we already made the attachment feature but i dont see where we can
+   attach files in our build") — the prototype's `ctlBg`/`ctlShadow`/
+   `accent` "control button" pairing (`desktop.dc.html:1363-1366`), the same
+   `--gn-fill-tertiary`/`--gn-shadow-raised`/`--gn-text-accent` mapping this
+   file already documents for that exact prototype trio elsewhere. */
+.gn-ticket-sheet__attach-file {
+  align-self: flex-start;
+  margin-top: 0.75rem;
+  min-height: 2.75rem;
+  padding: 0 1.125rem;
+  border: none;
+  border-radius: var(--gn-radius-control);
+  background: var(--gn-fill-tertiary);
+  box-shadow: var(--gn-shadow-raised);
+  color: var(--gn-text-accent);
+  font: inherit;
+  font-weight: 600;
+  cursor: pointer;
+}
+.gn-ticket-sheet__attach-file:disabled { cursor: not-allowed; opacity: 0.6; }
+.gn-ticket-sheet__attach-file:focus-visible {
+  outline: 2px solid var(--gn-focus-ring);
+  outline-offset: 2px;
+}
+/* Visually hidden, not `display:none` — the same clip-path recipe
+   `TicketEditorSlot.tsx`'s disabled-reason span and the Attach button's own
+   hidden input (`editor.css`'s `.editor-slot__attach-input`) already use,
+   so `.click()` still reaches a real, focusable element reliably. */
+.gn-ticket-sheet__attach-file-input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip-path: inset(50%);
+  white-space: nowrap;
+  border: 0;
+}
 
 /* ══ The ticket sheet's `Visibility` section — "Who can see this" (spec §6) ══
 
@@ -4901,6 +4976,37 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    warning rather than a failure: `--gn-danger` would claim a finality the
    engine does not implement. */
 .gn-sync-status-bar__error { color: var(--gn-warning); }
+/* Trash Plan 3 — changes the device removed or could not save (spec §5.7: "a
+   visible notice — never silently"). The left rule is the warning ink the
+   strip's own server-reason line uses; the sentence carries the meaning, so
+   colour is never the only signal. The live region stays mounted and empty
+   when there is nothing to say. */
+/* Empty = visually nothing, NOT out of the accessibility tree: `display: none`
+   removes a live region from that tree, and a region that is inserted afresh
+   with its first notice is not reliably announced (the region must already
+   exist when the text arrives). Zero height, no padding, clipped — still there. */
+.gn-sync-notices:empty { height: 0; padding: 0; margin: 0; overflow: hidden; }
+.gn-sync-notices { background: var(--gn-surface); padding: 0.3rem 0.75rem; }
+.gn-sync-notices__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 0.4rem; }
+.gn-sync-notices__item {
+  display: flex;
+  align-items: center;
+  gap: 0.75rem;
+  border-left: 3px solid var(--gn-warning);
+  padding-left: 0.6rem;
+}
+.gn-sync-notices__text { flex: 1; color: var(--gn-text); font-size: 0.85rem; }
+.gn-sync-notices__dismiss {
+  min-height: 2.75rem;
+  padding: 0 0.9rem;
+  background: transparent;
+  color: var(--gn-text);
+  border: 1px solid var(--gn-border);
+  border-radius: 6px;
+  font: inherit;
+  cursor: pointer;
+}
+.gn-sync-notices__dismiss:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 2px; }
 
 /* ── The in-app manual and FAQ ────────────────────────────────────────────────
    Rendered by `packages/app-core/src/help/help-browser.tsx`, which both
@@ -5826,8 +5932,39 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
   font: inherit;
   font-size: 1.0625rem;
 }
+/* Unit 6d (owner, 2026-09-23: "Today placeholders have the same colour as
+   the input text. they should be much lighter"). `--gn-text-subtle` is the
+   role BELOW `--gn-text-muted` in the dim hierarchy (`tokens.ts`'s own
+   third-tier ink), light #5e5e62 / dark #a0a0a5 — `--gn-text-muted` in dark
+   theme (#ebebf5) reads nearly identical to typed text (#f2e9e1), which was
+   the reported defect. Measured against `--gn-fill-quaternary` (this rule's
+   own field background) COMPOSITED — that fill is translucent (5-10%
+   alpha), so its raw hex is not what a reader actually sees — 4.5:1 clears
+   in every `neo` context and in `hig`/`minimal` on `surface`/`
+   surfaceRaised`, but falls to 3.6-4.3:1 on `hig`/`minimal`'s `
+   surfaceSunken`/dark-`surfaceRaised`. Owner ruling, 2026-09-28, given the
+   measured numbers: accept 3:1 for `hig`/`minimal` rather than hold every
+   style to 4.5, since 6c's own label sweep already guarantees a real name
+   survives the placeholder vanishing — see `packages/ui/test/
+   field-placeholder-contrast.test.ts` for the composited proof (not the
+   shared `CONTRAST_PAIRS` array: its own `relativeLuminance` ignores alpha
+   by its own doc comment, so a naive entry there would test raw hex
+   instead of what renders, failing some combinations for the wrong reason
+   and passing others as a coincidence). */
 .gn-field__input::placeholder {
-  color: var(--gn-text-muted);
+  color: var(--gn-text-subtle);
+}
+/* Unit 6c (owner, 2026-09-23: "placeholders in the text box should not be
+   visible once they are in focus") — the placeholder is a HINT about what
+   to type, and once a field has focus it is either about to receive real
+   text or already gone, so leaving it painted invites a reader to mistake
+   it for a value already there. `:focus`, not `:focus-visible`: a
+   placeholder is a visual affordance with no keyboard-only counterpart, so
+   this hides on every kind of focus, mouse included, matching the ring
+   two lines below which is `:focus-visible` for a different reason (an
+   outline is a KEYBOARD-NAV aid; a placeholder is not). */
+.gn-field__input:focus::placeholder {
+  color: transparent;
 }
 .gn-field__input:focus-visible {
   outline: 2px solid var(--gn-focus-ring);
@@ -7196,14 +7333,41 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    means a newline, and that was true before this change and stays true after. */
 .gn-comment__body > * { margin: 0; }
 .gn-comment__body > * + * { margin-top: 0.4rem; }
+/* Headings and the horizontal rule (kb-editor-parity): the composer's toolbar
+   offers both, and `comment-body.tsx` renders a heading as a `<p>` carrying
+   its level (no heading in the ticket sheet's outline). Weight and a small
+   size step carry the hierarchy; a comment is not a page, so h1 stays modest. */
+.gn-comment__heading { font-weight: 700; }
+.gn-comment__heading--1 { font-size: 1.15em; }
+.gn-comment__heading--2 { font-size: 1.08em; }
+.gn-comment__heading--3 { font-size: 1.03em; }
+.gn-comment__rule { border: none; border-top: 1px solid var(--gn-border); margin: 0.6rem 0; }
 .gn-comment__list { padding-left: 1.3rem; }
-.gn-comment__list > li + li { margin-top: 0.15rem; }
+/* A listItem's child is a PARAGRAPH (`<li><p>…</p></li>`), one level deeper than
+   `.gn-comment__body > *` above reaches — left alone every `<p>` kept the
+   user-agent's 1em margins (17px each side), so items sat 17px apart (measured
+   2026-09-29: pitch 39px against 22px of text, vs the composer's 30px). The
+   same two declarations as the body's own blocks, one level down; a second
+   block in one item (a nested list, a quote, another paragraph) keeps the
+   body's 0.4rem. The task list is excluded — its `li` is `input + span`, and
+   `.gn-comment__task > span > *` below is its own version of this. Items are
+   0.25rem apart — the owner's choice (2026-09-29), deliberately TIGHTER than
+   the composer's `.ticket-editor__content p { margin: 0.5rem 0 }` (globals.css),
+   so a posted list is denser than the one that was typed. */
+.gn-comment__list:not(.gn-comment__list--tasks) > li > * { margin: 0; }
+.gn-comment__list:not(.gn-comment__list--tasks) > li > * + * { margin-top: 0.4rem; }
+.gn-comment__list > li + li { margin-top: 0.25rem; }
 .gn-comment__quote {
   margin: 0;
   padding-left: 0.6rem;
   border-left: 2px solid var(--gn-border);
   color: var(--gn-text-muted);
 }
+/* A quote's child is a PARAGRAPH too: its 1em margins collapsed THROUGH the
+   quote (no padding-top or border-top to stop them), so the block above it
+   sat 17px away whatever `> * + *` said — the same defect, one level down. */
+.gn-comment__quote > * { margin: 0; }
+.gn-comment__quote > * + * { margin-top: 0.4rem; }
 .gn-comment__code {
   font-family: ui-monospace, SFMono-Regular, Menlo, monospace;
   background: var(--gn-surface-sunken);
@@ -7221,6 +7385,13 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
 /* The marker goes, because the checkbox replaces it. */
 .gn-comment__list--tasks { list-style: none; padding-left: 0; }
 .gn-comment__task { display: flex; gap: 0.45rem; align-items: flex-start; }
+/* A taskItem's child is a PARAGRAPH, so the row is `<input><span><p>…</p></span>`,
+   one level deeper than `.gn-comment__body > *` above reaches — left alone the
+   `<p>` kept the user-agent's 1em margins (17px each side): the row grew to 56px
+   for one line and the checkbox sat 16px above its text. Same two declarations
+   as the body's own blocks, one level down. */
+.gn-comment__task > span > * { margin: 0; }
+.gn-comment__task > span > * + * { margin-top: 0.4rem; }
 /* Nudged down onto the first line of text rather than the top of the item box. */
 .gn-comment__task > input[type='checkbox'] { margin: 0.15rem 0 0; flex: none; }
 .gn-comment__details { margin: 0; }
@@ -7234,6 +7405,10 @@ button.gn-ticket-sheet__parent-chip { border: none; cursor: pointer; font-family
    (`.gn-comment__body a`), this rule only adds the one thing a span rendering
    still needs. */
 .gn-comment__ticketref { overflow-wrap: anywhere; }
+/* Trash Plan 3 (T11) — a chip whose target was permanently erased. Never a link;
+   italic as well as muted, so the ink is not the only difference, and the words
+   themselves ("Deleted item") carry the meaning. */
+.gn-comment__ref--purged { color: var(--gn-text-muted); font-style: italic; cursor: default; }
 .gn-comment__mention { color: var(--gn-text-accent); font-weight: 600; }
 .gn-comment__files { display: flex; gap: 0.45rem; flex-wrap: wrap; margin-top: 0.2rem; }
 .gn-comment__file {

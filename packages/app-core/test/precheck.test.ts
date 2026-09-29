@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest';
+import { describe, expect, it, vi } from 'vitest';
 import {
   eventEnvelopeSchema,
   isUlid,
@@ -18,6 +18,11 @@ import {
 } from '../src/precheck.js';
 import { makeSubmittedFactory } from '../src/submit.js';
 import { PARENT, PROJECT, TICKET, WF_ERRAND, WS, ticketStateSeed } from './helpers/seed.js';
+
+// This file builds events the door WOULD refuse, on purpose — stale and malformed payloads are the subject of several cases. The
+// suite-wide payload guard in `test/setup.ts` would throw at the factory, so it
+// is switched off for this file alone.
+vi.unmock('@gisik-nokma/domain');
 
 /**
  * ULID actor and ticket ids. The pre-check runs the REAL engine, and the events

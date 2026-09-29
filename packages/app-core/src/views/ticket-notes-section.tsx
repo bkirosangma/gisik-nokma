@@ -111,7 +111,7 @@ export function TicketNotesSection({
         <button
           ref={attachTriggerRef}
           type="button"
-          className="gn-ticket-sheet__attach"
+          className="gn-button gn-button--ghost gn-ticket-sheet__attach"
           data-testid="attach-note"
           aria-haspopup="dialog"
           aria-expanded={pickerOpen}

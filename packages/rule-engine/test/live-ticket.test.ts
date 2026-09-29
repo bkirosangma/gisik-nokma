@@ -82,6 +82,14 @@ const EXEMPT: ReadonlyArray<[type: string, payloadFor: (id: string) => unknown, 
   ['ticket.created', () => ({ typeId: 'task', projectId: PROJECT, parentId: null, title: 't' }), 'an id that resolves is `ticket.already-exists`, not this'],
   ['claim.contested', (id) => ({ originalEvent: refusedClaim(id), rule: 'deleted-ticket', reason: 'x' }), 'the server\'s record of a refusal — including THIS one'],
   ['claim.contested_resolved', () => ({ contestedEventId: CONTEST, resolution: 'withdrawn' }), 'bookkeeping about a contest, not a write to the ticket'],
+  // Trash series, Plan 1 (spec §4): `purge.marked` REFUSES a ticket that is
+  // NOT deleted ("Delete it first" — Task 4's checkLifecycle), so marking one
+  // for permanent deletion is exactly the act this gate would otherwise turn
+  // away.
+  ['purge.marked', () => ({}), 'marks a DELETED ticket for permanent deletion — the gate would make the feature unreachable'],
+  ['purge.unmarked', () => ({}), 'its undo — it requires the ticket to still be marked, which requires it to still be deleted'],
+  // Trash series, Plan 2: the tombstone the purge appends to a deleted item.
+  ['purge.completed', () => ({ kind: 'ticket', markedBy: 'u', markedAt: '2026-09-13T10:00:00.000Z' }), 'the purge\'s own tombstone on an item that is deleted by definition'],
 ];
 
 describe('17.121 E6-2 — the live-ticket gate refuses every ordinary write against a soft-deleted ticket', () => {

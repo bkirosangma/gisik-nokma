@@ -12,6 +12,8 @@ import {
 } from '../flows/guarded-child-event.js';
 import { PARENT_TERMINAL_RULE, precheckEvent } from '../precheck.js';
 import { makeSubmittedFactory } from '../submit.js';
+import { outsiderIngest } from '../people/outsider-ingest.js';
+import type { AssignOutsider, LookupPerson } from '../people/types.js';
 import type { TicketRead } from '../view-types.js';
 import type { EditorSlotComponent } from './editor-slot.js';
 import { NewTicketDialog, type NewTicketDraft, type TypeOption } from './new-ticket-dialog.js';
@@ -38,6 +40,13 @@ export type CreateTicketFlowProps = {
   assigneeCandidates: ReadonlyArray<{ id: string; name: string }>;
   /** See `NewTicketDialogProps.assigneeCandidatesUnavailable`. */
   assigneeCandidatesUnavailable?: string;
+  /** See `NewTicketDialogProps.lookupPerson` — passed through. */
+  lookupPerson?: LookupPerson;
+  /**
+   * The outsider door (access plan W6). Present with `lookupPerson`: an outsider
+   * draft's `ticket.created` is sent through it instead of `dataSource.ingest`.
+   */
+  assignOutsider?: AssignOutsider;
   /** See `NewTicketDialogProps.workflowStates` — this flow only passes it through. */
   workflowStates: (workflowId: string) => { initialStateId: string; states: Array<{ id: string; name: string; category: string; creatable: boolean }> } | null;
   /**
@@ -169,6 +178,8 @@ export function CreateTicketFlow({
   editorSlot,
   assigneeCandidates,
   assigneeCandidatesUnavailable,
+  lookupPerson,
+  assignOutsider,
   workflowStates,
   initialSelection,
   onCreated,
@@ -373,7 +384,14 @@ export function CreateTicketFlow({
       }
     }
 
-    const outcome = await submitChildEvent(dataSource, childEvent);
+    // An outsider birth assignee (access plan W6) goes through the outsider door;
+    // every outcome branch below is unchanged because the answer still arrives as
+    // an ingest result. The reopen path stays on `dataSource` — residual D11.
+    const via =
+      draft.assigneeIsOutsider === true && assignOutsider !== undefined && draft.assigneeId !== null
+        ? { ...dataSource, ingest: outsiderIngest(assignOutsider, draft.assigneeId) }
+        : dataSource;
+    const outcome = await submitChildEvent(via, childEvent);
     if (outcome.kind === 'committed') {
       setDialogOpen(false);
       onCreated(childEvent.entity.id);
@@ -521,6 +539,7 @@ export function CreateTicketFlow({
         editorSlot={editorSlot}
         assigneeCandidates={assigneeCandidates}
         assigneeCandidatesUnavailable={assigneeCandidatesUnavailable}
+        {...(lookupPerson === undefined ? {} : { lookupPerson })}
         workflowStates={workflowStates}
         initialSelection={initialSelection}
         stateRefusal={stateRefusal}

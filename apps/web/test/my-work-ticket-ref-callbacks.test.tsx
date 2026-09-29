@@ -127,6 +127,7 @@ function mount(): { services: AppServices } {
           role: 'owner' as const,
           memberCount: 1,
           nameRestrictedProjectCount: 0,
+          archived: false,
           projects: [{ id: PROJECT, name: 'Shop operations', prefix: 'SF', archived: false, ticketCount: 1, blockedCount: 0 }],
         },
       ],

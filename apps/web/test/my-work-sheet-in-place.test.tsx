@@ -219,6 +219,7 @@ function workspaceRow() {
     // page down and reads as a layout failure.
     prefix: 'GH',
     role: 'owner',
+    archived: false,
     memberCount: 1,
     nameRestrictedProjectCount: 0,
     projects: [
