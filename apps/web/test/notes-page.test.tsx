@@ -1,4 +1,4 @@
-import { cleanup, render, screen } from '@testing-library/react';
+import { cleanup, render, screen, waitFor } from '@testing-library/react';
 import { readFileSync } from 'node:fs';
 import { dirname, join, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
@@ -240,6 +240,68 @@ describe('18.11 The Notes page — the shell', () => {
     expect(screen.queryByText('No notes yet')).toBeNull();
     expect(screen.queryByText(/could not be loaded/)).toBeNull();
     expect(screen.queryByRole('button', { name: 'New note' })).toBeNull();
+  });
+
+  /**
+   * 18.462 (R7b, planner's browser pass 2026-09-30) — a note opened while the
+   * workspaces read is still in flight never draws "That note is no longer
+   * shared with you.". The page used to hand the document `workspaces ?? []`,
+   * so its search walked an empty list, found nothing and drew the copy until
+   * the read landed (measured 95–137 ms on direct load). A MutationObserver
+   * records the copy at ANY moment, not just where the test looks.
+   *
+   * CONTROLS, same `it`: once the read answers a workspace that does not hold
+   * the note, or `[]` (a person with no workspaces), the copy IS drawn — `[]`
+   * is an answer and stays the document's to word.
+   * MUTATION TARGET: restore `workspaces ?? []` for the not-yet-asked arm.
+   */
+  it('18.462 a note opened while the workspaces read is pending never draws the lost-access copy; CONTROL: an answered miss and an answered [] do', async () => {
+    const LOST = 'That note is no longer shared with you.';
+    let flashed = false;
+    const observer = new MutationObserver(() => {
+      if (document.body.textContent?.includes(LOST) === true) flashed = true;
+    });
+    observer.observe(document.body, { childList: true, subtree: true, characterData: true });
+    let answer: (value: WorkspaceRef[]) => void = () => undefined;
+    try {
+      render(
+        <Providers
+          services={stubServices(
+            {
+              getMyWorkspaces: () => new Promise<WorkspaceRef[]>((resolve) => (answer = resolve)),
+              getNote: async () => null,
+            },
+            { notifications: { unreadCount: async () => 0 } },
+          )}
+        >
+          <NotesPage noteId="01J9NOTEMISSING000000000000" />
+        </Providers>,
+      );
+      // Nothing has answered yet (the tree says so), and the observer is watching.
+      expect((await screen.findAllByText('Loading…')).length).toBeGreaterThanOrEqual(1);
+      await new Promise((resolve) => setTimeout(resolve, 30));
+      expect(screen.queryByText(LOST)).toBeNull();
+      expect(flashed).toBe(false);
+      // CONTROL A — the read answers a workspace that does not hold the note.
+      answer([WS_A_REF]);
+      expect(await screen.findByText(LOST)).toBeInTheDocument();
+    } finally {
+      observer.disconnect();
+    }
+    cleanup();
+
+    // CONTROL B — the read answers [] (no workspaces): the copy is drawn, not held back.
+    render(
+      <Providers
+        services={stubServices(
+          { getMyWorkspaces: async () => [], getNote: async () => null },
+          { notifications: { unreadCount: async () => 0 } },
+        )}
+      >
+        <NotesPage noteId="01J9NOTEMISSING000000000000" />
+      </Providers>,
+    );
+    await waitFor(() => expect(screen.getByText(LOST)).toBeInTheDocument());
   });
 
   /**

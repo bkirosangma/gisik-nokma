@@ -281,6 +281,16 @@ export function NotesPage({ noteId }: { noteId?: string }) {
           <section className="gn-notes__document" data-testid="note-document-region">
             {noteId === undefined ? (
               <p className="gn-notes__hint">{NO_NOTE_COPY}</p>
+            ) : workspaces === null && refusal === null ? (
+              // R7b (case 18.462): the workspaces read is still in flight, so
+              // the document has nothing to search. Mounting it with `[]` made
+              // its search find nothing and draw "That note is no longer
+              // shared with you." until the read landed. `[]` is a legitimate
+              // ANSWER (no workspaces) and stays the document's to word; only
+              // "not asked yet" is held here.
+              <p className="gn-notes__hint" role="status">
+                Loading…
+              </p>
             ) : (
               <NoteDocument
                 noteId={noteId}
