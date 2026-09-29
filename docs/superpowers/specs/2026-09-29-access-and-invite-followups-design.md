@@ -30,6 +30,8 @@ Two small findings from the 2026-09-29 production cleanup ride along (§9).
 - A4. Project- and workspace-scope tickets are unchanged: the assignee arm still covers an assignee outside that scope (a guest assignee sees that one ticket).
 - A5. The docblock at `can-see.ts:58-60` and the shipped spec's W3 are amended to say so; history shows the list change as its own line beside the assignment.
 
+**⚠ Re-confirm A2 with the owner before planning R1.** The ruling was given on a premise the planner misstated in chat ("assigning adds them to its visibility" — it does not; today only the read-time arm applies). The deciding question: *once someone is unassigned, should they keep seeing the ticket and the notes and sub-tickets that inherit its list?* Yes → A1–A5 as written. No → keep today's arm and extend it to inherited notes/sub-tickets instead. This blocks building R1, not merging this spec.
+
 **Open for the plan:** whether the append is a separate `visibility.*` event in the batch or a field on the assignment event. Recommendation: a separate, ordinary visibility event — every reader of the list already understands it.
 
 ## 3. R2 — email lookup: no role, no guests
@@ -45,7 +47,7 @@ Two small findings from the 2026-09-29 production cleanup ride along (§9).
 **Decision.**
 - N1. `/actor-names` returns every workspace member including guests, with the **email as the label when the name is blank** (synthetic phone addresses excepted: those show the phone number, formatted) — the server already does this at `people.ts:62` and `invites.ts:54-63`.
 - N2. The four id-only sites go through the shared label (`actorLabelFrom` with the actor-names map).
-- N3. **A guest viewer may read `/actor-names`** (names and emails of the workspace's people), so a guest sees who assigned or commented rather than ids. The deployment is private to one team (owner, 2026-09-29), which is why this is the recommendation; the alternative is to limit a guest to the people on tickets they can see. Owner may overrule.
+- N3. **A guest viewer sees labels only for the people on tickets they can see** (the payloads they already receive carry those people's labels), not the whole directory — R2 refuses guests the email lookup, and handing them every member's email through `/actor-names` would give back more than R2 withholds. **Owner question:** open `/actor-names` to guests in full instead (the deployment is private to one team)?
 - N4. A raw id is never shown as a person's name anywhere; a truly unknown id (deleted account) reads "Unknown person".
 
 ## 5. R4 — a link opened by the wrong account is refused
@@ -77,15 +79,15 @@ Two small findings from the 2026-09-29 production cleanup ride along (§9).
 
 **Likely causes, ranked (unmeasured):**
 1. **IPv4/IPv6 choice with a 10 s stall.** nodemailer resolves A and AAAA and picks an address at random; if an IPv6 connect is silently dropped it waits the full 10 s `connectionTimeout`, then falls back. 10 s + a normal cold send ≈ 18 s. Nothing logs the fallback today (nodemailer's logger is off).
-2. **The SMTP port filtered** — every address times out, the send FAILS (~20 s). Ruled in or out without a deploy: did the invite result say "Invitation emailed to …" (it did in the 2026-09-29 production check, and the email arrived), and is there an `invitation email failed` log line? A success rules this out.
-3. **A cold connection every send** (DNS + TCP + TLS + AUTH, no pool; a dev send measured 4.2 s).
-4. DNS (first send per 5 min).
+- *Ruled out:* the SMTP port being filtered (every address would time out and the send would FAIL) — the 2026-09-29 production check showed "Invitation emailed to …" and the email arrived.
+2. **A cold connection every send** (DNS + TCP + TLS + AUTH, no pool; a dev send measured 4.2 s).
+3. DNS (first send per 5 min).
 
 **Decision.**
 - S1. **Measure first:** per-phase timing logs around the invite handler (ingest, insert, reads, send) and nodemailer's `logger` enabled for the connection phase (connect target, family, fallback), for both the invite and magic-link senders. One deploy with the release; the owner times 3–4 invites.
-- S2. **Fix what the measurement names;** the plan carries both candidate fixes behind the measurement: one **pooled** transporter reused across sends, and **IPv4-first** connection if the fallback shows up. The timeouts stay.
+- S2. **Fix what the measurement names;** the plan carries both candidate fixes behind the measurement: one **pooled** transporter reused across sends, and **IPv4-first** connection if the fallback shows up — the plan must first confirm nodemailer exposes an option for it (else resolve the host to an IPv4 address ourselves and pass the name for TLS). The timeouts stay.
 - S3. **The button shows progress regardless:** disabled with "Sending…" while the request is in flight; the address clears on success; a second submit while one is in flight does nothing.
-- S4. **Server dedupe:** a second invite to an address that already has a PENDING invite in the same workspace re-sends that invite rather than minting another (`invites.ts:341` mints a new id today; there is no uniqueness, `projections/proj-invites.ts:67-71`).
+- S4. **Server dedupe:** a second invite to an address that already has a PENDING invite in the same workspace re-sends that invite rather than minting another (`invites.ts:341` mints a new id today; there is no uniqueness, `projections/proj-invites.ts:67-71`). **Open for the plan:** if link tokens are stored hashed, the original link cannot be re-emailed — "re-send" then means rotating the token on the existing invite (the old link stops working).
 - S5. Sending the email after the response (fire-and-forget) is **not** chosen: the result card promises "Invitation emailed to …" and must stay true.
 
 ## 8. R7 — the new-note flash
