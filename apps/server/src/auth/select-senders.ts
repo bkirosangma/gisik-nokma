@@ -1,7 +1,7 @@
 import type { AppConfig } from '../config.js';
 import { LogMagicLinkSender, type MagicLinkSender } from './magic-link-sender.js';
 import { NullOtpSender, type OtpSender } from './otp-sender.js';
-import { SmtpMagicLinkSender } from './smtp-magic-link-sender.js';
+import { SmtpMagicLinkSender, type SmtpLog } from './smtp-magic-link-sender.js';
 
 /**
  * WHICH SENDERS A DEPLOYMENT GETS — as functions, not as two ternaries inside
@@ -31,10 +31,11 @@ import { SmtpMagicLinkSender } from './smtp-magic-link-sender.js';
  */
 export function selectMagicLinkSender(
   config: Pick<AppConfig, 'smtpUrl' | 'magicLinkFrom'>,
+  log?: SmtpLog,
 ): MagicLinkSender {
   return config.smtpUrl === null
     ? new LogMagicLinkSender()
-    : new SmtpMagicLinkSender(config.smtpUrl, config.magicLinkFrom);
+    : new SmtpMagicLinkSender(config.smtpUrl, config.magicLinkFrom, undefined, log);
 }
 
 /**

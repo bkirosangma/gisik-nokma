@@ -1,4 +1,6 @@
+import { format } from 'node:util';
 import { createTransport, type Transporter } from 'nodemailer';
+import type SMTPPool from 'nodemailer/lib/smtp-pool';
 import type { MagicLinkSender } from './magic-link-sender.js';
 
 /**
@@ -34,6 +36,88 @@ export const SMTP_TIMEOUTS_MS = {
   greetingTimeout: 10_000,
   socketTimeout: 20_000,
 } as const;
+
+/** Where the connection-phase records go: `app.log.info` in production, a collector in a test. */
+export type SmtpLog = (fields: Record<string, unknown>, message: string) => void;
+
+/** The `tnx` (transaction) values nodemailer stamps on records about reaching the server, not about the mail. */
+const CONNECTION_PHASE_TNX = new Set(['dns', 'network', 'pool', 'connection']);
+
+/** `smtp` records that describe the session, as against `User %s authenticated`, which names the AUTH account. */
+const SESSION_SMTP_MESSAGE = /^(SMTP handshake finished|Closing connection|Connection upgraded|Failed STARTTLS)/;
+
+/**
+ * A nodemailer `logger` that forwards ONLY the connection phase (owner ruling
+ * 2026-09-29, S1: "which address, which family, did it fall back, how long").
+ *
+ * An ALLOW-list, on purpose. nodemailer's `debug: true` would pass the whole
+ * SMTP conversation to the logger, and that conversation carries the AUTH
+ * exchange (the provider credentials) and the DATA phase (the message — for an
+ * invitation, the link, which is a credential). This logger is fed without
+ * `debug`, so those records are never produced, and the filter is the second
+ * lock: `send` and `message` records (they name the recipient), `create` and
+ * `transport` records, `client`/`server` traffic, and the `smtp` records that
+ * name the AUTH user are all dropped. Fields are picked by name rather than
+ * copied, so a field a later nodemailer adds is not logged until someone
+ * chooses to.
+ */
+export function connectionPhaseLogger(log: SmtpLog): Record<'trace' | 'debug' | 'info' | 'warn' | 'error' | 'fatal', (data: unknown, message?: unknown, ...args: unknown[]) => void> {
+  const forward = (level: string) => (data: unknown, message?: unknown, ...args: unknown[]): void => {
+    const record = (typeof data === 'object' && data !== null ? data : {}) as Record<string, unknown>;
+    const tnx = typeof record.tnx === 'string' ? record.tnx : undefined;
+    const template = typeof message === 'string' ? message : '';
+    const isFailure = level === 'warn' || level === 'error' || level === 'fatal';
+    const wanted =
+      tnx === undefined
+        ? isFailure
+        : CONNECTION_PHASE_TNX.has(tnx) || (tnx === 'smtp' && SESSION_SMTP_MESSAGE.test(template));
+    if (!wanted) return;
+    const fields: Record<string, unknown> = { component: 'smtp', level };
+    for (const key of ['tnx', 'cid', 'action', 'source', 'resolved', 'cached', 'remoteAddress', 'remotePort', 'localPort'] as const) {
+      if (record[key] !== undefined) fields[key] = record[key];
+    }
+    const err = record.err;
+    if (err instanceof Error) fields.errMessage = err.message.slice(0, 200);
+    log(fields, format(template, ...args).slice(0, 300));
+  };
+  return {
+    trace: forward('trace'),
+    debug: forward('debug'),
+    info: forward('info'),
+    warn: forward('warn'),
+    error: forward('error'),
+    fatal: forward('fatal'),
+  };
+}
+
+/**
+ * The ONE transport-options builder both senders use (invite and sign-in), so
+ * they cannot drift apart: the single options object carrying `url` (see the
+ * class docblock — the two-argument form is inert), the bounded timeouts, and
+ * a POOLED transport.
+ *
+ * WHY POOLED (owner ruling 2026-09-29, S2): unpooled, every send paid a full
+ * TCP + TLS + AUTH handshake — a measured ~3 s floor. One pool per sender
+ * reuses the connection across sends.
+ *
+ * WHAT IT DOES NOT PROMISE: a pooled connection is an IDLE socket, and
+ * `socketTimeout` (20 s, above) governs idleness too. Measured against Mailpit
+ * on the installed nodemailer 10.0.0: a send 25 s after the previous one
+ * opened a NEW connection (a `Pool Error … Timeout` record, then a second
+ * `Created new pool resource`), while one immediately after reused it. So the
+ * pool removes the floor for sends within ~20 s of each other and not beyond;
+ * keeping it warm longer would mean raising `socketTimeout`, which also
+ * loosens the bound on a hung DATA phase — left to the owner (hand-back
+ * question), not decided here.
+ */
+export function smtpTransportOptions(smtpUrl: string, log?: SmtpLog): SMTPPool.Options {
+  return {
+    url: smtpUrl,
+    ...SMTP_TIMEOUTS_MS,
+    pool: true,
+    ...(log === undefined ? {} : { logger: connectionPhaseLogger(log) }),
+  };
+}
 
 /**
  * Real email delivery for sign-in links, over SMTP.
@@ -77,8 +161,9 @@ export class SmtpMagicLinkSender implements MagicLinkSender {
     smtpUrl: string,
     private readonly from: string,
     transporter?: Transporter,
+    log?: SmtpLog,
   ) {
-    this.transporter = transporter ?? createTransport({ url: smtpUrl, ...SMTP_TIMEOUTS_MS });
+    this.transporter = transporter ?? createTransport(smtpTransportOptions(smtpUrl, log));
   }
 
   async send(email: string, url: string): Promise<void> {

@@ -1,4 +1,4 @@
-import type { ReactNode } from 'react';
+import { useId, type ReactNode } from 'react';
 
 export type SwitchProps = {
   checked: boolean;
@@ -10,10 +10,10 @@ export type SwitchProps = {
   onChange: (next: boolean) => void;
   disabled?: boolean;
   /**
-   * The visible text, and therefore the control's accessible name: the `<label>`
-   * below wraps the input, so `getByLabelText` and a screen reader both resolve
-   * to whatever is written here. There is deliberately no separate `aria-label`,
-   * which would let the two drift apart.
+   * The visible text, and therefore the control's accessible name: the input
+   * carries `aria-labelledby` pointing at the span that holds these children
+   * (and the `<label>` wraps both, so `getByLabelText` resolves too). There is
+   * deliberately no separate `aria-label`, which would let the two drift apart.
    */
   children: ReactNode;
   className?: string;
@@ -55,8 +55,18 @@ export type SwitchProps = {
  * ## The DOM order, and the two things that are NOT true about it
  *
  * The input is the FIRST child and the label text the second. The accessible
- * name does not depend on that order at all: the `<label>` WRAPS both, so the
- * name is the label's text content whichever way round they sit.
+ * name does not depend on that order at all: the input is `aria-labelledby` the
+ * text span, so the name is that span's text whichever way round they sit.
+ *
+ * ## Why the name is explicit and not left to the wrapping `<label>`
+ *
+ * Measured in production through the browser's accessibility tree (2026-09-29):
+ * the delete dialog's switch was `checkbox "on"` — the checkbox's own `value` —
+ * rather than "Delete permanently". The input is `appearance: none` and sits
+ * inside the label with the text, and the browser did not derive the label's
+ * text as the name. jsdom DOES resolve the wrapping label, so a `getByRole`
+ * name query passes either way and is no evidence for this; the pinned property
+ * is the `aria-labelledby` attribute and the element it names.
  *
  * **An earlier version of this docblock claimed `.gn-switch-row` is
  * `justify-content: space-between` and that "the text therefore stays FIRST in
@@ -68,6 +78,7 @@ export type SwitchProps = {
  * (`.gn-account__notification-row` in `globals.css`) and nowhere else.
  */
 export function Switch({ checked, onChange, disabled = false, children, className }: SwitchProps) {
+  const labelId = useId();
   return (
     <label className={['gn-switch-row', className].filter(Boolean).join(' ')}>
       <input
@@ -75,9 +86,12 @@ export function Switch({ checked, onChange, disabled = false, children, classNam
         className="gn-switch"
         checked={checked}
         disabled={disabled}
+        aria-labelledby={labelId}
         onChange={(event) => onChange(event.target.checked)}
       />
-      <span className="gn-switch__label">{children}</span>
+      <span id={labelId} className="gn-switch__label">
+        {children}
+      </span>
     </label>
   );
 }

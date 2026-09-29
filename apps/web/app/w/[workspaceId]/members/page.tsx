@@ -18,8 +18,10 @@ import { useAppServices, useCurrentUser } from '../../../../src/providers.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 import {
   CREATE_INVITE_LINK,
+  CREATING_INVITE_LINK,
   INVITE_EMAIL_FAILED,
   SEND_INVITATION,
+  SENDING_INVITATION,
   alreadyMemberLine,
   hasAccountLine,
   inviteEmailedLine,
@@ -798,14 +800,27 @@ function MintForm({
   };
   const [refusal, setRefusal] = useState<string | null>(null);
 
+  // In flight, as STATE (the button reads it) and as a REF (the guard reads it): two submits in the
+  // same tick both see the state from before the first one's `setSending`, and Enter in the address
+  // field submits the form even where the disabled button would not have been clicked.
+  const [sending, setSending] = useState(false);
+  const inFlight = useRef(false);
+
   const submit = (event: FormEvent): void => {
     event.preventDefault();
+    if (inFlight.current) return;
+    inFlight.current = true;
+    setSending(true);
     setRefusal(null);
     const target = account?.email ?? address;
     void invitesAdmin
       .mintInvite(workspaceId, { address: target, channel, role })
       .then(
         (result) => {
+          // Sent: the field is done with. A failure keeps it, so the admin can retry without retyping.
+          setAddress('');
+          askedAddress.current = null;
+          setAccount(null);
           onMinted(result, { address: target, channel });
         },
         (cause: unknown) => {
@@ -815,7 +830,11 @@ function MintForm({
               : 'The invitation could not be sent, and the server did not say why.',
           );
         },
-      );
+      )
+      .finally(() => {
+        inFlight.current = false;
+        setSending(false);
+      });
   };
 
   return (
@@ -919,8 +938,14 @@ function MintForm({
         />
       </label>
 
-      <Button variant="primary" type="submit">
-        {channel === 'phone' ? CREATE_INVITE_LINK : SEND_INVITATION}
+      <Button variant="primary" type="submit" disabled={sending}>
+        {sending
+          ? channel === 'phone'
+            ? CREATING_INVITE_LINK
+            : SENDING_INVITATION
+          : channel === 'phone'
+            ? CREATE_INVITE_LINK
+            : SEND_INVITATION}
       </Button>
 
       {/* RULING V2: the minted-URL card moved to the PAGE (`MembersPage`,

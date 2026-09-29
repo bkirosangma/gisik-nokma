@@ -335,3 +335,11 @@ the number you added — an unchanged count has reported a clean sweep over case
 
 - ✅ **19.200 — the engine's `onNoticesChanged` fires after a flushed claim is refused (a notice or a failed row) and after a purge lookup erases something, and the replica data source forwards it to a subscriber as a `refresh` frame;** control: a lookup naming nothing, and a flush with nothing queued, fire nothing. Mutation: drop the `notifyNoticesChanged()` after `eraseEntities`.
 
+## 19.41 The delete dialog's switch is named "Delete permanently" (fix-now batch, 2026-09-29)
+
+Case ids 19.280–19.289 belong to this batch. The bug is browser-side (the accessibility tree read `checkbox "on"`); jsdom names the input through the wrapping label either way, so these cases pin the attribute and the element it names, not a name query alone.
+
+- ✅ **19.280 — the shared `Switch`'s input carries `aria-labelledby` naming an element that exists in the document and whose text is the children text, for string children and for element children, and two switches never share an id;** control: there is no `aria-label` copy and the named span does not contain the input. Mutation: remove `aria-labelledby` from the input (two tests red). (`packages/ui/test/components.test.tsx`)
+- ✅ **19.281 — the ticket, project and workspace delete dialogs each resolve their switch to "Delete permanently" through that attribute;** control: the named element is the visible switch text. Mutation: the same removal (red). (`packages/app-core/test/views/delete-dialog.test.tsx`)
+- ✅ **19.282 — the note delete dialog's switch resolves the same way;** control: the id names the visible text in the document. Mutation: the same removal (red). (`apps/web/test/note-document.test.tsx`)
+- 🚫 **19.283 — the browser accessibility tree reads the switch as "Delete permanently" on the rebuilt dev stack;** not measured by the executor lane, the controller re-measures after the rebuild.
