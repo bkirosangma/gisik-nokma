@@ -386,6 +386,10 @@ export function buildApp(
                * rest of the path survives, so the operator still sees which
                * route was called.
                *
+               * The same holds for credentials in the QUERY (a magic-link
+               * `token`, an OAuth `code` and `state`): `redactRequestUrl`
+               * replaces those values too, keeping the parameter names.
+               *
                * Everything else here reproduces Fastify's own default request
                * serializer: dropping a field would quietly remove operational
                * detail nobody asked to lose.
@@ -903,7 +907,9 @@ export function buildApp(
   registerInviteRoutes(
     app,
     {
-      pool: deps.pool,
+      // A `Pool` because the mint takes a dedicated client for its advisory lock
+      // (`AppDeps.pool` is declared `Queryable`; `buildApp` is always handed a Pool).
+      pool: deps.pool as Pool,
       ingest: deps.ingest,
       serverAppend: deps.serverAppend,
       webOrigin: deps.webOrigin,

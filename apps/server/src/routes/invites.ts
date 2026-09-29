@@ -1,12 +1,14 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { newUlid, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
+import type { Pool } from 'pg';
+import { newUlid, parseEvent, type EventEnvelope, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import { alertWithoutWaiting, type ErrorAlerter } from '../alerts/error-alerter.js';
 import { isSyntheticPhoneEmail } from '../auth/synthetic-address.js';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import { appendAcceptance } from '../invites/acceptance.js';
 import { INVITER_FALLBACK, type InviteMailer } from '../invites/invite-mailer.js';
+import { checkPermission } from '../permissions/check-permission.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
 
@@ -37,7 +39,8 @@ import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
 export type ServerAppend = (events: SubmittedEvent[]) => Promise<IngestResult[]>;
 
 export type InviteRouteDeps = {
-  pool: Queryable;
+  /** A real `Pool`, not a `Queryable`: the mint holds a dedicated client for its advisory lock. */
+  pool: Pool;
   /** The GATED door: issuance goes through it, so the admin-only refusal fires. */
   ingest: ClientIngest;
   /** The internal door: acceptance only. See `ServerAppend`. */
@@ -168,6 +171,75 @@ function hashToken(token: string): string {
  */
 export function redactInviteToken(url: string): string {
   return url.replace(/^(\/v1\/invites\/)[^/?#]+/, '$1[redacted]');
+}
+
+/**
+ * The key one mint serialises on. Email addresses compare case-insensitively
+ * (the rule `routes/my-invitations.ts` applies), so they are lower-cased here;
+ * a phone number is compared as written.
+ */
+function mintLockKey(workspaceId: string, channel: string, address: string): string {
+  return `invite-mint:${workspaceId}:${channel}:${channel === 'email' ? address.toLowerCase() : address}`;
+}
+
+/**
+ * Run `work` while holding a transaction-scoped advisory lock on `key`, on a
+ * dedicated pool client, and hand `work` that client to query through (so its
+ * reads and writes see the lock's serialisation). The lock is released by the
+ * COMMIT/ROLLBACK, and the client goes back to the pool before this returns.
+ * `null` runs `work` unlocked on the pool.
+ *
+ * A waiter gives up after `lock_timeout` rather than queueing forever: every
+ * waiter holds one of the pool's connections, and the holder needs one more for
+ * ingest, so an unbounded pile-up of one key could otherwise wedge the pool.
+ */
+async function withMintLock<T>(pool: Pool, key: string | null, work: (db: Queryable) => Promise<T>): Promise<T> {
+  if (key === null) return work(pool);
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '15s'");
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [key]);
+    const value = await work(client);
+    await client.query('COMMIT');
+    return value;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // A connection that cannot roll back is destroyed, not returned to the pool.
+      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
+    throw error;
+  } finally {
+    client.release(broken);
+  }
+}
+
+/**
+ * The PENDING invitation this request repeats: same workspace, channel and
+ * address, the same role and the SAME project set (order-insensitive — `@>` and
+ * `<@` together are set equality). A revoked, accepted or declined invitation is
+ * never matched. A pending one that differs in role or projects is NOT matched
+ * either: that case mints a new invitation as it always did (an open question
+ * for the owner). Newest first, because rows minted before this dedupe existed
+ * may already be duplicated.
+ */
+async function findPendingMatch(
+  db: Queryable,
+  args: { workspaceId: string; channel: string; role: string; address: string; projectIds: string[] },
+): Promise<string | null> {
+  const { rows } = await db.query<{ invite_id: string }>(
+    `SELECT invite_id FROM proj_invites
+      WHERE workspace_id = $1 AND channel = $2 AND role = $3 AND status = 'pending'
+        AND (CASE WHEN channel = 'email' THEN lower(address) = lower($4) ELSE address = $4 END)
+        AND project_ids @> $5::text[] AND project_ids <@ $5::text[]
+      ORDER BY invited_at DESC
+      LIMIT 1`,
+    [args.workspaceId, args.channel, args.role, args.address, args.projectIds],
+  );
+  return rows[0]?.invite_id ?? null;
 }
 
 type TokenRow = { invite_id: string; expires_at: Date };
@@ -338,20 +410,20 @@ export function registerInviteRoutes(
     async (request, reply) => {
       const { workspaceId } = request.params;
       const { address, channel, role, projectIds } = request.body;
-      const inviteId = newUlid();
+      const newInviteId = newUlid();
 
       const submitted: SubmittedEvent = {
         id: newUlid(),
         workspaceId,
-        entity: { kind: 'invite', id: inviteId },
+        entity: { kind: 'invite', id: newInviteId },
         type: 'invite.sent',
         version: 1,
         // `projectIds` is omitted rather than sent as `[]` when absent: the
         // domain schema refuses the key entirely on a guest invite, and an
         // empty array a client never asked for would be refused as if they had.
         payload: projectIds === undefined
-          ? { inviteId, address, channel, role }
-          : { inviteId, address, channel, role, projectIds },
+          ? { inviteId: newInviteId, address, channel, role }
+          : { inviteId: newInviteId, address, channel, role, projectIds },
         actorId: request.currentUserId,
         // envelope-origin `'web'` — a person's claim that they invited someone,
         // not the server's own record. The gate refuses a client-submitted
@@ -360,29 +432,86 @@ export function registerInviteRoutes(
         clientTime: new Date().toISOString(),
       };
 
-      const [result] = await deps.ingest.ingestClientBatch([submitted], request.currentUserId);
-      if (result === undefined) {
-        throw new Error('ingest returned no result for the invite.sent event');
-      }
-      if (result.status !== 'committed') {
-        // The ingest layer's own refusal, verbatim — the same contract the
-        // founding door publishes. A plain member's `permission.role` and a
-        // guest-with-projects parse refusal both arrive here unchanged.
-        return reply.code(422).send(result);
-      }
+      // THE AUTHORISATION COMES FIRST, and it is the gate itself run dry — the
+      // pre-flight `routes/people.ts` uses for the same reason. A repeat
+      // invitation to a pending address ROTATES that invitation's token and
+      // hands the new link to the caller, so the dedupe below must never be
+      // reachable by anybody the ingest gate would refuse: a plain member or a
+      // guest who could rotate a pending invitation would receive a working link
+      // to it. Only a `null` (allowed) pre-flight may dedupe; ANY refusal takes
+      // the ordinary path below untouched, where ingest produces the 422 itself
+      // — byte for byte the body a fresh mint gets, with no second copy of the
+      // role rule to drift from the first.
+      //
+      // The gate reads a PARSED event — a payload the schema would refuse (a guest
+      // with projects, an `owner` invitation) reaches it as undefined fields and
+      // throws — so the parse runs first, as `routes/people.ts` does, and an
+      // unparseable claim simply may not dedupe: ingest refuses it below with its
+      // own 422.
+      const parsed = parseEvent(submitted);
+      const mayDedupe =
+        parsed.ok &&
+        (await checkPermission(
+          { ...parsed.event, serverTime: new Date().toISOString(), seq: 0 } satisfies EventEnvelope,
+          { db: deps.pool, sessionUserId: request.currentUserId },
+        )) === null;
 
-      // ONLY NOW does a credential exist. See the docblock on ordering: this
-      // line failing leaves a pending invitation nobody can open, which is
-      // recoverable (revoke it, invite again); the reverse order would leave an
-      // openable link with no claim behind it, which is not.
-      const token = randomBytes(32).toString('base64url');
-      const createdAt = new Date();
-      const expiresAt = new Date(createdAt.getTime() + INVITE_TOKEN_TTL_MS);
-      await deps.pool.query(
-        `INSERT INTO invite_tokens (invite_id, token_hash, created_at, expires_at)
-         VALUES ($1, $2, $3, $4)`,
-        [inviteId, hashToken(token), createdAt.toISOString(), expiresAt.toISOString()],
+      // ONE request at a time per (workspace, channel, address) inside the
+      // check-and-mint, so a double submit makes ONE invitation. The lock is a
+      // transaction-scoped advisory lock on a dedicated connection and is
+      // released BEFORE the letter is sent: holding a pooled connection across
+      // an SMTP send would starve the pool.
+      const outcome = await withMintLock(
+        deps.pool,
+        mayDedupe ? mintLockKey(workspaceId, channel, address) : null,
+        async (db) => {
+          const existing = mayDedupe
+            ? await findPendingMatch(db, { workspaceId, channel, role, address, projectIds: projectIds ?? [] })
+            : null;
+
+          if (existing === null) {
+            const [result] = await deps.ingest.ingestClientBatch([submitted], request.currentUserId);
+            if (result === undefined) {
+              throw new Error('ingest returned no result for the invite.sent event');
+            }
+            if (result.status !== 'committed') {
+              // The ingest layer's own refusal, verbatim — the same contract the
+              // founding door publishes. A plain member's `permission.role` and a
+              // guest-with-projects parse refusal both arrive here unchanged.
+              return { kind: 'refused' as const, result };
+            }
+          }
+          const inviteId = existing ?? newInviteId;
+
+          // ONLY NOW does a credential exist. See the docblock on ordering: this
+          // line failing leaves a pending invitation nobody can open, which is
+          // recoverable (revoke it, invite again); the reverse order would leave an
+          // openable link with no claim behind it, which is not.
+          //
+          // On a REPEAT the invitation already exists and only its credential
+          // changes: tokens are stored hashed, so the original link cannot be
+          // re-sent, and a fresh token REPLACES the old one — the old link stops
+          // opening anything. An upsert, because the old row may be expired or
+          // may have been swept.
+          const token = randomBytes(32).toString('base64url');
+          const createdAt = new Date();
+          const expiresAt = new Date(createdAt.getTime() + INVITE_TOKEN_TTL_MS);
+          await db.query(
+            `INSERT INTO invite_tokens (invite_id, token_hash, created_at, expires_at)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (invite_id) DO UPDATE
+               SET token_hash = EXCLUDED.token_hash,
+                   created_at = EXCLUDED.created_at,
+                   expires_at = EXCLUDED.expires_at`,
+            [inviteId, hashToken(token), createdAt.toISOString(), expiresAt.toISOString()],
+          );
+          return { kind: 'minted' as const, inviteId, token, expiresAt, deduped: existing !== null };
+        },
       );
+      if (outcome.kind === 'refused') {
+        return reply.code(422).send(outcome.result);
+      }
+      const { inviteId, token, expiresAt } = outcome;
 
       // The one and only copy of the raw token leaves here. `expiresAt` rides
       // with it so the admin can be told when the link lapses rather than
