@@ -1,4 +1,4 @@
-import { expect, test } from '@playwright/test';
+import { expect, test, type Locator, type Page } from '@playwright/test';
 import { ACCOUNTANT_EMAIL, OWNER_EMAIL, signIn } from './helpers/sign-in.js';
 import { openSeededBoard } from './helpers/board.js';
 
@@ -40,27 +40,75 @@ async function openFirstSeededTicket(page: Parameters<typeof openSeededBoard>[0]
   return { workspaceId, projectId, ticketId };
 }
 
+/**
+ * Clicks a popover's trigger only after the sheet's scroll has come to rest
+ * (18.254–18.256, 18.330 — a spec defect, not a product one).
+ *
+ * The Notes section and the Visibility control can sit far below the fold of
+ * the sheet's scroll body (measured: Attach-note button top 1446 px in a
+ * 720 px viewport). Playwright's own auto-scroll before a click moves that
+ * body, but the resulting `scroll` event is delivered on the NEXT frame —
+ * after the click handler has already opened the popover. `Popover`
+ * (packages/ui/src/components/popover.tsx) hands `onClose` to react-aria's
+ * `useOverlayPosition`, which closes an open overlay on any scroll of the
+ * trigger's scrollable ancestors, so the popover opened and was gone within
+ * ~5 ms; `getByRole('textbox', { name: 'Find a note' })` then waited out the
+ * 90 s test timeout on a popover that no longer existed. A person clicks
+ * after the scroll has come to rest; so do we.
+ */
+async function clickTriggerSettled(page: Page, trigger: Locator) {
+  await trigger.scrollIntoViewIfNeeded();
+  // Two frames: the scroll event of the scroll above is delivered, and spent,
+  // before the click that opens the popover.
+  await page.evaluate(
+    () => new Promise<void>((resolve) => requestAnimationFrame(() => requestAnimationFrame(() => resolve()))),
+  );
+  await trigger.click();
+}
+
+/** Opens the ticket sheet's Attach-note popover and returns its search box. */
+async function openAttachPicker(page: Page) {
+  await clickTriggerSettled(page, page.getByTestId('attach-note'));
+  const search = page.getByRole('textbox', { name: 'Find a note' });
+  await expect(search).toBeVisible({ timeout: 10_000 });
+  return search;
+}
+
+/**
+ * A per-run-unique tag for the note titles this file attaches. The seeded
+ * board's first ticket is SHARED fixture state (this file's four specs and
+ * `notes-references.spec.ts` all attach to it, and a rerun finds the last
+ * run's notes still there), so a fixed title makes `getByRole('link', { name })`
+ * match the earlier attachments too — by substring, and by exact name on a
+ * rerun — and the badge assertion dies on a strict-mode violation.
+ */
+function uniqueTag(): string {
+  return `${Date.now()}-${Math.random().toString(36).slice(2, 8)}`;
+}
+
 test('18.254 attach note → New note navigates to the note page, and the badge persists on return without a reload', async ({
   page,
 }) => {
   await signIn(page, OWNER_EMAIL);
   await openFirstSeededTicket(page);
 
-  await page.getByTestId('attach-note').click();
-  await page.getByRole('textbox', { name: 'Find a note' }).fill('Compressor log');
-  await page.getByRole('option', { name: 'New note: Compressor log' }).click();
+  const title = `Compressor log ${uniqueTag()}`;
+  await (await openAttachPicker(page)).fill(title);
+  await page.getByRole('option', { name: `New note: ${title}` }).click();
 
   // The New-note row writes note.created + attaches at birth, then the
   // section navigates via TicketSheetProps.onNavigate (a real router.push at
   // the project page's call site).
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
-  await expect(page.getByTestId('note-title')).toHaveText('Compressor log');
+  await expect(page.getByTestId('note-title')).toHaveText(title);
 
   // Back to the ticket — an SPA history navigation, no page.reload() call —
   // and the badge is present from the live query alone.
   await page.goBack();
   await expect(page.getByTestId('ticket-notes')).toBeVisible({ timeout: 20_000 });
-  await expect(page.getByRole('link', { name: 'Compressor log' })).toBeVisible({ timeout: 10_000 });
+  await expect(page.getByTestId('ticket-notes').getByRole('link', { name: title, exact: true })).toBeVisible({
+    timeout: 10_000,
+  });
 });
 
 test('18.330 clicking a note’s ticket badge opens the sheet in place; the URL path stays /notes/<id>', async ({
@@ -71,8 +119,7 @@ test('18.330 clicking a note’s ticket badge opens the sheet in place; the URL 
 
   // The same recipe 18.254 uses to reach a note with a real ticket badge on
   // it — this spec's own subject only exists once that badge does.
-  await page.getByTestId('attach-note').click();
-  await page.getByRole('textbox', { name: 'Find a note' }).fill('Ticket-sheet-in-place note');
+  await (await openAttachPicker(page)).fill('Ticket-sheet-in-place note');
   await page.getByRole('option', { name: 'New note: Ticket-sheet-in-place note' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   const notePath = new URL(page.url()).pathname;
@@ -80,7 +127,10 @@ test('18.330 clicking a note’s ticket badge opens the sheet in place; the URL 
   // POSITIVE CONTROL: the note itself is actually on screen before the
   // badge under test is touched.
   await expect(page.getByTestId('note-title')).toHaveText('Ticket-sheet-in-place note');
-  const badge = page.getByRole('link').filter({ hasText: /.+/ }).first();
+  // The byline's ticket badge is the one link on the page whose href IS the
+  // ticket's `?ticket=` sheet path. (An earlier `getByRole('link').first()`
+  // resolved to the "Skip to content" link, which is off-screen by design.)
+  const badge = page.locator(`a[href$="?ticket=${ticketId}"]`);
   await expect(badge).toBeVisible({ timeout: 10_000 });
 
   await badge.click();
@@ -105,22 +155,25 @@ test('18.255 × on a note badge detaches it; Undo brings it back', async ({ page
   await openFirstSeededTicket(page);
 
   // Attach a fresh note so this spec does not depend on 18.254 having run.
-  await page.getByTestId('attach-note').click();
-  await page.getByRole('textbox', { name: 'Find a note' }).fill('Fridge parts list');
-  await page.getByRole('option', { name: 'New note: Fridge parts list' }).click();
+  const title = `Fridge parts list ${uniqueTag()}`;
+  await (await openAttachPicker(page)).fill(title);
+  await page.getByRole('option', { name: `New note: ${title}` }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   await page.goBack();
 
   // POSITIVE CONTROL FIRST: the badge is present before it is touched.
-  const badge = page.getByRole('link', { name: 'Fridge parts list' });
+  const notes = page.getByTestId('ticket-notes');
+  const badge = notes.getByRole('link', { name: title, exact: true });
   await expect(badge).toBeVisible({ timeout: 20_000 });
 
-  await page.getByRole('button', { name: 'Detach Fridge parts list' }).click();
+  await notes.getByRole('button', { name: `Detach ${title}`, exact: true }).click();
   await expect(badge).toHaveCount(0, { timeout: 10_000 });
-  await expect(page.getByRole('button', { name: 'Undo' })).toBeVisible({ timeout: 10_000 });
+  // Scoped: the description and comment editors each carry their own (disabled)
+  // toolbar "Undo" button, so an unscoped name match is a strict-mode violation.
+  await expect(notes.getByRole('button', { name: 'Undo' })).toBeVisible({ timeout: 10_000 });
 
-  await page.getByRole('button', { name: 'Undo' }).click();
-  await expect(page.getByRole('link', { name: 'Fridge parts list' })).toBeVisible({ timeout: 10_000 });
+  await notes.getByRole('button', { name: 'Undo' }).click();
+  await expect(badge).toBeVisible({ timeout: 10_000 });
 });
 
 /**
@@ -149,16 +202,23 @@ test('18.256 two sessions: narrowing a ticket away from a guest evicts them from
     await signIn(ownerPage, OWNER_EMAIL);
     const { ticketId, workspaceId, projectId } = await openFirstSeededTicket(ownerPage);
 
-    // A grants the accountant EXPLICIT visibility on this ticket.
-    await ownerPage.locator('.gn-visibility__trigger').click();
+    // A grants the accountant EXPLICIT visibility on this ticket — and names
+    // every OTHER person on the roster too. Apply is disabled while `explicit`
+    // names nobody (visibility-editor.tsx), so a list of ONLY the accountant
+    // leaves the narrowing step below with nothing to Apply: unchecking the
+    // accountant empties the list, and the click waits out the 90 s timeout on
+    // a disabled button.
+    await clickTriggerSettled(ownerPage, ownerPage.locator('.gn-visibility__trigger'));
     await ownerPage.getByRole('radio', { name: 'Only the people I name' }).check();
-    await ownerPage.getByRole('checkbox', { name: new RegExp(ACCOUNTANT_EMAIL) }).check();
+    await expect(ownerPage.getByRole('checkbox', { name: new RegExp(ACCOUNTANT_EMAIL) })).toBeVisible();
+    for (const person of await ownerPage.locator('.gn-popover').getByRole('checkbox').all()) {
+      await person.check();
+    }
     await ownerPage.getByRole('button', { name: 'Apply' }).click();
     await expect(ownerPage.getByRole('button', { name: 'Apply' })).toBeHidden({ timeout: 10_000 });
 
     // A attaches an inherit-scoped note (the New-note row's own scope, D12).
-    await ownerPage.getByTestId('attach-note').click();
-    await ownerPage.getByRole('textbox', { name: 'Find a note' }).fill('Shared maintenance notes');
+    await (await openAttachPicker(ownerPage)).fill('Shared maintenance notes');
     await ownerPage.getByRole('option', { name: 'New note: Shared maintenance notes' }).click();
     await expect(ownerPage).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
     const noteUrl = ownerPage.url();
@@ -172,11 +232,25 @@ test('18.256 two sessions: narrowing a ticket away from a guest evicts them from
       timeout: 20_000,
     });
 
-    // A narrows the ticket away from B — re-open the SAME picker and uncheck.
+    // A narrows the ticket away from B. The editor RE-AUTHORS the audience on
+    // every open: an `explicit` roster is cut from the wire (routes/tickets.ts,
+    // cited in visibility-editor.tsx), so the reopened list shows nobody
+    // checked whatever was saved — there is no accountant box to untick. Narrowing
+    // is therefore a fresh list that simply omits B: everyone but the accountant.
+    // (Naming nobody leaves Apply disabled, hence the others are checked.)
     await ownerPage.goto(`/w/${workspaceId}/p/${projectId}?ticket=${ticketId}`, { waitUntil: 'networkidle' });
-    await ownerPage.locator('.gn-visibility__trigger').click();
-    await ownerPage.getByRole('checkbox', { name: new RegExp(ACCOUNTANT_EMAIL) }).uncheck();
+    await clickTriggerSettled(ownerPage, ownerPage.locator('.gn-visibility__trigger'));
+    await ownerPage.getByRole('radio', { name: 'Only the people I name' }).check();
+    const everyoneButB = ownerPage
+      .locator('.gn-popover')
+      .getByRole('checkbox', { name: /^(?!accountant@)/ });
+    for (const person of await everyoneButB.all()) await person.check();
+    await expect(ownerPage.getByRole('checkbox', { name: new RegExp(ACCOUNTANT_EMAIL) })).not.toBeChecked();
+    await expect(ownerPage.getByRole('button', { name: 'Apply' })).toBeEnabled();
     await ownerPage.getByRole('button', { name: 'Apply' }).click();
+    // POSITIVE CONTROL: the narrowing was accepted (Apply closes the menu on
+    // success and leaves it open on a refusal) before B is asked to react to it.
+    await expect(ownerPage.getByRole('button', { name: 'Apply' })).toBeHidden({ timeout: 10_000 });
 
     // B's OPEN note page — no navigation performed by B — returns to /notes
     // with the toast (spec §9.6, case 18.221's own wiring, seen through the
@@ -204,7 +278,7 @@ test('18.257 a semantically related note surfaces in meaning search after the em
   await expect(page.getByRole('heading', { name: 'Convenience Corner' })).toBeVisible({ timeout: 20_000 });
 
   await page.getByRole('button', { name: 'New note' }).click();
-  await page.getByRole('textbox', { name: 'Title' }).fill('Compressor stopped in the cold room');
+  await page.getByRole('textbox', { name: 'Title', exact: true }).fill('Compressor stopped in the cold room');
   await page.getByRole('button', { name: 'Create' }).click();
   await expect(page).toHaveURL(/\/notes\/[^/]+$/, { timeout: 20_000 });
   await expect(page.getByTestId('note-title')).toHaveText('Compressor stopped in the cold room');
