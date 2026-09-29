@@ -1,11 +1,12 @@
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
+import type { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
 import type { InviteEmail, InviteMailer } from '../../src/invites/invite-mailer.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { signInWithPhone } from '../helpers/session.js';
+import { signInWithEmail, signInWithPhone } from '../helpers/session.js';
 
 /**
  * **A second invitation to an address that already has a pending one ROTATES
@@ -22,6 +23,7 @@ import { signInWithPhone } from '../helpers/session.js';
 let db: TestDatabase;
 let app: FastifyInstance;
 let otp: LogOtpSender;
+let magic: LogMagicLinkSender;
 const mailed: InviteEmail[] = [];
 const recordingMailer: InviteMailer = {
   send: async (mail) => {
@@ -34,6 +36,7 @@ beforeAll(async () => {
   const built = buildTestApp(db, { inviteMailer: recordingMailer });
   app = built.app;
   otp = built.otp;
+  magic = built.magic;
   await app.ready();
 });
 
@@ -42,13 +45,14 @@ afterAll(async () => {
   await db.drop();
 });
 
-type Caller = { userId: string; headers: { authorization: string } };
+type Caller = { userId: string; headers: { authorization: string }; phone: string };
 let phoneCounter = 0;
 
 async function signedIn(): Promise<Caller> {
   phoneCounter += 1;
-  const user = await signInWithPhone(app, otp, `+9190024${String(phoneCounter).padStart(5, '0')}`);
-  return { userId: user.userId, headers: { authorization: `Bearer ${user.token}` } };
+  const phone = `+9190024${String(phoneCounter).padStart(5, '0')}`;
+  const user = await signInWithPhone(app, otp, phone);
+  return { userId: user.userId, headers: { authorization: `Bearer ${user.token}` }, phone };
 }
 
 async function found(owner: Caller): Promise<string> {
@@ -78,7 +82,8 @@ async function mintOk(caller: Caller, workspaceId: string, body: MintBody = {}):
 
 async function joinAs(owner: Caller, workspaceId: string, role: string): Promise<Caller> {
   const joiner = await signedIn();
-  const { token } = await mintOk(owner, workspaceId, { role, address: `join-${role}-${phoneCounter}@example.com` });
+  // R4: the acceptor is the addressed account — invite the phone the joiner signed in with.
+  const { token } = await mintOk(owner, workspaceId, { role, channel: 'phone', address: joiner.phone });
   const res = await app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: joiner.headers });
   expect(res.statusCode, res.body).toBe(200);
   return joiner;
@@ -244,7 +249,9 @@ describe('6.225 what is and is not a match', () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const accepted = await mintOk(owner, workspaceId, { address: 'gone@example.com' });
-    const joiner = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const joinerUser = await signInWithEmail(app, magic, 'gone@example.com');
+    const joiner = { headers: { authorization: `Bearer ${joinerUser.token}` } };
     expect((await app.inject({ method: 'POST', url: `/v1/invites/${accepted.token}/accept`, headers: joiner.headers })).statusCode).toBe(200);
     const afterAccept = await mintOk(owner, workspaceId, { address: 'gone@example.com' });
     expect(afterAccept.inviteId).not.toBe(accepted.inviteId);
