@@ -190,7 +190,7 @@ describe('useLiveQuery — a keyed initial answer (case 18.461)', () => {
     const load = () => new Promise<string | null>((resolve) => loads.push(resolve));
 
     const { result, rerender } = renderHook(
-      ({ key }: { key: string }) => useLiveQuery<string>(SOURCE, 'ws', key, load, 200, { key: 'k1', data: 'seeded' }),
+      ({ key }: { key: string }) => useLiveQuery<string | null>(SOURCE, 'ws', key, load, 200, { key: 'k1', data: 'seeded' }),
       { initialProps: { key: 'k1' } },
     );
     // Served on the FIRST render, before any load has answered — not after an effect.
