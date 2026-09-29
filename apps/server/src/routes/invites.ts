@@ -773,6 +773,22 @@ export function registerInviteRoutes(
   );
 }
 
+type AcceptingAccount = {
+  email: string;
+  emailVerified: boolean;
+  phoneNumber: string | null;
+  phoneNumberVerified: boolean | null;
+};
+
+/** The columns `addressMatchesAccount` compares an invitation's address against. */
+async function accountOf(db: Queryable, userId: string): Promise<AcceptingAccount | null> {
+  const { rows } = await db.query<AcceptingAccount>(
+    `SELECT "email", "emailVerified", "phoneNumber", "phoneNumberVerified" FROM "user" WHERE "id" = $1`,
+    [userId],
+  );
+  return rows[0] ?? null;
+}
+
 /**
  * The one resolver both token-addressed routes use, so they cannot disagree
  * about what an openable invitation is.
@@ -806,22 +822,6 @@ export function registerInviteRoutes(
  * test on this path could only assert that nothing changed, which is a check
  * that cannot fail.
  */
-type AcceptingAccount = {
-  email: string;
-  emailVerified: boolean;
-  phoneNumber: string | null;
-  phoneNumberVerified: boolean | null;
-};
-
-/** The columns `addressMatchesAccount` compares an invitation's address against. */
-async function accountOf(db: Queryable, userId: string): Promise<AcceptingAccount | null> {
-  const { rows } = await db.query<AcceptingAccount>(
-    `SELECT "email", "emailVerified", "phoneNumber", "phoneNumberVerified" FROM "user" WHERE "id" = $1`,
-    [userId],
-  );
-  return rows[0] ?? null;
-}
-
 async function openableInvite(db: Queryable, token: string): Promise<OpenableInvite | null> {
   const { rows: tokenRows } = await db.query<TokenRow>(
     `SELECT invite_id, expires_at FROM invite_tokens
