@@ -3,6 +3,7 @@ import { Writable } from 'node:stream';
 import { afterAll, beforeAll, describe, expect, it } from 'vitest';
 import { newUlid } from '@gisik-nokma/domain';
 import type { FastifyInstance } from 'fastify';
+import type { LogMagicLinkSender } from '../../src/auth/magic-link-sender.js';
 import type { LogOtpSender } from '../../src/auth/otp-sender.js';
 import {
   INVITE_ADMIN_ONLY_BODY,
@@ -12,7 +13,7 @@ import {
 } from '../../src/routes/invites.js';
 import { buildTestApp, TEST_WEB_ORIGIN } from '../helpers/app.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
-import { signInWithPhone } from '../helpers/session.js';
+import { signInWithEmail, signInWithPhone } from '../helpers/session.js';
 
 /**
  * Plan 4 Task 14 — invitations: the address-named claim, and the token that is
@@ -47,12 +48,14 @@ import { signInWithPhone } from '../helpers/session.js';
 let db: TestDatabase;
 let app: FastifyInstance;
 let otp: LogOtpSender;
+let magic: LogMagicLinkSender;
 
 beforeAll(async () => {
   db = await createTestDatabase();
   const built = buildTestApp(db);
   app = built.app;
   otp = built.otp;
+  magic = built.magic;
   await app.ready();
 });
 
@@ -64,10 +67,21 @@ afterAll(async () => {
 type Caller = { userId: string; headers: { authorization: string } };
 
 let phoneCounter = 0;
+/** The phone each `signedIn()` caller signed in with — R4 invites a joiner on the number they hold. */
+const phoneByUser = new Map<string, string>();
+
+function phoneOf(caller: Caller): string {
+  const phone = phoneByUser.get(caller.userId);
+  if (phone === undefined) throw new Error(`no phone recorded for ${caller.userId}`);
+  return phone;
+}
 
 async function signedIn(): Promise<Caller> {
   phoneCounter += 1;
-  return withHeaders(await signInWithPhone(app, otp, `+9190014${String(phoneCounter).padStart(5, '0')}`));
+  const phone = `+9190014${String(phoneCounter).padStart(5, '0')}`;
+  const caller = withHeaders(await signInWithPhone(app, otp, phone));
+  phoneByUser.set(caller.userId, phone);
+  return caller;
 }
 
 function withHeaders(user: { userId: string; token: string }): Caller {
@@ -113,7 +127,9 @@ async function mintOk(
  */
 async function joinViaInvite(owner: Caller, workspaceId: string, role: string): Promise<Caller> {
   const joiner = await signedIn();
-  const { token } = await mintOk(owner, workspaceId, { role, address: `${role}-${phoneCounter}@example.com` });
+  // R4 (owner ruling 2026-09-29): the link opens only for the account it names,
+  // so the joiner is invited on the phone they signed in with.
+  const { token } = await mintOk(owner, workspaceId, { role, channel: 'phone', address: phoneOf(joiner) });
   const res = await app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: joiner.headers });
   expect(res.statusCode, res.body).toBe(200);
   return joiner;
@@ -460,7 +476,8 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
     expect((revoke.json() as { results: Array<{ status: string }> }).results[0]?.status).toBe('committed');
 
     const spentInvite = await mintOk(owner, workspaceId, { address: 'spent@example.com' });
-    const acceptor = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const acceptor = await emailAccount('spent@example.com');
     expect(
       (await app.inject({
         method: 'POST',
@@ -525,7 +542,8 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
     expect(await eventCount(workspaceId)).toBe(before);
     expect(await workspaceRoleOf(workspaceId, one.userId)).toBeNull();
 
-    const two = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const two = await emailAccount('lapse-b@example.com');
     const accepted = await app.inject({
       method: 'POST',
       url: `/v1/invites/${fresh.token}/accept`,
@@ -539,7 +557,8 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const { token } = await mintOk(owner, workspaceId);
-    const acceptor = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const acceptor = await emailAccount('accountant@example.com');
 
     expect(
       (await app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: acceptor.headers }))
@@ -592,7 +611,8 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const { inviteId, token } = await mintOk(owner, workspaceId, { address: 'crash@example.com' });
-    const acceptor = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const acceptor = await emailAccount('crash@example.com');
 
     expect(
       (await app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: acceptor.headers }))
@@ -667,9 +687,17 @@ describe('unknown, revoked, spent and lapsed links are indistinguishable (case 6
  * Reusing one workspace would make trial 2 prove nothing: the trial-1 winner is
  * a member by then, and 6.116's rule says an existing member's acceptance
  * appends NO `membership.granted` at all — the grant count would move for a
- * reason that has nothing to do with the race. So the three acceptors are
- * created once (they hold no role in a workspace that did not exist when they
+ * reason that has nothing to do with the race. So the addressed account is
+ * created once (it holds no role in a workspace that did not exist when it
  * signed in) and the WORKSPACE and the INVITATION are fresh every trial.
+ *
+ * ## Who races (R4, 2026-09-29)
+ *
+ * Only the account a link names may present it, so the race can no longer be
+ * between three different people (two of them would now be refused 403 before
+ * the consume). It is three SESSIONS of the ONE addressed account — one person
+ * on three devices — which still reaches the consume together and still lets
+ * only one through; the losers' answer stays the dead-link 404.
  *
  * Every trial's outcome is collected and the whole run is asserted at the end,
  * rather than failing on the first breach: a race that fires in 24 of 25 trials
@@ -696,11 +724,15 @@ describe('one token admits exactly one acceptance, under genuine concurrency (ca
 
   it(`${PRESENTERS} parallel acceptances of one token yield ONE join and ${PRESENTERS - 1} refusals, ${TRIALS} trials`, async () => {
     const owner = await signedIn();
-    const presenters: Caller[] = [];
-    for (let i = 0; i < PRESENTERS; i += 1) {
-      presenters.push(await signedIn());
+    // R4: only the addressed account may present the link, so the race is
+    // between PRESENTERS sessions of ONE account (one person on several
+    // devices) — the consume, not the address check, decides the winner.
+    const invitee = await signedIn();
+    const presenters: Caller[] = [invitee];
+    for (let i = 1; i < PRESENTERS; i += 1) {
+      presenters.push(withHeaders(await signInWithPhone(app, otp, phoneOf(invitee))));
     }
-    const presenterIds = presenters.map((p) => p.userId);
+    const presenterIds = [invitee.userId];
 
     type Breach = {
       trial: number;
@@ -716,7 +748,8 @@ describe('one token admits exactly one acceptance, under genuine concurrency (ca
     for (let trial = 0; trial < TRIALS; trial += 1) {
       const workspaceId = await found(owner, `Race ${trial}`);
       const { inviteId, token } = await mintOk(owner, workspaceId, {
-        address: `race-${trial}@example.com`,
+        channel: 'phone',
+        address: phoneOf(invitee),
         role: 'admin',
       });
 
@@ -781,7 +814,8 @@ describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)',
       role: 'member',
       projectIds: [projectId],
     });
-    const acceptor = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const acceptor = await emailAccount('bookkeeper@example.com');
 
     const before = await eventCount(workspaceId);
     const res = await app.inject({
@@ -831,7 +865,8 @@ describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)',
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const { token } = await mintOk(owner, workspaceId, { address: 'guest@example.com', role: 'guest' });
-    const guest = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const guest = await emailAccount('guest@example.com');
 
     const before = await eventCount(workspaceId);
     expect(
@@ -853,22 +888,27 @@ describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)',
   /**
    * The escalation this route must not open in the OTHER direction.
    *
-   * A link is bearer-authorised — whoever holds it may use it, which is the
-   * point, because the address is a claim about where to reach a person and
-   * never an assertion about who they are. But `membership.granted` is an UPSERT
-   * keyed on the person: an owner who opened a guest link addressed to somebody
-   * else would demote themselves out of their own workspace, and no event would
-   * look wrong afterwards. Changing an existing member's role is an admin's
-   * attributed act, not something a forwarded link may do.
+   * `membership.granted` is an UPSERT keyed on the person: an owner who opened a
+   * guest link addressed to THEM would demote themselves out of their own
+   * workspace, and no event would look wrong afterwards. Changing an existing
+   * member's role is an admin's attributed act, not something a link may do.
+   * (Before R4 the link was bearer-authorised and the owner opened one
+   * addressed to somebody else; that is refused now, case 6.265, so this case
+   * uses a link addressed to the owner's own phone.)
    */
   it('planted defect: an existing member accepting a lower-role invitation keeps the role they had', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     expect(await workspaceRoleOf(workspaceId, owner.userId)).toBe('owner');
 
-    const { inviteId, token } = await mintOk(owner, workspaceId, { address: 'someone@example.com', role: 'guest' });
+    // R4: the OWNER opens a guest link addressed to THEM (their own phone). A
+    // link addressed to somebody else is refused now (6.265).
+    const { inviteId, token } = await mintOk(owner, workspaceId, {
+      channel: 'phone',
+      address: phoneOf(owner),
+      role: 'guest',
+    });
     const before = await eventCount(workspaceId);
-    // The OWNER opens the guest link addressed to somebody else.
     const res = await app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: owner.headers });
     expect(res.statusCode, res.body).toBe(200);
 
@@ -884,7 +924,8 @@ describe('POST /v1/invites/:token/accept — the grant it promised (case 6.37)',
     // THE POSITIVE CONTROL: the same route, the same workspace, a person with
     // no role — the grant does land. Without it, "no membership.granted" is
     // equally consistent with a route that never grants anything.
-    const newcomer = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const newcomer = await emailAccount('newcomer@example.com');
     const second = await mintOk(owner, workspaceId, { address: 'newcomer@example.com', role: 'guest' });
     expect(
       (await app.inject({ method: 'POST', url: `/v1/invites/${second.token}/accept`, headers: newcomer.headers }))
@@ -972,7 +1013,8 @@ describe('GET /v1/workspaces/:workspaceId/invites — the pending list (case 6.4
     const accepted = await mintOk(owner, workspaceId, { address: 'accepted@example.com' });
     const revoked = await mintOk(owner, workspaceId, { address: 'revoked@example.com' });
 
-    const acceptor = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const acceptor = await emailAccount('accepted@example.com');
     expect(
       (await app.inject({ method: 'POST', url: `/v1/invites/${accepted.token}/accept`, headers: acceptor.headers }))
         .statusCode,
@@ -1110,7 +1152,8 @@ describe('the promised projects (cases 6.126, 6.127)', () => {
     expect(await workspaceRoleOf(workspaceId, guest.userId)).toBe('guest');
 
     const upgrade = await mintOk(owner, workspaceId, {
-      address: 'upgrade@example.com',
+      channel: 'phone',
+      address: phoneOf(guest), // R4: the acceptor is the addressed account.
       role: 'member',
       projectIds: [projectId],
     });
@@ -1129,7 +1172,8 @@ describe('the promised projects (cases 6.126, 6.127)', () => {
     // THE POSITIVE CONTROL, same workspace, same project, same invitation
     // shape: a NEWCOMER accepting it does get the row. Without it, "no project
     // row" is equally consistent with acceptance no longer appending any.
-    const newcomer = await signedIn();
+    // R4: the acceptor is the addressed account.
+    const newcomer = await emailAccount('newcomer2@example.com');
     const second = await mintOk(owner, workspaceId, {
       address: 'newcomer2@example.com',
       role: 'member',
@@ -1146,7 +1190,8 @@ describe('the promised projects (cases 6.126, 6.127)', () => {
     // being a guest, not about already being in the workspace.
     const member = await joinViaInvite(owner, workspaceId, 'member');
     const third = await mintOk(owner, workspaceId, {
-      address: 'existing-member@example.com',
+      channel: 'phone',
+      address: phoneOf(member), // R4: the acceptor is the addressed account.
       role: 'member',
       projectIds: [projectId],
     });
@@ -1356,5 +1401,277 @@ describe('13.988 the link read carries the presented token’s expiry', () => {
     expect(again.statusCode).toBe(200);
     const secondExpiry = (again.json() as { expiresAt: string }).expiresAt;
     expect(Date.parse(secondExpiry)).toBeGreaterThanOrEqual(Date.parse(firstExpiry));
+  });
+});
+
+// ───────────────────────────────────────────── R4: the link opens for its address ──
+
+/**
+ * R4 (owner ruling 2026-09-29, "refuse"): an invitation link is accepted only by
+ * the account it was addressed to. The refusal runs BEFORE the consume, so a
+ * wrong account never spends the link, and it runs AFTER the openable read, so a
+ * revoked, lapsed, spent or unknown link still answers the 404 it always did and
+ * the refusal never tells anyone that a link is live.
+ */
+let r4Counter = 0;
+
+async function emailAccount(email: string): Promise<Caller> {
+  return withHeaders(await signInWithEmail(app, magic, email));
+}
+
+function acceptLink(token: string, caller: Caller) {
+  return app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: caller.headers });
+}
+
+async function tokenRowCount(inviteId: string): Promise<number> {
+  const { rows } = await db.pool.query<{ n: number }>(
+    'SELECT count(*)::int AS n FROM invite_tokens WHERE invite_id = $1',
+    [inviteId],
+  );
+  return rows[0]?.n ?? 0;
+}
+
+async function revokeInvite(owner: Caller, workspaceId: string, inviteId: string): Promise<void> {
+  const res = await app.inject({
+    method: 'POST',
+    url: '/v1/events',
+    headers: owner.headers,
+    payload: {
+      events: [
+        {
+          id: newUlid(),
+          workspaceId,
+          entity: { kind: 'invite', id: inviteId },
+          type: 'invite.revoked',
+          version: 1,
+          payload: { inviteId },
+          actorId: owner.userId,
+          origin: 'web',
+          clientTime: new Date().toISOString(),
+        },
+      ],
+    },
+  });
+  expect(res.statusCode, res.body).toBe(200);
+}
+
+const NOT_YOURS_A = JSON.stringify({
+  error: 'not_yours',
+  message: 'This invitation was sent to a•••@example.com. Sign in with that account to accept it.',
+});
+
+describe('R4 an invitation link opens only for the account it was sent to', () => {
+  it('6.261 a different account gets 403 and the masked body, appends nothing, spends nothing; CONTROL: the addressed account then opens the SAME link', async () => {
+    r4Counter += 1;
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    const address = `alma-r4-${r4Counter}@example.com`;
+    const { inviteId, token } = await mintOk(owner, workspaceId, { address });
+
+    const stranger = await emailAccount(`zed-r4-${r4Counter}@example.com`);
+    const phoneOnly = await signedIn(); // a phone account: synthetic email, verified phone
+    const before = await eventCount(workspaceId);
+
+    for (const wrong of [stranger, phoneOnly]) {
+      const refused = await acceptLink(token, wrong);
+      expect(refused.statusCode, refused.body).toBe(403);
+      // The WHOLE body: the message, the mask, nothing else — and not the address.
+      expect(refused.body).toBe(NOT_YOURS_A);
+      expect(refused.body).not.toContain(address);
+      expect(refused.body).not.toContain('lma-r4');
+      expect(await workspaceRoleOf(workspaceId, wrong.userId)).toBeNull();
+    }
+    // Appends nothing, and the link is NOT spent: its token row is still there.
+    expect(await eventCount(workspaceId)).toBe(before);
+    expect(await tokenRowCount(inviteId)).toBe(1);
+
+    // CONTROL (same it): the addressed account opens the same link and joins.
+    const alma = await emailAccount(address);
+    const accepted = await acceptLink(token, alma);
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(await workspaceRoleOf(workspaceId, alma.userId)).toBe('member');
+    expect((await workspaceStream(workspaceId)).slice(before).map((row) => row.type)).toContain('invite.accepted');
+  });
+
+  it('6.261 a revoked, lapsed, spent, unknown or superseded link answers what it always did (404), even to a non-matching account; CONTROL: a live link answers 403', async () => {
+    r4Counter += 1;
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    const stranger = await emailAccount(`zed-r4-${r4Counter}@example.com`);
+    const mk = (name: string) => mintOk(owner, workspaceId, { address: `${name}-r4-${r4Counter}@example.com` });
+
+    const live = await mk('live');
+    const revoked = await mk('revoked');
+    const lapsed = await mk('lapsed');
+    const spent = await mk('spent');
+    await revokeInvite(owner, workspaceId, revoked.inviteId);
+    await db.pool.query("UPDATE invite_tokens SET expires_at = now() - interval '1 second' WHERE invite_id = $1", [
+      lapsed.inviteId,
+    ]);
+    const spender = await emailAccount(`spent-r4-${r4Counter}@example.com`);
+    expect((await acceptLink(spent.token, spender)).statusCode).toBe(200);
+    // A re-send rotates the token (S4): the OLD link is gone, the new one is live.
+    const resent = await mintOk(owner, workspaceId, { address: `resent-r4-${r4Counter}@example.com` });
+    const rotated = await mintOk(owner, workspaceId, { address: `resent-r4-${r4Counter}@example.com` });
+    expect(rotated.inviteId).toBe(resent.inviteId);
+    expect(rotated.token).not.toBe(resent.token);
+
+    const unknown = 'B'.repeat(43);
+    const before = await eventCount(workspaceId);
+    for (const [label, token] of [
+      ['revoked', revoked.token],
+      ['lapsed', lapsed.token],
+      ['spent', spent.token],
+      ['unknown', unknown],
+      ['superseded', resent.token],
+    ] as const) {
+      const res = await acceptLink(token, stranger);
+      expect(res.statusCode, `${label}: ${res.body}`).toBe(404);
+      expect(res.json(), label).toEqual(INVITE_NOT_OPENABLE_BODY);
+    }
+    // The addressed account gets the same 404 on the superseded link, and the NEW link works for them.
+    const resentAccount = await emailAccount(`resent-r4-${r4Counter}@example.com`);
+    expect((await acceptLink(resent.token, resentAccount)).statusCode).toBe(404);
+    expect(await eventCount(workspaceId)).toBe(before);
+    // CONTROL: the check can tell — a LIVE link answers this same stranger 403.
+    expect((await acceptLink(live.token, stranger)).statusCode).toBe(403);
+    expect((await acceptLink(rotated.token, stranger)).statusCode).toBe(403);
+    const ok = await acceptLink(rotated.token, resentAccount);
+    expect(ok.statusCode, ok.body).toBe(200);
+  });
+
+  it('6.261 the refusal is not in the process log line and appends no event; CONTROL: the request line IS logged with its 403', async () => {
+    r4Counter += 1;
+    const lines: string[] = [];
+    const stream = new Writable({
+      write(chunk, _encoding, callback) {
+        lines.push(String(chunk));
+        callback();
+      },
+    });
+    const logged = buildTestApp(db, { logStream: stream });
+    await logged.app.ready();
+    try {
+      const owner = withHeaders(
+        await signInWithPhone(logged.app, logged.otp, `+919001${String(Date.now() % 100000).padStart(5, '0')}`),
+      );
+      const created = await logged.app.inject({
+        method: 'POST',
+        url: '/v1/workspaces',
+        headers: owner.headers,
+        payload: { name: 'Logged R4' },
+      });
+      const workspaceId = (created.json() as { workspaceId: string }).workspaceId;
+      const address = `alma-r4-log-${r4Counter}@example.com`;
+      const minted = await logged.app.inject({
+        method: 'POST',
+        url: `/v1/workspaces/${workspaceId}/invites`,
+        headers: owner.headers,
+        payload: { address, channel: 'email', role: 'member' },
+      });
+      expect(minted.statusCode, minted.body).toBe(201);
+      const token = (minted.json() as { url: string }).url.slice(`${TEST_WEB_ORIGIN}/invite/`.length);
+      const stranger = withHeaders(await signInWithEmail(logged.app, logged.magic, `zed-r4-log-${r4Counter}@example.com`));
+
+      const { rows: before } = await db.pool.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM events WHERE workspace_id = $1',
+        [workspaceId],
+      );
+      lines.length = 0;
+      const refused = await logged.app.inject({
+        method: 'POST',
+        url: `/v1/invites/${token}/accept`,
+        headers: stranger.headers,
+      });
+      expect(refused.statusCode, refused.body).toBe(403);
+
+      const written = lines.join('');
+      // The instrument works: this very request was logged, with its status.
+      expect(written).toContain('/v1/invites/[redacted]/accept');
+      expect(written).toContain('"statusCode":403');
+      // The point: neither address nor credential is in the log.
+      expect(written).not.toContain(address);
+      expect(written).not.toContain('lma-r4-log');
+      expect(written).not.toContain(token);
+      // And the event log gained nothing from the refusal.
+      const { rows: after } = await db.pool.query<{ n: number }>(
+        'SELECT count(*)::int AS n FROM events WHERE workspace_id = $1',
+        [workspaceId],
+      );
+      expect(after[0]?.n).toBe(before[0]?.n);
+    } finally {
+      await logged.app.close();
+    }
+  });
+
+  it('6.262 the addressed account accepts regardless of address case, from a second sign-in; CONTROL: another domain is refused', async () => {
+    r4Counter += 1;
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    const { token } = await mintOk(owner, workspaceId, { address: `Alma-R4-${r4Counter}@Example.COM` });
+
+    const lookalike = await emailAccount(`alma-r4-${r4Counter}@example.org`);
+    expect((await acceptLink(token, lookalike)).statusCode).toBe(403);
+
+    // The right person signs in twice (two devices) and types their address in a third case.
+    const firstDevice = await emailAccount(`alma-r4-${r4Counter}@EXAMPLE.com`);
+    const secondDevice = await emailAccount(`ALMA-R4-${r4Counter}@example.com`);
+    expect(secondDevice.userId).toBe(firstDevice.userId);
+    const accepted = await acceptLink(token, secondDevice);
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(await workspaceRoleOf(workspaceId, firstDevice.userId)).toBe('member');
+  });
+
+  it('6.263 a phone-channel invite opens for the account whose verified phone it names, and is refused for one with no verified phone; CONTROL: the right phone account then opens it', async () => {
+    r4Counter += 1;
+    const n = String(r4Counter).padStart(3, '0');
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    // Typed with separators; stored exactly as typed (FD4).
+    const { token } = await mintOk(owner, workspaceId, { channel: 'phone', address: `+91 90015-00${n}` });
+
+    const emailOnly = await emailAccount(`zed-r4-${r4Counter}@example.com`); // verified email, no phone at all
+    const refused = await acceptLink(token, emailOnly);
+    expect(refused.statusCode, refused.body).toBe(403);
+    expect(refused.body).toBe(
+      JSON.stringify({
+        error: 'not_yours',
+        message: `This invitation was sent to •••${n.slice(-2)}. Sign in with that account to accept it.`,
+      }),
+    );
+    expect(refused.body).not.toContain(`90015-00${n}`);
+    expect(refused.body).not.toContain(`9001500${n}`);
+    const otherPhone = withHeaders(await signInWithPhone(app, otp, `+9190015${String(500 + r4Counter).padStart(5, '0')}`));
+    expect((await acceptLink(token, otherPhone)).statusCode).toBe(403);
+
+    const right = withHeaders(await signInWithPhone(app, otp, `+919001500${n}`));
+    const accepted = await acceptLink(token, right);
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(await workspaceRoleOf(workspaceId, right.userId)).toBe('member');
+  });
+
+  it('6.265 an EXISTING member opening a link addressed to someone else is refused and keeps their role; CONTROL: a link to their own phone still leaves the role alone', async () => {
+    r4Counter += 1;
+    const owner = await signedIn();
+    const workspaceId = await found(owner);
+    expect(await workspaceRoleOf(workspaceId, owner.userId)).toBe('owner');
+
+    // Before R4 this same request answered 200 (an owner opening someone else's
+    // guest link kept their role and appended `invite.accepted`). Not asserted.
+    const foreign = await mintOk(owner, workspaceId, { address: `someone-r4-${r4Counter}@example.com`, role: 'guest' });
+    const before = await eventCount(workspaceId);
+    const refused = await acceptLink(foreign.token, owner);
+    expect(refused.statusCode, refused.body).toBe(403);
+    expect(await workspaceRoleOf(workspaceId, owner.userId)).toBe('owner');
+    expect(await eventCount(workspaceId)).toBe(before);
+    expect(await tokenRowCount(foreign.inviteId)).toBe(1);
+
+    // CONTROL: a link that IS the owner's own (their phone) is accepted and the role is untouched.
+    const own = await mintOk(owner, workspaceId, { channel: 'phone', address: phoneOf(owner), role: 'guest' });
+    const beforeOwn = await eventCount(workspaceId);
+    const accepted = await acceptLink(own.token, owner);
+    expect(accepted.statusCode, accepted.body).toBe(200);
+    expect(await workspaceRoleOf(workspaceId, owner.userId)).toBe('owner');
+    expect((await workspaceStream(workspaceId)).slice(beforeOwn).map((row) => row.type)).toEqual(['invite.accepted']);
   });
 });

@@ -1,4 +1,5 @@
 import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
+import { assigneeArmTickets } from '../visibility/assignee-arm.js';
 import { canSeeResolved } from '../visibility/can-see.js';
 import type { Queryable } from '../db/queryable.js';
 
@@ -86,6 +87,8 @@ export async function restrictedParentsFor(
   const roleByWorkspace = new Map<string, EffectiveRole>();
   const visibleParents = new Set<string>();
   const knownParents = new Set<string>();
+  // Parents the audience does not admit and the assignee arm may still open (a role is held).
+  const armCandidates: string[] = [];
   for (const parent of rows) {
     knownParents.add(parent.ticket_id);
     let eff = roleByWorkspace.get(parent.workspace_id);
@@ -102,8 +105,13 @@ export async function restrictedParentsFor(
       })
     ) {
       visibleParents.add(parent.ticket_id);
+    } else if (eff.workspaceRole !== null) {
+      armCandidates.push(parent.ticket_id);
     }
   }
+  // The assignee arm (R1, FD1): a parent the viewer is assigned, or inherits an assignment for, is one
+  // they can open — `canSee`'s own answer — so it is not "restricted".
+  for (const id of await assigneeArmTickets(db, viewerId, armCandidates)) visibleParents.add(id);
 
   for (const card of cards) {
     if (card.parent_id === null) continue;

@@ -39,11 +39,11 @@ afterAll(async () => {
   await db.drop();
 });
 
-type Caller = { userId: string; headers: { authorization: string } };
+type Caller = { userId: string; headers: { authorization: string }; phone?: string; email?: string };
 let n = 0;
 async function byEmail(email: string): Promise<Caller> {
   const u = await signInWithEmail(app, magic, email);
-  return { userId: u.userId, headers: { authorization: `Bearer ${u.token}` } };
+  return { userId: u.userId, headers: { authorization: `Bearer ${u.token}` }, email };
 }
 async function byPhone(): Promise<Caller & { phone: string }> {
   n += 1;
@@ -73,7 +73,11 @@ async function submit(caller: Caller, events: SubmittedEvent[]) {
 
 /** Joins `who` at `role` the way the product does: an admin's invitation, accepted. */
 async function join(owner: Caller, ws: string, who: Caller, role: 'admin' | 'member' | 'guest'): Promise<void> {
-  const minted = await post(owner, `/v1/workspaces/${ws}/invites`, { address: `${who.userId}@join.test`, channel: 'phone', role });
+  // R4: the acceptor is the addressed account — invite the phone or the email `who` signed in with.
+  const addressed = who.phone !== undefined
+    ? { channel: 'phone', address: who.phone }
+    : { channel: 'email', address: who.email ?? '' };
+  const minted = await post(owner, `/v1/workspaces/${ws}/invites`, { ...addressed, role });
   expect(minted.statusCode, minted.body).toBe(201);
   const token = (minted.json() as { url: string }).url.slice(`${TEST_WEB_ORIGIN}/invite/`.length);
   const accepted = await app.inject({ method: 'POST', url: `/v1/invites/${token}/accept`, headers: who.headers });

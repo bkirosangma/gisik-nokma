@@ -7,7 +7,7 @@ import type {
 import type { Queryable } from '../db/queryable.js';
 import { rowToEnvelope, type EventRow } from '../ledger/event-store.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
-import { canReadNote, loadNoteForVisibility } from './can-read-note.js';
+import { canReadNote, loadNoteForVisibility, noteArmReach } from './can-read-note.js';
 import { canSee } from './can-see.js';
 import {
   grantNoticeFor,
@@ -534,10 +534,12 @@ export async function* visibleEventsFor(
             // readable BY DEFINITION of `canReadNote`'s `inherit` arm, which
             // asks the same `canSeeResolved` of the same ticket. So on this path
             // the filter cannot change an answer **for a reader admitted by the
-            // audience** — but since the assignee arm (W3) `canSee` ALSO admits an
-            // ASSIGNEE the note's inherited scope does not, and for that reader
-            // the filter is what keeps the note out (final review 2026-09-29):
-            // do not remove it. It is kept because
+            // audience** — and since R1 (2026-09-30) an `inherit` note is ALSO
+            // opened by the assignee arm (`canReadNote`'s `armReach`, threaded
+            // through `noteGrantNoticeFor`), so the two definitions still agree
+            // for an assignee; the filter matters for a note whose attached
+            // tickets are not all readable, and for a `project`-scope note the
+            // assignment does NOT open: do not remove it. It is kept because
             // `noteGrantNoticeFor` is also the note branch's filter (Task 1),
             // where it is load-bearing — a note event reaches that call for a
             // note whose readability nothing else has asked about — and because
@@ -700,7 +702,8 @@ export async function* visibleEventsFor(
         // and withhold them from everybody, the author included.
         const loaded = await loadNoteForVisibility(db, env.entity.id);
         if (loaded === null) break;
-        if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities)) break;
+        const armReach = await noteArmReach(db, userId, loaded.attachedVisibilities);
+        if (!canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities, armReach)) break;
         // The grant half, one entity kind over from the ticket branch above and
         // under the same ruling: a note event that can change this note's
         // resolved audience, reaching a reader who may read it NOW, hands back

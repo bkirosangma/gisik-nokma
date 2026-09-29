@@ -18,7 +18,7 @@ import { projectExists } from '../projections/proj-projects.js';
 import { getTicketStateFromDb } from '../projections/tickets.js';
 import { projectPrefixesInWorkspace } from '../read/visible-projects.js';
 import { canSee, getResolvedVisibility } from '../visibility/can-see.js';
-import { canReadNote, loadNoteForVisibility } from '../visibility/can-read-note.js';
+import { canReadNote, loadNoteForVisibility, noteArmReach } from '../visibility/can-read-note.js';
 import { checkLifecycle } from './check-lifecycle.js';
 import { hasProjectAdminRights, resolveEffectiveRole, type EffectiveRole } from './effective-role.js';
 
@@ -1323,7 +1323,8 @@ export async function checkNotePermission(env: EventEnvelope, ctx: VisibilityCon
   // answer, deliberately, and it is the same rule the read routes apply: a
   // distinct refusal for "exists but hidden" is an existence oracle.
   if (loaded === null) return refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_READABLE_REASON);
-  const readable = canReadNote(ctx.eff, ctx.sessionUserId, loaded.note, loaded.attachedVisibilities);
+  const armReach = await noteArmReach(ctx.db, ctx.sessionUserId, loaded.attachedVisibilities);
+  const readable = canReadNote(ctx.eff, ctx.sessionUserId, loaded.note, loaded.attachedVisibilities, armReach);
   if (!readable) return refuseWith(NOTE_PERMISSION_RULE, NOTE_NOT_READABLE_REASON);
   if (NOTE_AUTHOR_EVENTS.has(env.type)) {
     const isAuthor = loaded.note.authorId === ctx.sessionUserId;
