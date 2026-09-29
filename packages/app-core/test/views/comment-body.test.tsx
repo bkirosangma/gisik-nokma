@@ -502,4 +502,54 @@ describe('19.188 a chip to an erased item', () => {
     const links = [...container.querySelectorAll('a')];
     expect(links.map((a) => a.textContent)).toEqual(['SHOP-9 Fix the freezer']);
   });
+  /**
+   * CASE 9.483 — a posted comment's task checkbox has an ACCESSIBLE NAME.
+   *
+   * The box is `<input type="checkbox" disabled>` beside a `<span>` that holds
+   * the text; nothing joined them, so a screen reader announced "checkbox,
+   * checked" with no words. `aria-labelledby` points each box at ITS OWN span.
+   * The id must be unique across the PAGE, not just this body: a thread renders
+   * many comments, so two bodies with the same shape must not share ids
+   * (`idPrefix` — the thread passes the comment id).
+   */
+  it('9.483 every task checkbox is labelled by its own text span, with an id unique across bodies', () => {
+    const tasks = (...texts: string[]): unknown => ({
+      type: 'doc',
+      content: [
+        {
+          type: 'taskList',
+          content: texts.map((text, index) => ({
+            type: 'taskItem',
+            attrs: { checked: index === 1 },
+            content: [{ type: 'paragraph', content: [{ type: 'text', text }] }],
+          })),
+        },
+      ],
+    });
+    const { container } = render(
+      <>
+        <div data-testid="a">{renderCommentBody(tasks('Order filters', 'Call the vendor'), () => null, () => false, 'comment-a')}</div>
+        <div data-testid="b">{renderCommentBody(tasks('Same shape', 'Different words'), () => null, () => false, 'comment-b')}</div>
+      </>,
+    );
+    const boxes = [...container.querySelectorAll<HTMLInputElement>('li.gn-comment__task > input')];
+    expect(boxes).toHaveLength(4);
+    const ids = boxes.map((box) => box.getAttribute('aria-labelledby'));
+    expect(ids.every((id) => id !== null && id !== ''), 'every box names a label').toBe(true);
+    expect(new Set(ids).size, 'no two boxes share a label id, across both bodies').toBe(4);
+    for (const box of boxes) {
+      const label = container.querySelector(`#${CSS.escape(box.getAttribute('aria-labelledby')!)}`);
+      expect(label, 'the id resolves').not.toBeNull();
+      expect(label!.parentElement, 'and it is this box\'s OWN row').toBe(box.parentElement);
+      expect(label!.tagName).toBe('SPAN');
+    }
+    expect(boxes.map((box) => document.getElementById(box.getAttribute('aria-labelledby')!)?.textContent)).toEqual([
+      'Order filters',
+      'Call the vendor',
+      'Same shape',
+      'Different words',
+    ]);
+    // CONTROL: the accessible-name computation actually reads it — the role query resolves by that name.
+    expect(screen.getByRole('checkbox', { name: 'Call the vendor', checked: true })).toBe(boxes[1]);
+  });
 });

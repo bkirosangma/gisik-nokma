@@ -251,8 +251,12 @@ function renderNode(
         disabled: true,
         readOnly: true,
         checked: attrs !== null && attrs['checked'] === true,
+        // The box's accessible name is its own text (case 9.483). `key` is the
+        // item's path in the body, so it is unique within one body; the body's
+        // `idPrefix` makes it unique across a thread.
+        'aria-labelledby': `${key}-task`,
       }),
-      createElement('span', null, children),
+      createElement('span', { id: `${key}-task` }, children),
     );
   }
   if (node.type === 'details') {
@@ -370,11 +374,16 @@ function renderNode(
  * this renderer has no href resolver of its own the way `wikiLink`'s
  * `/notes/<id>` is built in, so a caller that supplies none gets a `ticketRef`
  * chip rendered as a plain span (spec §14.2).
+ *
+ * `idPrefix` seeds the ids a task item's checkbox points its label at
+ * (`aria-labelledby`, case 9.483). A page that renders several bodies must give
+ * each its own — the thread passes the comment id.
  */
 export function renderCommentBody(
   doc: unknown,
   ticketHref: TicketHrefResolver = () => null,
   isPurged: PurgedPredicate = () => false,
+  idPrefix = 'b',
 ): ReactNode {
-  return renderNode(doc, 0, 'b', ticketHref, isPurged);
+  return renderNode(doc, 0, idPrefix, ticketHref, isPurged);
 }

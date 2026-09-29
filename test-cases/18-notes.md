@@ -18,6 +18,7 @@ in the table below. Take from your block, never from the tip.
 | 7 Inline references | `18.271`–`18.300` |
 | editor-polish Unit 6 | `18.301`–`18.320` |
 | note mentions (`feat/note-mentions`) | `18.401`–`18.420` — **minted: `18.401`–`18.416`**, so `18.417`–`18.420` are unused |
+| scope editor commits (`fix/notes-scope-and-dark`) | `18.430`–`18.439` — **minted: `18.430`–`18.432`**, so `18.433`–`18.439` are unused |
 
 **Write cases as `- ❌ **18.001 — …**` id LINES.** The guard (`scripts/check-case-ids.mjs`) counts id LINES and
 nothing else; four spellings are invisible to it (a markdown **table row**, a **`##` heading**, a **backticked**
@@ -367,3 +368,9 @@ have failed even 3:1 for a reason unrelated to what renders). Cases file: this o
 - 🧪 **18.414 — browser: as user A type `@` in a note body and see the people; mention user B (who can read the note) and save; B's Inbox shows "… mentioned you" naming the note; clicking opens the note. Repeat in a comment: the click lands on that comment, scrolled into view. Mention a person the note is not shared with: nothing arrives for them.** Recipe: two browsers on the dev stack (`ctl rebuild` from `release/trash`). Not measured in this change.
 - ✅ **18.415 — the manual (the Inbox list, "Mentioning somebody in a note") and the FAQ ("If I mention someone in a note, do they get told?") say so, the shipped help copy matches, and the Account → Notifications row for mentions names notes.** `packages/app-core/test/help/note-mentions-documented.test.ts`.
 - ✅ **18.416 — a comment-mention link (`#comment-<id>`) scrolls that comment into view once the thread has loaded, once per hash; with no hash nothing scrolls (control).** Mutation: drop the `scrollIntoView` call. `apps/web/test/note-comments.test.tsx`.
+
+## The scope chip commits, and the test door is real (controller browser pass 2026-09-29) — block `18.430`–`18.439`
+
+- ✅ **18.430 — changing a note's scope from the byline chip builds a `note.scope_set` the real schema accepts.** The editor's own event (Workspace, and Specific people with the picked `userIds`) is parsed with `domainRegistry`'s `note.scope_set@1` schema and passes; control, same `it`: the old NESTED `{ scope: { mode } }` shape is refused. Mutation: nest the payload again → red. (`apps/web/test/create-note-dialog.test.tsx`)
+- ✅ **18.431 — the test door refuses what the server door would.** In the `apps/web` and `packages/app-core` vitest setups `newSubmittedEvent` throws for an envelope whose payload its registered schema refuses; ULID-shaped fixture noise is ignored, a case can opt out with `__gnAllowRefusedPayloads` (reset after each test), and the flag cannot leak. Control: a valid envelope passes. Mutation: remove the guard → the witness (`door-guard.test.ts`) and 18.430's pre-fix run go red. (`packages/app-core/test/door-guard.test.ts`)
+- 🧪 **18.432 — browser: on a note you own, open the scope chip and pick Private, then Workspace, then Specific people + a person + Save audience.** Each commits (the server's `GET /v1/notes/:id` shows the mode, the chip and Select read it, the popover closes); before the fix the same click answered `invalid-payload` (`payload for 'note.scope_set' v1 is invalid at mode: Invalid discriminator value`). Measured 2026-09-29 on `next dev` (lane port) against the dev server.

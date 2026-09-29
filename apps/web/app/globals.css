@@ -3995,10 +3995,15 @@ input, textarea, select { font-family: inherit; }
 .ticket-editor__content ul[data-type='taskList'] > li > div > p:first-child { margin-top: 0; }
 .ticket-editor__content ul[data-type='taskList'] > li > div > p:last-child { margin-bottom: 0; }
 /* A done item reads MUTED, never struck through (owner, 2026-09-29: "done items
-   should not be struck through") — the checked box already says "done". */
+   should not be struck through") — the checked box already says "done".
+   `--gn-text-subtle`, NOT `--gn-text-muted`: `-muted` is the legible "secondary
+   label" and measures 1.28:1 from the body text in light and 1.01:1 in dark
+   (`#ebebf5` on a `#f2e9e1` body — slightly BRIGHTER), so a done item was not
+   visibly dimmer. `-subtle` is 2.16:1 from the body text and still >= 5.28:1 on
+   the surface in all six style x theme blocks (case 9.480). */
 .ticket-editor__content ul[data-type='taskList'] > li[data-checked='true'] > div,
 .gn-comment__task > input[type='checkbox']:checked + span {
-  color: var(--gn-text-muted);
+  color: var(--gn-text-subtle);
 }
 /* The box: the real `<input type="checkbox">` stays (keyboard toggle, label
    association, checked state) and is only restyled — the recipe of
@@ -4053,14 +4058,22 @@ input, textarea, select { font-family: inherit; }
    (line-height - box) / 2 = (1.375rem - 1rem) / 2, the body's line-height in
    `ui.css` — 9.365 recomputes it from there, so changing one without the other
    fails a test instead of the eye. */
-.gn-comment__task { min-height: 1.5rem; }
+.gn-comment__task { min-height: 1.5rem; gap: 0.75rem; }
 .gn-comment__task + .gn-comment__task { margin-top: 0; }
-.gn-comment__task > input[type='checkbox'] { margin: 0.1875rem 0 0; }
+.gn-comment__task > input[type='checkbox'] { margin: 0.1875rem 0 0; margin-left: 0.25rem; }
+/* Horizontal start, measured on the same page 2026-09-29: the composer's 1.5rem label centres the
+   1rem box (inset 4px) and the row's 0.5rem gap follows it (text at 32px). The posted row had the
+   box at 0px and text at 23.2px (`ui.css`'s 0.45rem gap), so a list shifted sideways when sent.
+   inset = (1.5 - 1) / 2 = 0.25rem; gap = 1.5 + 0.5 - 0.25 - 1 = 0.75rem (case 9.482). */
 /* `neo` fields are borderless and sunken (`[data-style="neo"] .gn-field__input`);
-   the unchecked box takes the same coat, the checked one stays a flat accent. */
+   the unchecked box takes the same coat, the checked one stays a flat accent.
+   The coat alone is NOT an edge: neo's sunken surface IS its surface (`#1b2340`
+   both in dark) and the inset shadow is 5% white, so the box vanished. It keeps
+   `--gn-border-strong` (5.37:1 dark, 4.39:1 light on the neo surface; WCAG 1.4.11
+   asks 3:1, case 9.481). */
 [data-style='neo'] .ticket-editor__content ul[data-type='taskList'] input[type='checkbox']:not(:checked),
 [data-style='neo'] .gn-comment__task > input[type='checkbox']:not(:checked) {
-  border-color: transparent;
+  border-color: var(--gn-border-strong);
   background: var(--gn-surface-sunken);
   box-shadow: var(--gn-shadow-sunken);
 }

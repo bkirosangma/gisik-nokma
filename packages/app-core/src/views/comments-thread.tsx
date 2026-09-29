@@ -147,7 +147,12 @@ function CommentItem({
   // F3 — the body is rendered as the DOCUMENT the composer wrote, not as its
   // plain text. `docToPlainText` still serves the search projection and the
   // notifications; it is a display of last resort and never was this one.
-  const text = renderCommentBody(comment.body, ticketHref ?? (() => null), isPurged ?? (() => false));
+  const text = renderCommentBody(
+    comment.body,
+    ticketHref ?? (() => null),
+    isPurged ?? (() => false),
+    `comment-${comment.commentId}`,
+  );
   return (
     <li className="gn-comment" id={`comment-${comment.commentId}`} data-testid={`comment-${comment.commentId}`}>
       <span className="gn-comment__avatar" aria-hidden="true">
