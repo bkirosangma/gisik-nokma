@@ -1394,6 +1394,56 @@ describe('13.900 — Switch', () => {
   });
 });
 
+describe('19.280 — Switch carries an explicit accessible name', () => {
+  /**
+   * MEASURED in production through the accessibility tree: the delete dialog's
+   * switch was `checkbox "on"` (DOM `value: "on"`), not "Delete permanently".
+   * jsdom resolves the WRAPPING label to a name and passes today, so a name
+   * query alone is no evidence — the assertion is on the attribute that names
+   * the input without depending on label wrapping.
+   */
+  function labelText(control: HTMLElement): string | null {
+    const id = control.getAttribute('aria-labelledby');
+    if (id === null) return null;
+    const target = document.getElementById(id);
+    return target === null ? null : (target.textContent ?? '');
+  }
+
+  it('19.280 the input is aria-labelledby an element that exists and holds the children text — string children', () => {
+    render(
+      <Switch checked={false} onChange={() => {}}>
+        Delete permanently
+      </Switch>,
+    );
+    const control = screen.getByRole('checkbox', { name: 'Delete permanently' });
+    expect(control.getAttribute('aria-labelledby')).toBeTruthy();
+    expect(labelText(control)).toBe('Delete permanently');
+    // The named element is the visible text, not the row that wraps the input.
+    expect(control.contains(document.getElementById(control.getAttribute('aria-labelledby') ?? ''))).toBe(false);
+    expect(document.getElementById(control.getAttribute('aria-labelledby') ?? '')).not.toContainElement(control);
+    // Control: there is no `aria-label` copy of the text to drift from it.
+    expect(control).not.toHaveAttribute('aria-label');
+  });
+
+  it('19.280 element children resolve the same way, and two switches never share an id', () => {
+    render(
+      <>
+        <Switch checked onChange={() => {}}>
+          <strong>Close tickets</strong> automatically
+        </Switch>
+        <Switch checked={false} onChange={() => {}}>
+          Second
+        </Switch>
+      </>,
+    );
+    const first = screen.getByRole('checkbox', { name: 'Close tickets automatically' });
+    const second = screen.getByRole('checkbox', { name: 'Second' });
+    expect(labelText(first)).toBe('Close tickets automatically');
+    expect(labelText(second)).toBe('Second');
+    expect(first.getAttribute('aria-labelledby')).not.toBe(second.getAttribute('aria-labelledby'));
+  });
+});
+
 describe('13.900 — InfoTip', () => {
   it('is closed to begin with, naming its button for what it explains', () => {
     render(

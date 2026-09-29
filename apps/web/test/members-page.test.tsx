@@ -1,4 +1,4 @@
-import { render, screen, waitFor, within } from '@testing-library/react';
+import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { membershipId, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
@@ -314,6 +314,91 @@ describe('3.132 the mint form honours the two refusals the door would give', () 
     await user.type(await screen.findByLabelText('Address'), 'a@b.test');
     await user.click(screen.getByRole('button', { name: 'Send invitation' }));
     expect(await screen.findByRole('alert')).toHaveTextContent(reason);
+  });
+});
+
+/**
+ * S3 (fix-now batch, owner rulings 2026-09-29 evening; spec §7): the first send
+ * measured 18 s in production with the button doing nothing visible. While the
+ * mint is in flight the button is disabled and reads "Sending…", a second submit
+ * does nothing (guarded in the handler too — Enter in the address field submits
+ * the form), the address clears on success and is KEPT on failure.
+ */
+describe('13.1560 the Send invitation button shows progress and cannot double-send', () => {
+  function deferredMint() {
+    const requests: unknown[] = [];
+    let settle!: { resolve: () => void; reject: (cause: unknown) => void };
+    const pending = new Promise<{ inviteId: string; url: string; expiresAt: string; emailSent: boolean }>(
+      (resolve, reject) => {
+        settle = {
+          resolve: () =>
+            resolve({ inviteId: 'i_1', url: 'http://localhost:3001/invite/tok', expiresAt: 'later', emailSent: true }),
+          reject,
+        };
+      },
+    );
+    const mintInvite: NonNullable<GatewayStubs['invitesAdmin']>['mintInvite'] = (_workspaceId, request) => {
+      requests.push(request);
+      return pending;
+    };
+    return { requests, settle, mintInvite };
+  }
+
+  it('13.1560 disabled + "Sending…" while in flight, ONE request after a click, an Enter and a raw submit; then the field clears and the button returns', async () => {
+    const mint = deferredMint();
+    mount({ listPending: async () => [], mintInvite: mint.mintInvite });
+    const user = userEvent.setup();
+    const field = await screen.findByLabelText('Address');
+    await user.type(field, 'anselma@example.test');
+    // Control: before submitting, the button is enabled and says what it always said.
+    expect(screen.getByRole('button', { name: SEND_INVITATION })).toBeEnabled();
+
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    const busy = await screen.findByRole('button', { name: 'Sending…' });
+    expect(busy).toBeDisabled();
+    expect(screen.queryByRole('button', { name: SEND_INVITATION })).toBeNull();
+
+    // The other two ways to submit while it is in flight: Enter in the address field, and a form
+    // submit that ignores the button's disabled attribute — the handler's own guard is what stops both.
+    await user.type(field, '{Enter}');
+    fireEvent.submit(field.closest('form') as HTMLFormElement);
+    expect(mint.requests).toHaveLength(1);
+
+    mint.settle.resolve();
+    await waitFor(() => expect(screen.getByRole('button', { name: SEND_INVITATION })).toBeEnabled());
+    expect((screen.getByLabelText('Address') as HTMLInputElement).value).toBe('');
+    expect(mint.requests).toHaveLength(1);
+  });
+
+  it('13.1561 a rejected mint re-enables the button and KEEPS the address; CONTROL: the retry sends again', async () => {
+    const mint = deferredMint();
+    const requests: unknown[] = [];
+    let fail = true;
+    mount({
+      listPending: async () => [],
+      mintInvite: (workspaceId, request) => {
+        if (fail) {
+          requests.push(request);
+          return Promise.reject(new InviteAdminError(422, 'No.'));
+        }
+        return mint.mintInvite(workspaceId, request);
+      },
+    });
+    const user = userEvent.setup();
+    await user.type(await screen.findByLabelText('Address'), 'anselma@example.test');
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+
+    expect(await screen.findByRole('alert')).toHaveTextContent('No.');
+    expect(screen.getByRole('button', { name: SEND_INVITATION })).toBeEnabled();
+    expect((screen.getByLabelText('Address') as HTMLInputElement).value).toBe('anselma@example.test');
+
+    fail = false;
+    await user.click(screen.getByRole('button', { name: SEND_INVITATION }));
+    await screen.findByRole('button', { name: 'Sending…' });
+    expect(mint.requests).toHaveLength(1);
+    expect(requests).toHaveLength(1);
+    mint.settle.resolve();
+    await waitFor(() => expect((screen.getByLabelText('Address') as HTMLInputElement).value).toBe(''));
   });
 });
 
