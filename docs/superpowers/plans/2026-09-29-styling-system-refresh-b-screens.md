@@ -7,9 +7,14 @@
 - the **Global Constraints**, which this plan inherits WORD FOR WORD, with the branch name changed (below);
 - the per-style table;
 - the token translation;
-- deviations D1–D22.
+- deviations D1–D27 (D21 retired, D25–D27 added 2026-09-29).
 
 This plan adds the inventory and one task per screen.
+
+> **Amended 2026-09-29 (owner kanban rulings).** The owner ruled "hover = shadow only" for cards (Plan A, the note at its top). **P-LIFT is now shadow only**, and because P-LIFT is shared, this restyles every Plan B screen that uses it, not only the board.
+> - The door cards (B13's workspace card, project card and the home's section cards) answer hover with `lift-near` above their neighbours and press with `lift-press`. Nothing scales.
+> - With no transform and no filter on a door card, the `:not(:has(.gn-dialog__scrim))` guard and the reduced-motion arms have nothing left to protect. They are removed (Plan A D21, retired). B1's `expectReducedMotionFor` helper loses its only consumer and is not written.
+> - Primary buttons keep their 1.04/0.98 hover and press (Plan A Task 3). Cases 20.321, 20.322, 20.593 and 20.595 are rewritten in place, so no ids are added.
 
 **Depends on:** Plan A Tasks 1–4. Those are the tokens, the shared `Button` (P-PRIMARY, P-QUIET), `Card` (P-RAISED) and `Dialog`, plus the test helpers `packages/ui/test/helpers/css-rules.ts` and `contrast.ts`. Plan B Task B1 may start once Plan A Task 4 has merged into the release branch. Plan B's screen tasks are independent of one another, and they may run in any order after B1.
 
@@ -57,7 +62,7 @@ Plan A defines P-PRIMARY and P-QUIET (the shared `Button`), P-RAISED (`.gn-card`
 | **P-WELL** (a recessed group or notice INSIDE a raised panel) | `background: var(--gn-surface-well); box-shadow: var(--gn-shadow-track); border-radius: var(--gn-radius-card);` | rows inside it take `border-radius: calc(var(--gn-radius-card) - 0.5rem)` when the well pads by 8 |
 | **P-RAISED** (a static panel) | `background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift); border-radius: var(--gn-radius-card);` | no hover |
 | **P-ROW** (one item of a list of items on the page ground) | P-RAISED's three declarations | rows 8px apart (`gap: 0.5rem` on the list) |
-| **P-LIFT** (an interactive raised item: a card that IS a door) | P-RAISED, plus on the element that owns the door: `transform-origin: 50% 60%; transition: transform var(--gn-motion-lift) var(--gn-motion-ease-out), box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);` | `<container>:has(<door>:hover):not(:has(.gn-dialog__scrim)) { transform: scale(1.025); box-shadow: var(--gn-shadow-lift-near); position: relative; z-index: 1; }`, and the same guarded selector with `:active` → `scale(1.01)` and `lift-press`. Under `@media (prefers-reduced-motion: reduce)`, the SAME selectors get `transform: none` and the container `transition: none`. **Never** key it on `.gn-card` alone, and never omit the `:has(.gn-dialog__scrim)` guard (Plan A D21) |
+| **P-LIFT** (an interactive raised item: a card that IS a door). **Amended 2026-09-29: shadow only** | P-RAISED, plus on the container: `transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);` | `<container>:has(<door>:hover) { box-shadow: var(--gn-shadow-lift-near); position: relative; z-index: 1; }`, and `<container>:has(<door>:active) { box-shadow: var(--gn-shadow-lift-press); transition-duration: var(--gn-motion-feedback); }`. There is **no transform and no filter**, so there is no reduced-motion arm and no `:has(.gn-dialog__scrim)` guard (Plan A D21, retired). **Never** key it on `.gn-card` alone. **Never** add a transform or a filter to a door card: either one makes the card the containing block of the Delete dialog it opens, which is the hazard D21 recorded |
 | **P-FLOAT** (a panel floating above the page: menu, popover, select list, tooltip panel, popup) | `background: var(--gn-surface-raised); box-shadow: var(--gn-shadow-lift-near); border-radius: var(--gn-radius-card);` | — |
 | **P-HOVER** (a row or link that answered hover with the 1.14:1 sunken fill) | `:hover` → `background: var(--gn-fill-quaternary);` | — |
 | **P-TIERS** | page titles in `--gn-text`; secondary copy in `--gn-text-muted`; eyebrows, counts, timestamps and meta in `--gn-text-subtle`; the accent only on the screen's one primary action and on links | — |
@@ -115,10 +120,10 @@ The audit tables mark those rows **kept**, with the reason.
 ## Review Focus
 
 1. **A second primary appears on a screen.** Condition: a workspace with pending invitations, where **Create workspace** plus N × **Accept** are all primaries today. Expected: one loud element. Owner: B14, case 20.332.
-2. **A lifted door card traps its own dialog.** Condition: the workspace or project card's overflow menu opens **Delete…** (`DeleteDialog`) inside the card while it is hovered. The existing `filter: brightness(0.97)` hover (`globals.css:526-527`) already creates a containing block for fixed descendants. Expected: the dialog stays centred in the viewport. Owners: B13 and B14 (the `:has(.gn-dialog__scrim)` guard); browser case 20.593.
+2. **A hovered door card traps its own dialog.** Condition: the workspace or project card's overflow menu opens **Delete…** (`DeleteDialog`) inside the card while it is hovered. The existing `filter: brightness(0.97)` hover (`globals.css:526-527`) already creates a containing block for fixed descendants. Expected: the dialog stays centred in the viewport. That now holds because B13 deletes the filter and adds no transform (amended 2026-09-29, P-LIFT shadow only). Owners: B13, case 20.322 (no door-card rule transforms or filters); browser case 20.593.
 3. **Floating panels in dark theme.** Expected: menus, popovers and select lists on `lift-near` stay distinguishable from the page in hig dark, where the shadow is black on navy. Owner: B3, case 20.222 (the panel's ground differs from the page ground in every style × theme; neo excepted by design, where the shadow carries it).
 4. **Neo pressed-in controls are not flattened.** Expected: `[data-style="neo"]` rules that pinned sunken selected states keep them (10.80, 13.339). Owner: B2, case 20.213's control.
-5. **Reduced motion on every P-LIFT.** Expected: every hover scale added by this plan has a reduced-motion arm with the same selector. Owner: B1's roster helper `expectReducedMotionFor`, used by B13 and B14.
+5. **No P-LIFT moves** (amended 2026-09-29; this was "reduced motion on every P-LIFT"). Expected: this plan adds no hover scale anywhere, so reduced motion has nothing to cancel on a door card. Owner: B13, case 20.322's scan.
 
 ---
 
@@ -126,7 +131,7 @@ The audit tables mark those rows **kept**, with the reason.
 
 | File | Responsibility |
 |---|---|
-| `packages/ui/test/helpers/style-patterns.ts` (new, B1) | `PATTERNS`, `expectPattern`, `expectReducedMotionFor`, `readGlobalsCss`, `SCREEN_OWNERS`, `unownedRoutes` |
+| `packages/ui/test/helpers/style-patterns.ts` (new, B1) | `PATTERNS`, `expectPattern`, `readGlobalsCss`, `SCREEN_OWNERS`, `unownedRoutes` |
 | `packages/ui/test/styling-inventory.test.ts` (new, B1) | every `page.tsx` has an owner |
 | `packages/ui/test/styling-b<N>-<slug>.test.ts` (new, one per task) | that task's roster |
 | `packages/ui/src/ui.css`, `apps/web/app/globals.css` | the rules each task's table names, edited in place |
@@ -149,7 +154,6 @@ The audit tables mark those rows **kept**, with the reason.
   - `type RosterRow = { sheet: 'ui' | 'globals'; selectors: string | readonly string[]; pattern?: PatternName; declarations?: Record<string, string>; atRule?: string }`;
   - `expectRow(row)`;
   - `flatBoundaryOffenders(css, prefixes, kept)`;
-  - `expectReducedMotionFor(sheet, selectors)`;
   - `SCREEN_OWNERS`, `listPageRoutes()`, `unownedRoutes(found, owners)`.
 
 Cases (ids `20.201`–`20.210`). The guard moves by **3**:
@@ -267,11 +271,6 @@ export function flatBoundaryOffenders(css: string, prefixes: readonly string[], 
     })
     .map((rule) => rule.selectors.join(', '))
     .filter((list) => !kept.includes(list));
-}
-
-export function expectReducedMotionFor(sheet: 'ui' | 'globals', selectors: readonly string[]): void {
-  const body = ruleExactly(cssOf(sheet), selectors, '@media (prefers-reduced-motion: reduce)');
-  expect(valueOf(body, 'transform'), `reduced motion for ${selectors.join(', ')}`).toBe('none');
 }
 
 /** Every route file, repo-relative. */
@@ -1041,79 +1040,61 @@ describe('20.312 no flat boundary on Members', () => {
 
 ---
 
-### Task B13: The workspace home — and the one hover vocabulary for every door card
+### Task B13: The workspace home — and the one hover vocabulary for every door card (amended 2026-09-29: shadow only)
 
 Ids `20.321`–`20.330`, section `## 20.33`. The guard moves by **3**. **Loud element:** **Create project** (`apps/web/app/w/[workspaceId]/page.tsx:1253`, P-PRIMARY). **Save name** (`:907`) renders only while the name is being edited, and it is the loud element of that moment.
 
-**The hover vocabulary changes product-wide here.** Round 21 (owner: "also lighten the setting cards") gave every card-shaped door ONE hover: `filter: brightness(0.97)` in light and `1.18` in dark (`globals.css:526-537`, `:1107-1111`). The owner's 2026-09-29 ruling replaces it with the lift toward the user. It is still ONE vocabulary, now P-LIFT, for the workspace card, the project card and the home's section cards together. The workspace card's own rules are B14's, but the shared hover rule is here.
+**The hover vocabulary changes product-wide here.** Round 21 (owner: "also lighten the setting cards") gave every card-shaped door ONE hover: `filter: brightness(0.97)` in light and `1.18` in dark (`globals.css:526-537`, `:1107-1111`). The owner's 2026-09-29 rulings replace it with P-LIFT, which after the kanban ruling of the same day is **shadow only**: hover deepens the card's shadow and nothing scales. It is still ONE vocabulary, for the workspace card, the project card and the home's section cards together. The workspace card's own rules are B14's, but the shared hover rule is here.
 
-⚠ `filter` ALSO creates a containing block for `position: fixed` descendants. The project and workspace cards hold an overflow menu that opens `DeleteDialog` INSIDE the card (trash Plan 4 D5), so today's brightness hover already contains that dialog while the card is hovered. The P-LIFT guard `:not(:has(.gn-dialog__scrim))` fixes both the old filter and the new transform.
+⚠ `filter` ALSO creates a containing block for `position: fixed` descendants. The project and workspace cards hold an overflow menu that opens `DeleteDialog` INSIDE the card (trash Plan 4 D5), so today's brightness hover already contains that dialog while the card is hovered. Deleting the filter fixes it. The shadow-only P-LIFT adds no transform, so no guard is needed (Plan A D21, retired). 20.322 pins that no door-card rule transforms or filters.
 
 **Audit** (`globals.css`):
 
 | Rule | Today | Becomes |
 |---|---|---|
-| `:526-527` `.gn-card:has(> .gn-workspace-card__door:hover), .gn-card:has(> .gn-project-card__door:hover)` | `filter: brightness(0.97)` | **P-LIFT hover**. The selectors become `.gn-card:has(> .gn-workspace-card__door:hover):not(:has(.gn-dialog__scrim)), .gn-card:has(> .gn-project-card__door:hover):not(:has(.gn-dialog__scrim))` with `transform: scale(1.025); box-shadow: var(--gn-shadow-lift-near); z-index: 1;` |
+| `:526-527` `.gn-card:has(> .gn-workspace-card__door:hover), .gn-card:has(> .gn-project-card__door:hover)` | `filter: brightness(0.97)` | **P-LIFT hover**. The selectors stay as they are, and the filter becomes `box-shadow: var(--gn-shadow-lift-near); z-index: 1;` |
 | `:528-537` the two dark-theme brightness rules for the same selectors | `filter: brightness(1.18)` | **deleted**. The lift needs no per-theme arm: `lift-near` is per theme through the token |
-| new, directly after | — | the `:active` pair: `.gn-card:has(> .gn-workspace-card__door:active):not(:has(.gn-dialog__scrim)), .gn-card:has(> .gn-project-card__door:active):not(:has(.gn-dialog__scrim)) { transform: scale(1.01); box-shadow: var(--gn-shadow-lift-press); transition-duration: var(--gn-motion-feedback); }` |
-| `:443` `.gn-workspace-card` and `:1167` `.gn-project-card` | no transition | both gain `transform-origin: 50% 60%; transition: transform var(--gn-motion-lift) var(--gn-motion-ease-out), box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);`. `.gn-workspace-card` also gains `position: relative;` (`.gn-project-card` already has it) |
-| `:1079` `.gn-workspace-home__link` (the section cards) | raised | **P-RAISED**, plus the same transition and origin |
-| `:1107-1111` `.gn-workspace-home__link:hover` and its two dark arms | brightness | `.gn-workspace-home__link:hover { transform: scale(1.025); box-shadow: var(--gn-shadow-lift-near); position: relative; z-index: 1; }` and `.gn-workspace-home__link:active { transform: scale(1.01); box-shadow: var(--gn-shadow-lift-press); transition-duration: var(--gn-motion-feedback); }`. The two dark arms are deleted. The link holds no dialog, so it needs no guard |
-| new, after the above | — | the reduced-motion arm, written out in full below the table |
+| new, directly after | — | the `:active` pair: `.gn-card:has(> .gn-workspace-card__door:active), .gn-card:has(> .gn-project-card__door:active) { box-shadow: var(--gn-shadow-lift-press); transition-duration: var(--gn-motion-feedback); }` |
+| `:443` `.gn-workspace-card` and `:1167` `.gn-project-card` | no transition | both gain `transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);`. `.gn-workspace-card` also gains `position: relative;` (`.gn-project-card` already has it) |
+| `:1079` `.gn-workspace-home__link` (the section cards) | raised | **P-RAISED**, plus the same transition |
+| `:1107-1111` `.gn-workspace-home__link:hover` and its two dark arms | brightness | `.gn-workspace-home__link:hover { box-shadow: var(--gn-shadow-lift-near); position: relative; z-index: 1; }` and `.gn-workspace-home__link:active { box-shadow: var(--gn-shadow-lift-press); transition-duration: var(--gn-motion-feedback); }`. The two dark arms are deleted |
 | `:1295`, `:1296-1298`, `:1300-1302` `.gn-project-card__actions .gn-button:hover:not(:disabled)` and its two dark arms | a brightness filter on the card's Archive button | **deleted**: the ghost Button's own hover fill (Plan A Task 3) answers it, as one hover vocabulary |
 | `:1431` `.gn-project-founding` | raised | **P-RAISED** |
 
-The reduced-motion arm, placed after the `:active` rules:
-
-```css
-@media (prefers-reduced-motion: reduce) {
-  .gn-workspace-card,
-  .gn-project-card,
-  .gn-workspace-home__link { transition: none; }
-  .gn-card:has(> .gn-workspace-card__door:hover):not(:has(.gn-dialog__scrim)),
-  .gn-card:has(> .gn-project-card__door:hover):not(:has(.gn-dialog__scrim)),
-  .gn-card:has(> .gn-workspace-card__door:active):not(:has(.gn-dialog__scrim)),
-  .gn-card:has(> .gn-project-card__door:active):not(:has(.gn-dialog__scrim)) { transform: none; }
-  .gn-workspace-home__link:hover,
-  .gn-workspace-home__link:active { transform: none; }
-}
-```
+No reduced-motion arm (amended 2026-09-29). None of these rules moves anything, and a shadow change is not motion.
 
 **Tests that name these selectors:** `apps/web/test/workspace-home.test.tsx`, `founding.test.tsx`, `workspace-restricted-spacing.test.ts`, `account-page.test.tsx`, `neo-card-radius.test.ts` (13.355/P16: the three card classes declare no radius; this task adds none to them), and whichever case pins the Round-21 brightness pair. Find it with `git grep -n "brightness(0.97)" -- '*/test/*'` and amend it to the lift.
 
 ```markdown
-- ❌ **20.321 — every card-shaped door (workspace card, project card, the home's section cards) answers hover with the lift toward the user — `scale(1.025)` on `lift-near`, above its neighbours — and press with `scale(1.01)` on `lift-press`, one vocabulary replacing Round 21's brightness pair, with no per-theme arm;** control: no rule anywhere in `globals.css` still declares `filter: brightness(` on a card door. Mutation: restore `filter: brightness(0.97)` on the door hover rule.
-- ❌ **20.322 — the two door cards' lift is guarded by `:not(:has(.gn-dialog__scrim))`, so the Delete dialog their overflow menu opens is never inside a transformed (or filtered) box, and reduced motion removes every one of these transforms with the same selectors;** control: the section-card link, which holds no dialog, needs no guard. Mutation: remove the guard from the project card's hover selector.
+- ❌ **20.321 — every card-shaped door (workspace card, project card, the home's section cards) answers hover with the deeper `lift-near` shadow above its neighbours and press with `lift-press` in the feedback time — SHADOW ONLY, no scale (owner ruling 2026-09-29) — one vocabulary replacing Round 21's brightness pair, with no per-theme arm, each card's transition naming `box-shadow` alone;** control: no rule anywhere in `globals.css` still declares `filter: brightness(` on a card door. Mutation: restore `filter: brightness(0.97)` on the door hover rule.
+- ❌ **20.322 — no door-card rule transforms or filters anything (every rule whose selector names `.gn-workspace-card`, `.gn-project-card`, either card's `__door`, or `.gn-workspace-home__link` declares neither `transform` nor `filter`, other than `none`), so the Delete dialog their overflow menu opens is never inside a containing block, and no guard or reduced-motion arm is needed (Plan A D21, retired);** control: the scan covers at least the six hover/press/rest rules this task writes. Mutation: put `transform: scale(1.025)` back on the project card's hover rule.
 - ❌ **20.323 — the workspace home's section cards and the project-founding panel rest on the raised `lift` shadow;** control: `.gn-project-card` keeps `position: relative` (its door's `::after` hit area depends on it). Mutation: restore `box-shadow: var(--gn-shadow-raised)` on `.gn-project-founding`.
 ```
 
 ```ts
-import { valueOf, ruleExactly } from './helpers/css-rules.js';
-import { expectReducedMotionFor } from './helpers/style-patterns.js';
+import { parseRules, valueOf } from './helpers/css-rules.js';
 
+// Shadow only (owner ruling 2026-09-29): no scale, no guard, no reduced-motion arm.
 const HOVER = [
-  '.gn-card:has(> .gn-workspace-card__door:hover):not(:has(.gn-dialog__scrim))',
-  '.gn-card:has(> .gn-project-card__door:hover):not(:has(.gn-dialog__scrim))',
+  '.gn-card:has(> .gn-workspace-card__door:hover)',
+  '.gn-card:has(> .gn-project-card__door:hover)',
 ];
 const PRESS = [
-  '.gn-card:has(> .gn-workspace-card__door:active):not(:has(.gn-dialog__scrim))',
-  '.gn-card:has(> .gn-project-card__door:active):not(:has(.gn-dialog__scrim))',
+  '.gn-card:has(> .gn-workspace-card__door:active)',
+  '.gn-card:has(> .gn-project-card__door:active)',
 ];
 
-describe('20.321 one hover vocabulary: the lift', () => {
-  it('20.321 doors lift and press; no brightness remains', () => {
-    expectRow({ sheet: 'globals', selectors: HOVER, declarations: { transform: 'scale(1.025)', 'box-shadow': 'var(--gn-shadow-lift-near)', 'z-index': '1' } });
-    expectRow({ sheet: 'globals', selectors: PRESS, declarations: { transform: 'scale(1.01)', 'box-shadow': 'var(--gn-shadow-lift-press)' } });
-    expectRow({ sheet: 'globals', selectors: '.gn-workspace-home__link:hover', declarations: { transform: 'scale(1.025)', 'box-shadow': 'var(--gn-shadow-lift-near)' } });
-    expectRow({ sheet: 'globals', selectors: '.gn-workspace-home__link:active', declarations: { transform: 'scale(1.01)' } });
+describe('20.321 one hover vocabulary: the shadow', () => {
+  it('20.321 doors deepen their shadow and settle on press; no brightness remains', () => {
+    expectRow({ sheet: 'globals', selectors: HOVER, declarations: { 'box-shadow': 'var(--gn-shadow-lift-near)', 'z-index': '1' } });
+    expectRow({ sheet: 'globals', selectors: PRESS, declarations: { 'box-shadow': 'var(--gn-shadow-lift-press)', 'transition-duration': 'var(--gn-motion-feedback)' } });
+    expectRow({ sheet: 'globals', selectors: '.gn-workspace-home__link:hover', declarations: { 'box-shadow': 'var(--gn-shadow-lift-near)', 'z-index': '1' } });
+    expectRow({ sheet: 'globals', selectors: '.gn-workspace-home__link:active', declarations: { 'box-shadow': 'var(--gn-shadow-lift-press)' } });
     for (const selectors of [['.gn-workspace-card'], ['.gn-project-card'], ['.gn-workspace-home__link']]) {
       expectRow({
         sheet: 'globals',
         selectors,
-        declarations: {
-          'transform-origin': '50% 60%',
-          transition: 'transform var(--gn-motion-lift) var(--gn-motion-ease-out), box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out)',
-        },
+        declarations: { transition: 'box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out)' },
       });
     }
     // CONTROL — no brightness filter survives ANYWHERE in globals.css: the three
@@ -1124,13 +1105,20 @@ describe('20.321 one hover vocabulary: the lift', () => {
     }
   });
 });
-describe('20.322 the guard and reduced motion', () => {
-  it('20.322 guarded door selectors; every transform cancelled under reduced motion', () => {
-    for (const selector of [...HOVER, ...PRESS]) expect(selector).toContain(':not(:has(.gn-dialog__scrim))');
-    expectReducedMotionFor('globals', [...HOVER, ...PRESS]);
-    expectReducedMotionFor('globals', ['.gn-workspace-home__link:hover', '.gn-workspace-home__link:active']);
-    // CONTROL — the section link holds no dialog, so its selector is unguarded on purpose.
-    expect(() => ruleExactly(cssOf('globals'), '.gn-workspace-home__link:hover')).not.toThrow();
+describe('20.322 no door card transforms or filters', () => {
+  it('20.322 every door-card rule declares neither transform nor filter', () => {
+    let scanned = 0;
+    for (const rule of parseRules(cssOf('globals'))) {
+      if (!rule.selectors.some((s) => /\.gn-workspace-card(__door)?\b|\.gn-project-card(__door)?\b|\.gn-workspace-home__link\b/.test(s))) continue;
+      scanned += 1;
+      for (const property of ['transform', 'filter']) {
+        const value = valueOf(rule.body, property);
+        expect(value === null || value === 'none', `${rule.selectors.join(', ')}: ${property}`).toBe(true);
+      }
+    }
+    // CONTROL — the scan reaches the rules this task writes, the door hover/press rules
+    // included (their selectors name `__door`, which the pattern above admits on purpose).
+    expect(scanned).toBeGreaterThanOrEqual(6);
   });
 });
 describe('20.323 raised panels on the home', () => {
@@ -1144,7 +1132,7 @@ describe('20.323 raised panels on the home', () => {
 
 (Merge the imports into the shared shape's import lines.)
 
-`Features.md` bullet: `- ✅ **One hover vocabulary for every door card: the lift toward the user** (styling refresh Plan B Task B13; \`globals.css\`) — the workspace card, the project card and the workspace home's section cards all rise toward the user on hover (\`scale(1.025)\`, the near shadow, above their neighbours) and settle on press, replacing Round 21's brightness pair with no per-theme arm; guarded so a card's own Delete dialog is never trapped in a transformed box; off under reduced motion. Create project is the home's one loud element. Cases 20.321–20.323.` Under the workspace-home bullet (`Features.md:213`), append a `  - ✅` sub-bullet naming 20.321–20.323.
+`Features.md` bullet: `- ✅ **One hover vocabulary for every door card: the shadow deepens** (styling refresh Plan B Task B13; \`globals.css\`) — the workspace card, the project card and the workspace home's section cards answer hover with the near shadow above their neighbours and settle it on press — shadow only, nothing scales (owner ruling 2026-09-29) — replacing Round 21's brightness pair with no per-theme arm; with no filter or transform left, a card's own Delete dialog is never trapped in a containing block. Create project is the home's one loud element. Cases 20.321–20.323.` Under the workspace-home bullet (`Features.md:213`), append a `  - ✅` sub-bullet naming 20.321–20.323.
 
 ---
 
@@ -1202,7 +1190,7 @@ describe('20.332 no flat boundary on /workspaces', () => {
 });
 ```
 
-`Features.md` bullet: `- ✅ **The workspaces page has one loud element** (styling refresh Plan B Task B14) — Create workspace is the only primary; each invitation's Accept is a quiet outlined control (a variant change only), so pending invitations no longer multiply the loud elements; the cards lift toward the user (B13). Cases 20.331–20.332.` Under the workspace card bullet (`Features.md:199`), append a `  - ✅` sub-bullet.
+`Features.md` bullet: `- ✅ **The workspaces page has one loud element** (styling refresh Plan B Task B14) — Create workspace is the only primary; each invitation's Accept is a quiet outlined control (a variant change only), so pending invitations no longer multiply the loud elements; the cards deepen their shadow on hover, shadow only (B13). Cases 20.331–20.332.` Under the workspace card bullet (`Features.md:199`), append a `  - ✅` sub-bullet.
 
 ---
 
@@ -1597,9 +1585,9 @@ Ids `20.591`–`20.600`, section `## 20.59 Browser — Plan B`. The guard moves 
 ```markdown
 - 🧪 **20.591 — every one of the 36 surfaces in the Inventory renders under hig, neo and minimal in light and dark with no flat sunken boundary left, raised items with a lit top edge (hig), recessed tracks and wells, and no horizontal overflow at 390px and 1280px;** control: the board (Plan A 20.096) is the reference. Evidence: one screenshot per surface per style×theme (a contact sheet is fine).
 - 🧪 **20.592 — ONE loud element per screen: on each route count the visible `.gn-button--primary` elements (`document.querySelectorAll('.gn-button--primary')` filtered by `offsetParent !== null`); every screen reads 1, or 0 where the Inventory names the page title as its loud element;** control: /workspaces with two pending invitations reads 1 (B14). Evidence: a table, route → count.
-- 🧪 **20.593 — dialogs opened from door cards stay centred: hover a workspace card and open its overflow menu → Delete…; the dialog's panel centre is within 2px of the viewport centre and the card's computed `transform` and `filter` are `none` while it is open; the same for a project card; and each of the five app-core dialog primaries (bulk close, new ticket, reopen, transition, visibility) is 48px tall and inside its action row;** control: closing the dialog and hovering again lifts the card (`matrix(1.025, …)`).
+- 🧪 **20.593 — dialogs opened from door cards stay centred: hover a workspace card and open its overflow menu → Delete…; the dialog's panel centre is within 2px of the viewport centre and the card's computed `transform` and `filter` are `none` while it is open; the same for a project card; and each of the five app-core dialog primaries (bulk close, new ticket, reopen, transition, visibility) is 48px tall and inside its action row;** control: closing the dialog and hovering again deepens the card's box-shadow while its `transform` stays `none` (shadow only, amended 2026-09-29).
 - 🧪 **20.594 — every interactive control on every route is at least 44×44, except the rules this plan KEPT at the 24px in-list floor (listed per task);** Steps: on each route run `[...document.querySelectorAll('button, a[href], [role="tab"], input, select, textarea')].filter((el) => el.offsetParent !== null).map((el) => [el.className, el.getBoundingClientRect().height]).filter(([, h]) => h < 44)` and compare the result with the kept lists. Evidence: the per-route output.
-- 🧪 **20.595 — reduced motion (DevTools → Rendering → `prefers-reduced-motion: reduce`): hovering any door card (workspace, project, section card), the board's cards and any primary button computes `transform: none`;** control: turning emulation off restores the scale.
+- 🧪 **20.595 — reduced motion (DevTools → Rendering → `prefers-reduced-motion: reduce`): hovering any primary button computes `transform: none`; door cards (workspace, project, section card) and the board's cards compute `transform: none` with or without emulation, because they never scale (shadow only, amended 2026-09-29);** control: turning emulation off restores the primary button's scale, while the door cards' `transform` stays `none`.
 - 🧪 **20.596 — the desktop shell (`apps/desktop`, `pnpm --filter desktop dev`) shows the refreshed shared layer: Help (app-core `HelpBrowser`) has recessed result trays and wells, and any Button it renders follows Plan A; nothing from `globals.css` is expected there (B-D1 records mobile);** control: the web Help page matches it. Evidence: two screenshots.
 ```
 

@@ -4,6 +4,15 @@
 
 **Plan B** (every other screen, one task per screen, after an inventory) is `docs/superpowers/plans/2026-09-29-styling-system-refresh-b-screens.md`, on the same branch. **Plan B depends on this plan's Tasks 1–4** (tokens and shared components), and it consumes the names in this plan's Pattern table (below) verbatim.
 
+> **Amended 2026-09-29 (owner kanban rulings).** After a kanban-UX video the owner ruled: *"yes, update the mockup and the styling plan"*, for three things.
+> 1. **Hover is shadow only.** A card's hover changes its shadow (`lift-near`) and nothing else. There is no scale. Press settles onto `lift-press`, also with no scale. This supersedes the "lift comes toward the user" ruling FOR CARDS (Task 5, and Plan B's P-LIFT door cards). Primary and danger BUTTONS keep their 1.04 hover and 0.98 press (Task 3, unchanged).
+> 2. **The full lift happens only while a card is DRAGGED.** The dragged card scales 1.03, takes a deeper spreading shadow (new role `lift-drag`, Task 2) and tilts 2.5°. It leaves behind a placeholder sized to the card, so nothing jumps. This is new **Task 5A**.
+> 3. **A single column collapses to a narrow labelled strip with a count.** The owner named Done and Backlog. This is new **Task 5B**, and it covers TERMINAL columns only. Backlog is never a board column (D27).
+>
+> D21 is retired (nothing on a card slot transforms any more). D13 is amended for the strip. D25–D27 are new. Cases 20.043–20.045 and 20.094 are rewritten. New cases are 20.101–20.105 (5A), 20.111–20.116 (5B) and 20.121–20.122 (browser).
+> - Soft WIP limits and swimlanes came from the same video. They are NOT in this plan and each needs its own short spec.
+> - A pointer-based drag (a custom overlay rather than the browser's drag image) is also out of scope (D26).
+
 ## Design source
 
 There is no separate spec. The owner-approved design is the mockup together with the rules and rulings below, and this section is the whole of it.
@@ -42,9 +51,13 @@ There is no separate spec. The owner-approved design is the mockup together with
 **Owner rulings on the mockup** (verbatim where quoted):
 - **Every field stays.** The real card keeps EVERY field it shows today: epic chip, title, assignee, status chips, rollup progress, the keys row `[parent] key [priority] · due` with its late variant, "who · when", the move arrows, and Close on terminal columns. Owner: *"just confirming that it was only for the mockup, and that the actual one will still have those information"*.
 - **The lift comes toward the user.** Owner: *"the lift seems to be 2d. vertically up. but make it seem more 3d. like the lifting is towards the user."*
-  - Cards scale 1.025 from origin 50% 60%, with a 3-layer spreading shadow and a brighter lit edge. Press is 1.01. Timing is 220ms `cubic-bezier(.2,.8,.2,1)`.
-  - Primary buttons do the same at 1.04 hover / 0.98 press, 200ms. Owner: *"yes, apply the same lift to the buttons"*.
-  - All of it is off under `prefers-reduced-motion`.
+  - ~~Cards scale 1.025 from origin 50% 60% on hover, press 1.01.~~ **Superseded for cards 2026-09-29 (owner kanban rulings):**
+    - On HOVER a card takes the 3-layer spreading shadow with the brighter lit edge (`lift-near`), with no scale. Press is `lift-press`, with no scale. Timing is 220ms `cubic-bezier(.2,.8,.2,1)`.
+    - The full toward-the-user lift happens only while the card is DRAGGED: scale 1.03, the deeper `lift-drag` shadow and a 2.5° tilt (Task 5A).
+  - Primary buttons keep the hover lift at 1.04 hover / 0.98 press, 200ms. Owner: *"yes, apply the same lift to the buttons"*. The 2026-09-29 ruling leaves buttons as they are.
+  - Every scale and tilt is off under `prefers-reduced-motion`. That means the buttons' scale and the drag image's scale and tilt. Shadows still change.
+- **Drag placeholder** (owner, 2026-09-29): the dragged card leaves a placeholder the size of the card, so the column does not jump (Task 5A).
+- **Collapsible single columns** (owner, 2026-09-29: Done and Backlog). A column collapses to a narrow labelled strip with its count. The plan builds this for terminal columns (Task 5B, D27).
 - **No per-card tick.** Owner: *"the tick button shouldnt be there"*. Close stays a TEXT button, on terminal-column cards only, as today (`board.tsx:2374`, `category === 'terminal'`).
 - **Parent separator.** Owner: *"if parent is present, separate with >"*. The keys row reads `GN-17 › GN-15`: the parent link, then an `aria-hidden` `›`, then the key.
 - **Applies everywhere.** Owner, 2026-09-29, the scope change: *"hope the plan includes on applying this styling everywhere. consistency."* That is why there are two plans and why the primary `Button` changes product-wide.
@@ -77,7 +90,7 @@ There is no separate spec. The owner-approved design is the mockup together with
 Then apply the rules to the two screens the mockup draws: the board and the ticket sheet.
 
 **Architecture:**
-- **Tokens first.** `packages/ui/src/tokens.ts` gains three colour roles, eight shadow roles (and a `spread` term on a shadow layer), one radius role and two style-invariant families (`--gn-space-*`, `--gn-motion-*`). Every value is emitted by `themeStylesheet()`, so `apps/web` (inline stylesheet) and `apps/desktop` (`installTheme`, `apps/desktop/src/theme.ts`) both receive them.
+- **Tokens first.** `packages/ui/src/tokens.ts` gains three colour roles, nine shadow roles (the mockup's eight plus Task 5A's `lift-drag`, and a `spread` term on a shadow layer), one radius role and two style-invariant families (`--gn-space-*`, `--gn-motion-*`). Every value is emitted by `themeStylesheet()`, so `apps/web` (inline stylesheet) and `apps/desktop` (`installTheme`, `apps/desktop/src/theme.ts`) both receive them.
 - **Shared components next.** They are pure CSS edits in `packages/ui/src/ui.css`, IN PLACE: no appended overrides, because several existing tests read the FIRST rule for a selector.
 - **Then the two screens.** `packages/app-core/src/views/board.tsx` gets exactly two markup changes: the `›` separator and a footer wrapper. The ticket sheet is CSS-only.
 - **Tests.** Each new test reads the stylesheet through ONE new exact-selector reader (`packages/ui/test/helpers/css-rules.ts`), which Plan B reuses.
@@ -188,7 +201,7 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
 | **P-TRACK** | a container that HOLDS raised items on the page ground | `background: var(--gn-surface-track); box-shadow: var(--gn-shadow-track); border-radius: var(--gn-radius-track); padding: 0.5rem;` |
 | **P-WELL** | a recessed group INSIDE a raised panel | `background: var(--gn-surface-well); box-shadow: var(--gn-shadow-track); border-radius: var(--gn-radius-card); padding: 0.5rem;`. Rows inside it take `border-radius: calc(var(--gn-radius-card) - 0.5rem)` |
 | **P-RAISED** | a static panel | `.gn-card` (Task 4): `box-shadow: var(--gn-shadow-lift)`. No hover |
-| **P-LIFT** | an interactive raised item | P-RAISED plus the Task 5 hover/press/reduced-motion trio, keyed on the element that performs the action, never on `.gn-card` |
+| **P-LIFT** | an interactive raised item | P-RAISED plus the Task 5 hover/press pair, keyed on the element that performs the action, never on `.gn-card`. **Amended 2026-09-29: shadow only.** Hover is `box-shadow: var(--gn-shadow-lift-near)` above its neighbours (`position: relative; z-index: 1`). Press is `box-shadow: var(--gn-shadow-lift-press)` in the feedback time. The transition is on `box-shadow` alone. There is NO transform, so no reduced-motion arm and no dialog guard are needed (D21 retired). Plan B's door cards take the same pair, so this restyles those screens too |
 
 ## Recorded deviations
 
@@ -197,7 +210,7 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
   - The dark accent `#97bdf2` is the house `textAccentDark`, not `accent`. The product keeps `blue300` `#7fa9e4` as its dark accent fill, because `accent` feeds `focusRing` and `categoryActive` too (`tokens.ts:969`, `:981`).
   - `onAccent` `#ffffff` becomes `accentText` `#fbf7f3`: 5.81:1 on `#33629f` against the mockup's 6.2:1, both clear of 4.5.
   - The dark accent EDGE `#bcd4f7` IS adopted, as new primitive `accentEdgeDark`: 11.42:1 on `navyBase`.
-- **D3 — `minimal` takes no depth.** Its shadows are `[]` for every role, and `tokens.test.ts:255-260` asserts `none` for every role in `SHADOW_ROLES`, which grows by eight here.
+- **D3 — `minimal` takes no depth.** Its shadows are `[]` for every role, and `tokens.test.ts:255-260` asserts `none` for every role in `SHADOW_ROLES`, which grows by nine here (the eight mockup roles plus `lift-drag`, Task 5A's drag shadow).
   - In minimal the track and well are fill-only (1.08:1 and 1.10:1). They are identified by their contents, not their edge. Minimal is flat by design (`tokens.ts:1252-1253`).
   - Rules 01–03, 05 and 06 apply to minimal in full.
 - **D4 — The two "token findings", measured against this tree.**
@@ -226,7 +239,7 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
   - Cases 13.1452 and 13.1453 are amended in place.
   - **The report flags this for the owner.** If the owner wants the tints back, revert Task 6 Step 5's items 2a (the tint rules), 2h (the priority ink) and 3 (the retired roles), and the 13.1453 rewrite in item 4.
 - **D12 — The column name stays a category `Chip`.** The mockup draws plain 15px/600 text. Ruling 14 (`ui.css:962-974`) keeps the name inside the tone chip, because the chip's tone carries CATEGORY for every column.
-- **D13 — Lanes keep their 18rem fixed width in a scrolling rail** (`ui.css:951-961`). The mockup's 5-column grid is a fixed 1440px artboard.
+- **D13 — Lanes keep their 18rem fixed width in a scrolling rail** (`ui.css:951-961`). The mockup's 5-column grid is a fixed 1440px artboard. **Amended 2026-09-29:** a COLLAPSED terminal column (Task 5B) is a 3.5rem strip (`flex: 0 0 3.5rem`). That is the one exception to the 18rem lane, and an expanded column is still 18rem.
 - **D14 — Two markup changes in `board.tsx`, both layout-only.**
   - the `›` span (the owner's ruling);
   - a `gn-board-card__footer` wrapper around "who · when" and the move arrows, so they share one row that reaches into the card's padding.
@@ -239,16 +252,36 @@ Tasks 3–7 introduce these, and Plan B applies them by NAME. Each is written ou
 - **D18 — No hairline role.** The mockup's `hair` equals the unused `line` primitive. The sheet footer's rule (today `border-top: 1px solid var(--gn-border)`, `ui.css:2320`, which at 4.27:1 reads as a heavy rule) becomes the alpha `fillSecondary`. It is a decorative separator and owes no contrast.
 - **D19 — The epic chip uses the house chip fill `fillTertiary`, not the mockup's `sunken` hex.** It is the fill every other chip-like control already takes (`.gn-chip`, `ui.css:164`).
 - **D20 — Every button-shaped control is a pill (radius = height ÷ 2, rule 05).** That includes "who · when", which the mockup draws at radius 12 (`Main.dc.html:110`).
-- **D21 — The hover lift must not break the transition dialog.**
-  - `MoveArrows` renders `TransitionDialog` INSIDE the card (`board.tsx:2422`). `Dialog` renders its `position: fixed` scrim in place, with no portal (`packages/ui/src/components/dialog.tsx:121-122`; `ui.css:335-342`).
-  - A transformed ancestor becomes the containing block for fixed descendants, so a hovered card would pull its own dialog into itself.
-  - The lift is therefore keyed `.gn-board__card-slot:hover:not(:has(.gn-dialog__scrim))`. No `will-change` either, which would create the same containing block permanently.
+- **D21 — RETIRED 2026-09-29 (owner kanban rulings).** The deviation said the hover lift must not break the transition dialog.
+  - The hazard was real. `MoveArrows` renders `TransitionDialog` INSIDE the card (`board.tsx:2422`). `Dialog` renders its `position: fixed` scrim in place, with no portal (`packages/ui/src/components/dialog.tsx:121-122`; `ui.css:335-342`). A transformed ancestor becomes the containing block for fixed descendants, so a scaled card would have pulled its own dialog into itself.
+  - It no longer applies because hover and press are now shadow only (Task 5). Nothing on the slot transforms, and a `box-shadow` or a `z-index` creates no containing block, so the guard `:not(:has(.gn-dialog__scrim))` is removed rather than kept as a selector-spelling check.
+  - The drag's scale and tilt live on a detached `setDragImage` clone (Task 5A). That clone holds no dialog and is never an ancestor of one.
+  - Two things carry over:
+    - The rule against `will-change` stays (20.026), because it creates a permanent containing block.
+    - The dialog-centred check stays as browser case 20.094, now a regression check.
 - **D23 — The spacing variables are emitted but not yet consumed.** Task 2 emits `--gn-space-1/2/3` (8/16/24), and every rule in both plans writes the literal `0.5rem`/`1rem`/`1.5rem`. The tests pin the literals, the way this stylesheet writes every other length. The variables exist so a runtime consumer (an inline style, `apps/desktop`) can read the grid. `tokens.ts`'s own emitter docblock argues against a value nothing renders, so a reviewer may ask to adopt `var(--gn-space-N)` in Tasks 5–7, or to drop the emission. Either is a small follow-up. It is recorded, not decided.
-- **D24 — The plan is two files, although the split trigger never fired.** The coordinator's instruction was to split above ~6,000 lines. Plan A is 2.9k and Plan B 1.6k. The planner split early, on an estimate that turned out wrong, and kept the split because Plan B's tasks are independent of each other and can run as a separate lane. Also, the coordinator asked for the inventory FIRST in Phase B, before the board and the sheet. Here the board and the sheet are Plan A's Tasks 5–7, because the brief carried them in full, and the inventory is Plan B's Task B1. Every other screen follows the inventory.
+- **D24 — The plan is two files, although the split trigger never fired.** The coordinator's instruction was to split above ~6,000 lines. Plan A is 3.4k (2.9k before the 2026-09-29 amendment) and Plan B 1.6k. The planner split early, on an estimate that turned out wrong, and kept the split because Plan B's tasks are independent of each other and can run as a separate lane. Also, the coordinator asked for the inventory FIRST in Phase B, before the board and the sheet. Here the board and the sheet are Plan A's Tasks 5–7, because the brief carried them in full, and the inventory is Plan B's Task B1. Every other screen follows the inventory.
 - **D22 — Out of this plan, into Plan B.** These belong to other screens' tasks:
   - the whole-board and per-column empty states (`ui.css:1015-1133`);
   - the List's `.gn-row-action`/`.gn-list__bulk-close`, which today share a rule with the board's Close (`ui.css:1511-1514`), a group this plan SPLITS;
   - fields, menus, popovers, toasts and the app shell.
+- **D25 — The TARGET column gets a track highlight, not an inserted placeholder** (Task 5A, added 2026-09-29).
+  - The owner asked for "a drag placeholder sized to the dragged card". The placeholder IS built, at the card's SOURCE slot: the slot stays in the DOM with its box unchanged and its contents hidden, so the source column does not jump.
+  - In the column being dragged over there is NO inserted placeholder. A board drop changes a ticket's STATE (`onDropCard(event, column.stateId)`, `board.tsx:1076`). It does not reorder: the drop handler reads only a ticket id and a state id (`board.tsx:1305-1307`), and the card lands wherever the column's own order puts it. A placeholder at an index would claim a position the drop won't honour. Inserting one on `dragenter` would also cause the very layout jump the ruling removes.
+  - Instead the column shows a 2px accent outline inside its edge while a card is over it. The accent is rule 03's "one accent, saved for the action", and this is the action.
+- **D26 — Native HTML5 drag-and-drop stays, and the lift lives on a `setDragImage` clone** (Task 5A, added 2026-09-29).
+  - The board drags natively (`draggable`/`onDragStart`, `board.tsx:1444-1452`). The browser drags a BITMAP snapshot of an element, so CSS on the source `<li>` does not follow the pointer.
+  - The tilt, the scale and the `lift-drag` shadow are therefore painted on an off-screen clone handed to `event.dataTransfer.setDragImage` at `dragstart`, then removed.
+  - The browser adds its own translucency to a drag image (Chromium and Safari both do), and no page can switch that off. Full fidelity is therefore witnessed in browser case 20.121, not claimed by a unit test.
+  - An opaque lifted card that follows the pointer needs a pointer-events drag with a custom overlay. That is a different interaction model, touching every drag-drop case, so it is a SEPARATE plan and out of scope here.
+- **D27 — Only TERMINAL columns collapse. Backlog is not built. NEEDS OWNER RULING** (Task 5B, added 2026-09-29).
+  - The owner named "Done + Backlog". But Backlog is never a board column (spec §1.1). `packages/app-core/src/views/board.tsx:1700-1705` records it: "Backlog is never a board column (spec §1.1), so a card dropped there has no column to land in". Backlog is its own tab.
+  - So Task 5B offers the collapse on every `column.category === 'terminal'` column, which is Done on the standard workflows.
+  - The options for the owner:
+    - (a) terminal columns only, as built here;
+    - (b) also the workflow's FIRST open column (its `initialStateId`, e.g. "To do"), which is a small extension of Task 5B's predicate;
+    - (c) bring Backlog onto the board, which is a spec §1.1 change and not styling.
+  - The mockup follows (a): only Done carries the control.
 
 ## Review Focus
 
@@ -264,11 +297,22 @@ Most likely to bite first. Each item has its test in the owning task.
 3. **Neo keeps its look.**
    - Expected: every new shadow role under neo is built from neo's own dual-shadow primitives and geometry, never the hig drop shadow.
    - Owners: Task 2, case 20.013; browser case 20.096 (screenshots per style × theme).
-4. **The hover lift does not clip, overlap wrongly, or relocate a dialog.**
-   - Expected: a hovered card rises ABOVE its neighbours (`z-index`), its scale stays inside the track's 8px padding, the rail leaves room for the falling shadow, and a transition dialog opened from a hovered card stays centred in the viewport.
-   - Owners: Task 5, case 20.043 (the `:has()` guard, z-index, rail bottom room); browser case 20.094.
-5. **Reduced-motion users get no scale** — on cards, primary buttons or danger buttons — while hover still changes the shadow.
-   - Owners: Task 3, case 20.023; Task 5, case 20.045; browser case 20.095.
+4. **The hover shadow does not clip or draw under its neighbour, and a dialog stays centred** (amended 2026-09-29: hover is shadow only).
+   - Expected:
+     - a hovered card's shadow draws ABOVE the next card (`z-index`);
+     - NOTHING on the card or its slot transforms;
+     - the rail leaves room for the falling shadow;
+     - a transition dialog opened from a hovered card stays centred in the viewport.
+   - Owners: Task 5, case 20.043 (no transform, z-index, rail bottom room); browser case 20.094.
+5. **Reduced-motion users get no scale and no tilt** on primary or danger buttons, or on the drag image. Hover still changes the shadow.
+   - Owners: Task 3, case 20.023; Task 5A, case 20.103 (the drag clone); browser case 20.095.
+6. **A drag leaves nothing behind and breaks no existing drag case** (added 2026-09-29).
+   - Expected:
+     - the `setDragImage` clone is detached after the snapshot, and no second `ticket-card-*` test id exists during a drag;
+     - the jsdom `DataTransfer` fakes, which have no `setDragImage` (`board-drag-drop.test.tsx:100-109`, `board-card-click.test.tsx:77-86`), still drag and drop;
+     - the placeholder and every column highlight clear on `dragend`, including Esc and a refused drop.
+   - Owners: Task 5A, cases 20.101, 20.102, 20.104 and 20.105.
+7. **A collapsed Done column still takes a drop** (added 2026-09-29). Expected: dropping a card on the strip moves the ticket, and the strip's count goes up. Owner: Task 5B, case 20.114.
 
 ---
 
@@ -276,9 +320,11 @@ Most likely to bite first. Each item has its test in the owning task.
 
 | File | Responsibility in this plan |
 |---|---|
-| `packages/ui/src/tokens.ts` | roles `surfaceTrack`, `surfaceWell`, `accentEdge`; 11 `CONTRAST_PAIRS` rows; `ShadowLayer.spread`; 8 shadow roles; radius `track`; `spacing` + `motion` (emitted once); retire 4 priority roles (Task 6) |
+| `packages/ui/src/tokens.ts` | roles `surfaceTrack`, `surfaceWell`, `accentEdge`; 11 `CONTRAST_PAIRS` rows; `ShadowLayer.spread`; 9 shadow roles (incl. `lift-drag`, Task 5A); radius `track`; `spacing` + `motion` (emitted once); retire 4 priority roles (Task 6) |
 | `packages/ui/src/ui.css` | `.gn-button` family, `.gn-card`, `.gn-dialog`, the board rules (`:883-1549`), the sheet rules (`:352-847`, `:2313-2536`) — edited in place |
-| `packages/app-core/src/views/board.tsx` | `›` after the parent key (`:1628-1637`); `gn-board-card__footer` around provenance + arrows (`:1658-1666`) |
+| `packages/app-core/src/views/board.tsx` | `›` after the parent key (`:1628-1637`); `gn-board-card__footer` around provenance + arrows (`:1658-1666`); the drag image, source placeholder and target highlight (Task 5A); the terminal-column collapse (Task 5B) |
+| `packages/app-core/src/views/board-drag-image.ts` (new, Task 5A) | `setCardDragImage(event, cardElement)`: the feature-guarded, detached, id-stripped clone |
+| `packages/app-core/src/preferences/column-collapse.ts` (new, Task 5B) | which terminal columns a person collapsed, per user and project, in `localStorage` (the `workflow-collapse.ts` shape) |
 | `packages/ui/test/helpers/css-rules.ts` (new) | `parseRules`, `ruleExactly`, `rulesNaming`, `valueOf` — the exact-selector reader Plan B reuses |
 | `packages/ui/test/helpers/contrast.ts` (new) | `contrastRatio`, `over` |
 | `test-cases/20-styling-system.md` (new), `test-cases/README.md`, `scripts/fixtures/check-case-citations-baseline.json` | the bucket |
@@ -291,6 +337,8 @@ Tests (new unless stated):
 - `packages/ui/test/styling-surfaces.test.ts` (Task 4)
 - `packages/ui/test/styling-board.test.ts` (Tasks 5–6)
 - `packages/app-core/test/views/board-styling.test.tsx` (Task 6)
+- `packages/app-core/test/views/board-drag-lift.test.tsx` (Task 5A)
+- `packages/app-core/test/preferences/column-collapse.test.ts` and `packages/app-core/test/views/board-column-collapse.test.tsx` (Task 5B)
 - `packages/ui/test/styling-sheet.test.ts` (Task 7)
 - existing, amended in place:
   - `packages/ui/test/tokens.test.ts`;
@@ -779,7 +827,7 @@ The owner's twelve rules (2026-09-29), applied through the shared layers so ever
 **Interfaces:**
 - Consumes: Task 1's roles, and `helpers/css-rules.ts`.
 - Produces:
-  - `ShadowRole` gains `'lift' | 'lift-near' | 'lift-press' | 'track' | 'action' | 'action-near' | 'action-press' | 'sheet'`. It is emitted as `--gn-shadow-lift` and so on.
+  - `ShadowRole` gains `'lift' | 'lift-near' | 'lift-press' | 'lift-drag' | 'track' | 'action' | 'action-near' | 'action-press' | 'sheet'`. It is emitted as `--gn-shadow-lift` and so on. `lift-drag` was added 2026-09-29 (owner kanban rulings). It is the dragged card's shadow, deeper than `lift-near`, and Task 5A consumes it.
   - `ShadowLayer` gains `spread?: number`.
   - `RadiusRole` gains `'track'` (→ `--gn-radius-track`).
   - New exports:
@@ -792,8 +840,8 @@ Cases (`## 20.2 Tokens — depth, radius, spacing, motion`). The guard moves by 
 
 ```markdown
 - ❌ **20.011 — a shadow layer can carry a SPREAD, rendered as a fourth length (`0px 8px 16px -8px`), and every pre-existing layer renders byte-identically;** control: `sunken-compact` under neo still renders exactly `inset 2px 2px 4px #b098848c, inset -2px -2px 4px #fffffff2` (the value `tokens.test.ts:282-284` pins). Mutation: drop the spread term from `shadowLayerCss`.
-- ❌ **20.012 — hig's eight new shadow roles are the mockup's values exactly, light and dark (lit edge + falling shadow; the near lift a 3-layer spread; press shallower; the track inset lit from above; the action shadows tinted by the accent in light), and minimal renders `none` for all eight;** control: every new hig role is a different string from `raised`. Mutation: swap hig light `lift-near` and `lift-press`.
-- ❌ **20.013 — neo expresses the same eight roles in its OWN dual-shadow language: `lift` = `raised`, `track` = `sunken`, `sheet` = `overlay`, `action-press` = `selected`, `action-near` = `raised`, and `lift-near` is a LARGER raised pair than `lift` while `lift-press` and `action` are smaller;** control: no neo value contains a hig shadow primitive. Mutation: set neo light `lift` to hig's light `lift` layers.
+- ❌ **20.012 — hig's nine new shadow roles are the mockup's values exactly, light and dark (lit edge + falling shadow; the near lift a 3-layer spread; press shallower; the track inset lit from above; the action shadows tinted by the accent in light), plus `lift-drag` — the dragged card, a 4-layer fall that reaches further than `lift-near` (40px down, 64px blur) built only from primitives the mockup roles already declare — and minimal renders `none` for all nine;** control: every new hig role is a different string from `raised`, and `lift-drag` differs from `lift-near`. Mutation: swap hig light `lift-near` and `lift-press`.
+- ❌ **20.013 — neo expresses the same nine roles in its OWN dual-shadow language: `lift` = `raised`, `track` = `sunken`, `sheet` = `overlay`, `action-press` = `selected`, `action-near` = `raised`, `lift-near` is a LARGER raised pair than `lift` and `lift-drag` a larger one still (14/14/32), while `lift-press` and `action` are smaller;** control: no neo value contains a hig shadow primitive. Mutation: set neo light `lift` to hig's light `lift` layers.
 - ❌ **20.014 — `radius.track` is the card radius plus the track's 8px padding in every style (hig/minimal 24px, neo 28px), so rule 05 (inner = outer − padding) holds per style;** control: `radius.card` is unchanged (16/16/20). Mutation: set neo's track to `24px`.
 - ❌ **20.015 — the spacing steps (8/16/24) and the motion constants (100/200/220/300ms, `cubic-bezier(0.2, 0.8, 0.2, 1)`) are emitted exactly once, under the bare `:root`, and the stylesheet still opens with the font block;** control: no motion duration exceeds 300ms or falls below 100ms (rules 06). Mutation: emit them from `declarationsFor` instead (the count becomes 9 — one per style × theme block).
 ```
@@ -829,6 +877,9 @@ const HIG_EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     'lift-near':
       'inset 0px 1px 0px #ffffffff, 0px 2px 4px #273a6314, 0px 12px 24px -6px #273a632e, 0px 28px 48px -16px #273a6347',
     'lift-press': 'inset 0px 1px 0px #ffffffe6, 0px 1px 2px #273a6324, 0px 4px 8px -4px #273a6333',
+    // Added 2026-09-29 (owner kanban rulings, Task 5A): the dragged card.
+    'lift-drag':
+      'inset 0px 1px 0px #ffffffff, 0px 4px 8px #273a631f, 0px 20px 32px -8px #273a6338, 0px 40px 64px -20px #273a6347',
     track: 'inset 0px 2px 4px #b0988459, inset 0px -1px 0px #ffffff99',
     action: 'inset 0px 1px 0px #ffffff47, 0px 1px 2px #273a6340, 0px 8px 16px -6px #33629f73',
     'action-near':
@@ -841,6 +892,8 @@ const HIG_EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     'lift-near':
       'inset 0px 1px 0px #f2e9e11f, 0px 2px 4px #00000059, 0px 12px 24px -6px #0000008c, 0px 28px 48px -16px #00000099',
     'lift-press': 'inset 0px 1px 0px #f2e9e112, 0px 1px 2px #0000008c, 0px 4px 8px -4px #00000080',
+    'lift-drag':
+      'inset 0px 1px 0px #f2e9e11f, 0px 4px 8px #00000059, 0px 20px 32px -8px #0000008c, 0px 40px 64px -20px #00000099',
     track: 'inset 0px 2px 4px #00000073, inset 0px -1px 0px #ffffff0a',
     action: 'inset 0px 1px 0px #ffffff73, 0px 1px 2px #00000080, 0px 8px 16px -6px #0000008c',
     'action-near':
@@ -849,7 +902,7 @@ const HIG_EXPECTED: Record<'light' | 'dark', Record<string, string>> = {
     sheet: 'inset 1px 0px 0px #f2e9e114, -24px 0px 48px -16px #00000099',
   },
 };
-const NEW_ROLES = ['lift', 'lift-near', 'lift-press', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;
+const NEW_ROLES = ['lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;
 
 describe('20.012 hig takes the mockup, minimal takes none', () => {
   it('20.012 every new role, pinned exactly in both themes', () => {
@@ -860,6 +913,8 @@ describe('20.012 hig takes the mockup, minimal takes none', () => {
         // CONTROL — a new role is a new value, not the old raised shadow renamed.
         expect(shadowValueOf('hig', theme, role)).not.toBe(shadowValueOf('hig', theme, 'raised'));
       }
+      // CONTROL — the drag shadow is its own, deeper value, not the hover one renamed.
+      expect(shadowValueOf('hig', theme, 'lift-drag')).not.toBe(shadowValueOf('hig', theme, 'lift-near'));
     }
     for (const role of NEW_ROLES) expect(SHADOW_ROLES).toContain(role);
   });
@@ -874,6 +929,7 @@ describe('20.013 neo speaks its own depth language', () => {
       expect(shadowValueOf('neo', theme, 'action-press')).toBe(shadowValueOf('neo', theme, 'selected'));
       expect(shadowValueOf('neo', theme, 'action-near')).toBe(shadowValueOf('neo', theme, 'raised'));
       expect(shadowValueOf('neo', theme, 'lift-near')).toMatch(/^10px 10px 24px /);
+      expect(shadowValueOf('neo', theme, 'lift-drag')).toMatch(/^14px 14px 32px /);
       expect(shadowValueOf('neo', theme, 'lift-press')).toMatch(/^4px 4px 10px /);
       expect(shadowValueOf('neo', theme, 'action')).toMatch(/^4px 4px 10px /);
       // CONTROL — no hig primitive leaks into neo.
@@ -990,6 +1046,7 @@ export type ShadowRole =
   | 'lift'
   | 'lift-near'
   | 'lift-press'
+  | 'lift-drag'
   | 'track'
   | 'action'
   | 'action-near'
@@ -1028,6 +1085,18 @@ function shadowLayerCss(layer: ShadowLayer): string {
         { x: 0, y: 1, blur: 0, colour: 'shadowLitLight', inset: true },
         { x: 0, y: 1, blur: 2, colour: 'shadowFallPressLight1' },
         { x: 0, y: 4, blur: 8, spread: -4, colour: 'shadowFallPressLight2' },
+      ],
+      /**
+       * Added 2026-09-29 (owner kanban rulings; Task 5A). The DRAGGED card is
+       * lifted furthest toward the user: `lift-near`'s lit edge, with a fall that
+       * reaches further and softer (40px down, 64px blur). The mockup draws no
+       * drag state, so this reuses the mockup's own primitives and adds none.
+       */
+      'lift-drag': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearLight', inset: true },
+        { x: 0, y: 4, blur: 8, colour: 'shadowFallLight1' },
+        { x: 0, y: 20, blur: 32, spread: -8, colour: 'shadowFallLight2' },
+        { x: 0, y: 40, blur: 64, spread: -20, colour: 'shadowFallNearLight3' },
       ],
       /** `:150` `recess` — the track, lit from above (dark top inset, light bottom lip). */
       track: [
@@ -1078,6 +1147,12 @@ function shadowLayerCss(layer: ShadowLayer): string {
         { x: 0, y: 1, blur: 2, colour: 'shadowFallNearDark2' },
         { x: 0, y: 4, blur: 8, spread: -4, colour: 'shadowFallDark1' },
       ],
+      'lift-drag': [
+        { x: 0, y: 1, blur: 0, colour: 'shadowLitNearDark', inset: true },
+        { x: 0, y: 4, blur: 8, colour: 'shadowFallNearDark1' },
+        { x: 0, y: 20, blur: 32, spread: -8, colour: 'shadowFallNearDark2' },
+        { x: 0, y: 40, blur: 64, spread: -20, colour: 'shadowFallDark2' },
+      ],
       track: [
         { x: 0, y: 2, blur: 4, colour: 'shadowTrackDark', inset: true },
         { x: 0, y: -1, blur: 0, colour: 'shadowTrackLitDark', inset: true },
@@ -1103,7 +1178,7 @@ function shadowLayerCss(layer: ShadowLayer): string {
       ],
 ```
 
-     - **minimal.light** and **minimal.dark**: add `lift: [], 'lift-near': [], 'lift-press': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: []` inside each one-line object.
+     - **minimal.light** and **minimal.dark**: add `lift: [], 'lift-near': [], 'lift-press': [], 'lift-drag': [], track: [], action: [], 'action-near': [], 'action-press': [], sheet: []` inside each one-line object.
      - **neo.light:**
 
 ```ts
@@ -1120,6 +1195,11 @@ function shadowLayerCss(layer: ShadowLayer): string {
       'lift-press': [
         { x: 4, y: 4, blur: 10, colour: 'shadowNeoRaisedDarkLight' },
         { x: -4, y: -4, blur: 10, colour: 'shadowNeoHighlightLight' },
+      ],
+      /** Dragged (2026-09-29, Task 5A): the raised pair thrown further still. */
+      'lift-drag': [
+        { x: 14, y: 14, blur: 32, colour: 'shadowNeoRaisedDarkLight' },
+        { x: -14, y: -14, blur: 32, colour: 'shadowNeoHighlightLight' },
       ],
       /** The track IS neo's `sunken` tray. */
       track: [
@@ -1146,7 +1226,7 @@ function shadowLayerCss(layer: ShadowLayer): string {
 ```
 
      - **neo.dark:** the same geometry with neo's dark primitives:
-       - `shadowNeoRaisedDarkDark`/`shadowNeoRaisedHighlightDark` for `lift`, `lift-near`, `lift-press`, `action`, `action-near` and `sheet`;
+       - `shadowNeoRaisedDarkDark`/`shadowNeoRaisedHighlightDark` for `lift`, `lift-near`, `lift-press`, `lift-drag` (14/14/32), `action`, `action-near` and `sheet`;
        - `shadowNeoSunkenDarkDark`/`shadowNeoSunkenHighlightDark` (inset, 4/4/9) for `track`;
        - `shadowNeoSunkenCompactDarkDark`/`shadowNeoSunkenHighlightDark` (inset, 3/3/6) for `action-press`. That is exactly `SHADOWS.neo.dark.selected`, `tokens.ts:1352-1355`.
   5. `SHADOW_ROLES` (`:1568`):
@@ -1161,6 +1241,7 @@ export const SHADOW_ROLES: readonly ShadowRole[] = [
   'lift',
   'lift-near',
   'lift-press',
+  'lift-drag',
   'track',
   'action',
   'action-near',
@@ -1220,16 +1301,16 @@ export function motionVariableName(key: MotionKey): string {
 
   9. `tokens.test.ts`:
      - Add `radiusVariableName('track'),` to the declared set at `:137-138`. After `...FONT_ROLE_NAMES.map(fontVariableName),` add `...([1, 2, 3] as const).map(spaceVariableName),` and `...(['feedback', 'move', 'lift', 'done', 'ease-out'] as const).map(motionVariableName),`. Import both functions.
-     - In 13.411 (`:364`), extend the literal: `const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;`. Add one comment line: `// The eight styling-refresh roles added 2026-09-29 (Plan A Task 2, 20.012) — added HERE by hand, which is the point of this literal.`
+     - In 13.411 (`:364`), extend the literal: `const EXPECTED_SHADOW_ROLES = ['raised', 'sunken', 'overlay', 'sunken-compact', 'selected', 'lift', 'lift-near', 'lift-press', 'lift-drag', 'track', 'action', 'action-near', 'action-press', 'sheet'] as const;`. Add one comment line: `// The nine styling-refresh roles added 2026-09-29 (Plan A Task 2, 20.012; lift-drag for Task 5A) — added HERE by hand, which is the point of this literal.`
 
 - [ ] **Step 5: Run to see it pass**: the file, then all of `packages/ui`, then `pnpm --filter @gisik-nokma/ui typecheck` and the desktop theme test.
-  - `tokens.test.ts:255-260` (minimal renders `none` for every `SHADOW_ROLES` entry) now covers the eight new roles, and it must pass.
+  - `tokens.test.ts:255-260` (minimal renders `none` for every `SHADOW_ROLES` entry) now covers the nine new roles, and it must pass.
   - `:229-253` (every `shadow*` primitive is 8-digit and names no contrast pair) must pass.
 
 - [ ] **Step 6: Catalogue.** Flip 20.011–20.015. Append to §17:
 
 ```markdown
-- ⚙️ **Depth, radius, spacing and motion tokens** (styling refresh Plan A Task 2; `packages/ui/src/tokens.ts`) — eight shadow roles (`lift`, `lift-near`, `lift-press`, `track`, `action`, `action-near`, `action-press`, `sheet`): hig takes the owner-approved mockup's values exactly (lit top edge, shadow falling down, a 3-layer spreading "near" lift that reads as coming toward the user), neo expresses each in its own dual-shadow language (rest = `raised`, track = `sunken`, press = `selected`, the near lift a larger raised pair), and minimal stays flat (`none`); a shadow layer can now carry a spread. `radius.track` = card + 8 per style (rule 05). `--gn-space-1/2/3` (8/16/24) and `--gn-motion-feedback/move/lift/done/ease-out` (100/200/220/300ms, `cubic-bezier(0.2, 0.8, 0.2, 1)`) are emitted once under the bare `:root`, so `apps/desktop` receives them through `installTheme` too. Cases 20.011–20.015.
+- ⚙️ **Depth, radius, spacing and motion tokens** (styling refresh Plan A Task 2; `packages/ui/src/tokens.ts`) — nine shadow roles (`lift`, `lift-near`, `lift-press`, `lift-drag`, `track`, `action`, `action-near`, `action-press`, `sheet`): hig takes the owner-approved mockup's values exactly (lit top edge, shadow falling down, a 3-layer spreading "near" shadow for a hovered card), plus `lift-drag`, a deeper 4-layer fall for a DRAGGED card built from the same primitives, neo expresses each in its own dual-shadow language (rest = `raised`, track = `sunken`, press = `selected`, the near lift a larger raised pair and the drag lift larger still), and minimal stays flat (`none`); a shadow layer can now carry a spread. `radius.track` = card + 8 per style (rule 05). `--gn-space-1/2/3` (8/16/24) and `--gn-motion-feedback/move/lift/done/ease-out` (100/200/220/300ms, `cubic-bezier(0.2, 0.8, 0.2, 1)`) are emitted once under the bare `:root`, so `apps/desktop` receives them through `installTheme` too. Cases 20.011–20.015.
 ```
 
 - [ ] **Step 7: Commit** `Styling A/Task 2: depth/radius/spacing/motion tokens (20.011-20.015)`. Then mutate, show red, restore.
@@ -1284,7 +1365,7 @@ Cases (`## 20.3 The shared Button`). The guard moves by **6**:
 - ❌ **20.023 — under `prefers-reduced-motion: reduce` the Button has no transition and the primary and danger hover/press transforms are `none`, written with the SAME selectors as the rules they cancel so the cancellation wins on source order;** control: outside the media arm the base transition names only `--gn-motion-*` durations. Mutation: drop `.gn-button--primary:hover:not(:disabled)` from the reduced-motion group.
 - ❌ **20.024 — the ghost Button (every quiet control) is transparent with a 1px `border` edge — the accessible grey, ≥ 3:1 (20.004) — a `textMuted` 600 label and a soft `fillQuaternary` fill on hover;** control: the base rule paints no border, so a primary or danger never inherits the grey edge. Mutation: set the ghost's `border` to `none`.
 - ❌ **20.025 — the danger Button shares the primary's geometry (48px, 24px, 17px) and its lift pair, on the NEUTRAL `lift` shadows rather than the accent-tinted `action` ones;** control: danger's resting shadow differs from primary's. Mutation: set `.gn-button--danger`'s `min-height` to `2.75rem`.
-- ❌ **20.026 — motion discipline: no rule in `ui.css` declares `will-change` (a permanent containing block, D21), and every Button transition names `--gn-motion-*` durations with the `--gn-motion-ease-out` curve;** control: the scan reads a stylesheet that does declare transitions. Mutation: add `will-change: transform;` to `.gn-button--primary`.
+- ❌ **20.026 — motion discipline: no rule in `ui.css` declares `will-change` (a permanent containing block — the hazard recorded in D21, retired for the card hover but still true of `will-change`), and every Button transition names `--gn-motion-*` durations with the `--gn-motion-ease-out` curve;** control: the scan reads a stylesheet that does declare transitions. Mutation: add `will-change: transform;` to `.gn-button--primary`.
 ```
 
 - [ ] **Step 1: Write the cases.** +6.
@@ -1641,7 +1722,7 @@ describe('20.032 Dialog floats near', () => {
 
 ---
 
-### Task 5: The board — recessed column tracks, raised cards, and the lift toward the user
+### Task 5: The board — recessed column tracks, raised cards, and a hover that deepens the shadow
 
 **Files:**
 - Modify: `packages/ui/src/ui.css`:
@@ -1658,18 +1739,18 @@ describe('20.032 Dialog floats near', () => {
 
 **Interfaces:**
 - Consumes: Task 1 (`--gn-surface-track`, `--gn-text-subtle`), Task 2 (`--gn-shadow-track`, `--gn-shadow-lift*`, `--gn-radius-track`, `--gn-motion-*`), Task 4 (P-RAISED).
-- Produces: pattern **P-TRACK** (the column) and pattern **P-LIFT** (keyed on `.gn-board__card-slot`, the element that opens the ticket, `board.tsx:1440-1462`). Task 6 relies on `.gn-board-card` being `display: flex; flex-direction: column; gap: 0.5rem`.
+- Produces: pattern **P-TRACK** (the column) and pattern **P-LIFT** (keyed on `.gn-board__card-slot`, the element that opens the ticket, `board.tsx:1440-1462`). **Amended 2026-09-29 (owner kanban rulings):** P-LIFT is shadow only. Hover gives `lift-near` above the neighbours and press gives `lift-press`, with no transform. The scale and tilt belong to the DRAG (Task 5A). Task 6 relies on `.gn-board-card` being `display: flex; flex-direction: column; gap: 0.5rem`.
 
 **The loud element on the board:** the **New ticket** primary in the project header (`create-ticket-flow.tsx:488`). It became P-PRIMARY in Task 3 with no board-specific CSS. **Filters** (`apps/web/app/w/[workspaceId]/p/[projectId]/page.tsx:2524`, a raw `gn-button gn-button--ghost`) became P-QUIET the same way. The only other header controls are the search field and the workflow select, and those are Plan B's project-chrome task.
 
-Cases (`## 20.5 Board — tracks and lift`). The guard moves by **6**:
+Cases (`## 20.5 Board — tracks and hover`). The guard moves by **6** (20.043–20.045 were rewritten in place on 2026-09-29, which adds no ids):
 
 ```markdown
 - ❌ **20.041 — a board column is a recessed TRACK: the `surfaceTrack` ground, the `track` inset shadow lit from above, the `track` radius (24; neo 28), 8px padding and 8px between cards;** control: no board rule paints `surface-sunken` any more (the 1.14:1 flat fill, 20.001). Mutation: restore `background: var(--gn-surface-sunken)` on `.gn-board__column`.
 - ❌ **20.042 — a board card is RAISED: 16px padding, a column flex with 8px between lines, the `lift` shadow, and no radius of its own, so it takes the card token (16; neo 20 = 28 − 8, rule 05);** control: 13.464's no-radius assertion still holds. Mutation: add `border-radius: 1rem;` to `.gn-board-card`.
-- ❌ **20.043 — hovering a card lifts it TOWARD the user — `scale(1.025)` from `50% 60%`, the 3-layer `lift-near` shadow, above its neighbours (`z-index: 1` on its positioned slot) in 220ms ease-out — keyed on the slot that opens the ticket and guarded by `:not(:has(.gn-dialog__scrim))` so a transition dialog opened from the card is never inside a transformed box; the rail leaves 24px below the cards for the falling shadow;** control: no rule scales `.gn-card` or `.gn-board-card` without that guard. Mutation: delete `:not(:has(.gn-dialog__scrim))` from the hover selector.
-- ❌ **20.044 — pressing a card settles it to `scale(1.01)` on the `lift-press` shadow within the 100ms feedback time;** control: the press is a smaller scale than the hover. Mutation: set the press to `scale(1.025)`.
-- ❌ **20.045 — under `prefers-reduced-motion: reduce` the card has no transition and neither hover nor press transforms it, written with the same guarded selectors so the cancellation wins on source order;** control: outside the arm the card's transition names `--gn-motion-lift` and `--gn-motion-ease-out`. Mutation: delete the press selector from the reduced-motion group.
+- ❌ **20.043 — hovering a card changes its SHADOW ONLY (owner ruling 2026-09-29, "hover = shadow only"): the 3-layer `lift-near` shadow, above its neighbours (`z-index: 1` on its positioned slot), with the card's transition on `box-shadow` alone at 220ms ease-out, keyed on the slot that opens the ticket; the rail leaves 24px below the cards for the falling shadow;** control: NO rule anywhere in `ui.css` whose selector names `.gn-board-card` or `.gn-board__card-slot` declares a `transform` other than `none`, except the drag clone's (`.gn-board-drag-image > .gn-board-card`, Task 5A). Mutation: put `transform: scale(1.025)` back on the hover rule.
+- ❌ **20.044 — pressing a card settles its shadow to `lift-press` within the 100ms feedback time, with no transform;** control: the press shadow is a different role from the hover shadow. Mutation: put `transform: scale(1.01)` back on the press rule.
+- ❌ **20.045 — with no card transform left to cancel, the board declares NO reduced-motion arm for hover or press (a shadow change is not motion); the only reduced-motion rule on the board is the drag clone's (Task 5A, 20.103);** control: the card's transition names only `box-shadow`, so nothing it animates moves. Mutation: add `transform var(--gn-motion-lift) var(--gn-motion-ease-out)` back to the card's transition.
 - ❌ **20.046 — the column header sits on the 8pt grid (8px padding, 8px gap), its count is `textSubtle` (the third tier), `Close all (N)` is pushed to the far edge, and columns are 16px apart;** control: the header no longer spreads its children with `space-between`. Mutation: restore `justify-content: space-between` on `.gn-board__column-header`.
 ```
 
@@ -1685,12 +1766,16 @@ import { parseRules, readUiCss, ruleExactly, rulesNaming, valueOf } from './help
  * Styling refresh Plan A, Tasks 5–6 — cases 20.041–20.046 (§20.5) and
  * 20.051–20.059 (§20.6). The owner-approved board (`Main.dc.html:64-122`),
  * translated: columns are recessed tracks, cards are raised, the lift comes
- * toward the user (owner ruling, 2026-09-29).
+ * toward the user (owner ruling, 2026-09-29) — and, amended the same day after
+ * the kanban video, only while DRAGGED (Task 5A): hover and press change the
+ * shadow and nothing else.
  */
 const CSS = readUiCss();
 const REDUCE = '@media (prefers-reduced-motion: reduce)';
-const HOVER = '.gn-board__card-slot:hover:not(:has(.gn-dialog__scrim)) > .gn-board-card';
-const PRESS = '.gn-board__card-slot:active:not(:has(.gn-dialog__scrim)) > .gn-board-card';
+const HOVER = '.gn-board__card-slot:hover > .gn-board-card';
+const PRESS = '.gn-board__card-slot:active > .gn-board-card';
+/** Task 5A's drag clone — the ONE place a board card may transform. */
+const DRAG_CLONE = '.gn-board-drag-image > .gn-board-card';
 
 describe('20.041 a board column is a recessed track', () => {
   it('20.041 track ground, track shadow, track radius, 8px padding, 8px between cards', () => {
@@ -1723,48 +1808,54 @@ describe('20.042 a board card is raised', () => {
   });
 });
 
-describe('20.043 hover lifts the card toward the user, never around a dialog', () => {
-  it('20.043 scale 1.025 from 50% 60%, near shadow, raised above neighbours, guarded by :has', () => {
+describe('20.043 hover deepens the shadow and moves nothing', () => {
+  it('20.043 near shadow, raised above neighbours, box-shadow-only transition, no transform', () => {
     const hover = ruleExactly(CSS, HOVER);
-    expect(valueOf(hover, 'transform')).toBe('scale(1.025)');
     expect(valueOf(hover, 'box-shadow')).toBe('var(--gn-shadow-lift-near)');
-    expect(valueOf(ruleExactly(CSS, '.gn-board__card-slot:hover:not(:has(.gn-dialog__scrim))'), 'z-index')).toBe('1');
+    expect(valueOf(hover, 'transform')).toBeNull();
+    expect(valueOf(ruleExactly(CSS, '.gn-board__card-slot:hover'), 'z-index')).toBe('1');
     expect(valueOf(ruleExactly(CSS, '.gn-board__card-slot'), 'position')).toBe('relative');
     const card = ruleExactly(CSS, '.gn-board-card');
-    expect(valueOf(card, 'transform-origin')).toBe('50% 60%');
-    expect(valueOf(card, 'transition')).toBe(
-      'transform var(--gn-motion-lift) var(--gn-motion-ease-out), box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out)',
-    );
+    expect(valueOf(card, 'transition')).toBe('box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out)');
+    expect(valueOf(card, 'transform-origin')).toBeNull();
     expect(valueOf(ruleExactly(CSS, '.gn-board__rail'), 'padding-bottom')).toBe('1.5rem');
-    // CONTROL — no unguarded transform on a card anywhere.
+    // CONTROL — no board card or slot transforms anywhere, except Task 5A's drag clone.
+    let scanned = 0;
     for (const rule of parseRules(CSS)) {
       for (const selector of rule.selectors) {
-        if (/\.gn-(board-)?card\b/.test(selector) && valueOf(rule.body, 'transform') !== null && valueOf(rule.body, 'transform') !== 'none') {
-          expect(selector, 'a transformed card must be guarded against an open dialog').toContain(':not(:has(.gn-dialog__scrim))');
-        }
+        if (!/\.gn-board-card\b|\.gn-board__card-slot\b/.test(selector)) continue;
+        scanned += 1;
+        const transform = valueOf(rule.body, 'transform');
+        if (transform === null || transform === 'none') continue;
+        expect(selector, 'only the drag clone may transform a board card').toBe(DRAG_CLONE);
       }
     }
+    expect(scanned).toBeGreaterThan(10);
   });
 });
 
-describe('20.044 pressing settles the card', () => {
-  it('20.044 scale 1.01, press shadow, feedback time', () => {
+describe('20.044 pressing settles the shadow', () => {
+  it('20.044 press shadow, feedback time, no transform', () => {
     const press = ruleExactly(CSS, PRESS);
-    expect(valueOf(press, 'transform')).toBe('scale(1.01)');
     expect(valueOf(press, 'box-shadow')).toBe('var(--gn-shadow-lift-press)');
     expect(valueOf(press, 'transition-duration')).toBe('var(--gn-motion-feedback)');
-    // CONTROL — press is smaller than hover.
-    const scale = (value: string | null): number => Number.parseFloat((value ?? '').replace(/^scale\(/, ''));
-    expect(scale(valueOf(press, 'transform'))).toBeLessThan(scale(valueOf(ruleExactly(CSS, HOVER), 'transform')));
+    expect(valueOf(press, 'transform')).toBeNull();
+    // CONTROL — press is its own role, not the hover shadow again.
+    expect(valueOf(press, 'box-shadow')).not.toBe(valueOf(ruleExactly(CSS, HOVER), 'box-shadow'));
   });
 });
 
-describe('20.045 reduced motion: no scale on the board', () => {
-  it('20.045 transition none, and both guarded selectors cancel their transform', () => {
-    expect(valueOf(ruleExactly(CSS, '.gn-board-card', REDUCE), 'transition')).toBe('none');
-    expect(valueOf(ruleExactly(CSS, [HOVER, PRESS], REDUCE), 'transform')).toBe('none');
-    // CONTROL — outside the arm the transition is the lift timing.
-    expect(valueOf(ruleExactly(CSS, '.gn-board-card'), 'transition')).toContain('var(--gn-motion-lift)');
+describe('20.045 no hover motion to reduce', () => {
+  it('20.045 the card animates only its shadow, so hover and press have no reduced-motion arm', () => {
+    // The positive arm — RED before Step 4, and red again under the mutation.
+    expect(valueOf(ruleExactly(CSS, '.gn-board-card'), 'transition')).toBe(
+      'box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out)',
+    );
+    // CONTROL — no reduced-motion rule names the hover or press selectors. (These two
+    // arms pass before Step 4 as well, since no such rule exists yet; the arm above is
+    // the one that can fail.)
+    expect(() => ruleExactly(CSS, [HOVER, PRESS], REDUCE)).toThrow();
+    expect(() => ruleExactly(CSS, HOVER, REDUCE)).toThrow();
   });
 });
 
@@ -1837,50 +1928,38 @@ describe('20.046 the column header and the rail sit on the 8pt grid', () => {
   flex-direction: column;
   gap: 0.5rem;
   box-shadow: var(--gn-shadow-lift);
-  transform-origin: 50% 60%;
-  transition:
-    transform var(--gn-motion-lift) var(--gn-motion-ease-out),
-    box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
+  /* Shadow only (owner ruling 2026-09-29): nothing on a resting, hovered or
+     pressed card moves, so the transition names box-shadow alone. */
+  transition: box-shadow var(--gn-motion-lift) var(--gn-motion-ease-out);
 }
 ```
 
   7. `.gn-board__card-slot` (`:1304`) → `.gn-board__card-slot { cursor: pointer; position: relative; }`. Directly after `.gn-board__card-slot[draggable="true"] { cursor: grab; }` (`:1305`), add:
 
 ```css
-/* THE LIFT TOWARD THE USER (owner ruling, 2026-09-29: "make it seem more 3d.
-   like the lifting is towards the user"). The card grows 2.5% from just below
-   its centre and its shadow spreads, softens and falls further (`lift-near`,
-   three layers) — the cues of an object coming closer, not one sliding up.
-   220ms ease-out (rule 06); press settles it to 1.01 within 100ms.
+/* THE HOVER DEEPENS THE SHADOW, AND ONLY THE SHADOW (owner rulings,
+   2026-09-29). The first ruling lifted the card toward the user on hover
+   (`scale(1.025)`); after the kanban-UX video the owner ruled "hover = shadow
+   only" — the full lift (scale, deeper shadow, tilt) happens only while a card
+   is DRAGGED, on the drag image (Task 5A). So on hover the shadow spreads,
+   softens and falls further (`lift-near`, three layers) and press settles it
+   (`lift-press`, within 100ms); nothing scales.
 
    Keyed on the SLOT — the element whose click opens the ticket — never on
    `.gn-card`, which is not interactive (pattern P-LIFT). The slot is
-   positioned and raised a layer while hovered so the lifted card and its
-   shadow sit ABOVE the next card, not under it.
+   positioned and raised a layer while hovered so the deeper shadow draws
+   ABOVE the next card, not under it.
 
-   ⚠ `:not(:has(.gn-dialog__scrim))` IS LOAD-BEARING (plan D21). `MoveArrows`
-   renders its `TransitionDialog` INSIDE this card, and `Dialog` draws its
-   `position: fixed` scrim in place (no portal). A transformed ancestor becomes
-   the containing block of a fixed descendant, so without the guard a hovered
-   card would pull its own dialog into itself. No `will-change` for the same
-   reason: it would create that containing block permanently. */
-.gn-board__card-slot:hover:not(:has(.gn-dialog__scrim)) { z-index: 1; }
-.gn-board__card-slot:hover:not(:has(.gn-dialog__scrim)) > .gn-board-card {
-  transform: scale(1.025);
-  box-shadow: var(--gn-shadow-lift-near);
-}
-.gn-board__card-slot:active:not(:has(.gn-dialog__scrim)) > .gn-board-card {
-  transform: scale(1.01);
+   No `:not(:has(.gn-dialog__scrim))` guard (plan D21, retired): a box-shadow
+   and a z-index create no containing block, so the transition dialog
+   `MoveArrows` renders inside this card stays viewport-fixed. Do NOT add a
+   transform here without bringing that guard back. No `will-change` either
+   (20.026). No reduced-motion arm: nothing here moves. */
+.gn-board__card-slot:hover { z-index: 1; }
+.gn-board__card-slot:hover > .gn-board-card { box-shadow: var(--gn-shadow-lift-near); }
+.gn-board__card-slot:active > .gn-board-card {
   box-shadow: var(--gn-shadow-lift-press);
   transition-duration: var(--gn-motion-feedback);
-}
-/* Reduced motion: the shadow still answers the pointer; nothing scales. The
-   selectors repeat the guarded ones EXACTLY — `:not(:has(...))` carries a
-   class's specificity, so an unguarded selector here would lose. */
-@media (prefers-reduced-motion: reduce) {
-  .gn-board-card { transition: none; }
-  .gn-board__card-slot:hover:not(:has(.gn-dialog__scrim)) > .gn-board-card,
-  .gn-board__card-slot:active:not(:has(.gn-dialog__scrim)) > .gn-board-card { transform: none; }
 }
 ```
 
@@ -1897,12 +1976,451 @@ describe('20.046 the column header and the rail sit on the 8pt grid', () => {
   - Append to §17:
 
 ```markdown
-- ✅ **The board's columns are recessed tracks and its cards lift toward you** (styling refresh Plan A Task 5; `ui.css` `.gn-board__column`, `.gn-board-card`, `.gn-board__card-slot`) — each column is a track (the `surfaceTrack` ground, an inset shadow lit from above, radius 24 — neo 28 — and 8px padding), each card is raised on the lit-edge `lift` shadow with 16px padding and radius 16 (= 24 − 8; neo 20 = 28 − 8), columns 16px apart. Hovering a card brings it TOWARD the user (owner ruling 2026-09-29): `scale(1.025)` from `50% 60%` with a 3-layer spreading shadow, above its neighbours, 220ms ease-out; press settles to 1.01. Keyed on the slot that opens the ticket and guarded by `:not(:has(.gn-dialog__scrim))` so a move dialog opened from the card is never trapped in a transformed box; off under reduced motion. The header's **New ticket** is the board's one loud element (the shared primary). Cases 20.041–20.046.
+- ✅ **The board's columns are recessed tracks and a hovered card's shadow deepens** (styling refresh Plan A Task 5; `ui.css` `.gn-board__column`, `.gn-board-card`, `.gn-board__card-slot`) — each column is a track (the `surfaceTrack` ground, an inset shadow lit from above, radius 24 — neo 28 — and 8px padding), each card is raised on the lit-edge `lift` shadow with 16px padding and radius 16 (= 24 − 8; neo 20 = 28 − 8), columns 16px apart. Hovering a card changes its SHADOW ONLY (owner ruling 2026-09-29, "hover = shadow only"): a 3-layer spreading shadow above its neighbours, 220ms ease-out; press settles the shadow within 100ms. Nothing scales (the lift belongs to the drag, Task 5A), so a move dialog opened from the card stays viewport-centred with no guard. The header's **New ticket** is the board's one loud element (the shared primary). Cases 20.041–20.046.
 ```
 
-  - Under `:182`, append: `  - ✅ **Styling refresh (2026-09-29):** columns are recessed tracks (no longer the 1.14:1 sunken fill), cards raised with the toward-the-user hover lift. Cases 20.041–20.046.`
+  - Under `:182`, append: `  - ✅ **Styling refresh (2026-09-29):** columns are recessed tracks (no longer the 1.14:1 sunken fill), cards raised, with a hover that deepens the shadow and moves nothing. Cases 20.041–20.046.`
 
-- [ ] **Step 7: Commit** `Styling A/Task 5: board tracks, raised cards, the lift toward the user (20.041-20.046)`. Then mutate, show red, restore.
+- [ ] **Step 7: Commit** `Styling A/Task 5: board tracks, raised cards, the shadow-only hover (20.041-20.046)`. Then mutate, show red, restore.
+
+---
+
+### Task 5A: The drag lift and the placeholder (added 2026-09-29, owner kanban rulings)
+
+Owner, 2026-09-29: *"yes, update the mockup and the styling plan"*. The ruling:
+- the full lift toward the user (scale ~1.03, a deeper spreading shadow and a 2–3° tilt) happens ONLY while a card is being dragged;
+- a drag placeholder sized to the dragged card's height, so the layout does not jump.
+
+Native HTML5 drag-and-drop stays (D26). The lift is painted on a `setDragImage` clone. The placeholder is the source slot itself, and the column being dragged over gets a highlight rather than an inserted placeholder (D25).
+
+**Files:**
+- Create: `packages/app-core/src/views/board-drag-image.ts`.
+- Create: `packages/app-core/test/views/board-drag-lift.test.tsx`.
+- Modify: `packages/app-core/src/views/board.tsx`:
+  - `DRAG_TICKET_FORMAT`, `:361`: add a marker format beside it;
+  - `BoardCardSlot`, `:1420-1475`: `onDragStart` (`:1445-1452`) and a new `onDragEnd`, plus the placeholder state;
+  - the column `<section>` in `BoardGroupSection`, `:1058-1077`: `onDragEnter` and `onDragLeave` beside the existing `onDragOver`/`onDrop`, plus the highlight state.
+- Modify: `packages/ui/src/ui.css`: new rules directly after Task 5's `.gn-board__card-slot:active > .gn-board-card` rule.
+- Modify: `packages/ui/test/styling-board.test.ts` (append), `test-cases/20-styling-system.md` (new `## 20.10 Board — the drag lift and the placeholder`), `Features.md`.
+
+**Interfaces:**
+- Consumes: Task 2 (`--gn-shadow-lift-drag`, `--gn-shadow-track`, `--gn-surface-track`, `--gn-radius-card`); Task 5 (`.gn-board__card-slot` is `position: relative`).
+- Produces:
+  - `setCardDragImage(event: DragEvent<HTMLElement>, card: HTMLElement): void`;
+  - `DRAG_CARD_MARKER = 'application/x-gisik-card'`, exported from `board.tsx` beside `DRAG_TICKET_FORMAT`;
+  - the classes `.gn-board-drag-image`, `.gn-board__card-slot--placeholder` and `.gn-board__column--drop-target`.
+
+**Why a marker format.** `DRAG_TICKET_FORMAT` is `'text/plain'` (`board.tsx:361`). Any text selection dragged across the page carries `text/plain` too. During `dragenter` a page can read a drag's `types` but not its data. So the highlight keys on a second, card-only type that `dragstart` sets with an empty value. The drop still reads the ticket id from `DRAG_TICKET_FORMAT`, exactly as today (`:1307`).
+
+Cases (`## 20.10 Board — the drag lift and the placeholder`). The guard moves by **5**:
+
+```markdown
+- ❌ **20.101 — at `dragstart` a card hands the browser a LIFTED drag image: `setDragImage` is called once with a `.gn-board-drag-image` wrapper attached to `document.body`, `aria-hidden="true"` and `inert`, holding a deep clone of the card at the source card's measured width, with every `id` and `data-testid` stripped from the clone and all its descendants, the offsets being the pointer's offset inside the card plus the wrapper's padding (48px left, 24px top); the wrapper is removed on the next task (`setTimeout(…, 0)`), after the browser has taken its snapshot;** control: during the drag `getAllByTestId('ticket-card-<id>')` still has exactly ONE element. Mutation: skip the `data-testid` strip.
+- ❌ **20.102 — the drag image is FEATURE-GUARDED: a `DataTransfer` with no `setDragImage` (the jsdom fakes at `board-drag-drop.test.tsx:100-109` and `board-card-click.test.tsx:77-86`) drags without throwing, attaches no wrapper, and still sets `DRAG_TICKET_FORMAT` and the marker, so the drop moves the ticket;** control: the existing drag-drop cases in `board-drag-drop.test.tsx` pass unchanged. Mutation: delete the `typeof event.dataTransfer.setDragImage === 'function'` guard (a TypeError on `dragstart`).
+- ❌ **20.103 — the clone's card is tilted and lifted: `.gn-board-drag-image > .gn-board-card` declares `transform: rotate(2.5deg) scale(1.03)` and `box-shadow: var(--gn-shadow-lift-drag)`; the wrapper is `position: fixed` at `-10000px`/`-10000px` with padding `1.5rem 3rem 5.5rem`, so the 40px-down, 64px-blur fall is not clipped, and `pointer-events: none`; under `prefers-reduced-motion: reduce` the same selector's `transform` is `none` while the shadow stays;** control: this is the ONLY board rule with a transform other than `none` (20.043's scan). Mutation: delete the reduced-motion arm.
+- ❌ **20.104 — the source slot becomes the PLACEHOLDER one animation frame after `dragstart` and stops being it on `dragend` (which fires on a drop, on Esc and on a refused drop): `gn-board__card-slot--placeholder` is absent synchronously after `dragstart`, present after the frame, absent after `dragend`; its card is `visibility: hidden` and the slot draws a recessed outline (`background: var(--gn-surface-track)`, `box-shadow: var(--gn-shadow-track)`, `border-radius: var(--gn-radius-card)`, `outline: 1px dashed var(--gn-border)`, `outline-offset: -1px`) without declaring any `height`, `padding`, `margin` or `border`, so its box stays the card's own size;** control: a `dragend` that arrives BEFORE the frame cancels it, so no placeholder class is left behind. Mutation: apply the class synchronously in `onDragStart` (the synchronous-absent assertion fails).
+- ❌ **20.105 — the column being dragged over is HIGHLIGHTED, not given a placeholder: a `dragenter` whose `types` include `DRAG_CARD_MARKER` adds `gn-board__column--drop-target` (`outline: 2px solid var(--gn-accent); outline-offset: -2px`); entering a child card and then leaving the column once keeps it (an enter/leave depth counter, because `dragleave` fires when the pointer moves onto a child); the matching final `dragleave`, a `drop`, or a card's `dragend` anywhere on the board clears it; a drag without the marker (a text selection carrying only `text/plain`) never highlights; the column's card list gains no element;** control: the list's child count is the same before, during and after the highlight. Mutation: replace the counter with a boolean set on enter and cleared on any leave (the child-enter arm clears it).
+```
+
+- [ ] **Step 1: Write the cases.** +5.
+
+- [ ] **Step 2: Write the failing tests.**
+  - Append to `packages/ui/test/styling-board.test.ts`:
+
+```ts
+describe('20.103 the drag clone is tilted and lifted', () => {
+  it('20.103 rotate + scale + lift-drag, padded off-screen wrapper, reduced motion drops the transform', () => {
+    const clone = ruleExactly(CSS, DRAG_CLONE);
+    expect(valueOf(clone, 'transform')).toBe('rotate(2.5deg) scale(1.03)');
+    expect(valueOf(clone, 'box-shadow')).toBe('var(--gn-shadow-lift-drag)');
+    const wrapper = ruleExactly(CSS, '.gn-board-drag-image');
+    expect(valueOf(wrapper, 'position')).toBe('fixed');
+    expect(valueOf(wrapper, 'top')).toBe('-10000px');
+    expect(valueOf(wrapper, 'left')).toBe('-10000px');
+    expect(valueOf(wrapper, 'padding')).toBe('1.5rem 3rem 5.5rem');
+    expect(valueOf(wrapper, 'pointer-events')).toBe('none');
+    const reduced = ruleExactly(CSS, DRAG_CLONE, REDUCE);
+    expect(valueOf(reduced, 'transform')).toBe('none');
+    // CONTROL — reduced motion keeps the shadow: it restates no box-shadow.
+    expect(valueOf(reduced, 'box-shadow')).toBeNull();
+  });
+});
+
+describe('20.104 the placeholder keeps the card box', () => {
+  it('20.104 hidden card, recessed outline, no box-changing declaration', () => {
+    const slot = ruleExactly(CSS, '.gn-board__card-slot--placeholder');
+    expect(valueOf(slot, 'background')).toBe('var(--gn-surface-track)');
+    expect(valueOf(slot, 'box-shadow')).toBe('var(--gn-shadow-track)');
+    expect(valueOf(slot, 'border-radius')).toBe('var(--gn-radius-card)');
+    expect(valueOf(slot, 'outline')).toBe('1px dashed var(--gn-border)');
+    expect(valueOf(slot, 'outline-offset')).toBe('-1px');
+    expect(valueOf(ruleExactly(CSS, '.gn-board__card-slot--placeholder > .gn-board-card'), 'visibility')).toBe('hidden');
+    // CONTROL — nothing that changes the box.
+    for (const property of ['height', 'min-height', 'padding', 'margin', 'border']) {
+      expect(valueOf(slot, property), property).toBeNull();
+    }
+  });
+});
+
+describe('20.105 the drop target is an outline, inside the edge', () => {
+  it('20.105 accent outline, negative offset', () => {
+    const target = ruleExactly(CSS, '.gn-board__column--drop-target');
+    expect(valueOf(target, 'outline')).toBe('2px solid var(--gn-accent)');
+    expect(valueOf(target, 'outline-offset')).toBe('-2px');
+  });
+});
+```
+
+  - Create `packages/app-core/test/views/board-drag-lift.test.tsx`. Mount the board exactly as `board-drag-drop.test.tsx` does, and copy its seed and `renderBoard` helpers (`:1-130`). Two local fakes:
+
+```ts
+function liftingDataTransfer(types: string[] = []): DataTransfer & { setDragImage: ReturnType<typeof vi.fn> } {
+  const store = new Map<string, string>();
+  const setDragImage = vi.fn();
+  return {
+    setData: (format: string, data: string) => {
+      store.set(format, data);
+      if (!types.includes(format)) types.push(format);
+    },
+    getData: (format: string) => store.get(format) ?? '',
+    effectAllowed: 'uninitialized',
+    types,
+    setDragImage,
+  } as unknown as DataTransfer & { setDragImage: ReturnType<typeof vi.fn> };
+}
+```
+
+  The cases:
+    - **20.101:**
+      - fire `dragStart` on the slot with `liftingDataTransfer()` and `clientX`/`clientY` 30/20 inside a card whose `getBoundingClientRect` is stubbed to `{ left: 10, top: 10, width: 288 }`;
+      - `setDragImage` was called once with `(wrapper, 20 + 48, 10 + 24)`;
+      - the wrapper is in `document.body`, has class `gn-board-drag-image`, `aria-hidden="true"` and the `inert` attribute, and its first child has class `gn-board-card` and `style.width === '288px'`;
+      - `wrapper.querySelectorAll('[id], [data-testid]')` is empty;
+      - the control: `getAllByTestId('ticket-card-<id>')` has length 1;
+      - after `await new Promise((resolve) => setTimeout(resolve, 0))` the wrapper is no longer connected.
+    - **20.102:** the existing `fakeDataTransfer()` shape (no `setDragImage`, copied verbatim). `dragStart` does not throw, `document.querySelector('.gn-board-drag-image')` is null, and `getData(DRAG_TICKET_FORMAT)` returns the ticket id. Then `drop` on another column calls the move with that id (the same assertion `board-drag-drop.test.tsx:134-150` makes).
+    - **20.104:**
+      - right after `dragStart` the slot lacks `gn-board__card-slot--placeholder`;
+      - after `await new Promise((resolve) => requestAnimationFrame(() => resolve(null)))` it has it;
+      - after `fireEvent.dragEnd(slot)` it lacks it;
+      - the control: `dragStart` then an immediate `dragEnd`, then wait one frame, and the class is absent.
+    - **20.105:**
+      - with `liftingDataTransfer([DRAG_CARD_MARKER])`: `dragEnter` on column B adds `gn-board__column--drop-target`;
+      - `dragEnter` on a card inside B, then `dragLeave` on B, keeps it;
+      - a second `dragLeave` on B removes it;
+      - enter again, then `drop`, removes it;
+      - enter again, then `dragEnd` on the source slot, removes it;
+      - with a `DataTransfer` whose `types` is `['text/plain']`, `dragEnter` adds nothing;
+      - the control: `within(columnB).getByRole('list').children.length` is equal before, during and after.
+
+- [ ] **Step 3: Run to see them fail.** Build `packages/ui`, then run `styling-board.test.ts` (20.103–20.105 RED: no rules yet) and `board-drag-lift.test.tsx` (20.101, 20.104 and 20.105 RED). 20.102 PASSES before implementation. It is the regression guard for the feature check, and its mutation is what proves it.
+
+- [ ] **Step 4: Implement.**
+  1. `packages/app-core/src/views/board-drag-image.ts`:
+
+```ts
+import type { DragEvent } from 'react';
+
+/**
+ * The dragged card's lifted image (styling refresh Plan A Task 5A; owner
+ * ruling 2026-09-29: the full lift toward the user — scale, deeper shadow,
+ * a 2–3° tilt — happens only while a card is DRAGGED).
+ *
+ * The board drags NATIVELY, and a native drag moves a bitmap the browser
+ * snapshots at `dragstart`: CSS on the source `<li>` never follows the
+ * pointer. So the lift is painted on a clone, handed to `setDragImage`, and
+ * removed on the next task — after the snapshot, which the browser takes
+ * synchronously once this handler returns. The browser adds its own
+ * translucency to a drag image; no page can remove it (plan D26).
+ *
+ * The clone is `aria-hidden` and `inert`, and every `id`/`data-testid` in it is
+ * stripped: for the one task it exists it must not be a second copy of the
+ * card to assistive tech, to `getByTestId`, or to `document.getElementById`.
+ *
+ * FEATURE-GUARDED: jsdom's `DataTransfer` fakes carry no `setDragImage`
+ * (`board-drag-drop.test.tsx:100-109`); the drag must still work without one.
+ */
+const PAD_LEFT = 48; // = the wrapper's 3rem inline padding
+const PAD_TOP = 24; // = its 1.5rem top padding
+
+export function setCardDragImage(event: DragEvent<HTMLElement>, card: HTMLElement): void {
+  if (typeof event.dataTransfer.setDragImage !== 'function') return;
+  const rect = card.getBoundingClientRect();
+  const clone = card.cloneNode(true) as HTMLElement;
+  clone.removeAttribute('id');
+  clone.removeAttribute('data-testid');
+  for (const element of clone.querySelectorAll('[id], [data-testid]')) {
+    element.removeAttribute('id');
+    element.removeAttribute('data-testid');
+  }
+  clone.style.width = `${rect.width}px`;
+  const wrapper = document.createElement('div');
+  wrapper.className = 'gn-board-drag-image';
+  wrapper.setAttribute('aria-hidden', 'true');
+  wrapper.setAttribute('inert', '');
+  wrapper.append(clone);
+  document.body.append(wrapper);
+  event.dataTransfer.setDragImage(
+    wrapper,
+    event.clientX - rect.left + PAD_LEFT,
+    event.clientY - rect.top + PAD_TOP,
+  );
+  setTimeout(() => wrapper.remove(), 0);
+}
+```
+
+  2. `board.tsx`, directly after `DRAG_TICKET_FORMAT` (`:361`), add this, with a docblock giving the "Why a marker format" paragraph above:
+
+```ts
+export const DRAG_CARD_MARKER = 'application/x-gisik-card';
+```
+
+  3. `BoardCardSlot` (`:1420-1475`):
+     - add `const [placeholder, setPlaceholder] = useState(false);` and `const frameRef = useRef<number | null>(null);` beside `draggedRef`;
+     - `className={placeholder ? 'gn-board__card-slot gn-board__card-slot--placeholder' : 'gn-board__card-slot'}`;
+     - `onDragStart`, after the existing three lines:
+
+```ts
+event.dataTransfer.setData(DRAG_CARD_MARKER, '');
+const card = event.currentTarget.firstElementChild;
+if (card instanceof HTMLElement) setCardDragImage(event, card);
+// One frame later, NOT now: restyling the source synchronously would put the
+// hidden card into the browser's snapshot (Chromium can cancel the drag).
+frameRef.current = requestAnimationFrame(() => {
+  frameRef.current = null;
+  setPlaceholder(true);
+});
+```
+
+     - a new `onDragEnd` (the same `arrows === null ? undefined : …` gate): `if (frameRef.current !== null) cancelAnimationFrame(frameRef.current); frameRef.current = null; setPlaceholder(false);`. Do NOT touch `draggedRef` here. It is cleared on the next `mousedown`, never on `dragend` (the docblock at `:1375-1382`).
+  4. `BoardGroupSection`, the column `<section>` (`:1058-1077`):
+     - add `const [dropTarget, setDropTarget] = useState<string | null>(null);` and `const depthRef = useRef(new Map<string, number>());` at the top of the component;
+     - add `column.stateId === dropTarget ? ' gn-board__column--drop-target' : ''` to the section's class;
+     - under the SAME `onDropCard === null ? undefined : …` gate as `onDragOver`, add these handlers (`isCardDrag` is `(event) => Array.from(event.dataTransfer.types ?? []).includes(DRAG_CARD_MARKER)`):
+       - `onDragEnter`: if `isCardDrag(event)`, increment the column's depth and `setDropTarget(column.stateId)`;
+       - `onDragLeave`: if `isCardDrag(event)`, decrement, and at 0 delete the entry and clear `dropTarget` when it is this column;
+       - `onDrop`: first clear this column's depth and `dropTarget`, then call `onDropCard` as today.
+     - on the rail's wrapper, add `onDragEnd={() => { depthRef.current.clear(); setDropTarget(null); }}`. A card's `dragend` bubbles here from the source slot, and that covers Esc and a drop outside every column.
+  5. `ui.css`, directly after Task 5's `.gn-board__card-slot:active > .gn-board-card` rule:
+
+```css
+/* THE DRAG LIFT (owner ruling 2026-09-29: the full lift toward the user —
+   scale 1.03, a deeper spreading shadow, a 2.5° tilt — happens ONLY while a
+   card is dragged). Painted on the detached drag-image clone
+   (`board-drag-image.ts`), because a native drag moves a browser snapshot and
+   CSS on the source never follows the pointer (plan D26). The wrapper sits
+   off-screen and pads the clone so the shadow's 40px/64px fall is inside the
+   snapshot rather than clipped at the card's edge. The clone is never an
+   ancestor of a dialog, so its transform needs no guard (D21, retired). */
+.gn-board-drag-image {
+  position: fixed;
+  top: -10000px;
+  left: -10000px;
+  padding: 1.5rem 3rem 5.5rem;
+  pointer-events: none;
+}
+.gn-board-drag-image > .gn-board-card {
+  transform: rotate(2.5deg) scale(1.03);
+  box-shadow: var(--gn-shadow-lift-drag);
+}
+@media (prefers-reduced-motion: reduce) {
+  .gn-board-drag-image > .gn-board-card { transform: none; }
+}
+/* THE PLACEHOLDER (owner ruling 2026-09-29: "sized to the dragged card, no
+   layout jump"). The source slot stays in place with its box untouched — no
+   height, padding, margin or border here — its card hidden and a recessed,
+   dashed outline drawn in the card's shape. The dashed `border` grey clears
+   3:1, so the outline still reads where minimal draws no shadow. */
+.gn-board__card-slot--placeholder {
+  background: var(--gn-surface-track);
+  box-shadow: var(--gn-shadow-track);
+  border-radius: var(--gn-radius-card);
+  outline: 1px dashed var(--gn-border);
+  outline-offset: -1px;
+}
+.gn-board__card-slot--placeholder > .gn-board-card { visibility: hidden; }
+/* THE DROP TARGET (plan D25): a board drop changes state, it does not
+   reorder, so the column is outlined rather than given a placeholder at an
+   index it would not honour. Inside the edge so the rail does not shift.
+   The accent — rule 03's one accent, saved for the action; this is it. */
+.gn-board__column--drop-target { outline: 2px solid var(--gn-accent); outline-offset: -2px; }
+```
+
+- [ ] **Step 5: Run to see them pass.** Then run the whole `packages/app-core` suite, which covers `board-drag-drop.test.tsx`, `board-card-click.test.tsx` (13.521 and the `draggedRef` cases) and `board-workflow-collapse.test.tsx`, and the whole `packages/ui` suite. Then build and typecheck.
+
+- [ ] **Step 6: Catalogue.** Flip 20.101–20.105. Append to §17:
+
+```markdown
+- ✅ **A dragged card lifts toward you and leaves a placeholder** (styling refresh Plan A Task 5A; `packages/app-core/src/views/board-drag-image.ts`, `board.tsx` `BoardCardSlot` and the column section, `ui.css` `.gn-board-drag-image`, `.gn-board__card-slot--placeholder`, `.gn-board__column--drop-target`) — owner ruling 2026-09-29: the full lift happens only while dragging. The drag image is a detached clone of the card tilted 2.5°, scaled 1.03 and on the deeper `lift-drag` shadow (no tilt or scale under reduced motion; the browser adds its own translucency). The card's own slot stays put as a recessed dashed placeholder the size of the card, so nothing jumps, and the column under the pointer gains an accent outline (a drop changes state, it does not reorder, so no placeholder is inserted there). Feature-checked, so a browser without `setDragImage` still drags. Cases 20.101–20.105.
+```
+
+- [ ] **Step 7: Commit** `Styling A/Task 5A: the drag lift, the placeholder, the drop-target outline (20.101-20.105)`. Then mutate, show red, restore.
+
+---
+
+### Task 5B: Terminal columns collapse to a labelled strip (added 2026-09-29, owner kanban rulings)
+
+Owner, 2026-09-29: single columns (Done and Backlog) collapse to a narrow labelled strip with a count. **Backlog is never a board column** (spec §1.1; `board.tsx:1700-1705`), so this task builds the collapse for TERMINAL columns only, pending the owner's ruling on D27. It is a behaviour change as well as a styling one, and it is remembered in `localStorage` on the pattern `preferences/workflow-collapse.ts` set. That precedent is the owner's own: *"only on the local storage, clientside"* (`workflow-collapse.ts:1-60`).
+
+**Files:**
+- Create: `packages/app-core/src/preferences/column-collapse.ts`.
+- Create: `packages/app-core/test/preferences/column-collapse.test.ts` and `packages/app-core/test/views/board-column-collapse.test.tsx`.
+- Modify: `packages/app-core/src/views/board.tsx`:
+  - `Board`: a `columnChoices` state read with the `useHydrationLayoutEffect` that already reads `groupChoices` (`:505-545`);
+  - `BoardGroupSection`'s column `<section>` (`:1058-1200`): the header toggle, the collapsed branch and the props that carry the choices down.
+- Modify: `packages/ui/src/ui.css`: new rules after `.gn-board__column-header > .gn-board__column-action` (Task 5).
+- Modify: `packages/ui/test/styling-board.test.ts` (append), `test-cases/20-styling-system.md` (new `## 20.11 Board — collapsible terminal columns`), `Features.md`.
+
+**Interfaces:**
+- Consumes: Task 5 (P-TRACK column; `.gn-board__column-header`), the Pattern table's P-GHOST declarations (written out in full in Step 4, since Task 6, which first applies P-GHOST on the board, runs after this task), and Task 5A (the section's drag handlers stay on the section in both states).
+- Produces:
+  - `COLUMN_COLLAPSE_KEY = 'gn-board-column-collapse'`;
+  - `type ColumnCollapseChoices = Record<string, boolean>`, where `false` means collapsed by a person, `true` means expanded by a person and an absent key means no choice (expanded);
+  - `NO_COLUMN_CHOICES`;
+  - `readColumnCollapse(userId, projectId)`;
+  - `rememberColumnCollapse(userId, projectId, choices)`;
+  - `columnCollapseKey(workflowId, stateId)` = `${workflowId}:${stateId}`. Keyed by workflow and not by version, so a new version of the same workflow keeps the person's choice for a state it still has.
+
+**The shape, copied, not reinvented.** Every rule in `workflow-collapse.ts`'s docblock carries over:
+- keyed by user AND project;
+- another user's record is never honoured, on read or on write;
+- every storage access is wrapped, so every failure answers the default;
+- choices only, never resolved states;
+- `''` or `undefined` means no session, so nothing is read and nothing is written.
+
+The one difference is that there is no auto-expand rule here. The default is EXPANDED for every terminal column, so nobody's board changes until they press the control.
+
+**The markup.**
+- **Expanded terminal column.** The header gains a 44×44 ghost icon button at the far edge, AFTER `Close all (N)`: `<button type="button" className="gn-board__column-collapse" aria-expanded="true" aria-controls={cardsId} aria-label={`Collapse ${column.name}`}>`, with a chevron icon (`aria-hidden`). The `<ul className="gn-board__cards">` gains `id={cardsId}`, where `cardsId = `board-cards-${group.workflowId}-${column.stateId}``.
+- **Collapsed terminal column.** The SAME `<section>` stays, with the same `role`, `aria-label`, `data-testid` and the same `onDragOver`/`onDragEnter`/`onDragLeave`/`onDrop`, so it is still a drop target. It adds the class `gn-board__column--collapsed` and holds ONLY `<button type="button" className="gn-board__column-strip" aria-expanded="false" aria-label={`Expand ${column.name}, ${n} ${n === 1 ? 'ticket' : 'tickets'}`}>`. Inside it is the count (`gn-board__count`) and then the name, written vertically (`gn-board__column-strip-name`, `aria-hidden` because the button's name already says it). It has no `aria-controls`, because the list it would control is not rendered.
+- **Collapsed hides everything else.** The header, the card list, `Close all (N)`, the per-column empty state and its `Add a ticket` are all hidden. The owner asked for a strip. Close all returns on expand.
+- **Focus follows the toggle.** Pressing Collapse moves focus to the strip's button, and pressing the strip moves focus to the Collapse button, because the pressed control unmounts. Use a ref and a layout effect keyed on the column's state.
+- **Scope.** Only `column.category === 'terminal'` columns get either control. Open and active columns render exactly as Task 5 left them.
+
+Cases (`## 20.11 Board — collapsible terminal columns`). The guard moves by **6**:
+
+```markdown
+- ❌ **20.111 — `column-collapse.ts` remembers a person's column choices per user AND project in `localStorage` under `gn-board-column-collapse`, choices only (an absent key is "nobody chose", not `false`), merging one project's write without touching another's, and answers `NO_COLUMN_CHOICES` for no session, a throwing accessor, unparseable text, a non-object document and another user's document — whose projects are also never carried into this user's write;** control: `workflow-collapse.ts`'s key is untouched by a column write (the two memories are separate documents). Mutation: drop the `storedUserId !== userId` check from the read.
+- ❌ **20.112 — ONLY terminal columns carry the control: an expanded terminal column's header holds a 44×44 ghost `Collapse <name>` button (`aria-expanded="true"`, `aria-controls` naming the column's card list, which exists), after `Close all (N)`; open and active columns hold no collapse control;** control: the open and active columns' headers hold exactly the children Task 5 left them (the name chip and the count), and no element in those sections has the class `gn-board__column-collapse`. Mutation: offer the control on every column.
+- ❌ **20.113 — collapsing keeps the SAME `<section>` (same role, name and test id) and renders in it only a `<button aria-expanded="false">` named `Expand <name>, <n> tickets` (`1 ticket` when there is one), with the count and the name visible; the card list, `Close all (N)`, the empty copy and `Add a ticket` are not rendered; focus moves to the strip, and expanding restores everything and moves focus to `Collapse <name>`;** control: a collapsed column with zero cards is named `Expand Done, 0 tickets`. Mutation: leave the count out of the strip's accessible name.
+- ❌ **20.114 — a COLLAPSED column is still a drop target: dropping a card from another column on the strip moves the ticket to that state (the same `onDropCard` call an expanded column makes), the strip's count and name go up by one, and the column stays collapsed;** control: the same drop on the expanded column makes the identical `onDropCard(event, stateId)` call. Mutation: attach the drag handlers only in the expanded branch.
+- ❌ **20.115 — the choice survives a remount for the same user and project, a fresh user and a board with no `currentUserId` see every terminal column expanded, and pressing the toggle with no session changes the board for that session but writes nothing;** control: expanding a column a person collapsed writes `true`, not a deleted key, and a record with no choices removes the project's entry. Mutation: make the default collapsed.
+- ❌ **20.116 — the collapsed column is a 3.5rem strip (`flex: 0 0 3.5rem; min-width: 3.5rem`, plan D13 amended) whose button fills it (`width: 100%`, `min-height: 2.75rem`, the P-GHOST ground and hover), with the name set vertically (`writing-mode: vertical-rl`) in the second text tier and the count in the third; the expanded header's collapse button is P-GHOST, icon-only, 44×44;** control: `.gn-board__column` itself still declares `flex: 0 0 18rem`. Mutation: remove `writing-mode` from the strip name.
+```
+
+- [ ] **Step 1: Write the cases.** +6.
+
+- [ ] **Step 2: Write the failing tests.**
+  - `packages/app-core/test/preferences/column-collapse.test.ts`. Mirror the cases that pin `workflow-collapse.ts`, found with `git grep -n "WORKFLOW_COLLAPSE_KEY" -- packages/app-core/test`: the same arms, with the column module's names. 20.111's control writes a column choice and asserts `localStorage.getItem(WORKFLOW_COLLAPSE_KEY)` is unchanged.
+  - `packages/app-core/test/views/board-column-collapse.test.tsx`. Seed a board whose workflow has an open, an active and a terminal state, with two cards in the terminal one. Mount it as `board-workflow-collapse.test.tsx` does, with `currentUserId` and a project id.
+    - **20.112:** `getByRole('button', { name: 'Collapse Done' })` has `aria-expanded="true"`, and its `aria-controls` resolves to a `<ul>` in the Done region. `queryByRole('button', { name: /^Collapse (To do|Doing)$/ })` is null. The control: each open and active header's `children` are exactly the chip and the `.gn-board__count`, and `section.querySelector('.gn-board__column-collapse')` is null.
+    - **20.113:** press Collapse. `within(getByTestId('board-column-<done>')).getAllByRole('button')` is exactly `[Expand Done, 2 tickets]` with `aria-expanded="false"`, and `document.activeElement` is that button. `queryByText('Close all (2)')` is null. Press it, and `document.activeElement` is `Collapse Done` and `Close all (2)` is back. The control: an empty Done.
+    - **20.114:** collapse Done, then `dragStart` a card in the active column and `drop` on `board-column-<done>` (the `fakeDataTransfer` of `board-drag-drop.test.tsx:100-109`). The move is called with the Done state id. After the reload the strip is named `Expand Done, 3 tickets` and still has `aria-expanded="false"`.
+    - **20.115:** collapse, unmount, remount with the same user, and the strip is shown. Remount as another user, and Collapse is shown. Mount with no `currentUserId`, press Collapse, and `localStorage.getItem(COLUMN_COLLAPSE_KEY)` is null.
+  - Append 20.116 to `packages/ui/test/styling-board.test.ts`:
+
+```ts
+describe('20.116 the collapsed column is a labelled 3.5rem strip', () => {
+  it('20.116 strip width, full-size ghost button, vertical name, ghost collapse icon', () => {
+    const collapsed = ruleExactly(CSS, '.gn-board__column--collapsed');
+    expect(valueOf(collapsed, 'flex')).toBe('0 0 3.5rem');
+    expect(valueOf(collapsed, 'min-width')).toBe('3.5rem');
+    const strip = ruleExactly(CSS, '.gn-board__column-strip');
+    expect(valueOf(strip, 'width')).toBe('100%');
+    expect(valueOf(strip, 'min-height')).toBe('2.75rem');
+    expect(valueOf(strip, 'background')).toBe('transparent');
+    expect(valueOf(ruleExactly(CSS, ['.gn-board__column-strip:hover', '.gn-board__column-strip:focus-visible']), 'background')).toBe(
+      'var(--gn-fill-tertiary)',
+    );
+    const name = ruleExactly(CSS, '.gn-board__column-strip-name');
+    expect(valueOf(name, 'writing-mode')).toBe('vertical-rl');
+    expect(valueOf(name, 'color')).toBe('var(--gn-text-muted)');
+    const toggle = ruleExactly(CSS, '.gn-board__column-collapse');
+    expect(valueOf(toggle, 'min-width')).toBe('2.75rem');
+    expect(valueOf(toggle, 'min-height')).toBe('2.75rem');
+    expect(valueOf(toggle, 'border')).toBe('none');
+    expect(valueOf(toggle, 'margin-left')).toBe('auto');
+    expect(valueOf(ruleExactly(CSS, '.gn-board__column-action + .gn-board__column-collapse'), 'margin-left')).toBe('0');
+    // CONTROL — an expanded column is still the 18rem lane.
+    expect(valueOf(ruleExactly(CSS, '.gn-board__column'), 'flex')).toBe('0 0 18rem');
+  });
+});
+```
+
+- [ ] **Step 3: Run to see them fail.** All six are RED.
+
+- [ ] **Step 4: Implement.**
+  1. `column-collapse.ts`: copy `workflow-collapse.ts` (`:1-216`) and rename it. The module docblock points back at `workflow-collapse.ts` for the reasoning instead of restating it, and adds one paragraph for the difference: no auto-expand, the default is expanded, and the scope is terminal columns (plan D27). Add `columnCollapseKey`.
+  2. `board.tsx`:
+     - in `Board`, add `const [columnChoices, setColumnChoices] = useState<ColumnCollapseChoices>(NO_COLUMN_CHOICES);` beside `groupChoices`, and read it inside the SAME `useHydrationLayoutEffect` (`:543-545`);
+     - pass `columnChoices` and `onToggleColumn(workflowId, stateId, expanded)` to `BoardGroupSection`. The toggle builds the next choices, calls `setColumnChoices`, and calls `rememberColumnCollapse(currentUserId ?? '', board.projectId, next)`;
+     - in the column map, `const collapsible = column.category === 'terminal'; const collapsed = collapsible && columnChoices[columnCollapseKey(group.workflowId, column.stateId)] === false;`;
+     - render the collapsed branch or the expanded one as **The markup** above says, keeping the section's attributes and handlers in ONE place outside the branch.
+  3. `ui.css`, after `.gn-board__column-header > .gn-board__column-action`:
+
+```css
+/* COLLAPSIBLE TERMINAL COLUMNS (owner ruling 2026-09-29; plan D27 — Backlog is
+   never a board column). The collapsed column is the same section, a 3.5rem
+   strip (D13 amended), still a drop target; its one control fills it. */
+.gn-board__column--collapsed { flex: 0 0 3.5rem; min-width: 3.5rem; }
+.gn-board__column-strip {
+  width: 100%;
+  min-height: 2.75rem;
+  flex: 1 1 auto;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 0.5rem;
+  padding: 0.5rem 0;
+  border: none;
+  border-radius: calc(var(--gn-radius-track) - 0.5rem);
+  background: transparent;
+  cursor: pointer;
+  transition: background-color var(--gn-motion-feedback) ease-out;
+}
+.gn-board__column-strip:hover,
+.gn-board__column-strip:focus-visible { background: var(--gn-fill-tertiary); }
+.gn-board__column-strip:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+.gn-board__column-strip-name {
+  writing-mode: vertical-rl;
+  font-size: 0.9375rem;
+  font-weight: 600;
+  color: var(--gn-text-muted);
+}
+/* The expanded header's collapse control — P-GHOST, icon-only, 44×44. */
+.gn-board__column-collapse {
+  min-width: 2.75rem;
+  min-height: 2.75rem;
+  border: none;
+  border-radius: 999px;
+  background: transparent;
+  color: var(--gn-text-subtle);
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  transition: background-color var(--gn-motion-feedback) ease-out, color var(--gn-motion-feedback) ease-out;
+  margin-left: auto; /* far edge when there is no Close all (an empty Done) */
+}
+/* Close all already took the far edge (Task 5); the toggle sits right after it. */
+.gn-board__column-action + .gn-board__column-collapse { margin-left: 0; }
+.gn-board__column-collapse:hover,
+.gn-board__column-collapse:focus-visible { background: var(--gn-fill-tertiary); color: var(--gn-text-muted); }
+.gn-board__column-collapse:focus-visible { outline: 2px solid var(--gn-focus-ring); outline-offset: 0; }
+```
+
+  The strip's inner radius is the track's radius minus its 8px padding (rule 05). Its count reuses `.gn-board__count` (`textSubtle`, Task 5). `textMuted` over `fillTertiary` clears 4.5 in every style × theme (the measurement Task 6's 20.059 control records), and so does `textSubtle` on the track (20.001).
+
+- [ ] **Step 5: Run to see them pass.** Then run the whole `packages/app-core` suite (the workflow-collapse and drag-drop suites must stay green) and the whole `packages/ui` suite, then build, typecheck and `pnpm check:help`. The two new accessible names are the only new strings.
+
+- [ ] **Step 6: Catalogue.** Flip 20.111–20.116. Append to §17:
+
+```markdown
+- ✅ **Terminal columns collapse to a labelled strip** (styling refresh Plan A Task 5B; `packages/app-core/src/preferences/column-collapse.ts`, `board.tsx` column section, `ui.css` `.gn-board__column--collapsed`, `.gn-board__column-strip`, `.gn-board__column-collapse`) — owner ruling 2026-09-29. A terminal column (Done) carries a 44×44 **Collapse Done** control; collapsed, it is a 3.5rem strip holding one button, **Expand Done, N tickets**, with the name set vertically and the count, and it still takes drops. Close all and the column's cards return on expand. Remembered per user and per project in `localStorage` (the workflow-collapse shape), default expanded. Backlog is not a board column (spec §1.1), so it has no strip; the owner's ruling on that is open (plan D27). Cases 20.111–20.116.
+```
+
+  Under the board bullet at `:182`, append: `  - ✅ **Collapsible terminal columns (2026-09-29):** Done collapses to a labelled strip with its count, still a drop target, remembered locally. Cases 20.111–20.116.`
+
+- [ ] **Step 7: Commit** `Styling A/Task 5B: terminal columns collapse to a labelled strip (20.111-20.116)`. Then mutate, show red, restore.
 
 ---
 
@@ -2796,21 +3314,23 @@ This task writes the cases with their exact steps and marks them 🧪. The **con
 
 Measurements use Chromium DevTools. For "computed", read `getComputedStyle(el)` in the console. Run every case under `neo` (the default) unless it says otherwise.
 
-Cases. The guard moves by **8**: `🧪` is a status marker (`test-cases/README.md:5`), and the guard reads a marker-then-bold-id line.
+Cases. The guard moves by **10** (8, plus 20.121–20.122 added 2026-09-29): `🧪` is a status marker (`test-cases/README.md:5`), and the guard reads a marker-then-bold-id line.
 
 ```markdown
 - 🧪 **20.091 — the board's header has ONE loud element: New ticket computes `height: 48px`, `font-size: 17px`, `font-weight: 600`, `border-radius` ≥ 24px, a 1px edge; Filters is 44px tall with a 1px `rgb(…)` edge and a transparent background;** control: hovering New ticket computes `transform: matrix(1.04, 0, 0, 1.04, 0, 0)` and pressing it `matrix(0.98, …)`. Steps: open a project's Board; inspect both buttons; hover; press and hold. Mutation (optional): none — a browser case is witnessed.
 - 🧪 **20.092 — a column is a recessed track and a card is raised: the column computes `border-radius: 24px` (neo 28px), `padding: 8px` and an `inset` box-shadow; a card computes `border-radius: 16px` (neo 20px), `padding: 16px`;** control: the gap between two cards measures 8px and between two columns 16px (compare `getBoundingClientRect()`s).
 - 🧪 **20.093 — a card with EVERY field (epic chip, a parent — reads `GN-17 › GN-15` — assignee, progress, the `reopened — live work added` chip, a LATE due date in red, and "who · when" UNFOLDED) stays inside its 18rem lane with no horizontal overflow, the title's computed `font-size` (15px) is the largest on the card, the footer wraps so the arrows sit on their own line, and the `›` has `aria-hidden="true"` and sits between the parent badge and the key;** control: the same card with "who · when" folded keeps the arrows on the footer's first row. Steps: seed or pick a ticket with a parent that is not its epic, an epic, a sub-task rollup, a past due date; open the board; click "who · when".
-- 🧪 **20.094 — hovering a card computes `transform: matrix(1.025, 0, 0, 1.025, 0, 0)` and a 4-layer box-shadow (hig) on it, its slot `z-index: 1`, and the lifted card's shadow draws OVER the card below; with the move dialog open from that card (press an arrow whose move needs a comment), the dialog is centred in the VIEWPORT (its panel's `getBoundingClientRect()` centre within 2px of `innerWidth/2`, `innerHeight/2`) and the card's computed transform is `none`;** control: moving the pointer off the card returns `transform: none` within 300ms. Steps: hover the top card of a column with at least two cards; then use `WF_ERRAND`-like "doing → done needs a comment" or any transition with a rule to open the dialog while hovering.
-- 🧪 **20.095 — with reduced motion emulated (DevTools → Rendering → `prefers-reduced-motion: reduce`), hovering a card or New ticket computes `transform: none` while the box-shadow still changes;** control: turning emulation off restores the scale.
+- 🧪 **20.094 — hovering a card changes its SHADOW ONLY (owner ruling 2026-09-29): its computed `transform` stays `none`, its box-shadow becomes a 4-layer string (hig), its slot computes `z-index: 1`, and the deeper shadow draws OVER the card below; with the move dialog open from that card (press an arrow whose move needs a comment), the dialog is centred in the VIEWPORT (its panel's `getBoundingClientRect()` centre within 2px of `innerWidth/2`, `innerHeight/2`) — the regression check that D21's retirement is safe;** control: moving the pointer off the card returns the 3-layer resting shadow within 300ms, and the card's `getBoundingClientRect()` width is identical hovered and at rest. Steps: hover the top card of a column with at least two cards; then use `WF_ERRAND`-like "doing → done needs a comment" or any transition with a rule to open the dialog while hovering.
+- 🧪 **20.095 — with reduced motion emulated (DevTools → Rendering → `prefers-reduced-motion: reduce`), hovering New ticket computes `transform: none` while its box-shadow still changes, and a card's drag image (20.121) is upright and unscaled;** control: turning emulation off restores the button's scale and the drag image's tilt.
 - 🧪 **20.096 — every style × theme renders with its own character: hig light/dark (the mockup's lit edges and falling shadows), neo light/dark (dual neumorphic shadows, columns pressed in, cards raised — no hig drop shadow), minimal light/dark (flat: no shadows, the track visible only by its fill);** control: switching the style changes the card's computed `box-shadow` string. Evidence: six screenshots of the same board, same scroll position.
 - 🧪 **20.097 — every primary Button in the product stays in layout at 48px/24px/17px, at 390px AND 1280px wide: for each of the 26 usages in Plan A Task 3's table, open its screen, measure the button's `getBoundingClientRect()` and its parent's, and record any button that overflows its row or forces horizontal scroll;** control: the board's New ticket (20.091) is in layout. Evidence: a table of 26 rows (usage, 390 result, 1280 result). Any overflow is fixed in the owning Plan B screen task, never by excluding the usage (D5).
 - 🧪 **20.098 — the ticket sheet: the panel computes `border-top-left-radius: 24px` (neo 28px) and `border-top-right-radius: 0px`, the header `padding: 24px 24px 16px`, the title `font-size: 26px; font-weight: 700`, the fields group an `inset` box-shadow with 8px padding, the close button transparent at rest and filled on hover, and every `Move…`/`Close`/`Reopen` 44px tall with a 1px edge;** control: Full screen removes the radius and the shadow. Steps: open any ticket from the board; hover the ✕; press Full screen.
+- 🧪 **20.121 — dragging a card (added 2026-09-29): the image under the pointer is the card tilted about 2.5° and slightly larger, with a deep shadow that is not clipped at the card's edge (the browser's own translucency is expected and recorded, D26); the source column does not move — every other card's `getBoundingClientRect().top` is identical before and during the drag (read in a `dragover` listener) — and the source slot shows a dashed recessed outline the size of the card; the column under the pointer shows an accent outline and nothing is inserted into it; Esc restores the card and clears every outline;** control: a drop onto another column moves the ticket exactly as before this plan. Evidence: a screen recording (GIF) per browser — Chromium and Safari — plus the before/during `top` values. Steps: open a Board with a column holding at least three cards; drag the middle card across two columns, pause over each, press Esc; drag again and drop.
+- 🧪 **20.122 — a terminal column collapses (added 2026-09-29): pressing Collapse Done leaves a 56px-wide strip (`getBoundingClientRect().width` = 56) reading the count and "Done" vertically, the neighbouring columns keep 288px, dragging a card onto the strip moves it there and the count goes up, and a reload keeps the column collapsed; VoiceOver reads the strip as "Expand Done, N tickets, button, collapsed";** control: another browser profile (a different signed-in user) sees Done expanded. Steps: open a Board whose workflow has a terminal state; collapse Done; drag a card onto the strip; reload; turn VoiceOver on and focus the strip.
 ```
 
-- [ ] **Step 1: Write the cases** under `## 20.8 Browser — Plan A`. Guard: +8.
-- [ ] **Step 2: Commit** `Styling A/Task 8: browser cases 20.091-20.098 (🧪, run by the controller)`.
+- [ ] **Step 1: Write the cases** under `## 20.8 Browser — Plan A`. Guard: +10.
+- [ ] **Step 2: Commit** `Styling A/Task 8: browser cases 20.091-20.098, 20.121-20.122 (🧪, run by the controller)`.
 
 ---
 
@@ -2822,12 +3342,12 @@ Cases. The guard moves by **8**: `🧪` is a status marker (`test-cases/README.m
   3. each package's suite with the Global Constraints command: `packages/ui`, `packages/app-core`, `apps/web`, `apps/desktop`;
   4. `pnpm check:citations`, `pnpm check:help`, `node scripts/check-case-ids.mjs`.
 
-  `check:help` should not move: this plan changes no user-visible string. If it reports a span, the change is in `board.tsx`, and the only string added there is the `aria-hidden` `›`.
+  `check:help` should move by at most Task 5B's two new accessible names (`Collapse <column>` and `Expand <column>, N tickets`). Otherwise this plan changes no user-visible string. If it reports any other span, the change is in `board.tsx`, and the only other string added there is the `aria-hidden` `›`.
 - [ ] **Orphan check.** After any run that returned suspiciously fast, reap ONLY orphaned workers with `ps -eo pid=,ppid=,comm=,args= | awk '$3 ~ /node$/ && $2 == 1 && index($0, "vitest") > 0 {print $1}'` (repo `CLAUDE.md`). Never `pkill -f vitest`.
 - [ ] **Re-read the catalogue.**
-  - Read `Features.md` §17's seven bullets and the four sub-bullets (`:32`, `:43`, `:55`, `:182`) against the code.
+  - Read `Features.md` §17's nine bullets and the five sub-bullets (`:32`, `:43`, `:55`, and two under `:182`) against the code.
   - Read every id line you flipped, and the eleven amended cases.
-  - The id count moves by **47** in total:
+  - The id count moves by **58** in total (47, plus 11 added 2026-09-29):
 
     | Task | Cases |
     |---|---|
@@ -2836,21 +3356,23 @@ Cases. The guard moves by **8**: `🧪` is a status marker (`test-cases/README.m
     | 3 | 6 |
     | 4 | 2 |
     | 5 | 6 |
+    | 5A | 5 |
+    | 5B | 6 |
     | 6 | 9 |
     | 7 | 7 |
-    | 8 | 8 |
+    | 8 | 10 |
 
-  - That uses `20.001`–`20.098` with gaps at 20.005–20.010, 20.016–20.020, 20.027–20.030, 20.033–20.040, 20.047–20.050, 20.060–20.070, 20.078–20.090 and 20.099–20.150. Those gaps are reserved for this plan's own follow-ups and are never used by Plan B.
+  - That uses `20.001`–`20.122` with gaps at 20.005–20.010, 20.016–20.020, 20.027–20.030, 20.033–20.040, 20.047–20.050, 20.060–20.070, 20.078–20.090, 20.099–20.100, 20.106–20.110, 20.117–20.120 and 20.123–20.150. Those gaps are reserved for this plan's own follow-ups and are never used by Plan B.
 - [ ] **Merge forward before the PR:**
   1. Record the guard count.
   2. `git fetch origin && git merge origin/release/<date>`.
   3. Re-run build, typecheck, the four suites and the checks.
   4. Confirm the guard count is yours plus exactly the id lines the merge brought in.
 - [ ] **PR body** (`bash scripts/ctl/ctl pr open task/styling-a-foundation --repo <worktree> --base release/<date> --title "Styling refresh Plan A: tokens, Button, surfaces, board, sheet" --body FILE`). It lists:
-  - every deviation D1–D22, in one line each. **D11 (priority tints retired) is flagged for the owner's confirmation.**
+  - every deviation D1–D27, in one line each. **D11 (priority tints retired) and D27 (terminal columns only; Backlog is not a board column) are flagged for the owner's confirmation.**
   - the eleven amended cases, each with its new sentence;
   - each mutation, with its red summary line;
-  - that 20.091–20.098 are 🧪 and need the controller;
+  - that 20.091–20.098 and 20.121–20.122 are 🧪 and need the controller;
   - which local run each summary line comes from.
 
   CI does not run on this PR. The run you quote is the verification.
