@@ -1092,8 +1092,8 @@ export function TicketSheet({
   // renaming a decision no person made. What changed (2026-09-22) is the LABEL
   // it is handed: `memberLabel` (name → email → id) rather than the raw
   // display name, so the magic-link population reads as their address here
-  // instead of as an empty string. A member the roster does not cover is still
-  // `null`, and `actorLabel`'s own id floor answers for it, unchanged.
+  // instead of as an empty string. A member neither source covers is still `null`,
+  // and `actorLabel`'s own floor (`Unknown person`, R3 N4) answers for it.
   const nameOf = (userId: string): string =>
     actorLabel(userId, actorLabelFrom(userId, members.data, actorNames));
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
@@ -3625,6 +3625,7 @@ export function TicketSheet({
                   ticketId={ticketId}
                   currentUserId={currentUserId}
                   members={members.data ?? []}
+                  names={actorNames}
                   current={standingVisibility}
                   canEdit={canSetVisibility}
                   onChanged={() => {

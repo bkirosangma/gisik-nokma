@@ -852,8 +852,8 @@ function priorityOf(state: TicketState): PriorityView {
 /**
  * `{id, name: id}` when nothing better is known — the substitution
  * `online/mappers.ts`'s `mapAssignee` already makes, for the reason it gives:
- * "the id is a fact the server sent, and `actorLabel(id, null)` renders it that
- * way everywhere else in this client". It is a DEGRADE on one actor the caller
+ * "the id is a fact the server sent" — and `actorLabel` reads a name equal to
+ * the id as absent, so the row renders `Unknown person`, never the id (6.254). It is a DEGRADE on one actor the caller
  * already holds, which is why it is fine here and enumerating a roster is not.
  */
 function actorOf(assigneeId: string | null): Actor | null {

@@ -15,6 +15,7 @@ import {
   createHttpClient,
   createHttpFoundingGateway,
   createHttpInviteAdminGateway,
+  createHttpMembersGateway,
   createHttpPeopleGateway,
   createHttpInviteGateway,
   createHttpMyInvitationsGateway,
@@ -23,6 +24,7 @@ import {
   createOnlineDataSource,
   type FoundingGateway,
   type InviteAdminGateway,
+  type MembersGateway,
   type PeopleGateway,
   type InviteGateway,
   type MyInvitationsGateway,
@@ -79,6 +81,8 @@ export type AppServices = {
   ticketLocation: TicketLocator;
   /** Access plan: the exact-email lookup and the outsider door. */
   people: PeopleGateway;
+  /** Access follow-ups R5. Remove a person from the workspace. */
+  members: MembersGateway;
 };
 
 const AppServicesContext = createContext<AppServices | null>(null);
@@ -166,6 +170,7 @@ export function Providers({
       notificationPreferences: createHttpNotificationPreferencesGateway(http),
       ticketLocation: createHttpTicketLocator(http),
       people: createHttpPeopleGateway(http),
+      members: createHttpMembersGateway(http),
     };
   }, [services]);
   const value = services ?? constructed;

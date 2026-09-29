@@ -22,13 +22,15 @@ import type { ServerAppend } from '../routes/invites.js';
  * acceptance semantics once, and the two doors differ only in the proof they
  * demand:
  *
- * - `/v1/invites/:token/accept` — proof is **possession of the link**.
+ * - `/v1/invites/:token/accept` — proof is **possession of the link AND being the
+ *   account it names** (`addressMatchesAccount`, R4).
  * - `/v1/me/invitations/:inviteId/accept` — proof is **a verified email equal to
  *   the address the invitation names**.
  *
- * The second is STRICTLY NARROWER than the first ON WHO MAY ACCEPT, which is why
- * adding it widens nothing there: a forwarded link admits somebody the
- * invitation was never addressed to, and a verified address cannot.
+ * Since R4 (owner ruling 2026-09-29) the link door ALSO refuses any account
+ * whose verified address is not the one the invitation names, so the two doors
+ * now agree on who may accept; the link door still differs in that it is
+ * reached through the token rather than the account's own list.
  *
  * **The claim is scoped to that axis on purpose.** On WHAT IS DISCLOSED the
  * caller-scoped read is the wider of the two: `GET /v1/invites/:token`

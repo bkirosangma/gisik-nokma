@@ -24,6 +24,7 @@ import {
   matchesBoardCard,
   matchesListRow,
   actorLabelFrom,
+  UNKNOWN_PERSON,
   memberLabel,
   sortByRank,
   useBoard,
@@ -1505,7 +1506,7 @@ function ProjectBoard() {
     // for the calendar and the timeline), none of them renders a claim, and the
     // system-actor override belongs to claims. Auto-close has no card in either
     // view to be drawn on.
-    return (userId: string): string => actorLabelFrom(userId, members.data, actorNames) ?? userId;
+    return (userId: string): string => actorLabelFrom(userId, members.data, actorNames) ?? UNKNOWN_PERSON;
   }, [members.data, actorNames]);
 
   /**
@@ -3290,6 +3291,7 @@ function ProjectBoard() {
                       return word === undefined ? {} : { narrowing: word };
                     })()}
                     rows={backlogRows}
+                    actorLabelOf={nameOf}
                     currentUserId={currentUserId}
                     prefs={list.prefs}
                     onPrefsChange={list.setPrefs}
@@ -3443,6 +3445,7 @@ function ProjectBoard() {
                 // that is harmless and deliberate: this prop drives only the
                 // *Recently assigned* pin, so an unknown viewer pins nothing.
                 // It reaches no write door from this component.
+                actorLabelOf={nameOf}
                 currentUserId={currentUserId}
                 prefs={list.prefs}
                 onPrefsChange={list.setPrefs}

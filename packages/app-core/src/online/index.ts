@@ -43,6 +43,13 @@ export {
 } from './invites-admin.js';
 export { createHttpPeopleGateway, PeopleLookupError, type PeopleGateway } from './people.js';
 export {
+  MemberRemovalError,
+  createHttpMembersGateway,
+  type InviteNotWithdrawn,
+  type MembersGateway,
+  type RemoveMemberOutcome,
+} from './members.js';
+export {
   FoundingError,
   createHttpFoundingGateway,
   type FoundingGateway,

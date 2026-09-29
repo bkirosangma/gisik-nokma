@@ -1,4 +1,5 @@
 import { IST_DAY_REGEX, formatIstInstant, istDayBounds, SYSTEM_ACTOR_NAMES } from '@gisik-nokma/domain';
+import { UNKNOWN_PERSON } from './member-label.js';
 import type { ClaimProvenance } from './view-types.js';
 
 /**
@@ -47,14 +48,18 @@ import type { ClaimProvenance } from './view-types.js';
  * so no join can hand it an address, and the system step answers before the
  * argument is even trimmed. Case 13.1293 pins both halves.
  *
- * The fallback below it is unchanged and still total: an ordinary id with no
- * name is attributed by id, never blanked.
+ * The floor below it is `Unknown person` (R3 N4, owner 2026-09-29), never the
+ * id: an ordinary id nobody names is still attributed — the sentence says a
+ * person did it — but a ULID is not a name. **A label equal to the id is the
+ * same as no label**: the mapper synthesises `name = id` for an assignee the
+ * roster does not cover, and `memberLabel` floors at the id, and both must
+ * reach this floor rather than print the id through the middle step.
  */
 export function actorLabel(actorId: string, actorName: string | null | undefined): string {
   const systemName = SYSTEM_ACTOR_NAMES.get(actorId);
   if (systemName !== undefined) return systemName;
   const name = actorName?.trim();
-  return name !== undefined && name.length > 0 ? name : actorId;
+  return name !== undefined && name.length > 0 && name !== actorId ? name : UNKNOWN_PERSON;
 }
 
 /**

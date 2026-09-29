@@ -535,14 +535,14 @@ describe('GET /v1/workspaces/:workspaceId/actor-names', () => {
     });
   });
 
-  it('7.292 owner, admin, member, outsider and project lead all get the same answer; a guest (7.91), a stranger and a neighbour get the roster’s 404', async () => {
+  it('7.292 owner, admin, member, outsider and project lead all get the same answer; a stranger and a neighbour get the roster’s 404; a guest is served a SCOPED answer (amended by 6.248, R3)', async () => {
     await withNamedPeople(NAMED(), async () => {
       const owner = await okJson('owner', '/actor-names');
       for (const role of ['admin', 'member', 'outsider', 'projectLead'] as const) {
         expect([role, await okJson(role, '/actor-names')]).toEqual([role, owner]);
       }
       const refusals = [];
-      for (const role of ['guest', 'stranger', 'neighbour'] as const) {
+      for (const role of ['stranger', 'neighbour'] as const) {
         const response = await get(role, '/actor-names');
         expect([role, response.statusCode]).toEqual([role, 404]);
         expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
@@ -553,6 +553,14 @@ describe('GET /v1/workspaces/:workspaceId/actor-names', () => {
         expect(comparableHeaders(refusal)).toEqual(comparableHeaders(refusals[0]!));
       }
       expect(JSON.stringify(refusals.map((r) => r.body))).not.toContain('Gita Guest');
+      // Amended 2026-09-29 by 6.248 (R3): the guest is no longer refused; they are
+      // named only the people on tickets they can see, so the whole-workspace
+      // answer the owner gets is NOT theirs (the roster is still theirs to 404: 7.91).
+      const guest = await get('guest', '/actor-names');
+      expect(guest.statusCode).toBe(200);
+      const guestIds = (guest.json() as { names: Array<{ userId: string }> }).names.map((n) => n.userId);
+      expect(guestIds.length).toBeLessThan((owner as { names: unknown[] }).names.length);
+      expect((await get('guest', '/members')).statusCode).toBe(404);
     });
   });
 });

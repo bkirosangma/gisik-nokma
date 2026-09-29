@@ -3,7 +3,11 @@ import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
 import { getNoteStateFromDb } from '../projections/notes.js';
 import { ticketIsLive } from '../read/live-ticket.js';
+import { assigneeArmTickets } from './assignee-arm.js';
 import { canSeeResolved, getResolvedVisibility, type ResolvedVisibility } from './can-see.js';
+
+/** A live attached ticket's resolved audience, plus which ticket it is — what the assignee arm needs to be asked about. */
+export type AttachedVisibility = ResolvedVisibility & { ticketId: string };
 
 /**
  * "Who may read a note" — the ONE definition (notes series, Plan 1 of 6, spec
@@ -38,6 +42,13 @@ import { canSeeResolved, getResolvedVisibility, type ResolvedVisibility } from '
  * nothing, their own note included, because `eff.workspaceRole` is null and the
  * function has already returned.
  *
+ * ## The assignee arm (R1)
+ *
+ * The inherit arm also admits a reader the assignee arm reaches (`armReach`, computed by
+ * `noteArmReach` from the note's LIVE attached tickets), so a note attached to a ticket assigned to
+ * the reader — or to one that inherits it — is readable. `visibleNotesWhere` is the SQL spelling and
+ * asks `assigneeReachWhere` over the same attached tickets (cases 6.273, 6.274).
+ *
  * ## Deleted notes
  *
  * `deleted` is in the signature and is deliberately NOT consulted. A deleted
@@ -50,7 +61,8 @@ export function canReadNote(
   eff: EffectiveRole,
   userId: string,
   note: Pick<NoteState, 'authorId' | 'homeProjectId' | 'scope' | 'deleted'>,
-  attachedVisibilities: ResolvedVisibility[],
+  attachedVisibilities: readonly AttachedVisibility[],
+  armReach: ReadonlySet<string>,
 ): boolean {
   if (eff.workspaceRole === null) return false; // not a member of the workspace
   if (note.authorId === userId) return true; // the author always reads their own note
@@ -74,9 +86,12 @@ export function canReadNote(
       return note.scope.userIds.includes(userId);
     // ANY one attached visible ticket admits the reader. A `every` here would
     // make a note attached to two tickets hidden from somebody who can see one
-    // of them, which is the opposite of what "inherit" means.
+    // of them, which is the opposite of what "inherit" means. "Visible" is the
+    // ticket's AUDIENCE or, since R1 (owner ruling 2026-09-29), the assignee arm:
+    // `armReach` is the subset of the attached tickets the reader is assigned or
+    // inherits an assignment for (`noteArmReach`; the role is non-null here).
     case 'inherit':
-      return attachedVisibilities.some((v) => canSeeResolved(eff, userId, v));
+      return attachedVisibilities.some((v) => canSeeResolved(eff, userId, v) || armReach.has(v.ticketId));
   }
 }
 
@@ -99,16 +114,29 @@ export function canReadNote(
 export async function loadNoteForVisibility(
   db: Queryable,
   noteId: string,
-): Promise<{ note: NoteState; attachedVisibilities: ResolvedVisibility[] } | null> {
+): Promise<{ note: NoteState; attachedVisibilities: AttachedVisibility[] } | null> {
   const note = await getNoteStateFromDb(db, noteId);
   if (note === null) return null;
-  const attachedVisibilities: ResolvedVisibility[] = [];
+  const attachedVisibilities: AttachedVisibility[] = [];
   for (const ticketId of note.attachedTicketIds) {
     if (!(await ticketIsLive(db, note.workspaceId, ticketId))) continue;
     const v = await getResolvedVisibility(db, ticketId);
-    if (v !== null) attachedVisibilities.push(v);
+    if (v !== null) attachedVisibilities.push({ ...v, ticketId });
   }
   return { note, attachedVisibilities };
+}
+
+/**
+ * Which of a note's attached tickets the assignee arm reaches for this reader — the `armReach`
+ * argument of `canReadNote`. One query over the note's LIVE attached tickets; every caller of
+ * `canReadNote` computes it here so none can forget or spell it differently.
+ */
+export async function noteArmReach(
+  db: Queryable,
+  userId: string,
+  attached: readonly AttachedVisibility[],
+): Promise<Set<string>> {
+  return assigneeArmTickets(db, userId, attached.map((a) => a.ticketId));
 }
 
 /**
@@ -121,5 +149,6 @@ export async function canReadNoteById(db: Queryable, userId: string, noteId: str
   const loaded = await loadNoteForVisibility(db, noteId);
   if (loaded === null) return false;
   const eff = await resolveEffectiveRole(db, userId, loaded.note.workspaceId);
-  return canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities);
+  const armReach = await noteArmReach(db, userId, loaded.attachedVisibilities);
+  return canReadNote(eff, userId, loaded.note, loaded.attachedVisibilities, armReach);
 }

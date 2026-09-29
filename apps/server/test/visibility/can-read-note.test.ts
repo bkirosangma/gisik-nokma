@@ -3,7 +3,7 @@ import { newUlid } from '@gisik-nokma/domain';
 import { resolveEffectiveRole } from '../../src/permissions/effective-role.js';
 import { SqlParams } from '../../src/read/sql-params.js';
 import { visibleNotesWhere } from '../../src/read/visible-where.js';
-import { canReadNote, canReadNoteById, loadNoteForVisibility } from '../../src/visibility/can-read-note.js';
+import { canReadNote, canReadNoteById, loadNoteForVisibility, noteArmReach } from '../../src/visibility/can-read-note.js';
 import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
 import { applyCommitted, makeCommitted } from '../helpers/apply.js';
 import { seedNotesFixture } from '../helpers/notes-fixture.js';
@@ -137,7 +137,8 @@ describe('18.020 canReadNote', () => {
         const eff = await resolveEffectiveRole(db.pool, ids[u], WS);
         const loaded = await loadNoteForVisibility(db.pool, noteId);
         expect(loaded, noteKey).not.toBeNull();
-        expect(canReadNote(eff, ids[u], loaded!.note, loaded!.attachedVisibilities), `${noteKey}/${u}`).toBe(
+        const armReach = await noteArmReach(db.pool, ids[u], loaded!.attachedVisibilities);
+        expect(canReadNote(eff, ids[u], loaded!.note, loaded!.attachedVisibilities, armReach), `${noteKey}/${u}`).toBe(
           EXPECTED[noteKey]![u],
         );
       }

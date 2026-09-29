@@ -1,4 +1,14 @@
 /**
+ * What a person id NOBODY names is called: `Unknown person`, never the id
+ * (R3 N4, owner 2026-09-29). A ULID is a fact the server sent, not a name, and
+ * it read as one in tooltips, chips and attribution lines. `provenance.ts`'s
+ * `actorLabel` floors here; `memberLabel` below still floors at the id, because
+ * its callers (the picker, the mention list) hand the result to `actorLabel`
+ * or to `actorLabelFrom`, which treat an id-shaped label as absent.
+ */
+export const UNKNOWN_PERSON = 'Unknown person';
+
+/**
  * The label a person is shown and named by: **name, then email, then id**, in
  * that order, resolved in ONE place.
  *
@@ -64,7 +74,7 @@
  * riding the roster JOIN's VALUE (`rosterByActorId`, `online/mappers.ts`), which
  * is built with THIS function. So the chain, end to end, is:
  * `memberLabel` names the member; the join carries that name; `actorLabel` puts
- * a system actor in front of it and floors at the id.
+ * a system actor in front of it and floors at `Unknown person`.
  */
 export function memberLabel(member: { id: string; name: string; email?: string }): string {
   const name = member.name.trim();
@@ -77,7 +87,7 @@ export function memberLabel(member: { id: string; name: string; email?: string }
 /**
  * What to call `userId` given the roster AND the names-only read
  * (`DataSourceQuery.getActorNames`) — or `null` when neither names them, so the
- * caller's own floor (`actorLabel`, the raw id) still answers.
+ * caller's own floor (`actorLabel`, `Unknown person`) still answers.
  *
  * Order: the roster's label (`memberLabel`, name → email) when it says something
  * better than the id; else the names-only read's name. The roster wins because

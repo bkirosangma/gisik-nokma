@@ -1,7 +1,7 @@
 import { render, screen, waitFor } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
-import { InviteAcceptanceError } from '@gisik-nokma/app-core/online';
+import { HttpError, InviteAcceptanceError, createHttpInviteGateway } from '@gisik-nokma/app-core/online';
 import InvitePage from '../app/invite/[token]/page.js';
 import { Providers } from '../src/providers.js';
 import { stubServices, type GatewayStubs } from './helpers/stub-services.js';
@@ -236,6 +236,39 @@ describe('3.122 the invite page — a refused acceptance', () => {
     const alert = await screen.findByRole('alert');
     expect(alert).toHaveTextContent('the server did not say why');
     expect(alert.textContent?.trim()).not.toBe('');
+  });
+});
+
+/**
+ * 6.261 (R4) — the server refuses a link opened by another account with a 403
+ * whose `message` is the sentence to show. Driven through the REAL gateway and
+ * the real body the server sends (`inviteNotYoursBody`), not a hand-built
+ * `InviteAcceptanceError`, so the status-agnostic path from body to page is what
+ * is measured. The refusal must not route, must not retry, and must leave the
+ * button usable.
+ */
+describe('6.261 the invite page — a link addressed to another account', () => {
+  it('6.261 renders the 403 sentence verbatim, asks once, routes nowhere; CONTROL: a later 200 still joins', async () => {
+    const message = 'This invitation was sent to a•••@example.com. Sign in with that account to accept it.';
+    const post = vi
+      .fn()
+      .mockRejectedValueOnce(new HttpError(403, '/v1/invites/tok_e2e/accept', { error: 'not_yours', message }))
+      .mockResolvedValueOnce({ workspaceId: SUMMARY.workspaceId });
+    const gateway = createHttpInviteGateway({ get: vi.fn(), post, put: vi.fn(), del: vi.fn() });
+    mount({ getInvite: async () => SUMMARY, acceptInvite: (token) => gateway.acceptInvite(token) });
+    const user = userEvent.setup();
+
+    await user.click(await screen.findByRole('button', { name: /^Join / }));
+    const alert = await screen.findByRole('alert');
+    expect(alert.textContent?.trim()).toBe(message);
+    expect(post).toHaveBeenCalledTimes(1);
+    expect(push).not.toHaveBeenCalled();
+    // Not spinning, not disabled: the visitor can sign in elsewhere or try again.
+    expect(screen.getByRole('button', { name: /^Join / })).toBeEnabled();
+
+    // CONTROL (same it): the same page joins when the door says yes.
+    await user.click(screen.getByRole('button', { name: /^Join / }));
+    await waitFor(() => expect(push).toHaveBeenCalledWith(`/w/${SUMMARY.workspaceId}/my-work`));
   });
 });
 

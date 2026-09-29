@@ -144,6 +144,9 @@ function ControlledList({
   // here would leave that default exercised by every case but measured by none.
   selection,
   controls,
+  // Undefaulted for the same reason as the four above: `TicketList`'s own
+  // no-label default (6.255's control) is the one every other case exercises.
+  actorLabelOf,
 }: {
   rows?: ListRow[];
   initial?: ProjectViewPrefs;
@@ -156,6 +159,7 @@ function ControlledList({
   rowDrag?: { onReorder: (movedTicketId: string, beforeTicketId: string | null) => void };
   selection?: { selected: ReadonlySet<string>; onToggle: (ticketId: string) => void };
   controls?: ReactNode;
+  actorLabelOf?: (userId: string) => string;
 }) {
   const [prefs, setPrefs] = useState(initial);
   return (
@@ -176,6 +180,7 @@ function ControlledList({
       {...(rowDrag === undefined ? {} : { rowDrag })}
       {...(selection === undefined ? {} : { selection })}
       {...(controls === undefined ? {} : { controls })}
+      {...(actorLabelOf === undefined ? {} : { actorLabelOf })}
     />
   );
 }
@@ -2238,5 +2243,44 @@ describe('13.1116/13.1107 a preferences failure is not a LIST failure (E5-42)', 
     // And the list's own summary is still a claim about the project, not a
     // sentence about the person's columns.
     expect(screen.getByTestId('list-summary')).toBeInTheDocument();
+  });
+});
+
+/**
+ * 6.255 (R3 N4) — THE LIST'S "closed by" AND "set by" TOOLTIPS NAME THE PERSON.
+ *
+ * Both sites called `actorLabel(id, null)` — a claim's name was never joined in,
+ * so the tooltip printed a ULID. The host now passes `actorLabelOf`
+ * (`useActorLabels`), and a list with no such prop names nobody it cannot name.
+ */
+describe('6.255 the List tooltips name the person through actorLabelOf, never the id', () => {
+  const FIELD_ROW: ListRow = listRowSeed({
+    ticketId: 'fld',
+    title: 'Has a field',
+    fields: { gst: { value: 'GSTIN-1', actorId: 'user_field_setter', clientTime: '2026-09-17T09:00:00.000Z', serverTime: '2026-09-17T09:00:01.000Z' } },
+  });
+  const chooseGst = chose([...DEFAULT_LIST_COLUMNS, 'field:gst'], 'flat');
+
+  it('with the prop: the closed chip and the field cell carry the resolved name; CONTROL: without it both read `Unknown person`', () => {
+    const labelOf = (id: string): string => (id === 'anselma' ? 'Anselma Marak' : id === 'user_field_setter' ? 'Rina Marak' : `?${id}`);
+    const { unmount } = render(<ControlledList rows={[CLOSED_ROW, FIELD_ROW]} initial={chooseGst} actorLabelOf={labelOf} />);
+    const closedChip = screen.getByText('Closed');
+    expect(closedChip.getAttribute('title')).toContain('closed by Anselma Marak on ');
+    const fieldCell = screen.getByText('GSTIN-1');
+    expect(fieldCell.getAttribute('title')).toContain('set by Rina Marak on ');
+    unmount();
+
+    render(<ControlledList rows={[CLOSED_ROW, FIELD_ROW]} initial={chooseGst} />);
+    expect(screen.getByText('Closed').getAttribute('title')).toContain('closed by Unknown person on ');
+    expect(screen.getByText('GSTIN-1').getAttribute('title')).toContain('set by Unknown person on ');
+    expect(screen.getByText('Closed').getAttribute('title')).not.toContain('anselma');
+    expect(screen.getByText('GSTIN-1').getAttribute('title')).not.toContain('user_field_setter');
+  });
+
+  it('an assignee the names read cannot resolve renders `Unknown person`, not the id the mapper synthesised as a name', () => {
+    const row = listRowSeed({ ticketId: 'asg', title: 'Assigned to nobody known', assignee: { id: 'u_nowhere', name: 'u_nowhere' } });
+    render(<ControlledList rows={[row]} />);
+    expect(screen.getAllByText('Unknown person').length).toBeGreaterThan(0);
+    expect(screen.queryByText('u_nowhere')).not.toBeInTheDocument();
   });
 });

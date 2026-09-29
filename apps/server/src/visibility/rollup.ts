@@ -1,5 +1,6 @@
 import type { Queryable } from '../db/queryable.js';
 import { resolveEffectiveRole, type EffectiveRole } from '../permissions/effective-role.js';
+import { assigneeArmTickets } from './assignee-arm.js';
 import { canSeeResolved } from './can-see.js';
 
 /**
@@ -285,9 +286,11 @@ export async function rollupFor(
   // parent are nearly always in one workspace, and a per-child resolve would be
   // N round-trips for an answer that cannot differ within a workspace.
   const roleByWorkspace = new Map<string, EffectiveRole>();
-  let restrictedCount = 0;
   let terminal = 0;
   let uncategorized = 0;
+  // Children the AUDIENCE does not admit, and the subset of them the assignee arm may still open.
+  let notAdmitted = 0;
+  const armCandidates: string[] = [];
 
   for (const child of rows) {
     // Counted BEFORE the audience question and never inside it: the category
@@ -314,9 +317,17 @@ export async function rollupFor(
       resolvedUserIds: child.resolved_user_ids,
     });
     if (!visible) {
-      restrictedCount += 1;
+      notAdmitted += 1;
+      // A viewer with NO workspace role reaches nothing by assignment (case 6.276): such a child
+      // stays restricted and is never put to the arm.
+      if (eff.workspaceRole !== null) armCandidates.push(child.ticket_id);
     }
   }
+  // The per-viewer half follows `canSee`, including the assignee arm (R1, FD1 of the access follow-ups
+  // plan): a child the viewer can open — a ticket assigned to them, or one inheriting from such a
+  // ticket — is not "restricted".
+  const armReach = await assigneeArmTickets(db, viewerId, armCandidates);
+  const restrictedCount = notAdmitted - armReach.size;
 
   // `rows.length`, and the loop above never touches it: the total is a fact
   // about the PARENT, and the one thing that must not be reconstructed from the

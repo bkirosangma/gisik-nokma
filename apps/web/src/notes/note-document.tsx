@@ -17,6 +17,7 @@ import {
   DeleteDialog,
   TicketSheet,
   actorLabelFrom,
+  UNKNOWN_PERSON,
   classifyBatch,
   makeSubmittedFactory,
   mentionCandidatesOf,
@@ -135,6 +136,11 @@ function NoteDocumentBody({
 
   const [resolvedWorkspaceId, setResolvedWorkspaceId] = useState<string | null>(null);
   const [searched, setSearched] = useState(false);
+  // The note the search below FOUND, keyed by the live query it belongs to. The
+  // search used to discard it, and the key change it caused reset the document
+  // to null for one round trip — "That note is no longer shared with you." on
+  // EVERY open (R7, case 18.460). Handed to `useLiveQuery` as its initial answer.
+  const [found, setFound] = useState<{ key: string; data: NoteDetail } | null>(null);
 
   const workspaceKey = workspaces.map((workspace) => workspace.id).join(',');
   // The IDS, held in a ref, are what the effect walks — NOT the `workspaces`
@@ -151,9 +157,10 @@ function NoteDocumentBody({
     setSearched(false);
     void (async () => {
       for (const workspace of workspacesRef.current) {
-        const found = await dataSource.query.getNote(workspace.id, noteId);
+        const hit = await dataSource.query.getNote(workspace.id, noteId);
         if (cancelled) return;
-        if (found !== null) {
+        if (hit !== null) {
+          setFound({ key: `note:${workspace.id}:${noteId}`, data: hit });
           setResolvedWorkspaceId(workspace.id);
           setSearched(true);
           return;
@@ -182,6 +189,8 @@ function NoteDocumentBody({
       resolvedWorkspaceId === null
         ? Promise.resolve<NoteDetail | null>(null)
         : dataSource.query.getNote(resolvedWorkspaceId, noteId),
+    undefined,
+    found ?? undefined,
   );
 
   const note = live.data;
@@ -531,7 +540,7 @@ function NoteDocumentBody({
 
   /** Any author's name from the roster, then the names-only read — History rows and comments name whoever wrote them, not just the note's own author. */
   const nameOf = useMemo(
-    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? authorId,
+    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? UNKNOWN_PERSON,
     [members, actorNames],
   );
 

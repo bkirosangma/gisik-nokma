@@ -470,8 +470,10 @@ describe('3.111 the standing audience — served where it is served, absent wher
     const standing = document.querySelector('.gn-visibility__standing');
     expect(standing?.textContent).toContain('Anselma Marak');
     expect(standing?.textContent).not.toContain('1 person');
-    // A nameless actor renders by id, never blank and never "system".
-    expect(standing?.textContent).toContain(DIPU);
+    // A nameless actor renders as Unknown person — never blank, never "system",
+    // and never the id (Amended 2026-09-29 by 6.254 (R3 N4)).
+    expect(standing?.textContent).toContain('Unknown person');
+    expect(standing?.textContent).not.toContain(DIPU);
   });
 
   /**
@@ -990,6 +992,41 @@ describe('16.118 the visibility pill is a menu trigger', () => {
     // many chips the audience draws. Counted on the chips themselves rather than
     // on `/./`-matching text, which would also count the group's own caption.
     expect(viewers.querySelectorAll('.gn-visibility__viewer')).toHaveLength(2);
+  });
+
+  /**
+   * 6.257 (R3 N4) — a viewer chip for somebody the roster omits (a guest, for a
+   * plain member's roster; a former member) is named through the names read.
+   */
+  it('6.257 an off-roster viewer’s chip reads the names read’s label; CONTROL: the roster person keeps the roster label, and with no names read the chip is `Unknown person`', () => {
+    const OFF_ROSTER = '01J0000000000000000000000G';
+    const current: React.ComponentProps<typeof VisibilityEditor>['current'] = {
+      ownMode: 'explicit',
+      resolvedMode: 'explicit',
+      userIds: [KIRO, OFF_ROSTER],
+      claim: null,
+    };
+    const { unmount } = render(
+      <VisibilityEditor
+        dataSource={recordingSource().dataSource}
+        workspaceId="ws_1"
+        ticketId={TICKET_ID}
+        currentUserId={KIRO}
+        members={MEMBERS}
+        names={[{ id: OFF_ROSTER, name: 'Ambe Sangma (removed)' }]}
+        current={current}
+        canEdit
+      />,
+    );
+    let viewers = screen.getByTestId('visibility-viewers');
+    expect(within(viewers).getByText('Ambe Sangma (removed)')).toBeInTheDocument();
+    expect(within(viewers).getByText('Kiro')).toBeInTheDocument();
+    unmount();
+
+    mount({ current });
+    viewers = screen.getByTestId('visibility-viewers');
+    expect(within(viewers).getByText('Unknown person')).toBeInTheDocument();
+    expect(within(viewers).queryByText(OFF_ROSTER)).toBeNull();
   });
 
   it('16.121 with NO served audience the pill still exists so the menu can be reached', async () => {

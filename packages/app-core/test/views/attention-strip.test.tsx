@@ -101,7 +101,8 @@ describe('3.56–3.57 AttentionStrip — computed, never authored (spec §7)', (
 
   it('PLANTED DEFECT: a nameless claim is attributed by id, and a claimless item invents nothing', () => {
     render(<AttentionStrip items={[ITEMS[1]!, ITEMS[3]!]} onOpenTicket={vi.fn()} />);
-    expect(screen.getByText('claimed by user_kiro on 19 Aug 2026')).toBeInTheDocument();
+    // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(screen.getByText('claimed by Unknown person on 19 Aug 2026')).toBeInTheDocument();
     // The stale item carries no claim: exactly one provenance line total.
     expect(screen.getAllByText(/^claimed by/)).toHaveLength(1);
   });

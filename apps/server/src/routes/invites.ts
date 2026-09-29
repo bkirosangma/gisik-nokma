@@ -1,12 +1,15 @@
 import { createHash, randomBytes } from 'node:crypto';
 import type { FastifyInstance, preHandlerHookHandler } from 'fastify';
-import { newUlid, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
+import type { Pool } from 'pg';
+import { newUlid, parseEvent, type EventEnvelope, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import { alertWithoutWaiting, type ErrorAlerter } from '../alerts/error-alerter.js';
 import { isSyntheticPhoneEmail } from '../auth/synthetic-address.js';
 import type { Queryable } from '../db/queryable.js';
 import type { ClientIngest } from '../ingest/ingest-service.js';
 import { appendAcceptance } from '../invites/acceptance.js';
+import { addressMatchesAccount, maskAddress } from '../invites/address-match.js';
 import { INVITER_FALLBACK, type InviteMailer } from '../invites/invite-mailer.js';
+import { checkPermission } from '../permissions/check-permission.js';
 import { resolveEffectiveRole } from '../permissions/effective-role.js';
 import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
 
@@ -37,7 +40,8 @@ import { workspaceNameFromLedger } from '../workspaces/workspace-name.js';
 export type ServerAppend = (events: SubmittedEvent[]) => Promise<IngestResult[]>;
 
 export type InviteRouteDeps = {
-  pool: Queryable;
+  /** A real `Pool`, not a `Queryable`: the mint holds a dedicated client for its advisory lock. */
+  pool: Pool;
   /** The GATED door: issuance goes through it, so the admin-only refusal fires. */
   ingest: ClientIngest;
   /** The internal door: acceptance only. See `ServerAppend`. */
@@ -129,6 +133,20 @@ export const INVITE_NOT_OPENABLE_BODY = {
     'This invitation link does not open anything. It may have been used, withdrawn, or lapsed — ask whoever invited you for a new one.',
 } as const;
 
+/**
+ * R4 (owner ruling 2026-09-29, "refuse"): the link was addressed to another
+ * account. `403`, and the body names the address only in its MASKED form
+ * (`maskAddress`). Sent only for a link that is still openable, so it never
+ * tells anyone that a revoked, lapsed, spent or unknown link is live.
+ */
+export const INVITE_NOT_YOURS_STATUS = 403;
+export function inviteNotYoursBody(masked: string): { error: 'not_yours'; message: string } {
+  return {
+    error: 'not_yours',
+    message: `This invitation was sent to ${masked}. Sign in with that account to accept it.`,
+  };
+}
+
 /** The refusal a plain member meets on both admin-only invite doors. */
 export const INVITE_ADMIN_ONLY_BODY = {
   error: 'forbidden',
@@ -170,6 +188,95 @@ export function redactInviteToken(url: string): string {
   return url.replace(/^(\/v1\/invites\/)[^/?#]+/, '$1[redacted]');
 }
 
+/**
+ * Per-phase wall-clock for one mint, in whole milliseconds. Measurement, not
+ * control flow (owner ruling 2026-09-29, S1): the first send after a restart
+ * measured 18 s in production and the per-phase split was unknown. Each `mark`
+ * charges the time since the previous mark to `name`. What it carries is
+ * durations only — never an address, a link or a token.
+ */
+function phaseTimer(): { mark: (name: string) => void; ms: Record<string, number> } {
+  let last = performance.now();
+  const ms: Record<string, number> = {};
+  return {
+    mark(name) {
+      const now = performance.now();
+      ms[name] = Math.round((ms[name] ?? 0) + (now - last));
+      last = now;
+    },
+    ms,
+  };
+}
+
+/**
+ * The key one mint serialises on. Email addresses compare case-insensitively
+ * (the rule `routes/my-invitations.ts` applies), so they are lower-cased here;
+ * a phone number is compared as written.
+ */
+function mintLockKey(workspaceId: string, channel: string, address: string): string {
+  return `invite-mint:${workspaceId}:${channel}:${channel === 'email' ? address.toLowerCase() : address}`;
+}
+
+/**
+ * Run `work` while holding a transaction-scoped advisory lock on `key`, on a
+ * dedicated pool client, and hand `work` that client to query through (so its
+ * reads and writes see the lock's serialisation). The lock is released by the
+ * COMMIT/ROLLBACK, and the client goes back to the pool before this returns.
+ * `null` runs `work` unlocked on the pool.
+ *
+ * A waiter gives up after `lock_timeout` rather than queueing forever: every
+ * waiter holds one of the pool's connections, and the holder needs one more for
+ * ingest, so an unbounded pile-up of one key could otherwise wedge the pool.
+ */
+async function withMintLock<T>(pool: Pool, key: string | null, work: (db: Queryable) => Promise<T>): Promise<T> {
+  if (key === null) return work(pool);
+  const client = await pool.connect();
+  let broken: Error | undefined;
+  try {
+    await client.query('BEGIN');
+    await client.query("SET LOCAL lock_timeout = '15s'");
+    await client.query('SELECT pg_advisory_xact_lock(hashtextextended($1, 0))', [key]);
+    const value = await work(client);
+    await client.query('COMMIT');
+    return value;
+  } catch (error) {
+    try {
+      await client.query('ROLLBACK');
+    } catch (rollbackError) {
+      // A connection that cannot roll back is destroyed, not returned to the pool.
+      broken = rollbackError instanceof Error ? rollbackError : new Error(String(rollbackError));
+    }
+    throw error;
+  } finally {
+    client.release(broken);
+  }
+}
+
+/**
+ * The PENDING invitation this request repeats: same workspace, channel and
+ * address, the same role and the SAME project set (order-insensitive — `@>` and
+ * `<@` together are set equality). A revoked, accepted or declined invitation is
+ * never matched. A pending one that differs in role or projects is NOT matched
+ * either: that case mints a new invitation as it always did (an open question
+ * for the owner). Newest first, because rows minted before this dedupe existed
+ * may already be duplicated.
+ */
+async function findPendingMatch(
+  db: Queryable,
+  args: { workspaceId: string; channel: string; role: string; address: string; projectIds: string[] },
+): Promise<string | null> {
+  const { rows } = await db.query<{ invite_id: string }>(
+    `SELECT invite_id FROM proj_invites
+      WHERE workspace_id = $1 AND channel = $2 AND role = $3 AND status = 'pending'
+        AND (CASE WHEN channel = 'email' THEN lower(address) = lower($4) ELSE address = $4 END)
+        AND project_ids @> $5::text[] AND project_ids <@ $5::text[]
+      ORDER BY invited_at DESC
+      LIMIT 1`,
+    [args.workspaceId, args.channel, args.role, args.address, args.projectIds],
+  );
+  return rows[0]?.invite_id ?? null;
+}
+
 type TokenRow = { invite_id: string; expires_at: Date };
 type InviteRow = {
   invite_id: string;
@@ -177,6 +284,9 @@ type InviteRow = {
   role: 'admin' | 'member' | 'guest';
   status: 'pending' | 'accepted' | 'revoked' | 'declined';
   project_ids: string[];
+  /** R4: who the link was addressed to; read for the acceptance check, never served. */
+  address: string;
+  channel: 'email' | 'phone';
 };
 
 /**
@@ -287,17 +397,20 @@ type OpenableInvite = InviteRow & { expires_at: Date };
  *
  * ## What acceptance does NOT do
  *
- * It does not change the workspace role of somebody who already has one. An
- * invitation link is bearer-authorised: whoever holds it may use it, which is
- * the point (the address is a claim about where to reach a person, never an
- * assertion about who they are). But `membership.granted` is an UPSERT keyed on
- * the person, so an owner who opened a guest link addressed to somebody else
- * would demote themselves out of their own workspace, and no event would look
- * wrong. Changing an existing member's role is `membership.granted` submitted by
- * an admin, an attributed act with its own gate; it is not something a link
- * someone forwarded may do. So an existing member's acceptance records
- * `invite.accepted` — the invitation really was consumed — and appends the
- * promised project rows, and leaves their role exactly as it was.
+ * The link is NOT bearer-authorised any more (R4, owner ruling 2026-09-29): it
+ * opens only for the account the address names, matching the `/workspaces`
+ * banner door. A different account — including an existing member — is refused
+ * `403` before anything is consumed or appended.
+ *
+ * It does not change the workspace role of somebody who already has one.
+ * `membership.granted` is an UPSERT keyed on the person, so an owner who opened
+ * a guest link addressed to THEM (their own address, a second invitation) would
+ * demote themselves out of their own workspace, and no event would look wrong.
+ * Changing an existing member's role is `membership.granted` submitted by an
+ * admin, an attributed act with its own gate; it is not something a link may do.
+ * So an existing member's acceptance records `invite.accepted` — the invitation
+ * really was consumed — and appends the promised project rows, and leaves their
+ * role exactly as it was.
  */
 export function registerInviteRoutes(
   app: FastifyInstance,
@@ -338,20 +451,21 @@ export function registerInviteRoutes(
     async (request, reply) => {
       const { workspaceId } = request.params;
       const { address, channel, role, projectIds } = request.body;
-      const inviteId = newUlid();
+      const timing = phaseTimer();
+      const newInviteId = newUlid();
 
       const submitted: SubmittedEvent = {
         id: newUlid(),
         workspaceId,
-        entity: { kind: 'invite', id: inviteId },
+        entity: { kind: 'invite', id: newInviteId },
         type: 'invite.sent',
         version: 1,
         // `projectIds` is omitted rather than sent as `[]` when absent: the
         // domain schema refuses the key entirely on a guest invite, and an
         // empty array a client never asked for would be refused as if they had.
         payload: projectIds === undefined
-          ? { inviteId, address, channel, role }
-          : { inviteId, address, channel, role, projectIds },
+          ? { inviteId: newInviteId, address, channel, role }
+          : { inviteId: newInviteId, address, channel, role, projectIds },
         actorId: request.currentUserId,
         // envelope-origin `'web'` — a person's claim that they invited someone,
         // not the server's own record. The gate refuses a client-submitted
@@ -360,29 +474,93 @@ export function registerInviteRoutes(
         clientTime: new Date().toISOString(),
       };
 
-      const [result] = await deps.ingest.ingestClientBatch([submitted], request.currentUserId);
-      if (result === undefined) {
-        throw new Error('ingest returned no result for the invite.sent event');
-      }
-      if (result.status !== 'committed') {
-        // The ingest layer's own refusal, verbatim — the same contract the
-        // founding door publishes. A plain member's `permission.role` and a
-        // guest-with-projects parse refusal both arrive here unchanged.
-        return reply.code(422).send(result);
-      }
+      // THE AUTHORISATION COMES FIRST, and it is the gate itself run dry — the
+      // pre-flight `routes/people.ts` uses for the same reason. A repeat
+      // invitation to a pending address ROTATES that invitation's token and
+      // hands the new link to the caller, so the dedupe below must never be
+      // reachable by anybody the ingest gate would refuse: a plain member or a
+      // guest who could rotate a pending invitation would receive a working link
+      // to it. Only a `null` (allowed) pre-flight may dedupe; ANY refusal takes
+      // the ordinary path below untouched, where ingest produces the 422 itself
+      // — byte for byte the body a fresh mint gets, with no second copy of the
+      // role rule to drift from the first.
+      //
+      // The gate reads a PARSED event — a payload the schema would refuse (a guest
+      // with projects, an `owner` invitation) reaches it as undefined fields and
+      // throws — so the parse runs first, as `routes/people.ts` does, and an
+      // unparseable claim simply may not dedupe: ingest refuses it below with its
+      // own 422.
+      const parsed = parseEvent(submitted);
+      const mayDedupe =
+        parsed.ok &&
+        (await checkPermission(
+          { ...parsed.event, serverTime: new Date().toISOString(), seq: 0 } satisfies EventEnvelope,
+          { db: deps.pool, sessionUserId: request.currentUserId },
+        )) === null;
+      timing.mark('gate');
 
-      // ONLY NOW does a credential exist. See the docblock on ordering: this
-      // line failing leaves a pending invitation nobody can open, which is
-      // recoverable (revoke it, invite again); the reverse order would leave an
-      // openable link with no claim behind it, which is not.
-      const token = randomBytes(32).toString('base64url');
-      const createdAt = new Date();
-      const expiresAt = new Date(createdAt.getTime() + INVITE_TOKEN_TTL_MS);
-      await deps.pool.query(
-        `INSERT INTO invite_tokens (invite_id, token_hash, created_at, expires_at)
-         VALUES ($1, $2, $3, $4)`,
-        [inviteId, hashToken(token), createdAt.toISOString(), expiresAt.toISOString()],
+      // ONE request at a time per (workspace, channel, address) inside the
+      // check-and-mint, so a double submit makes ONE invitation. The lock is a
+      // transaction-scoped advisory lock on a dedicated connection and is
+      // released BEFORE the letter is sent: holding a pooled connection across
+      // an SMTP send would starve the pool.
+      const outcome = await withMintLock(
+        deps.pool,
+        mayDedupe ? mintLockKey(workspaceId, channel, address) : null,
+        async (db) => {
+          // Connect, BEGIN and the lock wait: everything since the gate.
+          timing.mark('lock');
+          const existing = mayDedupe
+            ? await findPendingMatch(db, { workspaceId, channel, role, address, projectIds: projectIds ?? [] })
+            : null;
+
+          timing.mark('match');
+          if (existing === null) {
+            const [result] = await deps.ingest.ingestClientBatch([submitted], request.currentUserId);
+            if (result === undefined) {
+              throw new Error('ingest returned no result for the invite.sent event');
+            }
+            if (result.status !== 'committed') {
+              // The ingest layer's own refusal, verbatim — the same contract the
+              // founding door publishes. A plain member's `permission.role` and a
+              // guest-with-projects parse refusal both arrive here unchanged.
+              return { kind: 'refused' as const, result };
+            }
+          }
+          timing.mark('ingest');
+          const inviteId = existing ?? newInviteId;
+
+          // ONLY NOW does a credential exist. See the docblock on ordering: this
+          // line failing leaves a pending invitation nobody can open, which is
+          // recoverable (revoke it, invite again); the reverse order would leave an
+          // openable link with no claim behind it, which is not.
+          //
+          // On a REPEAT the invitation already exists and only its credential
+          // changes: tokens are stored hashed, so the original link cannot be
+          // re-sent, and a fresh token REPLACES the old one — the old link stops
+          // opening anything. An upsert, because the old row may be expired or
+          // may have been swept.
+          const token = randomBytes(32).toString('base64url');
+          const createdAt = new Date();
+          const expiresAt = new Date(createdAt.getTime() + INVITE_TOKEN_TTL_MS);
+          await db.query(
+            `INSERT INTO invite_tokens (invite_id, token_hash, created_at, expires_at)
+             VALUES ($1, $2, $3, $4)
+             ON CONFLICT (invite_id) DO UPDATE
+               SET token_hash = EXCLUDED.token_hash,
+                   created_at = EXCLUDED.created_at,
+                   expires_at = EXCLUDED.expires_at`,
+            [inviteId, hashToken(token), createdAt.toISOString(), expiresAt.toISOString()],
+          );
+          timing.mark('token');
+          return { kind: 'minted' as const, inviteId, token, expiresAt, deduped: existing !== null };
+        },
       );
+      timing.mark('commit');
+      if (outcome.kind === 'refused') {
+        return reply.code(422).send(outcome.result);
+      }
+      const { inviteId, token, expiresAt, deduped } = outcome;
 
       // The one and only copy of the raw token leaves here. `expiresAt` rides
       // with it so the admin can be told when the link lapses rather than
@@ -399,10 +577,13 @@ export function registerInviteRoutes(
       let emailSent = false;
       if (channel === 'email') {
         try {
+          const inviterName = await inviterLabel(deps.pool, request.currentUserId);
+          const workspaceName = (await workspaceNameFromLedger(deps.pool, workspaceId)) ?? 'a workspace';
+          timing.mark('lookups');
           await deps.mailer.send({
             to: address,
-            inviterName: await inviterLabel(deps.pool, request.currentUserId),
-            workspaceName: (await workspaceNameFromLedger(deps.pool, workspaceId)) ?? 'a workspace',
+            inviterName,
+            workspaceName,
             role,
             url,
             expiresAt: expiresAt.toISOString(),
@@ -413,6 +594,10 @@ export function registerInviteRoutes(
           alertWithoutWaiting(deps.alerter, `invitation email for invite ${inviteId}`, error);
         }
       }
+      timing.mark('send');
+      // The measurement the owner asked for (S1): where an invite's seconds go.
+      // Durations and ids only.
+      request.log.info({ inviteId, channel, deduped, emailSent, timingMs: timing.ms }, 'invite mint timing');
       return reply.code(201).send({ inviteId, url, expiresAt: expiresAt.toISOString(), emailSent });
     },
   );
@@ -478,6 +663,17 @@ export function registerInviteRoutes(
         return reply.code(404).send(INVITE_NOT_OPENABLE_BODY);
       }
 
+      // R4 (owner ruling 2026-09-29: "refuse"). AFTER the openable read, so a
+      // revoked, lapsed, spent or unknown link answers its usual 404 and this
+      // refusal never says a link is live; BEFORE the consume, so a
+      // wrong-account attempt does not burn the link for the person it names.
+      const account = await accountOf(deps.pool, request.currentUserId);
+      if (account === null || !addressMatchesAccount(invite.channel, invite.address, account)) {
+        return reply
+          .code(INVITE_NOT_YOURS_STATUS)
+          .send(inviteNotYoursBody(maskAddress(invite.channel, invite.address)));
+      }
+
       // THE CONSUME, and the only thing that makes this link single-use. The
       // read above says the invitation still opens something; this says THIS
       // presentation is the one that gets to open it. Losing it is a 404 with
@@ -500,7 +696,8 @@ export function registerInviteRoutes(
       // the actor/origin split, the membership read through
       // `resolveEffectiveRole`, and the guest-stays-guest projectIds guard that
       // closes a measured hole. This handler keeps what is ITS OWN — the proof
-      // it demands (possession of the link) and the refusal that follows.
+      // it demands (possession of the link, and — R4 — being the account it names) and
+      // the refusal that follows.
       const workspaceId = await appendAcceptance(deps, invite, request.currentUserId);
 
       // No deletion here any more: the token row went at the consume, before a
@@ -576,6 +773,22 @@ export function registerInviteRoutes(
   );
 }
 
+type AcceptingAccount = {
+  email: string;
+  emailVerified: boolean;
+  phoneNumber: string | null;
+  phoneNumberVerified: boolean | null;
+};
+
+/** The columns `addressMatchesAccount` compares an invitation's address against. */
+async function accountOf(db: Queryable, userId: string): Promise<AcceptingAccount | null> {
+  const { rows } = await db.query<AcceptingAccount>(
+    `SELECT "email", "emailVerified", "phoneNumber", "phoneNumberVerified" FROM "user" WHERE "id" = $1`,
+    [userId],
+  );
+  return rows[0] ?? null;
+}
+
 /**
  * The one resolver both token-addressed routes use, so they cannot disagree
  * about what an openable invitation is.
@@ -620,7 +833,7 @@ async function openableInvite(db: Queryable, token: string): Promise<OpenableInv
     return null;
   }
   const { rows } = await db.query<InviteRow>(
-    `SELECT invite_id, workspace_id, role, status, project_ids
+    `SELECT invite_id, workspace_id, role, status, project_ids, address, channel
        FROM proj_invites WHERE invite_id = $1`,
     [tokenRow.invite_id],
   );

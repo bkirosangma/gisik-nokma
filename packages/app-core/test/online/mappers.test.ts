@@ -22,6 +22,7 @@ import {
   ServingGapError,
   UnexpressibleFilterError,
   boardWorkspaceId,
+  mapActorNames,
   mapActors,
   mapAttention,
   mapBoardView,
@@ -2652,10 +2653,10 @@ describe('3.42 getTickets and getTicket map, and the withheld case is withheld',
     // takes the label it was handed, so the two assertions above are about the
     // reserved id and not about `actorLabel` ignoring its argument.
     expect(actorLabel('u1', 'Kiro')).toBe('Kiro');
-    // And `actorLabel`'s own floor is still the id — it is handed a claim's
-    // `{actorId, actorName}` and has no address to reach for, which is why the
-    // email step lives in the JOIN and not here.
-    expect(actorLabel('u1', null)).toBe('u1');
+    // And `actorLabel`'s own floor is `Unknown person` (Amended 2026-09-29 by 6.254 (R3 N4); it was the id) — it
+    // is handed a claim's `{actorId, actorName}` and has no address to reach
+    // for, which is why the email step lives in the JOIN and not here.
+    expect(actorLabel('u1', null)).toBe('Unknown person');
   });
 
   /**
@@ -3273,5 +3274,23 @@ describe('13.1280 the board card key', () => {
     const absent = body({});
     absent.columns[0]!.cards = [without as BoardTicketCard];
     expect(() => mapBoardView(absent)).toThrow(/key/);
+  });
+});
+
+describe('6.253 mapActorNames — a former member reads "Name (removed)"', () => {
+  it('a removed row reads "Name (removed)"; CONTROL: a current row keeps its bare name', () => {
+    const actors = mapActorNames({
+      names: [
+        { userId: 'u1', displayName: 'Rina Marak', removed: true },
+        { userId: 'u2', displayName: 'Tengsim' },
+        { userId: 'u3', displayName: 'Ambe', removed: 'yes' },
+      ],
+    });
+    expect(actors).toEqual([
+      { id: 'u1', name: 'Rina Marak (removed)' },
+      { id: 'u2', name: 'Tengsim' },
+      // Only the boolean `true` counts — the mapper's existing strictness.
+      { id: 'u3', name: 'Ambe' },
+    ]);
   });
 });
