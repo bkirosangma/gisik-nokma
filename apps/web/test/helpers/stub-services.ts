@@ -13,6 +13,7 @@ import {
   type InviteAdminGateway,
   type InviteGateway,
   type MyInvitationsGateway,
+  type MembersGateway,
   type PeopleGateway,
 } from '@gisik-nokma/app-core/online';
 import type { AppServices } from '../../src/providers.js';
@@ -76,6 +77,7 @@ export type GatewayStubs = {
   invitesAdmin?: Partial<InviteAdminGateway>;
   /** Access plan: the exact-email lookup and the outsider door. Same rule: un-stubbed members reject BY NAME. */
   people?: Partial<PeopleGateway>;
+  members?: Partial<MembersGateway>;
   /**
    * Task 17's caller-scoped invitations. Same rule as every gateway here:
    * un-stubbed members reject BY NAME. A case that mounts `/workspaces` and
@@ -236,6 +238,10 @@ export function stubServices(
       assignOutsider: unstubbedGateway('people.assignOutsider'),
       ...gateways.people,
     } as PeopleGateway,
+    members: {
+      remove: unstubbedGateway('members.remove'),
+      ...gateways.members,
+    } as MembersGateway,
     myInvitations: {
       list: unstubbedGateway('myInvitations.list'),
       accept: unstubbedGateway('myInvitations.accept'),

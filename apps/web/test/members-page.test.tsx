@@ -1,9 +1,16 @@
-import { fireEvent, render, screen, waitFor, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react';
 import { userEvent } from '@testing-library/user-event';
 import { beforeEach, describe, expect, it, vi } from 'vitest';
 import { membershipId, type IngestResult, type SubmittedEvent } from '@gisik-nokma/domain';
 import type { DataSourceQuery, ProjectRef, RosterMember, WorkspaceRef } from '@gisik-nokma/app-core';
-import { InviteAdminError, type PeopleGateway, type PendingInvite } from '@gisik-nokma/app-core/online';
+import {
+  InviteAdminError,
+  MemberRemovalError,
+  type MembersGateway,
+  type PeopleGateway,
+  type PendingInvite,
+  type RemoveMemberOutcome,
+} from '@gisik-nokma/app-core/online';
 import MembersPage, { COPY_IT_NOW } from '../app/w/[workspaceId]/members/page.js';
 import { Providers } from '../src/providers.js';
 import { clearWorkspaceNameCache } from '../src/use-workspace-name.js';
@@ -1505,13 +1512,13 @@ describe('13.960 the roster shows the address when the name is absent, and names
     ).toBeInTheDocument();
 
     // ─── THE DEFECT: the control names the person, in both populations ───────
-    expect(within(emailRow).getByRole('button').getAttribute('aria-label')).toBe(
+    expect(within(emailRow).getByRole('button', { name: /^.*Role for / }).getAttribute('aria-label')).toBe(
       'Role for anselma@example.test',
     );
     // The phone member keeps their name — the fallback is conditional, and this
     // is the arm that reddens if it ever stops being.
     expect(within(phoneRow).getByText('+919000700001')).toBeInTheDocument();
-    expect(within(phoneRow).getByRole('button').getAttribute('aria-label')).toBe(
+    expect(within(phoneRow).getByRole('button', { name: /^.*Role for / }).getAttribute('aria-label')).toBe(
       'Role for +919000700001',
     );
 
@@ -1520,7 +1527,7 @@ describe('13.960 the roster shows the address when the name is absent, and names
     // empty tail is what an absent name produced, and it is a well-formed
     // accessible name — which is why nothing else notices it.
     for (const row of [emailRow, phoneRow]) {
-      const label = within(row).getByRole('button').getAttribute('aria-label') ?? '';
+      const label = within(row).getByRole('button', { name: /^.*Role for / }).getAttribute('aria-label') ?? '';
       expect([label, label.startsWith('Role for '), label.slice('Role for '.length).trim() !== '']).toEqual([
         label,
         true,
@@ -1709,5 +1716,183 @@ describe('access plan — the invite form after 2026-09-29 (3.991–3.997)', () 
     await user.type(screen.getByLabelText('Address'), '+919001400001');
     await user.tab();
     expect(lookups).toEqual(['nobody@example.test']);
+  });
+});
+
+/**
+ * Access follow-ups R5 — "Remove from workspace…", cases 6.287–6.288.
+ *
+ * The signed-in user (the `authClient` mock above) is `01J9USER000000000000000000`.
+ * The admin gate is the pending read's 403, exactly as for every other control
+ * on this page, so "a non-admin" is `listPending` refusing.
+ */
+const ME = '01J9USER000000000000000000';
+const REMOVE = 'Remove from workspace…';
+const REMOVE_BODY =
+  'They lose access at once. Their history stays, tickets stay assigned to them marked "(removed)", and any invitation still pending for them is withdrawn.';
+
+function mountRemove(
+  roster: RosterMember[],
+  members: Partial<MembersGateway> = {},
+  opts: { admin?: boolean; workspaceName?: string | null; loadMembers?: () => void } = {},
+) {
+  const admin = opts.admin ?? true;
+  const services = stubServices(
+    {
+      getMembers: async () => {
+        opts.loadMembers?.();
+        return roster;
+      },
+      ...(opts.workspaceName === null ? {} : { getMyWorkspaces: async () => [workspaceRef(opts.workspaceName ?? 'Convenience Corner')] }),
+    },
+    {
+      invitesAdmin: {
+        listPending: async () => (admin ? [] : Promise.reject(new InviteAdminError(403, ADMIN_ONLY))),
+      },
+      members,
+    },
+  );
+  return render(
+    <Providers services={services}>
+      <MembersPage />
+    </Providers>,
+  );
+}
+
+const rowOf = async (name: string): Promise<HTMLElement> => (await screen.findByText(name)).closest('tr')!;
+
+describe('6.287 the row action is offered to an admin, on another member’s row only', () => {
+  const ROWS: RosterMember[] = [
+    { id: ME, name: 'Kiro', role: 'admin' },
+    { id: '01J9USER000000000000000009', name: 'Olga Sangma', role: 'owner' },
+    { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
+  ];
+
+  it('6.287 an admin sees it on a member’s row (named by role and text, described by the person), beside the role picker; NEVER on their own row nor on the last owner’s; CONTROL: with a SECOND owner that owner’s row has it', async () => {
+    mountRemove(ROWS);
+    const anselma = await rowOf('Anselma Marak');
+    const button = within(anselma).getByRole('button', { name: REMOVE });
+    expect(button).toHaveAccessibleDescription('Anselma Marak');
+    expect(within(anselma).getByRole('button', { name: /Role for Anselma Marak/ })).toBeInTheDocument(); // control
+    expect(within(await rowOf('Kiro')).queryByRole('button', { name: REMOVE })).toBeNull(); // their own row
+    expect(within(await rowOf('Olga Sangma')).queryByRole('button', { name: REMOVE })).toBeNull(); // the last owner
+
+    // CONTROL, same case: with a SECOND owner the other owner's row offers it.
+    cleanup();
+    mountRemove([
+      { id: ME, name: 'Kiro', role: 'owner' },
+      { id: '01J9USER000000000000000009', name: 'Olga Sangma', role: 'owner' },
+    ]);
+    expect(within(await rowOf('Olga Sangma')).getByRole('button', { name: REMOVE })).toBeInTheDocument();
+    expect(within(await rowOf('Kiro')).queryByRole('button', { name: REMOVE })).toBeNull();
+  });
+
+  it('6.287 a non-admin (the pending read refused 403) is offered no removal anywhere; CONTROL: the roster still renders', async () => {
+    mountRemove(ROWS, {}, { admin: false });
+    expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
+    await screen.findByText(ADMIN_ONLY);
+    expect(screen.queryByRole('button', { name: REMOVE })).toBeNull();
+  });
+});
+
+describe('6.288 confirming removes the person; the gate’s refusal is shown in its own words', () => {
+  const ROWS: RosterMember[] = [
+    { id: ME, name: 'Kiro', role: 'owner' },
+    { id: '01J9USER000000000000000001', name: 'Anselma Marak', role: 'member' },
+    { id: '01J9USER000000000000000002', name: 'Bora Sangma', role: 'member' },
+  ];
+  const REMOVED: RemoveMemberOutcome = { kind: 'removed', invitesWithdrawn: 0, invitesNotWithdrawn: [] };
+
+  async function openDialog(user: ReturnType<typeof userEvent.setup>, name = 'Anselma Marak') {
+    const trigger = within(await rowOf(name)).getByRole('button', { name: REMOVE });
+    await user.click(trigger);
+    return { trigger, dialog: await screen.findByRole('dialog', { name: `Remove ${name} from Convenience Corner?` }) };
+  }
+
+  it('6.288 the dialog carries the verbatim title and body; Cancel calls nothing and focus returns to the row’s button; CONTROL: Remove then calls the gateway ONCE with (workspace, person), the row disappears and nothing else is shown', async () => {
+    const user = userEvent.setup();
+    const remove = vi.fn(async (): Promise<RemoveMemberOutcome> => REMOVED);
+    mountRemove(ROWS, { remove }, { workspaceName: 'Convenience Corner' });
+    const { trigger, dialog } = await openDialog(user);
+    expect(within(dialog).getByText(REMOVE_BODY)).toBeInTheDocument();
+
+    await user.click(within(dialog).getByRole('button', { name: 'Cancel' }));
+    expect(remove).not.toHaveBeenCalled();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    // react-aria's FocusScope restores on the next animation frame, not synchronously.
+    await waitFor(() => expect(trigger).toHaveFocus());
+    expect(screen.getByText('Anselma Marak')).toBeInTheDocument();
+
+    await user.click(trigger);
+    await user.click(within(await screen.findByRole('dialog')).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(screen.queryByText('Anselma Marak')).toBeNull());
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(remove).toHaveBeenCalledWith(WS, '01J9USER000000000000000001');
+    expect(screen.queryByRole('dialog')).toBeNull();
+    expect(screen.queryByRole('alert')).toBeNull();
+    expect(screen.getByText('Bora Sangma')).toBeInTheDocument(); // control: the other row stays
+    // Focus does not fall to <body> when its row vanishes: it lands on the page heading.
+    expect(screen.getByRole('heading', { name: 'Members' })).toHaveFocus();
+  });
+
+  it('6.288 the dialog stays open, with Remove disabled, until the call resolves; CONTROL: it then closes', async () => {
+    const user = userEvent.setup();
+    let resolve!: (outcome: RemoveMemberOutcome) => void;
+    const remove = vi.fn(() => new Promise<RemoveMemberOutcome>((r) => { resolve = r; }));
+    mountRemove(ROWS, { remove });
+    const { dialog } = await openDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    expect(remove).toHaveBeenCalledTimes(1);
+    expect(screen.getByRole('dialog')).toBeInTheDocument();
+    expect(within(screen.getByRole('dialog')).getByRole('button', { name: 'Remove' })).toBeDisabled();
+    resolve(REMOVED);
+    await waitFor(() => expect(screen.queryByRole('dialog')).toBeNull());
+  });
+
+  it('6.288 a refusal is shown in the roster’s refusal region in the gate’s own words and the row stays; CONTROL: the dialog closes and focus returns to the button', async () => {
+    const user = userEvent.setup();
+    const remove = vi.fn(async (): Promise<RemoveMemberOutcome> => ({
+      kind: 'refused',
+      rule: 'remove-owner-requires-owner',
+      reason: 'Only a workspace owner can remove the owner role from a member.',
+    }));
+    mountRemove(ROWS, { remove });
+    const { trigger, dialog } = await openDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    const alert = await screen.findByRole('alert');
+    expect(alert).toHaveTextContent('remove-owner-requires-owner: Only a workspace owner can remove the owner role from a member.');
+    expect(alert).toHaveClass('gn-refusal', 'gn-refusal--server');
+    expect(screen.getByText('Anselma Marak')).toBeInTheDocument();
+    expect(screen.queryByRole('dialog')).toBeNull();
+    await waitFor(() => expect(trigger).toHaveFocus());
+  });
+
+  it('6.288 a thrown failure is shown in the same region; a removal whose invitations could not all be withdrawn says so and still drops the row', async () => {
+    const user = userEvent.setup();
+    const remove = vi
+      .fn<MembersGateway['remove']>()
+      .mockRejectedValueOnce(new MemberRemovalError(404, null))
+      .mockResolvedValueOnce({
+        kind: 'removed',
+        invitesWithdrawn: 0,
+        invitesNotWithdrawn: [{ inviteId: 'i1', rule: 'permission.role', reason: 'Only an admin may withdraw an invitation.' }],
+      });
+    mountRemove(ROWS, { remove });
+    let { trigger, dialog } = await openDialog(user);
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    expect(await screen.findByRole('alert')).toHaveTextContent('HTTP 404');
+    expect(screen.getByText('Anselma Marak')).toBeInTheDocument();
+
+    ({ trigger, dialog } = await openDialog(user));
+    await user.click(within(dialog).getByRole('button', { name: 'Remove' }));
+    await waitFor(() => expect(screen.queryByText('Anselma Marak')).toBeNull());
+    expect(screen.getByRole('alert')).toHaveTextContent('Only an admin may withdraw an invitation.');
+  });
+
+  it('6.288 the title says "this workspace" when the workspace’s name is not served; the copy is otherwise verbatim', async () => {
+    const user = userEvent.setup();
+    mountRemove(ROWS, { remove: async () => REMOVED }, { workspaceName: null });
+    await user.click(within(await rowOf('Bora Sangma')).getByRole('button', { name: REMOVE }));
+    expect(await screen.findByRole('dialog', { name: 'Remove Bora Sangma from this workspace?' })).toBeInTheDocument();
   });
 });

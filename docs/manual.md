@@ -318,16 +318,19 @@ withdraw it and send a fresh one.
 
 ### Seeing and changing what people are
 
-**You can see, and an admin can change a role — but nobody can be removed.** The People page lists the
+**You can see, change and remove — an owner or admin does the last two.** The People page lists the
 people you can see in this workspace, and names each person's role. An admin gets a **Role** picker on
-every row except an owner's; changing it submits there and then. **There is still no "remove".**
+every row except an owner's; changing it submits there and then. **An owner or admin can also take
+somebody out of the workspace:** **Remove from workspace…** on their row asks you to confirm, and then they
+lose access at once. Their history stays, tickets stay assigned to them marked "(removed)", and any
+invitation still pending for them is withdrawn. It is never offered on your own row or on the only
+owner's row, and if the workspace refuses (an admin cannot remove an owner, for one) the page says so in
+the workspace's own words.
 
-This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable finds
-the correction where they last saw it. Combined with the re-invitation problem above, a workspace's
-people list can still drift out of step with reality: a role can be fixed on screen now, but somebody
-still has to be removed another way.
+This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable, or a
+person as impossible to remove, finds the correction where they last saw it.
 
-If somebody *is* removed by some other route, it takes effect immediately — on their very next action.
+If somebody is removed, it takes effect immediately — on their very next action.
 If they are only taken off one project, they lose that project and keep everything else. Their saved
 settings are kept for about a month in case they come back.
 

@@ -1746,6 +1746,13 @@ input, textarea, select { font-family: inherit; }
    shared rule does not carry is the prototype's `font-weight: 500`, which is
    all this rule adds. */
 .gn-members__role { font-weight: 500; }
+/* R5: the role control and the quiet "Remove from workspace…" action share the cell. */
+.gn-members__role-cell { display: flex; flex-wrap: wrap; align-items: center; gap: 0.5rem; }
+/* The confirm dialog reuses the delete dialog's layout, declaration for declaration. */
+.gn-members__remove-dialog { display: flex; flex-direction: column; gap: 1rem; max-width: 32rem; }
+.gn-members__remove-note { margin: 0; color: var(--gn-text-muted); font-size: 0.875rem; line-height: 1.5; }
+.gn-members__remove-actions { display: flex; flex-wrap: wrap; justify-content: flex-end; gap: 0.75rem; }
+.gn-members__remove-actions .gn-button { min-height: 2.75rem; padding-inline: 1rem; }
 
 /* `.gn-view-tabs button, .gn-view-tabs [role='tab'] { min-height: 2.75rem;
    padding-inline: 0.75rem; }` — DELETED (board-prototype-port Task 4,

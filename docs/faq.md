@@ -139,14 +139,14 @@ No, and this is a nasty one. The invitation shows as **accepted** and **they sta
 warns you and nothing warns them. A wrong answer delivered as a right one.
 
 **Where do I change somebody's role, or take them off?**
-Changing a role is on screen; taking somebody off is not. The People page lists the people you can see
-and shows each person's role, and if you are an admin every row except an owner's carries a **Role**
-picker. There is still no remove, so you can let people in and change what they are, and you
-still cannot put them out. Combined with
-the promotion problem above, a workspace's people list can drift out of step with reality with no way
-to fix it from the interface.
+Both are on screen, for an owner or admin. The People page lists the people you can see and shows each
+person's role; an admin gets a **Role** picker on every row except an owner's, and **Remove from
+workspace…** on every row except their own and the only owner's. Removing asks you to confirm, and then
+the person loses access at once; their history stays, tickets stay assigned to them marked "(removed)",
+and any invitation still pending for them is withdrawn. If the workspace refuses (an admin cannot remove
+an owner), the page shows its reason.
 
-**If somebody is removed some other way, when does it take effect?**
+**When does a removal take effect?**
 Immediately, on their very next action — not at some later refresh. If they are only taken off one
 project, they lose that project and keep everything else. Their saved settings are kept for about a
 month (thirty days, described as a placeholder) in case they come back; re-add them within that window

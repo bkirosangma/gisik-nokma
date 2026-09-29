@@ -1751,7 +1751,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "bold",
-                    "text": "You can see, and an admin can change a role — but nobody can be removed."
+                    "text": "You can see, change and remove — an owner or admin does the last two."
                   },
                   {
                     "kind": "text",
@@ -1767,7 +1767,19 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "bold",
-                    "text": "There is still no \"remove\"."
+                    "text": "An owner or admin can also take somebody out of the workspace:"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Remove from workspace…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on their row asks you to confirm, and then they lose access at once. Their history stays, tickets stay assigned to them marked \"(removed)\", and any invitation still pending for them is withdrawn. It is never offered on your own row or on the only owner's row, and if the workspace refuses (an admin cannot remove an owner, for one) the page says so in the workspace's own words."
                   }
                 ]
               },
@@ -1776,7 +1788,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable finds the correction where they last saw it. Combined with the re-invitation problem above, a workspace's people list can still drift out of step with reality: a role can be fixed on screen now, but somebody still has to be removed another way."
+                    "text": "This paragraph is kept, rather than deleted, so a reader who remembers the role as unchangeable, or a person as impossible to remove, finds the correction where they last saw it."
                   }
                 ]
               },
@@ -1785,15 +1797,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "If somebody "
-                  },
-                  {
-                    "kind": "italic",
-                    "text": "is"
-                  },
-                  {
-                    "kind": "text",
-                    "text": " removed by some other route, it takes effect immediately — on their very next action. If they are only taken off one project, they lose that project and keep everything else. Their saved settings are kept for about a month in case they come back."
+                    "text": "If somebody is removed, it takes effect immediately — on their very next action. If they are only taken off one project, they lose that project and keep everything else. Their saved settings are kept for about a month in case they come back."
                   }
                 ]
               }
@@ -9640,7 +9644,7 @@ export const HELP_CONTENT: HelpContent = [
                 "spans": [
                   {
                     "kind": "text",
-                    "text": "Changing a role is on screen; taking somebody off is not. The People page lists the people you can see and shows each person's role, and if you are an admin every row except an owner's carries a "
+                    "text": "Both are on screen, for an owner or admin. The People page lists the people you can see and shows each person's role; an admin gets a "
                   },
                   {
                     "kind": "bold",
@@ -9648,15 +9652,23 @@ export const HELP_CONTENT: HelpContent = [
                   },
                   {
                     "kind": "text",
-                    "text": " picker. There is still no remove, so you can let people in and change what they are, and you still cannot put them out. Combined with the promotion problem above, a workspace's people list can drift out of step with reality with no way to fix it from the interface."
+                    "text": " picker on every row except an owner's, and "
+                  },
+                  {
+                    "kind": "bold",
+                    "text": "Remove from workspace…"
+                  },
+                  {
+                    "kind": "text",
+                    "text": " on every row except their own and the only owner's. Removing asks you to confirm, and then the person loses access at once; their history stays, tickets stay assigned to them marked \"(removed)\", and any invitation still pending for them is withdrawn. If the workspace refuses (an admin cannot remove an owner), the page shows its reason."
                   }
                 ]
               }
             ]
           },
           {
-            "id": "if-somebody-is-removed-some-other-way-when-does-it-take-effe",
-            "title": "If somebody is removed some other way, when does it take effect?",
+            "id": "when-does-a-removal-take-effect",
+            "title": "When does a removal take effect?",
             "blocks": [
               {
                 "kind": "paragraph",

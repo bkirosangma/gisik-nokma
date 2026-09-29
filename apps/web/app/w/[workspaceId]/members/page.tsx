@@ -2,7 +2,7 @@
 
 import { useCallback, useEffect, useRef, useState, type FormEvent } from 'react';
 import { useParams } from 'next/navigation';
-import { Button, Card, Select } from '@gisik-nokma/ui';
+import { Button, Card, Dialog, Select } from '@gisik-nokma/ui';
 import { INVITE_CHANNELS, membershipId } from '@gisik-nokma/domain';
 import {
   formatDateTime,
@@ -38,6 +38,20 @@ import {
  * can deliver.
  */
 export const COPY_IT_NOW = 'Copy it now — it is not stored and cannot be shown again';
+
+/**
+ * R5 (access follow-ups, owner ruling 2026-09-29) — the row action and its
+ * confirmation, verbatim from the plan. The title's workspace is the served
+ * name; while it is unserved the title says "this workspace" rather than a
+ * placeholder or the raw id (the same rule the summary line follows).
+ */
+export const REMOVE_FROM_WORKSPACE = 'Remove from workspace…';
+export const removeFromWorkspaceTitle = (label: string, workspaceName: string | null): string =>
+  `Remove ${label} from ${workspaceName ?? 'this workspace'}?`;
+export const REMOVE_FROM_WORKSPACE_BODY =
+  'They lose access at once. Their history stays, tickets stay assigned to them marked "(removed)", and any invitation still pending for them is withdrawn.';
+export const REMOVE_CONFIRM = 'Remove';
+export const REMOVE_CANCEL = 'Cancel';
 
 /**
  * E6-9 — the mint form's Channel select used to offer `email`/`sms`/`whatsapp`
@@ -195,7 +209,7 @@ export const CHANNEL_LABELS: Record<(typeof INVITE_CHANNELS)[number], string> = 
 export default function MembersPage() {
   const params = useParams<{ workspaceId: string }>();
   const { workspaceId } = params;
-  const { dataSource, invitesAdmin } = useAppServices();
+  const { dataSource, invitesAdmin, members: membersGateway } = useAppServices();
   const user = useCurrentUser();
   /**
    * The workspace's own served name, for the summary line — `null` while it is
@@ -210,6 +224,12 @@ export default function MembersPage() {
   const [pending, setPending] = useState<PendingInvite[] | null>(null);
   const [revokeRefusal, setRevokeRefusal] = useState<string | null>(null);
   const [roleRefusal, setRoleRefusal] = useState<string | null>(null);
+  /** R5: the person whose removal the open dialog asks about, and whether the call is in flight. */
+  const [removing, setRemoving] = useState<{ member: RosterMember; label: string } | null>(null);
+  const [removeBusy, setRemoveBusy] = useState(false);
+  const headingRef = useRef<HTMLHeadingElement>(null);
+  /** Set when a removed row takes its own focus target with it; consumed once the row is gone. */
+  const [refocusHeading, setRefocusHeading] = useState(false);
   const [adminGate, setAdminGate] = useState<
     { kind: 'asking' } | { kind: 'admin' } | { kind: 'member'; why: string } | { kind: 'failed'; why: string }
   >({ kind: 'asking' });
@@ -422,13 +442,49 @@ export default function MembersPage() {
   //
   // Derived rather than held in state: `members` is the server's answer, and a
   // second copy of anything derived from it is a second thing to keep in step.
+  useEffect(() => {
+    if (!refocusHeading) return;
+    setRefocusHeading(false);
+    // The removed row's button is gone and the dialog's focus restore would land
+    // on nothing: the page's own heading is the nearest stable place.
+    headingRef.current?.focus();
+  }, [refocusHeading]);
+
+  const removeMember = async (target: { member: RosterMember; label: string }): Promise<void> => {
+    setRoleRefusal(null);
+    setRemoveBusy(true);
+    try {
+      const outcome = await membersGateway.remove(workspaceId, target.member.id);
+      setRemoving(null);
+      if (outcome.kind === 'refused') {
+        setRoleRefusal(`${outcome.rule}: ${outcome.reason}`);
+        return;
+      }
+      setMembers((current) => (current === null ? current : current.filter((row) => row.id !== target.member.id)));
+      setRefocusHeading(true);
+      loadPending();
+      if (outcome.invitesNotWithdrawn.length > 0) {
+        setRoleRefusal(outcome.invitesNotWithdrawn.map((row) => row.reason).join(' '));
+      }
+    } catch (cause) {
+      setRemoving(null);
+      setRoleRefusal(cause instanceof Error ? cause.message : String(cause));
+    } finally {
+      setRemoveBusy(false);
+    }
+  };
+
+  const ownerCount = (members ?? []).filter((member) => member.role === 'owner').length;
+  const canRemove = (member: RosterMember): boolean =>
+    adminGate.kind === 'admin' && member.id !== user?.id && !(member.role === 'owner' && ownerCount === 1);
+
   const rosterRows = (members ?? []).map((member) => ({ member, label: memberLabel(member) }));
 
   return (
     <main id="gn-main" className="gn-shell">
       <AppNav workspaceId={workspaceId} />
       <div className="gn-members__head">
-        <h1 className="gn-page-title">Members</h1>
+        <h1 ref={headingRef} tabIndex={-1} className="gn-page-title">Members</h1>
         {/* No summary until the roster has answered: a count drawn over a
             read that has not returned is a number nobody counted. */}
         {members !== null && members.length > 0 ? (
@@ -508,7 +564,7 @@ export default function MembersPage() {
                           correction is recorded rather than swapped because the
                           wrong version named a population that reads plausible. */}
                       <span className="gn-members__identity">
-                        <span className="gn-members__name">{label}</span>
+                        <span id={`gn-members-name-${member.id}`} className="gn-members__name">{label}</span>
                         {member.name.trim() !== '' && (member.email?.trim() ?? '') !== '' ? (
                           <span className="gn-members__email">{member.email?.trim()}</span>
                         ) : null}
@@ -550,16 +606,29 @@ export default function MembersPage() {
                         `.gn-chip__dot`, and this chip has no dot; see
                         `.gn-members__role` in `globals.css` for the one
                         declaration the shared rule does not already carry. */}
-                    {adminGate.kind === 'admin' && isEditableRole(member.role) ? (
-                      <Select
-                        options={EDITABLE_ROLE_OPTIONS}
-                        value={member.role}
-                        onChange={(next) => changeRole(member, next)}
-                        aria-label={`Role for ${label}`}
-                      />
-                    ) : (
-                      <span className="gn-chip gn-members__role">{member.role}</span>
-                    )}
+                    <div className="gn-members__role-cell">
+                      {adminGate.kind === 'admin' && isEditableRole(member.role) ? (
+                        <Select
+                          options={EDITABLE_ROLE_OPTIONS}
+                          value={member.role}
+                          onChange={(next) => changeRole(member, next)}
+                          aria-label={`Role for ${label}`}
+                        />
+                      ) : (
+                        <span className="gn-chip gn-members__role">{member.role}</span>
+                      )}
+                      {canRemove(member) ? (
+                        // Named by its visible text (a speech user says what they
+                        // read); WHICH person is the description, so a screen reader
+                        // hears "Remove from workspace…, Anselma Marak".
+                        <Button
+                          aria-describedby={`gn-members-name-${member.id}`}
+                          onClick={() => setRemoving({ member, label })}
+                        >
+                          {REMOVE_FROM_WORKSPACE}
+                        </Button>
+                      ) : null}
+                    </div>
                   </td>
                 </tr>
               ))}
@@ -581,6 +650,39 @@ export default function MembersPage() {
           {roleRefusal}
         </p>
       ) : null}
+
+      {/* R5. One dialog for the page, opened for one row at a time. It stays open
+          (Remove disabled) until the call answers, so a refusal is never a
+          dialog that vanished and left the person guessing; a refusal lands in
+          the refusal region above, in the gate's own words. */}
+      <Dialog
+        open={removing !== null}
+        title={removeFromWorkspaceTitle(removing?.label ?? '', workspaceName)}
+        onClose={() => {
+          if (!removeBusy) setRemoving(null);
+        }}
+        describedBy="gn-members-remove-body"
+      >
+        <div className="gn-members__remove-dialog">
+          <p id="gn-members-remove-body" className="gn-members__remove-note">
+            {REMOVE_FROM_WORKSPACE_BODY}
+          </p>
+          <div className="gn-members__remove-actions">
+            <Button disabled={removeBusy} onClick={() => setRemoving(null)}>
+              {REMOVE_CANCEL}
+            </Button>
+            <Button
+              variant="danger"
+              disabled={removeBusy}
+              onClick={() => {
+                if (removing !== null) void removeMember(removing);
+              }}
+            >
+              {REMOVE_CONFIRM}
+            </Button>
+          </div>
+        </div>
+      </Dialog>
 
       {/* RULING V2: rendered OUTSIDE the `adminGate` chain below on purpose —
           the one-time credential must survive a re-read that flips the gate
