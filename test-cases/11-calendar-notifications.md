@@ -421,3 +421,14 @@ reachability is pinned separately at **13.417**, which is what keeps this shorte
 expected list is also what deleting the links would produce.
 
 **Block `11.225`–`11.234` is ALLOCATED to the access-and-invites plan (`docs/superpowers/plans/2026-09-29-workspace-access-and-invites.md`, 2026-09-29).** Measured across all remote branches: §11's tip is `11.224`.
+
+## Actor names on the inbox, the project calendar and the ticket sheet (`fix/names-nav-focus`, 2026-09-29) — block `11.240`–`11.249`
+
+*Ids `11.245`–`11.249` are unused. Sits after the access plan's block `11.225`–`11.234`.*
+
+- ✅ **11.240 — an assignment row on `/inbox` names the assigner from the roster or the names-only read; a person NEITHER names keeps the id.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.241 — a refused roster and names read (a guest viewer) leaves the id, and the page still draws.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.242 — each workspace on the inbox is read once, for its own rows.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.243 — a claim made by a person the roster omits (a guest, for a member) is attributed on the project calendar/timeline by the names-only read, not the raw id.** (`apps/web/test/project-calendar-timeline.test.tsx`)
+- ✅ **11.244 — the ticket sheet names the people the roster omits on claims and the assignee from the names-only read; the roster keeps priority.** (`packages/app-core/test/views/ticket-sheet.test.tsx`)
+

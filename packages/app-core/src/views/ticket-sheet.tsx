@@ -14,7 +14,8 @@ import type { DataSource } from '../data-source.js';
 import { precheckEvent, type PrecheckResult } from '../precheck.js';
 import { writeFailureCopy, writeFailureRefusalClass } from '../session-expired.js';
 import { actorLabel, formatDate, formatStateProvenance } from '../provenance.js';
-import { memberLabel } from '../member-label.js';
+import { actorLabelFrom, memberLabel } from '../member-label.js';
+import { useActorNames } from './use-actor-names.js';
 import { mentionCandidatesOf } from '../mention-candidates.js';
 import { makeSubmittedFactory } from '../submit.js';
 import { dateClaimOf } from '../claims/ticket-dates.js';
@@ -859,6 +860,13 @@ export function TicketSheet({
   const members = useLiveQuery(dataSource, workspaceId, workspaceId, () =>
     dataSource.query.getMembers(workspaceId),
   );
+  /**
+   * The names-only read, for the people the roster omits — a guest, for a plain
+   * member's roster. It feeds `nameOf` (labels) and NOTHING ELSE: `members`
+   * above is what the pickers and the visibility editor offer, and a guest must
+   * not be offered there. One-time, not live — see `useActorNames`.
+   */
+  const actorNames = useActorNames(dataSource, workspaceId);
   const history = useLiveQuery(dataSource, workspaceId, `${ticketId}:history`, () =>
     dataSource.query.getTicketHistory(ticketId, undefined, HISTORY_PAGE_LIMIT),
   );
@@ -1086,10 +1094,8 @@ export function TicketSheet({
   // display name, so the magic-link population reads as their address here
   // instead of as an empty string. A member the roster does not cover is still
   // `null`, and `actorLabel`'s own id floor answers for it, unchanged.
-  const nameOf = (userId: string): string => {
-    const member = members.data?.find((candidate) => candidate.id === userId);
-    return actorLabel(userId, member === undefined ? null : memberLabel(member));
-  };
+  const nameOf = (userId: string): string =>
+    actorLabel(userId, actorLabelFrom(userId, members.data, actorNames));
   const make = makeSubmittedFactory({ actorId: currentUserId, origin: 'web' });
 
   /**

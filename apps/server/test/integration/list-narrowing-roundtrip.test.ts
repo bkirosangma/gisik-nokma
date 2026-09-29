@@ -374,8 +374,12 @@ describe('13.304 — the List narrows at the real door when the checkbox is tick
     expect(narrowedPages).toHaveLength(1);
     expect(decodeURIComponent(narrowedPages[0] ?? '')).toContain('"stateCategory":"active"');
     expect(narrowedRosters).toHaveLength(1);
-    expect(narrowedCalls).toHaveLength(2);
-    expect(narrowedPages.length + narrowedRosters.length).toBe(narrowedCalls.length);
+    // The names-only read (`/actor-names`, cases 7.290–7.297) the roster join
+    // falls back to: once per walk, its own bucket.
+    const narrowedNames = narrowedCalls.filter((url) => url.includes('/actor-names'));
+    expect(narrowedNames).toHaveLength(1);
+    expect(narrowedCalls).toHaveLength(3);
+    expect(narrowedPages.length + narrowedRosters.length + narrowedNames.length).toBe(narrowedCalls.length);
 
     // ─── THE BOARD READ IS UNNARROWED — a SUPPORTING fact, NOT the negative arm ─
     // `getBoard(projectId)` takes NO filter (`data-source.ts:142`), so the Board's

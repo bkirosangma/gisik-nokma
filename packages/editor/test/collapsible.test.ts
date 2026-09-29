@@ -379,4 +379,40 @@ describe('9.451-9.454 the collapsible fold control', () => {
     expect(toggle.getAttribute('aria-expanded')).toBe('true');
     editor.destroy();
   });
+
+  /**
+   * 9.490 — WHERE FOCUS LANDS AFTER A CLICK (controller browser pass 2026-09-29;
+   * case 9.455's wording said "after a key" and was silent on a click).
+   *
+   * Tiptap's own click handler moves focus INTO the document
+   * (`editor.commands.focus()`), and 9.454's key path puts it back on the
+   * button. The same move happens for ANY click, and a `click` with `detail ===
+   * 0` is not a mouse: it is a keyboard activation or an assistive technology's
+   * (VoiceOver's VO-Space, a screen reader's browse-mode Enter) — which are
+   * exactly the users who lose their place when the button they just pressed
+   * stops being the focused element and the new `aria-expanded` is never read.
+   * A pointer click (`detail >= 1`) keeps the editor focus: the caret is
+   * restored where the writer left it, so typing carries on.
+   */
+  it('9.490 a keyboard/AT click keeps focus on the fold button; a pointer click leaves it in the editor', async () => {
+    const editor = createTestEditor({}, detailsDoc(true));
+    document.body.append(editor.view.dom.parentElement ?? editor.view.dom);
+    await tick();
+    const { toggle } = parts(editor);
+    const raf = (): Promise<void> => new Promise((r) => requestAnimationFrame(() => requestAnimationFrame(() => r())));
+
+    // CONTROL, same `it`: a pointer click still moves focus into the editor.
+    toggle.dispatchEvent(new MouseEvent('click', { bubbles: true, cancelable: true, detail: 1 }));
+    await raf();
+    expect(toggle.getAttribute('aria-expanded'), 'the pointer click folded it').toBe('false');
+    expect(document.activeElement, 'a pointer click leaves focus in the editor').toBe(editor.view.dom);
+
+    // The keyboard/AT click: `detail === 0`, as `HTMLElement.click()` makes it.
+    toggle.focus();
+    toggle.click();
+    await raf();
+    expect(toggle.getAttribute('aria-expanded'), 'the AT click unfolded it').toBe('true');
+    expect(document.activeElement, 'focus stays on the button after a keyboard/AT click').toBe(toggle);
+    editor.destroy();
+  });
 });

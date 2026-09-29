@@ -69,6 +69,74 @@ function deferred<T>() {
   return { promise, settle };
 }
 
+describe('/inbox — who did it is a NAME, not an id (cases 11.240–11.242)', () => {
+  function inboxOf(rows: Notification[], services: Parameters<typeof stubServices>[0]) {
+    return render(
+      <Providers
+        services={stubServices(services, {
+          notifications: { list: async () => ({ notifications: rows, nextCursor: null }) },
+        })}
+      >
+        <InboxPage />
+      </Providers>,
+    );
+  }
+
+  it('11.240 an assignment row names the assigner from the roster or the names-only read; a person NEITHER names keeps the id', async () => {
+    const byGuest = { ...assignment('n_g'), workspaceId: 'ws_1' } as Notification;
+    (byGuest.payload as { assignedBy: string }).assignedBy = 'u_gita';
+    const byEmailOnly = { ...assignment('n_e'), workspaceId: 'ws_1' } as Notification;
+    (byEmailOnly.payload as { assignedBy: string }).assignedBy = 'u_mail';
+    const byNobody = { ...assignment('n_z'), workspaceId: 'ws_1' } as Notification;
+    (byNobody.payload as { assignedBy: string }).assignedBy = 'u_zed';
+    inboxOf([assignment('n_a'), byGuest, byEmailOnly, byNobody], {
+      getMembers: async () => [
+        { id: 'u_ana', name: 'Anselma Marak', role: 'member' },
+        { id: 'u_mail', name: '', role: 'member', email: 'mail@example.test' },
+      ],
+      getActorNames: async () => [{ id: 'u_gita', name: 'Gita Guest' }],
+    });
+
+    expect(await screen.findByText('Anselma Marak assigned this to you')).toBeInTheDocument();
+    expect(screen.getByText('Gita Guest assigned this to you')).toBeInTheDocument();
+    expect(screen.getByText('mail@example.test assigned this to you')).toBeInTheDocument();
+    // CONTROL: nobody names u_zed, so the id is what is there — the floor is unchanged.
+    expect(screen.getByText('u_zed assigned this to you')).toBeInTheDocument();
+    // And no raw id sits where a name was found.
+    expect(screen.queryByText(/u_ana|u_gita/)).not.toBeInTheDocument();
+  });
+
+  it('11.241 a refused roster and names read (a guest viewer) leaves the id — and the page still draws', async () => {
+    inboxOf([assignment('n_a')], {
+      getMembers: async () => {
+        throw new Error('refused');
+      },
+      getActorNames: async () => {
+        throw new Error('refused');
+      },
+    });
+    expect(await screen.findByText('u_ana assigned this to you')).toBeInTheDocument();
+  });
+
+  it('11.242 each workspace on the page is read once, for its own rows', async () => {
+    const other = { ...assignment('n_o'), workspaceId: 'ws_2' } as Notification;
+    (other.payload as { assignedBy: string }).assignedBy = 'u_bea';
+    const asked: string[] = [];
+    inboxOf([assignment('n_a'), assignment('n_b'), other], {
+      getMembers: async (workspaceId: string) => {
+        asked.push(workspaceId);
+        return workspaceId === 'ws_2'
+          ? [{ id: 'u_bea', name: 'Bea', role: 'member' }]
+          : [{ id: 'u_ana', name: 'Anselma Marak', role: 'member' }];
+      },
+      getActorNames: async () => [],
+    });
+    expect(await screen.findByText('Bea assigned this to you')).toBeInTheDocument();
+    expect(screen.getAllByText('Anselma Marak assigned this to you')).toHaveLength(2);
+    expect([...asked].sort()).toEqual(['ws_1', 'ws_2']);
+  });
+});
+
 describe('/inbox — four states, because the plan’s two collapse the one that lies', () => {
   it('11.144 says "Loading…" while the first page is in flight, NOT that the inbox is empty', async () => {
     const first = deferred<{ notifications: Notification[]; nextCursor: string | null }>();

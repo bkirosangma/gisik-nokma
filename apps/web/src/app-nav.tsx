@@ -312,8 +312,9 @@ export function AppNav({ workspaceId }: { workspaceId?: string }) {
           <Link
             href={`/w/${effectiveWorkspaceId}`}
             aria-current={current(`/w/${effectiveWorkspaceId}`)}
+            className="gn-nav__workspace"
           >
-            {workspaceName}
+            <span className="gn-nav__label">{workspaceName}</span>
           </Link>
         ) : null}
         {/* IMMEDIATELY RIGHT OF THE WORKSPACE NAME (owner, 2026-09-18) — the

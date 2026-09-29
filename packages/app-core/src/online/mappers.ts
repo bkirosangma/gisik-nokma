@@ -509,6 +509,41 @@ export function rosterByActorId(
 }
 
 /**
+ * `GET /v1/workspaces/:id/actor-names` → `Actor[]`. Two fields a row, both
+ * required: unlike the roster's `email`, nothing here is absent-by-decision.
+ */
+export function mapActorNames(raw: unknown): Actor[] {
+  const record = asRecord(raw, 'actorNames');
+  return asArray(record['names'], 'actorNames.names').map((entry, index) => {
+    const row = asRecord(entry, `actorNames.names[${index}]`);
+    return {
+      id: asString(row['userId'], `actorNames.names[${index}].userId`),
+      name: asString(row['displayName'], `actorNames.names[${index}].displayName`),
+    };
+  });
+}
+
+/**
+ * The roster join with the names-only read laid UNDER it: an id the roster
+ * labels keeps the roster's label (which may be an email — `memberLabel`), and
+ * an id the roster does not carry, or carries with no better label than the id
+ * itself, takes the names read's name. Returns a new map.
+ */
+export function withActorNames(
+  roster: ReadonlyMap<string, string>,
+  names: readonly { id: string; name: string }[],
+): Map<string, string> {
+  const joined = new Map(roster);
+  for (const { id, name } of names) {
+    const label = name.trim();
+    if (label === '') continue;
+    const existing = joined.get(id);
+    if (existing === undefined || existing === id) joined.set(id, label);
+  }
+  return joined;
+}
+
+/**
  * `StateProvenance.cause` is `TransitionCause | null` — REQUIRED and nullable
  * (`packages/domain/src/read-models.ts`), and `TransitionCause` has exactly one
  * member.

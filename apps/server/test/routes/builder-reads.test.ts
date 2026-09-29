@@ -450,6 +450,113 @@ describe('GET /v1/workspaces/:workspaceId/members', () => {
   });
 });
 
+describe('GET /v1/workspaces/:workspaceId/actor-names', () => {
+  /**
+   * NAMES ARE NOT THE SENSITIVE PART (owner, 2026-09-29): every signed-in
+   * member of a workspace sees the display name of anyone who acted in it. The
+   * roster (`/members`) cannot serve that by itself — it hides guests from a
+   * non-admin and refuses a guest altogether — so a member reading a note a
+   * guest wrote saw the guest's raw ULID. This route is the names-only answer:
+   * `{userId, displayName}` and nothing else.
+   *
+   * The fixture users are phone sign-ups (name = the phone, address synthetic),
+   * so each case names the people it needs and puts the vendor columns back.
+   */
+  async function withNamedPeople<T>(
+    people: Array<{ id: string; name: string; email: string }>,
+    body: () => Promise<T>,
+  ): Promise<T> {
+    const { rows } = await db.pool.query<{ id: string; name: string; email: string }>(
+      'SELECT "id", "name", "email" FROM "user" WHERE "id" = ANY ($1::text[])',
+      [people.map((p) => p.id)],
+    );
+    for (const p of people) {
+      await db.pool.query('UPDATE "user" SET name = $1, email = $2 WHERE id = $3', [p.name, p.email, p.id]);
+    }
+    try {
+      return await body();
+    } finally {
+      for (const row of rows) {
+        await db.pool.query('UPDATE "user" SET name = $1, email = $2 WHERE id = $3', [row.name, row.email, row.id]);
+      }
+    }
+  }
+
+  const NAMED = () => [
+    { id: read.userIds.owner, name: 'Anselma Marak', email: 'anselma@example.test' },
+    { id: read.userIds.member, name: 'Mika Sangma', email: 'mika@example.test' },
+    { id: read.userIds.guest, name: 'Gita Guest', email: 'gita@example.test' },
+    { id: read.userIds.neighbour, name: 'Nadia Neighbour', email: 'nadia@example.test' },
+  ];
+
+  it('7.290 a plain member is told the guest’s display name — which the roster withholds from them — and no email, role or phone', async () => {
+    await withNamedPeople(NAMED(), async () => {
+      // THE CONTROL: the roster really does withhold the guest from this member,
+      // so the name below is not one the member already had.
+      const roster = await okJson<MemberListResponse>('member', '/members');
+      expect(roster.members.map((m) => m.userId)).not.toContain(read.userIds.guest);
+
+      const response = await get('member', '/actor-names');
+      expect(response.statusCode).toBe(200);
+      const body = response.json() as { workspaceId: string; names: Array<Record<string, unknown>> };
+      expect(body.workspaceId).toBe(read.world.workspaceId);
+      const byUser = Object.fromEntries(body.names.map((n) => [n['userId'], n['displayName']]));
+      expect(byUser[read.userIds.guest]).toBe('Gita Guest');
+      expect(byUser[read.userIds.owner]).toBe('Anselma Marak');
+      expect(byUser[read.userIds.member]).toBe('Mika Sangma');
+      // Another workspace's person is not in this workspace's answer.
+      expect(byUser[read.userIds.neighbour]).toBeUndefined();
+
+      // NAME ONLY: exactly two keys per row, and none of the gated fields' bytes.
+      for (const row of body.names) expect(Object.keys(row).sort()).toEqual(['displayName', 'userId']);
+      const bytes = JSON.stringify(body);
+      for (const gated of ['@example.test', SYNTHETIC_PHONE_EMAIL_DOMAIN, '"role"', '"email"']) {
+        expect(bytes).not.toContain(gated);
+      }
+    });
+  });
+
+  it('7.291 a person whose name IS their phone is left out — the name would otherwise put a phone number on the wire for a viewer the roster would not tell', async () => {
+    await withNamedPeople(NAMED(), async () => {
+      // CONTROL: the admin and the outsider still hold the seeded phone-as-name.
+      const { rows } = await db.pool.query<{ id: string; name: string; email: string }>(
+        'SELECT "id", "name", "email" FROM "user" WHERE "id" = ANY ($1::text[])',
+        [[read.userIds.admin, read.userIds.outsider]],
+      );
+      expect(rows).toHaveLength(2);
+      for (const row of rows) expect(isSyntheticPhoneEmail(row.email)).toBe(true);
+
+      const body = await okJson<{ names: Array<{ userId: string; displayName: string }> }>('member', '/actor-names');
+      const ids = body.names.map((n) => n.userId);
+      expect(ids).not.toContain(read.userIds.admin);
+      expect(ids).not.toContain(read.userIds.outsider);
+      const bytes = JSON.stringify(body);
+      for (const row of rows) expect(bytes).not.toContain(row.name);
+    });
+  });
+
+  it('7.292 owner, admin, member, outsider and project lead all get the same answer; a guest (7.91), a stranger and a neighbour get the roster’s 404', async () => {
+    await withNamedPeople(NAMED(), async () => {
+      const owner = await okJson('owner', '/actor-names');
+      for (const role of ['admin', 'member', 'outsider', 'projectLead'] as const) {
+        expect([role, await okJson(role, '/actor-names')]).toEqual([role, owner]);
+      }
+      const refusals = [];
+      for (const role of ['guest', 'stranger', 'neighbour'] as const) {
+        const response = await get(role, '/actor-names');
+        expect([role, response.statusCode]).toEqual([role, 404]);
+        expect(response.json()).toEqual(READ_NOT_FOUND_BODY);
+        refusals.push(response);
+      }
+      // Byte-identical: nobody learns the route or a name by the shape of the refusal.
+      for (const refusal of refusals) {
+        expect(comparableHeaders(refusal)).toEqual(comparableHeaders(refusals[0]!));
+      }
+      expect(JSON.stringify(refusals.map((r) => r.body))).not.toContain('Gita Guest');
+    });
+  });
+});
+
 describe('GET /v1/workspaces/:workspaceId/workflows/:workflowId/state-occupancy', () => {
   it('7.40 counts the tickets sitting in each state of the workflow, zeroes included', async () => {
     const errands = await okJson<StateOccupancyResponse>('owner', '/workflows/wf-errands/state-occupancy');

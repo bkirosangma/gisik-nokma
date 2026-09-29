@@ -73,3 +73,29 @@ export function memberLabel(member: { id: string; name: string; email?: string }
   if (email.length > 0) return email;
   return member.id;
 }
+
+/**
+ * What to call `userId` given the roster AND the names-only read
+ * (`DataSourceQuery.getActorNames`) — or `null` when neither names them, so the
+ * caller's own floor (`actorLabel`, the raw id) still answers.
+ *
+ * Order: the roster's label (`memberLabel`, name → email) when it says something
+ * better than the id; else the names-only read's name. The roster wins because
+ * it carries the email fallback the names-only read may not (it is withheld from
+ * a viewer the roster does not cover); the names-only read is what names a
+ * person the roster omits — a guest, for a plain member's roster.
+ *
+ * One function so the notes byline, the ticket sheet, the calendar and the board
+ * filter cannot answer "who is this id" three different ways.
+ */
+export function actorLabelFrom(
+  userId: string,
+  members: readonly { id: string; name: string; email?: string }[] | null | undefined,
+  names: readonly { id: string; name: string }[] | null | undefined,
+): string | null {
+  const member = members?.find((candidate) => candidate.id === userId);
+  const fromRoster = member === undefined ? null : memberLabel(member);
+  if (fromRoster !== null && fromRoster !== userId) return fromRoster;
+  const named = names?.find((candidate) => candidate.id === userId)?.name.trim() ?? '';
+  return named !== '' ? named : fromRoster;
+}

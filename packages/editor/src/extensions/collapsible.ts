@@ -158,6 +158,24 @@ export const Collapsible = Extension.create({
               requestAnimationFrame(() => button.focus({ preventScroll: true }));
               return true;
             },
+            /**
+             * A CLICK THAT IS NOT A MOUSE (case 9.490). Tiptap's click handler moves
+             * focus into the document after every toggle — right for a pointer,
+             * whose caret is restored where the writer left it, wrong for a
+             * keyboard or assistive-technology activation, which fires a `click`
+             * with `detail === 0` and would strand that user in the body with the
+             * new `aria-expanded` never read. The listener on the button itself
+             * runs first (target phase), so by the time this bubbles up focus has
+             * already been taken, and the same next-frame hand-back the key path
+             * uses gives it back. `detail >= 1` is a pointer: left alone.
+             */
+            click: (_view, event) => {
+              if (event.detail !== 0) return false;
+              const button = foldButton(event.target);
+              if (button === null) return false;
+              requestAnimationFrame(() => button.focus({ preventScroll: true }));
+              return false;
+            },
           },
         },
       }),

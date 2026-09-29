@@ -204,6 +204,27 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     expect(document.body.textContent).not.toContain('system');
   });
 
+  it('11.244 people the roster omits (a guest, for a member) are named from the names-only read on claims and the assignee; the roster keeps priority', async () => {
+    const source = createFakeDataSource({
+      getTicket: async () => ticketRead(),
+      getWorkflowDef: async () => WF_ERRAND,
+      // The roster names Kiro only; Anselma (the assignee) is omitted from it.
+      getMembers: async () => [{ id: 'user_kiro', name: 'Kiro', role: 'member' }],
+      getActorNames: async () => [
+        { id: 'user_anselma', name: 'Anselma Marak' },
+        { id: 'user_kiro', name: 'Someone Else' },
+      ],
+      getTicketHistory: async () => [],
+    });
+    renderSheet(ticketRead(), source);
+    await settled();
+    // Kiro, by the roster's label — priority over the names read's other spelling.
+    expect(within(screen.getByTestId('field-due')).getByText('set by Kiro on 18 Aug 2026')).toBeInTheDocument();
+    // Anselma, only the names-only read knows.
+    expect(screen.getByTestId('field-assignee').textContent).toContain('Anselma Marak');
+    expect(screen.getByTestId('field-assignee').textContent).not.toContain('user_anselma');
+  });
+
   it('PLANTED DEFECT: every field carries a claim line — a value is never a standing property', async () => {
     renderSheet(ticketRead());
     await settled();

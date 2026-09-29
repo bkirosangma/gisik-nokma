@@ -129,6 +129,8 @@ export function stubServices(
     // case that does not care is not made to stub it. A case that does, stubs it.
     purgedAmong: async () => [],
     getMembers: unstubbed('getMembers'),
+    // A label join must not fail a read, so `[]` (no name known) rather than `unstubbed`.
+    getActorNames: async () => [],
     getBoard: unstubbed('getBoard'),
     getTickets: unstubbed('getTickets'),
     getTicket: unstubbed('getTicket'),

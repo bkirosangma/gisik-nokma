@@ -16,6 +16,7 @@ import { Button } from '@gisik-nokma/ui';
 import {
   DeleteDialog,
   TicketSheet,
+  actorLabelFrom,
   classifyBatch,
   makeSubmittedFactory,
   mentionCandidatesOf,
@@ -25,6 +26,7 @@ import {
   useLiveQuery,
   usePurgedPredicate,
   writeFailureCopy,
+  type Actor,
   type DataSource,
   type RosterMember,
   type WorkspaceRef,
@@ -343,6 +345,29 @@ function NoteDocumentBody({
   }, [dataSource, note?.workspaceId]);
 
   /**
+   * The names-only read, for the people the roster omits — a guest author, for a
+   * member's roster. Kept apart from `members` on purpose: `members` feeds the
+   * scope picker and the mention list, which must not offer a guest; this feeds
+   * labels only (`actorLabelFrom`). A refusal is an empty list.
+   */
+  const [actorNames, setActorNames] = useState<Actor[]>([]);
+  useEffect(() => {
+    if (note === null) return;
+    let cancelled = false;
+    dataSource.query.getActorNames(note.workspaceId).then(
+      (rows) => {
+        if (!cancelled) setActorNames(rows);
+      },
+      () => {
+        if (!cancelled) setActorNames([]);
+      },
+    );
+    return () => {
+      cancelled = true;
+    };
+  }, [dataSource, note?.workspaceId]);
+
+  /**
    * The document as the editor last reported it. `onDraft` fires on every
    * change in note mode, and this is what "Copy as Markdown" and the reading
    * time read — WITHOUT it they would serialise the body the note was LOADED
@@ -504,20 +529,13 @@ function NoteDocumentBody({
     }
   }
 
-  const authorName = useMemo(() => {
-    if (note === null) return '';
-    const author = members.find((member) => member.id === note.authorId);
-    return author?.name?.trim() || author?.email?.trim() || note.authorId;
-  }, [note, members]);
-
-  /** Any author's name from the SAME roster `authorName` reads — History rows name whoever recorded each version, not just the note's own author. */
+  /** Any author's name from the roster, then the names-only read — History rows and comments name whoever wrote them, not just the note's own author. */
   const nameOf = useMemo(
-    () => (authorId: string) => {
-      const member = members.find((candidate) => candidate.id === authorId);
-      return member?.name?.trim() || member?.email?.trim() || authorId;
-    },
-    [members],
+    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? authorId,
+    [members, actorNames],
   );
+
+  const authorName = useMemo(() => (note === null ? '' : nameOf(note.authorId)), [note, nameOf]);
 
   const [historyOpen, setHistoryOpen] = useState(false);
   /**

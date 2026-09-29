@@ -1,10 +1,11 @@
 import { PURGED_LOOKUP_MAX_IDS, ULID_REGEX, type PurgedRef } from '@gisik-nokma/domain';
 import type { DataSource, DataSourceQuery } from '../data-source.js';
-import type { FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
+import type { Actor, FilterSpec, Grouping, ListRow, UserPreferences } from '../view-types.js';
 import { SessionExpiredError } from '../session-expired.js';
 import { HttpError, createHttpClient, type FetchLike, type HttpClient } from './http.js';
 import {
   boardWorkspaceId,
+  mapActorNames,
   mapActors,
   mapAttention,
   mapPurgedLookup,
@@ -37,6 +38,7 @@ import {
   rosterByActorId,
   toServerFilterSpec,
   toServerPreferences,
+  withActorNames,
   type ListPage,
 } from './mappers.js';
 import { createStreamSubscriber, type WebSocketLike } from './stream.js';
@@ -145,8 +147,20 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
    * the same person two ways inside one view.
    */
   async function workspaceRoster(workspaceId: string): Promise<Map<string, string>> {
-    const raw = await http.get(`/v1/workspaces/${workspaceId}/members`);
-    return raw === null ? new Map() : rosterByActorId(mapActors(raw));
+    // Two reads, in parallel, one join. The roster is the directory and hides a
+    // guest from a non-admin; the names-only read names them anyway. Either may
+    // be refused (a guest viewer gets a 404 from both) and each refusal is an
+    // empty answer, never a failure of the read that asked.
+    const [raw, names] = await Promise.all([
+      http.get(`/v1/workspaces/${workspaceId}/members`),
+      actorNames(workspaceId),
+    ]);
+    return withActorNames(raw === null ? new Map() : rosterByActorId(mapActors(raw)), names);
+  }
+
+  async function actorNames(workspaceId: string): Promise<Actor[]> {
+    const raw = await http.get(`/v1/workspaces/${workspaceId}/actor-names`);
+    return raw === null ? [] : mapActorNames(raw);
   }
 
   const query: DataSourceQuery = {
@@ -187,6 +201,8 @@ export function createOnlineDataSource(deps: OnlineDataSourceDeps): DataSource {
       const raw = await http.get(`/v1/workspaces/${workspaceId}/members`);
       return raw === null ? [] : mapActors(raw);
     },
+
+    getActorNames: (workspaceId) => actorNames(workspaceId),
 
     getBoard: async (projectId) => {
       const path = `/v1/projects/${projectId}/board`;

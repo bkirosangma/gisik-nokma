@@ -89,6 +89,11 @@ function pagingFetch(
     // caller who may not read the roster (`door(..., 'no-guests')`). The walk
     // still resolves and names degrade to ids — that is 13.1289, so the default
     // is the refused case rather than the happy one.
+    // The names-only read (`/actor-names`) is the roster join's second source and
+    // gets the same treatment for the same reason: its own path, absent by default.
+    if (input.includes(`/v1/workspaces/${WORKSPACE}/actor-names`)) {
+      return { ok: false, status: 404, json: async () => undefined } as Response;
+    }
     if (input.includes(`/v1/workspaces/${WORKSPACE}/members`)) {
       const body = options.members;
       return {
@@ -318,6 +323,7 @@ describe('3.40 the four answerable reads, at the paths the server registers', ()
     expect(calls.map((call) => call.input)).toEqual([
       `http://server.test/v1/projects/${PROJECT}/board`,
       `http://server.test/v1/workspaces/${WORKSPACE}/members`,
+      `http://server.test/v1/workspaces/${WORKSPACE}/actor-names`,
     ]);
   });
 
@@ -509,6 +515,7 @@ describe('3.40 the three signatures that grew a workspaceId (P25 clause 2)', () 
       `/v1/me/preferences?workspaceId=${WORKSPACE}`,
       `/v1/me/work?workspaceId=${WORKSPACE}`,
       `/v1/workspaces/${WORKSPACE}/members`,
+      `/v1/workspaces/${WORKSPACE}/actor-names`,
     ]);
     // The PUT sends the SERVER's document (P24), not the client's.
     expect(JSON.parse(String(calls[1]?.init?.body))).toEqual({
@@ -1069,6 +1076,74 @@ function listBodyAssignedTo(...pairs: readonly (readonly [string, string])[]) {
 }
 
 /**
+ * Cases 7.293–7.295 — the roster join falls back to the names-only read
+ * (`GET /v1/workspaces/:id/actor-names`) for an actor the roster does not name.
+ *
+ * A plain member's roster omits guests, so a card assigned by (or a claim made
+ * by) a guest carried the guest's raw id. The names-only read is the second
+ * source; the roster keeps priority so the email fallback it already carries is
+ * unchanged.
+ */
+describe('the roster join falls back to actor-names for a person the roster omits', () => {
+  const NAMES = { workspaceId: WORKSPACE, names: [{ userId: 'u9', displayName: 'Gita Guest' }] };
+
+  it('7.293 a card assigned to a guest the roster omits carries the guest’s NAME as assignee and provenance actor; a person NEITHER read names keeps the id', async () => {
+    const { fetchImpl, calls } = recordingFetch({
+      [`/v1/projects/${PROJECT}/tickets`]: listBodyAssignedTo(['t1', 'u1'], ['t2', 'u9'], ['t3', 'u77']),
+      [`/v1/workspaces/${WORKSPACE}/members`]: NAMED_MEMBERS,
+      [`/v1/workspaces/${WORKSPACE}/actor-names`]: NAMES,
+    });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+
+    expect(view.rows[0]?.assignee).toEqual({ id: 'u1', name: 'Kiro' });
+    expect(view.rows[1]?.assignee).toEqual({ id: 'u9', name: 'Gita Guest' });
+    expect(view.rows[1]?.stateProvenance.actorName).toBe('Gita Guest');
+    // CONTROL: a person nobody names still floors at the id.
+    expect(view.rows[2]?.assignee).toEqual({ id: 'u77', name: 'u77' });
+    expect(view.rows[2]?.stateProvenance.actorName).toBeNull();
+    // Both reads were made, once each for the whole walk.
+    const roster = calls.filter((call) => !isTicketCall(call.input)).map((call) => call.input).sort();
+    expect(roster).toEqual([
+      `http://server.test/v1/workspaces/${WORKSPACE}/actor-names`,
+      `http://server.test/v1/workspaces/${WORKSPACE}/members`,
+    ]);
+  });
+
+  it('7.294 the roster keeps priority: a member the roster labels by EMAIL is not renamed by the names read, and a refused names read costs nothing', async () => {
+    const emailOnly: MemberListResponse = {
+      workspaceId: WORKSPACE,
+      members: [{ userId: 'u1', displayName: '', role: 'member', email: 'kiro@example.test' }],
+    };
+    const { fetchImpl } = recordingFetch({
+      [`/v1/projects/${PROJECT}/tickets`]: listBodyAssignedTo(['t1', 'u1']),
+      [`/v1/workspaces/${WORKSPACE}/members`]: emailOnly,
+      // Both reads speak for u1 under different names: the roster's label wins.
+      [`/v1/workspaces/${WORKSPACE}/actor-names`]: { workspaceId: WORKSPACE, names: [{ userId: 'u1', displayName: 'Someone Else' }] },
+    });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    const view = await source.query.getTickets(PROJECT, {}, 'flat');
+    expect(view.rows[0]?.assignee).toEqual({ id: 'u1', name: 'kiro@example.test' });
+
+    // A refused names read (a guest viewer: 404) leaves the roster's answer alone.
+    const refused = recordingFetch({
+      [`/v1/projects/${PROJECT}/tickets`]: listBodyAssignedTo(['t1', 'u1']),
+      [`/v1/workspaces/${WORKSPACE}/members`]: NAMED_MEMBERS,
+    });
+    const again = await createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl: refused.fetchImpl }).query.getTickets(PROJECT, {}, 'flat');
+    expect(again.rows[0]?.assignee).toEqual({ id: 'u1', name: 'Kiro' });
+  });
+
+  it('7.295 getActorNames answers {id, name} for the route’s rows, and [] for a refusal', async () => {
+    const { fetchImpl } = recordingFetch({ [`/v1/workspaces/${WORKSPACE}/actor-names`]: NAMES });
+    const source = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl });
+    expect(await source.query.getActorNames(WORKSPACE)).toEqual([{ id: 'u9', name: 'Gita Guest' }]);
+    const refused = createOnlineDataSource({ baseUrl: 'http://server.test', fetchImpl: recordingFetch({}).fetchImpl });
+    expect(await refused.query.getActorNames(WORKSPACE)).toEqual([]);
+  });
+});
+
+/**
  * 13.1288–13.1290 — `getTickets` joins the roster the list body names.
  *
  * The List tab printed ULIDs for the assignee because the walk mapped every row
@@ -1103,6 +1178,7 @@ describe('getTickets joins the roster off the list body’s own workspaceId', ()
     // constant, at `PROJECT`, or at nothing at all fails here.
     expect(calls.filter((call) => !isTicketCall(call.input)).map((call) => call.input)).toEqual([
       `http://server.test/v1/workspaces/${WORKSPACE}/members`,
+      `http://server.test/v1/workspaces/${WORKSPACE}/actor-names`,
     ]);
   });
 
@@ -1122,7 +1198,8 @@ describe('getTickets joins the roster off the list body’s own workspaceId', ()
     // The join was ATTEMPTED. Without this the case would be green on a source
     // that never fetched a roster at all — which is precisely the defect it
     // guards. Asserted on the roster call so the two readings are separable.
-    expect(calls.filter((call) => !isTicketCall(call.input))).toHaveLength(1);
+    // Two roster-side reads now (the roster and the names-only read), both refused here.
+    expect(calls.filter((call) => !isTicketCall(call.input))).toHaveLength(2);
   });
 
   it('13.1290 a two-page walk fetches the roster ONCE, not once per page', async () => {
@@ -1140,7 +1217,8 @@ describe('getTickets joins the roster off the list body’s own workspaceId', ()
     // would fetch it twice and still satisfy every row assertion above — the
     // walk would merely be slower, and a membership revoked between pages would
     // name the same person two ways inside one view.
-    expect(urls.filter((url) => !isTicketCall(url))).toHaveLength(1);
+    // The roster AND the names-only read, once each for the whole walk.
+    expect(urls.filter((url) => !isTicketCall(url))).toHaveLength(2);
   });
 });
 
