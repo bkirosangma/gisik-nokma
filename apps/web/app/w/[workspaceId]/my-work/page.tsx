@@ -16,6 +16,7 @@ import { AppNav } from '../../../../src/app-nav.js';
 import { ShellRefusal } from '../../../../src/shell-refusal.js';
 import { useAppServices, useSessionStatus } from '../../../../src/providers.js';
 import { peopleProps } from '../../../../src/people-props.js';
+import { useActorLabels } from '../../../../src/use-actor-labels.js';
 import { useProjectName } from '../../../../src/use-project-name.js';
 import { useWorkspaceName } from '../../../../src/use-workspace-name.js';
 import { buildProjectPageQueryTickets, ticketRefHrefIn } from '../../../../src/ticket-ref-callbacks.js';
@@ -137,6 +138,8 @@ function MyWorkBoard() {
   const currentUserId = session.kind === 'signed-in' ? session.user.id : '';
   const [placement, setPlacement] = useState<Placement | null>(null);
   const attention = useAttention(dataSource, workspaceId);
+  // Names the claimant of a contested claim (R3 N4, case 6.256).
+  const actorLabelOf = useActorLabels([workspaceId]);
   const myWork = useMyWork(dataSource, workspaceId);
 
   // A 401 on EITHER read is a session that ended, not a refusal to answer, and
@@ -340,7 +343,7 @@ function MyWorkBoard() {
             {myWork.error !== null ? (
               <ShellRefusal what="My Work" message={myWork.error} />
             ) : myWork.data !== null ? (
-              <MyWork view={myWork.data} onOpenTicket={openTicket} />
+              <MyWork view={myWork.data} onOpenTicket={openTicket} actorLabelOf={actorLabelOf} />
             ) : (
               <p>Loading…</p>
             )}

@@ -23,7 +23,8 @@ import type { EffectiveRole } from '../permissions/effective-role.js';
 import { getWorkflowDefFromProjection } from '../projections/workflows.js';
 import { READ_NOT_FOUND_BODY, requireMember } from '../read/membership.js';
 import { ROSTER_VISIBLE_CLAUSE, isWorkspaceAdmin } from '../read/membership-roster.js';
-import { LIVE_TICKET_WHERE } from '../read/visible-where.js';
+import { SqlParams } from '../read/sql-params.js';
+import { LIVE_TICKET_WHERE, visibleTicketsWhere } from '../read/visible-where.js';
 import { latestWorkflowDefs } from '../read/workflow-defs.js';
 import { canSee } from '../visibility/can-see.js';
 
@@ -298,29 +299,81 @@ export async function readMembers(
  *
  * ## What is left out, and why
  *
- * - A blank name: there is nothing to say, and the caller's own fallback
- *   (roster email, then id) is unchanged.
+ * - Nobody is left out for a BLANK name: it is labelled by the verified email
+ *   (R3, owner ruling 2026-09-29: "show email"). A row with neither name nor
+ *   address says nothing and is left out.
  * - A person whose address is synthetic: their name IS their phone number
  *   (`auth.ts`'s `getTempName`), and the roster withholds that address for
  *   exactly this reason. Their name travels only where the roster already
  *   carried it, which is where the client's roster join already finds it.
- * - Anyone with no CURRENT workspace-scope membership here: a removed person,
- *   and every other workspace's people. What the product shows for a removed
- *   person is unchanged (their id).
+ * - Anyone this workspace never GRANTED (`membership.granted` in its own
+ *   ledger): every other workspace's people, and accounts that were never here.
+ *
+ * ## A FORMER member is served, flagged (R5/FD6)
+ *
+ * A person whose workspace-scope row is gone but whom this workspace's ledger
+ * did grant is served with `removed: true`, so the client can write
+ * "Name (removed)" instead of an id. Granted, revoked and granted again is
+ * CURRENT: the current row exists, so the second half of the union skips it.
  */
 export async function readActorNames(db: Queryable, workspaceId: string): Promise<ActorName[]> {
-  const { rows } = await db.query<{ user_id: string; display_name: string; email: string }>(
-    `SELECT m.user_id, u."name" AS display_name, u."email"
+  const { rows } = await db.query<NameRow>(
+    `SELECT m.user_id, u."name" AS display_name, u."email", FALSE AS removed
        FROM proj_memberships m
        JOIN "user" u ON u."id" = m.user_id
-      WHERE m.workspace_id = $1
-        AND m.scope_kind = 'workspace'
-      ORDER BY m.user_id`,
+      WHERE m.workspace_id = $1 AND m.scope_kind = 'workspace'
+     UNION
+     SELECT DISTINCT e.payload->>'userId', u."name", u."email", TRUE
+       FROM events e
+       JOIN "user" u ON u."id" = e.payload->>'userId'
+      WHERE e.workspace_id = $1 AND e.type = 'membership.granted'
+        AND NOT EXISTS (SELECT 1 FROM proj_memberships m2
+                         WHERE m2.workspace_id = $1 AND m2.scope_kind = 'workspace'
+                           AND m2.user_id = e.payload->>'userId')
+     ORDER BY 1`,
     [workspaceId],
   );
-  return rows
-    .filter((row) => !isSyntheticPhoneEmail(row.email) && (row.display_name ?? '').trim() !== '')
-    .map((row) => ({ userId: row.user_id, displayName: row.display_name.trim() }));
+  return rows.flatMap(labelled);
+}
+
+type NameRow = { user_id: string; display_name: string | null; email: string; removed: boolean };
+
+/** One row → its label, or nothing (FD3: a phone user is never labelled here). */
+function labelled(row: NameRow): ActorName[] {
+  if (isSyntheticPhoneEmail(row.email)) return [];
+  const name = (row.display_name ?? '').trim();
+  const displayName = name !== '' ? name : row.email.trim();
+  if (displayName === '') return [];
+  return [row.removed ? { userId: row.user_id, displayName, removed: true } : { userId: row.user_id, displayName }];
+}
+
+/**
+ * FD2 / spec N3 (owner ruling 2026-09-29, "go with the recommendation"): a guest
+ * is named the people on the tickets they can see — each such ticket's current
+ * assignee and every actor of an event filed against it — and nobody else.
+ *
+ * "The tickets they can see" is `visibleTicketsWhere` for the guest, the very
+ * predicate every ticket read asks, never a second copy of the audience test:
+ * taken off a ticket's list, the guest stops being named that ticket's people.
+ */
+export async function readActorNamesForGuest(
+  db: Queryable,
+  workspaceId: string,
+  eff: EffectiveRole,
+  guestId: string,
+): Promise<ActorName[]> {
+  const params = new SqlParams();
+  const ws = params.add(workspaceId);
+  const visible = `SELECT v.ticket_id FROM proj_visibility v JOIN proj_tickets t ON t.ticket_id = v.ticket_id
+                    WHERE v.workspace_id = ${ws} AND ${LIVE_TICKET_WHERE} AND ${visibleTicketsWhere(eff, guestId, params)}`;
+  const { rows } = await db.query<{ user_id: string }>(
+    `SELECT t.assignee_id AS user_id FROM proj_tickets t WHERE t.ticket_id IN (${visible}) AND t.assignee_id IS NOT NULL
+     UNION
+     SELECT e.actor_id FROM events e WHERE e.workspace_id = ${ws} AND e.entity_kind = 'ticket' AND e.entity_id IN (${visible})`,
+    params.toArray(),
+  );
+  const wanted = new Set(rows.map((r) => r.user_id));
+  return (await readActorNames(db, workspaceId)).filter((n) => wanted.has(n.userId));
 }
 
 /**
@@ -754,14 +807,15 @@ export function registerBuilderReadRoutes(
     { preHandler: requireSession },
     async (request, reply) => {
       const { workspaceId } = request.params;
-      // The roster's door, and on purpose: 7.91 keeps a guest out of anything
-      // that lists the workspace's people, and this lists them (names only).
-      // Letting a guest see staff names is one enum value here — `'no-guests'`
-      // to the door's member-level answer — and is the owner's call, not this
-      // route's.
-      const eff = await door(request, workspaceId, 'no-guests');
+      // A guest is served the people on their own tickets only (FD2, owner
+      // ruling 2026-09-29); the roster (`/members`) stays `no-guests`.
+      const eff = await door(request, workspaceId, 'members-only');
       if (eff === null) return reply.code(404).send(READ_NOT_FOUND_BODY);
-      const body: ActorNameListResponse = { workspaceId, names: await readActorNames(deps.pool, workspaceId) };
+      const names =
+        eff.workspaceRole === 'guest'
+          ? await readActorNamesForGuest(deps.pool, workspaceId, eff, request.currentUserId)
+          : await readActorNames(deps.pool, workspaceId);
+      const body: ActorNameListResponse = { workspaceId, names };
       return body;
     },
   );

@@ -2384,13 +2384,13 @@ instead of off a parameter.
 - **13.1288** ✅ A named member's row carries their NAME as the assignee AND as the provenance actor —
   both doors into the one roster map are asserted in a single case, because a join wired to only one of
   them would satisfy the other. **The control is in the same case and in the same walk:** a row assigned
-  to somebody the roster does not cover keeps the id, so a mapper that printed the first member's name
+  to somebody the roster does not cover keeps the id as its synthesised `name` (rendered `Unknown person`, 6.254), so a mapper that printed the first member's name
   for every row cannot pass. The roster is fetched from the id the BODY named — the test's `WORKSPACE`
   appears nowhere else, so a join pointed at a constant, at the project id, or at nothing fails. —
   (`packages/app-core/test/online/online-data-source.test.ts`)
 - **13.1289** ✅ A REFUSED roster does not take the list down with it: the members route answers 404 (the
   shipped answer to a caller who may not read the roster, `door(..., 'no-guests')`), the walk still
-  resolves, and names stay ids. **The case asserts the join was ATTEMPTED**, without which it would be
+  resolves, and the synthesised names stay ids (rendered `Unknown person`, 6.254). **The case asserts the join was ATTEMPTED**, without which it would be
   green on a source that never fetched a roster at all — which is the defect it guards. —
   (`packages/app-core/test/online/online-data-source.test.ts`)
 - **13.1290** ✅ A two-page walk fetches the roster exactly ONCE. The row assertions alone would pass on

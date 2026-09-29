@@ -204,9 +204,10 @@ describe('18.440 the note byline names its author even when the roster omits the
     expect(await screen.findByText('Anselma Marak')).toBeInTheDocument();
     ana.unmount();
 
-    // CONTROL: nobody names this author — the id is what the byline shows.
+    // CONTROL: nobody names this author — the byline shows `Unknown person`, never the id (Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.)
     renderDocument({ role: 'member', note: noteDetail({ authorId: 'u_zed' }) });
-    expect(await screen.findByText('u_zed')).toBeInTheDocument();
+    expect(await screen.findByText('Unknown person')).toBeInTheDocument();
+    expect(screen.queryByText('u_zed')).not.toBeInTheDocument();
   });
 });
 

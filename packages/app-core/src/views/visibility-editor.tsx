@@ -3,7 +3,7 @@ import { VISIBILITY_MODES, type VisibilityMode, type IngestResult } from '@gisik
 import { Button, Popover } from '@gisik-nokma/ui';
 import type { DataSource } from '../data-source.js';
 import { actorLabel, formatDateTime } from '../provenance.js';
-import { memberLabel } from '../member-label.js';
+import { actorLabelFrom, memberLabel } from '../member-label.js';
 import { PeoplePicker } from './people-picker.js';
 import { makeSubmittedFactory } from '../submit.js';
 import type { ClaimProvenance, ResolvedVisibilityMode, RosterMember, TicketVisibility } from '../view-types.js';
@@ -146,6 +146,13 @@ export type VisibilityEditorProps = {
    * two rules kept apart.
    */
   members: RosterMember[];
+  /**
+   * The names-only read (`useActorNames`), for the viewer chips of somebody the
+   * roster omits — a guest, or a former member. Optional: an editor with no
+   * names read still labels a roster person by the roster and anyone else
+   * `Unknown person`, never by id (R3 N4, case 6.257).
+   */
+  names?: readonly { id: string; name: string }[];
   /**
    * The standing audience, or `null` when no read carried one.
    *
@@ -293,6 +300,7 @@ export function VisibilityEditor({
   ticketId,
   currentUserId,
   members,
+  names,
   current,
   canEdit,
   onChanged,
@@ -361,19 +369,18 @@ export function VisibilityEditor({
   // The viewers/sentence renderer, and the SAME shape `ticket-sheet.tsx`'s
   // `nameOf` takes: `actorLabel` stays the outer renderer — it checks
   // `SYSTEM_ACTOR_NAMES` first, which is what keeps a system actor from being
-  // renamed and keeps the id floor total — while the LABEL it is handed comes
-  // from `memberLabel` when the id is on the roster (name → email → id), and
-  // from `null` when it is not, which `actorLabel` renders as the id.
+  // renamed and keeps the floor total — while the LABEL it is handed comes
+  // from `actorLabelFrom` (roster name → email, then the names-only read) and
+  // `null` when neither names the id, which `actorLabel` renders as
+  // `Unknown person` (R3 N4, 6.257), never the id.
   //
   // The member row was already in hand (`members.find`); reading `.name` past
   // it printed a ULID for the nameless population on the two surfaces that are
   // most obviously lists of PEOPLE — the chips under "Who can see it" and the
   // `Only: …` sentence — while the picker one section up had offered those same
   // people by email since E4-6. Case 13.1296.
-  const nameOf = (userId: string): string => {
-    const member = members.find((candidate) => candidate.id === userId);
-    return actorLabel(userId, member === undefined ? null : memberLabel(member));
-  };
+  const nameOf = (userId: string): string =>
+    actorLabel(userId, actorLabelFrom(userId, members, names));
 
   const toggle = (userId: string) =>
     setUserIds((chosen) =>

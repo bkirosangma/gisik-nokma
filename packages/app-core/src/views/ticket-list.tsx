@@ -293,7 +293,30 @@ export type TicketListProps = {
    * component's row for it.
    */
   controls?: ReactNode;
+  /**
+   * What to call a person id in the row tooltips ("closed by …", "set by …")
+   * and wherever a claim carries no name of its own; the host passes
+   * `useActorLabels`. Default: the shared floor (`Unknown person`) — never the
+   * id (R3 N4, case 6.255).
+   */
+  actorLabelOf?: (userId: string) => string;
 };
+
+const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
+
+/**
+ * A claim's own name when it has one that is not just the id (the mapper
+ * synthesises `name = id` for somebody the roster does not cover); otherwise
+ * what the host resolves; `actorLabel` puts the reserved system actors first.
+ */
+function whoLabel(
+  actorLabelOf: (userId: string) => string,
+  id: string,
+  name: string | null | undefined,
+): string {
+  const own = name?.trim() ?? '';
+  return actorLabel(id, own !== '' && own !== id ? own : actorLabelOf(id));
+}
 
 /**
  * The Asana-shaped list, and the three ways it refuses to lie.
@@ -339,6 +362,7 @@ export function TicketList({
   rowDrag,
   selection,
   controls,
+  actorLabelOf = unnamedActorLabel,
 }: TicketListProps) {
   const [collapsed, setCollapsed] = useState<ReadonlySet<string>>(new Set());
   /*
@@ -710,6 +734,7 @@ export function TicketList({
             onOpenTicket={onOpenTicket}
             rowAction={rowAction}
             selection={selection}
+            actorLabelOf={actorLabelOf}
             {...(dragRowProps === undefined ? {} : { rowProps: dragRowProps })}
           />
         </section>
@@ -792,6 +817,7 @@ export function TicketList({
               onOpenTicket={onOpenTicket}
               rowAction={rowAction}
               selection={selection}
+              actorLabelOf={actorLabelOf}
               {...(dragRowProps === undefined ? {} : { rowProps: dragRowProps })}
             />
           </section>
@@ -927,6 +953,7 @@ function ListTable({
   rowAction,
   rowProps,
   selection,
+  actorLabelOf,
 }: {
   nodes: ListRowNode[];
   columns: ListColumnId[];
@@ -938,6 +965,8 @@ function ListTable({
   rowProps?: (node: ListRowNode) => HTMLAttributes<HTMLTableRowElement>;
   /** Second wave Task 11 — see `TicketListProps.selection`. Absent on every surface that does not select. */
   selection?: { selected: ReadonlySet<string>; onToggle: (ticketId: string) => void };
+  /** See `TicketListProps.actorLabelOf`. */
+  actorLabelOf: (userId: string) => string;
 }) {
   const tableColumns: TableColumn<ListRowNode>[] = [
     // Second wave Task 11 (spec §8.3, the List bullet) — the LEADING checkbox
@@ -1091,7 +1120,7 @@ function ListTable({
       header: columnLabel(id),
       headerClassName: 'gn-list__table-header',
       cellClassName: 'gn-list__table-cell--data',
-      cell: (node: ListRowNode) => <ListCell row={node.row} columnId={id} />,
+      cell: (node: ListRowNode) => <ListCell row={node.row} columnId={id} actorLabelOf={actorLabelOf} />,
     })),
     // Task 10 (backlog/closed spec §5.4) — a TRAILING column, present only
     // when a caller supplies `rowAction`. An empty header cell (`header:
@@ -1124,14 +1153,23 @@ function ListTable({
   );
 }
 
-function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
+function ListCell({
+  row,
+  columnId,
+  actorLabelOf,
+}: {
+  row: ListRow;
+  columnId: ListColumnId;
+  actorLabelOf: (userId: string) => string;
+}) {
+  const who = (id: string, name: string | null | undefined): string => whoLabel(actorLabelOf, id, name);
   switch (columnId) {
     case 'status':
       return (
         <>
           <Chip
             tone={row.stateCategory}
-            title={`marked ${row.stateName} by ${actorLabel(row.stateProvenance.actorId, row.stateProvenance.actorName)} on ${formatDate(row.stateProvenance.serverTime)}`}
+            title={`marked ${row.stateName} by ${who(row.stateProvenance.actorId, row.stateProvenance.actorName)} on ${formatDate(row.stateProvenance.serverTime)}`}
           >
             {row.stateName}
           </Chip>
@@ -1147,7 +1185,7 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
             optional form use.
           */}
           {row.closed !== null ? (
-            <Chip tone="neutral" title={`closed by ${actorLabel(row.closed.actorId, null)} on ${formatDate(row.closed.at)}`}>
+            <Chip tone="neutral" title={`closed by ${who(row.closed.actorId, null)} on ${formatDate(row.closed.at)}`}>
               Closed
             </Chip>
           ) : null}
@@ -1165,8 +1203,8 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
         <span>Unassigned</span>
       ) : (
         <span className="gn-list__assignee">
-          <Avatar name={actorLabel(row.assignee.id, row.assignee.name)} size="small" />
-          {actorLabel(row.assignee.id, row.assignee.name)}
+          <Avatar name={who(row.assignee.id, row.assignee.name)} size="small" />
+          {who(row.assignee.id, row.assignee.name)}
         </span>
       );
     case 'dueDate': {
@@ -1204,7 +1242,7 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
       const when = row.closed === null ? formatDate(due.date) : `Closed ${formatDate(row.closed.at)}`;
       return (
         <span className="gn-list__due">
-          {when} — {actorLabel(due.claim.actorId, due.claim.actorName)}&apos;s claim
+          {when} — {who(due.claim.actorId, due.claim.actorName)}&apos;s claim
         </span>
       );
     }
@@ -1216,7 +1254,7 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
       // reaching this switch always has a level and a claimant.
       return (
         <span className="gn-list__priority">
-          {row.priority.value} — {actorLabel(row.priority.claim.actorId, row.priority.claim.actorName)}&apos;s claim
+          {row.priority.value} — {who(row.priority.claim.actorId, row.priority.claim.actorName)}&apos;s claim
         </span>
       );
     case 'type':
@@ -1232,7 +1270,7 @@ function ListCell({ row, columnId }: { row: ListRow; columnId: ListColumnId }) {
       const fieldClaim = row.fields[fieldId];
       if (fieldClaim === undefined) return <span className="gn-list__empty-cell">—</span>;
       return (
-        <span title={`set by ${actorLabel(fieldClaim.actorId, null)} on ${formatDate(fieldClaim.serverTime)}`}>
+        <span title={`set by ${who(fieldClaim.actorId, null)} on ${formatDate(fieldClaim.serverTime)}`}>
           {String(fieldClaim.value)}
         </span>
       );

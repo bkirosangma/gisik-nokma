@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { actorLabelFrom, type Actor, type RosterMember } from '@gisik-nokma/app-core';
+import { actorLabelFrom, UNKNOWN_PERSON, type Actor, type RosterMember } from '@gisik-nokma/app-core';
 import { useAppServices } from './providers.js';
 
 type Sources = { members: RosterMember[]; names: Actor[] };
@@ -21,10 +21,12 @@ type Sources = { members: RosterMember[]; names: Actor[] };
  * ## Both sources, each allowed to fail
  *
  * The roster carries the email fallback, the names-only read carries the guests
- * a plain member's roster omits (`actorLabelFrom` orders them). Either refuses
- * for a guest viewer and either may fail on the wire; a failed read is an empty
- * one, and an id nobody names is what it always was — the id — so a headline is
- * never withheld for want of a name.
+ * a plain member's roster omits and the former members it marks `removed`
+ * (`actorLabelFrom` orders them). The roster refuses a guest viewer (the
+ * names-only read serves one only the people on tickets they can see — R3) and
+ * either may fail on the wire; a failed read is an empty one, and an id nobody
+ * names reads `Unknown person` (R3 N4), never the id — so a headline is never
+ * withheld for want of a name, and never shows a ULID as one.
  */
 export function useActorLabels(workspaceIds: readonly string[]): (userId: string) => string {
   const { dataSource } = useAppServices();
@@ -59,9 +61,9 @@ export function useActorLabels(workspaceIds: readonly string[]): (userId: string
     return (userId: string): string => {
       for (const { members, names } of all) {
         const label = actorLabelFrom(userId, members, names);
-        if (label !== null) return label;
+        if (label !== null && label !== userId) return label;
       }
-      return userId;
+      return UNKNOWN_PERSON;
     };
   }, [bySpace]);
 }

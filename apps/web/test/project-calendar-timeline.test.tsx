@@ -697,7 +697,7 @@ describe('the project page mounts four views over one list read', () => {
 });
 
 describe('the roster is a convenience, never a gate', () => {
-  it('11.168 still draws the claim when getMembers refuses, attributed to the raw actor id', async () => {
+  it('11.168 still draws the claim when getMembers refuses, attributed to Unknown person (not the raw actor id)', async () => {
     vi.useFakeTimers({ shouldAdvanceTime: true });
     vi.setSystemTime(new Date('2026-08-23T06:00:00.000Z'));
     render(
@@ -718,11 +718,12 @@ describe('the roster is a convenience, never a gate', () => {
       </Providers>,
     );
     await openTab('Calendar');
-    // Narrower than the truth, never wrong about it: an id is still the actor.
+    // Narrower than the truth, never wrong about it: the actor is still there,
+    // as `Unknown person` (Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.)
     // A refusal panel here would have put the calendar behind a read it does not
     // need in order to be correct.
     expect(
-      await screen.findByRole('button', { name: "needed by 30 Aug — user_kiro's claim" }),
+      await screen.findByRole('button', { name: "needed by 30 Aug — Unknown person's claim" }),
     ).toBeInTheDocument();
     expect(screen.queryByText(/could not be loaded/)).not.toBeInTheDocument();
   });

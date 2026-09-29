@@ -98,7 +98,8 @@ describe('3.69 HistoryList — the ledger filtered, never summarised (spec §3)'
     // `nameOf` that already falls back to the id, so it cannot tell a component
     // that applies `actorLabel` from one that does not.
     const { container } = render(<HistoryList events={[SKEWED]} nameOf={() => ''} />);
-    expect(container.querySelector('.gn-history__actor')?.textContent).toBe('user_anselma');
+    // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(container.querySelector('.gn-history__actor')?.textContent).toBe('Unknown person');
     expect(container.querySelector('.gn-history__actor')?.textContent).not.toBe('');
     expect(container.textContent).not.toContain('system');
   });
@@ -274,7 +275,7 @@ describe('3.69 HistoryList — the ledger filtered, never summarised (spec §3)'
     );
     expect(
       [...container.querySelectorAll('.gn-history__type')].map((n) => n.textContent),
-    ).toEqual(['Created as task', 'Moved to doing', 'Assigned to user_anselma']);
+    ).toEqual(['Created as task', 'Moved to doing', 'Assigned to Unknown person']);
   });
 });
 

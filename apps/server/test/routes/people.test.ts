@@ -140,16 +140,16 @@ describe('6.202–6.207 POST …/people-lookup', () => {
     expect((await lookup(owner, ws, 'balti@example.test')).json()).not.toEqual({ user: null });
   });
 
-  it('6.204 exactly five fields; CONTROL: a stranger is inWorkspace false, role null', async () => {
+  it('6.204 exactly four fields (no role, R2); CONTROL: a stranger is inWorkspace false', async () => {
     const owner = await byPhone();
     const ws = await found(owner);
     const dipu = await byEmail('dipu@example.test');
     const { user } = (await lookup(owner, ws, 'dipu@example.test')).json() as { user: Record<string, unknown> };
-    expect(Object.keys(user).sort()).toEqual(['email', 'inWorkspace', 'name', 'role', 'userId']);
-    expect(user).toMatchObject({ userId: dipu.userId, email: 'dipu@example.test', inWorkspace: false, role: null });
+    expect(Object.keys(user).sort()).toEqual(['email', 'inWorkspace', 'name', 'userId']);
+    expect(user).toMatchObject({ userId: dipu.userId, email: 'dipu@example.test', inWorkspace: false });
   });
 
-  it('6.205 a non-member gets the shared 404; CONTROL: a guest of the workspace may look up', async () => {
+  it('6.205 a non-member gets the shared 404; CONTROL: a member of the workspace may look up', async () => {
     const owner = await byPhone();
     const ws = await found(owner);
     const stranger = await byPhone();
@@ -159,19 +159,19 @@ describe('6.202–6.207 POST …/people-lookup', () => {
       expect(res.statusCode).toBe(404);
       expect(res.json()).toEqual(READ_NOT_FOUND_BODY);
     }
-    const guest = await byPhone();
-    await join(owner, ws, guest, 'guest');
-    expect((await lookup(guest, ws, 'era@example.test')).statusCode).toBe(200);
+    const member = await byPhone();
+    await join(owner, ws, member, 'member');
+    expect((await lookup(member, ws, 'era@example.test')).statusCode).toBe(200);
   });
 
-  it('6.206 a member comes back inWorkspace true with their role; CONTROL: a non-member false', async () => {
+  it('6.206 a member comes back inWorkspace true (no role, R2); CONTROL: a non-member false', async () => {
     const owner = await byPhone();
     const ws = await found(owner);
     const fern = await byEmail('fern@example.test');
     await join(owner, ws, fern, 'member');
     await byEmail('gita@example.test');
-    expect((await lookup(owner, ws, 'fern@example.test')).json()).toMatchObject({ user: { inWorkspace: true, role: 'member' } });
-    expect((await lookup(owner, ws, 'gita@example.test')).json()).toMatchObject({ user: { inWorkspace: false, role: null } });
+    expect((await lookup(owner, ws, 'fern@example.test')).json()).toMatchObject({ user: { inWorkspace: true } });
+    expect((await lookup(owner, ws, 'gita@example.test')).json()).toMatchObject({ user: { inWorkspace: false } });
   });
 
   it('6.207 a synthetic phone address never matches; CONTROL: a real address does', async () => {
@@ -309,3 +309,40 @@ describe('6.208–6.215 POST …/assign-outsider', () => {
 
 // The gate's sentence, imported so 6.208's mutation RED names it verbatim.
 void NAMED_PERSON_NOT_IN_WORKSPACE_REASON;
+
+describe('6.240–6.241 R2 — no role, no guests', () => {
+  const emailOf = async (who: Caller) =>
+    (await db.pool.query<{ email: string }>('SELECT "email" FROM "user" WHERE "id" = $1', [who.userId])).rows[0]!.email;
+
+  it('6.240 a guest caller gets the shared 404; CONTROL: a member gets the account', async () => {
+    const owner = await byEmail(`owner-${newUlid()}@example.test`);
+    const ws = await found(owner);
+    const guest = await byEmail(`guest-${newUlid()}@example.test`);
+    const member = await byEmail(`member-${newUlid()}@example.test`);
+    const target = await byEmail(`target-${newUlid()}@example.test`);
+    await join(owner, ws, guest, 'guest');
+    await join(owner, ws, member, 'member');
+    const targetEmail = await emailOf(target);
+
+    const refused = await lookup(guest, ws, targetEmail);
+    expect(refused.statusCode).toBe(404);
+    expect(refused.json()).toEqual(READ_NOT_FOUND_BODY);
+    // CONTROL — same address, a member caller.
+    const ok = await lookup(member, ws, targetEmail);
+    expect(ok.statusCode).toBe(200);
+    expect((ok.json() as { user: { userId: string } }).user.userId).toBe(target.userId);
+  });
+
+  it('6.241 exactly four keys, no role; CONTROL: inWorkspace tells member from stranger', async () => {
+    const owner = await byEmail(`owner-${newUlid()}@example.test`);
+    const ws = await found(owner);
+    const member = await byEmail(`m-${newUlid()}@example.test`);
+    const stranger = await byEmail(`s-${newUlid()}@example.test`);
+    await join(owner, ws, member, 'member');
+    for (const [who, inWorkspace] of [[member, true], [stranger, false]] as const) {
+      const { user } = (await lookup(owner, ws, await emailOf(who))).json() as { user: Record<string, unknown> };
+      expect(Object.keys(user).sort()).toEqual(['email', 'inWorkspace', 'name', 'userId']);
+      expect(user['inWorkspace']).toBe(inWorkspace);
+    }
+  });
+});

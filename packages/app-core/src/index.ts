@@ -10,7 +10,7 @@ export * from './workflow-builder/index.js';
 export * from './view-types.js';
 export { makeSubmittedFactory, type EnvelopeSeed, type MakeSubmitted } from './submit.js';
 export { actorLabel, formatDate, formatDateTime, formatStateProvenance } from './provenance.js';
-export { actorLabelFrom, memberLabel } from './member-label.js';
+export { actorLabelFrom, memberLabel, UNKNOWN_PERSON } from './member-label.js';
 export { mentionCandidatesOf, type MentionPerson } from './mention-candidates.js';
 export { createClientStateCache, type ClientStateCache } from './cache.js';
 export { withCacheFeed } from './cache-feed.js';

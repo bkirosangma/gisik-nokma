@@ -17,6 +17,7 @@ import {
   DeleteDialog,
   TicketSheet,
   actorLabelFrom,
+  UNKNOWN_PERSON,
   classifyBatch,
   makeSubmittedFactory,
   mentionCandidatesOf,
@@ -539,7 +540,7 @@ function NoteDocumentBody({
 
   /** Any author's name from the roster, then the names-only read — History rows and comments name whoever wrote them, not just the note's own author. */
   const nameOf = useMemo(
-    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? authorId,
+    () => (authorId: string) => actorLabelFrom(authorId, members, actorNames) ?? UNKNOWN_PERSON,
     [members, actorNames],
   );
 
