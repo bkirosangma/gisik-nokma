@@ -265,9 +265,9 @@ describe('the app error handler', () => {
   });
 
   /**
-   * 6.241 — the alert context also redacts a credential in the QUERY: a 5xx on the magic-link verify route must not page the token to a webhook.
+   * 6.221 — the alert context also redacts a credential in the QUERY: a 5xx on the magic-link verify route must not page the token to a webhook.
    */
-  it('6.241 the alert context redacts a query-string credential', async () => {
+  it('6.221 the alert context redacts a query-string credential', async () => {
     const contexts: string[] = [];
     const app = buildTestApp({ notify: async (context) => void contexts.push(context) });
     app.get('/api/auth/magic-link/verify', async () => {

@@ -97,8 +97,8 @@ afterEach(async () => {
 /** The senders hold their transporter privately; the test reaches in only to close it. */
 const transporterOf = (sender: object): Transporter => (sender as unknown as { transporter: Transporter }).transporter;
 
-describe('6.247 both senders share one pooled transport', () => {
-  it('6.247 two sends in a row open ONE connection, for the invite mailer and the sign-in sender alike; CONTROL: the unpooled form opens two', async () => {
+describe('6.227 both senders share one pooled transport', () => {
+  it('6.227 two sends in a row open ONE connection, for the invite mailer and the sign-in sender alike; CONTROL: the unpooled form opens two', async () => {
     const smtp = await startFakeSmtp();
     open.push(smtp.close);
     const url = `smtp://127.0.0.1:${smtp.port}`;
@@ -129,8 +129,8 @@ describe('6.247 both senders share one pooled transport', () => {
   });
 });
 
-describe('6.248 the SMTP log carries the connection, not the conversation', () => {
-  it('6.248 a real send with AUTH and a credential-bearing link logs the connection and none of the password, link, user or recipient; CONTROL: the connection records exist', async () => {
+describe('6.228 the SMTP log carries the connection, not the conversation', () => {
+  it('6.228 a real send with AUTH and a credential-bearing link logs the connection and none of the password, link, user or recipient; CONTROL: the connection records exist', async () => {
     const smtp = await startFakeSmtp();
     open.push(smtp.close);
     const records: Array<{ fields: Record<string, unknown>; message: string }> = [];
@@ -161,7 +161,7 @@ describe('6.248 the SMTP log carries the connection, not the conversation', () =
     }
   });
 
-  it('6.248 the filter is an allow-list: traffic, send/message and AUTH-user records are dropped; connection and failure records pass', () => {
+  it('6.228 the filter is an allow-list: traffic, send/message and AUTH-user records are dropped; connection and failure records pass', () => {
     const passed: Array<{ fields: Record<string, unknown>; message: string }> = [];
     const logger = connectionPhaseLogger((fields, message) => passed.push({ fields, message }));
 

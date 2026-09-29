@@ -14,8 +14,8 @@ import { createTestDatabase, type TestDatabase } from '../helpers/db.js';
  */
 const MARKER = 'TESTMARKER-not-a-token';
 
-describe('redactRequestUrl — the pure function (case 6.240)', () => {
-  it('6.240 replaces the VALUE of every credential-carrying query parameter and keeps the rest', () => {
+describe('redactRequestUrl — the pure function (case 6.220)', () => {
+  it('6.220 replaces the VALUE of every credential-carrying query parameter and keeps the rest', () => {
     // The magic-link verify URL from the production log.
     expect(redactRequestUrl(`/api/auth/magic-link/verify?token=${MARKER}`)).toBe(
       '/api/auth/magic-link/verify?token=[redacted]',
@@ -36,7 +36,7 @@ describe('redactRequestUrl — the pure function (case 6.240)', () => {
     expect(redactRequestUrl(`/v1/invites/${MARKER}?token=${MARKER}`)).toBe('/v1/invites/[redacted]?token=[redacted]');
   });
 
-  it('6.240 leaves an ordinary URL verbatim and does not mangle look-alikes', () => {
+  it('6.220 leaves an ordinary URL verbatim and does not mangle look-alikes', () => {
     // Control: a serializer that blanked every query would pass the test above.
     expect(redactRequestUrl('/v1/workspaces/W/invites')).toBe('/v1/workspaces/W/invites');
     expect(redactRequestUrl('/v1/events?since=12&limit=5')).toBe('/v1/events?since=12&limit=5');
@@ -51,7 +51,7 @@ describe('redactRequestUrl — the pure function (case 6.240)', () => {
   });
 });
 
-describe('the credential is not in an emitted log line (case 6.241)', () => {
+describe('the credential is not in an emitted log line (case 6.221)', () => {
   let db: TestDatabase;
 
   beforeAll(async () => {
@@ -61,7 +61,7 @@ describe('the credential is not in an emitted log line (case 6.241)', () => {
     await db.drop();
   });
 
-  it('6.241 a real logger writing a real line records the verify route and not the token', async () => {
+  it('6.221 a real logger writing a real line records the verify route and not the token', async () => {
     const lines: string[] = [];
     const stream = new Writable({
       write(chunk, _encoding, callback) {

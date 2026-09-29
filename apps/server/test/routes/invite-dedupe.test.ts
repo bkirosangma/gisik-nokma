@@ -133,8 +133,8 @@ async function foundProject(owner: Caller, workspaceId: string, name: string): P
   return projectId;
 }
 
-describe('6.242 a repeat invitation rotates the token on the existing invite', () => {
-  it('6.242 same inviteId, no new invite.sent, a new working link, the old one opens nothing, the letter is sent again; CONTROL: the first mint created exactly one invite', async () => {
+describe('6.222 a repeat invitation rotates the token on the existing invite', () => {
+  it('6.222 same inviteId, no new invite.sent, a new working link, the old one opens nothing, the letter is sent again; CONTROL: the first mint created exactly one invite', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const first = await mintOk(owner, workspaceId, { address: 'Ana@Example.com' });
@@ -162,8 +162,8 @@ describe('6.242 a repeat invitation rotates the token on the existing invite', (
   });
 });
 
-describe('6.243 the dedupe answers to the same gate as a fresh mint', () => {
-  it('6.243 a plain member, a guest and a non-member are refused with the ingest layer’s 422 and the stored hash is unchanged; CONTROL: an admin rotates it', async () => {
+describe('6.223 the dedupe answers to the same gate as a fresh mint', () => {
+  it('6.223 a plain member, a guest and a non-member are refused with the ingest layer’s 422 and the stored hash is unchanged; CONTROL: an admin rotates it', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const member = await joinAs(owner, workspaceId, 'member');
@@ -198,8 +198,8 @@ describe('6.243 the dedupe answers to the same gate as a fresh mint', () => {
   });
 });
 
-describe('6.244 two simultaneous identical requests make ONE invite', () => {
-  it('6.244 20 trials, a fresh address each: two 201s, one pending row, one invite.sent; CONTROL: the two answers name the same invite', async () => {
+describe('6.224 two simultaneous identical requests make ONE invite', () => {
+  it('6.224 20 trials, a fresh address each: two 201s, one pending row, one invite.sent; CONTROL: the two answers name the same invite', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     for (let trial = 0; trial < 20; trial += 1) {
@@ -215,8 +215,8 @@ describe('6.244 two simultaneous identical requests make ONE invite', () => {
   });
 });
 
-describe('6.245 what is and is not a match', () => {
-  it('6.245 an expired token is rotated (new expiry), not duplicated; CONTROL: the row count stays one', async () => {
+describe('6.225 what is and is not a match', () => {
+  it('6.225 an expired token is rotated (new expiry), not duplicated; CONTROL: the row count stays one', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const first = await mintOk(owner, workspaceId, { address: 'lapsed@example.com' });
@@ -230,7 +230,7 @@ describe('6.245 what is and is not a match', () => {
     expect(await pendingFor(workspaceId, 'lapsed@example.com')).toHaveLength(1);
   });
 
-  it('6.245 a swept token row (none at all) is recreated by the rotation', async () => {
+  it('6.225 a swept token row (none at all) is recreated by the rotation', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const first = await mintOk(owner, workspaceId, { address: 'swept@example.com' });
@@ -240,7 +240,7 @@ describe('6.245 what is and is not a match', () => {
     expect(await openable(second.token)).toBe(true);
   });
 
-  it('6.245 an ACCEPTED or REVOKED invite for the address is not matched — a fresh invite is minted; CONTROL: the pending one still is', async () => {
+  it('6.225 an ACCEPTED or REVOKED invite for the address is not matched — a fresh invite is minted; CONTROL: the pending one still is', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const accepted = await mintOk(owner, workspaceId, { address: 'gone@example.com' });
@@ -278,7 +278,7 @@ describe('6.245 what is and is not a match', () => {
     expect((await mintOk(owner, workspaceId, { address: 'gone@example.com' })).inviteId).toBe(afterAccept.inviteId);
   });
 
-  it('6.245 a different channel or workspace is not a match', async () => {
+  it('6.225 a different channel or workspace is not a match', async () => {
     const owner = await signedIn();
     const one = await found(owner);
     const two = await found(owner);
@@ -289,8 +289,8 @@ describe('6.245 what is and is not a match', () => {
   });
 });
 
-describe('6.246 a different role or project set mints a NEW invite (open question, unchanged behaviour)', () => {
-  it('6.246 role differs → new invite; project set differs → new invite; the same set in another order → rotated', async () => {
+describe('6.226 a different role or project set mints a NEW invite (open question, unchanged behaviour)', () => {
+  it('6.226 role differs → new invite; project set differs → new invite; the same set in another order → rotated', async () => {
     const owner = await signedIn();
     const workspaceId = await found(owner);
     const p1 = await foundProject(owner, workspaceId, 'One');

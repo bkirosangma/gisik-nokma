@@ -47,8 +47,8 @@ const timingLines = () =>
     .filter((line) => line.includes('invite mint timing'))
     .map((line) => JSON.parse(line) as { inviteId: string; deduped: boolean; emailSent: boolean; timingMs: Record<string, number> });
 
-describe('6.249 one timing line per mint', () => {
-  it('6.249 carries every phase as a non-negative whole number and names no address, link or token; CONTROL: the repeat is deduped and logs its own line', async () => {
+describe('6.229 one timing line per mint', () => {
+  it('6.229 carries every phase as a non-negative whole number and names no address, link or token; CONTROL: the repeat is deduped and logs its own line', async () => {
     const user = await signInWithPhone(app, otp, '+919002499901');
     const headers = { authorization: `Bearer ${user.token}` };
     const founded = await app.inject({ method: 'POST', url: '/v1/workspaces', headers, payload: { name: 'Timing' } });

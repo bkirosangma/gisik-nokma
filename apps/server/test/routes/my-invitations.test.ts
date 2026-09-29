@@ -222,7 +222,7 @@ describe('GET /v1/me/invitations — the caller-scoped read', () => {
 
     // Five invitations to ONE address that must stay five: a repeat of the same
     // role and project set would rotate the pending one instead of adding a row
-    // (case 6.242), so each differs in role or in project set (case 6.246).
+    // (case 6.222), so each differs in role or in project set (case 6.226).
     const [projectA, projectB] = [await foundProject(admin, workspaceId), await foundProject(admin, workspaceId)];
     const live = await invite(admin, workspaceId, me.email, 'member');
     const accepted = await invite(admin, workspaceId, me.email, 'admin');
