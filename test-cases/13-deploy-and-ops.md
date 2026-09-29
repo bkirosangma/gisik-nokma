@@ -430,8 +430,13 @@ block is `13.1501`–`13.1512`. All twelve are **🧪, not ✅, on purpose:** th
 `scripts/ctl/test/lib.test.sh`, executed by `pnpm check:ctl` / `ctl selftest`, and each test's name starts with its case id —
 but `scripts/check-case-citations.mjs` only scans `apps/` and `packages/`, so a non-suffixed ✅ here would read as uncited.
 The fixtures are throwaway bare repos, a fake `gh` that performs the merge for real inside the fixture, and a private copy of
-the ctl tree whose `checks` verb is a no-op. **No real PR is ever read or merged by these.** Mutation-witnessed 2026-09-29: with
-`--base` parsed but never applied the block goes red (see the PR body for the mutant table).
+the ctl tree whose `checks` verb is a no-op. **No real PR is ever read or merged by these.** Mutation-witnessed 2026-09-29, each mutant a private copy of `scripts/ctl` with one line changed, the block run against
+it (red = failing arms): `--base` validated but never applied 14 · one marker kind for every base 8 · land compares the PR
+base to literal `main` 7 · land fast-forwards a primary on `main` whatever the base 1 · `check-pr.py` ignores its base 5 ·
+the base validator accepts anything 4 · `pr open` reads the main-kind marker 2 · gate measures `origin/main` 2 · land's
+ancestry re-read measures `origin/main` 3 · land's retarget check removed 2. **Every mutant is killed.** The validator mutant
+first SURVIVED (rc 1, zero FAIL lines): the loop's `exit 1` inside `check`'s `eval` ended the whole script instead of
+failing one arm — the loops now run in a subshell.
 
 - 13.1501 🧪 `--base` accepts `main` and `release/<name>` (nested included) and NOTHING else. `develop`, a task branch,
   `release`, `release/`, `release/../main`, `release/a..b`, `release/a b`, `origin/main`, a dot-led segment and an empty value
