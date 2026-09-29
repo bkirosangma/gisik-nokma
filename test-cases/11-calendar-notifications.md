@@ -269,7 +269,7 @@ it stayed in `apps/web` when the gateway left.*
 - **11.165** ✅ Heads the timeline lane with a rank-1 "Initiative" type rather than "No epic" — (`project-calendar-timeline.test.tsx`)
 - **11.166** ✅ Renders a custom date claim under its own field name — (`project-calendar-timeline.test.tsx`)
 - **11.167** ✅ Leaves the Board and List arms exactly as they were — refusals, not spinners — (`project-calendar-timeline.test.tsx`)
-- **11.168** ✅ Still draws the claim when `getMembers` refuses, attributed to the raw actor id — (`project-calendar-timeline.test.tsx`)
+- **11.168** ✅ Still draws the claim when `getMembers` refuses, attributed to `Unknown person`, not the raw actor id (amended by 6.254, R3 N4) — (`project-calendar-timeline.test.tsx`)
 
 ## Reporting scope guard (`packages/app-core`)
 Spec §7's ban on estimation vocabulary, and the single-origin rule for IST day/zone literals,
@@ -426,8 +426,8 @@ expected list is also what deleting the links would produce.
 
 *Ids `11.245`–`11.249` are unused. Sits after the access plan's block `11.225`–`11.234`.*
 
-- ✅ **11.240 — an assignment row on `/inbox` names the assigner from the roster or the names-only read; a person NEITHER names keeps the id.** (`apps/web/test/inbox-page.test.tsx`)
-- ✅ **11.241 — a refused roster and names read (a guest viewer) leaves the id, and the page still draws.** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.240 — an assignment row on `/inbox` names the assigner from the roster or the names-only read; a person NEITHER names reads `Unknown person`, not the id (amended by 6.254, R3 N4).** (`apps/web/test/inbox-page.test.tsx`)
+- ✅ **11.241 — a refused roster and names read (a guest viewer) reads `Unknown person`, not the id, and the page still draws (amended by 6.254, R3 N4).** (`apps/web/test/inbox-page.test.tsx`)
 - ✅ **11.242 — each workspace on the inbox is read once, for its own rows.** (`apps/web/test/inbox-page.test.tsx`)
 - ✅ **11.243 — a claim made by a person the roster omits (a guest, for a member) is attributed on the project calendar/timeline by the names-only read, not the raw id.** (`apps/web/test/project-calendar-timeline.test.tsx`)
 - ✅ **11.244 — the ticket sheet names the people the roster omits on claims and the assignee from the names-only read; the roster keeps priority.** (`packages/app-core/test/views/ticket-sheet.test.tsx`)

@@ -116,7 +116,8 @@ describe('3.48 grouping arranges truth; it never changes it (spec §7 List)', ()
   it('PLANTED DEFECT: an assignee with no display name is labelled by id, never blank or "system"', () => {
     const nameless = listRowSeed({ ticketId: 'n1', assignee: { id: 'user_anselma', name: '' } });
     const labels = groupRows([nameless], 'assignee', LABELS).map((section) => section.label);
-    expect(labels).toEqual(['user_anselma']);
+    // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(labels).toEqual(['Unknown person']);
   });
 
   it('counts terminal rows from the flat set, and grouping cannot move that number', () => {

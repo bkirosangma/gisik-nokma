@@ -1167,8 +1167,8 @@ describe('getTickets joins the roster off the list body’s own workspaceId', ()
     expect(view.rows[0]?.stateProvenance.actorName).toBe('Kiro');
 
     // THE CONTROL, in the same case: a row assigned to somebody the roster does
-    // not cover keeps the ID — what `actorLabel(id, null)` renders everywhere
-    // else in this client. Without it, a mapper that printed the first member's
+    // not cover keeps the ID as its synthesised `name` — which `actorLabel`
+    // reads as absent and renders `Unknown person` (6.254). Without it, a mapper that printed the first member's
     // name for EVERY row would satisfy the assertions above.
     expect(view.rows[1]?.assignee).toEqual({ id: 'u9', name: 'u9' });
     expect(view.rows[1]?.stateProvenance.actorName).toBeNull();

@@ -139,19 +139,22 @@ export function renderContestedClaimText(payload: ClaimContestedPayload): string
  * Both go through `formatIstInstant`, so a moment is printed one way across the
  * server, the web client, the desktop client and the offline replica.
  *
- * The actor is rendered by RAW ID. `ContestedClaimProvenance` carries no
- * `actorName`: nothing resolves a refused claim's actor through the member
- * roster, and `ClaimProvenance` documents the raw id as the fallback for a null
- * name in any case — so this is that fallback, made the only path rather than a
- * branch that could never be taken.
+ * The actor is named by the CALLER's `actorLabel` (R3 N4, owner 2026-09-29; it
+ * used to be rendered by RAW ID). `ContestedClaimProvenance` carries no
+ * `actorName` and this package has no roster, so the client resolves the label
+ * (`useActorLabels`) and hands it in; with none it reads `Unknown person`,
+ * never the ULID.
  */
-export function renderContestedClaimAttribution(claim: {
-  actorId: string;
-  clientTime: string;
-  contestedAt: string;
-}): string {
+export function renderContestedClaimAttribution(
+  claim: {
+    actorId: string;
+    clientTime: string;
+    contestedAt: string;
+  },
+  actorLabel?: string,
+): string {
   return (
-    `claimed by ${claim.actorId} at ${formatIstInstant(claim.clientTime)} by their clock — ` +
+    `claimed by ${actorLabel ?? 'Unknown person'} at ${formatIstInstant(claim.clientTime)} by their clock — ` +
     `refused ${formatIstInstant(claim.contestedAt)}`
   );
 }

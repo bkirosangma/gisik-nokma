@@ -199,8 +199,10 @@ describe('TicketSheet — full state with per-field claim attribution', () => {
     renderSheet(ticketRead(), source);
     await settled();
     const dueDateRow = screen.getByTestId('field-due');
-    expect(within(dueDateRow).getByText('set by user_kiro on 18 Aug 2026')).toBeInTheDocument();
-    expect(screen.getByTestId('field-assignee').textContent).toContain('user_anselma');
+    // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(within(dueDateRow).getByText('set by Unknown person on 18 Aug 2026')).toBeInTheDocument();
+    expect(screen.getByTestId('field-assignee').textContent).toContain('Unknown person');
+    expect(screen.getByTestId('field-assignee').textContent).not.toContain('user_anselma');
     expect(document.body.textContent).not.toContain('system');
   });
 

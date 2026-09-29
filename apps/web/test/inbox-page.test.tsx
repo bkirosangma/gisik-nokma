@@ -100,8 +100,9 @@ describe('/inbox — who did it is a NAME, not an id (cases 11.240–11.242)', (
     expect(await screen.findByText('Anselma Marak assigned this to you')).toBeInTheDocument();
     expect(screen.getByText('Gita Guest assigned this to you')).toBeInTheDocument();
     expect(screen.getByText('mail@example.test assigned this to you')).toBeInTheDocument();
-    // CONTROL: nobody names u_zed, so the id is what is there — the floor is unchanged.
-    expect(screen.getByText('u_zed assigned this to you')).toBeInTheDocument();
+    // CONTROL: nobody names u_zed, so the floor answers. Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(screen.getByText('Unknown person assigned this to you')).toBeInTheDocument();
+    expect(screen.queryByText(/u_zed/)).not.toBeInTheDocument();
     // And no raw id sits where a name was found.
     expect(screen.queryByText(/u_ana|u_gita/)).not.toBeInTheDocument();
   });
@@ -115,7 +116,9 @@ describe('/inbox — who did it is a NAME, not an id (cases 11.240–11.242)', (
         throw new Error('refused');
       },
     });
-    expect(await screen.findByText('u_ana assigned this to you')).toBeInTheDocument();
+    // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(await screen.findByText('Unknown person assigned this to you')).toBeInTheDocument();
+    expect(screen.queryByText(/u_ana/)).not.toBeInTheDocument();
   });
 
   it('11.242 each workspace on the page is read once, for its own rows', async () => {

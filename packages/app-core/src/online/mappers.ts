@@ -511,14 +511,19 @@ export function rosterByActorId(
 /**
  * `GET /v1/workspaces/:id/actor-names` → `Actor[]`. Two fields a row, both
  * required: unlike the roster's `email`, nothing here is absent-by-decision.
+ *
+ * A row the server marks `removed: true` (a former member — R3, FD6) reads
+ * `Name (removed)`. Only the boolean `true` counts; anything else is ignored,
+ * which is this mapper's existing strictness about optional fields.
  */
 export function mapActorNames(raw: unknown): Actor[] {
   const record = asRecord(raw, 'actorNames');
   return asArray(record['names'], 'actorNames.names').map((entry, index) => {
     const row = asRecord(entry, `actorNames.names[${index}]`);
+    const displayName = asString(row['displayName'], `actorNames.names[${index}].displayName`);
     return {
       id: asString(row['userId'], `actorNames.names[${index}].userId`),
-      name: asString(row['displayName'], `actorNames.names[${index}].displayName`),
+      name: row['removed'] === true ? `${displayName} (removed)` : displayName,
     };
   });
 }
@@ -613,8 +618,8 @@ function mapAssignee(raw: unknown, path: string, roster: ReadonlyMap<string, str
   if (raw === null) return null;
   const id = asString(raw, path);
   // The one substitution in this function, argued in the docblock above: the id
-  // is a fact the server sent, and `actorLabel(id, null)` renders it that way
-  // everywhere else in this client.
+  // is a fact the server sent, and `actorLabel` reads a name equal to the id as
+  // absent (`Unknown person`, 6.254) everywhere in this client.
   return { id, name: roster.get(id) ?? id };
 }
 
@@ -1850,8 +1855,8 @@ function mapListRow(raw: unknown, path: string, roster: ReadonlyMap<string, stri
  * The parameter still DEFAULTS to an empty map, and that is not a leftover: it
  * is the shape a roster the caller may not read arrives in. `mapAssignee` and
  * `mapProvenance` both degrade correctly on it — the assignee's `name` becomes
- * the actor id, which is what `actorLabel(id, null)` renders everywhere else in
- * this client, and `actorName` stays `null`, which is that field's documented
+ * the actor id, which `actorLabel` reads as ABSENT and renders as `Unknown person`
+ * everywhere in this client (6.254; it used to print the id), and `actorName` stays `null`, which is that field's documented
  * absence value. A name is missing; no fact is invented. Verified at the seam
  * by case 13.1289, where the members route answers 404.
  */

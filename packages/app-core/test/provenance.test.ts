@@ -8,16 +8,17 @@ describe('actorLabel — never anonymous (honesty contract 1)', () => {
     expect(actorLabel('user_anselma', 'Anselma Marak')).toBe('Anselma Marak');
   });
 
-  it('PLANTED DEFECT: a null name falls back to the raw id', () => {
-    expect(actorLabel('user_anselma', null)).toBe('user_anselma');
+  // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+  it('PLANTED DEFECT: a null name falls back to Unknown person, never the raw id', () => {
+    expect(actorLabel('user_anselma', null)).toBe('Unknown person');
   });
 
-  it('PLANTED DEFECT: an undefined name falls back to the raw id', () => {
-    expect(actorLabel('user_anselma', undefined)).toBe('user_anselma');
+  it('PLANTED DEFECT: an undefined name falls back to Unknown person, never the raw id', () => {
+    expect(actorLabel('user_anselma', undefined)).toBe('Unknown person');
   });
 
-  it('PLANTED DEFECT: a blank name falls back to the raw id', () => {
-    expect(actorLabel('user_anselma', '   ')).toBe('user_anselma');
+  it('PLANTED DEFECT: a blank name falls back to Unknown person, never the raw id', () => {
+    expect(actorLabel('user_anselma', '   ')).toBe('Unknown person');
   });
 
   it('PLANTED DEFECT: a nameless claim never renders as the empty string', () => {
@@ -141,9 +142,10 @@ describe('formatStateProvenance — the unfold text', () => {
     expect(formatStateProvenance('Done', claim())).toBe('marked Done by Anselma Marak on 19 Aug 2026');
   });
 
-  it('PLANTED DEFECT: nameless claims still name the actor by id', () => {
+  // Amended 2026-09-29 by 6.254 (R3 N4): a nameless claim still names an ACTOR — as Unknown person, not the id.
+  it('PLANTED DEFECT: nameless claims still attribute the claim, as Unknown person', () => {
     expect(formatStateProvenance('Done', claim({ actorName: null }))).toBe(
-      'marked Done by user_anselma on 19 Aug 2026',
+      'marked Done by Unknown person on 19 Aug 2026',
     );
   });
 
@@ -187,9 +189,9 @@ describe('13.725 actorLabel knows the reserved system actors; the roster cannot 
     // the roster's name, so the system lookup is a FIRST check and not a
     // replacement for the roster.
     expect(actorLabel('user_anselma', 'Anselma Marak')).toBe('Anselma Marak');
-    // And the fallback below it is untouched — an ordinary id with no name is
-    // still attributed by id rather than blanked (honesty contract 1).
-    expect(actorLabel('user_anselma', null)).toBe('user_anselma');
+    // And the fallback below it still attributes rather than blanks (honesty
+    // contract 1) — as Unknown person, not the id (Amended 2026-09-29 by 6.254 (R3 N4)).
+    expect(actorLabel('user_anselma', null)).toBe('Unknown person');
   });
 
   it('the provenance sentence for a system actor reads as the spec fixes it', () => {

@@ -58,7 +58,8 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
     ).toBeInTheDocument();
   });
 
-  it('PLANTED DEFECT: a nameless due claim is attributed by id — a deadline is never an unowned property', () => {
+  // Amended 2026-09-29 by 6.254 (R3 N4): attributed as Unknown person, not by id.
+  it('PLANTED DEFECT: a nameless due claim is still attributed — a deadline is never an unowned property', () => {
     const nameless: MyWorkView = {
       ...VIEW,
       assigned: [
@@ -66,7 +67,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
       ],
     };
     render(<MyWork view={nameless} onOpenTicket={vi.fn()} />);
-    expect(screen.getByText("needed by 30 Aug 2026 — user_kiro's claim")).toBeInTheDocument();
+    expect(screen.getByText("needed by 30 Aug 2026 — Unknown person's claim")).toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: an item with no due date renders no due line — no invented deadline', () => {
@@ -91,7 +92,7 @@ describe('3.59 MyWork — assigned, in transit, contested (spec §7)', () => {
     // claimant's device clock, and the server's stamp on the CONTEST — so a
     // reader cannot mistake the second for when the claim was made.
     expect(
-      within(contested).getByText(/claimed by user_anselma at .* by their clock — refused /),
+      within(contested).getByText(/claimed by Unknown person at .* by their clock — refused /),
     ).toBeInTheDocument();
     // The excluding half, in the same run: no rendered text dates this claim by
     // a server instant it never had. `contestedClaim()` carries no `serverTime`
@@ -595,5 +596,32 @@ describe('3.60 useMyWork — a refusal is an error, never three empty sections',
     expect(asked).toEqual([WS]);
     expect(screen.getByTestId('view')).toHaveTextContent('assigned:1');
     expect(source.subscriptions).toEqual([{ workspaceId: WS, afterSeq: 0 }]);
+  });
+});
+
+/**
+ * 6.256 (R3 N4) — MY WORK'S CONTESTED LINE NAMES THE CLAIMANT.
+ *
+ * `renderContestedClaimAttribution` printed `claim.actorId`. The host now passes
+ * `actorLabelOf` (`useActorLabels`), and a call with no label reads `Unknown
+ * person` rather than a ULID.
+ */
+describe('6.256 the contested claim line names the claimant through actorLabelOf', () => {
+  it('with the prop: the resolved name; CONTROL: without it `Unknown person` and never the id', () => {
+    const { unmount } = render(
+      <MyWork
+        view={VIEW}
+        onOpenTicket={vi.fn()}
+        actorLabelOf={(id) => (id === 'user_anselma' ? 'Anselma Marak' : `?${id}`)}
+      />,
+    );
+    const contested = screen.getByRole('region', { name: 'My contested claims' });
+    expect(within(contested).getByText(/claimed by Anselma Marak at /)).toBeInTheDocument();
+    unmount();
+
+    render(<MyWork view={VIEW} onOpenTicket={vi.fn()} />);
+    const bare = screen.getByRole('region', { name: 'My contested claims' });
+    expect(within(bare).getByText(/claimed by Unknown person at /)).toBeInTheDocument();
+    expect(within(bare).queryByText(/user_anselma/)).not.toBeInTheDocument();
   });
 });

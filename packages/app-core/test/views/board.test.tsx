@@ -191,7 +191,8 @@ describe('Board card — the provenance unfold (honesty contract 1)', () => {
     const board = errandBoard([boardCardSeed({ stateProvenance: claim({ actorName: null }) })]);
     render(<Board board={board} onOpenTicket={() => {}} />);
     await user.click(screen.getByRole('button', { name: 'who · when' }));
-    expect(screen.getByText('marked Doing by user_anselma on 19 Aug 2026')).toBeInTheDocument();
+    // Amended 2026-09-29 by 6.254 (R3 N4): the floor is `Unknown person`, not the id.
+    expect(screen.getByText('marked Doing by Unknown person on 19 Aug 2026')).toBeInTheDocument();
   });
 
   it('PLANTED DEFECT: parent progress shows restricted children — "5 of 8 done · 2 restricted" with only 6 visible', () => {

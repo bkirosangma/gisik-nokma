@@ -800,5 +800,5 @@ is empty.
 - ✅ **7.294 — the roster keeps priority: a member the roster labels by email is not renamed by the names read, and a refused (404) names read costs nothing.** (`packages/app-core/test/online/online-data-source.test.ts`)
 - ✅ **7.295 — `getActorNames` answers `{id, name}` for the route's rows and `[]` for a refusal.** (`packages/app-core/test/online/online-data-source.test.ts`)
 - ✅ **7.296 — `actorLabelFrom`: a person the roster omits is named by the names read; the roster wins where it says more than the id.** (`packages/app-core/test/member-label.test.ts`)
-- ✅ **7.297 — `actorLabelFrom`: a roster row with nothing better than the id yields to the names read; nobody named is `null`, so the caller's id floor answers.** Mutation (7.296, 7.297 and 11.244 together): make `actorLabelFrom` ignore the names read → red. (`packages/app-core/test/member-label.test.ts`)
+- ✅ **7.297 — `actorLabelFrom`: a roster row with nothing better than the id yields to the names read; nobody named is `null`, so the caller's floor (`Unknown person`, 6.254) answers.** Mutation (7.296, 7.297 and 11.244 together): make `actorLabelFrom` ignore the names read → red. (`packages/app-core/test/member-label.test.ts`)
 

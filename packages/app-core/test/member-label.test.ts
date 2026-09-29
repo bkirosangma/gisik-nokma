@@ -1,5 +1,7 @@
 import { describe, expect, it } from 'vitest';
-import { actorLabelFrom, memberLabel } from '../src/member-label.js';
+import { SYSTEM_ACTOR_AUTO_CLOSE } from '@gisik-nokma/domain';
+import { actorLabelFrom, memberLabel, UNKNOWN_PERSON } from '../src/member-label.js';
+import { actorLabel } from '../src/provenance.js';
 
 /**
  * 13.1291 — the label a person is shown and named by is resolved in ONE place,
@@ -76,5 +78,21 @@ describe('actorLabelFrom — the roster first, the names-only read second, null 
     expect(actorLabelFrom('guest', null, undefined)).toBeNull();
     // A blank names-read entry does not erase a roster row's own id floor.
     expect(actorLabelFrom('bare', roster, [{ id: 'bare', name: ' ' }])).toBe('bare');
+  });
+});
+
+describe('6.254 actorLabel — an id nobody names reads `Unknown person`, never the id (R3 N4)', () => {
+  it('a null, blank or id-equal label floors at Unknown person; CONTROL: a system actor and a named id keep theirs', () => {
+    expect(UNKNOWN_PERSON).toBe('Unknown person');
+    const ulid = '01JQ0000000000000000000000';
+    expect(actorLabel(ulid, null)).toBe('Unknown person');
+    expect(actorLabel(ulid, undefined)).toBe('Unknown person');
+    expect(actorLabel(ulid, '   ')).toBe('Unknown person');
+    // A join that had nothing better hands back the id AS the label (the mapper
+    // synthesises `name = id`; `memberLabel` floors at the id): that is absent.
+    expect(actorLabel(ulid, ulid)).toBe('Unknown person');
+    // Controls, same case.
+    expect(actorLabel(SYSTEM_ACTOR_AUTO_CLOSE, null)).toBe('Auto-close');
+    expect(actorLabel(ulid, 'Rina Marak')).toBe('Rina Marak');
   });
 });

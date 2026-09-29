@@ -8,7 +8,15 @@ import { useLiveQuery, type LiveQueryResult } from './use-live-query.js';
 export type MyWorkProps = {
   view: MyWorkView;
   onOpenTicket: (ticketId: string) => void;
+  /**
+   * What to call the claimant of a contested claim (a refused claim carries no
+   * name of its own); the host passes `useActorLabels`. Default: the shared
+   * floor (`Unknown person`) — never the id (R3 N4, case 6.256).
+   */
+  actorLabelOf?: (userId: string) => string;
 };
+
+const unnamedActorLabel = (userId: string): string => actorLabel(userId, null);
 
 /**
  * My Work: assigned, in transit, contested (spec §7).
@@ -68,7 +76,7 @@ export type MyWorkProps = {
  * fourth kind; a section heading inside a view the user opened on purpose is
  * not read as an all-clear about the product.
  */
-export function MyWork({ view, onOpenTicket }: MyWorkProps) {
+export function MyWork({ view, onOpenTicket, actorLabelOf = unnamedActorLabel }: MyWorkProps) {
   return (
     <div className="gn-my-work">
       <section role="region" aria-label="Assigned to me" className="gn-my-work__section">
@@ -99,7 +107,12 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
           <p className="gn-my-work__empty">No contested claims.</p>
         ) : (
           view.contested.map((contested) => (
-            <ContestedCard key={contested.ticketId} contested={contested} onOpenTicket={onOpenTicket} />
+            <ContestedCard
+              key={contested.ticketId}
+              contested={contested}
+              onOpenTicket={onOpenTicket}
+              actorLabelOf={actorLabelOf}
+            />
           ))
         )}
       </section>
@@ -136,9 +149,11 @@ export function MyWork({ view, onOpenTicket }: MyWorkProps) {
 function ContestedCard({
   contested,
   onOpenTicket,
+  actorLabelOf,
 }: {
   contested: ContestedClaim;
   onOpenTicket: (ticketId: string) => void;
+  actorLabelOf: (userId: string) => string;
 }) {
   return (
     <Card className="gn-my-work__contested">
@@ -165,7 +180,7 @@ function ContestedCard({
         claim, and both instants labelled for what they actually are.
       */}
       <span className="gn-my-work__claim">
-        {renderContestedClaimAttribution(contested.claim)}
+        {renderContestedClaimAttribution(contested.claim, actorLabel(contested.claim.actorId, actorLabelOf(contested.claim.actorId)))}
       </span>
     </Card>
   );
